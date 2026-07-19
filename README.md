@@ -113,9 +113,9 @@ Groups of 2+ copies show path, library folder, size, and date, with a link to ea
 | Channel | Audience | Status |
 |---------|----------|--------|
 | **Python app** (this repo) | Developers / power users | Available now |
-| **Prebuilt downloads** (GitHub Releases, e.g. Windows `.exe` via PyInstaller) | End users without Python | Planned next — see [`packaging/README.md`](packaging/README.md) |
+| **Prebuilt downloads** (GitHub Releases, Windows zip via PyInstaller) | End users without Python | Available — see [Releases](https://github.com/Magehawks/orga-drone/releases) and [`packaging/README.md`](packaging/README.md) |
 
-Prebuilt binaries will ship **only the application**, never your videos or database.
+Prebuilt binaries ship **only the application**, never your videos or database.
 
 ## DJI notes
 

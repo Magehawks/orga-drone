@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orga-drone"
-version = "0.1.0"
+version = "1.1.0"
 description = "Local open-source drone video library manager (DJI Avata 2 first)"
 readme = "README.md"
 license = { text = "MIT" }

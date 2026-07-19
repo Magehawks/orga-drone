@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import webbrowser
 from threading import Timer
 
@@ -19,13 +20,19 @@ def main() -> None:
         webbrowser.open(url)
 
     Timer(1.0, _open).start()
-    uvicorn.run(
-        "orga_drone.app:create_app",
-        factory=True,
-        host=host,
-        port=port,
-        log_level="info",
-    )
+    # PyInstaller frozen: import the app object directly (string factory fails when frozen).
+    if getattr(sys, "frozen", False):
+        from orga_drone.app import create_app
+
+        uvicorn.run(create_app(), host=host, port=port, log_level="info")
+    else:
+        uvicorn.run(
+            "orga_drone.app:create_app",
+            factory=True,
+            host=host,
+            port=port,
+            log_level="info",
+        )
 
 
 if __name__ == "__main__":

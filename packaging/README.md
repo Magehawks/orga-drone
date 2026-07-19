@@ -2,28 +2,32 @@
 
 orga-drone is distributed in two ways:
 
-1. **Python application** (primary today) — `pip install -e .` / `requirements.txt`
-2. **Precompiled binaries** (planned) — GitHub Releases for users without Python
+1. **Python application** (this repo) — `pip install -e .` / `requirements.txt`
+2. **Precompiled binaries** — GitHub Releases (Windows onefolder via PyInstaller)
 
-## Planned Windows build (PyInstaller)
+## Windows build (PyInstaller)
 
-Example once packaging is wired:
+Requires an editable install so package data resolves correctly:
 
-```bash
+```powershell
+.\.venv\Scripts\activate
+pip install -e .
 pip install pyinstaller
-pyinstaller --name orga-drone --onefile -m orga_drone
+pyinstaller packaging\orga-drone.spec --noconfirm --clean --distpath dist
 ```
 
-A future `orga-drone.spec` should bundle:
+Output: `dist/orga-drone/` (exe + `_internal` deps, including `templates` / `static` / `locales`).
 
-- `orga_drone/templates`
-- `orga_drone/static`
-- `orga_drone/locales`
+Release layout (local, not committed as binaries):
 
-User data must remain outside the binary (`%APPDATA%/orga-drone`).
+```text
+releases/1.1.0/orga-drone/          # copy of dist/orga-drone
+releases/1.1.0/orga-drone-windows-x64.zip
+releases/1.1.0/README.md            # points to the GitHub Release
+```
+
+User data stays outside the binary (`%APPDATA%/orga-drone`). Do not embed library paths, `.env`, or media in artifacts.
 
 ## CI idea
 
 On git tags, GitHub Actions can build Windows (then macOS/Linux) artifacts and attach them to a Release. No secrets are required for a basic public build.
-
-Do not embed personal library paths, `.env` files, or media in release artifacts.

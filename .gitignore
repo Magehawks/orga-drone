@@ -27,11 +27,17 @@ data-test/
 .DS_Store
 Thumbs.db
 
-# Packaging
+# Packaging / PyInstaller
 *.spec
+!packaging/*.spec
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Local release build output (upload via GitHub Releases instead)
+releases/*/orga-drone/
+releases/*.zip
+releases/**/*.zip
 
 # Locale build artifacts (keep .po/.mo we commit)
 *.pot
