@@ -112,5 +112,7 @@
   "Free-text notes…": "Freitext-Notizen…",
   "Save": "Speichern",
   "Tags and notes saved.": "Tags und Notizen gespeichert.",
-  "Filename, tags, notes…": "Dateiname, Tags, Notizen…"
+  "Filename, tags, notes…": "Dateiname, Tags, Notizen…",
+  "Export spot": "Spot exportieren",
+  "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.": "Lädt eine lokale GeoJSON-Datei (.orga-spot.json) herunter. Koordinaten werden aus Datenschutzgründen gerundet. Es wird nichts hochgeladen."
 }

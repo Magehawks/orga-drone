@@ -440,6 +440,13 @@ th { color: var(--muted); font-weight: 600; }
 }
 .session-list .flow-mark { color: var(--accent); font-size: 0.85rem; }
 
+.spot-export-row {
+  margin: 0.5rem 0 0.25rem;
+}
+.spot-export-row .button {
+  display: inline-block;
+}
+
 .actions-panel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

@@ -154,6 +154,11 @@
         {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
         · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
       </p>
+      <p class="spot-export-row">
+        <a class="button" href="/media/{{ item.id }}/export/spot.geojson"
+           download>{{ _('Export spot') }}</a>
+      </p>
+      <p class="hint">{{ _('Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.') }}</p>
       {% if track and track|length > 1 and item.kind == 'video' and can_play %}
       <p class="hint track-seek-hint">{{ _('Click track to seek') }}</p>
       {% endif %}

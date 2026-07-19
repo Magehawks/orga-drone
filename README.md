@@ -17,6 +17,7 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - **Themes**: Dark, Light, and Custom (accent / background / panel) — choice persisted via cookie + `%APPDATA%/orga-drone/theme.json`
 - **Rename** files (and matching LRF/SRT siblings) from the detail page
 - **Auto-merge** split flow clips into one MP4 (via bundled/`imageio-ffmpeg` or system `ffmpeg`; originals kept)
+- **Spot export** (GeoJSON / `.orga-spot.json`) from the detail page when GPS is available — **local download only**, no upload
 
 ## Requirements
 
@@ -83,6 +84,15 @@ Override with `ORGA_DRONE_DATA_DIR` in `.env`.
 
 In the header, switch **Dark** / **Light** / **Custom**. Custom shows color pickers for accent, background, and panel; click **Apply** to save. Preference is stored in a cookie and mirrored to `theme.json` in the app-data folder (not in the git repo).
 
+### Spot export (GeoJSON)
+
+On a detail page with GPS, use **Export spot** / **Spot exportieren**. The browser downloads a `.orga-spot.json` GeoJSON file (also available at `GET /media/{id}/export/spot.geojson`).
+
+- **Local only** — nothing is uploaded; files stay on your machine.
+- Coordinates are rounded to **4 decimal places** (≈11 m) so the exact home/takeoff point is not exported.
+- Optional flight track is included as a simplified LineString when SRT telemetry exists.
+- Future **community sharing** of flight spots will be opt-in and separate from this local export.
+
 ## Distribution
 
 | Channel | Audience | Status |
@@ -118,10 +128,8 @@ Flows nest inside sessions: split parts of the same recording always share one s
 
 ## Roadmap (not in MVP)
 
-- Spot export (GeoJSON) and optional community sharing of flight spots
+- Optional community sharing of flight spots (opt-in; builds on local GeoJSON export)
 - Reverse geocoding (place names)
-- Video/LRF preview player
-- Auto-merge of split files
 - More drone brands via parsers
 - CI-built installers for Windows / macOS / Linux
 

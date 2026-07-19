@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
@@ -14,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from orga_drone import __version__
 from orga_drone.config import settings
 from orga_drone.db import Database, make_identity_key, parse_tags, track_from_json
+from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, ffmpeg_available, merge_flow
@@ -325,6 +327,29 @@ def create_app() -> FastAPI:
                 url=f"/media/{media_id}?error={quote(str(exc)[:300])}",
                 status_code=303,
             )
+
+    @app.get("/media/{media_id}/export/spot.geojson")
+    async def media_export_spot(media_id: int) -> Response:
+        """Download a local GeoJSON / .orga-spot.json — no upload."""
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        if item.latitude is None or item.longitude is None:
+            raise HTTPException(status_code=404, detail="No GPS for this media")
+        track = track_from_json(item.track_json)
+        try:
+            payload = build_spot_geojson(item, track)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        body = json.dumps(payload, ensure_ascii=False, indent=2)
+        filename = spot_download_filename(item.filename)
+        return Response(
+            content=body,
+            media_type="application/geo+json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
 
     @app.get("/media/{media_id}/thumb")
     async def media_thumb(media_id: int) -> FileResponse:
