@@ -11,6 +11,7 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - Detect **drone model** from DJI MP4 metadata / photo EXIF (`FC8485` → DJI Avata 2)
 - Read **GPS** from DJI `.SRT` telemetry and photo EXIF
 - Group **split clips** (≈4 GB FAT32 splits) into a **flow**
+- Group a logical **flight session** (takeoff → landing) across one or more clips/flows
 - Show location on an embedded **OpenStreetMap** map (Leaflet) + external OSM link
 - UI in **German** and **English** (JSON + `.po` i18n files for future languages)
 - **Themes**: Dark, Light, and Custom (accent / background / panel) — choice persisted via cookie + `%APPDATA%/orga-drone/theme.json`
@@ -103,6 +104,17 @@ DJI_YYYYMMDDHHMMSS_NNNN_D.JPG
 ```
 
 Long recordings are often split near ~3.5 GB. orga-drone groups those consecutive parts into one **flow**.
+
+### Sessions vs Flows
+
+| | **Flow** | **Session** |
+|---|----------|-------------|
+| Meaning | One continuous recording split by the camera/filesystem (FAT32 ≈4 GB parts) | One logical flight from takeoff to landing |
+| Typical size | 2+ consecutive near-full files with tiny gaps | One or more clips/flows with short idle gaps |
+| Detection | File size near limit + sequence/time | Time gaps + optional SRT altitude/GPS (near ground = landing) |
+| UI | Badge “N parts”; filter “Only multi-clip flows” | Badge “N clips”; filter “Only multi-clip sessions”; detail lists all session clips |
+
+Flows nest inside sessions: split parts of the same recording always share one session. After each library scan, flows are rebuilt first, then sessions.
 
 ## Roadmap (not in MVP)
 

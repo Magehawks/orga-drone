@@ -168,12 +168,14 @@ def create_app() -> FastAPI:
         kind: str | None = None,
         gps: str | None = None,
         flows: str | None = None,
+        sessions: str | None = None,
         favorite: str | None = None,
         q: str | None = None,
         view: str | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
+        sessions_only = {"yes": True, "no": False}.get(sessions or "")
         favorite_only = {"yes": True, "no": False}.get(favorite or "")
         current_view = view_from_request(request, view)
         items = db.list_media(
@@ -183,6 +185,7 @@ def create_app() -> FastAPI:
             kind=kind or None,
             has_gps=has_gps,
             flows_only=flows_only,
+            sessions_only=sessions_only,
             favorite=favorite_only,
             q=q or None,
         )
@@ -199,6 +202,7 @@ def create_app() -> FastAPI:
                 "kind": kind or "",
                 "gps": gps or "",
                 "flows": flows or "",
+                "sessions": sessions or "",
                 "favorite": favorite or "",
                 "q": q or "",
                 "view": current_view,
@@ -222,6 +226,15 @@ def create_app() -> FastAPI:
         multi_flow = bool(item.flow_id and item.clip_count and item.clip_count > 1)
         if not multi_flow and item.flow_id and len(clips) > 1:
             multi_flow = True
+        session_clips = db.session_clips(item.session_id) if item.session_id else []
+        multi_session = bool(
+            item.session_id
+            and item.session_video_count
+            and item.session_video_count > 1
+        )
+        if not multi_session and item.session_id:
+            video_n = sum(1 for c in session_clips if c.kind == "video")
+            multi_session = video_n > 1
         track = track_from_json(item.track_json)
         map_link = (
             osm_link(item.latitude, item.longitude)
@@ -236,6 +249,7 @@ def create_app() -> FastAPI:
             "detail.html",
             item=item,
             clips=clips,
+            session_clips=session_clips if multi_session else [],
             track=track,
             osm_url=map_link,
             can_play=media_path is not None,

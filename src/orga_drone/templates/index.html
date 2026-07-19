@@ -16,6 +16,7 @@
         <option value="duration" {% if filters.sort=='duration' %}selected{% endif %}>{{ _('Duration') }}</option>
         <option value="drone" {% if filters.sort=='drone' %}selected{% endif %}>{{ _('Drone') }}</option>
         <option value="filename" {% if filters.sort=='filename' %}selected{% endif %}>{{ _('Filename') }}</option>
+        <option value="session" {% if filters.sort=='session' %}selected{% endif %}>{{ _('Session') }}</option>
         <option value="flow" {% if filters.sort=='flow' %}selected{% endif %}>{{ _('Flow') }}</option>
         <option value="stars" {% if filters.sort=='stars' %}selected{% endif %}>{{ _('Rating') }}</option>
       </select>
@@ -53,6 +54,14 @@
       </select>
     </label>
     <label>
+      {{ _('Session') }}
+      <select name="sessions">
+        <option value="">{{ _('Any') }}</option>
+        <option value="yes" {% if filters.sessions=='yes' %}selected{% endif %}>{{ _('Only multi-clip sessions') }}</option>
+        <option value="no" {% if filters.sessions=='no' %}selected{% endif %}>{{ _('Only single-clip sessions') }}</option>
+      </select>
+    </label>
+    <label>
       {{ _('Flow') }}
       <select name="flows">
         <option value="">{{ _('Any') }}</option>
@@ -76,9 +85,9 @@
   <div class="view-toggle">
     <span>{{ _('View') }}:</span>
     <a class="button ghost {% if view=='grid' %}active{% endif %}"
-       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
     <a class="button ghost {% if view=='list' %}active{% endif %}"
-       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
+       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
   </div>
 </section>
 
@@ -99,7 +108,9 @@
           <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
         {% endif %}
         <span class="badge">{{ item.kind }}</span>
-        {% if item.clip_count and item.clip_count > 1 %}
+        {% if item.session_video_count and item.session_video_count > 1 %}
+          <span class="badge session">{{ item.session_video_count }} {{ _('clips') }}</span>
+        {% elif item.clip_count and item.clip_count > 1 %}
           <span class="badge flow">{{ item.clip_count }} {{ _('parts') }}</span>
         {% endif %}
         {% if item.favorite or item.stars %}
@@ -114,7 +125,9 @@
         <div class="meta-line">
           <span>{{ item.recorded_at or '—' }}</span>
           <span>
-            {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
+              {{ item.session_total_size|filesize }}
+            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
               {{ item.flow_total_size|filesize }}
             {% else %}
               {{ item.size_bytes|filesize }}
@@ -124,7 +137,9 @@
         <div class="meta-line muted">
           <span>{{ item.drone_model or '—' }}</span>
           <span>
-            {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+              {{ item.session_total_duration|duration }}
+            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
               {{ item.flow_total_duration|duration }}
             {% else %}
               {{ item.duration_s|duration }}
@@ -156,6 +171,7 @@
           <th>{{ _('Size') }}</th>
           <th>{{ _('Duration') }}</th>
           <th>{{ _('GPS') }}</th>
+          <th>{{ _('Session') }}</th>
           <th>{{ _('Flow') }}</th>
           <th></th>
         </tr>
@@ -194,14 +210,18 @@
           </td>
           <td>{{ item.drone_model or '—' }}</td>
           <td>
-            {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
+              {{ item.session_total_size|filesize }}
+            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
               {{ item.flow_total_size|filesize }}
             {% else %}
               {{ item.size_bytes|filesize }}
             {% endif %}
           </td>
           <td>
-            {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+              {{ item.session_total_duration|duration }}
+            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
               {{ item.flow_total_duration|duration }}
             {% else %}
               {{ item.duration_s|duration }}
@@ -210,6 +230,13 @@
           <td>
             {% if item.latitude is not none and item.longitude is not none %}
               {{ '%.5f'|format(item.latitude) }}, {{ '%.5f'|format(item.longitude) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if item.session_video_count and item.session_video_count > 1 %}
+              {{ item.session_video_count }} {{ _('clips') }}
             {% else %}
               —
             {% endif %}

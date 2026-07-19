@@ -1,13 +1,42 @@
-"""Group split DJI clips into flows (4GB FAT32 splits)."""
+"""Group split DJI clips into flows (4GB FAT32 splits) and flight sessions."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
 
+from orga_drone.group.sessions import (
+    SESSION_LANDING_REL_ALT_M,
+    SESSION_MAX_GAP_SECONDS,
+    SESSION_PHOTO_ATTACH_SECONDS,
+    SESSION_SOFT_GAP_SECONDS,
+    ClipForSession,
+    altitude_edges_from_track,
+    attach_photos_to_sessions,
+    group_clips_into_sessions,
+    should_continue_session,
+)
+
 # Avata 2 / DJI often splits near ~3.5–3.7 GB on FAT32
 NEAR_LIMIT_BYTES = int(3.4 * 1024**3)
 MAX_GAP_SECONDS = 5 * 60  # continuation window after a near-full file
+
+__all__ = [
+    "NEAR_LIMIT_BYTES",
+    "MAX_GAP_SECONDS",
+    "ClipForGrouping",
+    "should_continue",
+    "group_clips_into_flows",
+    "SESSION_SOFT_GAP_SECONDS",
+    "SESSION_MAX_GAP_SECONDS",
+    "SESSION_LANDING_REL_ALT_M",
+    "SESSION_PHOTO_ATTACH_SECONDS",
+    "ClipForSession",
+    "altitude_edges_from_track",
+    "should_continue_session",
+    "group_clips_into_sessions",
+    "attach_photos_to_sessions",
+]
 
 
 @dataclass

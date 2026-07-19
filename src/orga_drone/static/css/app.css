@@ -337,6 +337,12 @@ th { color: var(--muted); font-weight: 600; }
   background: color-mix(in srgb, var(--accent) 85%, transparent);
   color: var(--on-accent);
 }
+.thumb .badge.session {
+  left: auto;
+  right: 0.5rem;
+  background: color-mix(in srgb, var(--accent) 55%, #1a3a4a);
+  color: #fff;
+}
 .thumb .badge.meta-badge {
   left: auto;
   right: 0.5rem;
@@ -420,6 +426,17 @@ th { color: var(--muted); font-weight: 600; }
 .detail-split .map { height: min(52vh, 420px); min-height: 280px; }
 .detail-split .media-player { max-height: min(52vh, 420px); }
 .flow-block { margin-top: 0.5rem; }
+.session-block { margin-top: 1rem; }
+.session-list { padding-left: 1.2rem; }
+.session-list .current { font-weight: 700; }
+.session-list .kind {
+  display: inline-block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 0.25rem;
+}
+.session-list .flow-mark { color: var(--accent); font-size: 0.85rem; }
 
 .actions-panel {
   display: grid;

@@ -28,14 +28,18 @@
     <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
     <div><dt>{{ _('Camera') }}</dt><dd>{{ item.camera_model or '—' }}</dd></div>
     <div><dt>{{ _('Size') }}</dt><dd>
-      {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+      {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
+        {{ item.session_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
+      {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
         {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('Video') }})
       {% else %}
         {{ item.size_bytes|filesize }}
       {% endif %}
     </dd></div>
     <div><dt>{{ _('Duration') }}</dt><dd>
-      {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+      {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+        {{ item.session_total_duration|duration }}
+      {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
         {{ item.flow_total_duration|duration }}
       {% else %}
         {{ item.duration_s|duration }}
@@ -157,6 +161,26 @@
     </div>
     {% endif %}
   </div>
+
+  {% if session_clips and session_clips|length > 1 %}
+  <div class="session-block">
+    <h2>{{ _('Clips in this flight session') }} ({{ session_clips|length }})</h2>
+    <p class="hint">{{ _('A session groups recordings from takeoff to landing. Split flow parts stay together.') }}</p>
+    <ol class="session-list">
+      {% for clip in session_clips %}
+      <li {% if clip.id == item.id %}class="current"{% endif %}>
+        <a href="/media/{{ clip.id }}">{{ clip.filename }}</a>
+        <span class="kind">{{ clip.kind }}</span>
+        — {{ clip.size_bytes|filesize }}
+        {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
+        {% if clip.clip_count and clip.clip_count > 1 %}
+          · <span class="flow-mark">{{ _('Flow') }} {{ clip.clip_count }} {{ _('parts') }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
 
   {% if clips and clips|length > 1 %}
   <div class="flow-block">
