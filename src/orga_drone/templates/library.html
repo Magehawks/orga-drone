@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Library') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>{{ _('Manage libraries') }}</h1>
+  <p>{{ _('Local only — your videos never leave this computer.') }}</p>
+
+  <form method="post" action="/library/add" class="add-form">
+    <label>
+      {{ _('Folder path') }}
+      <input type="text" name="path" required placeholder="D:\\DroneMedia">
+    </label>
+    <label>
+      {{ _('Label (optional)') }}
+      <input type="text" name="label" placeholder="Avata 2 SD">
+    </label>
+    <button type="submit">{{ _('Add folder') }}</button>
+  </form>
+  <p class="hint">
+    {{ _('Example Windows path') }}: <code>D:\DroneMedia</code><br>
+    {{ _('Example macOS/Linux path') }}: <code>/media/user/drone</code>
+  </p>
+
+  <form method="post" action="/library/scan-all" class="inline">
+    <button type="submit">{{ _('Scan all') }}</button>
+  </form>
+</section>
+
+<section class="panel">
+  {% if not roots %}
+    <p>{{ _('Empty library') }}</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>{{ _('Label (optional)') }}</th>
+          <th>{{ _('Path') }}</th>
+          <th>{{ _('Last scanned') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for root in roots %}
+        <tr>
+          <td>{{ root['label'] or '—' }}</td>
+          <td class="mono">{{ root['path'] }}</td>
+          <td>{{ root['last_scanned_at'] or _('Never') }}</td>
+          <td class="row-actions">
+            <form method="post" action="/library/{{ root['id'] }}/scan">
+              <button type="submit">{{ _('Scan') }}</button>
+            </form>
+            <form method="post" action="/library/{{ root['id'] }}/remove"
+                  onsubmit="return confirm('OK?');">
+              <button type="submit" class="danger">{{ _('Remove') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

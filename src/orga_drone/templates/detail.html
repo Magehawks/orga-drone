@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ item.filename }} · {{ _('orga-drone') }}{% endblock %}
+{% block head %}
+  {% if item.latitude is not none and item.longitude is not none %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  {% endif %}
+{% endblock %}
+{% block content %}
+<p><a href="/">&larr; {{ _('Back') }}</a></p>
+
+<section class="detail panel">
+  <h1>{{ item.filename }}</h1>
+  <dl class="meta">
+    <div><dt>{{ _('Date') }}</dt><dd>{{ item.recorded_at or '—' }}</dd></div>
+    <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
+    <div><dt>{{ _('Camera') }}</dt><dd>{{ item.camera_model or '—' }}</dd></div>
+    <div><dt>{{ _('Size') }}</dt><dd>
+      {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+        {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('Video') }})
+      {% else %}
+        {{ item.size_bytes|filesize }}
+      {% endif %}
+    </dd></div>
+    <div><dt>{{ _('Duration') }}</dt><dd>
+      {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+        {{ item.flow_total_duration|duration }}
+      {% else %}
+        {{ item.duration_s|duration }}
+      {% endif %}
+    </dd></div>
+    <div><dt>{{ _('Sequence') }}</dt><dd>{{ item.sequence if item.sequence is not none else '—' }}</dd></div>
+    <div><dt>{{ _('Has SRT') }}</dt><dd>{{ _('Yes') if item.has_srt else _('No') }}</dd></div>
+    <div><dt>{{ _('Has LRF') }}</dt><dd>{{ _('Yes') if item.has_lrf else _('No') }}</dd></div>
+    <div><dt>{{ _('Altitude') }}</dt><dd>{% if item.abs_alt is not none %}{{ '%.1f'|format(item.abs_alt) }} m{% else %}—{% endif %}</dd></div>
+    <div class="wide"><dt>{{ _('Path') }}</dt><dd class="mono">{{ item.path }}</dd></div>
+  </dl>
+
+  {% if item.latitude is not none and item.longitude is not none %}
+  <div class="map-block">
+    <h2>{{ _('Location') }}</h2>
+    <p>
+      {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
+      · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
+    </p>
+    <div id="map" class="map"
+         data-lat="{{ item.latitude }}"
+         data-lon="{{ item.longitude }}"
+         data-track='{{ track|tojson }}'></div>
+  </div>
+  {% endif %}
+
+  {% if clips and clips|length > 1 %}
+  <div class="flow-block">
+    <h2>{{ _('Clips in this flow') }} ({{ clips|length }})</h2>
+    <ol class="flow-list">
+      {% for clip in clips %}
+      <li {% if clip.id == item.id %}class="current"{% endif %}>
+        <a href="/media/{{ clip.id }}">{{ clip.filename }}</a>
+        — {{ clip.size_bytes|filesize }}
+        {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+  {% if item.latitude is not none and item.longitude is not none %}
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/map.js"></script>
+  {% endif %}
+{% endblock %}

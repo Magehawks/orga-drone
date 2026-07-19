@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Home') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<section class="panel filters">
+  <form method="get" action="/" class="filter-grid">
+    <label>
+      {{ _('Search') }}
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="DJI_…">
+    </label>
+    <label>
+      {{ _('Sort by') }}
+      <select name="sort">
+        <option value="recorded_at" {% if filters.sort=='recorded_at' %}selected{% endif %}>{{ _('Date') }}</option>
+        <option value="size" {% if filters.sort=='size' %}selected{% endif %}>{{ _('Size') }}</option>
+        <option value="duration" {% if filters.sort=='duration' %}selected{% endif %}>{{ _('Duration') }}</option>
+        <option value="drone" {% if filters.sort=='drone' %}selected{% endif %}>{{ _('Drone') }}</option>
+        <option value="filename" {% if filters.sort=='filename' %}selected{% endif %}>{{ _('Filename') }}</option>
+        <option value="flow" {% if filters.sort=='flow' %}selected{% endif %}>{{ _('Flow') }}</option>
+      </select>
+    </label>
+    <label>
+      {{ _('Order') }}
+      <select name="order">
+        <option value="desc" {% if filters.order=='desc' %}selected{% endif %}>{{ _('Descending') }}</option>
+        <option value="asc" {% if filters.order=='asc' %}selected{% endif %}>{{ _('Ascending') }}</option>
+      </select>
+    </label>
+    <label>
+      {{ _('Drone') }}
+      <select name="drone">
+        <option value="">{{ _('All drones') }}</option>
+        {% for d in drones %}
+          <option value="{{ d }}" {% if filters.drone==d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      {{ _('Video') }} / {{ _('Photo') }}
+      <select name="kind">
+        <option value="">{{ _('All types') }}</option>
+        <option value="video" {% if filters.kind=='video' %}selected{% endif %}>{{ _('Video') }}</option>
+        <option value="photo" {% if filters.kind=='photo' %}selected{% endif %}>{{ _('Photo') }}</option>
+      </select>
+    </label>
+    <label>
+      {{ _('GPS') }}
+      <select name="gps">
+        <option value="">{{ _('Any') }}</option>
+        <option value="yes" {% if filters.gps=='yes' %}selected{% endif %}>{{ _('With GPS') }}</option>
+        <option value="no" {% if filters.gps=='no' %}selected{% endif %}>{{ _('Without GPS') }}</option>
+      </select>
+    </label>
+    <label>
+      {{ _('Flow') }}
+      <select name="flows">
+        <option value="">{{ _('Any') }}</option>
+        <option value="yes" {% if filters.flows=='yes' %}selected{% endif %}>{{ _('Only multi-clip flows') }}</option>
+        <option value="no" {% if filters.flows=='no' %}selected{% endif %}>{{ _('Only single clips') }}</option>
+      </select>
+    </label>
+    <div class="actions">
+      <button type="submit">{{ _('Apply') }}</button>
+      <a class="button ghost" href="/">{{ _('Reset') }}</a>
+    </div>
+  </form>
+</section>
+
+{% if not items %}
+  <section class="empty panel">
+    <h1>{{ _('No media yet') }}</h1>
+    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+    <a class="button" href="/library">{{ _('Manage libraries') }}</a>
+  </section>
+{% else %}
+  <section class="table-wrap panel">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ _('Date') }}</th>
+          <th>{{ _('Filename') }}</th>
+          <th>{{ _('Drone') }}</th>
+          <th>{{ _('Size') }}</th>
+          <th>{{ _('Duration') }}</th>
+          <th>{{ _('GPS') }}</th>
+          <th>{{ _('Flow') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.recorded_at or '—' }}</td>
+          <td>
+            <span class="kind">{{ item.kind }}</span>
+            {{ item.filename }}
+          </td>
+          <td>{{ item.drone_model or '—' }}</td>
+          <td>
+            {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+              {{ item.flow_total_size|filesize }}
+            {% else %}
+              {{ item.size_bytes|filesize }}
+            {% endif %}
+          </td>
+          <td>
+            {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+              {{ item.flow_total_duration|duration }}
+            {% else %}
+              {{ item.duration_s|duration }}
+            {% endif %}
+          </td>
+          <td>
+            {% if item.latitude is not none and item.longitude is not none %}
+              {{ '%.5f'|format(item.latitude) }}, {{ '%.5f'|format(item.longitude) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if item.clip_count and item.clip_count > 1 %}
+              {{ item.clip_count }} {{ _('parts') }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td><a href="/media/{{ item.id }}">{{ _('Open') }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+{% endblock %}

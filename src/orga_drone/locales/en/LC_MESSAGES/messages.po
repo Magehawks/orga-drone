@@ -1,0 +1,14 @@
+/* Sample gettext PO for translators – runtime uses messages.json */
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Drone video library"
+msgstr "Drone video library"
+
+msgid "Library"
+msgstr "Library"
+
+msgid "Open in OpenStreetMap"
+msgstr "Open in OpenStreetMap"

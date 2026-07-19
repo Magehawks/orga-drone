@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ _('orga-drone') }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <a href="/" class="logo">{{ _('orga-drone') }}</a>
+      <span class="tagline">{{ _('Drone video library') }}</span>
+    </div>
+    <nav>
+      <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>{{ _('Home') }}</a>
+      <a href="/library" {% if request.url.path.startswith('/library') %}class="active"{% endif %}>{{ _('Library') }}</a>
+      <span class="lang">
+        {{ _('Language') }}:
+        {% for code in langs %}
+          <a href="/lang/{{ code }}" {% if code == lang %}class="active"{% endif %}>{{ code }}</a>
+        {% endfor %}
+      </span>
+    </nav>
+  </header>
+
+  <section class="stats">
+    <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
+    <div><strong>{{ stats.photos }}</strong> {{ _('Photos') }}</div>
+    <div><strong>{{ stats.flows }}</strong> {{ _('Flows') }}</div>
+    <div><strong>{{ stats.roots }}</strong> {{ _('Roots') }}</div>
+  </section>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>{{ _('Local only — your videos never leave this computer.') }} · v{{ version }}</p>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

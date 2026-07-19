@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orga-drone"
+version = "0.1.0"
+description = "Local open-source drone video library manager (DJI Avata 2 first)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "orga-drone contributors" }]
+keywords = ["drone", "dji", "video", "library", "openstreetmap"]
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "jinja2>=3.1.4",
+  "python-multipart>=0.0.12",
+  "pillow>=10.4.0",
+  "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+orga-drone = "orga_drone.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+orga_drone = [
+  "templates/**/*",
+  "static/**/*",
+  "locales/**/*",
+]
