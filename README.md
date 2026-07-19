@@ -18,6 +18,7 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - **Rename** files (and matching LRF/SRT siblings) from the detail page
 - **Auto-merge** split flow clips into one MP4 (via bundled/`imageio-ffmpeg` or system `ffmpeg`; originals kept)
 - **Spot export** (GeoJSON / `.orga-spot.json`) from the detail page when GPS is available — **local download only**, no upload
+- Detect **likely duplicates** across library folders (SD + backup) via DJI stem / size+date+duration heuristics — no auto-delete
 
 ## Requirements
 
@@ -92,6 +93,19 @@ On a detail page with GPS, use **Export spot** / **Spot exportieren**. The brows
 - Coordinates are rounded to **4 decimal places** (≈11 m) so the exact home/takeoff point is not exported.
 - Optional flight track is included as a simplified LineString when SRT telemetry exists.
 - Future **community sharing** of flight spots will be opt-in and separate from this local export.
+
+### Duplicates (SD + backup)
+
+Open **Duplicates** / **Duplikate** in the nav (or visit `/duplicates`). Click **Scan duplicates** after indexing two or more folders that may contain the same clips.
+
+Matching (MVP, no full-file hash):
+
+| Signal | Rule |
+|--------|------|
+| DJI stem | Same normalized `DJI_YYYYMMDDHHMMSS_NNNN_M` stem (case-insensitive) |
+| Attributes | Same filename + **exact** size, `recorded_at` within **±2 s**, `duration_s` within **±1 s** |
+
+Groups of 2+ copies show path, library folder, size, and date, with a link to each detail page. **Keep hint:** prefer the backup-drive copy. orga-drone **never deletes** files automatically — detection and navigation only. Results always reflect the current library index (re-scan folders, then scan duplicates again).
 
 ## Distribution
 

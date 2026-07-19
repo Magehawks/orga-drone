@@ -114,5 +114,21 @@
   "Tags and notes saved.": "Tags and notes saved.",
   "Filename, tags, notes…": "Filename, tags, notes…",
   "Export spot": "Export spot",
-  "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.": "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded."
+  "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.": "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.",
+  "Duplicates": "Duplicates",
+  "Find likely copies of the same clip across library folders (e.g. SD card and backup drive).": "Find likely copies of the same clip across library folders (e.g. SD card and backup drive).",
+  "Keep hint: Prefer the copy on your backup drive. orga-drone never deletes files automatically.": "Keep hint: Prefer the copy on your backup drive. orga-drone never deletes files automatically.",
+  "Matching uses DJI filename stem, or same name + exact size with date ±%(date)s s and duration ±%(dur)s s (no full-file hash).": "Matching uses DJI filename stem, or same name + exact size with date ±%(date)s s and duration ±%(dur)s s (no full-file hash).",
+  "Scan duplicates": "Scan duplicates",
+  "Duplicate scan finished.": "Duplicate scan finished.",
+  "No duplicates found": "No duplicates found",
+  "Add more than one library folder that contains the same clips, then scan again.": "Add more than one library folder that contains the same clips, then scan again.",
+  "duplicate groups": "duplicate groups",
+  "items": "items",
+  "Group": "Group",
+  "copies": "copies",
+  "Matched by": "Matched by",
+  "DJI filename stem": "DJI filename stem",
+  "Name, size, date, duration": "Name, size, date, duration",
+  "Library folder": "Library folder"
 }

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Duplicates') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>{{ _('Duplicates') }}</h1>
+  <p>{{ _('Find likely copies of the same clip across library folders (e.g. SD card and backup drive).') }}</p>
+  <p class="hint">
+    {{ _('Keep hint: Prefer the copy on your backup drive. orga-drone never deletes files automatically.') }}
+  </p>
+  <p class="hint">
+    {{ _('Matching uses DJI filename stem, or same name + exact size with date ±%(date)s s and duration ±%(dur)s s (no full-file hash).')|format(date=recorded_tol_s|int, dur=duration_tol_s|int) }}
+  </p>
+
+  <form method="post" action="/duplicates/scan" class="inline">
+    <button type="submit">{{ _('Scan duplicates') }}</button>
+  </form>
+
+  {% if flash_msg == 'scanned' %}
+  <p class="flash ok">{{ _('Duplicate scan finished.') }}</p>
+  {% endif %}
+</section>
+
+{% if not groups %}
+<section class="panel empty">
+  <p>{{ _('No duplicates found') }}</p>
+  <p class="hint">{{ _('Add more than one library folder that contains the same clips, then scan again.') }}</p>
+</section>
+{% else %}
+<section class="panel">
+  <p>
+    <strong>{{ group_count }}</strong> {{ _('duplicate groups') }}
+    · <strong>{{ item_count }}</strong> {{ _('items') }}
+  </p>
+</section>
+
+{% for group in groups %}
+<section class="panel dupe-group">
+  <header class="dupe-header">
+    <h2>{{ _('Group') }} {{ loop.index }} · {{ group.size }} {{ _('copies') }}</h2>
+    <p class="hint">
+      {{ _('Matched by') }}:
+      {% for reason in group.match_reasons %}
+        {% if reason == 'dji_stem' %}{{ _('DJI filename stem') }}{% elif reason == 'attributes' %}{{ _('Name, size, date, duration') }}{% else %}{{ reason }}{% endif %}{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ _('Filename') }}</th>
+          <th>{{ _('Library folder') }}</th>
+          <th>{{ _('Path') }}</th>
+          <th>{{ _('Size') }}</th>
+          <th>{{ _('Date') }}</th>
+          <th>{{ _('Duration') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in group.members %}
+        <tr>
+          <td>
+            <span class="kind">{% if m.kind == 'video' %}{{ _('Video') }}{% elif m.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ m.kind }}{% endif %}</span>
+            {{ m.filename }}
+          </td>
+          <td>{{ m.root_label or m.root_path or ('#' ~ m.root_id) }}</td>
+          <td class="mono">{{ m.path }}</td>
+          <td>{{ m.size_bytes|filesize }}</td>
+          <td>{{ m.recorded_at or '—' }}</td>
+          <td>{{ m.duration_s|duration }}</td>
+          <td><a class="button ghost" href="/media/{{ m.id }}">{{ _('Open') }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}

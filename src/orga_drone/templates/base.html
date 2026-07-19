@@ -16,6 +16,7 @@
     <nav>
       <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>{{ _('Home') }}</a>
       <a href="/library" {% if request.url.path.startswith('/library') %}class="active"{% endif %}>{{ _('Library') }}</a>
+      <a href="/duplicates" {% if request.url.path.startswith('/duplicates') %}class="active"{% endif %}>{{ _('Duplicates') }}</a>
       <span class="theme-switch">
         {{ _('Theme') }}:
         <a href="/theme/dark" {% if theme == 'dark' %}class="active"{% endif %}>{{ _('Dark') }}</a>

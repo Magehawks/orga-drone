@@ -114,5 +114,21 @@
   "Tags and notes saved.": "Tags und Notizen gespeichert.",
   "Filename, tags, notes…": "Dateiname, Tags, Notizen…",
   "Export spot": "Spot exportieren",
-  "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.": "Lädt eine lokale GeoJSON-Datei (.orga-spot.json) herunter. Koordinaten werden aus Datenschutzgründen gerundet. Es wird nichts hochgeladen."
+  "Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.": "Lädt eine lokale GeoJSON-Datei (.orga-spot.json) herunter. Koordinaten werden aus Datenschutzgründen gerundet. Es wird nichts hochgeladen.",
+  "Duplicates": "Duplikate",
+  "Find likely copies of the same clip across library folders (e.g. SD card and backup drive).": "Findet wahrscheinliche Kopien desselben Clips über Bibliotheksordner hinweg (z. B. SD-Karte und Backup-Platte).",
+  "Keep hint: Prefer the copy on your backup drive. orga-drone never deletes files automatically.": "Hinweis: Behalte bevorzugt die Kopie auf der Backup-Platte. orga-drone löscht keine Dateien automatisch.",
+  "Matching uses DJI filename stem, or same name + exact size with date ±%(date)s s and duration ±%(dur)s s (no full-file hash).": "Abgleich über DJI-Dateinamen-Stamm oder gleicher Name + exakte Größe mit Datum ±%(date)s s und Dauer ±%(dur)s s (kein vollständiger Datei-Hash).",
+  "Scan duplicates": "Duplikate scannen",
+  "Duplicate scan finished.": "Duplikat-Scan abgeschlossen.",
+  "No duplicates found": "Keine Duplikate gefunden",
+  "Add more than one library folder that contains the same clips, then scan again.": "Füge mehr als einen Bibliotheksordner mit denselben Clips hinzu und scanne erneut.",
+  "duplicate groups": "Duplikat-Gruppen",
+  "items": "Einträge",
+  "Group": "Gruppe",
+  "copies": "Kopien",
+  "Matched by": "Erkannt über",
+  "DJI filename stem": "DJI-Dateinamen-Stamm",
+  "Name, size, date, duration": "Name, Größe, Datum, Dauer",
+  "Library folder": "Bibliotheksordner"
 }

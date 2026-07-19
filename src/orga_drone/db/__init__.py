@@ -792,6 +792,21 @@ class Database:
                 ).fetchall()
         return {int(r["id"]): dict(r) for r in rows}
 
+    def list_media_for_duplicates(self) -> list[sqlite3.Row]:
+        """All video/photo rows with root label/path for duplicate scanning."""
+        with self.connect() as conn:
+            return list(
+                conn.execute(
+                    """SELECT m.id, m.root_id, m.kind, m.filename, m.path,
+                              m.size_bytes, m.duration_s, m.recorded_at,
+                              r.label AS root_label, r.path AS root_path
+                       FROM media m
+                       LEFT JOIN library_roots r ON r.id = m.root_id
+                       WHERE m.kind IN ('video', 'photo')
+                       ORDER BY m.id"""
+                )
+            )
+
     def stats(self) -> dict[str, int]:
         with self.connect() as conn:
             videos = conn.execute("SELECT COUNT(*) AS c FROM media WHERE kind='video'").fetchone()["c"]

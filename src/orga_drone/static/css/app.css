@@ -553,6 +553,12 @@ th { color: var(--muted); font-weight: 600; }
 }
 .tag-chip.more { color: var(--accent); }
 
+.dupe-group h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+.dupe-header { margin-bottom: 0.75rem; }
+
 footer {
   padding: 1rem 1.5rem 2rem;
   color: var(--muted);

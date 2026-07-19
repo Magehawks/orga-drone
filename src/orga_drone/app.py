@@ -15,6 +15,12 @@ from fastapi.templating import Jinja2Templates
 from orga_drone import __version__
 from orga_drone.config import settings
 from orga_drone.db import Database, make_identity_key, parse_tags, track_from_json
+from orga_drone.dupes import (
+    DURATION_TOLERANCE_S,
+    RECORDED_AT_TOLERANCE_S,
+    find_duplicate_groups,
+    media_row_to_fingerprint,
+)
 from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
@@ -389,6 +395,38 @@ def create_app() -> FastAPI:
         if path is None:
             raise HTTPException(status_code=404, detail="File missing")
         return file_response(path)
+
+    def _compute_duplicate_groups():
+        rows = db.list_media_for_duplicates()
+        inputs = [media_row_to_fingerprint(r) for r in rows]
+        return find_duplicate_groups(inputs)
+
+    @app.get("/duplicates", response_class=HTMLResponse)
+    async def duplicates_page(
+        request: Request,
+        msg: str | None = None,
+    ) -> HTMLResponse:
+        groups = _compute_duplicate_groups()
+        return render(
+            request,
+            "duplicates.html",
+            groups=groups,
+            group_count=len(groups),
+            item_count=sum(g.size for g in groups),
+            recorded_tol_s=RECORDED_AT_TOLERANCE_S,
+            duration_tol_s=DURATION_TOLERANCE_S,
+            flash_msg=msg,
+        )
+
+    @app.post("/duplicates/scan")
+    async def duplicates_scan() -> RedirectResponse:
+        # Fingerprints are derived from the current index (no file hashing).
+        # Re-running after a library scan picks up new/removed paths.
+        groups = _compute_duplicate_groups()
+        return RedirectResponse(
+            url=f"/duplicates?msg=scanned&n={len(groups)}",
+            status_code=303,
+        )
 
     @app.get("/library", response_class=HTMLResponse)
     async def library_page(request: Request) -> HTMLResponse:
