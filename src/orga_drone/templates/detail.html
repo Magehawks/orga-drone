@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ item.filename }} · {{ _('orga-drone') }}{% endblock %}
 {% block head %}
-  {% if item.latitude is not none and item.longitude is not none %}
+  {% if show_map %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   {% endif %}
@@ -23,6 +23,21 @@
     <p class="flash err">{{ flash_error }}</p>
   {% endif %}
 
+  {% if show_view_tabs %}
+  <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
+    <a role="tab"
+       class="view-tab {% if active_tab == 'clip' %}active{% endif %}"
+       href="/media/{{ item.id }}?tab=clip"
+       aria-selected="{{ 'true' if active_tab == 'clip' else 'false' }}"
+       id="tab-clip">{{ _('Single clip') }}</a>
+    <a role="tab"
+       class="view-tab {% if active_tab == 'flight' %}active{% endif %}"
+       href="/media/{{ item.id }}?tab=flight"
+       aria-selected="{{ 'true' if active_tab == 'flight' else 'false' }}"
+       id="tab-flight">{{ _('Complete flight') }}</a>
+  </nav>
+  {% endif %}
+
   <dl class="meta">
     <div><dt>{{ _('Date') }}</dt><dd>{{ item.recorded_at or '—' }}</dd></div>
     <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
@@ -37,7 +52,9 @@
       {% endif %}
     </dd></div>
     <div><dt>{{ _('Duration') }}</dt><dd>
-      {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+      {% if active_tab == 'flight' and map_duration is not none %}
+        {{ map_duration|duration }}
+      {% elif item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
         {{ item.session_total_duration|duration }}
       {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
         {{ item.flow_total_duration|duration }}
@@ -116,34 +133,78 @@
     {% endif %}
   </div>
 
-  <div class="detail-split {% if item.latitude is none or item.longitude is none %}single{% endif %}">
+  {% if active_tab == 'flight' and flight_items %}
+  <div class="flight-playlist panel-inset" id="flight-playlist-ui"
+       data-start-index="{{ play_start_index }}">
+    <h2>{% if flight_source == 'session' %}{{ _('Clips in this flight session') }}{% else %}{{ _('Clips in this flow') }}{% endif %}
+      ({{ flight_items|length }})</h2>
+    {% if flight_source == 'session' %}
+    <p class="hint">{{ _('A session groups recordings from takeoff to landing. Split flow parts stay together.') }}</p>
+    {% endif %}
+    <p class="hint">{{ _('Videos play one after another. Click a clip to jump.') }}</p>
+    <ol class="flight-clip-list">
+      {% for clip in flight_items %}
+      {% set pidx = playlist_index_by_id.get(clip.id) %}
+      <li class="flight-clip {% if clip.id == play_id %}current{% endif %}"
+          data-media-id="{{ clip.id }}"
+          {% if pidx is not none %}data-playlist-index="{{ pidx }}"{% endif %}>
+        <a class="flight-clip-thumb" href="/media/{{ clip.id }}?tab=flight" title="{{ clip.filename }}">
+          {% if clip.kind == 'video' %}
+          <video muted playsinline preload="metadata" src="/media/{{ clip.id }}/proxy#t=0.1"></video>
+          {% else %}
+          <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy">
+          {% endif %}
+        </a>
+        <div class="flight-clip-meta">
+          <a href="/media/{{ clip.id }}?tab=flight">{{ clip.filename }}</a>
+          <span class="kind">{{ clip.kind }}</span>
+          — {{ clip.size_bytes|filesize }}
+          {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
+          {% if clip.clip_count and clip.clip_count > 1 %}
+            · <span class="flow-mark">{{ _('Flow') }} {{ clip.clip_count }} {{ _('parts') }}</span>
+          {% endif %}
+        </div>
+        {% if pidx is not none %}
+        <button type="button" class="ghost flight-play-btn" data-play-index="{{ pidx }}">
+          {{ _('Play') }}
+        </button>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  <script type="application/json" id="flight-playlist-data">{{ flight_playlist_json|safe }}</script>
+  {% endif %}
+
+  <div class="detail-split {% if not show_map %}single{% endif %}">
     <div class="detail-media">
       {% if can_play %}
-        <h2>{{ _('Preview') }}</h2>
-        {% if item.kind == 'photo' %}
+        <h2>{% if active_tab == 'flight' %}{{ _('Flight preview') }}{% else %}{{ _('Preview') }}{% endif %}</h2>
+        {% if item.kind == 'photo' and active_tab != 'flight' %}
           <div class="photo-frame">
             <img src="/media/{{ item.id }}/stream" alt="{{ item.filename }}" class="photo-preview">
           </div>
-        {% elif item.kind == 'video' %}
-          <div class="player-toolbar">
+        {% elif item.kind == 'video' or active_tab == 'flight' %}
+          <div class="player-toolbar" id="player-toolbar"
+               {% if active_tab == 'flight' %}data-flight-mode="1"{% endif %}>
             {% if has_proxy %}
               <label>
-                <input type="radio" name="quality" value="proxy" checked data-src="/media/{{ item.id }}/proxy">
+                <input type="radio" name="quality" value="proxy" checked data-src="/media/{{ play_id }}/proxy">
                 {{ _('Preview quality (LRF)') }}
               </label>
             {% endif %}
             <label>
-              <input type="radio" name="quality" value="full" {% if not has_proxy %}checked{% endif %} data-src="/media/{{ item.id }}/stream">
+              <input type="radio" name="quality" value="full" {% if not has_proxy %}checked{% endif %} data-src="/media/{{ play_id }}/stream">
               {{ _('Full quality') }}
             </label>
           </div>
           <div class="player-stage">
             <video id="media-player" class="media-player" controls playsinline preload="metadata"
-                   src="{% if has_proxy %}/media/{{ item.id }}/proxy{% else %}/media/{{ item.id }}/stream{% endif %}">
+                   src="{% if has_proxy %}/media/{{ play_id }}/proxy{% else %}/media/{{ play_id }}/stream{% endif %}">
             </video>
             {% if track and track|length > 0 %}
             <aside id="telemetry-overlay" class="telemetry-overlay" hidden
-                   data-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+                   data-duration="{{ map_duration if map_duration is not none else '' }}"
                    data-track='{{ track|tojson }}'
                    aria-label="{{ _('Telemetry') }}">
               <p class="telemetry-title">{{ _('Telemetry') }}</p>
@@ -164,7 +225,11 @@
             </aside>
             {% endif %}
           </div>
+          {% if active_tab == 'flight' %}
+          <p class="hint">{{ _('Clips play in order. When one ends, the next starts automatically.') }}</p>
+          {% else %}
           <p class="hint">{{ _('Large files may take a moment to start. Prefer LRF preview when available.') }}</p>
+          {% endif %}
           {% if track and track|length > 0 %}
           <p class="hint">{{ _('Live overlay from SRT track during playback. Burn-in export is planned later.') }}</p>
           {% endif %}
@@ -174,11 +239,11 @@
       {% endif %}
     </div>
 
-    {% if item.latitude is not none and item.longitude is not none %}
+    {% if show_map %}
     <div class="detail-map map-block">
       <h2>{{ _('Location') }}</h2>
       <p>
-        {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
+        {{ '%.6f'|format(map_lat) }}, {{ '%.6f'|format(map_lon) }}
         · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
       </p>
       <p class="spot-export-row">
@@ -186,19 +251,19 @@
            download>{{ _('Export spot') }}</a>
       </p>
       <p class="hint">{{ _('Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.') }}</p>
-      {% if track and track|length > 1 and item.kind == 'video' and can_play %}
+      {% if track and track|length > 1 and (item.kind == 'video' or active_tab == 'flight') and can_play %}
       <p class="hint track-seek-hint">{{ _('Click track to seek') }}</p>
       {% endif %}
       <div id="map" class="map"
-           data-lat="{{ item.latitude }}"
-           data-lon="{{ item.longitude }}"
-           data-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+           data-lat="{{ map_lat }}"
+           data-lon="{{ map_lon }}"
+           data-duration="{{ map_duration if map_duration is not none else '' }}"
            data-track='{{ track|tojson }}'></div>
     </div>
     {% endif %}
   </div>
 
-  {% if session_clips and session_clips|length > 1 %}
+  {% if active_tab == 'clip' and session_clips and session_clips|length > 1 %}
   <div class="session-block">
     <h2>{{ _('Clips in this flight session') }} ({{ session_clips|length }})</h2>
     <p class="hint">{{ _('A session groups recordings from takeoff to landing. Split flow parts stay together.') }}</p>
@@ -218,7 +283,7 @@
   </div>
   {% endif %}
 
-  {% if clips and clips|length > 1 %}
+  {% if active_tab == 'clip' and clips and clips|length > 1 %}
   <div class="flow-block">
     <h2>{{ _('Clips in this flow') }} ({{ clips|length }})</h2>
     <ol class="flow-list">
@@ -236,14 +301,17 @@
 {% endblock %}
 {% block scripts %}
   <script src="/static/js/player.js"></script>
-  {% if (track and track|length > 0 and item.kind == 'video' and can_play)
-        or (item.latitude is not none and item.longitude is not none) %}
+  {% if active_tab == 'flight' and flight_playlist %}
+  <script src="/static/js/flight.js"></script>
+  {% endif %}
+  {% if (track and track|length > 0 and (item.kind == 'video' or active_tab == 'flight') and can_play)
+        or show_map %}
   <script src="/static/js/track.js"></script>
   {% endif %}
-  {% if track and track|length > 0 and item.kind == 'video' and can_play %}
+  {% if track and track|length > 0 and (item.kind == 'video' or active_tab == 'flight') and can_play %}
   <script src="/static/js/overlay.js"></script>
   {% endif %}
-  {% if item.latitude is not none and item.longitude is not none %}
+  {% if show_map %}
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/static/js/map.js"></script>

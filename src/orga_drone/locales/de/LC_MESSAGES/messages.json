@@ -135,5 +135,12 @@
   "Altitude (abs)": "Höhe (abs)",
   "Altitude (rel)": "Höhe (rel)",
   "Speed": "Geschwindigkeit",
-  "Live overlay from SRT track during playback. Burn-in export is planned later.": "Live-Overlay aus SRT-Track während der Wiedergabe. Burn-in-Export ist für später geplant."
+  "Live overlay from SRT track during playback. Burn-in export is planned later.": "Live-Overlay aus SRT-Track während der Wiedergabe. Burn-in-Export ist für später geplant.",
+  "View mode": "Ansicht",
+  "Single clip": "Einzelclip",
+  "Complete flight": "Kompletter Flug",
+  "Flight preview": "Flug-Vorschau",
+  "Videos play one after another. Click a clip to jump.": "Videos spielen nacheinander. Klicke einen Clip zum Springen.",
+  "Clips play in order. When one ends, the next starts automatically.": "Clips spielen der Reihe nach. Wenn einer endet, startet automatisch der nächste.",
+  "Play": "Abspielen"
 }

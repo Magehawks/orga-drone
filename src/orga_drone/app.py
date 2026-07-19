@@ -22,6 +22,12 @@ from orga_drone.dupes import (
     media_row_to_fingerprint,
 )
 from orga_drone.export import build_spot_geojson, spot_download_filename
+from orga_drone.flight_view import (
+    build_flight_playlist,
+    concat_clip_tracks,
+    flight_map_center,
+    normalize_detail_tab,
+)
 from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, ffmpeg_available, merge_flow
@@ -226,6 +232,7 @@ def create_app() -> FastAPI:
         media_id: int,
         msg: str | None = None,
         error: str | None = None,
+        tab: str | None = None,
     ) -> HTMLResponse:
         item = db.get_media(media_id)
         if not item:
@@ -243,14 +250,60 @@ def create_app() -> FastAPI:
         if not multi_session and item.session_id:
             video_n = sum(1 for c in session_clips if c.kind == "video")
             multi_session = video_n > 1
+
+        # Prefer multi-clip session; fall back to multi-clip flow for the flight tab.
+        if multi_session:
+            flight_items = session_clips
+            flight_source = "session"
+        elif multi_flow:
+            flight_items = clips
+            flight_source = "flow"
+        else:
+            flight_items = []
+            flight_source = None
+        show_view_tabs = len(flight_items) > 1
+        active_tab = normalize_detail_tab(tab) if show_view_tabs else "clip"
+        if active_tab == "flight" and not show_view_tabs:
+            active_tab = "clip"
+
+        flight_playlist = build_flight_playlist(db, flight_items) if show_view_tabs else []
+        playlist_index_by_id = {int(e["id"]): i for i, e in enumerate(flight_playlist)}
+        flight_track: list[dict[str, Any]] = []
+        flight_duration: float | None = None
+        if active_tab == "flight" and flight_items:
+            flight_track, total_s = concat_clip_tracks(flight_items)
+            flight_duration = total_s if total_s > 0 else None
+
         track = track_from_json(item.track_json)
-        map_link = (
-            osm_link(item.latitude, item.longitude)
-            if item.latitude is not None and item.longitude is not None
-            else None
+        display_track = flight_track if active_tab == "flight" and flight_track else track
+        display_duration = (
+            flight_duration if active_tab == "flight" and flight_duration is not None else item.duration_s
         )
+
+        map_lat, map_lon = (
+            flight_map_center(item, flight_items, display_track)
+            if active_tab == "flight"
+            else (item.latitude, item.longitude)
+        )
+        map_link = osm_link(map_lat, map_lon) if map_lat is not None and map_lon is not None else None
+        show_map = map_lat is not None and map_lon is not None
+
         media_path = resolve_media_file(db, item)
         proxy_path = resolve_proxy_file(db, item) if item.kind == "video" else None
+        play_id = item.id
+        play_has_proxy = proxy_path is not None
+        play_can = media_path is not None
+        play_start_index = 0
+        if active_tab == "flight" and flight_playlist:
+            for i, entry in enumerate(flight_playlist):
+                if entry["id"] == item.id:
+                    play_start_index = i
+                    break
+            start_entry = flight_playlist[play_start_index]
+            play_id = int(start_entry["id"])
+            play_has_proxy = bool(start_entry["has_proxy"])
+            play_can = bool(start_entry["can_play"])
+
         stem = Path(item.filename).stem
         return render(
             request,
@@ -258,10 +311,23 @@ def create_app() -> FastAPI:
             item=item,
             clips=clips,
             session_clips=session_clips if multi_session else [],
-            track=track,
+            flight_items=flight_items if show_view_tabs else [],
+            flight_playlist=flight_playlist,
+            flight_playlist_json=json.dumps(flight_playlist),
+            playlist_index_by_id=playlist_index_by_id,
+            flight_source=flight_source,
+            show_view_tabs=show_view_tabs,
+            active_tab=active_tab,
+            track=display_track,
+            map_lat=map_lat,
+            map_lon=map_lon,
+            map_duration=display_duration,
+            show_map=show_map,
             osm_url=map_link,
-            can_play=media_path is not None,
-            has_proxy=proxy_path is not None,
+            can_play=play_can,
+            has_proxy=play_has_proxy,
+            play_id=play_id,
+            play_start_index=play_start_index,
             can_merge=multi_flow and item.kind == "video",
             ffmpeg_ok=ffmpeg_available(),
             merge_default_name=default_merge_name(item) if item.kind == "video" else "",

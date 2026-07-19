@@ -36,11 +36,22 @@
   }
 
   function durationNow() {
+    if (window.OrgaFlight && window.OrgaFlight.active) {
+      const total = window.OrgaFlight.totalDuration();
+      if (total > 0) return total;
+    }
     return OrgaTrack.getDuration(player, durationHint, points);
   }
 
+  function playbackTime() {
+    if (window.OrgaFlight && window.OrgaFlight.active) {
+      return window.OrgaFlight.globalTime();
+    }
+    return player.currentTime || 0;
+  }
+
   function update() {
-    const t = player.currentTime || 0;
+    const t = playbackTime();
     const duration = durationNow();
     const idx = OrgaTrack.indexForTime(t, points, duration);
     const sample = OrgaTrack.sampleAt(idx, points);
@@ -53,5 +64,6 @@
   player.addEventListener("timeupdate", update);
   player.addEventListener("seeked", update);
   player.addEventListener("loadedmetadata", update);
+  player.addEventListener("orgaflightchange", update);
   update();
 })();

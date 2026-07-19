@@ -1,6 +1,10 @@
 (function () {
   const player = document.getElementById("media-player");
   if (!player) return;
+  const toolbar = document.getElementById("player-toolbar");
+  // Flight mode: sequential player owns quality switching.
+  if (toolbar && toolbar.dataset.flightMode) return;
+
   document.querySelectorAll('input[name="quality"]').forEach((input) => {
     input.addEventListener("change", () => {
       if (!input.checked) return;

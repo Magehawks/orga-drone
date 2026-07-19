@@ -41,11 +41,23 @@
   let doneLine = null;
 
   function durationNow() {
+    if (window.OrgaFlight && window.OrgaFlight.active) {
+      const total = window.OrgaFlight.totalDuration();
+      if (total > 0) return total;
+    }
     return OrgaTrack.getDuration(
       document.getElementById("media-player"),
       durationHint,
       points
     );
+  }
+
+  function playbackTime() {
+    if (window.OrgaFlight && window.OrgaFlight.active) {
+      return window.OrgaFlight.globalTime();
+    }
+    const media = document.getElementById("media-player");
+    return media ? media.currentTime || 0 : 0;
   }
 
   function updateAtTime(t) {
@@ -84,12 +96,17 @@
     const { index, distanceM } = nearestIndex(latlng);
     // Ignore clicks far from the track (meters; hit-area polyline keeps this small).
     if (distanceM > 120) return;
-    const player = document.getElementById("media-player");
     const time = OrgaTrack.timeForIndex(index, points, durationNow());
-    if (player && Number.isFinite(time)) {
-      try {
-        player.currentTime = time;
-      } catch (_) {}
+    if (!Number.isFinite(time)) return;
+    if (window.OrgaFlight && window.OrgaFlight.active) {
+      window.OrgaFlight.seekGlobal(time);
+    } else {
+      const media = document.getElementById("media-player");
+      if (media) {
+        try {
+          media.currentTime = time;
+        } catch (_) {}
+      }
     }
     updateAtTime(time);
   }
@@ -130,10 +147,11 @@
 
   const player = document.getElementById("media-player");
   if (player && points.length > 1) {
-    const sync = () => updateAtTime(player.currentTime || 0);
+    const sync = () => updateAtTime(playbackTime());
     player.addEventListener("timeupdate", sync);
     player.addEventListener("seeked", sync);
     player.addEventListener("loadedmetadata", sync);
+    player.addEventListener("orgaflightchange", sync);
     // Quality switch (player.js) keeps the same <video> element — listeners stay valid.
     sync();
   }
