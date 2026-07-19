@@ -19,6 +19,7 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - **Auto-merge** split flow clips into one MP4 (via bundled/`imageio-ffmpeg` or system `ffmpeg`; originals kept)
 - **Spot export** (GeoJSON / `.orga-spot.json`) from the detail page when GPS is available — **local download only**, no upload
 - Detect **likely duplicates** across library folders (SD + backup) via DJI stem / size+date+duration heuristics — no auto-delete
+- **Live SRT telemetry overlay** on the detail player (altitude + ground speed) synced to playback when a track exists
 
 ## Requirements
 
@@ -140,9 +141,14 @@ Long recordings are often split near ~3.5 GB. orga-drone groups those consecut
 
 Flows nest inside sessions: split parts of the same recording always share one session. After each library scan, flows are rebuilt first, then sessions.
 
+### Telemetry overlay (SRT)
+
+On a video detail page with a scanned SRT track, a small **Telemetry** panel appears on the preview during playback. Absolute/relative altitude come from the current track sample; ground speed is estimated from consecutive GPS points and cue times (or evenly along the clip when `t` is missing). Values update on `timeupdate` with the same track-index logic as map ↔ video sync. Re-scan the library after adding/updating `.SRT` files so track points (and timestamps) are stored. **Burn-in** (baking telemetry into an exported video via ffmpeg) is not included yet — planned later.
+
 ## Roadmap (not in MVP)
 
 - Optional community sharing of flight spots (opt-in; builds on local GeoJSON export)
+- ffmpeg burn-in of SRT telemetry into a short preview export
 - Reverse geocoding (place names)
 - More drone brands via parsers
 - CI-built installers for Windows / macOS / Linux

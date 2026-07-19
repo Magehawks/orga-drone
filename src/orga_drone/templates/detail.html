@@ -137,10 +137,37 @@
               {{ _('Full quality') }}
             </label>
           </div>
-          <video id="media-player" class="media-player" controls playsinline preload="metadata"
-                 src="{% if has_proxy %}/media/{{ item.id }}/proxy{% else %}/media/{{ item.id }}/stream{% endif %}">
-          </video>
+          <div class="player-stage">
+            <video id="media-player" class="media-player" controls playsinline preload="metadata"
+                   src="{% if has_proxy %}/media/{{ item.id }}/proxy{% else %}/media/{{ item.id }}/stream{% endif %}">
+            </video>
+            {% if track and track|length > 0 %}
+            <aside id="telemetry-overlay" class="telemetry-overlay" hidden
+                   data-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+                   data-track='{{ track|tojson }}'
+                   aria-label="{{ _('Telemetry') }}">
+              <p class="telemetry-title">{{ _('Telemetry') }}</p>
+              <dl class="telemetry-values">
+                <div>
+                  <dt>{{ _('Altitude (abs)') }}</dt>
+                  <dd data-field="abs_alt">—</dd>
+                </div>
+                <div>
+                  <dt>{{ _('Altitude (rel)') }}</dt>
+                  <dd data-field="rel_alt">—</dd>
+                </div>
+                <div>
+                  <dt>{{ _('Speed') }}</dt>
+                  <dd data-field="speed">—</dd>
+                </div>
+              </dl>
+            </aside>
+            {% endif %}
+          </div>
           <p class="hint">{{ _('Large files may take a moment to start. Prefer LRF preview when available.') }}</p>
+          {% if track and track|length > 0 %}
+          <p class="hint">{{ _('Live overlay from SRT track during playback. Burn-in export is planned later.') }}</p>
+          {% endif %}
         {% endif %}
       {% else %}
         <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
@@ -209,6 +236,13 @@
 {% endblock %}
 {% block scripts %}
   <script src="/static/js/player.js"></script>
+  {% if (track and track|length > 0 and item.kind == 'video' and can_play)
+        or (item.latitude is not none and item.longitude is not none) %}
+  <script src="/static/js/track.js"></script>
+  {% endif %}
+  {% if track and track|length > 0 and item.kind == 'video' and can_play %}
+  <script src="/static/js/overlay.js"></script>
+  {% endif %}
   {% if item.latitude is not none and item.longitude is not none %}
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

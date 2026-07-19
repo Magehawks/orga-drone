@@ -130,5 +130,10 @@
   "Matched by": "Matched by",
   "DJI filename stem": "DJI filename stem",
   "Name, size, date, duration": "Name, size, date, duration",
-  "Library folder": "Library folder"
+  "Library folder": "Library folder",
+  "Telemetry": "Telemetry",
+  "Altitude (abs)": "Altitude (abs)",
+  "Altitude (rel)": "Altitude (rel)",
+  "Speed": "Speed",
+  "Live overlay from SRT track during playback. Burn-in export is planned later.": "Live overlay from SRT track during playback. Burn-in export is planned later."
 }

@@ -389,6 +389,19 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.9rem;
 }
 .player-toolbar label { flex-direction: row; align-items: center; gap: 0.4rem; }
+.player-stage {
+  position: relative;
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+.player-stage .media-player {
+  display: block;
+  border: none;
+  border-radius: 0;
+}
 .media-player,
 .photo-preview {
   width: 100%;
@@ -396,6 +409,54 @@ th { color: var(--muted); font-weight: 600; }
   border-radius: 10px;
   background: #000;
   border: 1px solid var(--border);
+}
+.telemetry-overlay {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 2;
+  max-width: min(100% - 1.3rem, 220px);
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  color: var(--text);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.telemetry-overlay[hidden] { display: none; }
+.telemetry-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.telemetry-values {
+  margin: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.telemetry-values div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.telemetry-values dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 400;
+}
+.telemetry-values dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text);
 }
 .photo-frame {
   display: flex;
@@ -424,7 +485,8 @@ th { color: var(--muted); font-weight: 600; }
 .detail-media h2,
 .detail-map h2 { margin: 0 0 0.6rem; font-size: 1.05rem; }
 .detail-split .map { height: min(52vh, 420px); min-height: 280px; }
-.detail-split .media-player { max-height: min(52vh, 420px); }
+.detail-split .media-player,
+.detail-split .player-stage .media-player { max-height: min(52vh, 420px); }
 .detail-map .track-seek-hint { margin: 0.35rem 0 0; }
 .leaflet-interactive.track-hit { cursor: pointer; }
 .flow-block { margin-top: 0.5rem; }

@@ -1,6 +1,6 @@
 (function () {
   const el = document.getElementById("map");
-  if (!el || typeof L === "undefined") return;
+  if (!el || typeof L === "undefined" || typeof OrgaTrack === "undefined") return;
 
   const lat = parseFloat(el.dataset.lat);
   const lon = parseFloat(el.dataset.lon);
@@ -14,15 +14,8 @@
   }
 
   const durationHint = parseFloat(el.dataset.duration || "");
-  const points = (track || [])
-    .filter((p) => p && typeof p.lat === "number" && typeof p.lon === "number")
-    .map((p) => ({
-      lat: p.lat,
-      lon: p.lon,
-      t: typeof p.t === "number" && Number.isFinite(p.t) ? p.t : null,
-    }));
+  const points = OrgaTrack.normalizePoints(track);
   const latlngs = points.map((p) => [p.lat, p.lon]);
-  const hasTimedTrack = points.length > 1 && points.every((p) => p.t !== null);
 
   const map = L.map(el).setView([lat, lon], 15);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -47,69 +40,18 @@
   let fullLine = null;
   let doneLine = null;
 
-  function getDuration() {
-    const player = document.getElementById("media-player");
-    if (player && Number.isFinite(player.duration) && player.duration > 0) {
-      return player.duration;
-    }
-    if (Number.isFinite(durationHint) && durationHint > 0) return durationHint;
-    if (hasTimedTrack) {
-      const last = points[points.length - 1].t;
-      if (last > 0) return last;
-    }
-    return 0;
-  }
-
-  /** Fractional track index for a playback time (seconds). */
-  function indexForTime(t) {
-    const n = points.length;
-    if (n <= 1) return 0;
-    if (hasTimedTrack) {
-      if (t <= points[0].t) return 0;
-      if (t >= points[n - 1].t) return n - 1;
-      let lo = 0;
-      let hi = n - 1;
-      while (hi - lo > 1) {
-        const mid = (lo + hi) >> 1;
-        if (points[mid].t <= t) lo = mid;
-        else hi = mid;
-      }
-      const t0 = points[lo].t;
-      const t1 = points[hi].t;
-      const f = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
-      return lo + f;
-    }
-    const duration = getDuration();
-    if (duration <= 0) return 0;
-    return Math.max(0, Math.min(1, t / duration)) * (n - 1);
-  }
-
-  function positionAt(indexF) {
-    const n = points.length;
-    if (n === 0) return [lat, lon];
-    if (n === 1) return [points[0].lat, points[0].lon];
-    const i0 = Math.max(0, Math.min(n - 1, Math.floor(indexF)));
-    const i1 = Math.min(n - 1, i0 + 1);
-    const f = indexF - i0;
-    const a = points[i0];
-    const b = points[i1];
-    return [a.lat + (b.lat - a.lat) * f, a.lon + (b.lon - a.lon) * f];
-  }
-
-  function timeForIndex(index) {
-    const n = points.length;
-    if (n <= 1) return 0;
-    const i = Math.max(0, Math.min(n - 1, index));
-    if (hasTimedTrack) return points[i].t;
-    const duration = getDuration();
-    if (duration <= 0) return 0;
-    return (i / (n - 1)) * duration;
+  function durationNow() {
+    return OrgaTrack.getDuration(
+      document.getElementById("media-player"),
+      durationHint,
+      points
+    );
   }
 
   function updateAtTime(t) {
     if (points.length < 2) return;
-    const idx = indexForTime(t);
-    const ll = positionAt(idx);
+    const idx = OrgaTrack.indexForTime(t, points, durationNow());
+    const ll = OrgaTrack.positionAt(idx, points, [lat, lon]);
     playMarker.setLatLng(ll);
 
     if (doneLine) {
@@ -143,7 +85,7 @@
     // Ignore clicks far from the track (meters; hit-area polyline keeps this small).
     if (distanceM > 120) return;
     const player = document.getElementById("media-player");
-    const time = timeForIndex(index);
+    const time = OrgaTrack.timeForIndex(index, points, durationNow());
     if (player && Number.isFinite(time)) {
       try {
         player.currentTime = time;
