@@ -46,13 +46,7 @@
     </nav>
   </header>
 
-  <section class="stats">
-    <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
-    <div><strong>{{ stats.photos }}</strong> {{ _('Photos') }}</div>
-    <div><strong>{{ stats.sessions }}</strong> {{ _('Sessions') }}</div>
-    <div><strong>{{ stats.flows }}</strong> {{ _('Flows') }}</div>
-    <div><strong>{{ stats.roots }}</strong> {{ _('Roots') }}</div>
-  </section>
+  {% block stats %}{% endblock %}
 
   <main>
     {% block content %}{% endblock %}

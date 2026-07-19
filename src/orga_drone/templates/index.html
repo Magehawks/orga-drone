@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ _('Home') }} · {{ _('orga-drone') }}{% endblock %}
+{% block stats %}
+  <section class="stats">
+    <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
+    <div><strong>{{ stats.photos }}</strong> {{ _('Photos') }}</div>
+    <div><strong>{{ stats.sessions }}</strong> {{ _('Sessions') }}</div>
+    <div><strong>{{ stats.flows }}</strong> {{ _('Flows') }}</div>
+    <div><strong>{{ stats.roots }}</strong> {{ _('Roots') }}</div>
+  </section>
+{% endblock %}
 {% block content %}
 <section class="panel filters">
   <form method="get" action="/" class="filter-grid" id="filter-form">
