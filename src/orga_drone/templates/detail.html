@@ -11,6 +11,16 @@
 
 <section class="detail panel">
   <h1>{{ item.filename }}</h1>
+
+  {% if flash_msg == 'renamed' %}
+    <p class="flash ok">{{ _('File renamed. Matching LRF/SRT files were renamed too.') }}</p>
+  {% elif flash_msg == 'merged' %}
+    <p class="flash ok">{{ _('Flow merged into one file. Original clips were kept.') }}</p>
+  {% endif %}
+  {% if flash_error %}
+    <p class="flash err">{{ flash_error }}</p>
+  {% endif %}
+
   <dl class="meta">
     <div><dt>{{ _('Date') }}</dt><dd>{{ item.recorded_at or '—' }}</dd></div>
     <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
@@ -36,19 +46,81 @@
     <div class="wide"><dt>{{ _('Path') }}</dt><dd class="mono">{{ item.path }}</dd></div>
   </dl>
 
-  {% if item.latitude is not none and item.longitude is not none %}
-  <div class="map-block">
-    <h2>{{ _('Location') }}</h2>
-    <p>
-      {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
-      · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
-    </p>
-    <div id="map" class="map"
-         data-lat="{{ item.latitude }}"
-         data-lon="{{ item.longitude }}"
-         data-track='{{ track|tojson }}'></div>
+  <div class="actions-panel">
+    <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
+      <h2>{{ _('Rename') }}</h2>
+      <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>
+      <label>
+        {{ _('New name (without extension)') }}
+        <input type="text" name="new_name" value="{{ rename_stem }}" required>
+      </label>
+      <button type="submit">{{ _('Rename') }}</button>
+    </form>
+
+    {% if can_merge %}
+    <form method="post" action="/media/{{ item.id }}/merge" class="action-form"
+          onsubmit="return confirm('{{ _('Merge all clips in this flow into one MP4? Originals are kept.')|e }}');">
+      <h2>{{ _('Auto-merge flow') }}</h2>
+      {% if ffmpeg_ok %}
+        <p class="hint">{{ _('Joins all split clips into one file (fast stream copy).') }}</p>
+        <label>
+          {{ _('Output filename') }}
+          <input type="text" name="output_name" value="{{ merge_default_name }}">
+        </label>
+        <button type="submit">{{ _('Merge clips') }}</button>
+      {% else %}
+        <p class="hint">{{ _('Install ffmpeg or: pip install imageio-ffmpeg') }}</p>
+        <button type="submit" disabled>{{ _('Merge clips') }}</button>
+      {% endif %}
+    </form>
+    {% endif %}
   </div>
-  {% endif %}
+
+  <div class="detail-split {% if item.latitude is none or item.longitude is none %}single{% endif %}">
+    <div class="detail-media">
+      {% if can_play %}
+        <h2>{{ _('Preview') }}</h2>
+        {% if item.kind == 'photo' %}
+          <div class="photo-frame">
+            <img src="/media/{{ item.id }}/stream" alt="{{ item.filename }}" class="photo-preview">
+          </div>
+        {% elif item.kind == 'video' %}
+          <div class="player-toolbar">
+            {% if has_proxy %}
+              <label>
+                <input type="radio" name="quality" value="proxy" checked data-src="/media/{{ item.id }}/proxy">
+                {{ _('Preview quality (LRF)') }}
+              </label>
+            {% endif %}
+            <label>
+              <input type="radio" name="quality" value="full" {% if not has_proxy %}checked{% endif %} data-src="/media/{{ item.id }}/stream">
+              {{ _('Full quality') }}
+            </label>
+          </div>
+          <video id="media-player" class="media-player" controls playsinline preload="metadata"
+                 src="{% if has_proxy %}/media/{{ item.id }}/proxy{% else %}/media/{{ item.id }}/stream{% endif %}">
+          </video>
+          <p class="hint">{{ _('Large files may take a moment to start. Prefer LRF preview when available.') }}</p>
+        {% endif %}
+      {% else %}
+        <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
+      {% endif %}
+    </div>
+
+    {% if item.latitude is not none and item.longitude is not none %}
+    <div class="detail-map map-block">
+      <h2>{{ _('Location') }}</h2>
+      <p>
+        {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
+        · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
+      </p>
+      <div id="map" class="map"
+           data-lat="{{ item.latitude }}"
+           data-lon="{{ item.longitude }}"
+           data-track='{{ track|tojson }}'></div>
+    </div>
+    {% endif %}
+  </div>
 
   {% if clips and clips|length > 1 %}
   <div class="flow-block">
@@ -67,6 +139,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
+  <script src="/static/js/player.js"></script>
   {% if item.latitude is not none and item.longitude is not none %}
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

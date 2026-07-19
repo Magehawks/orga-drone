@@ -13,6 +13,8 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - Group **split clips** (≈4 GB FAT32 splits) into a **flow**
 - Show location on an embedded **OpenStreetMap** map (Leaflet) + external OSM link
 - UI in **German** and **English** (JSON + `.po` i18n files for future languages)
+- **Rename** files (and matching LRF/SRT siblings) from the detail page
+- **Auto-merge** split flow clips into one MP4 (via bundled/`imageio-ffmpeg` or system `ffmpeg`; originals kept)
 
 ## Requirements
 

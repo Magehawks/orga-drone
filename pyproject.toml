@@ -18,6 +18,7 @@ dependencies = [
   "python-multipart>=0.0.12",
   "pillow>=10.4.0",
   "python-dotenv>=1.0.1",
+  "imageio-ffmpeg>=0.5.1",
 ]
 
 [project.optional-dependencies]

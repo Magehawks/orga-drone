@@ -394,6 +394,54 @@ class Database:
             roots = conn.execute("SELECT COUNT(*) AS c FROM library_roots").fetchone()["c"]
         return {"videos": videos, "photos": photos, "flows": flows, "roots": roots}
 
+    def repath_file(self, old_path: str, new_path: str, *, new_stem: str | None = None) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            if new_stem is not None:
+                conn.execute(
+                    "UPDATE assets SET path = ?, stem_base = ? WHERE path = ?",
+                    (new_path, new_stem, old_path),
+                )
+            else:
+                conn.execute("UPDATE assets SET path = ? WHERE path = ?", (new_path, old_path))
+            row = conn.execute("SELECT id, filename FROM media WHERE path = ?", (old_path,)).fetchone()
+            if row:
+                new_name = Path(new_path).name
+                conn.execute(
+                    "UPDATE media SET path = ?, filename = ?, updated_at = ? WHERE id = ?",
+                    (new_path, new_name, now, row["id"]),
+                )
+
+    def update_media_identity(
+        self,
+        media_id: int,
+        *,
+        filename: str,
+        path: str,
+        has_lrf: int,
+        has_srt: int,
+    ) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE media
+                   SET filename = ?, path = ?, has_lrf = ?, has_srt = ?, updated_at = ?
+                   WHERE id = ?""",
+                (filename, path, has_lrf, has_srt, now, media_id),
+            )
+
+    def find_media_by_path(self, path: str) -> MediaRow | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
+                          f.total_duration_s AS flow_total_duration
+                   FROM media m
+                   LEFT JOIN flows f ON f.id = m.flow_id
+                   WHERE m.path = ?""",
+                (path,),
+            ).fetchone()
+        return self._row_to_media(row) if row else None
+
     @staticmethod
     def _row_to_media(row: sqlite3.Row) -> MediaRow:
         return MediaRow(

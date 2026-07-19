@@ -24,6 +24,10 @@ def _catalog(lang: str) -> dict[str, str]:
         return {}
 
 
+def clear_catalog_cache() -> None:
+    _catalog.cache_clear()
+
+
 def get_translator(lang: str) -> Callable[[str], str]:
     catalog = _catalog(lang)
 

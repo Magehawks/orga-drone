@@ -2,7 +2,8 @@
 {% block title %}{{ _('Home') }} · {{ _('orga-drone') }}{% endblock %}
 {% block content %}
 <section class="panel filters">
-  <form method="get" action="/" class="filter-grid">
+  <form method="get" action="/" class="filter-grid" id="filter-form">
+    <input type="hidden" name="view" value="{{ view }}">
     <label>
       {{ _('Search') }}
       <input type="search" name="q" value="{{ filters.q }}" placeholder="DJI_…">
@@ -60,9 +61,16 @@
     </label>
     <div class="actions">
       <button type="submit">{{ _('Apply') }}</button>
-      <a class="button ghost" href="/">{{ _('Reset') }}</a>
+      <a class="button ghost" href="/?view={{ view }}">{{ _('Reset') }}</a>
     </div>
   </form>
+  <div class="view-toggle">
+    <span>{{ _('View') }}:</span>
+    <a class="button ghost {% if view=='grid' %}active{% endif %}"
+       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+    <a class="button ghost {% if view=='list' %}active{% endif %}"
+       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&q={{ filters.q }}">{{ _('List') }}</a>
+  </div>
 </section>
 
 {% if not items %}
@@ -71,11 +79,53 @@
     <p>{{ _('Add a library folder and scan your drone files.') }}</p>
     <a class="button" href="/library">{{ _('Manage libraries') }}</a>
   </section>
+{% elif view == 'grid' %}
+  <section class="media-grid">
+    {% for item in items %}
+    <a class="card" href="/media/{{ item.id }}">
+      <div class="thumb">
+        {% if item.kind == 'video' and item.has_lrf %}
+          <video muted playsinline preload="metadata" src="/media/{{ item.id }}/proxy#t=0.1"></video>
+        {% else %}
+          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
+        {% endif %}
+        <span class="badge">{{ item.kind }}</span>
+        {% if item.clip_count and item.clip_count > 1 %}
+          <span class="badge flow">{{ item.clip_count }} {{ _('parts') }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <strong class="title">{{ item.filename }}</strong>
+        <div class="meta-line">
+          <span>{{ item.recorded_at or '—' }}</span>
+          <span>
+            {% if item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+              {{ item.flow_total_size|filesize }}
+            {% else %}
+              {{ item.size_bytes|filesize }}
+            {% endif %}
+          </span>
+        </div>
+        <div class="meta-line muted">
+          <span>{{ item.drone_model or '—' }}</span>
+          <span>
+            {% if item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+              {{ item.flow_total_duration|duration }}
+            {% else %}
+              {{ item.duration_s|duration }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </section>
 {% else %}
   <section class="table-wrap panel">
     <table>
       <thead>
         <tr>
+          <th></th>
           <th>{{ _('Date') }}</th>
           <th>{{ _('Filename') }}</th>
           <th>{{ _('Drone') }}</th>
@@ -89,6 +139,15 @@
       <tbody>
         {% for item in items %}
         <tr>
+          <td class="thumb-cell">
+            <a href="/media/{{ item.id }}">
+              {% if item.kind == 'video' and item.has_lrf %}
+                <video class="list-thumb" muted playsinline preload="metadata" src="/media/{{ item.id }}/proxy#t=0.1"></video>
+              {% else %}
+                <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
+              {% endif %}
+            </a>
+          </td>
           <td>{{ item.recorded_at or '—' }}</td>
           <td>
             <span class="kind">{{ item.kind }}</span>
@@ -130,4 +189,7 @@
     </table>
   </section>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/thumbs.js"></script>
 {% endblock %}

@@ -39,6 +39,7 @@ class Settings:
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        (self.data_dir / "thumbs").mkdir(parents=True, exist_ok=True)
 
 
 settings = Settings()
