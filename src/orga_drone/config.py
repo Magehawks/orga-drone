@@ -37,6 +37,10 @@ class Settings:
     def db_path(self) -> Path:
         return self.data_dir / "orga-drone.sqlite3"
 
+    @property
+    def theme_path(self) -> Path:
+        return self.data_dir / "theme.json"
+
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / "thumbs").mkdir(parents=True, exist_ok=True)

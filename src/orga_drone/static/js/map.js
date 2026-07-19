@@ -26,7 +26,10 @@
     .map((p) => [p.lat, p.lon]);
 
   if (latlngs.length > 1) {
-    const line = L.polyline(latlngs, { color: "#3db8a0", weight: 3 }).addTo(map);
+    const accent =
+      getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() ||
+      "#3db8a0";
+    const line = L.polyline(latlngs, { color: accent, weight: 3 }).addTo(map);
     map.fitBounds(line.getBounds(), { padding: [24, 24] });
   }
 })();

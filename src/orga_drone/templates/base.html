@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}">
+<html lang="{{ lang }}" data-theme="{{ theme }}"{% if theme == 'custom' and theme_style %} style="{{ theme_style }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,6 +16,26 @@
     <nav>
       <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>{{ _('Home') }}</a>
       <a href="/library" {% if request.url.path.startswith('/library') %}class="active"{% endif %}>{{ _('Library') }}</a>
+      <span class="theme-switch">
+        {{ _('Theme') }}:
+        <a href="/theme/dark" {% if theme == 'dark' %}class="active"{% endif %}>{{ _('Dark') }}</a>
+        <a href="/theme/light" {% if theme == 'light' %}class="active"{% endif %}>{{ _('Light') }}</a>
+        <a href="/theme/custom" {% if theme == 'custom' %}class="active"{% endif %}>{{ _('Custom') }}</a>
+        {% if theme == 'custom' %}
+        <form class="theme-custom" method="post" action="/theme/custom">
+          <label>{{ _('Accent') }}
+            <input type="color" name="accent" value="{{ theme_accent }}" title="{{ _('Accent') }}">
+          </label>
+          <label>{{ _('Background') }}
+            <input type="color" name="background" value="{{ theme_bg }}" title="{{ _('Background') }}">
+          </label>
+          <label>{{ _('Panel') }}
+            <input type="color" name="panel" value="{{ theme_panel }}" title="{{ _('Panel') }}">
+          </label>
+          <button type="submit">{{ _('Apply') }}</button>
+        </form>
+        {% endif %}
+      </span>
       <span class="lang">
         {{ _('Language') }}:
         {% for code in langs %}

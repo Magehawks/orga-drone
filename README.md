@@ -13,6 +13,7 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - Group **split clips** (≈4 GB FAT32 splits) into a **flow**
 - Show location on an embedded **OpenStreetMap** map (Leaflet) + external OSM link
 - UI in **German** and **English** (JSON + `.po` i18n files for future languages)
+- **Themes**: Dark, Light, and Custom (accent / background / panel) — choice persisted via cookie + `%APPDATA%/orga-drone/theme.json`
 - **Rename** files (and matching LRF/SRT siblings) from the detail page
 - **Auto-merge** split flow clips into one MP4 (via bundled/`imageio-ffmpeg` or system `ffmpeg`; originals kept)
 
@@ -76,6 +77,10 @@ App data (SQLite index) is stored in the OS app-data folder, e.g.:
 - Linux: `~/.local/share/orga-drone/`
 
 Override with `ORGA_DRONE_DATA_DIR` in `.env`.
+
+### Themes
+
+In the header, switch **Dark** / **Light** / **Custom**. Custom shows color pickers for accent, background, and panel; click **Apply** to save. Preference is stored in a cookie and mirrored to `theme.json` in the app-data folder (not in the git repo).
 
 ## Distribution
 

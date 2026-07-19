@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -19,6 +19,15 @@ from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, ffmpeg_available, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
 from orga_drone.scan import scan_all_roots, scan_root
+from orga_drone.theme import (
+    ThemePrefs,
+    custom_css_vars,
+    load_theme_file,
+    normalize_hex,
+    normalize_theme,
+    prefs_from_cookies,
+    save_theme_file,
+)
 from orga_drone.thumbs import ensure_thumbnail
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -87,9 +96,37 @@ def create_app() -> FastAPI:
         raw = (override or request.cookies.get("view") or "grid").lower()
         return raw if raw in {"grid", "list"} else "grid"
 
+    def theme_from_request(request: Request) -> ThemePrefs:
+        stored = load_theme_file(settings.theme_path)
+        return prefs_from_cookies(dict(request.cookies), stored)
+
+    def theme_cookie_age() -> int:
+        return 365 * 24 * 3600
+
+    def apply_theme_cookies(response: Response, prefs: ThemePrefs) -> None:
+        p = prefs.normalize()
+        age = theme_cookie_age()
+        response.set_cookie("theme", p.mode, max_age=age)
+        response.set_cookie("theme_accent", p.accent, max_age=age)
+        response.set_cookie("theme_bg", p.background, max_age=age)
+        response.set_cookie("theme_panel", p.panel, max_age=age)
+
+    def safe_back_url(request: Request) -> str:
+        referer = request.headers.get("referer") or "/"
+        if referer.startswith("/") and not referer.startswith("//"):
+            return referer
+        try:
+            parsed = urlparse(referer)
+            if parsed.path:
+                return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+        except Exception:
+            pass
+        return "/"
+
     def ctx(request: Request, **extra: Any) -> dict[str, Any]:
         lang = lang_from_request(request)
         _ = get_translator(lang)
+        theme = theme_from_request(request)
         return {
             "request": request,
             "lang": lang,
@@ -97,6 +134,11 @@ def create_app() -> FastAPI:
             "_": _,
             "version": __version__,
             "stats": db.stats(),
+            "theme": theme.mode,
+            "theme_accent": theme.accent,
+            "theme_bg": theme.background,
+            "theme_panel": theme.panel,
+            "theme_style": custom_css_vars(theme) if theme.mode == "custom" else "",
             **extra,
         }
 
@@ -311,6 +353,38 @@ def create_app() -> FastAPI:
         lang = normalize_lang(code, settings.default_lang)
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie("lang", lang, max_age=365 * 24 * 3600)
+        return response
+
+    @app.get("/theme/{mode}")
+    async def set_theme(request: Request, mode: str) -> RedirectResponse:
+        current = theme_from_request(request)
+        prefs = ThemePrefs(
+            mode=normalize_theme(mode),
+            accent=current.accent,
+            background=current.background,
+            panel=current.panel,
+        ).normalize()
+        save_theme_file(settings.theme_path, prefs)
+        response = RedirectResponse(url=safe_back_url(request), status_code=303)
+        apply_theme_cookies(response, prefs)
+        return response
+
+    @app.post("/theme/custom")
+    async def set_custom_theme(
+        request: Request,
+        accent: str = Form("#3db8a0"),
+        background: str = Form("#f4f7f9"),
+        panel: str = Form("#ffffff"),
+    ) -> RedirectResponse:
+        prefs = ThemePrefs(
+            mode="custom",
+            accent=normalize_hex(accent, "#3db8a0"),
+            background=normalize_hex(background, "#f4f7f9"),
+            panel=normalize_hex(panel, "#ffffff"),
+        ).normalize()
+        save_theme_file(settings.theme_path, prefs)
+        response = RedirectResponse(url=safe_back_url(request), status_code=303)
+        apply_theme_cookies(response, prefs)
         return response
 
     @app.get("/health")
