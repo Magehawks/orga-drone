@@ -16,6 +16,8 @@
     <p class="flash ok">{{ _('File renamed. Matching LRF/SRT files were renamed too.') }}</p>
   {% elif flash_msg == 'merged' %}
     <p class="flash ok">{{ _('Flow merged into one file. Original clips were kept.') }}</p>
+  {% elif flash_msg == 'meta_saved' %}
+    <p class="flash ok">{{ _('Tags and notes saved.') }}</p>
   {% endif %}
   {% if flash_error %}
     <p class="flash err">{{ flash_error }}</p>
@@ -47,6 +49,40 @@
   </dl>
 
   <div class="actions-panel">
+    <form method="post" action="/media/{{ item.id }}/meta" class="action-form meta-form">
+      <h2>{{ _('Tags & notes') }}</h2>
+      <fieldset class="stars-field">
+        <legend>{{ _('Rating') }}</legend>
+        <div class="stars" role="radiogroup" aria-label="{{ _('Rating') }}">
+          <label class="star-option">
+            <input type="radio" name="stars" value="0" {% if not item.stars %}checked{% endif %}>
+            <span>{{ _('None') }}</span>
+          </label>
+          {% for n in range(1, 6) %}
+          <label class="star-option">
+            <input type="radio" name="stars" value="{{ n }}" {% if item.stars == n %}checked{% endif %}>
+            <span aria-hidden="true">{% for _ in range(n) %}★{% endfor %}</span>
+            <span class="sr-only">{{ n }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <label class="check-row">
+        <input type="checkbox" name="favorite" value="1" {% if item.favorite %}checked{% endif %}>
+        {{ _('Favorite') }}
+      </label>
+      <label>
+        {{ _('Tags') }}
+        <input type="text" name="tags" value="{{ item.tags|join(', ') }}"
+               placeholder="{{ _('Comma-separated tags') }}">
+      </label>
+      <label>
+        {{ _('Notes') }}
+        <textarea name="notes" rows="4" placeholder="{{ _('Free-text notes…') }}">{{ item.notes }}</textarea>
+      </label>
+      <button type="submit">{{ _('Save') }}</button>
+    </form>
+
     <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
       <h2>{{ _('Rename') }}</h2>
       <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>

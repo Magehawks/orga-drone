@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
@@ -76,11 +77,72 @@ CREATE TABLE IF NOT EXISTS flow_items (
     PRIMARY KEY (flow_id, media_id)
 );
 
+-- User metadata survives clear_root_media / rescan (keyed by path + identity).
+CREATE TABLE IF NOT EXISTS media_meta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_path TEXT NOT NULL UNIQUE,
+    identity_key TEXT,
+    stars INTEGER NOT NULL DEFAULT 0 CHECK (stars >= 0 AND stars <= 5),
+    favorite INTEGER NOT NULL DEFAULT 0,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    notes TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_media_recorded ON media(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_media_drone ON media(drone_model);
 CREATE INDEX IF NOT EXISTS idx_media_size ON media(size_bytes);
 CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
+CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);
+CREATE INDEX IF NOT EXISTS idx_media_meta_favorite ON media_meta(favorite);
 """
+
+
+def make_identity_key(
+    filename: str,
+    size_bytes: int,
+    recorded_at: str | None,
+) -> str:
+    """Stable key across rescans when path is unchanged or rematched."""
+    payload = f"{filename.lower()}|{int(size_bytes)}|{recorded_at or ''}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def parse_tags(raw: str | list[str] | None) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        parts = raw
+    else:
+        parts = raw.replace(";", ",").split(",")
+    seen: set[str] = set()
+    tags: list[str] = []
+    for part in parts:
+        tag = str(part).strip()
+        if not tag:
+            continue
+        key = tag.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        tags.append(tag)
+    return tags
+
+
+def tags_to_json(tags: list[str]) -> str:
+    return json.dumps(tags, ensure_ascii=False)
+
+
+def tags_from_json(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return parse_tags([str(x) for x in data])
 
 
 @dataclass
@@ -107,6 +169,10 @@ class MediaRow:
     clip_count: int | None = None
     flow_total_size: int | None = None
     flow_total_duration: float | None = None
+    stars: int = 0
+    favorite: bool = False
+    tags: list[str] = field(default_factory=list)
+    notes: str = ""
 
 
 class Database:
@@ -165,6 +231,7 @@ class Database:
             )
 
     def clear_root_media(self, root_id: int) -> None:
+        """Drop indexed media for a root. Does NOT touch media_meta (user data)."""
         with self.connect() as conn:
             # flows that only belong to this root
             conn.execute("DELETE FROM flow_items WHERE media_id IN (SELECT id FROM media WHERE root_id = ?)", (root_id,))
@@ -291,6 +358,7 @@ class Database:
         kind: str | None = None,
         has_gps: bool | None = None,
         flows_only: bool | None = None,
+        favorite: bool | None = None,
         q: str | None = None,
     ) -> list[MediaRow]:
         allowed_sort = {
@@ -300,6 +368,7 @@ class Database:
             "drone": "m.drone_model",
             "filename": "m.filename",
             "flow": "m.flow_id",
+            "stars": "COALESCE(mm.stars, 0)",
         }
         sort_sql = allowed_sort.get(sort, "m.recorded_at")
         order_sql = "ASC" if order.lower() == "asc" else "DESC"
@@ -320,18 +389,28 @@ class Database:
             where.append("f.clip_count > 1")
         if flows_only is False:
             where.append("(m.flow_id IS NULL OR f.clip_count = 1)")
+        if favorite is True:
+            where.append("COALESCE(mm.favorite, 0) = 1")
+        if favorite is False:
+            where.append("COALESCE(mm.favorite, 0) = 0")
         if q:
-            where.append("(m.filename LIKE ? OR m.path LIKE ? OR m.drone_model LIKE ?)")
+            where.append(
+                "(m.filename LIKE ? OR m.path LIKE ? OR m.drone_model LIKE ?"
+                " OR IFNULL(mm.tags_json, '') LIKE ? OR IFNULL(mm.notes, '') LIKE ?)"
+            )
             like = f"%{q}%"
-            params.extend([like, like, like])
+            params.extend([like, like, like, like, like])
 
         # One row per flow (representative = first clip) + singles
         sql = f"""
             SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
-                   f.total_duration_s AS flow_total_duration
+                   f.total_duration_s AS flow_total_duration,
+                   mm.stars AS meta_stars, mm.favorite AS meta_favorite,
+                   mm.tags_json AS meta_tags_json, mm.notes AS meta_notes
             FROM media m
             LEFT JOIN flows f ON f.id = m.flow_id
             LEFT JOIN flow_items fi ON fi.media_id = m.id
+            LEFT JOIN media_meta mm ON mm.media_path = m.path
             WHERE {' AND '.join(where)}
               AND (m.flow_id IS NULL OR fi.position = 0 OR f.clip_count IS NULL OR f.clip_count = 1)
             ORDER BY {sort_sql} {order_sql} NULLS LAST, m.id DESC
@@ -347,9 +426,12 @@ class Database:
         with self.connect() as conn:
             row = conn.execute(
                 """SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
-                          f.total_duration_s AS flow_total_duration
+                          f.total_duration_s AS flow_total_duration,
+                          mm.stars AS meta_stars, mm.favorite AS meta_favorite,
+                          mm.tags_json AS meta_tags_json, mm.notes AS meta_notes
                    FROM media m
                    LEFT JOIN flows f ON f.id = m.flow_id
+                   LEFT JOIN media_meta mm ON mm.media_path = m.path
                    WHERE m.id = ?""",
                 (media_id,),
             ).fetchone()
@@ -359,15 +441,127 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
-                          f.total_duration_s AS flow_total_duration
+                          f.total_duration_s AS flow_total_duration,
+                          mm.stars AS meta_stars, mm.favorite AS meta_favorite,
+                          mm.tags_json AS meta_tags_json, mm.notes AS meta_notes
                    FROM flow_items fi
                    JOIN media m ON m.id = fi.media_id
                    LEFT JOIN flows f ON f.id = fi.flow_id
+                   LEFT JOIN media_meta mm ON mm.media_path = m.path
                    WHERE fi.flow_id = ?
                    ORDER BY fi.position""",
                 (flow_id,),
             ).fetchall()
         return [self._row_to_media(r) for r in rows]
+
+    def upsert_media_meta(
+        self,
+        media_path: str,
+        *,
+        stars: int = 0,
+        favorite: bool = False,
+        tags: list[str] | None = None,
+        notes: str = "",
+        identity_key: str | None = None,
+    ) -> None:
+        stars_n = max(0, min(5, int(stars)))
+        tags_list = parse_tags(tags)
+        notes_text = (notes or "").strip()
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM media_meta WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE media_meta
+                       SET identity_key = COALESCE(?, identity_key),
+                           stars = ?, favorite = ?, tags_json = ?, notes = ?, updated_at = ?
+                       WHERE media_path = ?""",
+                    (
+                        identity_key,
+                        stars_n,
+                        1 if favorite else 0,
+                        tags_to_json(tags_list),
+                        notes_text,
+                        now,
+                        media_path,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO media_meta(
+                         media_path, identity_key, stars, favorite, tags_json, notes, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        media_path,
+                        identity_key,
+                        stars_n,
+                        1 if favorite else 0,
+                        tags_to_json(tags_list),
+                        notes_text,
+                        now,
+                    ),
+                )
+
+    def repath_media_meta(self, old_path: str, new_path: str) -> None:
+        if old_path == new_path:
+            return
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            # Prefer keeping meta attached to the renamed path.
+            conflict = conn.execute(
+                "SELECT id FROM media_meta WHERE media_path = ?",
+                (new_path,),
+            ).fetchone()
+            if conflict:
+                conn.execute("DELETE FROM media_meta WHERE media_path = ?", (old_path,))
+            else:
+                conn.execute(
+                    "UPDATE media_meta SET media_path = ?, updated_at = ? WHERE media_path = ?",
+                    (new_path, now, old_path),
+                )
+
+    def link_media_meta_for_path(
+        self,
+        media_path: str,
+        *,
+        filename: str,
+        size_bytes: int,
+        recorded_at: str | None,
+    ) -> None:
+        """After rescan/rename: ensure identity_key is set; rematch by identity if needed."""
+        identity = make_identity_key(filename, size_bytes, recorded_at)
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            by_path = conn.execute(
+                "SELECT id FROM media_meta WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if by_path:
+                conn.execute(
+                    "UPDATE media_meta SET identity_key = ?, updated_at = ? WHERE id = ?",
+                    (identity, now, by_path["id"]),
+                )
+                return
+            orphan = conn.execute(
+                """SELECT id FROM media_meta
+                   WHERE identity_key = ?
+                     AND media_path NOT IN (SELECT path FROM media)""",
+                (identity,),
+            ).fetchone()
+            if orphan:
+                conflict = conn.execute(
+                    "SELECT id FROM media_meta WHERE media_path = ?",
+                    (media_path,),
+                ).fetchone()
+                if conflict:
+                    return
+                conn.execute(
+                    "UPDATE media_meta SET media_path = ?, updated_at = ? WHERE id = ?",
+                    (media_path, now, orphan["id"]),
+                )
 
     def distinct_drones(self) -> list[str]:
         with self.connect() as conn:
@@ -411,6 +605,7 @@ class Database:
                     "UPDATE media SET path = ?, filename = ?, updated_at = ? WHERE id = ?",
                     (new_path, new_name, now, row["id"]),
                 )
+        self.repath_media_meta(old_path, new_path)
 
     def update_media_identity(
         self,
@@ -423,20 +618,33 @@ class Database:
     ) -> None:
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
+            old = conn.execute("SELECT path, size_bytes, recorded_at FROM media WHERE id = ?", (media_id,)).fetchone()
             conn.execute(
                 """UPDATE media
                    SET filename = ?, path = ?, has_lrf = ?, has_srt = ?, updated_at = ?
                    WHERE id = ?""",
                 (filename, path, has_lrf, has_srt, now, media_id),
             )
+        if old and old["path"] != path:
+            self.repath_media_meta(old["path"], path)
+        if old:
+            self.link_media_meta_for_path(
+                path,
+                filename=filename,
+                size_bytes=int(old["size_bytes"] or 0),
+                recorded_at=old["recorded_at"],
+            )
 
     def find_media_by_path(self, path: str) -> MediaRow | None:
         with self.connect() as conn:
             row = conn.execute(
                 """SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
-                          f.total_duration_s AS flow_total_duration
+                          f.total_duration_s AS flow_total_duration,
+                          mm.stars AS meta_stars, mm.favorite AS meta_favorite,
+                          mm.tags_json AS meta_tags_json, mm.notes AS meta_notes
                    FROM media m
                    LEFT JOIN flows f ON f.id = m.flow_id
+                   LEFT JOIN media_meta mm ON mm.media_path = m.path
                    WHERE m.path = ?""",
                 (path,),
             ).fetchone()
@@ -444,6 +652,11 @@ class Database:
 
     @staticmethod
     def _row_to_media(row: sqlite3.Row) -> MediaRow:
+        keys = row.keys()
+        stars = int(row["meta_stars"] or 0) if "meta_stars" in keys else 0
+        favorite = bool(row["meta_favorite"]) if "meta_favorite" in keys else False
+        tags = tags_from_json(row["meta_tags_json"] if "meta_tags_json" in keys else None)
+        notes = (row["meta_notes"] or "") if "meta_notes" in keys else ""
         return MediaRow(
             id=int(row["id"]),
             root_id=int(row["root_id"]),
@@ -464,9 +677,13 @@ class Database:
             has_lrf=bool(row["has_lrf"]),
             track_json=row["track_json"],
             flow_id=row["flow_id"],
-            clip_count=row["clip_count"] if "clip_count" in row.keys() else None,
-            flow_total_size=row["flow_total_size"] if "flow_total_size" in row.keys() else None,
-            flow_total_duration=row["flow_total_duration"] if "flow_total_duration" in row.keys() else None,
+            clip_count=row["clip_count"] if "clip_count" in keys else None,
+            flow_total_size=row["flow_total_size"] if "flow_total_size" in keys else None,
+            flow_total_duration=row["flow_total_duration"] if "flow_total_duration" in keys else None,
+            stars=stars,
+            favorite=favorite,
+            tags=tags,
+            notes=notes,
         )
 
 

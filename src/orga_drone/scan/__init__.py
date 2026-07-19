@@ -93,6 +93,13 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
                 "track_json": track_to_json(parsed.track),
             }
         )
+        # Re-attach user metadata that survived clear_root_media (path / identity).
+        db.link_media_meta_for_path(
+            str(path.resolve()),
+            filename=path.name,
+            size_bytes=parsed.size_bytes,
+            recorded_at=recorded,
+        )
         if parsed.kind == "video":
             counts["videos"] += 1
         else:

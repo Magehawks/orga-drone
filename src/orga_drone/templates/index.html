@@ -6,7 +6,7 @@
     <input type="hidden" name="view" value="{{ view }}">
     <label>
       {{ _('Search') }}
-      <input type="search" name="q" value="{{ filters.q }}" placeholder="DJI_…">
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ _('Filename, tags, notes…') }}">
     </label>
     <label>
       {{ _('Sort by') }}
@@ -17,6 +17,7 @@
         <option value="drone" {% if filters.sort=='drone' %}selected{% endif %}>{{ _('Drone') }}</option>
         <option value="filename" {% if filters.sort=='filename' %}selected{% endif %}>{{ _('Filename') }}</option>
         <option value="flow" {% if filters.sort=='flow' %}selected{% endif %}>{{ _('Flow') }}</option>
+        <option value="stars" {% if filters.sort=='stars' %}selected{% endif %}>{{ _('Rating') }}</option>
       </select>
     </label>
     <label>
@@ -59,6 +60,14 @@
         <option value="no" {% if filters.flows=='no' %}selected{% endif %}>{{ _('Only single clips') }}</option>
       </select>
     </label>
+    <label>
+      {{ _('Favorite') }}
+      <select name="favorite">
+        <option value="">{{ _('Any') }}</option>
+        <option value="yes" {% if filters.favorite=='yes' %}selected{% endif %}>{{ _('Favorites only') }}</option>
+        <option value="no" {% if filters.favorite=='no' %}selected{% endif %}>{{ _('Not favorites') }}</option>
+      </select>
+    </label>
     <div class="actions">
       <button type="submit">{{ _('Apply') }}</button>
       <a class="button ghost" href="/?view={{ view }}">{{ _('Reset') }}</a>
@@ -67,9 +76,9 @@
   <div class="view-toggle">
     <span>{{ _('View') }}:</span>
     <a class="button ghost {% if view=='grid' %}active{% endif %}"
-       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
     <a class="button ghost {% if view=='list' %}active{% endif %}"
-       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&q={{ filters.q }}">{{ _('List') }}</a>
+       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
   </div>
 </section>
 
@@ -92,6 +101,12 @@
         <span class="badge">{{ item.kind }}</span>
         {% if item.clip_count and item.clip_count > 1 %}
           <span class="badge flow">{{ item.clip_count }} {{ _('parts') }}</span>
+        {% endif %}
+        {% if item.favorite or item.stars %}
+          <span class="badge meta-badge">
+            {% if item.favorite %}♥{% endif %}
+            {% if item.stars %}{% for _ in range(item.stars) %}★{% endfor %}{% endif %}
+          </span>
         {% endif %}
       </div>
       <div class="card-body">
@@ -116,6 +131,14 @@
             {% endif %}
           </span>
         </div>
+        {% if item.tags %}
+        <div class="tag-line">
+          {% for tag in item.tags[:4] %}
+            <span class="tag-chip">{{ tag }}</span>
+          {% endfor %}
+          {% if item.tags|length > 4 %}<span class="tag-chip more">+{{ item.tags|length - 4 }}</span>{% endif %}
+        </div>
+        {% endif %}
       </div>
     </a>
     {% endfor %}
@@ -128,6 +151,7 @@
           <th></th>
           <th>{{ _('Date') }}</th>
           <th>{{ _('Filename') }}</th>
+          <th>{{ _('Rating') }}</th>
           <th>{{ _('Drone') }}</th>
           <th>{{ _('Size') }}</th>
           <th>{{ _('Duration') }}</th>
@@ -151,7 +175,22 @@
           <td>{{ item.recorded_at or '—' }}</td>
           <td>
             <span class="kind">{{ item.kind }}</span>
+            {% if item.favorite %}<span class="fav-mark" title="{{ _('Favorite') }}">♥</span>{% endif %}
             {{ item.filename }}
+            {% if item.tags %}
+              <div class="tag-line compact">
+                {% for tag in item.tags[:3] %}
+                  <span class="tag-chip">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </td>
+          <td class="stars-cell">
+            {% if item.stars %}
+              <span class="stars-display">{% for _ in range(item.stars) %}★{% endfor %}</span>
+            {% else %}
+              —
+            {% endif %}
           </td>
           <td>{{ item.drone_model or '—' }}</td>
           <td>

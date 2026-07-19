@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from orga_drone import __version__
 from orga_drone.config import settings
-from orga_drone.db import Database, track_from_json
+from orga_drone.db import Database, make_identity_key, parse_tags, track_from_json
 from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, ffmpeg_available, merge_flow
@@ -168,11 +168,13 @@ def create_app() -> FastAPI:
         kind: str | None = None,
         gps: str | None = None,
         flows: str | None = None,
+        favorite: str | None = None,
         q: str | None = None,
         view: str | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
+        favorite_only = {"yes": True, "no": False}.get(favorite or "")
         current_view = view_from_request(request, view)
         items = db.list_media(
             sort=sort,
@@ -181,6 +183,7 @@ def create_app() -> FastAPI:
             kind=kind or None,
             has_gps=has_gps,
             flows_only=flows_only,
+            favorite=favorite_only,
             q=q or None,
         )
         response = render(
@@ -196,6 +199,7 @@ def create_app() -> FastAPI:
                 "kind": kind or "",
                 "gps": gps or "",
                 "flows": flows or "",
+                "favorite": favorite or "",
                 "q": q or "",
                 "view": current_view,
             },
@@ -242,6 +246,34 @@ def create_app() -> FastAPI:
             rename_stem=stem,
             flash_msg=msg,
             flash_error=error,
+        )
+
+    @app.post("/media/{media_id}/meta")
+    async def media_meta_save(
+        media_id: int,
+        stars: int = Form(0),
+        favorite: str | None = Form(None),
+        tags: str = Form(""),
+        notes: str = Form(""),
+    ) -> RedirectResponse:
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        try:
+            stars_n = max(0, min(5, int(stars)))
+        except (TypeError, ValueError):
+            stars_n = 0
+        db.upsert_media_meta(
+            item.path,
+            stars=stars_n,
+            favorite=bool(favorite),
+            tags=parse_tags(tags),
+            notes=notes or "",
+            identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        )
+        return RedirectResponse(
+            url=f"/media/{media_id}?msg=meta_saved",
+            status_code=303,
         )
 
     @app.post("/media/{media_id}/rename")
