@@ -921,15 +921,18 @@ class Database:
 def track_to_json(track: list | None) -> str | None:
     if not track:
         return None
-    payload = [
-        {
+    payload = []
+    for p in track:
+        point = {
             "lat": p.lat,
             "lon": p.lon,
             "abs_alt": p.abs_alt,
             "rel_alt": p.rel_alt,
         }
-        for p in track
-    ]
+        t = getattr(p, "t", None)
+        if t is not None:
+            point["t"] = t
+        payload.append(point)
     return json.dumps(payload)
 
 

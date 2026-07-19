@@ -154,9 +154,13 @@
         {{ '%.6f'|format(item.latitude) }}, {{ '%.6f'|format(item.longitude) }}
         · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
       </p>
+      {% if track and track|length > 1 and item.kind == 'video' and can_play %}
+      <p class="hint track-seek-hint">{{ _('Click track to seek') }}</p>
+      {% endif %}
       <div id="map" class="map"
            data-lat="{{ item.latitude }}"
            data-lon="{{ item.longitude }}"
+           data-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
            data-track='{{ track|tojson }}'></div>
     </div>
     {% endif %}

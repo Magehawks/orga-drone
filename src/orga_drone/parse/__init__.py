@@ -49,6 +49,7 @@ class GpsPoint:
     lon: float
     abs_alt: float | None = None
     rel_alt: float | None = None
+    t: float | None = None  # seconds from clip start (SRT cue time), if known
 
 
 @dataclass
@@ -133,6 +134,10 @@ def parse_exif_gps(path: Path) -> tuple[GpsPoint | None, str | None, str | None]
         return None, drone, camera
 
 
+def _srt_timecode_to_seconds(h: str, m: str, s: str, ms: str) -> float:
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+
+
 def parse_srt(path: Path, *, max_track_points: int = 200) -> tuple[GpsPoint | None, list[GpsPoint], float | None]:
     """Parse DJI SRT: start GPS, sampled track, approximate duration from last cue."""
     try:
@@ -143,14 +148,27 @@ def parse_srt(path: Path, *, max_track_points: int = 200) -> tuple[GpsPoint | No
     points: list[GpsPoint] = []
     duration_s: float | None = None
 
-    # Duration from last timestamp arrow "HH:MM:SS,mmm --> HH:MM:SS,mmm"
-    times = re.findall(
+    # Cue start times for associating GPS samples with video time
+    cue_times: list[tuple[int, float]] = []
+    for tm in re.finditer(
         r"(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})",
         text,
-    )
-    if times:
-        h, m, s, ms = (int(x) for x in times[-1][4:8])
-        duration_s = h * 3600 + m * 60 + s + ms / 1000.0
+    ):
+        t0 = _srt_timecode_to_seconds(tm.group(1), tm.group(2), tm.group(3), tm.group(4))
+        t1 = _srt_timecode_to_seconds(tm.group(5), tm.group(6), tm.group(7), tm.group(8))
+        cue_times.append((tm.start(), t0))
+        duration_s = t1
+
+    def _cue_time_at(pos: int) -> float | None:
+        if not cue_times:
+            return None
+        best: float | None = None
+        for start, t0 in cue_times:
+            if start <= pos:
+                best = t0
+            else:
+                break
+        return best
 
     for match in SRT_GPS_RE.finditer(text):
         lat = float(match.group("lat"))
@@ -164,17 +182,27 @@ def parse_srt(path: Path, *, max_track_points: int = 200) -> tuple[GpsPoint | No
         if alt_m:
             rel_alt = float(alt_m.group("rel"))
             abs_alt = float(alt_m.group("abs"))
-        points.append(GpsPoint(lat, lon, abs_alt=abs_alt, rel_alt=rel_alt))
+        points.append(
+            GpsPoint(
+                lat,
+                lon,
+                abs_alt=abs_alt,
+                rel_alt=rel_alt,
+                t=_cue_time_at(match.start()),
+            )
+        )
 
     if not points:
         return None, [], duration_s
 
-    # Sample track evenly
+    # Sample track evenly (keeps per-point timestamps when present)
     if len(points) <= max_track_points:
         track = points
     else:
         step = max(1, len(points) // max_track_points)
         track = points[::step][:max_track_points]
+        if track[-1] is not points[-1]:
+            track.append(points[-1])
 
     return points[0], track, duration_s
 
