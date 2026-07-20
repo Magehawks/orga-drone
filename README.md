@@ -35,6 +35,10 @@ Clip detail with map and telemetry:
 
 ![Detail — video preview, map, and metadata](media/details_orga_drone.jpg)
 
+Realtime map marker follows video playback / Kartenmarker folgt der Videowiedergabe:
+
+![Detail — OSM map marker synced to video playback](media/detail_map_telemetry.gif)
+
 ## Requirements
 
 - Python **3.11+**
