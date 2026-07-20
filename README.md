@@ -21,6 +21,20 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - Detect **likely duplicates** across library folders (SD + backup) via DJI stem / size+date+duration heuristics — no auto-delete
 - **Live SRT telemetry overlay** on the detail player (altitude + ground speed) synced to playback when a track exists
 
+## Screenshots
+
+Home / overview (German UI):
+
+![Home — library overview with filters and media grid](media/home_orga_drone.jpg)
+
+Library folders:
+
+![Library — indexed folders and add-folder controls](media/libary_orga_drone.jpg)
+
+Clip detail with map and telemetry:
+
+![Detail — video preview, map, and metadata](media/details_orga_drone.jpg)
+
 ## Requirements
 
 - Python **3.11+**

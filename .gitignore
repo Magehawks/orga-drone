@@ -50,3 +50,16 @@ releases/**/*.zip
 *.JPEG
 *.MOV
 *.DNG
+
+# README / docs screenshots (override media globs above)
+!media/
+!media/*.jpg
+!media/*.jpeg
+!media/*.png
+!media/*.webp
+!media/*.gif
+!media/*.JPG
+!media/*.JPEG
+!media/*.PNG
+!media/*.WEBP
+!media/*.GIF
