@@ -142,5 +142,10 @@
   "Flight preview": "Flug-Vorschau",
   "Videos play one after another. Click a clip to jump.": "Videos spielen nacheinander. Klicke einen Clip zum Springen.",
   "Clips play in order. When one ends, the next starts automatically.": "Clips spielen der Reihe nach. Wenn einer endet, startet automatisch der nächste.",
-  "Play": "Abspielen"
+  "Play": "Abspielen",
+  "Main navigation": "Hauptnavigation",
+  "Breadcrumb": "Brotkrumen",
+  "Quality": "Qualität",
+  "Scanning…": "Scanne…",
+  "Something went wrong. Return to the library overview.": "Etwas ist schiefgelaufen. Zurück zur Bibliotheksübersicht."
 }

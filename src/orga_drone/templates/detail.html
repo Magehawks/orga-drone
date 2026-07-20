@@ -7,20 +7,24 @@
   {% endif %}
 {% endblock %}
 {% block content %}
-<p><a href="/">&larr; {{ _('Back') }}</a></p>
+<nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/">{{ _('Home') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span class="breadcrumb-current" title="{{ item.filename }}">{{ item.filename }}</span>
+</nav>
 
 <section class="detail panel">
   <h1>{{ item.filename }}</h1>
 
   {% if flash_msg == 'renamed' %}
-    <p class="flash ok">{{ _('File renamed. Matching LRF/SRT files were renamed too.') }}</p>
+    <div class="flash ok" role="status">{{ _('File renamed. Matching LRF/SRT files were renamed too.') }}</div>
   {% elif flash_msg == 'merged' %}
-    <p class="flash ok">{{ _('Flow merged into one file. Original clips were kept.') }}</p>
+    <div class="flash ok" role="status">{{ _('Flow merged into one file. Original clips were kept.') }}</div>
   {% elif flash_msg == 'meta_saved' %}
-    <p class="flash ok">{{ _('Tags and notes saved.') }}</p>
+    <div class="flash ok" role="status">{{ _('Tags and notes saved.') }}</div>
   {% endif %}
   {% if flash_error %}
-    <p class="flash err">{{ flash_error }}</p>
+    <div class="flash err" role="alert">{{ flash_error }}</div>
   {% endif %}
 
   {% if show_view_tabs %}
@@ -187,16 +191,18 @@
         {% elif item.kind == 'video' or active_tab == 'flight' %}
           <div class="player-toolbar" id="player-toolbar"
                {% if active_tab == 'flight' %}data-flight-mode="1"{% endif %}>
-            {% if has_proxy %}
+            <div class="quality-seg" role="group" aria-label="{{ _('Quality') }}">
+              {% if has_proxy %}
+                <label>
+                  <input type="radio" name="quality" value="proxy" checked data-src="/media/{{ play_id }}/proxy">
+                  {{ _('Preview quality (LRF)') }}
+                </label>
+              {% endif %}
               <label>
-                <input type="radio" name="quality" value="proxy" checked data-src="/media/{{ play_id }}/proxy">
-                {{ _('Preview quality (LRF)') }}
+                <input type="radio" name="quality" value="full" {% if not has_proxy %}checked{% endif %} data-src="/media/{{ play_id }}/stream">
+                {{ _('Full quality') }}
               </label>
-            {% endif %}
-            <label>
-              <input type="radio" name="quality" value="full" {% if not has_proxy %}checked{% endif %} data-src="/media/{{ play_id }}/stream">
-              {{ _('Full quality') }}
-            </label>
+            </div>
           </div>
           <div class="player-stage">
             <video id="media-player" class="media-player" controls playsinline preload="metadata"

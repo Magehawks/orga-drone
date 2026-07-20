@@ -142,5 +142,10 @@
   "Flight preview": "Flight preview",
   "Videos play one after another. Click a clip to jump.": "Videos play one after another. Click a clip to jump.",
   "Clips play in order. When one ends, the next starts automatically.": "Clips play in order. When one ends, the next starts automatically.",
-  "Play": "Play"
+  "Play": "Play",
+  "Main navigation": "Main navigation",
+  "Breadcrumb": "Breadcrumb",
+  "Quality": "Quality",
+  "Scanning…": "Scanning…",
+  "Something went wrong. Return to the library overview.": "Something went wrong. Return to the library overview."
 }

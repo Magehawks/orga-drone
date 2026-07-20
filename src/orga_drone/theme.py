@@ -13,9 +13,9 @@ DEFAULT_THEME = "dark"
 _HEX = re.compile(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 DEFAULT_CUSTOM = {
-    "accent": "#3db8a0",
-    "background": "#f4f7f9",
-    "panel": "#ffffff",
+    "accent": "#ff9f0a",
+    "background": "#0a0c0e",
+    "panel": "#14181d",
 }
 
 

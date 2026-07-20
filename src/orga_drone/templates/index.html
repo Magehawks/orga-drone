@@ -92,16 +92,18 @@
     </div>
   </form>
   <div class="view-toggle">
-    <span>{{ _('View') }}:</span>
-    <a class="button ghost {% if view=='grid' %}active{% endif %}"
-       href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
-    <a class="button ghost {% if view=='list' %}active{% endif %}"
-       href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
+    <span>{{ _('View') }}</span>
+    <div class="seg-control" role="group" aria-label="{{ _('View') }}">
+      <a class="seg-item {% if view=='grid' %}active{% endif %}"
+         href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+      <a class="seg-item {% if view=='list' %}active{% endif %}"
+         href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
+    </div>
   </div>
 </section>
 
 {% if not items %}
-  <section class="empty panel">
+  <section class="library-hero">
     <h1>{{ _('No media yet') }}</h1>
     <p>{{ _('Add a library folder and scan your drone files.') }}</p>
     <a class="button" href="/library">{{ _('Manage libraries') }}</a>
@@ -115,6 +117,9 @@
           <video muted playsinline preload="metadata" src="/media/{{ item.id }}/proxy#t=0.1"></video>
         {% else %}
           <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
+        {% endif %}
+        {% if item.kind == 'video' %}
+        <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
         {% endif %}
         <span class="badge">{{ item.kind }}</span>
         {% if item.session_video_count and item.session_video_count > 1 %}

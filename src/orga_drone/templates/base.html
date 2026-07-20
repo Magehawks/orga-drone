@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ _('orga-drone') }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/app.css">
   {% block head %}{% endblock %}
 </head>
@@ -13,37 +16,37 @@
       <a href="/" class="logo">{{ _('orga-drone') }}</a>
       <span class="tagline">{{ _('Drone video library') }}</span>
     </div>
-    <nav>
-      <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>{{ _('Home') }}</a>
-      <a href="/library" {% if request.url.path.startswith('/library') %}class="active"{% endif %}>{{ _('Library') }}</a>
-      <a href="/duplicates" {% if request.url.path.startswith('/duplicates') %}class="active"{% endif %}>{{ _('Duplicates') }}</a>
-      <span class="theme-switch">
-        {{ _('Theme') }}:
-        <a href="/theme/dark" {% if theme == 'dark' %}class="active"{% endif %}>{{ _('Dark') }}</a>
-        <a href="/theme/light" {% if theme == 'light' %}class="active"{% endif %}>{{ _('Light') }}</a>
-        <a href="/theme/custom" {% if theme == 'custom' %}class="active"{% endif %}>{{ _('Custom') }}</a>
-        {% if theme == 'custom' %}
-        <form class="theme-custom" method="post" action="/theme/custom">
-          <label>{{ _('Accent') }}
-            <input type="color" name="accent" value="{{ theme_accent }}" title="{{ _('Accent') }}">
-          </label>
-          <label>{{ _('Background') }}
-            <input type="color" name="background" value="{{ theme_bg }}" title="{{ _('Background') }}">
-          </label>
-          <label>{{ _('Panel') }}
-            <input type="color" name="panel" value="{{ theme_panel }}" title="{{ _('Panel') }}">
-          </label>
-          <button type="submit">{{ _('Apply') }}</button>
-        </form>
-        {% endif %}
-      </span>
-      <span class="lang">
-        {{ _('Language') }}:
-        {% for code in langs %}
-          <a href="/lang/{{ code }}" {% if code == lang %}class="active"{% endif %}>{{ code }}</a>
-        {% endfor %}
-      </span>
+    <nav class="primary-nav" aria-label="{{ _('Main navigation') }}">
+      <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">{{ _('Home') }}</a>
+      <a href="/library" class="nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">{{ _('Library') }}</a>
+      <a href="/duplicates" class="nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">{{ _('Duplicates') }}</a>
     </nav>
+    <div class="top-controls">
+      <div class="seg-control theme-switch" role="group" aria-label="{{ _('Theme') }}">
+        <a href="/theme/dark" class="seg-item {% if theme == 'dark' %}active{% endif %}" title="{{ _('Dark') }}">{{ _('Dark') }}</a>
+        <a href="/theme/light" class="seg-item {% if theme == 'light' %}active{% endif %}" title="{{ _('Light') }}">{{ _('Light') }}</a>
+        <a href="/theme/custom" class="seg-item {% if theme == 'custom' %}active{% endif %}" title="{{ _('Custom') }}">{{ _('Custom') }}</a>
+      </div>
+      {% if theme == 'custom' %}
+      <form class="theme-custom" method="post" action="/theme/custom">
+        <label>{{ _('Accent') }}
+          <input type="color" name="accent" value="{{ theme_accent }}" title="{{ _('Accent') }}">
+        </label>
+        <label>{{ _('Background') }}
+          <input type="color" name="background" value="{{ theme_bg }}" title="{{ _('Background') }}">
+        </label>
+        <label>{{ _('Panel') }}
+          <input type="color" name="panel" value="{{ theme_panel }}" title="{{ _('Panel') }}">
+        </label>
+        <button type="submit">{{ _('Apply') }}</button>
+      </form>
+      {% endif %}
+      <div class="seg-control lang" role="group" aria-label="{{ _('Language') }}">
+        {% for code in langs %}
+          <a href="/lang/{{ code }}" class="seg-item {% if code == lang %}active{% endif %}">{{ code }}</a>
+        {% endfor %}
+      </div>
+    </div>
   </header>
 
   {% block stats %}{% endblock %}
@@ -52,9 +55,25 @@
     {% block content %}{% endblock %}
   </main>
 
+  <nav class="bottom-nav" aria-label="{{ _('Main navigation') }}">
+    <a href="/" class="bottom-nav-link {% if request.url.path == '/' %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">◈</span>
+      <span>{{ _('Home') }}</span>
+    </a>
+    <a href="/library" class="bottom-nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">▣</span>
+      <span>{{ _('Library') }}</span>
+    </a>
+    <a href="/duplicates" class="bottom-nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">⧉</span>
+      <span>{{ _('Duplicates') }}</span>
+    </a>
+  </nav>
+
   <footer>
     <p>{{ _('Local only — your videos never leave this computer.') }} · v{{ version }}</p>
   </footer>
+  <script src="/static/js/ui.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

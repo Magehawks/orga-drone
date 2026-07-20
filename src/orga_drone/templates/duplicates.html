@@ -12,18 +12,19 @@
   </p>
 
   <form method="post" action="/duplicates/scan" class="inline">
-    <button type="submit">{{ _('Scan duplicates') }}</button>
+    <button type="submit" data-loading-label="{{ _('Scanning…') }}">{{ _('Scan duplicates') }}</button>
   </form>
 
   {% if flash_msg == 'scanned' %}
-  <p class="flash ok">{{ _('Duplicate scan finished.') }}</p>
+  <div class="flash ok" role="status">{{ _('Duplicate scan finished.') }}</div>
   {% endif %}
 </section>
 
 {% if not groups %}
 <section class="panel empty">
-  <p>{{ _('No duplicates found') }}</p>
-  <p class="hint">{{ _('Add more than one library folder that contains the same clips, then scan again.') }}</p>
+  <h1>{{ _('No duplicates found') }}</h1>
+  <p>{{ _('Add more than one library folder that contains the same clips, then scan again.') }}</p>
+  <a class="button" href="/library">{{ _('Manage libraries') }}</a>
 </section>
 {% else %}
 <section class="panel">

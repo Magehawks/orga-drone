@@ -547,15 +547,15 @@ def create_app() -> FastAPI:
     @app.post("/theme/custom")
     async def set_custom_theme(
         request: Request,
-        accent: str = Form("#3db8a0"),
-        background: str = Form("#f4f7f9"),
-        panel: str = Form("#ffffff"),
+        accent: str = Form("#ff9f0a"),
+        background: str = Form("#0a0c0e"),
+        panel: str = Form("#14181d"),
     ) -> RedirectResponse:
         prefs = ThemePrefs(
             mode="custom",
-            accent=normalize_hex(accent, "#3db8a0"),
-            background=normalize_hex(background, "#f4f7f9"),
-            panel=normalize_hex(panel, "#ffffff"),
+            accent=normalize_hex(accent, "#ff9f0a"),
+            background=normalize_hex(background, "#0a0c0e"),
+            panel=normalize_hex(panel, "#14181d"),
         ).normalize()
         save_theme_file(settings.theme_path, prefs)
         response = RedirectResponse(url=safe_back_url(request), status_code=303)

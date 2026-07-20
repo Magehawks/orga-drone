@@ -22,13 +22,16 @@
   </p>
 
   <form method="post" action="/library/scan-all" class="inline">
-    <button type="submit">{{ _('Scan all') }}</button>
+    <button type="submit" data-loading-label="{{ _('Scanning…') }}">{{ _('Scan all') }}</button>
   </form>
 </section>
 
 <section class="panel">
   {% if not roots %}
-    <p>{{ _('Empty library') }}</p>
+    <div class="empty">
+      <h1>{{ _('Empty library') }}</h1>
+      <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+    </div>
   {% else %}
     <table>
       <thead>
@@ -47,7 +50,7 @@
           <td>{{ root['last_scanned_at'] or _('Never') }}</td>
           <td class="row-actions">
             <form method="post" action="/library/{{ root['id'] }}/scan">
-              <button type="submit">{{ _('Scan') }}</button>
+              <button type="submit" data-loading-label="{{ _('Scanning…') }}">{{ _('Scan') }}</button>
             </form>
             <form method="post" action="/library/{{ root['id'] }}/remove"
                   onsubmit="return confirm('OK?');">

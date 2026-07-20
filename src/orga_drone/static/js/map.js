@@ -24,7 +24,7 @@
   }).addTo(map);
 
   const css = getComputedStyle(document.documentElement);
-  const accent = css.getPropertyValue("--accent").trim() || "#3db8a0";
+  const accent = css.getPropertyValue("--accent").trim() || "#ff9f0a";
   const accentDim = css.getPropertyValue("--accent-dim").trim() || accent;
   const onAccent = css.getPropertyValue("--on-accent").trim() || "#fff";
 
