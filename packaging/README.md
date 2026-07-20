@@ -21,9 +21,9 @@ Output: `dist/orga-drone/` (exe + `_internal` deps, including `templates` / `sta
 Release layout (local, not committed as binaries):
 
 ```text
-releases/1.1.0/orga-drone/          # copy of dist/orga-drone
-releases/1.1.0/orga-drone-windows-x64.zip
-releases/1.1.0/README.md            # points to the GitHub Release
+releases/1.2.0/orga-drone/          # copy of dist/orga-drone
+releases/1.2.0/orga-drone-windows-x64.zip
+releases/1.2.0/README.md            # points to the GitHub Release
 ```
 
 User data stays outside the binary (`%APPDATA%/orga-drone`). Do not embed library paths, `.env`, or media in artifacts.
