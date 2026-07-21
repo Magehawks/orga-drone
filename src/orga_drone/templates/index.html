@@ -113,11 +113,9 @@
     {% for item in items %}
     <a class="card" href="/media/{{ item.id }}">
       <div class="thumb">
-        {% if item.kind == 'video' and item.has_lrf %}
-          <video muted playsinline preload="metadata" src="/media/{{ item.id }}/proxy#t=0.1"></video>
-        {% else %}
-          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
-        {% endif %}
+        {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
+           (dozens of concurrent Range requests spike CPU/IO under Defender). #}
+        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
         {% if item.kind == 'video' %}
         <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
         {% endif %}
@@ -195,11 +193,7 @@
         <tr>
           <td class="thumb-cell">
             <a href="/media/{{ item.id }}">
-              {% if item.kind == 'video' and item.has_lrf %}
-                <video class="list-thumb" muted playsinline preload="metadata" src="/media/{{ item.id }}/proxy#t=0.1"></video>
-              {% else %}
-                <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy">
-              {% endif %}
+              <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
             </a>
           </td>
           <td>{{ item.recorded_at or '—' }}</td>

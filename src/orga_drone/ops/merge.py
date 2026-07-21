@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from orga_drone.db import Database, MediaRow
+from orga_drone.ffmpeg_bin import ffmpeg_available, find_ffmpeg
 from orga_drone.media_files import is_under_root, resolve_media_file
 from orga_drone.scan import scan_root
+
+# Re-export for callers that imported from this module.
+__all__ = [
+    "MergeError",
+    "MergeResult",
+    "default_merge_name",
+    "ffmpeg_available",
+    "find_ffmpeg",
+    "merge_flow",
+]
 
 
 @dataclass
@@ -22,22 +32,6 @@ class MergeResult:
 
 class MergeError(ValueError):
     pass
-
-
-def find_ffmpeg() -> str | None:
-    which = shutil.which("ffmpeg")
-    if which:
-        return which
-    try:
-        import imageio_ffmpeg
-
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except Exception:
-        return None
-
-
-def ffmpeg_available() -> bool:
-    return find_ffmpeg() is not None
 
 
 def default_merge_name(first: MediaRow) -> str:

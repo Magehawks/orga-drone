@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from orga_drone.dupes import (
     media_row_to_fingerprint,
 )
 from orga_drone.export import build_spot_geojson, spot_download_filename
+from orga_drone.ffmpeg_bin import ffmpeg_available
 from orga_drone.flight_view import (
     build_flight_playlist,
     concat_clip_tracks,
@@ -30,7 +32,7 @@ from orga_drone.flight_view import (
 )
 from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
-from orga_drone.ops.merge import MergeError, default_merge_name, ffmpeg_available, merge_flow
+from orga_drone.ops.merge import MergeError, default_merge_name, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
 from orga_drone.scan import scan_all_roots, scan_root
 from orga_drone.theme import (
@@ -165,12 +167,18 @@ def create_app() -> FastAPI:
         )
 
     def file_response(path: Path) -> FileResponse:
+        # Starlette FileResponse supports HTTP Range (partial content) and
+        # streams in chunks — no full-file read into memory.
         media_type = MIME_BY_SUFFIX.get(path.suffix.lower(), "application/octet-stream")
         return FileResponse(
             path,
             media_type=media_type,
             filename=path.name,
             content_disposition_type="inline",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "private, max-age=3600",
+            },
         )
 
     @app.get("/", response_class=HTMLResponse)
@@ -431,13 +439,21 @@ def create_app() -> FastAPI:
         path = resolve_media_file(db, item)
         if path is None:
             raise HTTPException(status_code=404, detail="File missing")
-        thumb = ensure_thumbnail(
+        # Thumb generation (ffmpeg/Pillow) is sync and can be slow — keep the
+        # event loop free so concurrent range streams stay responsive.
+        thumb = await asyncio.to_thread(
+            ensure_thumbnail,
             media_id=item.id,
             path=path,
             kind=item.kind,
             filename=item.filename,
         )
-        return FileResponse(thumb, media_type="image/jpeg", content_disposition_type="inline")
+        return FileResponse(
+            thumb,
+            media_type="image/jpeg",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     @app.get("/media/{media_id}/stream")
     async def media_stream(media_id: int) -> Response:

@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
 import subprocess
 from pathlib import Path
-
-from PIL import Image, ImageDraw
+from typing import TYPE_CHECKING
 
 from orga_drone.config import settings
+from orga_drone.ffmpeg_bin import find_ffmpeg
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 THUMB_SIZE = (480, 270)
 
@@ -41,6 +43,8 @@ def _cache_path(media_id: int, source: Path) -> Path:
 
 
 def _placeholder(kind: str, label: str) -> Image.Image:
+    from PIL import Image, ImageDraw
+
     img = Image.new("RGB", THUMB_SIZE, (18, 28, 36))
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, THUMB_SIZE[0] - 1, THUMB_SIZE[1] - 1), outline=(45, 70, 82), width=2)
@@ -50,6 +54,8 @@ def _placeholder(kind: str, label: str) -> Image.Image:
 
 
 def _save_image(img: Image.Image, dest: Path) -> Path:
+    from PIL import Image
+
     img = img.convert("RGB")
     img.thumbnail(THUMB_SIZE, Image.Resampling.LANCZOS)
     canvas = Image.new("RGB", THUMB_SIZE, (12, 18, 24))
@@ -62,7 +68,7 @@ def _save_image(img: Image.Image, dest: Path) -> Path:
 
 
 def _ffmpeg_frame(source: Path, dest: Path) -> bool:
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = find_ffmpeg()
     if not ffmpeg:
         return False
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -94,6 +100,8 @@ def _ffmpeg_frame(source: Path, dest: Path) -> bool:
 
 def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> Path:
     """Return path to a JPEG thumbnail, creating it if needed."""
+    from PIL import Image
+
     source = path
     if kind == "video":
         proxy = find_proxy(path)
@@ -115,7 +123,6 @@ def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> 
     if kind == "video":
         if _ffmpeg_frame(source, cache):
             return cache
-        # Soft fallback: still image placeholder (grid may use <video> instead)
         _save_image(_placeholder("video", filename), cache)
         return cache
 

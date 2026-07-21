@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def is_packaged() -> bool:
+    """True when running as a PyInstaller (or similar) frozen binary."""
+    if getattr(sys, "frozen", False):
+        return True
+    flag = os.getenv("ORGA_DRONE_PACKAGED", "").strip().lower()
+    return flag in {"1", "true", "yes", "on"}
 
 
 def _default_data_dir() -> Path:

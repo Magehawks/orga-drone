@@ -153,11 +153,7 @@
           data-media-id="{{ clip.id }}"
           {% if pidx is not none %}data-playlist-index="{{ pidx }}"{% endif %}>
         <a class="flight-clip-thumb" href="/media/{{ clip.id }}?tab=flight" title="{{ clip.filename }}">
-          {% if clip.kind == 'video' %}
-          <video muted playsinline preload="metadata" src="/media/{{ clip.id }}/proxy#t=0.1"></video>
-          {% else %}
-          <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy">
-          {% endif %}
+          <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy" decoding="async">
         </a>
         <div class="flight-clip-meta">
           <a href="/media/{{ clip.id }}?tab=flight">{{ clip.filename }}</a>
@@ -306,6 +302,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
+  <script src="/static/js/thumbs.js"></script>
   <script src="/static/js/player.js"></script>
   {% if active_tab == 'flight' and flight_playlist %}
   <script src="/static/js/flight.js"></script>
