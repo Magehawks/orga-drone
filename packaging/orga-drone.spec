@@ -30,6 +30,8 @@ hiddenimports = [
     "uvicorn.lifespan.on",
     "orga_drone.app",
     "orga_drone.__main__",
+    "orga_drone.desktop",
+    "webview",
 ]
 
 tmp_ret = collect_all("orga_drone")
@@ -42,6 +44,11 @@ binaries = list(tmp_ret[1])
 hiddenimports += tmp_ret[2]
 
 tmp_ret = collect_all("imageio_ffmpeg")
+datas += tmp_ret[0]
+binaries += tmp_ret[1]
+hiddenimports += tmp_ret[2]
+
+tmp_ret = collect_all("webview")
 datas += tmp_ret[0]
 binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]
@@ -74,7 +81,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    # No console window — desktop shell is the primary UI.
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

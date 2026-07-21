@@ -81,7 +81,23 @@ Or:
 orga-drone
 ```
 
-Then open `http://127.0.0.1:8765/` (the browser may open automatically).
+By default this opens a **native desktop window** (pywebview / Edge WebView2 on Windows) — no Chrome/Edge browser chrome. The FastAPI UI runs locally on `127.0.0.1` (port `8765`, or another free port if busy).
+
+Fallback / power-user options:
+
+| Goal | How |
+|------|-----|
+| Old behavior (system browser) | Set `ORGA_DRONE_BROWSER=1` |
+| pywebview not installed | Opens the system browser automatically |
+| Open manually | Visit `http://127.0.0.1:8765/` |
+
+### Windows exe (end users)
+
+1. Download the release zip from [Releases](https://github.com/Magehawks/orga-drone/releases)
+2. Unzip
+3. **Double-click `orga-drone.exe`** — a desktop window opens; add a library folder when prompted
+
+See [`packaging/README.md`](packaging/README.md) for build notes. A rebuild is required for existing release zips to pick up the desktop shell.
 
 ### Add your media
 

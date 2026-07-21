@@ -195,6 +195,10 @@ def create_app() -> FastAPI:
         q: str | None = None,
         view: str | None = None,
     ) -> HTMLResponse:
+        # First-run / empty library: send users straight to “Add folder”.
+        if db.stats()["roots"] == 0:
+            return RedirectResponse(url="/library", status_code=303)
+
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
         sessions_only = {"yes": True, "no": False}.get(sessions or "")

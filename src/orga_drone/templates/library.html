@@ -5,25 +5,27 @@
   <h1>{{ _('Manage libraries') }}</h1>
   <p>{{ _('Local only — your videos never leave this computer.') }}</p>
 
-  <form method="post" action="/library/add" class="add-form">
+  <form method="post" action="/library/add" class="add-form" id="add-folder-form">
     <label>
       {{ _('Folder path') }}
-      <input type="text" name="path" required placeholder="D:\\DroneMedia">
+      <input type="text" name="path" id="folder-path" required autofocus placeholder="D:\\DroneMedia">
     </label>
     <label>
       {{ _('Label (optional)') }}
       <input type="text" name="label" placeholder="Avata 2 SD">
     </label>
-    <button type="submit">{{ _('Add folder') }}</button>
+    <button type="submit" class="cta">{{ _('Add folder') }}</button>
   </form>
   <p class="hint">
     {{ _('Example Windows path') }}: <code>D:\DroneMedia</code><br>
     {{ _('Example macOS/Linux path') }}: <code>/media/user/drone</code>
   </p>
 
+  {% if roots %}
   <form method="post" action="/library/scan-all" class="inline">
     <button type="submit" data-loading-label="{{ _('Scanning…') }}">{{ _('Scan all') }}</button>
   </form>
+  {% endif %}
 </section>
 
 <section class="panel">
@@ -31,6 +33,7 @@
     <div class="empty">
       <h1>{{ _('Empty library') }}</h1>
       <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+      <a class="button cta" href="#add-folder-form">{{ _('Add folder') }}</a>
     </div>
   {% else %}
     <table>

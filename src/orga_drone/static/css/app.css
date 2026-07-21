@@ -486,6 +486,18 @@ th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: 
 }
 .empty .button { min-width: 10rem; }
 
+button.cta, .button.cta {
+  font-size: 1.05rem;
+  padding: 0.7rem 1.35rem;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.library-hero .button {
+  font-size: 1.05rem;
+  padding: 0.7rem 1.35rem;
+  min-width: 10rem;
+}
+
 .library-hero {
   text-align: center;
   padding: 2.5rem 1.25rem 2rem;
