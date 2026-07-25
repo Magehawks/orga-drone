@@ -53,11 +53,13 @@ STATIC_DIR = PACKAGE_DIR / "static"
 MIME_BY_SUFFIX = {
     ".mp4": "video/mp4",
     ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
     ".mkv": "video/x-matroska",
     ".lrf": "video/mp4",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
+    ".webp": "image/webp",
     ".dng": "image/x-adobe-dng",
 }
 
@@ -155,6 +157,7 @@ def create_app() -> FastAPI:
             "theme_bg": theme.background,
             "theme_panel": theme.panel,
             "theme_style": custom_css_vars(theme) if theme.mode == "custom" else "",
+            "nav_active": "",
             **extra,
         }
 
@@ -182,7 +185,25 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/", response_class=HTMLResponse)
-    async def index(
+    async def dashboard(request: Request) -> HTMLResponse:
+        """Welcome hub — stats, CTAs, recent/favorites shortcuts."""
+        recent = db.list_media(sort="recorded_at", order="desc")[:8]
+        favorites = db.list_media(sort="recorded_at", order="desc", favorite=True)[:8]
+        return render(
+            request,
+            "dashboard.html",
+            recent=recent,
+            favorites=favorites,
+            nav_active="dashboard",
+        )
+
+    @app.get("/dashboard")
+    async def dashboard_alias() -> RedirectResponse:
+        return RedirectResponse(url="/", status_code=303)
+
+    @app.get("/browse", response_class=HTMLResponse)
+    @app.get("/media", response_class=HTMLResponse)
+    async def browse(
         request: Request,
         sort: str = Query("recorded_at"),
         order: str = Query("desc"),
@@ -195,10 +216,6 @@ def create_app() -> FastAPI:
         q: str | None = None,
         view: str | None = None,
     ) -> HTMLResponse:
-        # First-run / empty library: send users straight to “Add folder”.
-        if db.stats()["roots"] == 0:
-            return RedirectResponse(url="/library", status_code=303)
-
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
         sessions_only = {"yes": True, "no": False}.get(sessions or "")
@@ -221,6 +238,7 @@ def create_app() -> FastAPI:
             items=items,
             drones=db.distinct_drones(),
             view=current_view,
+            nav_active="browse",
             filters={
                 "sort": sort,
                 "order": order,
@@ -237,6 +255,46 @@ def create_app() -> FastAPI:
         if view in {"grid", "list"}:
             response.set_cookie("view", view, max_age=365 * 24 * 3600)
         return response
+
+    @app.get("/map", response_class=HTMLResponse)
+    async def world_map(request: Request) -> HTMLResponse:
+        return render(request, "map.html", nav_active="map")
+
+    @app.get("/api/geo/media")
+    async def api_geo_media(
+        north: float | None = Query(None),
+        south: float | None = Query(None),
+        east: float | None = Query(None),
+        west: float | None = Query(None),
+        zoom: float | None = Query(None),
+        include_noloc: int = Query(0),
+    ) -> dict[str, Any]:
+        """GPS media points for the world map (optional bbox + without-location list)."""
+        bbox = None
+        if None not in (north, south, east, west):
+            bbox = (float(north), float(south), float(east), float(west))  # type: ignore[arg-type]
+        points = db.list_geo_media(
+            north=bbox[0] if bbox else None,
+            south=bbox[1] if bbox else None,
+            east=bbox[2] if bbox else None,
+            west=bbox[3] if bbox else None,
+            with_gps=True,
+        )
+        without: list[dict[str, Any]] = []
+        if include_noloc:
+            without = db.list_geo_media(with_gps=False, limit=200)
+        stats = db.stats()
+        return {
+            "items": points,
+            "without_location": without,
+            "count": len(points),
+            "without_count": len(without),
+            "totals": {
+                "with_gps": stats.get("with_gps", 0),
+                "media": stats["videos"] + stats["photos"],
+            },
+            "zoom": zoom,
+        }
 
     @app.get("/media/{media_id}", response_class=HTMLResponse)
     async def media_detail(

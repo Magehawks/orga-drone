@@ -182,7 +182,7 @@ def test_http_meta_save(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     assert item.tags == ["alpha", "beta"]
     assert item.notes == "hello note"
 
-    listed = client.get("/?favorite=yes&q=hello")
+    listed = client.get("/browse?favorite=yes&q=hello")
     assert listed.status_code == 200
     assert "DJI_0001.MP4" in listed.text
     assert "★" in listed.text or "alpha" in listed.text

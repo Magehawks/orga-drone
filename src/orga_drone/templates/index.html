@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Home') }} · {{ _('orga-drone') }}{% endblock %}
+{% block title %}{{ _('Browse') }} · {{ _('orga-drone') }}{% endblock %}
 {% block stats %}
   <section class="stats">
     <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
@@ -10,8 +10,13 @@
   </section>
 {% endblock %}
 {% block content %}
+<nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/">{{ _('Dashboard') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span class="breadcrumb-current">{{ _('Browse') }}</span>
+</nav>
 <section class="panel filters">
-  <form method="get" action="/" class="filter-grid" id="filter-form">
+  <form method="get" action="/browse" class="filter-grid" id="filter-form">
     <input type="hidden" name="view" value="{{ view }}">
     <label>
       {{ _('Search') }}
@@ -42,7 +47,7 @@
       <select name="drone">
         <option value="">{{ _('All drones') }}</option>
         {% for d in drones %}
-          <option value="{{ d }}" {% if filters.drone==d %}selected{% endif %}>{{ d }}</option>
+          <option value="{{ d }}" {% if filters.drone==d %}selected{% endif %}>{{ _(d) }}</option>
         {% endfor %}
       </select>
     </label>
@@ -88,16 +93,16 @@
     </label>
     <div class="actions">
       <button type="submit">{{ _('Apply') }}</button>
-      <a class="button ghost" href="/?view={{ view }}">{{ _('Reset') }}</a>
+      <a class="button ghost" href="/browse?view={{ view }}">{{ _('Reset') }}</a>
     </div>
   </form>
   <div class="view-toggle">
     <span>{{ _('View') }}</span>
     <div class="seg-control" role="group" aria-label="{{ _('View') }}">
       <a class="seg-item {% if view=='grid' %}active{% endif %}"
-         href="/?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+         href="/browse?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
       <a class="seg-item {% if view=='list' %}active{% endif %}"
-         href="/?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
+         href="/browse?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
     </div>
   </div>
 </section>
@@ -119,7 +124,7 @@
         {% if item.kind == 'video' %}
         <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
         {% endif %}
-        <span class="badge">{{ item.kind }}</span>
+        <span class="badge">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ item.kind }}{% endif %}</span>
         {% if item.session_video_count and item.session_video_count > 1 %}
           <span class="badge session">{{ item.session_video_count }} {{ _('clips') }}</span>
         {% elif item.clip_count and item.clip_count > 1 %}
@@ -147,7 +152,7 @@
           </span>
         </div>
         <div class="meta-line muted">
-          <span>{{ item.drone_model or '—' }}</span>
+          <span>{{ _(item.drone_model) if item.drone_model else '—' }}</span>
           <span>
             {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
               {{ item.session_total_duration|duration }}
@@ -198,7 +203,7 @@
           </td>
           <td>{{ item.recorded_at or '—' }}</td>
           <td>
-            <span class="kind">{{ item.kind }}</span>
+            <span class="kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ item.kind }}{% endif %}</span>
             {% if item.favorite %}<span class="fav-mark" title="{{ _('Favorite') }}">♥</span>{% endif %}
             {{ item.filename }}
             {% if item.tags %}
@@ -216,7 +221,7 @@
               —
             {% endif %}
           </td>
-          <td>{{ item.drone_model or '—' }}</td>
+          <td>{{ _(item.drone_model) if item.drone_model else '—' }}</td>
           <td>
             {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
               {{ item.session_total_size|filesize }}

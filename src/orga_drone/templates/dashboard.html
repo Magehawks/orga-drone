@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Dashboard') }} · {{ _('orga-drone') }}{% endblock %}
+{% block stats %}
+  <section class="stats">
+    <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
+    <div><strong>{{ stats.photos }}</strong> {{ _('Photos') }}</div>
+    <div><strong>{{ stats.sessions }}</strong> {{ _('Sessions') }}</div>
+    <div><strong>{{ stats.flows }}</strong> {{ _('Flows') }}</div>
+    <div><strong>{{ stats.with_gps or 0 }}</strong> {{ _('With GPS') }}</div>
+  </section>
+{% endblock %}
+{% block content %}
+{% if stats.roots == 0 %}
+  <section class="library-hero">
+    <h1>{{ _('Welcome to orga-drone') }}</h1>
+    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+    <a class="button cta" href="/library">{{ _('Add folder') }}</a>
+  </section>
+{% else %}
+  <section class="dash-hero">
+    <div class="dash-hero-copy">
+      <h1>{{ _('Welcome to orga-drone') }}</h1>
+      <p>{{ _('Your local drone media hub — browse the library or explore the world map.') }}</p>
+    </div>
+    <div class="dash-cta-row">
+      <a class="dash-cta" href="/browse">
+        <span class="dash-cta-icon" aria-hidden="true">▣</span>
+        <span class="dash-cta-label">{{ _('Browse media') }}</span>
+        <span class="dash-cta-hint">{{ _('Grid, list & filters') }}</span>
+      </a>
+      <a class="dash-cta" href="/map">
+        <span class="dash-cta-icon" aria-hidden="true">◎</span>
+        <span class="dash-cta-label">{{ _('World map') }}</span>
+        <span class="dash-cta-hint">{{ _('Photos & videos with GPS') }}</span>
+      </a>
+    </div>
+  </section>
+
+  {% if favorites %}
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>{{ _('Favorites') }}</h2>
+      <a href="/browse?favorite=yes">{{ _('Show all') }}</a>
+    </div>
+    <div class="dash-rail">
+      {% for item in favorites %}
+      <a class="dash-rail-item" href="/media/{{ item.id }}">
+        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        <span class="dash-rail-title">{{ item.filename }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if recent %}
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>{{ _('Recent') }}</h2>
+      <a href="/browse">{{ _('Show all') }}</a>
+    </div>
+    <div class="dash-rail">
+      {% for item in recent %}
+      <a class="dash-rail-item" href="/media/{{ item.id }}">
+        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        <span class="dash-rail-title">{{ item.filename }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% elif stats.videos + stats.photos == 0 %}
+  <section class="library-hero">
+    <h1>{{ _('No media yet') }}</h1>
+    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+    <a class="button" href="/library">{{ _('Add folder') }}</a>
+  </section>
+  {% endif %}
+
+  <p class="dash-folder-link">
+    <a href="/library">{{ _('Manage library folders') }}</a>
+  </p>
+{% endif %}
+{% endblock %}

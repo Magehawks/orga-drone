@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ _('World map') }} · {{ _('orga-drone') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
+{% endblock %}
+{% block content %}
+<section class="worldmap" id="worldmap"
+         data-i18n-visible="{{ _('Visible in map') }}"
+         data-i18n-items="{{ _('items') }}"
+         data-i18n-group-day="{{ _('By day') }}"
+         data-i18n-group-place="{{ _('By place') }}"
+         data-i18n-noloc="{{ _('Without location') }}"
+         data-i18n-empty="{{ _('No GPS media in this area') }}"
+         data-i18n-loading="{{ _('Loading…') }}"
+         data-i18n-open="{{ _('Open') }}">
+  <div class="worldmap-map-pane">
+    <div id="world-map" class="world-map" role="application" aria-label="{{ _('World map') }}"></div>
+    <div class="worldmap-toolbar">
+      <label class="worldmap-toggle">
+        <input type="checkbox" id="show-noloc" checked>
+        {{ _('Show without location') }}
+      </label>
+      <span class="worldmap-count" id="map-count" aria-live="polite"></span>
+    </div>
+  </div>
+  <aside class="worldmap-list-pane" aria-label="{{ _('Media list') }}">
+    <header class="worldmap-list-head">
+      <h1>{{ _('World map') }}</h1>
+      <p class="hint" id="list-summary">{{ _('Zoom and pan to filter the list.') }}</p>
+    </header>
+    <div class="worldmap-list" id="map-list">
+      <p class="hint">{{ _('Loading…') }}</p>
+    </div>
+  </aside>
+</section>
+{% endblock %}
+{% block scripts %}
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+  <script src="/static/js/worldmap.js"></script>
+{% endblock %}

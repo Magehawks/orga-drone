@@ -8,7 +8,9 @@
 {% endblock %}
 {% block content %}
 <nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
-  <a href="/">{{ _('Home') }}</a>
+  <a href="/">{{ _('Dashboard') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <a href="/browse">{{ _('Browse') }}</a>
   <span class="breadcrumb-sep" aria-hidden="true">/</span>
   <span class="breadcrumb-current" title="{{ item.filename }}">{{ item.filename }}</span>
 </nav>
@@ -50,7 +52,7 @@
       {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
         {{ item.session_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
       {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
-        {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('Video') }})
+        {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
       {% else %}
         {{ item.size_bytes|filesize }}
       {% endif %}
@@ -157,7 +159,7 @@
         </a>
         <div class="flight-clip-meta">
           <a href="/media/{{ clip.id }}?tab=flight">{{ clip.filename }}</a>
-          <span class="kind">{{ clip.kind }}</span>
+          <span class="kind">{% if clip.kind == 'video' %}{{ _('Video') }}{% elif clip.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ clip.kind }}{% endif %}</span>
           — {{ clip.size_bytes|filesize }}
           {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
           {% if clip.clip_count and clip.clip_count > 1 %}
@@ -273,7 +275,7 @@
       {% for clip in session_clips %}
       <li {% if clip.id == item.id %}class="current"{% endif %}>
         <a href="/media/{{ clip.id }}">{{ clip.filename }}</a>
-        <span class="kind">{{ clip.kind }}</span>
+        <span class="kind">{% if clip.kind == 'video' %}{{ _('Video') }}{% elif clip.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ clip.kind }}{% endif %}</span>
         — {{ clip.size_bytes|filesize }}
         {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
         {% if clip.clip_count and clip.clip_count > 1 %}

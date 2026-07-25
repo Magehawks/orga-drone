@@ -807,6 +807,79 @@ class Database:
                 )
             )
 
+    def list_geo_media(
+        self,
+        *,
+        north: float | None = None,
+        south: float | None = None,
+        east: float | None = None,
+        west: float | None = None,
+        with_gps: bool | None = True,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Lightweight media rows for the world map (GPS filter / bbox optional)."""
+        where = ["m.kind IN ('video', 'photo')"]
+        params: list[Any] = []
+        if with_gps is True:
+            where.append("m.latitude IS NOT NULL AND m.longitude IS NOT NULL")
+        elif with_gps is False:
+            where.append("(m.latitude IS NULL OR m.longitude IS NULL)")
+
+        if (
+            with_gps is not False
+            and north is not None
+            and south is not None
+            and east is not None
+            and west is not None
+        ):
+            # Handle antimeridian: east < west means bbox crosses 180°.
+            if east >= west:
+                where.append("m.latitude BETWEEN ? AND ? AND m.longitude BETWEEN ? AND ?")
+                params.extend([south, north, west, east])
+            else:
+                where.append(
+                    "m.latitude BETWEEN ? AND ?"
+                    " AND (m.longitude >= ? OR m.longitude <= ?)"
+                )
+                params.extend([south, north, west, east])
+
+        limit_sql = ""
+        if limit is not None and limit > 0:
+            limit_sql = " LIMIT ?"
+            params.append(int(limit))
+
+        sql = f"""
+            SELECT m.id, m.kind, m.filename, m.recorded_at, m.duration_s,
+                   m.size_bytes, m.drone_model, m.latitude, m.longitude,
+                   COALESCE(mm.stars, 0) AS stars,
+                   COALESCE(mm.favorite, 0) AS favorite
+            FROM media m
+            LEFT JOIN media_meta mm ON mm.media_path = m.path
+            WHERE {' AND '.join(where)}
+            ORDER BY m.recorded_at DESC, m.id DESC
+            {limit_sql}
+        """
+        with self.connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            out.append(
+                {
+                    "id": int(r["id"]),
+                    "kind": r["kind"],
+                    "filename": r["filename"],
+                    "recorded_at": r["recorded_at"],
+                    "duration_s": r["duration_s"],
+                    "size_bytes": int(r["size_bytes"] or 0),
+                    "drone_model": r["drone_model"],
+                    "lat": r["latitude"],
+                    "lon": r["longitude"],
+                    "stars": int(r["stars"] or 0),
+                    "favorite": bool(r["favorite"]),
+                }
+            )
+        return out
+
     def stats(self) -> dict[str, int]:
         with self.connect() as conn:
             videos = conn.execute("SELECT COUNT(*) AS c FROM media WHERE kind='video'").fetchone()["c"]
@@ -816,12 +889,24 @@ class Database:
                 "SELECT COUNT(*) AS c FROM sessions WHERE video_count > 1"
             ).fetchone()["c"]
             roots = conn.execute("SELECT COUNT(*) AS c FROM library_roots").fetchone()["c"]
+            with_gps = conn.execute(
+                """SELECT COUNT(*) AS c FROM media
+                   WHERE kind IN ('video', 'photo')
+                     AND latitude IS NOT NULL AND longitude IS NOT NULL"""
+            ).fetchone()["c"]
+            favorites = conn.execute(
+                """SELECT COUNT(*) AS c FROM media m
+                   JOIN media_meta mm ON mm.media_path = m.path
+                   WHERE m.kind IN ('video', 'photo') AND mm.favorite = 1"""
+            ).fetchone()["c"]
         return {
             "videos": videos,
             "photos": photos,
             "flows": flows,
             "sessions": sessions,
             "roots": roots,
+            "with_gps": with_gps,
+            "favorites": favorites,
         }
 
     def repath_file(self, old_path: str, new_path: str, *, new_stem: str | None = None) -> None:

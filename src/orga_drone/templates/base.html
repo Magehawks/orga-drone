@@ -17,7 +17,9 @@
       <span class="tagline">{{ _('Drone video library') }}</span>
     </div>
     <nav class="primary-nav" aria-label="{{ _('Main navigation') }}">
-      <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">{{ _('Home') }}</a>
+      <a href="/" class="nav-link {% if request.url.path == '/' or nav_active == 'dashboard' %}active{% endif %}">{{ _('Dashboard') }}</a>
+      <a href="/browse" class="nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">{{ _('Browse') }}</a>
+      <a href="/map" class="nav-link {% if request.url.path.startswith('/map') or nav_active == 'map' %}active{% endif %}">{{ _('World map') }}</a>
       <a href="/library" class="nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">{{ _('Library') }}</a>
       <a href="/duplicates" class="nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">{{ _('Duplicates') }}</a>
     </nav>
@@ -56,12 +58,20 @@
   </main>
 
   <nav class="bottom-nav" aria-label="{{ _('Main navigation') }}">
-    <a href="/" class="bottom-nav-link {% if request.url.path == '/' %}active{% endif %}">
+    <a href="/" class="bottom-nav-link {% if request.url.path == '/' or nav_active == 'dashboard' %}active{% endif %}">
       <span class="bottom-nav-icon" aria-hidden="true">◈</span>
-      <span>{{ _('Home') }}</span>
+      <span>{{ _('Dashboard') }}</span>
+    </a>
+    <a href="/browse" class="bottom-nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">▣</span>
+      <span>{{ _('Browse') }}</span>
+    </a>
+    <a href="/map" class="bottom-nav-link {% if request.url.path.startswith('/map') or nav_active == 'map' %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">◎</span>
+      <span>{{ _('Map') }}</span>
     </a>
     <a href="/library" class="bottom-nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">
-      <span class="bottom-nav-icon" aria-hidden="true">▣</span>
+      <span class="bottom-nav-icon" aria-hidden="true">▤</span>
       <span>{{ _('Library') }}</span>
     </a>
     <a href="/duplicates" class="bottom-nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">
