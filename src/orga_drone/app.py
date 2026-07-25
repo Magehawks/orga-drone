@@ -60,6 +60,8 @@ MIME_BY_SUFFIX = {
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
     ".dng": "image/x-adobe-dng",
 }
 
@@ -210,6 +212,7 @@ def create_app() -> FastAPI:
         drone: str | None = None,
         kind: str | None = None,
         gps: str | None = None,
+        source: str | None = None,
         flows: str | None = None,
         sessions: str | None = None,
         favorite: str | None = None,
@@ -226,6 +229,7 @@ def create_app() -> FastAPI:
             order=order,
             drone=drone or None,
             kind=kind or None,
+            source=source or None,
             has_gps=has_gps,
             flows_only=flows_only,
             sessions_only=sessions_only,
@@ -244,6 +248,7 @@ def create_app() -> FastAPI:
                 "order": order,
                 "drone": drone or "",
                 "kind": kind or "",
+                "source": source or "",
                 "gps": gps or "",
                 "flows": flows or "",
                 "sessions": sessions or "",

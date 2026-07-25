@@ -8,8 +8,9 @@ Your media stays on your machine. No cloud account is required for the MVP.
 
 - Index one or more folders / drives into a single library
 - List videos and photos by **date**, **size**, **duration**, **drone**, **GPS**, **flow**
-- Detect **drone model** from DJI MP4 metadata / photo EXIF (`FC8485` → DJI Avata 2)
-- Read **GPS** from DJI `.SRT` telemetry and photo EXIF
+- Index **vacation / hobby photos & videos** brand-agnostically (phones, cameras, action cams — no `DJI_` filename required)
+- Detect **drone model** from DJI MP4 metadata / photo EXIF (`FC8485` → DJI Avata 2); other cameras use label **Camera**
+- Read **GPS** from DJI `.SRT` telemetry, photo EXIF (JPEG/HEIC/…), and best-effort video container tags (ISO 6709 / ffprobe when available)
 - Group **split clips** (≈4 GB FAT32 splits) into a **flow**
 - Group a logical **flight session** (takeoff → landing) across one or more clips/flows
 - Show location on an embedded **OpenStreetMap** map (Leaflet) + external OSM link
@@ -107,6 +108,15 @@ See [`packaging/README.md`](packaging/README.md) for build notes. A rebuild is r
    - macOS/Linux: `/media/user/drone`
 3. Click **Add folder** (scans immediately)
 4. Browse, filter, and open details / map
+
+**Urlaubs- und Hobby-Medien (markenunabhängig):** Neben DJI-Dateien indexiert orga-drone normale Fotos und Videos von Smartphones und Kameras (iPhone, Android, Canon, Sony, Nikon, GoPro, …) — **ohne** `DJI_`-Dateinamenpflicht. Unter **Medien** filtert **Quelle** nach Drohne vs. andere Geräte.
+
+| Typ | Formate | Datum | GPS / Karte |
+|-----|---------|-------|-------------|
+| Fotos | JPG/JPEG, PNG, WebP, HEIC/HEIF (`pillow-heif`), DNG | EXIF `DateTimeOriginal` → sonst mtime | EXIF-GPS wenn vorhanden → OSM-Detailkarte / Weltkarte |
+| Videos | MP4, MOV, M4V, MKV | Container-`creation_time` / ffprobe → sonst mtime | Best-effort (ISO 6709 / ffprobe); **viele Handy-Videos haben kein GPS** und erscheinen trotzdem in der Bibliothek |
+
+Nicht-DJI-Medien bekommen typischerweise das Label **Camera** und `source_type` phone/camera/unknown; DJI-Erkennung (SRT, Flows, Sessions) bleibt unverändert.
 
 App data (SQLite index) is stored in the OS app-data folder, e.g.:
 

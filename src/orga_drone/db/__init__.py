@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS media (
     mode TEXT,
     drone_model TEXT,
     camera_model TEXT,
+    source_type TEXT,
     latitude REAL,
     longitude REAL,
     abs_alt REAL,
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS media_meta (
 
 CREATE INDEX IF NOT EXISTS idx_media_recorded ON media(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_media_drone ON media(drone_model);
+CREATE INDEX IF NOT EXISTS idx_media_source ON media(source_type);
 CREATE INDEX IF NOT EXISTS idx_media_size ON media(size_bytes);
 CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
 CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);
@@ -181,6 +183,7 @@ class MediaRow:
     mode: str | None
     drone_model: str | None
     camera_model: str | None
+    source_type: str | None
     latitude: float | None
     longitude: float | None
     abs_alt: float | None
@@ -266,6 +269,12 @@ class Database:
             conn.execute(
                 "ALTER TABLE sessions ADD COLUMN video_count INTEGER NOT NULL DEFAULT 1"
             )
+        media_cols = {row[1] for row in conn.execute("PRAGMA table_info(media)").fetchall()}
+        if "source_type" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN source_type TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_source ON media(source_type)"
+        )
 
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
@@ -360,6 +369,7 @@ class Database:
                 "mode",
                 "drone_model",
                 "camera_model",
+                "source_type",
                 "latitude",
                 "longitude",
                 "abs_alt",
@@ -496,6 +506,7 @@ class Database:
         order: str = "desc",
         drone: str | None = None,
         kind: str | None = None,
+        source: str | None = None,
         has_gps: bool | None = None,
         flows_only: bool | None = None,
         sessions_only: bool | None = None,
@@ -523,6 +534,10 @@ class Database:
         if kind:
             where.append("m.kind = ?")
             params.append(kind)
+        if source == "drone":
+            where.append("m.source_type = 'drone'")
+        elif source == "other":
+            where.append("(m.source_type IS NULL OR m.source_type != 'drone')")
         if has_gps is True:
             where.append("m.latitude IS NOT NULL AND m.longitude IS NOT NULL")
         if has_gps is False:
@@ -996,6 +1011,7 @@ class Database:
             mode=row["mode"],
             drone_model=row["drone_model"],
             camera_model=row["camera_model"],
+            source_type=(row["source_type"] if "source_type" in keys else None),
             latitude=row["latitude"],
             longitude=row["longitude"],
             abs_alt=row["abs_alt"],

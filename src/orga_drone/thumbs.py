@@ -102,6 +102,10 @@ def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> 
     """Return path to a JPEG thumbnail, creating it if needed."""
     from PIL import Image
 
+    from orga_drone.parse import ensure_heif_support
+
+    ensure_heif_support()
+
     source = path
     if kind == "video":
         proxy = find_proxy(path)
