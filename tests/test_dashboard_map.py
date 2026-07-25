@@ -92,7 +92,19 @@ def test_map_page_and_geo_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     page = client.get("/map")
     assert page.status_code == 200
     assert "world-map" in page.text
-    assert "leaflet.markercluster" in page.text
+    assert "/static/vendor/leaflet/leaflet.js" in page.text
+    assert "/static/vendor/leaflet.markercluster/" in page.text
+    assert "unpkg.com/leaflet" not in page.text
+
+    vendor_js = client.get("/static/vendor/leaflet/leaflet.js")
+    assert vendor_js.status_code == 200
+    assert len(vendor_js.content) > 1000
+    cluster_js = client.get(
+        "/static/vendor/leaflet.markercluster/leaflet.markercluster.js"
+    )
+    assert cluster_js.status_code == 200
+    worldmap_js = client.get("/static/js/worldmap.js")
+    assert worldmap_js.status_code == 200
 
     api = client.get("/api/geo/media?include_noloc=1")
     assert api.status_code == 200

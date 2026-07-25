@@ -14,7 +14,14 @@ from orga_drone.group import (
     group_clips_into_flows,
     group_clips_into_sessions,
 )
-from orga_drone.parse import VIDEO_EXTS, PHOTO_EXTS, PROXY_EXTS, SUBTITLE_EXTS, parse_media_file
+from orga_drone.parse import (
+    VIDEO_EXTS,
+    PHOTO_EXTS,
+    PROXY_EXTS,
+    SUBTITLE_EXTS,
+    live_photo_video_sidecars,
+    parse_media_file,
+)
 
 MEDIA_EXTS = VIDEO_EXTS | PHOTO_EXTS | PROXY_EXTS | SUBTITLE_EXTS
 
@@ -76,13 +83,25 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
     for f in files:
         by_stem.setdefault(f.stem, []).append(f)
 
+    live_sidecars = live_photo_video_sidecars(files)
+
     # Clear previous index for this root (simple full rescan for MVP)
     db.clear_root_media(root_id)
 
-    counts = {"assets": 0, "videos": 0, "photos": 0}
+    counts = {"assets": 0, "videos": 0, "photos": 0, "live_sidecars": 0}
 
     for path in files:
         parsed = parse_media_file(path)
+        try:
+            resolved = path.resolve()
+        except OSError:
+            resolved = path
+
+        # Live Photo companion MOV: keep as asset only, never as library video.
+        asset_kind = parsed.kind
+        if resolved in live_sidecars:
+            asset_kind = "live_sidecar"
+
         try:
             mtime = path.stat().st_mtime
         except OSError:
@@ -90,12 +109,16 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
         asset_id = db.upsert_asset(
             root_id=root_id,
             path=path,
-            kind=parsed.kind,
+            kind=asset_kind,
             size_bytes=parsed.size_bytes,
             mtime=mtime,
             stem_base=parsed.stem_base,
         )
         counts["assets"] += 1
+
+        if asset_kind == "live_sidecar":
+            counts["live_sidecars"] += 1
+            continue
 
         if parsed.kind not in {"video", "photo"}:
             continue

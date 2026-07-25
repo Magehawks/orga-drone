@@ -70,6 +70,10 @@ PHOTO_EXTS = {".jpg", ".jpeg", ".dng", ".png", ".webp", ".heic", ".heif"}
 PROXY_EXTS = {".lrf"}
 SUBTITLE_EXTS = {".srt"}
 
+# iPhone Live Photo: still (HEIC/JPG) + short companion .MOV with the same stem.
+LIVE_PHOTO_STILL_EXTS = {".heic", ".heif", ".jpg", ".jpeg"}
+LIVE_PHOTO_VIDEO_EXTS = {".mov"}
+
 NON_DJI_CAMERA_LABEL = "Camera"
 
 # Heuristic EXIF Make sets for source_type (brand-agnostic; not a whitelist for indexing).
@@ -168,6 +172,43 @@ def classify_ext(path: Path) -> str:
     if ext in SUBTITLE_EXTS:
         return "subtitle"
     return "other"
+
+
+def live_photo_video_sidecars(paths: list[Path]) -> set[Path]:
+    """Return .MOV paths that are Live Photo companions of a same-stem still.
+
+    iPhone Live Photos are typically exported as ``IMG_1234.HEIC`` (or ``.JPG``)
+    plus a short ``IMG_1234.MOV``. The still is the primary photo; the MOV is a
+    motion sidecar and should not appear as a standalone video in the library.
+    """
+    by_stem: dict[str, list[Path]] = {}
+    for path in paths:
+        by_stem.setdefault(path.stem, []).append(path)
+
+    sidecars: set[Path] = set()
+    for group in by_stem.values():
+        still = None
+        mov = None
+        for path in group:
+            ext = path.suffix.lower()
+            if ext in LIVE_PHOTO_STILL_EXTS and still is None:
+                still = path
+            elif ext in LIVE_PHOTO_VIDEO_EXTS and mov is None:
+                mov = path
+        if still is not None and mov is not None:
+            try:
+                sidecars.add(mov.resolve())
+            except OSError:
+                sidecars.add(mov)
+    return sidecars
+
+
+def is_live_photo_video_sidecar(path: Path, siblings: list[Path] | None = None) -> bool:
+    """True when ``path`` is a .MOV paired with a same-stem HEIC/JPG still."""
+    if path.suffix.lower() not in LIVE_PHOTO_VIDEO_EXTS:
+        return False
+    group = siblings if siblings is not None else list(path.parent.glob(f"{path.stem}.*"))
+    return path.resolve() in live_photo_video_sidecars(group) if group else False
 
 
 def parse_filename(path: Path) -> FilenameMeta:

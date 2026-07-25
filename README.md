@@ -116,7 +116,11 @@ See [`packaging/README.md`](packaging/README.md) for build notes. A rebuild is r
 | Fotos | JPG/JPEG, PNG, WebP, HEIC/HEIF (`pillow-heif`), DNG | EXIF `DateTimeOriginal` → sonst mtime | EXIF-GPS wenn vorhanden → OSM-Detailkarte / Weltkarte |
 | Videos | MP4, MOV, M4V, MKV | Container-`creation_time` / ffprobe → sonst mtime | Best-effort (ISO 6709 / ffprobe); **viele Handy-Videos haben kein GPS** und erscheinen trotzdem in der Bibliothek |
 
+**iPhone Live Photos:** Export oft als Standbild (`.HEIC`/`.JPG`) plus kurzes Begleit-`.MOV` mit gleichem Basisnamen. orga-drone erkennt solche Paare beim Scan, indexiert das **Bild als Foto** und blendet das Live-MOV als Sidecar aus (kein eigenständiges Video in Medien/Weltkarte). Ein alleinstehendes `.MOV` ohne passendes Bild bleibt ein normales Video.
+
 Nicht-DJI-Medien bekommen typischerweise das Label **Camera** und `source_type` phone/camera/unknown; DJI-Erkennung (SRT, Flows, Sessions) bleibt unverändert.
+
+**Weltkarte (`/map`):** Leaflet + MarkerCluster liegen unter `/static/vendor/` (kein CDN nötig). OSM-Kartentiles brauchen weiterhin Netz.
 
 App data (SQLite index) is stored in the OS app-data folder, e.g.:
 

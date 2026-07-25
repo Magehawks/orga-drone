@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ _('World map') }} · {{ _('orga-drone') }}{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster/MarkerCluster.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet.markercluster/MarkerCluster.Default.css">
 {% endblock %}
 {% block content %}
 <section class="worldmap" id="worldmap"
@@ -38,8 +37,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/vendor/leaflet.markercluster/leaflet.markercluster.js"></script>
   <script src="/static/js/worldmap.js"></script>
 {% endblock %}

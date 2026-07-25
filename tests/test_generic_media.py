@@ -242,3 +242,44 @@ def test_iter_media_files_picks_common_exts(tmp_path: Path) -> None:
     assert "b.m4v" in names
     assert "c.heic" in names
     assert "d.txt" not in names
+
+
+def test_live_photo_pair_detected(tmp_path: Path) -> None:
+    from orga_drone.parse import live_photo_video_sidecars
+
+    still = tmp_path / "IMG_0001.HEIC"
+    mov = tmp_path / "IMG_0001.MOV"
+    alone = tmp_path / "holiday.MOV"
+    still.write_bytes(b"still")
+    mov.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    alone.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+
+    sidecars = live_photo_video_sidecars([still, mov, alone])
+    assert mov.resolve() in sidecars
+    assert alone.resolve() not in sidecars
+
+
+def test_scan_skips_live_photo_mov_as_video(tmp_path: Path) -> None:
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    still = lib / "IMG_0042.JPG"
+    mov = lib / "IMG_0042.MOV"
+    real_video = lib / "clip.MOV"
+    _write_gps_image(still, make="Apple", model="iPhone 15")
+    mov.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    real_video.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+
+    db = Database(tmp_path / "live.sqlite3")
+    root_id = db.add_root(lib, label="iphone")
+    counts = scan_root(db, root_id, lib)
+
+    assert counts["photos"] >= 1
+    assert counts["videos"] == 1
+    assert counts.get("live_sidecars", 0) == 1
+
+    by_name = {i.filename: i for i in db.list_media()}
+    assert "IMG_0042.JPG" in by_name
+    assert by_name["IMG_0042.JPG"].kind == "photo"
+    assert "IMG_0042.MOV" not in by_name
+    assert "clip.MOV" in by_name
+    assert by_name["clip.MOV"].kind == "video"

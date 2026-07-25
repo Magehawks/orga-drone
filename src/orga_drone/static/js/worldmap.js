@@ -5,9 +5,16 @@
   const summaryEl = document.getElementById("list-summary");
   const countEl = document.getElementById("map-count");
   const nolocToggle = document.getElementById("show-noloc");
-  if (!root || !mapEl || typeof L === "undefined") return;
+  if (!root || !mapEl) return;
 
   const t = (key, fallback) => root.dataset[key] || fallback || "";
+
+  if (typeof L === "undefined") {
+    if (listEl) {
+      listEl.innerHTML = `<p class="hint">${t("i18nEmpty", "Map library failed to load")}</p>`;
+    }
+    return;
+  }
 
   const css = getComputedStyle(document.documentElement);
   const accent = css.getPropertyValue("--accent").trim() || "#ff9f0a";
@@ -19,6 +26,7 @@
   let selectedId = null;
   let clusterGroup = null;
   let moveTimer = null;
+  let resizeTimer = null;
 
   const map = L.map(mapEl, { worldCopyJump: true }).setView([20, 0], 2);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -279,11 +287,22 @@
       buildMarkers();
       renderList();
       // Invalidate size after layout (desktop split / mobile stack).
-      setTimeout(() => map.invalidateSize(), 50);
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        setTimeout(() => map.invalidateSize(), 120);
+      });
     } catch (err) {
       listEl.innerHTML = `<p class="hint">${escapeHtml(String(err.message || err))}</p>`;
     }
   }
+
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      map.invalidateSize();
+      renderList();
+    }, 150);
+  });
 
   load();
 })();
