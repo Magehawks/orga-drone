@@ -448,6 +448,53 @@ button.ghost.is-loading::after {
   to { transform: rotate(360deg); }
 }
 
+.busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg, #0e1116) 72%, transparent);
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+  animation: busy-fade-in 0.18s ease-out;
+}
+.busy-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.35rem 1.75rem;
+  border-radius: 12px;
+  background: var(--panel, #1a1f27);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px color-mix(in srgb, #000 35%, transparent);
+  min-width: 11rem;
+  text-align: center;
+}
+.busy-spinner {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2.5px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.busy-overlay-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+}
+body.is-busy {
+  overflow: hidden;
+}
+@keyframes busy-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }

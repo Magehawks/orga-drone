@@ -571,7 +571,7 @@ def create_app() -> FastAPI:
     async def duplicates_scan() -> RedirectResponse:
         # Fingerprints are derived from the current index (no file hashing).
         # Re-running after a library scan picks up new/removed paths.
-        groups = _compute_duplicate_groups()
+        groups = await asyncio.to_thread(_compute_duplicate_groups)
         return RedirectResponse(
             url=f"/duplicates?msg=scanned&n={len(groups)}",
             status_code=303,
@@ -586,19 +586,21 @@ def create_app() -> FastAPI:
         p = Path(path.strip().strip('"'))
         if p.exists() and p.is_dir():
             root_id = db.add_root(p, label.strip() or None)
-            scan_root(db, root_id, p)
+            await asyncio.to_thread(scan_root, db, root_id, p)
         return RedirectResponse(url="/library", status_code=303)
 
     @app.post("/library/{root_id}/scan")
     async def library_scan(root_id: int) -> RedirectResponse:
         roots = {int(r["id"]): r for r in db.list_roots()}
         if root_id in roots:
-            scan_root(db, root_id, Path(roots[root_id]["path"]))
+            await asyncio.to_thread(
+                scan_root, db, root_id, Path(roots[root_id]["path"])
+            )
         return RedirectResponse(url="/library", status_code=303)
 
     @app.post("/library/scan-all")
     async def library_scan_all() -> RedirectResponse:
-        scan_all_roots(db)
+        await asyncio.to_thread(scan_all_roots, db)
         return RedirectResponse(url="/library", status_code=303)
 
     @app.post("/library/{root_id}/remove")

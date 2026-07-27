@@ -114,7 +114,6 @@ CREATE TABLE IF NOT EXISTS media_meta (
 
 CREATE INDEX IF NOT EXISTS idx_media_recorded ON media(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_media_drone ON media(drone_model);
-CREATE INDEX IF NOT EXISTS idx_media_source ON media(source_type);
 CREATE INDEX IF NOT EXISTS idx_media_size ON media(size_bytes);
 CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
 CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);

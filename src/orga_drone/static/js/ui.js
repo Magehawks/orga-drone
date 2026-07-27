@@ -1,18 +1,50 @@
 (function () {
-  // Loading state on scan / long-running form submits
-  document.querySelectorAll("form").forEach((form) => {
+  // Loading overlay + button state on scan / long-running form submits
+  function isLongRunningForm(form) {
     const action = (form.getAttribute("action") || "").toLowerCase();
-    const isScan =
+    return (
+      action.includes("/library/add") ||
       action.includes("/scan") ||
       action.includes("scan-all") ||
-      action.includes("/duplicates/scan");
-    if (!isScan) return;
+      action.includes("/duplicates/scan")
+    );
+  }
+
+  function showBusyOverlay(message) {
+    let overlay = document.getElementById("busy-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "busy-overlay";
+      overlay.className = "busy-overlay";
+      overlay.setAttribute("role", "status");
+      overlay.setAttribute("aria-live", "polite");
+      overlay.setAttribute("aria-busy", "true");
+      overlay.innerHTML =
+        '<div class="busy-overlay-card">' +
+        '<span class="busy-spinner" aria-hidden="true"></span>' +
+        '<p class="busy-overlay-text"></p>' +
+        "</div>";
+      document.body.appendChild(overlay);
+    }
+    const text = overlay.querySelector(".busy-overlay-text");
+    if (text) text.textContent = message || "Loading…";
+    document.body.classList.add("is-busy");
+  }
+
+  document.querySelectorAll("form").forEach((form) => {
+    if (!isLongRunningForm(form)) return;
     form.addEventListener("submit", () => {
       const btn = form.querySelector('button[type="submit"], button:not([type])');
       if (btn && !btn.disabled) {
         btn.classList.add("is-loading");
         btn.setAttribute("aria-busy", "true");
+        btn.disabled = true;
       }
+      const label =
+        (btn && btn.getAttribute("data-loading-label")) ||
+        form.getAttribute("data-loading-label") ||
+        "Scanning…";
+      showBusyOverlay(label);
     });
   });
 
