@@ -4,6 +4,8 @@ Local open-source **drone video library** manager. Built first for **DJI Avata 2
 
 Your media stays on your machine. No cloud account is required for the MVP.
 
+**Windows:** [Download latest exe (zip)](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip) · [All releases](https://github.com/Magehawks/orga-drone/releases)
+
 ## Features (MVP)
 
 - Index one or more folders / drives into a single library
@@ -94,7 +96,9 @@ Fallback / power-user options:
 
 ### Windows exe (end users)
 
-1. Download the release zip from [Releases](https://github.com/Magehawks/orga-drone/releases)
+**[Download latest Windows build](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip)** (`orga-drone-windows-x64.zip`)
+
+1. Download the zip (or pick a version from [Releases](https://github.com/Magehawks/orga-drone/releases))
 2. Unzip
 3. **Double-click `orga-drone.exe`** — a desktop window opens; add a library folder when prompted
 
