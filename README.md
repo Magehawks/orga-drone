@@ -54,7 +54,7 @@ Realtime map marker follows video playback / Kartenmarker folgt der Videowiederg
 ## Install (Python application)
 
 ```bash
-git clone https://github.com/YOUR_USER/orga-drone.git
+git clone https://github.com/Magehawks/orga-drone.git
 cd orga-drone
 python -m venv .venv
 
@@ -75,6 +75,10 @@ cp .env.example .env
 ```
 
 Do **not** put passwords or API keys in the repo. The app does not need them for local use.
+
+## Contributing
+
+Bug reports, features, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
 
 ## Run
 

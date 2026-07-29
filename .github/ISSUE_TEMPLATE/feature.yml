@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        orga-drone is local-first — media stays on your machine. Ideas that fit that model are easiest to adopt.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do? Why is the current behavior insufficient?
+      placeholder: e.g. I index phone photos from vacations alongside DJI clips and want …
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work?
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope hints
+      options:
+        - label: Fits MVP / near-term roadmap (parsers, UI, local export, search)
+        - label: Willing to open a PR
+        - label: Needs discussion before implementation
