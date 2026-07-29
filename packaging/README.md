@@ -52,6 +52,8 @@ system browser. Rebuild and publish a new release so end users get double-click 
 
 User data stays outside the binary (`%APPDATA%/orga-drone`). Do not embed library paths, `.env`, or media in artifacts.
 
+Offline reverse geocoding (`reverse-geocoder`, for scan auto-tags) is bundled — no network required. Set `ORGA_DRONE_GEOCODE=off` to disable place lookup.
+
 Media files are always streamed from the configured library roots on disk — never from
 `sys._MEIPASS`. Only UI assets (templates/static/locales) live in the package.
 

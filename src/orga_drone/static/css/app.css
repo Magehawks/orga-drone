@@ -364,6 +364,32 @@ main { padding: 1rem 1.5rem 3rem; }
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.85rem;
 }
+.filter-span-2 {
+  grid-column: span 2;
+}
+@media (max-width: 640px) {
+  .filter-span-2 {
+    grid-column: span 1;
+  }
+}
+.ask-summary {
+  margin: 0.85rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ask-chip {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.8rem;
+}
 label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); }
 input, select, button, .button, textarea {
   font: inherit;
@@ -1282,6 +1308,19 @@ button.cta, .button.cta {
   padding: 0.1rem 0.35rem;
 }
 .tag-chip.more { color: var(--accent); }
+.tag-chip.auto {
+  color: var(--accent);
+  border-style: dashed;
+  background: transparent;
+}
+.auto-meta-readonly .auto-place-line {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+}
+.auto-place-label {
+  color: var(--muted);
+  margin-right: 0.35rem;
+}
 
 .dupe-group h2 {
   margin: 0 0 0.35rem;

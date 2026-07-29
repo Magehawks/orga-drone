@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS media (
     has_srt INTEGER NOT NULL DEFAULT 0,
     has_lrf INTEGER NOT NULL DEFAULT 0,
     track_json TEXT,
+    auto_tags_json TEXT NOT NULL DEFAULT '[]',
+    place_json TEXT,
     flow_id INTEGER,
     session_id INTEGER,
     updated_at TEXT NOT NULL
@@ -118,6 +120,19 @@ CREATE INDEX IF NOT EXISTS idx_media_size ON media(size_bytes);
 CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
 CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);
 CREATE INDEX IF NOT EXISTS idx_media_meta_favorite ON media_meta(favorite);
+
+CREATE TABLE IF NOT EXISTS geocode_cache (
+    lat_key REAL NOT NULL,
+    lon_key REAL NOT NULL,
+    country TEXT,
+    region TEXT,
+    city TEXT,
+    district TEXT,
+    country_code TEXT,
+    source TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (lat_key, lon_key)
+);
 """
 
 
@@ -202,6 +217,8 @@ class MediaRow:
     favorite: bool = False
     tags: list[str] = field(default_factory=list)
     notes: str = ""
+    auto_tags: list[str] = field(default_factory=list)
+    place: dict[str, Any] | None = None
 
 
 class Database:
@@ -273,6 +290,27 @@ class Database:
             conn.execute("ALTER TABLE media ADD COLUMN source_type TEXT")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_media_source ON media(source_type)"
+        )
+        media_cols = {row[1] for row in conn.execute("PRAGMA table_info(media)").fetchall()}
+        if "auto_tags_json" not in media_cols:
+            conn.execute(
+                "ALTER TABLE media ADD COLUMN auto_tags_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        if "place_json" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN place_json TEXT")
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS geocode_cache (
+                lat_key REAL NOT NULL,
+                lon_key REAL NOT NULL,
+                country TEXT,
+                region TEXT,
+                city TEXT,
+                district TEXT,
+                country_code TEXT,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (lat_key, lon_key)
+            )"""
         )
 
     def list_roots(self) -> list[sqlite3.Row]:
@@ -377,17 +415,91 @@ class Database:
                 "track_json",
                 "updated_at",
             ]
-            values = [data.get(c) for c in cols]
             if row:
+                values = [data.get(c) for c in cols]
                 sets = ", ".join(f"{c}=?" for c in cols)
                 conn.execute(f"UPDATE media SET {sets} WHERE id=?", (*values, row["id"]))
                 return int(row["id"])
-            placeholders = ", ".join("?" for _ in cols)
+            insert_cols = [*cols[:19], "auto_tags_json", "place_json", "updated_at"]
+            auto_tags = data.get("auto_tags_json") or "[]"
+            place_json = data.get("place_json")
+            values = [data.get(c) for c in cols[:19]] + [auto_tags, place_json, now]
+            placeholders = ", ".join("?" for _ in insert_cols)
             cur = conn.execute(
-                f"INSERT INTO media({', '.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO media({', '.join(insert_cols)}) VALUES ({placeholders})",
                 values,
             )
             return int(cur.lastrowid)
+
+    def update_media_auto_tags(
+        self,
+        media_id: int,
+        *,
+        auto_tags_json: str,
+        place_json: str | None,
+    ) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE media
+                   SET auto_tags_json = ?, place_json = ?, updated_at = ?
+                   WHERE id = ?""",
+                (auto_tags_json, place_json, now, media_id),
+            )
+
+    def get_geocode_cache(self, lat_key: float, lon_key: float):
+        from orga_drone.geocode import PlaceResult
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT country, region, city, district, country_code, source
+                   FROM geocode_cache WHERE lat_key = ? AND lon_key = ?""",
+                (lat_key, lon_key),
+            ).fetchone()
+        if not row:
+            return None
+        return PlaceResult(
+            country=row["country"],
+            region=row["region"],
+            city=row["city"],
+            district=row["district"],
+            country_code=row["country_code"],
+            source=row["source"] or "reverse_geocoder",
+        )
+
+    def upsert_geocode_cache(
+        self,
+        lat_key: float,
+        lon_key: float,
+        place,
+    ) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO geocode_cache(
+                       lat_key, lon_key, country, region, city, district,
+                       country_code, source, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(lat_key, lon_key) DO UPDATE SET
+                       country = excluded.country,
+                       region = excluded.region,
+                       city = excluded.city,
+                       district = excluded.district,
+                       country_code = excluded.country_code,
+                       source = excluded.source,
+                       updated_at = excluded.updated_at""",
+                (
+                    lat_key,
+                    lon_key,
+                    place.country,
+                    place.region,
+                    place.city,
+                    place.district,
+                    place.country_code,
+                    place.source,
+                    now,
+                ),
+            )
 
     def replace_flows_for_root(self, root_id: int, flows: list[list[int]], media_lookup: dict[int, dict]) -> None:
         with self.connect() as conn:
@@ -511,6 +623,8 @@ class Database:
         sessions_only: bool | None = None,
         favorite: bool | None = None,
         q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
     ) -> list[MediaRow]:
         allowed_sort = {
             "recorded_at": "m.recorded_at",
@@ -555,13 +669,22 @@ class Database:
             where.append("COALESCE(mm.favorite, 0) = 1")
         if favorite is False:
             where.append("COALESCE(mm.favorite, 0) = 0")
-        if q:
+        if date_from:
+            where.append("m.recorded_at IS NOT NULL AND date(m.recorded_at) >= date(?)")
+            params.append(date_from)
+        if date_to:
+            where.append("m.recorded_at IS NOT NULL AND date(m.recorded_at) <= date(?)")
+            params.append(date_to)
+        # Multi-token AND: each whitespace-separated term must match somewhere.
+        tokens = [t for t in (q or "").split() if t]
+        for token in tokens:
             where.append(
                 "(m.filename LIKE ? OR m.path LIKE ? OR m.drone_model LIKE ?"
-                " OR IFNULL(mm.tags_json, '') LIKE ? OR IFNULL(mm.notes, '') LIKE ?)"
+                " OR IFNULL(mm.tags_json, '') LIKE ? OR IFNULL(mm.notes, '') LIKE ?"
+                " OR IFNULL(m.auto_tags_json, '') LIKE ? OR IFNULL(m.place_json, '') LIKE ?)"
             )
-            like = f"%{q}%"
-            params.extend([like, like, like, like, like])
+            like = f"%{token}%"
+            params.extend([like, like, like, like, like, like, like])
 
         # Collapse rows:
         # - sessions_only / default: one row per multi-clip session (first item)
@@ -997,6 +1120,15 @@ class Database:
         favorite = bool(row["meta_favorite"]) if "meta_favorite" in keys else False
         tags = tags_from_json(row["meta_tags_json"] if "meta_tags_json" in keys else None)
         notes = (row["meta_notes"] or "") if "meta_notes" in keys else ""
+        auto_tags = tags_from_json(row["auto_tags_json"] if "auto_tags_json" in keys else None)
+        place_raw = row["place_json"] if "place_json" in keys else None
+        place: dict[str, Any] | None = None
+        if place_raw:
+            try:
+                parsed = json.loads(place_raw)
+                place = parsed if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                place = None
         return MediaRow(
             id=int(row["id"]),
             root_id=int(row["root_id"]),
@@ -1030,6 +1162,8 @@ class Database:
             favorite=favorite,
             tags=tags,
             notes=notes,
+            auto_tags=auto_tags,
+            place=place,
         )
 
 

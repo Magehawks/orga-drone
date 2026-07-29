@@ -35,6 +35,12 @@ from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
 from orga_drone.scan import scan_all_roots, scan_root
+from orga_drone.search import (
+    MediaSearch,
+    media_search_from_payload,
+    merge_search,
+    parse_natural_query,
+)
 from orga_drone.theme import (
     ThemePrefs,
     custom_css_vars,
@@ -94,6 +100,33 @@ def osm_link(lat: float, lon: float) -> str:
     return f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=16/{lat}/{lon}"
 
 
+def format_place(place: dict[str, Any] | None) -> str:
+    if not place:
+        return ""
+    parts: list[str] = []
+    seen: set[str] = set()
+    city = (place.get("city") or "").strip()
+    district = (place.get("district") or "").strip()
+    region = (place.get("region") or "").strip()
+    country = (place.get("country") or "").strip()
+
+    def add(label: str) -> None:
+        if not label:
+            return
+        key = label.casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        parts.append(label)
+
+    add(city)
+    if district and district.casefold() != city.casefold():
+        add(district)
+    add(region)
+    add(country)
+    return ", ".join(parts)
+
+
 def create_app() -> FastAPI:
     settings.ensure_dirs()
     db = Database(settings.db_path)
@@ -104,6 +137,7 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["filesize"] = format_bytes
     templates.env.filters["duration"] = format_duration
+    templates.env.filters["place_label"] = format_place
 
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -217,25 +251,52 @@ def create_app() -> FastAPI:
         sessions: str | None = None,
         favorite: str | None = None,
         q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        ask: str | None = None,
         view: str | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
         sessions_only = {"yes": True, "no": False}.get(sessions or "")
-        favorite_only = {"yes": True, "no": False}.get(favorite or "")
+        ask_text = (ask or "").strip()
+        parsed = parse_natural_query(ask_text) if ask_text else MediaSearch()
+        fav_explicit = {"yes": True, "no": False}.get(favorite or "")
+        search = merge_search(
+            parsed,
+            kind=kind or None,
+            date_from=date_from,
+            date_to=date_to,
+            q=q,
+            favorite=fav_explicit,
+        )
+        favorite_only = (
+            search.favorite
+            if fav_explicit is not None or search.favorite is not None
+            else None
+        )
         current_view = view_from_request(request, view)
+        resolved_kind = search.kind
+        resolved_q = search.effective_q()
+        resolved_from = search.date_from
+        resolved_to = search.date_to
         items = db.list_media(
             sort=sort,
             order=order,
             drone=drone or None,
-            kind=kind or None,
+            kind=resolved_kind,
             source=source or None,
             has_gps=has_gps,
             flows_only=flows_only,
             sessions_only=sessions_only,
             favorite=favorite_only,
-            q=q or None,
+            q=resolved_q,
+            date_from=resolved_from,
+            date_to=resolved_to,
         )
+        favorite_filter = favorite or ""
+        if not favorite_filter and search.favorite is True:
+            favorite_filter = "yes"
         response = render(
             request,
             "index.html",
@@ -243,23 +304,75 @@ def create_app() -> FastAPI:
             drones=db.distinct_drones(),
             view=current_view,
             nav_active="browse",
+            ask_summary=search.summary_parts() if ask_text else [],
             filters={
                 "sort": sort,
                 "order": order,
                 "drone": drone or "",
-                "kind": kind or "",
+                "kind": resolved_kind or "",
                 "source": source or "",
                 "gps": gps or "",
                 "flows": flows or "",
                 "sessions": sessions or "",
-                "favorite": favorite or "",
-                "q": q or "",
+                "favorite": favorite_filter,
+                "q": resolved_q or "",
+                "date_from": resolved_from or "",
+                "date_to": resolved_to or "",
+                "ask": ask_text,
                 "view": current_view,
             },
         )
         if view in {"grid", "list"}:
             response.set_cookie("view", view, max_age=365 * 24 * 3600)
         return response
+
+    @app.post("/api/search")
+    async def api_search(request: Request) -> dict[str, Any]:
+        """Structured / NL media search (JSON body). Same filters as Browse."""
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        search = media_search_from_payload(payload)
+        sort = str(payload.get("sort") or "recorded_at")
+        order = str(payload.get("order") or "desc")
+        items = db.list_media(
+            sort=sort,
+            order=order,
+            drone=(str(payload["drone"]).strip() or None) if payload.get("drone") else None,
+            kind=search.kind,
+            source=(str(payload["source"]).strip() or None) if payload.get("source") else None,
+            favorite=search.favorite,
+            q=search.effective_q(),
+            date_from=search.date_from,
+            date_to=search.date_to,
+        )
+        limit = search.limit
+        if limit is not None and limit > 0:
+            items = items[:limit]
+        return {
+            "filters": search.to_dict(),
+            "summary": search.summary_parts(),
+            "count": len(items),
+            "items": [
+                {
+                    "id": it.id,
+                    "kind": it.kind,
+                    "filename": it.filename,
+                    "recorded_at": it.recorded_at,
+                    "path": it.path,
+                    "drone_model": it.drone_model,
+                    "tags": it.tags,
+                    "auto_tags": it.auto_tags,
+                    "place": it.place,
+                    "favorite": it.favorite,
+                    "stars": it.stars,
+                }
+                for it in items
+            ],
+        }
 
     @app.get("/map", response_class=HTMLResponse)
     async def world_map(request: Request) -> HTMLResponse:

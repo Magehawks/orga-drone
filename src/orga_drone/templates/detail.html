@@ -75,6 +75,26 @@
   </dl>
 
   <div class="actions-panel">
+    {% if item.auto_tags or item.place %}
+    <div class="action-form auto-meta-readonly">
+      <h2>{{ _('Auto tags') }}</h2>
+      {% if item.place %}
+      <p class="auto-place-line">
+        <span class="auto-place-label">{{ _('Place') }}:</span>
+        {{ item.place|place_label or '—' }}
+      </p>
+      {% endif %}
+      {% if item.auto_tags %}
+      <div class="tag-line">
+        {% for tag in item.auto_tags %}
+          <span class="tag-chip auto">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <p class="hint">{{ _('Set automatically during scan from date and GPS. Not editable here.') }}</p>
+    </div>
+    {% endif %}
+
     <form method="post" action="/media/{{ item.id }}/meta" class="action-form meta-form">
       <h2>{{ _('Tags & notes') }}</h2>
       <fieldset class="stars-field">

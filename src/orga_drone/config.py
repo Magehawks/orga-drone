@@ -35,11 +35,17 @@ def _default_data_dir() -> Path:
     return (base / "orga-drone").resolve()
 
 
+def _geocode_mode() -> str:
+    raw = os.getenv("ORGA_DRONE_GEOCODE", "offline").strip().lower()
+    return raw if raw in {"off", "offline"} else "offline"
+
+
 @dataclass(frozen=True)
 class Settings:
     host: str = os.getenv("ORGA_DRONE_HOST", "127.0.0.1")
     port: int = int(os.getenv("ORGA_DRONE_PORT", "8765"))
     default_lang: str = os.getenv("ORGA_DRONE_LANG", "de")
+    geocode_mode: str = _geocode_mode()
     data_dir: Path = _default_data_dir()
 
     @property

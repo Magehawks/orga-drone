@@ -23,6 +23,9 @@ Your media stays on your machine. No cloud account is required for the MVP.
 - **Spot export** (GeoJSON / `.orga-spot.json`) from the detail page when GPS is available — **local download only**, no upload
 - Detect **likely duplicates** across library folders (SD + backup) via DJI stem / size+date+duration heuristics — no auto-delete
 - **Live SRT telemetry overlay** on the detail player (altitude + ground speed) synced to playback when a track exists
+- **Browse date range** — filter by `date_from` / `date_to` on recorded date (Browse page + URL params)
+- **Ask the library** — natural-language search (DE/EN rule parser), e.g. `videos from Malta vacation`, `photos November 2025`; programmatic access via `POST /api/search` (JSON)
+- **Auto-tags on scan** — year/month from `recorded_at` (`2025`, `2025-11`) and offline place names from GPS (`reverse-geocoder`, SQLite cache); stored in `auto_tags_json` / `place_json`, separate from manual user tags
 
 ## Screenshots
 
@@ -45,6 +48,7 @@ Realtime map marker follows video playback / Kartenmarker folgt der Videowiederg
 ## Requirements
 
 - Python **3.11+**
+- `reverse-geocoder` (via `requirements.txt`) for offline place auto-tags when GPS is present
 - Optional: network access for OSM map tiles (library itself works offline)
 
 ## Install (Python application)
@@ -111,7 +115,31 @@ See [`packaging/README.md`](packaging/README.md) for build notes. A rebuild is r
    - Windows: `D:\DroneMedia`
    - macOS/Linux: `/media/user/drone`
 3. Click **Add folder** (scans immediately)
-4. Browse, filter, and open details / map
+4. Browse, filter by date range, **Ask the library**, and open details / map
+
+### Browse & search
+
+On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date. **Ask the library** accepts short DE/EN phrases (kind, month/year, place keywords, favorites) — parsed server-side and combined with explicit filters.
+
+Examples: `videos from Malta`, `photos November 2025`, `favoriten 2024`.
+
+JSON API (same filter logic):
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"ask": "photos November 2025"}'
+```
+
+Body fields: `ask` (or `query`), plus optional `kind`, `date_from`, `date_to`, `q`, `place`, `tags`, `favorite`, `limit`. Explicit fields override parsed NL fields when both are set.
+
+### Tags
+
+Each library scan computes **auto tags** from metadata: calendar year and month from `recorded_at`, plus city/region/country from GPS when available (offline reverse geocoding, cached in SQLite). Auto tags are read-only on the detail page. **User tags** on the detail form stay fully manual and editable (`tags_json` per library path).
+
+Disable GPS place lookup (time tags still apply): `ORGA_DRONE_GEOCODE=off` in `.env` (default: `offline`).
+
+**Auto-Tags beim Scan:** Jahr/Monat aus Aufnahmedatum; Ortsnamen offline aus GPS (Standard). Nutzer-Tags bleiben manuell auf der Detailseite.
 
 **Urlaubs- und Hobby-Medien (markenunabhängig):** Neben DJI-Dateien indexiert orga-drone normale Fotos und Videos von Smartphones und Kameras (iPhone, Android, Canon, Sony, Nikon, GoPro, …) — **ohne** `DJI_`-Dateinamenpflicht. Unter **Medien** filtert **Quelle** nach Drohne vs. andere Geräte.
 
@@ -133,6 +161,8 @@ App data (SQLite index) is stored in the OS app-data folder, e.g.:
 - Linux: `~/.local/share/orga-drone/`
 
 Override with `ORGA_DRONE_DATA_DIR` in `.env`.
+
+`ORGA_DRONE_GEOCODE` — `offline` (default, bundled reverse geocoder) or `off` to skip place lookup during scan.
 
 ### Themes
 
@@ -201,7 +231,7 @@ On a video detail page with a scanned SRT track, a small **Telemetry** panel app
 
 - Optional community sharing of flight spots (opt-in; builds on local GeoJSON export)
 - ffmpeg burn-in of SRT telemetry into a short preview export
-- Reverse geocoding (place names)
+- Online geocoding providers (auto-tags are offline today)
 - More drone brands via parsers
 - CI-built installers for Windows / macOS / Linux
 

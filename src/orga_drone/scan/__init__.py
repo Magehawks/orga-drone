@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from orga_drone.auto_tags import apply_auto_tags_to_media
 from orga_drone.db import Database, track_from_json, track_to_json
 from orga_drone.group import (
     ClipForGrouping,
@@ -134,7 +135,7 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
 
         recorded = parsed.recorded_at.isoformat(timespec="seconds") if parsed.recorded_at else None
 
-        db.upsert_media(
+        media_id = db.upsert_media(
             {
                 "root_id": root_id,
                 "primary_asset_id": asset_id,
@@ -163,6 +164,13 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
             filename=path.name,
             size_bytes=parsed.size_bytes,
             recorded_at=recorded,
+        )
+        apply_auto_tags_to_media(
+            db,
+            media_id,
+            recorded_at=recorded,
+            latitude=parsed.latitude,
+            longitude=parsed.longitude,
         )
         if parsed.kind == "video":
             counts["videos"] += 1

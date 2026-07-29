@@ -18,9 +18,22 @@
 <section class="panel filters">
   <form method="get" action="/browse" class="filter-grid" id="filter-form">
     <input type="hidden" name="view" value="{{ view }}">
+    <label class="filter-span-2">
+      {{ _('Ask the library') }}
+      <input type="search" name="ask" value="{{ filters.ask }}"
+             placeholder="{{ _('e.g. videos from Malta vacation, photos November 2025') }}">
+    </label>
     <label>
       {{ _('Search') }}
       <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ _('Filename, tags, notes…') }}">
+    </label>
+    <label>
+      {{ _('From') }}
+      <input type="date" name="date_from" value="{{ filters.date_from }}">
+    </label>
+    <label>
+      {{ _('To') }}
+      <input type="date" name="date_to" value="{{ filters.date_to }}">
     </label>
     <label>
       {{ _('Sort by') }}
@@ -104,13 +117,21 @@
       <a class="button ghost" href="/browse?view={{ view }}">{{ _('Reset') }}</a>
     </div>
   </form>
+  {% if ask_summary %}
+  <p class="ask-summary" role="status">
+    {{ _('Interpreted as') }}:
+    {% for part in ask_summary %}
+      <span class="ask-chip">{{ part }}</span>
+    {% endfor %}
+  </p>
+  {% endif %}
   <div class="view-toggle">
     <span>{{ _('View') }}</span>
     <div class="seg-control" role="group" aria-label="{{ _('View') }}">
       <a class="seg-item {% if view=='grid' %}active{% endif %}"
-         href="/browse?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('Grid') }}</a>
+         href="/browse?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}">{{ _('Grid') }}</a>
       <a class="seg-item {% if view=='list' %}active{% endif %}"
-         href="/browse?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}">{{ _('List') }}</a>
+         href="/browse?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}">{{ _('List') }}</a>
     </div>
   </div>
 </section>
@@ -178,6 +199,13 @@
           {% endfor %}
           {% if item.tags|length > 4 %}<span class="tag-chip more">+{{ item.tags|length - 4 }}</span>{% endif %}
         </div>
+        {% elif item.auto_tags %}
+        <div class="tag-line">
+          {% for tag in item.auto_tags[:3] %}
+            <span class="tag-chip auto">{{ tag }}</span>
+          {% endfor %}
+          {% if item.auto_tags|length > 3 %}<span class="tag-chip more auto">+{{ item.auto_tags|length - 3 }}</span>{% endif %}
+        </div>
         {% endif %}
       </div>
     </a>
@@ -218,6 +246,12 @@
               <div class="tag-line compact">
                 {% for tag in item.tags[:3] %}
                   <span class="tag-chip">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            {% elif item.auto_tags %}
+              <div class="tag-line compact">
+                {% for tag in item.auto_tags[:2] %}
+                  <span class="tag-chip auto">{{ tag }}</span>
                 {% endfor %}
               </div>
             {% endif %}
