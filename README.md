@@ -60,7 +60,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Folder library + browse/list | Available | Full **rescan** per root (not incremental) |
+| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
 | iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
@@ -243,7 +243,7 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 **Possible next steps** (not available now):
 
 - Projects or albums for organizing media sets
-- Incremental or cheaper library rescans; clearer scan progress
+- Incremental or cheaper library rescans
 - Broader multi-brand parsers beyond the current DJI-first depth
 - ffmpeg burn-in of telemetry into a short preview export
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)

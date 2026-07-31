@@ -23,17 +23,40 @@ from orga_drone.parse import (
     live_photo_video_sidecars,
     parse_media_file,
 )
+from orga_drone.scan.progress import ProgressCallback, ScanProgress, display_scan_path
 
 MEDIA_EXTS = VIDEO_EXTS | PHOTO_EXTS | PROXY_EXTS | SUBTITLE_EXTS
 
 
-def iter_media_files(root: Path) -> list[Path]:
+def iter_media_files(
+    root: Path,
+    on_found: ProgressCallback | None = None,
+    *,
+    root_id: int | None = None,
+) -> list[Path]:
+    """Collect media-extension files under ``root``.
+
+    Optional ``on_found`` receives discovering progress (discovered count,
+    UI-safe current path). Non-media files are not counted.
+    """
+    root_resolved = root.resolve()
     files: list[Path] = []
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        if path.suffix.lower() in MEDIA_EXTS:
-            files.append(path)
+        if path.suffix.lower() not in MEDIA_EXTS:
+            continue
+        files.append(path)
+        if on_found is not None:
+            on_found(
+                ScanProgress(
+                    phase="discovering",
+                    discovered=len(files),
+                    processed=0,
+                    current_path=display_scan_path(path, root_resolved),
+                    root_id=root_id,
+                )
+            )
     return sorted(files)
 
 
@@ -76,9 +99,45 @@ def _clip_for_session(mid: int, row: dict) -> ClipForSession:
     )
 
 
-def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
+def _emit(
+    on_progress: ProgressCallback | None,
+    *,
+    phase: str,
+    discovered: int = 0,
+    processed: int = 0,
+    current_path: str | None = None,
+    root_id: int | None = None,
+) -> None:
+    if on_progress is None:
+        return
+    on_progress(
+        ScanProgress(
+            phase=phase,
+            discovered=discovered,
+            processed=processed,
+            current_path=current_path,
+            root_id=root_id,
+        )
+    )
+
+
+def scan_root(
+    db: Database,
+    root_id: int,
+    root_path: Path,
+    on_progress: ProgressCallback | None = None,
+) -> dict[str, int]:
     root_path = root_path.resolve()
-    files = iter_media_files(root_path)
+    _emit(on_progress, phase="discovering", discovered=0, processed=0, root_id=root_id)
+    files = iter_media_files(root_path, on_progress, root_id=root_id)
+    discovered = len(files)
+    _emit(
+        on_progress,
+        phase="indexing",
+        discovered=discovered,
+        processed=0,
+        root_id=root_id,
+    )
 
     by_stem: dict[str, list[Path]] = {}
     for f in files:
@@ -91,7 +150,7 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
 
     counts = {"assets": 0, "videos": 0, "photos": 0, "live_sidecars": 0}
 
-    for path in files:
+    for index, path in enumerate(files, start=1):
         parsed = parse_media_file(path)
         try:
             resolved = path.resolve()
@@ -119,9 +178,25 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
 
         if asset_kind == "live_sidecar":
             counts["live_sidecars"] += 1
+            _emit(
+                on_progress,
+                phase="indexing",
+                discovered=discovered,
+                processed=index,
+                current_path=display_scan_path(path, root_path),
+                root_id=root_id,
+            )
             continue
 
         if parsed.kind not in {"video", "photo"}:
+            _emit(
+                on_progress,
+                phase="indexing",
+                discovered=discovered,
+                processed=index,
+                current_path=display_scan_path(path, root_path),
+                root_id=root_id,
+            )
             continue
 
         sibs = _siblings(parsed.stem_base, by_stem)
@@ -177,6 +252,24 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
         else:
             counts["photos"] += 1
 
+        _emit(
+            on_progress,
+            phase="indexing",
+            discovered=discovered,
+            processed=index,
+            current_path=display_scan_path(path, root_path),
+            root_id=root_id,
+        )
+
+    _emit(
+        on_progress,
+        phase="grouping",
+        discovered=discovered,
+        processed=discovered,
+        current_path=None,
+        root_id=root_id,
+    )
+
     # Build flows for videos
     media_map = db.media_map_for_root(root_id)
     clips: list[ClipForGrouping] = []
@@ -216,17 +309,27 @@ def scan_root(db: Database, root_id: int, root_path: Path) -> dict[str, int]:
     )
     counts["flows"] = multi_flows
     counts["sessions"] = multi_sessions
+    _emit(
+        on_progress,
+        phase="done",
+        discovered=discovered,
+        processed=discovered,
+        current_path=None,
+        root_id=root_id,
+    )
     return counts
 
 
-def scan_all_roots(db: Database) -> list[dict]:
+def scan_all_roots(
+    db: Database,
+    on_progress: ProgressCallback | None = None,
+) -> list[dict]:
     results = []
     for root in db.list_roots():
         path = Path(root["path"])
         if not path.exists():
             results.append({"root_id": root["id"], "path": root["path"], "error": "missing"})
             continue
-        counts = scan_root(db, int(root["id"]), path)
+        counts = scan_root(db, int(root["id"]), path, on_progress=on_progress)
         results.append({"root_id": root["id"], "path": root["path"], **counts})
     return results
-

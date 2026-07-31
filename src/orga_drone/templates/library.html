@@ -1,9 +1,27 @@
 {% extends "base.html" %}
 {% block title %}{{ _('Library') }} · {{ _('orga-drone') }}{% endblock %}
 {% block content %}
-<section class="panel">
+<section
+  class="panel"
+  id="library-panel"
+  data-scan-job="{{ scan_job_id or '' }}"
+  data-i18n-scanning="{{ _('Scanning…') }}"
+  data-i18n-discovering="{{ _('Discovering media…') }}"
+  data-i18n-indexing="{{ _('Indexing media…') }}"
+  data-i18n-grouping="{{ _('Grouping flows and sessions…') }}"
+  data-i18n-completed="{{ _('Scan completed') }}"
+  data-i18n-failed="{{ _('Scan failed') }}"
+  data-i18n-progress="{{ _('Processed {processed} of {discovered}') }}"
+  data-i18n-current="{{ _('Current: {path}') }}"
+>
   <h1>{{ _('Manage libraries') }}</h1>
   <p>{{ _('Local only — your videos never leave this computer.') }}</p>
+
+  {% if scan_error == 'busy' %}
+  <div class="flash err" role="alert">
+    {{ _('A library scan is already running. Wait for it to finish before starting another.') }}
+  </div>
+  {% endif %}
 
   <form method="post" action="/library/add" class="add-form" id="add-folder-form">
     <label>

@@ -23,12 +23,13 @@ Highlights:
 - Flows, heuristic sessions, maps, rule-based Ask the library
 - User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
+- Library scan progress (live phase/counters during full rescan)
 
 ## Next (possible near-term)
 
 Not scheduled commitments — candidate improvements:
 
-1. **Incremental or cheaper rescans** and clearer scan progress
+1. **Incremental or cheaper rescans** (clearer scan progress is available)
 2. **Broader multi-brand parsers** beyond DJI-first depth
 3. **Projects or albums** for organizing media sets
 4. **ffmpeg telemetry burn-in** into a short preview export

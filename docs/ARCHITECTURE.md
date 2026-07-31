@@ -80,6 +80,12 @@ Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
 HTTP triggers in `app.py`: add root, scan one root, scan all.
 
+Library scans run in a **background thread** with an in-memory job
+(`src/orga_drone/scan/jobs.py`). The browser polls `GET /api/scan-jobs/{id}`
+for phase/counters (discovering / indexing / grouping). Full-rescan semantics
+are unchanged; jobs are not persisted in SQLite. At most one library scan runs
+at a time.
+
 ## UI surfaces
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,

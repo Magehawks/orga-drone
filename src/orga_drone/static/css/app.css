@@ -513,6 +513,38 @@ button.ghost.is-loading::after {
   font-weight: 500;
   color: var(--text);
 }
+.busy-overlay-detail,
+.busy-overlay-path {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  max-width: 22rem;
+  word-break: break-word;
+}
+.busy-progress {
+  width: 12rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  overflow: hidden;
+}
+.busy-progress-bar {
+  height: 100%;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.busy-progress.is-indeterminate .busy-progress-bar {
+  animation: busy-progress-indeterminate 1.1s ease-in-out infinite;
+}
+.busy-progress.is-determinate .busy-progress-bar {
+  width: 0%;
+  transition: width 0.2s ease-out;
+}
+@keyframes busy-progress-indeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(280%); }
+}
 body.is-busy {
   overflow: hidden;
 }
