@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import quote, urlencode, urlparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -35,6 +36,8 @@ from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
 from orga_drone.scan import scan_all_roots, scan_root
+from orga_drone.scan.jobs import ScanJobStore
+from orga_drone.scan.progress import ProgressCallback
 from orga_drone.search import (
     MediaSearch,
     media_search_from_payload,
@@ -133,6 +136,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="orga-drone", version=__version__)
     app.state.db = db
+    app.state.scan_jobs = ScanJobStore()
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["filesize"] = format_bytes
@@ -777,31 +781,84 @@ def create_app() -> FastAPI:
             status_code=303,
         )
 
+    def _start_library_scan(
+        *,
+        root_id: int | None,
+        work: Callable[[ProgressCallback], Any],
+    ) -> RedirectResponse:
+        store: ScanJobStore = app.state.scan_jobs
+        job = store.try_create(root_id=root_id)
+        if job is None:
+            return RedirectResponse(url="/library?scan_error=busy", status_code=303)
+
+        def runner() -> None:
+            store.mark_running(job.id)
+
+            def on_progress(progress: Any) -> None:
+                store.apply_progress(job.id, progress)
+
+            try:
+                result = work(on_progress)
+                store.complete(job.id, result)
+            except Exception as exc:  # noqa: BLE001 — surface to UI job state
+                # Avoid leaking absolute filesystem paths into the UI.
+                message = f"{exc.__class__.__name__}: scan could not be completed"
+                store.fail(job.id, message)
+
+        threading.Thread(target=runner, name=f"scan-job-{job.id[:8]}", daemon=True).start()
+        return RedirectResponse(url=f"/library?scan_job={job.id}", status_code=303)
+
     @app.get("/library", response_class=HTMLResponse)
     async def library_page(request: Request) -> HTMLResponse:
-        return render(request, "library.html", roots=db.list_roots(), scan_result=None)
+        scan_error = request.query_params.get("scan_error")
+        scan_job = request.query_params.get("scan_job")
+        return render(
+            request,
+            "library.html",
+            roots=db.list_roots(),
+            scan_result=None,
+            scan_error=scan_error,
+            scan_job_id=scan_job,
+        )
+
+    @app.get("/api/scan-jobs/{job_id}")
+    async def scan_job_status(job_id: str) -> JSONResponse:
+        store: ScanJobStore = app.state.scan_jobs
+        job = store.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Scan job not found")
+        return JSONResponse(job.to_dict())
 
     @app.post("/library/add")
     async def library_add(path: str = Form(...), label: str = Form("")) -> RedirectResponse:
         p = Path(path.strip().strip('"'))
-        if p.exists() and p.is_dir():
-            root_id = db.add_root(p, label.strip() or None)
-            await asyncio.to_thread(scan_root, db, root_id, p)
-        return RedirectResponse(url="/library", status_code=303)
+        if not (p.exists() and p.is_dir()):
+            return RedirectResponse(url="/library", status_code=303)
+        root_id = db.add_root(p, label.strip() or None)
+        return _start_library_scan(
+            root_id=root_id,
+            work=lambda on_progress: scan_root(db, root_id, p, on_progress=on_progress),
+        )
 
     @app.post("/library/{root_id}/scan")
     async def library_scan(root_id: int) -> RedirectResponse:
         roots = {int(r["id"]): r for r in db.list_roots()}
-        if root_id in roots:
-            await asyncio.to_thread(
-                scan_root, db, root_id, Path(roots[root_id]["path"])
-            )
-        return RedirectResponse(url="/library", status_code=303)
+        if root_id not in roots:
+            return RedirectResponse(url="/library", status_code=303)
+        root_path = Path(roots[root_id]["path"])
+        return _start_library_scan(
+            root_id=root_id,
+            work=lambda on_progress: scan_root(
+                db, root_id, root_path, on_progress=on_progress
+            ),
+        )
 
     @app.post("/library/scan-all")
     async def library_scan_all() -> RedirectResponse:
-        await asyncio.to_thread(scan_all_roots, db)
-        return RedirectResponse(url="/library", status_code=303)
+        return _start_library_scan(
+            root_id=None,
+            work=lambda on_progress: scan_all_roots(db, on_progress=on_progress),
+        )
 
     @app.post("/library/{root_id}/remove")
     async def library_remove(root_id: int) -> RedirectResponse:
