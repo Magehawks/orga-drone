@@ -628,6 +628,9 @@ button.cta, .button.cta {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.detail-map-return {
+  margin: -0.35rem 0 1rem;
+}
 
 .meta {
   display: grid;

@@ -14,6 +14,11 @@ if TYPE_CHECKING:
     from PIL import Image
 
 THUMB_SIZE = (480, 270)
+# Detail-page JPEG for formats browsers cannot show natively (HEIC/HEIF/DNG).
+PHOTO_PREVIEW_MAX = (1920, 1920)
+
+# Suffixes most browsers can render in <img src> without conversion.
+BROWSER_NATIVE_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
 def thumbs_dir() -> Path:
@@ -33,13 +38,19 @@ def find_proxy(path: Path) -> Path | None:
     return sibling_with_suffix(path, ".LRF") or sibling_with_suffix(path, ".lrf")
 
 
-def _cache_path(media_id: int, source: Path) -> Path:
+def browser_can_display_photo(path: Path) -> bool:
+    """True when a typical browser can show this photo file in an <img> tag."""
+    return path.suffix.lower() in BROWSER_NATIVE_PHOTO_EXTS
+
+
+def _cache_path(media_id: int, source: Path, *, prefix: str = "") -> Path:
     try:
         mtime = source.stat().st_mtime_ns
     except OSError:
         mtime = 0
     digest = hashlib.sha1(f"{media_id}:{source}:{mtime}".encode()).hexdigest()[:16]
-    return thumbs_dir() / f"{media_id}_{digest}.jpg"
+    name = f"{prefix}{media_id}_{digest}.jpg" if prefix else f"{media_id}_{digest}.jpg"
+    return thumbs_dir() / name
 
 
 def _placeholder(kind: str, label: str) -> Image.Image:
@@ -53,17 +64,27 @@ def _placeholder(kind: str, label: str) -> Image.Image:
     return img
 
 
-def _save_image(img: Image.Image, dest: Path) -> Path:
+def _save_image(
+    img: Image.Image,
+    dest: Path,
+    *,
+    size: tuple[int, int] = THUMB_SIZE,
+    letterbox: bool = True,
+    quality: int = 82,
+) -> Path:
     from PIL import Image
 
     img = img.convert("RGB")
-    img.thumbnail(THUMB_SIZE, Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", THUMB_SIZE, (12, 18, 24))
-    x = (THUMB_SIZE[0] - img.width) // 2
-    y = (THUMB_SIZE[1] - img.height) // 2
-    canvas.paste(img, (x, y))
+    img.thumbnail(size, Image.Resampling.LANCZOS)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(dest, "JPEG", quality=82, optimize=True)
+    if letterbox:
+        canvas = Image.new("RGB", size, (12, 18, 24))
+        x = (size[0] - img.width) // 2
+        y = (size[1] - img.height) // 2
+        canvas.paste(img, (x, y))
+        canvas.save(dest, "JPEG", quality=quality, optimize=True)
+    else:
+        img.save(dest, "JPEG", quality=quality, optimize=True)
     return dest
 
 
@@ -132,3 +153,38 @@ def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> 
 
     _save_image(_placeholder(kind, filename), cache)
     return cache
+
+
+def ensure_photo_preview(
+    *, media_id: int, path: Path, filename: str | None = None
+) -> Path:
+    """JPEG suitable for detail <img> when the original is HEIC/HEIF/DNG/etc.
+
+    Falls back to the map/grid thumbnail (including placeholder) so the detail
+    page never ends up with a broken image while thumbs still render.
+    """
+    from PIL import Image
+
+    from orga_drone.parse import ensure_heif_support
+
+    ensure_heif_support()
+    cache = _cache_path(media_id, path, prefix="prev_")
+    if cache.exists():
+        return cache
+    try:
+        with Image.open(path) as img:
+            _save_image(
+                img,
+                cache,
+                size=PHOTO_PREVIEW_MAX,
+                letterbox=False,
+                quality=88,
+            )
+        return cache
+    except OSError:
+        return ensure_thumbnail(
+            media_id=media_id,
+            path=path,
+            kind="photo",
+            filename=filename or path.name,
+        )

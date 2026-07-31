@@ -6,7 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -50,7 +50,7 @@ from orga_drone.theme import (
     prefs_from_cookies,
     save_theme_file,
 )
-from orga_drone.thumbs import ensure_thumbnail
+from orga_drone.thumbs import browser_can_display_photo, ensure_photo_preview, ensure_thumbnail
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = PACKAGE_DIR / "templates"
@@ -177,6 +177,47 @@ def create_app() -> FastAPI:
             pass
         return "/"
 
+    def map_return_from_request(
+        request: Request, media_id: int
+    ) -> tuple[str | None, str]:
+        """Build world-map return URL + detail qs when navigated from /map.
+
+        Expects ``?from=map&lat=&lon=&zoom=`` (zoom optional). Returns
+        ``(return_url, detail_qs)`` or ``(None, "")`` when not from the map.
+        """
+        qp = request.query_params
+        if qp.get("from") != "map":
+            return None, ""
+        lat: float | None = None
+        lon: float | None = None
+        zoom: float | None = None
+        try:
+            if qp.get("lat") is not None and qp.get("lon") is not None:
+                lat = float(qp["lat"])
+                lon = float(qp["lon"])
+                if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                    lat = lon = None
+        except (TypeError, ValueError):
+            lat = lon = None
+        try:
+            if qp.get("zoom") is not None:
+                zoom = max(1.0, min(19.0, float(qp["zoom"])))
+        except (TypeError, ValueError):
+            zoom = None
+        detail: dict[str, str] = {"from": "map"}
+        ret: dict[str, str] = {"focus": str(media_id)}
+        if lat is not None and lon is not None:
+            lat_s, lon_s = f"{lat:.6f}", f"{lon:.6f}"
+            detail["lat"] = lat_s
+            detail["lon"] = lon_s
+            ret["lat"] = lat_s
+            ret["lon"] = lon_s
+            if zoom is not None:
+                zoom_s = f"{zoom:.2f}".rstrip("0").rstrip(".")
+                detail["zoom"] = zoom_s
+                ret["zoom"] = zoom_s
+        return f"/map?{urlencode(ret)}", urlencode(detail)
+
     def ctx(request: Request, **extra: Any) -> dict[str, Any]:
         lang = lang_from_request(request)
         _ = get_translator(lang)
@@ -209,16 +250,19 @@ def create_app() -> FastAPI:
         # Starlette FileResponse supports HTTP Range (partial content) and
         # streams in chunks — no full-file read into memory.
         media_type = MIME_BY_SUFFIX.get(path.suffix.lower(), "application/octet-stream")
-        return FileResponse(
-            path,
-            media_type=media_type,
-            filename=path.name,
-            content_disposition_type="inline",
-            headers={
+        # Omit filename for images: some WebView2 builds treat
+        # Content-Disposition filename=… as a download and skip <img> display.
+        kwargs: dict[str, Any] = {
+            "media_type": media_type,
+            "content_disposition_type": "inline",
+            "headers": {
                 "Accept-Ranges": "bytes",
                 "Cache-Control": "private, max-age=3600",
             },
-        )
+        }
+        if not media_type.startswith("image/"):
+            kwargs["filename"] = path.name
+        return FileResponse(path, **kwargs)
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> HTMLResponse:
@@ -482,6 +526,14 @@ def create_app() -> FastAPI:
         play_has_proxy = proxy_path is not None
         play_can = media_path is not None
         play_start_index = 0
+        # Browsers cannot show HEIC/HEIF/DNG in <img>; map thumbs are JPEG — detail
+        # must use a converted preview for those formats.
+        photo_src: str | None = None
+        if item.kind == "photo" and media_path is not None:
+            if browser_can_display_photo(media_path):
+                photo_src = f"/media/{item.id}/stream"
+            else:
+                photo_src = f"/media/{item.id}/preview"
         if active_tab == "flight" and flight_playlist:
             for i, entry in enumerate(flight_playlist):
                 if entry["id"] == item.id:
@@ -493,6 +545,7 @@ def create_app() -> FastAPI:
             play_can = bool(start_entry["can_play"])
 
         stem = Path(item.filename).stem
+        map_return_url, map_from_qs = map_return_from_request(request, item.id)
         return render(
             request,
             "detail.html",
@@ -516,12 +569,15 @@ def create_app() -> FastAPI:
             has_proxy=play_has_proxy,
             play_id=play_id,
             play_start_index=play_start_index,
+            photo_src=photo_src,
             can_merge=multi_flow and item.kind == "video",
             ffmpeg_ok=ffmpeg_available(),
             merge_default_name=default_merge_name(item) if item.kind == "video" else "",
             rename_stem=stem,
             flash_msg=msg,
             flash_error=error,
+            map_return_url=map_return_url,
+            map_from_qs=map_from_qs,
         )
 
     @app.post("/media/{media_id}/meta")
@@ -630,6 +686,37 @@ def create_app() -> FastAPI:
         )
         return FileResponse(
             thumb,
+            media_type="image/jpeg",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+    @app.get("/media/{media_id}/preview")
+    async def media_preview(media_id: int) -> FileResponse:
+        """JPEG detail preview for photos browsers cannot display natively (HEIC/…)."""
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        if item.kind != "photo":
+            raise HTTPException(status_code=404, detail="Not a photo")
+        path = resolve_media_file(db, item)
+        if path is None:
+            raise HTTPException(status_code=404, detail="File missing")
+        if browser_can_display_photo(path):
+            return file_response(path)
+        try:
+            preview = await asyncio.to_thread(
+                ensure_photo_preview,
+                media_id=item.id,
+                path=path,
+                filename=item.filename,
+            )
+        except OSError as exc:
+            raise HTTPException(
+                status_code=404, detail="Preview unavailable"
+            ) from exc
+        return FileResponse(
+            preview,
             media_type="image/jpeg",
             content_disposition_type="inline",
             headers={"Cache-Control": "private, max-age=86400"},

@@ -12,3 +12,6 @@ msgstr "Bibliothek"
 
 msgid "Open in OpenStreetMap"
 msgstr "In OpenStreetMap öffnen"
+
+msgid "Back to map"
+msgstr "Zurück zur Karte"

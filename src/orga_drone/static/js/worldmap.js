@@ -34,6 +34,34 @@
     attribution: "&copy; OpenStreetMap",
   }).addTo(map);
 
+  function parseReturnView() {
+    const sp = new URLSearchParams(window.location.search);
+    const lat = parseFloat(sp.get("lat"));
+    const lon = parseFloat(sp.get("lon"));
+    const zoom = parseFloat(sp.get("zoom"));
+    const focusRaw = sp.get("focus") || sp.get("media") || "";
+    const focus = parseInt(focusRaw, 10);
+    return {
+      hasView: Number.isFinite(lat) && Number.isFinite(lon),
+      lat,
+      lon,
+      zoom: Number.isFinite(zoom) ? Math.max(1, Math.min(19, zoom)) : 12,
+      focus: Number.isFinite(focus) ? focus : null,
+    };
+  }
+
+  function mediaDetailUrl(item) {
+    const c = map.getCenter();
+    const z = map.getZoom();
+    const params = new URLSearchParams({
+      from: "map",
+      lat: c.lat.toFixed(6),
+      lon: c.lng.toFixed(6),
+      zoom: String(Math.round(z * 100) / 100),
+    });
+    return `/media/${item.id}?${params}`;
+  }
+
   function markerIcon() {
     return L.divIcon({
       className: "wm-marker",
@@ -153,7 +181,7 @@
     li.dataset.id = String(item.id);
 
     const a = document.createElement("a");
-    a.href = `/media/${item.id}`;
+    a.href = mediaDetailUrl(item);
     a.className = "wm-item-link";
 
     const thumb = document.createElement("img");
@@ -211,7 +239,8 @@
     }
   }
 
-  function buildMarkers() {
+  function buildMarkers(opts) {
+    const skipFit = Boolean(opts && opts.skipFit);
     markersById = new Map();
     if (clusterGroup) {
       map.removeLayer(clusterGroup);
@@ -238,22 +267,31 @@
       const m = L.marker([item.lat, item.lon], { icon: markerIcon(), title: item.filename });
       m.bindPopup(
         `<strong>${escapeHtml(item.filename)}</strong><br>` +
-          `<a href="/media/${item.id}">${escapeHtml(t("i18nOpen", "Open"))}</a>`
+          `<a href="${mediaDetailUrl(item)}">${escapeHtml(t("i18nOpen", "Open"))}</a>`
       );
       m.on("click", () => {
         selectedId = item.id;
         renderList();
         highlightMarker(item.id, false);
       });
+      // Refresh popup link with current viewport when opened (center may have moved).
+      m.on("popupopen", () => {
+        const el = m.getPopup() && m.getPopup().getElement();
+        if (!el) return;
+        const link = el.querySelector("a");
+        if (link) link.href = mediaDetailUrl(item);
+      });
       clusterGroup.addLayer(m);
       markersById.set(item.id, m);
       bounds.push([item.lat, item.lon]);
     }
     map.addLayer(clusterGroup);
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 12);
-    } else if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 12 });
+    if (!skipFit) {
+      if (bounds.length === 1) {
+        map.setView(bounds[0], 12);
+      } else if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [36, 36], maxZoom: 12 });
+      }
     }
   }
 
@@ -277,6 +315,7 @@
   }
 
   async function load() {
+    const returnView = parseReturnView();
     listEl.innerHTML = `<p class="hint">${escapeHtml(t("i18nLoading", "Loading…"))}</p>`;
     try {
       const resp = await fetch("/api/geo/media?include_noloc=1");
@@ -284,7 +323,28 @@
       const data = await resp.json();
       allPoints = Array.isArray(data.items) ? data.items : [];
       withoutLoc = Array.isArray(data.without_location) ? data.without_location : [];
-      buildMarkers();
+      const restore =
+        returnView.hasView || returnView.focus != null;
+      buildMarkers({ skipFit: restore });
+      if (returnView.hasView) {
+        map.setView([returnView.lat, returnView.lon], returnView.zoom, { animate: false });
+      } else if (returnView.focus != null) {
+        const marker = markersById.get(returnView.focus);
+        if (marker) {
+          map.setView(marker.getLatLng(), 14, { animate: false });
+        }
+      }
+      if (returnView.focus != null) {
+        selectedId = returnView.focus;
+        const marker = markersById.get(returnView.focus);
+        if (marker && clusterGroup && clusterGroup.zoomToShowLayer) {
+          clusterGroup.zoomToShowLayer(marker, () => {
+            marker.openPopup();
+          });
+        } else if (marker) {
+          marker.openPopup();
+        }
+      }
       renderList();
       // Invalidate size after layout (desktop split / mobile stack).
       requestAnimationFrame(() => {

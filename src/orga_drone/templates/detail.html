@@ -14,6 +14,12 @@
   <span class="breadcrumb-current" title="{{ item.filename }}">{{ item.filename }}</span>
 </nav>
 
+{% if map_return_url %}
+<p class="detail-map-return">
+  <a class="button ghost" href="{{ map_return_url }}">{{ _('Back to map') }}</a>
+</p>
+{% endif %}
+
 <section class="detail panel">
   <h1>{{ item.filename }}</h1>
 
@@ -32,12 +38,12 @@
   <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
     <a role="tab"
        class="view-tab {% if active_tab == 'clip' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=clip"
+       href="/media/{{ item.id }}?tab=clip{% if map_from_qs %}&amp;{{ map_from_qs }}{% endif %}"
        aria-selected="{{ 'true' if active_tab == 'clip' else 'false' }}"
        id="tab-clip">{{ _('Single clip') }}</a>
     <a role="tab"
        class="view-tab {% if active_tab == 'flight' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=flight"
+       href="/media/{{ item.id }}?tab=flight{% if map_from_qs %}&amp;{{ map_from_qs }}{% endif %}"
        aria-selected="{{ 'true' if active_tab == 'flight' else 'false' }}"
        id="tab-flight">{{ _('Complete flight') }}</a>
   </nav>
@@ -173,11 +179,11 @@
       <li class="flight-clip {% if clip.id == play_id %}current{% endif %}"
           data-media-id="{{ clip.id }}"
           {% if pidx is not none %}data-playlist-index="{{ pidx }}"{% endif %}>
-        <a class="flight-clip-thumb" href="/media/{{ clip.id }}?tab=flight" title="{{ clip.filename }}">
+        <a class="flight-clip-thumb" href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}" title="{{ clip.filename }}">
           <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy" decoding="async">
         </a>
         <div class="flight-clip-meta">
-          <a href="/media/{{ clip.id }}?tab=flight">{{ clip.filename }}</a>
+          <a href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}">{{ clip.filename }}</a>
           <span class="kind">{% if clip.kind == 'video' %}{{ _('Video') }}{% elif clip.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ clip.kind }}{% endif %}</span>
           — {{ clip.size_bytes|filesize }}
           {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
@@ -201,9 +207,12 @@
     <div class="detail-media">
       {% if can_play %}
         <h2>{% if active_tab == 'flight' %}{{ _('Flight preview') }}{% else %}{{ _('Preview') }}{% endif %}</h2>
-        {% if item.kind == 'photo' and active_tab != 'flight' %}
+        {% if item.kind == 'photo' %}
           <div class="photo-frame">
-            <img src="/media/{{ item.id }}/stream" alt="{{ item.filename }}" class="photo-preview">
+            <img src="{{ photo_src or ('/media/' ~ item.id ~ '/stream') }}"
+                 alt="{{ item.filename }}"
+                 class="photo-preview"
+                 onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='/media/{{ item.id }}/thumb';}">
           </div>
         {% elif item.kind == 'video' or active_tab == 'flight' %}
           <div class="player-toolbar" id="player-toolbar"
