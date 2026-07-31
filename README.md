@@ -6,6 +6,10 @@ Open source. Runs on your machine. No cloud account required. Built first for **
 
 **Windows:** [Download latest exe (zip)](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip) · [All releases](https://github.com/Magehawks/orga-drone/releases)
 
+## Scan Progress
+
+![Scan Progress](media/scan-progress.gif)
+
 ## Screenshots
 
 Home / overview (German UI):
