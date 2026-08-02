@@ -18,3 +18,18 @@ msgstr "Back to map"
 
 msgid "Back to browse"
 msgstr "Back to browse"
+
+msgid "Pagination"
+msgstr "Pagination"
+
+msgid "Previous"
+msgstr "Previous"
+
+msgid "Next"
+msgstr "Next"
+
+msgid "Page"
+msgstr "Page"
+
+msgid "of"
+msgstr "of"

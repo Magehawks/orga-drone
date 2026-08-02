@@ -130,6 +130,61 @@ def format_place(place: dict[str, Any] | None) -> str:
     return ", ".join(parts)
 
 
+# Cap DOM size in Browse (WebView2 keeps decoded thumbs for every card).
+BROWSE_PAGE_SIZE = 48
+
+
+def browse_page_clamp(page: int, *, total: int, page_size: int = BROWSE_PAGE_SIZE) -> int:
+    """Normalize a 1-based page index into a valid range for ``total`` rows."""
+    size = max(1, int(page_size))
+    total_pages = max(1, (max(0, int(total)) + size - 1) // size)
+    try:
+        raw = int(page)
+    except (TypeError, ValueError):
+        raw = 1
+    return max(1, min(raw, total_pages))
+
+
+def browse_pagination(
+    *,
+    total: int,
+    page: int,
+    page_size: int = BROWSE_PAGE_SIZE,
+) -> dict[str, Any]:
+    """Build pagination metadata for the Browse template."""
+    size = max(1, int(page_size))
+    total_n = max(0, int(total))
+    total_pages = max(1, (total_n + size - 1) // size) if total_n else 1
+    page_n = browse_page_clamp(page, total=total_n, page_size=size)
+    offset = (page_n - 1) * size
+    showing_to = min(offset + size, total_n) if total_n else 0
+    return {
+        "page": page_n,
+        "page_size": size,
+        "total": total_n,
+        "total_pages": total_pages,
+        "offset": offset,
+        "has_prev": page_n > 1,
+        "has_next": page_n < total_pages and total_n > 0,
+        "prev_page": page_n - 1,
+        "next_page": page_n + 1,
+        "showing_from": (offset + 1) if total_n else 0,
+        "showing_to": showing_to,
+    }
+
+
+def browse_filter_query(filters: dict[str, Any], *, page: int | None = None) -> str:
+    """URL query string for Browse links (filters + optional page)."""
+    params: dict[str, str] = {}
+    for key, value in filters.items():
+        if value is None or value == "":
+            continue
+        params[str(key)] = str(value)
+    if page is not None and page > 1:
+        params["page"] = str(page)
+    return urlencode(params)
+
+
 def create_app() -> FastAPI:
     settings.ensure_dirs()
     db = Database(settings.db_path)
@@ -237,6 +292,7 @@ def create_app() -> FastAPI:
         "date_to",
         "ask",
         "view",
+        "page",
     )
 
     def browse_detail_qs_from_request(request: Request) -> str:
@@ -389,6 +445,7 @@ def create_app() -> FastAPI:
         date_to: str | None = None,
         ask: str | None = None,
         view: str | None = None,
+        page: int = Query(1, ge=1),
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
@@ -414,23 +471,57 @@ def create_app() -> FastAPI:
         resolved_q = search.effective_q()
         resolved_from = search.date_from
         resolved_to = search.date_to
+        list_kwargs: dict[str, Any] = {
+            "sort": sort,
+            "order": order,
+            "drone": drone or None,
+            "kind": resolved_kind,
+            "source": source or None,
+            "has_gps": has_gps,
+            "flows_only": flows_only,
+            "sessions_only": sessions_only,
+            "favorite": favorite_only,
+            "q": resolved_q,
+            "date_from": resolved_from,
+            "date_to": resolved_to,
+        }
+        total = db.count_media(
+            drone=list_kwargs["drone"],
+            kind=list_kwargs["kind"],
+            source=list_kwargs["source"],
+            has_gps=list_kwargs["has_gps"],
+            flows_only=list_kwargs["flows_only"],
+            sessions_only=list_kwargs["sessions_only"],
+            favorite=list_kwargs["favorite"],
+            q=list_kwargs["q"],
+            date_from=list_kwargs["date_from"],
+            date_to=list_kwargs["date_to"],
+        )
+        pagination = browse_pagination(total=total, page=page)
         items = db.list_media(
-            sort=sort,
-            order=order,
-            drone=drone or None,
-            kind=resolved_kind,
-            source=source or None,
-            has_gps=has_gps,
-            flows_only=flows_only,
-            sessions_only=sessions_only,
-            favorite=favorite_only,
-            q=resolved_q,
-            date_from=resolved_from,
-            date_to=resolved_to,
+            **list_kwargs,
+            limit=pagination["page_size"],
+            offset=pagination["offset"],
         )
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
+        filters = {
+            "sort": sort,
+            "order": order,
+            "drone": drone or "",
+            "kind": resolved_kind or "",
+            "source": source or "",
+            "gps": gps or "",
+            "flows": flows or "",
+            "sessions": sessions or "",
+            "favorite": favorite_filter,
+            "q": resolved_q or "",
+            "date_from": resolved_from or "",
+            "date_to": resolved_to or "",
+            "ask": ask_text,
+            "view": current_view,
+        }
         response = render(
             request,
             "index.html",
@@ -440,22 +531,15 @@ def create_app() -> FastAPI:
             nav_active="browse",
             browse_detail_qs=browse_detail_qs_from_request(request),
             ask_summary=search.summary_parts() if ask_text else [],
-            filters={
-                "sort": sort,
-                "order": order,
-                "drone": drone or "",
-                "kind": resolved_kind or "",
-                "source": source or "",
-                "gps": gps or "",
-                "flows": flows or "",
-                "sessions": sessions or "",
-                "favorite": favorite_filter,
-                "q": resolved_q or "",
-                "date_from": resolved_from or "",
-                "date_to": resolved_to or "",
-                "ask": ask_text,
-                "view": current_view,
-            },
+            filters=filters,
+            pagination=pagination,
+            browse_qs=browse_filter_query(filters),
+            browse_qs_prev=browse_filter_query(
+                filters, page=pagination["prev_page"]
+            ),
+            browse_qs_next=browse_filter_query(
+                filters, page=pagination["next_page"]
+            ),
         )
         if view in {"grid", "list"}:
             response.set_cookie("view", view, max_age=365 * 24 * 3600)

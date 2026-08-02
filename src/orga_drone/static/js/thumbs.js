@@ -4,19 +4,29 @@
  *
  * Markup: <img data-thumb-src="..." loading="lazy"> or plain lazy <img src>.
  * When data-thumb-src is set, src is assigned only when in view and under the cap.
+ * Off-screen images revert to a tiny placeholder so WebView2 can drop decoded
+ * bitmaps (best-effort; page navigation still frees the full DOM).
  */
 (function () {
   const MAX_CONCURRENT = 4;
+  const PLACEHOLDER =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
   const imgs = Array.from(
     document.querySelectorAll("img.list-thumb, .thumb img, .flight-clip-thumb img")
   );
   if (!imgs.length) return;
 
-  // If templates already set src + loading=lazy, still throttle by temporarily
-  // parking src on data-thumb-src for off-screen images (browser may ignore
-  // lazy under some conditions / many above-the-fold cards).
   let active = 0;
   const queue = [];
+
+  function isQueued(img) {
+    return queue.indexOf(img) !== -1;
+  }
+
+  function dequeue(img) {
+    const idx = queue.indexOf(img);
+    if (idx !== -1) queue.splice(idx, 1);
+  }
 
   function pump() {
     while (active < MAX_CONCURRENT && queue.length) {
@@ -37,17 +47,26 @@
   function enqueue(img) {
     if (!img.dataset.thumbSrc) return;
     if (img.getAttribute("src") === img.dataset.thumbSrc) return;
+    if (isQueued(img)) return;
     queue.push(img);
     pump();
+  }
+
+  function unload(img) {
+    if (!img.dataset.thumbSrc) return;
+    dequeue(img);
+    if (img.getAttribute("src") === PLACEHOLDER) return;
+    img.src = PLACEHOLDER;
+    const thumb = img.closest(".thumb");
+    if (thumb) thumb.classList.remove("is-loaded");
   }
 
   imgs.forEach((img) => {
     const current = img.getAttribute("src");
     if (!current || !current.includes("/thumb")) return;
     img.dataset.thumbSrc = current;
-    // Keep a tiny transparent placeholder so layout stays stable.
     img.removeAttribute("src");
-    img.setAttribute("src", "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==");
+    img.setAttribute("src", PLACEHOLDER);
   });
 
   if (!("IntersectionObserver" in window)) {
@@ -58,9 +77,8 @@
   const io = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        io.unobserve(entry.target);
-        enqueue(entry.target);
+        if (entry.isIntersecting) enqueue(entry.target);
+        else unload(entry.target);
       });
     },
     { rootMargin: "200px 0px", threshold: 0.01 }
