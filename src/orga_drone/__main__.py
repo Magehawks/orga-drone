@@ -6,6 +6,7 @@ import os
 import sys
 import webbrowser
 from threading import Timer
+from typing import Any
 
 
 def _env_truthy(name: str) -> bool:
@@ -67,7 +68,7 @@ def _run_browser(host: str, port: int, *, packaged: bool) -> None:
     log_level = "warning" if packaged else "info"
     access_log = not packaged
     # log_config sets use_colors=False on DefaultFormatter (no isatty).
-    common = {
+    common: dict[str, Any] = {
         "host": host,
         "port": listen_port,
         "log_level": log_level,

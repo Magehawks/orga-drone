@@ -262,6 +262,8 @@ Bug reports, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTR
 
 ```bash
 pip install -e ".[dev]"
+ruff check .
+mypy src
 pytest
 ```
 
@@ -275,7 +277,7 @@ Known limitations:
 - Session and duplicate results are best-effort heuristics
 - No projects/albums, no plugin API, no content-hash duplicate detection
 - Ask the library is rule-based phrase parsing, not generative AI
-- Automated CI for tests/releases is not present in the repository yet
+- CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
 - Telemetry **burn-in** into exported video is not included
 
 If video browsing feels heavy under Windows Defender, exclude the unzipped `orga-drone` folder (see [`packaging/README.md`](packaging/README.md)).

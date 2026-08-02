@@ -144,7 +144,7 @@ def test_media_detail_back_to_map(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     resp = client.get(f"/media/{mid}?from=map&lat=47.050000&lon=8.300000&zoom=11.5")
     assert resp.status_code == 200
     assert "Zurück zur Karte" in resp.text or "Back to map" in resp.text
-    assert f'href="/map?' in resp.text
+    assert 'href="/map?' in resp.text
     assert f"focus={mid}" in resp.text
     assert "lat=47.05" in resp.text
     assert "lon=8.3" in resp.text

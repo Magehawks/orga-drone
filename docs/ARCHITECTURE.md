@@ -16,6 +16,7 @@ Do not invent layers, services, or plugins that are not present.
 | Maps | Leaflet (vendored) + OpenStreetMap tiles |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
 | Tests | pytest under `tests/` |
+| CI | GitHub Actions: Ruff, MyPy, pytest on pull requests |
 
 Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 `create_app()` in `src/orga_drone/app.py`.

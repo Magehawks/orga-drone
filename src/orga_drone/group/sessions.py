@@ -80,7 +80,12 @@ def _near_ground(rel_alt: float | None) -> bool:
 
 
 def _gps_stable(clip: ClipForSession) -> bool:
-    if None in (clip.start_lat, clip.start_lon, clip.end_lat, clip.end_lon):
+    if (
+        clip.start_lat is None
+        or clip.start_lon is None
+        or clip.end_lat is None
+        or clip.end_lon is None
+    ):
         return False
     return (
         abs(clip.start_lat - clip.end_lat) <= _GPS_STABLE_DEG

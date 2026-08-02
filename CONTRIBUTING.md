@@ -41,12 +41,24 @@ pytest
 
 Add or update tests when you change parsing, indexing, search, or API behavior. Tests live under `tests/`.
 
+## Quality checks (local and CI)
+
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with:
+
+```bash
+ruff check .
+mypy src
+pytest
+```
+
+Install the same tooling locally via `pip install -e ".[dev]"`. Configuration lives in `pyproject.toml`.
+
 ## Pull requests
 
 1. Branch from `master` (default branch).
 2. Keep commits readable; squash locally if you prefer one commit per PR.
 3. Update docs when behavior or setup changes.
-4. Confirm `pytest` passes before opening the PR.
+4. Confirm `ruff check .`, `mypy src`, and `pytest` pass before opening the PR.
 5. Fill in the PR template (summary, test plan).
 
 **Style:** Match existing code in the touched files — naming, typing, and structure. No drive-by refactors in the same PR unless required.
