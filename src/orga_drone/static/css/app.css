@@ -631,6 +631,13 @@ button.cta, .button.cta {
 
 .hint { color: var(--muted); font-size: 0.9rem; }
 .add-form { display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.75rem; align-items: end; margin: 1rem 0; }
+.path-with-browse {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.path-with-browse input { flex: 1; min-width: 0; }
+.path-with-browse button { flex-shrink: 0; white-space: nowrap; }
 .inline { margin: 0.75rem 0; }
 .row-actions { display: flex; gap: 0.4rem; }
 
