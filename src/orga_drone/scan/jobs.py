@@ -24,7 +24,7 @@ class ScanJob:
     current_path: str | None = None
     root_id: int | None = None
     error: str | None = None
-    counts: dict[str, Any] | None = None
+    counts: dict[str, Any] | list[dict[str, Any]] | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     finished_at: float | None = None

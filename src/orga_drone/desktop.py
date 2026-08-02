@@ -227,6 +227,8 @@ def run_desktop(
         height=height,
         min_size=(900, 600),
     )
+    if window is None:
+        raise RuntimeError("webview.create_window returned None")
 
     def _navigate() -> None:
         # Re-check readiness briefly in case the server died between wait and GUI start.

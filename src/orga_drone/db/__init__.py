@@ -330,7 +330,9 @@ class Database:
                 "INSERT INTO library_roots(path, label, added_at) VALUES (?, ?, ?)",
                 (resolved, label or path.name, now),
             )
-            return int(cur.lastrowid)
+            root_id = cur.lastrowid
+            assert root_id is not None
+            return int(root_id)
 
     def remove_root(self, root_id: int) -> None:
         with self.connect() as conn:
@@ -386,7 +388,9 @@ class Database:
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (root_id, p, kind, size_bytes, mtime, stem_base),
             )
-            return int(cur.lastrowid)
+            asset_id = cur.lastrowid
+            assert asset_id is not None
+            return int(asset_id)
 
     def upsert_media(self, data: dict[str, Any]) -> int:
         now = datetime.now().isoformat(timespec="seconds")
@@ -429,7 +433,9 @@ class Database:
                 f"INSERT INTO media({', '.join(insert_cols)}) VALUES ({placeholders})",
                 values,
             )
-            return int(cur.lastrowid)
+            media_id = cur.lastrowid
+            assert media_id is not None
+            return int(media_id)
 
     def update_media_auto_tags(
         self,
@@ -517,8 +523,12 @@ class Database:
                     continue
                 first = items[0]
                 total_size = sum(int(i.get("size_bytes") or 0) for i in items)
-                durations = [i.get("duration_s") for i in items if i.get("duration_s") is not None]
-                total_dur = sum(float(d) for d in durations) if durations else None
+                durations = [
+                    float(d)
+                    for i in items
+                    if (d := i.get("duration_s")) is not None
+                ]
+                total_dur = sum(durations) if durations else None
                 title = first.get("filename")
                 if len(items) > 1:
                     title = f"{first.get('filename')} (+{len(items) - 1})"
@@ -538,7 +548,9 @@ class Database:
                         first.get("drone_model"),
                     ),
                 )
-                flow_id = int(cur.lastrowid)
+                flow_row_id = cur.lastrowid
+                assert flow_row_id is not None
+                flow_id = int(flow_row_id)
                 for pos, mid in enumerate(group):
                     conn.execute(
                         "INSERT INTO flow_items(flow_id, media_id, position) VALUES (?, ?, ?)",
@@ -569,11 +581,11 @@ class Database:
                 first = videos[0] if videos else items[0]
                 total_size = sum(int(i.get("size_bytes") or 0) for i in items)
                 durations = [
-                    i.get("duration_s")
+                    float(d)
                     for i in items
-                    if i.get("kind") == "video" and i.get("duration_s") is not None
+                    if i.get("kind") == "video" and (d := i.get("duration_s")) is not None
                 ]
-                total_dur = sum(float(d) for d in durations) if durations else None
+                total_dur = sum(durations) if durations else None
                 video_count = len(videos) if videos else 0
                 title = first.get("filename")
                 if video_count > 1:
@@ -599,7 +611,9 @@ class Database:
                         first.get("drone_model"),
                     ),
                 )
-                session_id = int(cur.lastrowid)
+                session_row_id = cur.lastrowid
+                assert session_row_id is not None
+                session_id = int(session_row_id)
                 for pos, mid in enumerate(group):
                     conn.execute(
                         "INSERT INTO session_items(session_id, media_id, position) VALUES (?, ?, ?)",

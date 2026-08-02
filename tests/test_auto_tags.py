@@ -5,15 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from orga_drone.auto_tags import (
     apply_auto_tags_to_media,
     compute_auto_tags,
     place_tags_from_result,
     time_tags_from_recorded_at,
 )
-from orga_drone.db import Database, tags_from_json
+from orga_drone.db import Database
 from orga_drone.geocode import PlaceResult, round_coord
 
 

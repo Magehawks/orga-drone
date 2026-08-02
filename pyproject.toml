@@ -25,7 +25,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.8",
+  "mypy>=1.13",
+]
 
 [project.scripts]
 orga-drone = "orga_drone.__main__:main"
@@ -39,3 +43,29 @@ orga_drone = [
   "static/**/*",
   "locales/**/*",
 ]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+extend-exclude = ["releases", "dist", "build"]
+
+[tool.ruff.lint]
+# Classic pyflakes + critical pycodestyle baseline (pre-Ruff-0.16 defaults).
+# Broader rule adoption belongs in a dedicated cleanup PR, not in CI bootstrap.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+files = ["src"]
+explicit_package_bases = true
+warn_unused_configs = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+  "reverse_geocoder",
+  "imageio_ffmpeg",
+  "pillow_heif",
+]
+ignore_missing_imports = true

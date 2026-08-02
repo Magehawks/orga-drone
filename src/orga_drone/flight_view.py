@@ -30,7 +30,10 @@ def concat_clip_tracks(clips: list[MediaRow]) -> tuple[list[dict[str, Any]], flo
             ts = [p.get("t") for p in raw]
             has_t = all(isinstance(t, (int, float)) for t in ts)
             if has_t:
-                local_span = max((float(t) for t in ts), default=0.0)
+                local_span = max(
+                    (float(t) for t in ts if isinstance(t, (int, float))),
+                    default=0.0,
+                )
                 for p in raw:
                     point = dict(p)
                     point["t"] = float(p["t"]) + offset

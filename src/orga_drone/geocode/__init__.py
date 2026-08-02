@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from orga_drone.geocode.countries import country_name
