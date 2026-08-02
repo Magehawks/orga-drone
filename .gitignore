@@ -24,8 +24,18 @@ data-test/
 .idea/
 .vscode/
 *.swp
+*~
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Cursor: keep shared project agents/rules; ignore local-only state
+# Do NOT ignore .github/ — CI, issue/PR templates belong in the repo
+.cursor/*
+!.cursor/agents/
+!.cursor/agents/**
+!.cursor/rules/
+!.cursor/rules/**
 
 # Packaging / PyInstaller
 *.spec
@@ -33,6 +43,10 @@ Thumbs.db
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.log
 
 # Local release build output (upload via GitHub Releases instead)
 releases/*/orga-drone/
