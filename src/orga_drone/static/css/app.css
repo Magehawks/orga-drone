@@ -667,7 +667,8 @@ button.cta, .button.cta {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.detail-map-return {
+.detail-map-return,
+.detail-browse-return {
   margin: -0.35rem 0 1rem;
 }
 
