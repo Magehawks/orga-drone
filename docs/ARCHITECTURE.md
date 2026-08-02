@@ -9,7 +9,7 @@ Do not invent layers, services, or plugins that are not present.
 |-------|--------|
 | Language | Python ≥ 3.11 |
 | Web UI | FastAPI + Jinja2 templates + static JS/CSS |
-| Desktop shell | pywebview (Edge WebView2 on Windows); browser fallback |
+| Desktop shell | pywebview (Edge WebView2 on Windows); browser fallback; native folder picker via `FileDialog.FOLDER` |
 | Index | SQLite in the OS app-data directory |
 | Media | Streamed from configured library folders (not embedded) |
 | Thumbnails / merge | Pillow / pillow-heif; `imageio-ffmpeg` or system ffmpeg |
@@ -40,7 +40,7 @@ Media files stay on disk under user-chosen library roots.
 |------|----------------|
 | `app.py` | FastAPI routes (HTML + APIs) |
 | `config.py` | Settings, paths, env |
-| `desktop.py` | Desktop window / port discovery |
+| `desktop.py` | Desktop window / port discovery / native folder picker (pywebview) |
 | `db/` | Schema, migrations, queries |
 | `scan/` | Full rescan of library roots |
 | `parse/` | Filenames, SRT, EXIF, generic media |

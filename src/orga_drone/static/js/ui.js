@@ -232,6 +232,52 @@
     }
   }
 
+  // Native folder picker for library roots (pywebview desktop shell)
+  const browseFolderBtn = document.getElementById("browse-folder");
+  const folderPathInput = document.getElementById("folder-path");
+  if (browseFolderBtn && folderPathInput) {
+    browseFolderBtn.addEventListener("click", () => {
+      const unavailableMsg =
+        browseFolderBtn.getAttribute("data-i18n-unavailable") ||
+        "Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.";
+      browseFolderBtn.disabled = true;
+      fetch("/api/desktop/pick-folder", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      })
+        .then(async (resp) => {
+          let data = null;
+          try {
+            data = await resp.json();
+          } catch (_) {
+            data = null;
+          }
+          if (resp.status === 503 || (data && data.status === "unavailable")) {
+            window.alert(unavailableMsg);
+            return;
+          }
+          if (!resp.ok) {
+            window.alert(unavailableMsg);
+            return;
+          }
+          if (!data || data.status === "cancelled") {
+            // Leave the current path unchanged.
+            return;
+          }
+          if (data.status === "ok" && data.path) {
+            folderPathInput.value = data.path;
+            folderPathInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        })
+        .catch(() => {
+          window.alert(unavailableMsg);
+        })
+        .finally(() => {
+          browseFolderBtn.disabled = false;
+        });
+    });
+  }
+
   // Flash / toast polish: dismiss + auto-hide
   document.querySelectorAll(".flash").forEach((el) => {
     const dismiss = document.createElement("button");

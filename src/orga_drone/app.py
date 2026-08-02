@@ -829,6 +829,25 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Scan job not found")
         return JSONResponse(job.to_dict())
 
+    @app.post("/api/desktop/pick-folder")
+    def pick_folder_dialog() -> JSONResponse:
+        """Open a native folder picker (pywebview desktop shell only)."""
+        from orga_drone.desktop import FolderPickerError, pick_folder
+
+        try:
+            path = pick_folder()
+        except FolderPickerError:
+            return JSONResponse(
+                {
+                    "status": "unavailable",
+                    "error": "folder_picker_unavailable",
+                },
+                status_code=503,
+            )
+        if path is None:
+            return JSONResponse({"status": "cancelled"})
+        return JSONResponse({"status": "ok", "path": path})
+
     @app.post("/library/add")
     async def library_add(path: str = Form(...), label: str = Form("")) -> RedirectResponse:
         p = Path(path.strip().strip('"'))

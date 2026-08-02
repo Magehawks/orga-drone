@@ -24,9 +24,17 @@
   {% endif %}
 
   <form method="post" action="/library/add" class="add-form" id="add-folder-form">
-    <label>
+    <label class="path-field">
       {{ _('Folder path') }}
-      <input type="text" name="path" id="folder-path" required autofocus placeholder="D:\\DroneMedia">
+      <div class="path-with-browse">
+        <input type="text" name="path" id="folder-path" required autofocus placeholder="D:\\DroneMedia">
+        <button
+          type="button"
+          class="ghost"
+          id="browse-folder"
+          data-i18n-unavailable="{{ _('Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.') }}"
+        >{{ _('Browse…') }}</button>
+      </div>
     </label>
     <label>
       {{ _('Label (optional)') }}

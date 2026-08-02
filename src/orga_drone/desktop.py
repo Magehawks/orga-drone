@@ -106,6 +106,46 @@ def show_error_dialog(title: str, message: str) -> None:
     print(f"{title}: {message}", file=sys.stderr)
 
 
+class FolderPickerError(Exception):
+    """Raised when a native folder dialog cannot be shown."""
+
+
+def pick_folder(*, directory: str = "") -> str | None:
+    """Open the OS folder picker via the active pywebview window.
+
+    Uses ``webview.FileDialog.FOLDER`` (cross-platform; no OS-specific APIs).
+
+    Returns:
+        Selected directory path, or ``None`` if the user cancelled.
+
+    Raises:
+        FolderPickerError: When pywebview is missing or no desktop window is open
+            (e.g. browser-only mode).
+    """
+    try:
+        import webview
+    except ImportError as exc:
+        raise FolderPickerError("pywebview is not available") from exc
+
+    windows = list(getattr(webview, "windows", []) or [])
+    if not windows:
+        raise FolderPickerError(
+            "Native folder picker requires the desktop window "
+            "(not available in browser-only mode)"
+        )
+
+    result = windows[0].create_file_dialog(
+        webview.FileDialog.FOLDER,
+        directory=directory or "",
+    )
+    if not result:
+        return None
+    chosen = result[0]
+    if isinstance(chosen, bytes):
+        chosen = chosen.decode("utf-8")
+    return str(chosen)
+
+
 def find_listen_port(host: str, preferred: int) -> int:
     """Prefer ``preferred`` if free; otherwise bind an ephemeral port."""
     # Avoid SO_REUSEADDR on Windows — it can report a busy port as free.

@@ -61,6 +61,8 @@
   "Manage libraries": "Bibliotheken verwalten",
   "Add folder": "Ordner hinzufügen",
   "Folder path": "Ordnerpfad",
+  "Browse…": "Durchsuchen…",
+  "Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.": "Der native Ordnerdialog ist nicht verfügbar. Bitte den Pfad manuell eingeben oder orga-drone als Desktop-App starten.",
   "Label (optional)": "Bezeichnung (optional)",
   "Scan": "Scannen",
   "Scan all": "Alle scannen",
