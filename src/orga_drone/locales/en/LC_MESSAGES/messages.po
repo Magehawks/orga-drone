@@ -15,3 +15,6 @@ msgstr "Open in OpenStreetMap"
 
 msgid "Back to map"
 msgstr "Back to map"
+
+msgid "Back to browse"
+msgstr "Back to browse"

@@ -222,6 +222,54 @@ def create_app() -> FastAPI:
                 ret["zoom"] = zoom_s
         return f"/map?{urlencode(ret)}", urlencode(detail)
 
+    _BROWSE_RETURN_KEYS = (
+        "sort",
+        "order",
+        "drone",
+        "kind",
+        "gps",
+        "source",
+        "flows",
+        "sessions",
+        "favorite",
+        "q",
+        "date_from",
+        "date_to",
+        "ask",
+        "view",
+    )
+
+    def browse_detail_qs_from_request(request: Request) -> str:
+        """QS for media detail links so detail can return to the same browse filters."""
+        items: list[tuple[str, str]] = [("from", "browse")]
+        qp = request.query_params
+        for key in _BROWSE_RETURN_KEYS:
+            val = qp.get(key)
+            if val:
+                items.append((key, val))
+        return urlencode(items)
+
+    def browse_return_from_request(request: Request) -> tuple[str | None, str]:
+        """Build browse return URL + detail qs when navigated from /browse.
+
+        Expects ``?from=browse`` plus optional filter query params. Returns
+        ``(return_url, detail_qs)`` or ``(None, "")`` when not from browse.
+        """
+        qp = request.query_params
+        if qp.get("from") != "browse":
+            return None, ""
+        ret: list[tuple[str, str]] = []
+        detail: list[tuple[str, str]] = [("from", "browse")]
+        for key in _BROWSE_RETURN_KEYS:
+            val = qp.get(key)
+            if val:
+                ret.append((key, val))
+                detail.append((key, val))
+        detail_qs = urlencode(detail)
+        if ret:
+            return f"/browse?{urlencode(ret)}", detail_qs
+        return "/browse", detail_qs
+
     def ctx(request: Request, **extra: Any) -> dict[str, Any]:
         lang = lang_from_request(request)
         _ = get_translator(lang)
@@ -239,6 +287,7 @@ def create_app() -> FastAPI:
             "theme_panel": theme.panel,
             "theme_style": custom_css_vars(theme) if theme.mode == "custom" else "",
             "nav_active": "",
+            "browse_return_url": None,
             **extra,
         }
 
@@ -352,6 +401,7 @@ def create_app() -> FastAPI:
             drones=db.distinct_drones(),
             view=current_view,
             nav_active="browse",
+            browse_detail_qs=browse_detail_qs_from_request(request),
             ask_summary=search.summary_parts() if ask_text else [],
             filters={
                 "sort": sort,
@@ -550,6 +600,8 @@ def create_app() -> FastAPI:
 
         stem = Path(item.filename).stem
         map_return_url, map_from_qs = map_return_from_request(request, item.id)
+        browse_return_url, browse_from_qs = browse_return_from_request(request)
+        return_qs = map_from_qs or browse_from_qs
         return render(
             request,
             "detail.html",
@@ -582,6 +634,9 @@ def create_app() -> FastAPI:
             flash_error=error,
             map_return_url=map_return_url,
             map_from_qs=map_from_qs,
+            browse_return_url=browse_return_url,
+            browse_from_qs=browse_from_qs,
+            return_qs=return_qs,
         )
 
     @app.post("/media/{media_id}/meta")

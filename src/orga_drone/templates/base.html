@@ -18,7 +18,7 @@
     </div>
     <nav class="primary-nav" aria-label="{{ _('Main navigation') }}">
       <a href="/" class="nav-link {% if request.url.path == '/' or nav_active == 'dashboard' %}active{% endif %}">{{ _('Dashboard') }}</a>
-      <a href="/browse" class="nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">{{ _('Browse') }}</a>
+      <a href="{{ browse_return_url or '/browse' }}" class="nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">{{ _('Browse') }}</a>
       <a href="/map" class="nav-link {% if request.url.path.startswith('/map') or nav_active == 'map' %}active{% endif %}">{{ _('World map') }}</a>
       <a href="/library" class="nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">{{ _('Library') }}</a>
       <a href="/duplicates" class="nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">{{ _('Duplicates') }}</a>
@@ -62,7 +62,7 @@
       <span class="bottom-nav-icon" aria-hidden="true">◈</span>
       <span>{{ _('Dashboard') }}</span>
     </a>
-    <a href="/browse" class="bottom-nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">
+    <a href="{{ browse_return_url or '/browse' }}" class="bottom-nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">
       <span class="bottom-nav-icon" aria-hidden="true">▣</span>
       <span>{{ _('Browse') }}</span>
     </a>

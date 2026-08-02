@@ -145,7 +145,7 @@
 {% elif view == 'grid' %}
   <section class="media-grid">
     {% for item in items %}
-    <a class="card" href="/media/{{ item.id }}">
+    <a class="card" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
       <div class="thumb">
         {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
            (dozens of concurrent Range requests spike CPU/IO under Defender). #}
@@ -233,7 +233,7 @@
         {% for item in items %}
         <tr>
           <td class="thumb-cell">
-            <a href="/media/{{ item.id }}">
+            <a href="/media/{{ item.id }}?{{ browse_detail_qs }}">
               <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
             </a>
           </td>
@@ -303,7 +303,7 @@
               —
             {% endif %}
           </td>
-          <td><a href="/media/{{ item.id }}">{{ _('Open') }}</a></td>
+          <td><a href="/media/{{ item.id }}?{{ browse_detail_qs }}">{{ _('Open') }}</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -313,4 +313,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/thumbs.js"></script>
+<script src="/static/js/browse.js"></script>
 {% endblock %}

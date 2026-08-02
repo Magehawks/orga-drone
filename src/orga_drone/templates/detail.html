@@ -9,7 +9,7 @@
 <nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
   <a href="/">{{ _('Dashboard') }}</a>
   <span class="breadcrumb-sep" aria-hidden="true">/</span>
-  <a href="/browse">{{ _('Browse') }}</a>
+  <a href="{{ browse_return_url or '/browse' }}">{{ _('Browse') }}</a>
   <span class="breadcrumb-sep" aria-hidden="true">/</span>
   <span class="breadcrumb-current" title="{{ item.filename }}">{{ item.filename }}</span>
 </nav>
@@ -17,6 +17,10 @@
 {% if map_return_url %}
 <p class="detail-map-return">
   <a class="button ghost" href="{{ map_return_url }}">{{ _('Back to map') }}</a>
+</p>
+{% elif browse_return_url %}
+<p class="detail-browse-return">
+  <a class="button ghost" href="{{ browse_return_url }}">{{ _('Back to browse') }}</a>
 </p>
 {% endif %}
 
@@ -38,12 +42,12 @@
   <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
     <a role="tab"
        class="view-tab {% if active_tab == 'clip' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=clip{% if map_from_qs %}&amp;{{ map_from_qs }}{% endif %}"
+       href="/media/{{ item.id }}?tab=clip{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
        aria-selected="{{ 'true' if active_tab == 'clip' else 'false' }}"
        id="tab-clip">{{ _('Single clip') }}</a>
     <a role="tab"
        class="view-tab {% if active_tab == 'flight' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=flight{% if map_from_qs %}&amp;{{ map_from_qs }}{% endif %}"
+       href="/media/{{ item.id }}?tab=flight{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
        aria-selected="{{ 'true' if active_tab == 'flight' else 'false' }}"
        id="tab-flight">{{ _('Complete flight') }}</a>
   </nav>
