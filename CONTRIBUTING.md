@@ -41,6 +41,23 @@ pytest
 
 Add or update tests when you change parsing, indexing, search, or API behavior. Tests live under `tests/`.
 
+### Manual check: Browse memory (large libraries)
+
+Browse paginates media cards (default 48 per page) and unloads off-screen
+thumbnails in `static/js/thumbs.js`. After changing Browse DOM or thumbnail
+loading, verify manually when possible:
+
+1. Open a library with hundreds+ of items in the desktop WebView2 shell (or browser).
+2. Open **Browse**, scroll the first page, then move through several pages.
+3. In Task Manager, watch the **WebView2 / msedgewebview2** process (not only Python):
+   memory should plateau near a page’s worth of decoded thumbs, not climb linearly
+   through the whole library as you keep paging/scrolling.
+4. Leave Browse for the Dashboard; DOM/images for that page should be released.
+5. Confirm filters/sort still work and thumbs reappear when scrolling back into view.
+
+This is best-effort (Chromium may keep HTTP cache entries); the hard guarantee is
+bounded DOM size via pagination.
+
 ## Quality checks (local and CI)
 
 Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with:

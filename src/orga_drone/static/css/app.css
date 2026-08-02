@@ -727,6 +727,34 @@ button.cta, .button.cta {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.1rem;
 }
+.browse-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin: 1.25rem 0 0.5rem;
+  padding: 0.85rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.browse-pager-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.browse-pager-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.button.ghost.is-disabled,
+.button.ghost[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: default;
+}
 .card {
   display: flex;
   flex-direction: column;

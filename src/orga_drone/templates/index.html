@@ -211,6 +211,32 @@
     </a>
     {% endfor %}
   </section>
+  {% if pagination and pagination.total_pages > 1 %}
+  <nav class="browse-pager" aria-label="{{ _('Pagination') }}">
+    <p class="browse-pager-meta">
+      {{ pagination.showing_from }}–{{ pagination.showing_to }}
+      {{ _('of') }}
+      {{ pagination.total }}
+      ·
+      {{ _('Page') }}
+      {{ pagination.page }}
+      /
+      {{ pagination.total_pages }}
+    </p>
+    <div class="browse-pager-actions">
+      {% if pagination.has_prev %}
+        <a class="button ghost" href="/browse?{{ browse_qs_prev }}">{{ _('Previous') }}</a>
+      {% else %}
+        <span class="button ghost is-disabled" aria-disabled="true">{{ _('Previous') }}</span>
+      {% endif %}
+      {% if pagination.has_next %}
+        <a class="button ghost" href="/browse?{{ browse_qs_next }}">{{ _('Next') }}</a>
+      {% else %}
+        <span class="button ghost is-disabled" aria-disabled="true">{{ _('Next') }}</span>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 {% else %}
   <section class="table-wrap panel">
     <table>
@@ -309,6 +335,32 @@
       </tbody>
     </table>
   </section>
+  {% if pagination and pagination.total_pages > 1 %}
+  <nav class="browse-pager" aria-label="{{ _('Pagination') }}">
+    <p class="browse-pager-meta">
+      {{ pagination.showing_from }}–{{ pagination.showing_to }}
+      {{ _('of') }}
+      {{ pagination.total }}
+      ·
+      {{ _('Page') }}
+      {{ pagination.page }}
+      /
+      {{ pagination.total_pages }}
+    </p>
+    <div class="browse-pager-actions">
+      {% if pagination.has_prev %}
+        <a class="button ghost" href="/browse?{{ browse_qs_prev }}">{{ _('Previous') }}</a>
+      {% else %}
+        <span class="button ghost is-disabled" aria-disabled="true">{{ _('Previous') }}</span>
+      {% endif %}
+      {% if pagination.has_next %}
+        <a class="button ghost" href="/browse?{{ browse_qs_next }}">{{ _('Next') }}</a>
+      {% else %}
+        <span class="button ghost is-disabled" aria-disabled="true">{{ _('Next') }}</span>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}

@@ -624,11 +624,9 @@ class Database:
                         (session_id, mid),
                     )
 
-    def list_media(
+    def _media_list_filters(
         self,
         *,
-        sort: str = "recorded_at",
-        order: str = "desc",
         drone: str | None = None,
         kind: str | None = None,
         source: str | None = None,
@@ -639,20 +637,8 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
-    ) -> list[MediaRow]:
-        allowed_sort = {
-            "recorded_at": "m.recorded_at",
-            "size": "COALESCE(s.total_size_bytes, f.total_size_bytes, m.size_bytes)",
-            "duration": "COALESCE(s.total_duration_s, f.total_duration_s, m.duration_s)",
-            "drone": "m.drone_model",
-            "filename": "m.filename",
-            "flow": "m.flow_id",
-            "session": "m.session_id",
-            "stars": "COALESCE(mm.stars, 0)",
-        }
-        sort_sql = allowed_sort.get(sort, "m.recorded_at")
-        order_sql = "ASC" if order.lower() == "asc" else "DESC"
-
+    ) -> tuple[list[str], list[Any], str]:
+        """Return (where_clauses, params, collapse_sql) for browse list/count."""
         where = ["m.kind IN ('video', 'photo')"]
         params: list[Any] = []
         if drone:
@@ -722,6 +708,92 @@ class Database:
                 AND (m.flow_id IS NULL OR fi.position = 0 OR f.clip_count IS NULL OR f.clip_count = 1)
               )
             )"""
+        return where, params, collapse
+
+    def count_media(
+        self,
+        *,
+        drone: str | None = None,
+        kind: str | None = None,
+        source: str | None = None,
+        has_gps: bool | None = None,
+        flows_only: bool | None = None,
+        sessions_only: bool | None = None,
+        favorite: bool | None = None,
+        q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> int:
+        """Count browse rows after the same filters/collapse as ``list_media``."""
+        where, params, collapse = self._media_list_filters(
+            drone=drone,
+            kind=kind,
+            source=source,
+            has_gps=has_gps,
+            flows_only=flows_only,
+            sessions_only=sessions_only,
+            favorite=favorite,
+            q=q,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        sql = f"""
+            SELECT COUNT(*)
+            FROM media m
+            LEFT JOIN flows f ON f.id = m.flow_id
+            LEFT JOIN flow_items fi ON fi.media_id = m.id
+            LEFT JOIN sessions s ON s.id = m.session_id
+            LEFT JOIN session_items si ON si.media_id = m.id
+            LEFT JOIN media_meta mm ON mm.media_path = m.path
+            WHERE {' AND '.join(where)}
+              AND {collapse}
+        """
+        with self.connect() as conn:
+            row = conn.execute(sql, params).fetchone()
+        return int(row[0]) if row else 0
+
+    def list_media(
+        self,
+        *,
+        sort: str = "recorded_at",
+        order: str = "desc",
+        drone: str | None = None,
+        kind: str | None = None,
+        source: str | None = None,
+        has_gps: bool | None = None,
+        flows_only: bool | None = None,
+        sessions_only: bool | None = None,
+        favorite: bool | None = None,
+        q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[MediaRow]:
+        allowed_sort = {
+            "recorded_at": "m.recorded_at",
+            "size": "COALESCE(s.total_size_bytes, f.total_size_bytes, m.size_bytes)",
+            "duration": "COALESCE(s.total_duration_s, f.total_duration_s, m.duration_s)",
+            "drone": "m.drone_model",
+            "filename": "m.filename",
+            "flow": "m.flow_id",
+            "session": "m.session_id",
+            "stars": "COALESCE(mm.stars, 0)",
+        }
+        sort_sql = allowed_sort.get(sort, "m.recorded_at")
+        order_sql = "ASC" if order.lower() == "asc" else "DESC"
+        where, params, collapse = self._media_list_filters(
+            drone=drone,
+            kind=kind,
+            source=source,
+            has_gps=has_gps,
+            flows_only=flows_only,
+            sessions_only=sessions_only,
+            favorite=favorite,
+            q=q,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
         sql = f"""
             SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
@@ -742,6 +814,13 @@ class Database:
               AND {collapse}
             ORDER BY {sort_sql} {order_sql}, m.id DESC
         """
+        if limit is not None and limit > 0:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+            off = max(0, int(offset))
+            if off > 0:
+                sql += " OFFSET ?"
+                params.append(off)
 
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()

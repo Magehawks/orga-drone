@@ -18,3 +18,18 @@ msgstr "Zurück zur Karte"
 
 msgid "Back to browse"
 msgstr "Zurück zu Medien"
+
+msgid "Pagination"
+msgstr "Seitennummerierung"
+
+msgid "Previous"
+msgstr "Zurück"
+
+msgid "Next"
+msgstr "Weiter"
+
+msgid "Page"
+msgstr "Seite"
+
+msgid "of"
+msgstr "von"
