@@ -125,6 +125,16 @@ Documentation should be:
 - free of hype and empty AI terminology
 - explicit about what exists today and what is planned
 
+### Language for agent-written artifacts
+
+Write **pull request titles and bodies**, **commit messages**, **issue comments
+and docs updates drafted by agents**, and **release notes when agents draft
+them** in **English**.
+
+User-facing chat with the human may still follow the user’s language preference
+(e.g. German). That preference does **not** apply to the repository artifacts
+listed above.
+
 ## Canonical project docs
 
 | Topic | Path |

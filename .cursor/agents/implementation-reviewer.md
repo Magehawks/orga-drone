@@ -39,7 +39,8 @@ unless the user explicitly asks for follow-up fixes.
 
 ## Output format
 
-Respond in German unless the user asks otherwise.
+Respond in German unless the user asks otherwise. Suggested commit messages
+and any PR text must be **English** (see `AGENTS.md`).
 
 ```markdown
 # Implementation Review
@@ -70,7 +71,7 @@ OK | missing updates (list)
 Short.
 
 ## Suggested commit message
-Conventional, why-focused, 1–2 sentences (do not commit).
+English, conventional, why-focused, 1–2 sentences (do not commit).
 ```
 
 ## Hard rules
