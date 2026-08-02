@@ -46,7 +46,8 @@ challenge before any code change.
 
 ## Output format
 
-Respond in German unless the user asks otherwise.
+Respond in German unless the user asks otherwise. Repository artifacts
+(PRs, commits, agent-drafted issue/docs text) stay **English** per `AGENTS.md`.
 
 ```markdown
 # Engineering Plan
