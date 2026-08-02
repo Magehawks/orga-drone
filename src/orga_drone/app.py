@@ -7,7 +7,7 @@ import json
 import threading
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import parse_qsl, quote, urlencode, urlparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -249,26 +249,63 @@ def create_app() -> FastAPI:
                 items.append((key, val))
         return urlencode(items)
 
+    def _browse_filters_from_mapping(mapping: dict[str, str]) -> list[tuple[str, str]]:
+        items: list[tuple[str, str]] = []
+        for key in _BROWSE_RETURN_KEYS:
+            val = mapping.get(key)
+            if val:
+                items.append((key, str(val)))
+        return items
+
+    def _browse_return_pair(
+        filter_items: list[tuple[str, str]],
+    ) -> tuple[str, str]:
+        detail = [("from", "browse"), *filter_items]
+        detail_qs = urlencode(detail)
+        if filter_items:
+            return f"/browse?{urlencode(filter_items)}", detail_qs
+        return "/browse", detail_qs
+
+    def browse_return_from_referer(request: Request) -> tuple[str | None, str]:
+        """Fallback when detail was opened from /browse without ``from=browse`` qs."""
+        referer = request.headers.get("referer") or ""
+        if not referer:
+            return None, ""
+        try:
+            parsed = urlparse(referer)
+        except Exception:
+            return None, ""
+        path = parsed.path or ""
+        if parsed.netloc:
+            host = (request.headers.get("host") or "").split(":")[0].lower()
+            ref_host = (parsed.hostname or "").lower()
+            if ref_host and host and ref_host != host and ref_host not in {
+                "testserver",
+                "127.0.0.1",
+                "localhost",
+            }:
+                return None, ""
+        if path not in {"/browse", "/media"}:
+            return None, ""
+        filters = _browse_filters_from_mapping(
+            dict(parse_qsl(parsed.query, keep_blank_values=False))
+        )
+        return _browse_return_pair(filters)
+
     def browse_return_from_request(request: Request) -> tuple[str | None, str]:
         """Build browse return URL + detail qs when navigated from /browse.
 
-        Expects ``?from=browse`` plus optional filter query params. Returns
-        ``(return_url, detail_qs)`` or ``(None, "")`` when not from browse.
+        Prefers ``?from=browse`` (+ filter params). Falls back to a same-origin
+        Referer of ``/browse`` or ``/media`` so Nav/Zurück still work if the
+        detail link omitted the return query. Returns ``(return_url, detail_qs)``
+        or ``(None, "")`` when not from browse.
         """
         qp = request.query_params
-        if qp.get("from") != "browse":
+        if qp.get("from") == "map":
             return None, ""
-        ret: list[tuple[str, str]] = []
-        detail: list[tuple[str, str]] = [("from", "browse")]
-        for key in _BROWSE_RETURN_KEYS:
-            val = qp.get(key)
-            if val:
-                ret.append((key, val))
-                detail.append((key, val))
-        detail_qs = urlencode(detail)
-        if ret:
-            return f"/browse?{urlencode(ret)}", detail_qs
-        return "/browse", detail_qs
+        if qp.get("from") == "browse":
+            return _browse_return_pair(_browse_filters_from_mapping(dict(qp)))
+        return browse_return_from_referer(request)
 
     def ctx(request: Request, **extra: Any) -> dict[str, Any]:
         lang = lang_from_request(request)

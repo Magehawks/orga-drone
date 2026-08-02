@@ -173,17 +173,53 @@ def test_media_detail_back_to_browse(tmp_path: Path, monkeypatch: pytest.MonkeyP
     qs = "from=browse&kind=video&drone=Mini+4+Pro&favorite=yes&q=hello&view=list"
     resp = client.get(f"/media/{mid}?{qs}")
     assert resp.status_code == 200
-    assert "Zurück zu Medien" in resp.text or "Back to browse" in resp.text
+    assert "Zurück zu Medien" in resp.text
     assert "detail-browse-return" in resp.text
-    assert 'href="/browse?' in resp.text
-    assert "kind=video" in resp.text
-    assert "favorite=yes" in resp.text
-    assert "q=hello" in resp.text
-    assert "view=list" in resp.text
-    # Breadcrumb and primary nav should keep the filtered browse URL
-    assert resp.text.count('href="/browse?') >= 2
+    assert 'class="button" href="/browse?' in resp.text
+    expected = (
+        "/browse?drone=Mini+4+Pro&amp;kind=video&amp;favorite=yes&amp;q=hello&amp;view=list"
+    )
+    assert f'href="{expected}"' in resp.text
+    assert resp.text.count(f'href="{expected}"') >= 4
     assert "Back to map" not in resp.text
     assert "Zurück zur Karte" not in resp.text
+
+
+def test_media_detail_browse_return_from_referer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Even without from=browse qs, Referer /browse?filters keeps Nav/Zurück."""
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    mid = _seed(db, tmp_path / "lib", lat=1.0, lon=2.0, name="refbrowse.MP4")
+    client = TestClient(app)
+    resp = client.get(
+        f"/media/{mid}",
+        headers={"Referer": "http://testserver/browse?kind=photo&q=beach&view=grid"},
+    )
+    assert resp.status_code == 200
+    assert "Zurück zu Medien" in resp.text
+    assert "detail-browse-return" in resp.text
+    expected = "/browse?kind=photo&amp;q=beach&amp;view=grid"
+    assert f'href="{expected}"' in resp.text
+    assert resp.text.count(f'href="{expected}"') >= 4
+
+
+def test_media_detail_map_beats_browse_referer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    mid = _seed(db, tmp_path / "lib", lat=47.1, lon=8.2, name="mapwins.MP4")
+    client = TestClient(app)
+    resp = client.get(
+        f"/media/{mid}?from=map&lat=47.05&lon=8.3&zoom=11",
+        headers={"Referer": "http://testserver/browse?kind=photo"},
+    )
+    assert resp.status_code == 200
+    assert "detail-map-return" in resp.text
+    assert "detail-browse-return" not in resp.text
+    assert "Zurück zu Medien" not in resp.text
 
 
 def test_media_detail_without_browse_origin_has_plain_browse_link(
