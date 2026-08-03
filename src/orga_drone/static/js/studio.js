@@ -94,7 +94,10 @@
   function setSaveState(saved) {
     if (!saveStateEl) return;
     saveStateEl.dataset.state = saved ? "saved" : "dirty";
-    saveStateEl.textContent = saved ? labelSaved : labelUnsaved;
+    const label = saved ? labelSaved : labelUnsaved;
+    const text = saveStateEl.querySelector(".studio-save-state-text");
+    if (text) text.textContent = label;
+    saveStateEl.setAttribute("title", label);
   }
 
   function formatTime(seconds) {
@@ -220,7 +223,13 @@
   }
 
   function setToggleLabel() {
-    if (toggleBtn) toggleBtn.textContent = state.playing ? labelPause : labelPlay;
+    if (!toggleBtn) return;
+    const playIcon = toggleBtn.querySelector("[data-play-icon]");
+    const pauseIcon = toggleBtn.querySelector("[data-pause-icon]");
+    if (playIcon) playIcon.hidden = state.playing;
+    if (pauseIcon) pauseIcon.hidden = !state.playing;
+    toggleBtn.setAttribute("aria-label", state.playing ? labelPause : labelPlay);
+    toggleBtn.setAttribute("title", state.playing ? labelPause : labelPlay);
   }
 
   function stopWallClock() {

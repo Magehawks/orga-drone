@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import lucide %}
 {% block title %}{{ _('Studio') }} · {{ _('orga-drone') }}{% endblock %}
 {% block head %}
 <style>body.studio-app main { padding: 0; } body.studio-app footer { display: none; }</style>
@@ -9,8 +10,11 @@
   Creator Studio UI foundation (GitHub #14).
   Persistence: studio_items order + photo duration (existing APIs).
   Playback, transitions, music, and export are UI/state only — no render pipeline.
+  Icons: Lucide (vendored) — see static/vendor/lucide/README.md
 #}
 <script>document.body.classList.add("studio-app");</script>
+{# Inline Lucide sprite so <use href="#…"> works offline in WebView2. #}
+{% include "partials/lucide_sprite.html" %}
 
 <section class="studio-creator"
          id="studio-root"
@@ -42,17 +46,29 @@
       <input id="studio-project-title" class="studio-project-title" type="text"
              value="{{ _('Your story') }}" maxlength="120"
              aria-label="{{ _('Project title') }}">
-      <span class="studio-save-state" id="studio-save-state" data-state="saved">{{ _('Saved') }}</span>
+      <span class="studio-save-state" id="studio-save-state" data-state="saved"
+            title="{{ _('Saved') }}">
+        {{ lucide('save') }}
+        <span class="studio-save-state-text">{{ _('Saved') }}</span>
+      </span>
     </div>
     <div class="studio-topbar-actions">
       {% if items %}
       <form method="post" action="/studio/clear" class="studio-clear-form"
             onsubmit="return confirm('{{ _('Remove all media from Studio? This does not delete your files.')|e }}');">
-        <button type="submit" class="button ghost">{{ _('Clear Studio') }}</button>
+        <button type="submit" class="button ghost studio-icon-button"
+                title="{{ _('Clear Studio') }}" aria-label="{{ _('Clear Studio') }}">
+          {{ lucide('trash-2') }}
+          <span class="studio-btn-label">{{ _('Clear Studio') }}</span>
+        </button>
       </form>
       {% endif %}
-      <button type="button" class="button" id="studio-export-open"
-              {% if not items %}disabled{% endif %}>{{ _('Export') }}</button>
+      <button type="button" class="button studio-icon-button" id="studio-export-open"
+              title="{{ _('Export') }}" aria-label="{{ _('Export') }}"
+              {% if not items %}disabled{% endif %}>
+        {{ lucide('download') }}
+        <span class="studio-btn-label">{{ _('Export') }}</span>
+      </button>
     </div>
   </header>
 
@@ -126,7 +142,11 @@
             </div>
             <form method="post" action="/media/{{ fav.id }}/studio/add" class="studio-browser-add">
               <input type="hidden" name="return_to" value="/studio">
-              <button type="submit" class="button ghost">{{ _('Add') }}</button>
+              <button type="submit" class="button ghost studio-icon-button"
+                      title="{{ _('Add') }}" aria-label="{{ _('Add') }}">
+                {{ lucide('plus') }}
+                <span class="studio-btn-label">{{ _('Add') }}</span>
+              </button>
             </form>
           </li>
           {% endfor %}
@@ -136,7 +156,10 @@
         {% endif %}
       </div>
 
-      <a class="button ghost studio-add-media" href="{{ browse_return_url or '/browse' }}">{{ _('Add media from Browse') }}</a>
+      <a class="button ghost studio-add-media studio-icon-button" href="{{ browse_return_url or '/browse' }}">
+        {{ lucide('plus') }}
+        <span class="studio-btn-label">{{ _('Add media from Browse') }}</span>
+      </a>
     </aside>
 
     <div class="studio-stage">
@@ -160,17 +183,37 @@
       </div>
 
       <div class="studio-transport" role="group" aria-label="{{ _('Playback controls') }}">
-        <button type="button" class="studio-transport-btn" data-transport="start" title="{{ _('Jump to start') }}" {% if not items %}disabled{% endif %}>|&lt;</button>
-        <button type="button" class="studio-transport-btn" data-transport="prev" title="{{ _('Previous clip') }}" {% if not items %}disabled{% endif %}>&lt;</button>
-        <button type="button" class="studio-transport-btn studio-transport-play" data-transport="toggle" title="{{ _('Play / pause') }}" {% if not items %}disabled{% endif %}>{{ _('Play') }}</button>
-        <button type="button" class="studio-transport-btn" data-transport="next" title="{{ _('Next clip') }}" {% if not items %}disabled{% endif %}>&gt;</button>
-        <button type="button" class="studio-transport-btn" data-transport="end" title="{{ _('Jump to end') }}" {% if not items %}disabled{% endif %}>&gt;|</button>
+        <button type="button" class="studio-transport-btn" data-transport="start"
+                title="{{ _('Jump to start') }}" aria-label="{{ _('Jump to start') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('chevrons-left') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="prev"
+                title="{{ _('Previous clip') }}" aria-label="{{ _('Previous clip') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('skip-back') }}</button>
+        <button type="button" class="studio-transport-btn studio-transport-play" data-transport="toggle"
+                title="{{ _('Play / pause') }}" aria-label="{{ _('Play') }}"
+                {% if not items %}disabled{% endif %}>
+          <span class="studio-transport-icon is-play" data-play-icon>{{ lucide('play') }}</span>
+          <span class="studio-transport-icon is-pause" data-pause-icon hidden>{{ lucide('pause') }}</span>
+        </button>
+        <button type="button" class="studio-transport-btn" data-transport="next"
+                title="{{ _('Next clip') }}" aria-label="{{ _('Next clip') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('skip-forward') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="end"
+                title="{{ _('Jump to end') }}" aria-label="{{ _('Jump to end') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('chevrons-right') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="cut" disabled
+                title="{{ _('Cut clip — not available yet') }}"
+                aria-label="{{ _('Cut clip — not available yet') }}">{{ lucide('scissors') }}</button>
         <span class="studio-transport-time" id="studio-transport-time" aria-live="polite">00:00:00 / {{ summary.estimated_total_label }}</span>
         <label class="studio-transport-volume">
+          <span class="studio-transport-volume-icon" aria-hidden="true">{{ lucide('volume-2') }}</span>
           <span class="visually-hidden">{{ _('Volume') }}</span>
-          <input type="range" id="studio-volume" min="0" max="100" value="80" {% if not items %}disabled{% endif %}>
+          <input type="range" id="studio-volume" min="0" max="100" value="80"
+                 aria-label="{{ _('Volume') }}" {% if not items %}disabled{% endif %}>
         </label>
-        <button type="button" class="studio-transport-btn" data-transport="fullscreen" title="{{ _('Fullscreen') }}" {% if not items %}disabled{% endif %}>{{ _('Full') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="fullscreen"
+                title="{{ _('Fullscreen') }}" aria-label="{{ _('Fullscreen') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('fullscreen') }}</button>
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">
@@ -252,8 +295,9 @@
             <div class="studio-track-label">{{ _('Music') }}</div>
             <div class="studio-music-body" id="studio-music-body">
               <div class="studio-music-empty" id="studio-music-empty">
-                <label class="button ghost studio-music-add">
-                  {{ _('Add music') }}
+                <label class="button ghost studio-music-add studio-icon-button">
+                  {{ lucide('plus') }}
+                  <span class="studio-btn-label">{{ _('Add music') }}</span>
                   <input type="file" id="studio-music-file" accept="audio/*" hidden>
                 </label>
                 <p class="hint">{{ _('One music track only. File stays on this computer; not used for export yet.') }}</p>
@@ -267,7 +311,11 @@
                   <span class="studio-music-handle studio-music-handle-start" aria-hidden="true"></span>
                   <span class="studio-music-handle studio-music-handle-end" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="button ghost" id="studio-music-remove">{{ _('Remove') }}</button>
+                <button type="button" class="button ghost studio-icon-button" id="studio-music-remove"
+                        title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
+                  {{ lucide('trash-2') }}
+                  <span class="studio-btn-label">{{ _('Remove') }}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -301,7 +349,11 @@
         </label>
         <button type="button" class="button ghost" id="inspector-photo-reset" hidden>{{ _('Reset') }}</button>
         <form method="post" id="inspector-remove-form" class="studio-inspector-remove">
-          <button type="submit" class="button ghost">{{ _('Remove from story') }}</button>
+          <button type="submit" class="button ghost studio-icon-button"
+                  title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
+            {{ lucide('trash-2') }}
+            <span class="studio-btn-label">{{ _('Remove from story') }}</span>
+          </button>
         </form>
       </div>
 
@@ -336,7 +388,11 @@
           <span>{{ _('Fade out (s)') }}</span>
           <input type="number" id="inspector-music-fade-out" min="0" max="10" step="0.1" value="0">
         </label>
-        <button type="button" class="button ghost" id="inspector-music-remove">{{ _('Remove') }}</button>
+        <button type="button" class="button ghost studio-icon-button" id="inspector-music-remove"
+                title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
+          {{ lucide('trash-2') }}
+          <span class="studio-btn-label">{{ _('Remove') }}</span>
+        </button>
         <p class="hint">{{ _('Music settings are local UI state only and are not exported yet.') }}</p>
       </div>
     </aside>

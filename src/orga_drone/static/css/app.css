@@ -873,10 +873,14 @@ body.studio-app { padding-bottom: 0; }
   background: var(--input-bg);
 }
 .studio-save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--muted);
   white-space: nowrap;
 }
+.studio-save-state .studio-icon { width: 0.95rem; height: 0.95rem; }
 .studio-save-state[data-state="dirty"] { color: var(--accent); }
 .studio-topbar-actions {
   display: flex;
@@ -1073,13 +1077,42 @@ img.studio-preview-media {
   background: var(--surface-deep);
   color: var(--text);
   border-radius: var(--radius-sm);
-  min-width: 2.1rem;
-  height: 2.1rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   cursor: pointer;
 }
 .studio-transport-btn:disabled { opacity: 0.45; cursor: default; }
-.studio-transport-play { min-width: 4.2rem; }
+.studio-transport-play { min-width: 2.5rem; }
+.studio-transport-icon[hidden] { display: none !important; }
+.studio-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+}
+.studio-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.studio-icon-button .studio-icon { width: 1rem; height: 1rem; }
+.studio-transport-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.studio-transport-volume-icon {
+  display: inline-flex;
+  color: var(--muted);
+}
+.studio-transport-volume-icon .studio-icon { width: 1rem; height: 1rem; }
 .studio-transport-time {
   font-family: var(--mono);
   font-size: 0.8rem;

@@ -228,7 +228,7 @@ SQLite index and thumbs live in the OS app-data folder, for example:
 
 Override with `ORGA_DRONE_DATA_DIR` in `.env`.
 
-Leaflet + MarkerCluster are vendored under `/static/vendor/` (no CDN required for those assets). OSM **tiles** still need network.
+Leaflet + MarkerCluster are vendored under `/static/vendor/` (no CDN required for those assets). OSM **tiles** still need network. Studio transport/editing icons use **Lucide** SVGs vendored under `/static/vendor/lucide/` (ISC; see that folder’s README).
 
 ## Technology and architecture
 

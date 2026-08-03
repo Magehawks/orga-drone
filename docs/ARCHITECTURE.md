@@ -14,6 +14,7 @@ Do not invent layers, services, or plugins that are not present.
 | Media | Streamed from configured library folders (not embedded) |
 | Thumbnails / merge | Pillow / pillow-heif; `imageio-ffmpeg` or system ffmpeg |
 | Maps | Leaflet (vendored) + OpenStreetMap tiles |
+| Studio icons | Lucide SVGs (vendored under `static/vendor/lucide/`, ISC) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
 | Tests | pytest under `tests/` |
 | CI | GitHub Actions: Ruff, MyPy, pytest on pull requests |
@@ -95,7 +96,8 @@ Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
 Studio page: Jinja layout + `static/js/studio.js` (reorder/duration APIs;
 synced Story preview via `/stream`/`/proxy`; music/transitions/export remain
-client UI stubs only).
+client UI stubs only). Transport/editing controls use vendored Lucide icons
+(`static/vendor/lucide/`; see README there).
 
 Typical user flow:
 

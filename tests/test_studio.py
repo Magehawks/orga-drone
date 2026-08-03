@@ -354,6 +354,21 @@ def test_http_studio_creator_shell_with_items(
     assert 'id="studio-preview-video"' in html
     assert 'id="studio-preview-image"' in html
     assert "studio-transport" in html
+    assert 'data-transport="toggle"' in html
+    assert 'href="#lucide-play"' in html or "lucide-play" in html
+    assert 'href="#lucide-pause"' in html or "lucide-pause" in html
+    assert "lucide-chevrons-left" in html
+    assert "lucide-skip-back" in html
+    assert "lucide-skip-forward" in html
+    assert "lucide-chevrons-right" in html
+    assert "lucide-scissors" in html
+    assert "lucide-volume-2" in html
+    assert "lucide-fullscreen" in html
+    assert "lucide-download" in html
+    assert "lucide-save" in html
+    assert "lucide-trash-2" in html
+    assert "lucide-plus" in html
+    assert "|&lt;" not in html
     assert "studio-inspector" in html
     assert "studio-music-track" in html
     assert "studio-track-voice" in html
