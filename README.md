@@ -1,8 +1,10 @@
 # Orga Drone
 
-**A local-first drone media library with flight metadata, telemetry and map exploration.**
+**A local-first drone media library with flight metadata, telemetry, map exploration, and a Studio memory-editor UI.**
 
 Open source. Runs on your machine. No cloud account required. Built first for **DJI Avata 2**, usable on Windows (primary), macOS, and Linux via Python; Windows also ships as a downloadable desktop build.
+
+**Vision:** help people organize, rediscover, create and share the memories behind their adventures — without becoming a professional video editor. See [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
 
 **Windows:** [Download latest exe (zip)](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip) · [All releases](https://github.com/Magehawks/orga-drone/releases)
 
@@ -30,7 +32,7 @@ Map marker follows video playback:
 
 ## The problem
 
-Drone pilots end up with large piles of footage across SD cards, backups, and vacation folders. Editing tools, generic photo managers, and basic flight logs each solve a slice of the problem. Orga Drone focuses on **organizing local media**, **reading drone-oriented metadata**, **grouping clips into flights**, and **exploring where you flew** — without uploading your library.
+People fly drones for experiences, not for managing files. Footage piles up across SD cards, backups, and vacation folders. Editing tools, generic photo managers, and basic flight logs each solve a slice of the problem. Orga Drone focuses on **organizing local media**, **reading drone-oriented metadata**, **grouping clips into flights**, **exploring where you flew**, and **preparing a light Studio story** — without uploading your library or requiring a pro editor.
 
 ## What Orga Drone currently provides
 
@@ -43,12 +45,13 @@ Drone pilots end up with large piles of footage across SD cards, backups, and va
 - Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
+- **Studio:** collect media, arrange order, estimate runtime; Creator Studio UI with preview/Story track (playback, music, and export are UI stubs — no render pipeline yet)
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
 - Export a local spot GeoJSON download when GPS is available
 - Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
 - UI in German and English; Dark / Light / Custom themes
 
-It is **not** a video editor, mission planner, airspace tool, or cloud sync service.
+It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Real Studio playback, music-in-export, MP4 rendering, and social share destinations are **planned** (see vision / roadmap), not Available today.
 
 ### Flows vs sessions
 
@@ -77,10 +80,12 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Single curation list (add/remove/clear); not an editor or multi-project albums |
+| Studio workspace | Available | Creator Studio UI (preview, Story track, inspector, music/export stubs); persisted order + estimated runtime; single workspace, not multi-project albums |
+| Studio MP4 export / music-in-export | Not available | Studio MVP target — see `docs/PRODUCT_VISION.md` |
 | Projects / albums | Not available | Possible future work (Studio is a first slice) |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
+| Social share integrations | Not available | Later; local file / future MP4 first |
 | CI-built multi-OS installers | Not available | Windows zip built/published manually today |
 
 ## Installation and first start
@@ -243,19 +248,22 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 
 ## Roadmap
 
-**Longer-term vision (separate from today’s product):** an open-source platform for drone media, flight intelligence and creator workflows.
+**Vision:** organize, rediscover, create and share adventure memories — without becoming a pro NLE. Details: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
 
 **Possible next steps** (not available now):
 
+- Studio simple MP4 export + optional one music track (Studio MVP target)
+- Open / reveal exported local files on desktop
 - Projects or albums for organizing media sets
 - Incremental or cheaper library rescans
 - Broader multi-brand parsers beyond the current DJI-first depth
-- ffmpeg burn-in of telemetry into a short preview export
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)
 - Online geocoding providers (place auto-tags are offline today)
 - Plugin / extension hooks for parsers and exports
 - CI-built installers for Windows / macOS / Linux
-- Optional intelligent features only when they solve a concrete library problem
+- Optional intelligent features only when they solve a concrete memory/library problem
+
+Full prioritization language: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributing
 

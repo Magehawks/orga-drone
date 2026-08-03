@@ -66,7 +66,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
-| `studio_items` | Single Studio curation list (path + identity; survives rescan) |
+| `studio_items` | Single Studio curation list (path + identity + order; `kind_snapshot`, optional `photo_duration_s`; survives rescan) |
 | `geocode_cache` | Offline place cache |
 
 ## Scan / index pipeline
@@ -93,6 +93,8 @@ at a time.
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
+Studio page: Jinja layout + `static/js/studio.js` (reorder/duration APIs;
+playback/music/transitions/export are client UI state only).
 
 Typical user flow:
 

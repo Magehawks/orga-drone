@@ -23,6 +23,11 @@ from orga_drone.dupes import (
     find_duplicate_groups,
     media_row_to_fingerprint,
 )
+from orga_drone.studio_estimate import (
+    DEFAULT_PHOTO_DURATION_S,
+    effective_seconds,
+    summarize_studio_items,
+)
 from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.ffmpeg_bin import ffmpeg_available
 from orga_drone.flight_view import (
@@ -242,12 +247,14 @@ def create_app() -> FastAPI:
         target = raw.lower()
         if target == "browse":
             return "/browse"
+        if target == "studio":
+            return "/studio"
         if target == "detail":
             return f"/media/{media_id}"
         # Internal relative Browse URL with filters (Variant A allowlist extension).
         if raw.startswith("/") and not raw.startswith("//") and "://" not in raw:
             parsed = urlparse(raw)
-            if parsed.path in {"/browse", "/media"}:
+            if parsed.path in {"/browse", "/media", "/studio"}:
                 return parsed.path + (f"?{parsed.query}" if parsed.query else "")
         return f"/media/{media_id}"
 
@@ -784,12 +791,115 @@ def create_app() -> FastAPI:
         msg: str | None = None,
     ) -> HTMLResponse:
         items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        item_display: list[dict[str, Any]] = []
+        for it in items:
+            seconds = effective_seconds(
+                kind=it.kind or "unknown",
+                photo_duration_s=it.photo_duration_s,
+                duration_s=it.duration_s,
+                available=it.available,
+            )
+            item_display.append(
+                {
+                    "item": it,
+                    "effective_duration_s": seconds,
+                    "display_duration_s": (
+                        it.photo_duration_s
+                        if it.kind == "photo" and it.photo_duration_s is not None
+                        else (
+                            DEFAULT_PHOTO_DURATION_S
+                            if it.kind == "photo"
+                            else it.duration_s
+                        )
+                    ),
+                }
+            )
+        studio_paths = {it.media_path for it in items}
+        favorite_media = [
+            fav
+            for fav in db.list_media(favorite=True, sort="recorded_at", order="desc", limit=48)
+            if fav.path not in studio_paths
+        ]
         return render(
             request,
             "studio.html",
             items=items,
+            item_display=item_display,
+            summary=summary,
+            default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
+            favorite_media=favorite_media,
             flash_msg=msg,
             nav_active="studio",
+        )
+
+    @app.post("/api/studio/reorder")
+    async def api_studio_reorder(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_ids = payload.get("ordered_ids")
+        if not isinstance(raw_ids, list) or not all(
+            isinstance(x, int) and not isinstance(x, bool) for x in raw_ids
+        ):
+            raise HTTPException(
+                status_code=400, detail="ordered_ids must be a list of integers"
+            )
+        try:
+            ordered = db.reorder_studio_items([int(x) for x in raw_ids])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        return JSONResponse(
+            {"ok": True, "ordered_ids": ordered, "summary": summary.as_dict()}
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/photo-duration")
+    async def api_studio_photo_duration(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "duration_s" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include duration_s"
+            )
+        raw = payload.get("duration_s")
+        if raw is not None and not isinstance(raw, (int, float)):
+            raise HTTPException(
+                status_code=400, detail="duration_s must be a number or null"
+            )
+        duration_s: float | None = None if raw is None else float(raw)
+        try:
+            item = db.set_studio_photo_duration(studio_item_id, duration_s)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        seconds = effective_seconds(
+            kind=item.kind or "unknown",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "photo_duration_s": item.photo_duration_s,
+                "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
         )
 
     @app.post("/media/{media_id}/studio/add")
@@ -807,10 +917,13 @@ def create_app() -> FastAPI:
             ),
             filename=item.filename,
             recorded_at=item.recorded_at,
+            kind=item.kind,
         )
         base = studio_add_return_url(media_id, return_to)
         msg = "studio_added" if created else "studio_already"
         if base == "/browse" or base.startswith("/browse?"):
+            return RedirectResponse(url=base, status_code=303)
+        if base == "/studio" or base.startswith("/studio?"):
             return RedirectResponse(url=base, status_code=303)
         sep = "&" if "?" in base else "?"
         return RedirectResponse(url=f"{base}{sep}msg={msg}", status_code=303)

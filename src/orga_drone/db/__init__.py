@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS studio_items (
     position INTEGER NOT NULL,
     filename_snapshot TEXT NOT NULL,
     recorded_at_snapshot TEXT,
+    kind_snapshot TEXT NOT NULL,
+    photo_duration_s REAL,
     added_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key);
@@ -244,12 +246,15 @@ class StudioItem:
     position: int
     filename_snapshot: str
     recorded_at_snapshot: str | None
+    kind_snapshot: str
+    photo_duration_s: float | None
     added_at: str
     available: bool
     media_id: int | None
     filename: str
     recorded_at: str | None
     kind: str | None = None
+    duration_s: float | None = None
 
 
 class Database:
@@ -351,6 +356,8 @@ class Database:
                 position INTEGER NOT NULL,
                 filename_snapshot TEXT NOT NULL,
                 recorded_at_snapshot TEXT,
+                kind_snapshot TEXT NOT NULL DEFAULT 'photo',
+                photo_duration_s REAL,
                 added_at TEXT NOT NULL
             )"""
         )
@@ -360,6 +367,29 @@ class Database:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position)"
         )
+        studio_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+        }
+        if "kind_snapshot" not in studio_cols:
+            conn.execute("ALTER TABLE studio_items ADD COLUMN kind_snapshot TEXT")
+            conn.execute(
+                """UPDATE studio_items
+                   SET kind_snapshot = (
+                     SELECT m.kind FROM media m WHERE m.path = studio_items.media_path
+                   )
+                   WHERE kind_snapshot IS NULL"""
+            )
+            # Legacy rows without a live media join: conservative photo fallback.
+            conn.execute(
+                """UPDATE studio_items
+                   SET kind_snapshot = 'photo'
+                   WHERE kind_snapshot IS NULL"""
+            )
+        studio_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+        }
+        if "photo_duration_s" not in studio_cols:
+            conn.execute("ALTER TABLE studio_items ADD COLUMN photo_duration_s REAL")
 
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
@@ -1057,11 +1087,14 @@ class Database:
         identity_key: str,
         filename: str,
         recorded_at: str | None,
+        kind: str,
     ) -> tuple[int, bool]:
         """Add media to Studio. Returns ``(studio_item_id, created)``.
 
         Idempotent on ``media_path``: existing membership returns ``created=False``.
+        ``kind`` is snapshotted for unavailable / estimate use after rescan.
         """
+        kind_snapshot = kind if kind in {"photo", "video"} else "photo"
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
             existing = conn.execute(
@@ -1077,14 +1110,16 @@ class Database:
             cur = conn.execute(
                 """INSERT INTO studio_items(
                      media_path, identity_key, position,
-                     filename_snapshot, recorded_at_snapshot, added_at
-                   ) VALUES (?, ?, ?, ?, ?, ?)""",
+                     filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?)""",
                 (
                     media_path,
                     identity_key,
                     position,
                     filename,
                     recorded_at,
+                    kind_snapshot,
                     now,
                 ),
             )
@@ -1125,12 +1160,16 @@ class Database:
         return {str(r["media_path"]) for r in rows}
 
     def list_studio_items(self) -> list[StudioItem]:
+        from orga_drone.studio_estimate import effective_kind
+
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT s.id, s.media_path, s.identity_key, s.position,
                           s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
+                          s.kind_snapshot, s.photo_duration_s,
                           m.id AS media_id, m.filename AS live_filename,
-                          m.recorded_at AS live_recorded_at, m.kind AS live_kind
+                          m.recorded_at AS live_recorded_at, m.kind AS live_kind,
+                          m.duration_s AS live_duration_s
                    FROM studio_items s
                    LEFT JOIN media m ON m.path = s.media_path
                    ORDER BY s.position ASC, s.id ASC"""
@@ -1138,6 +1177,16 @@ class Database:
         out: list[StudioItem] = []
         for r in rows:
             available = r["media_id"] is not None
+            live_kind = (
+                str(r["live_kind"]) if available and r["live_kind"] else None
+            )
+            kind_snapshot = str(r["kind_snapshot"] or "photo")
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=kind_snapshot,
+            )
+            photo_raw = r["photo_duration_s"]
             out.append(
                 StudioItem(
                     id=int(r["id"]),
@@ -1146,6 +1195,10 @@ class Database:
                     position=int(r["position"]),
                     filename_snapshot=str(r["filename_snapshot"]),
                     recorded_at_snapshot=r["recorded_at_snapshot"],
+                    kind_snapshot=kind_snapshot,
+                    photo_duration_s=(
+                        float(photo_raw) if photo_raw is not None else None
+                    ),
                     added_at=str(r["added_at"]),
                     available=available,
                     media_id=int(r["media_id"]) if r["media_id"] is not None else None,
@@ -1159,10 +1212,77 @@ class Database:
                         if available
                         else r["recorded_at_snapshot"]
                     ),
-                    kind=str(r["live_kind"]) if available and r["live_kind"] else None,
+                    kind=kind if kind != "unknown" else None,
+                    duration_s=(
+                        float(r["live_duration_s"])
+                        if available and r["live_duration_s"] is not None
+                        else None
+                    ),
                 )
             )
         return out
+
+    def reorder_studio_items(self, ordered_ids: list[int]) -> list[int]:
+        """Set ``position`` to 1..n for an exact permutation of all Studio IDs.
+
+        Raises ``ValueError`` if ``ordered_ids`` is not an exact permutation.
+        """
+        with self.connect() as conn:
+            existing = {
+                int(r["id"])
+                for r in conn.execute("SELECT id FROM studio_items").fetchall()
+            }
+            if len(ordered_ids) != len(existing) or set(ordered_ids) != existing:
+                raise ValueError("ordered_ids must be an exact permutation of studio items")
+            for position, item_id in enumerate(ordered_ids, start=1):
+                conn.execute(
+                    "UPDATE studio_items SET position = ? WHERE id = ?",
+                    (position, item_id),
+                )
+        return list(ordered_ids)
+
+    def set_studio_photo_duration(
+        self,
+        studio_item_id: int,
+        duration_s: float | None,
+    ) -> StudioItem:
+        """Set or reset custom photo duration. Raises ``ValueError`` on bad input."""
+        from orga_drone.studio_estimate import (
+            clamp_photo_duration,
+            effective_kind,
+        )
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.kind_snapshot, m.kind AS live_kind, m.id AS media_id
+                   FROM studio_items s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "photo":
+                raise ValueError("photo duration only applies to photos")
+            if duration_s is None:
+                value: float | None = None
+            else:
+                value = clamp_photo_duration(float(duration_s))
+            conn.execute(
+                "UPDATE studio_items SET photo_duration_s = ? WHERE id = ?",
+                (value, studio_item_id),
+            )
+        items = {i.id: i for i in self.list_studio_items()}
+        return items[studio_item_id]
 
     def repath_studio_item(self, old_path: str, new_path: str) -> None:
         if old_path == new_path:

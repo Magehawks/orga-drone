@@ -27,3 +27,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0001](0001-studio-workspace-persistence.md) | Studio workspace persistence | Accepted |
+| [0002](0002-studio-order-and-duration.md) | Studio order and duration estimate | Accepted |
