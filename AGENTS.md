@@ -4,8 +4,8 @@
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(manual order + estimated runtime; preview/timeline chrome without real
-playback or export).
+(manual order + estimated runtime; synced Story preview playback; no MP4
+export yet).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -46,7 +46,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate; Creator UI with stub playback/music/export |
+| Studio | How do I want to tell this story? | Select, order, estimate; synced Story preview playback; music/export stubs |
 | Share | How do I share? | Local files on disk; Studio MP4 export = target MVP |
 
 ## Available now (implemented)
@@ -60,7 +60,8 @@ The application helps users:
 - filter, browse, and detect likely duplicate files (heuristics; no auto-delete)
 - collect selected media in a **Studio** workspace (single list with manual
   order and estimated runtime; Creator Studio UI with preview/Story track/
-  inspector; playback, music, and export are UI stubs only — no render pipeline)
+  inspector; Story preview plays photos/videos in sync with the playhead;
+  music and export remain UI stubs only — no render pipeline)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
@@ -71,8 +72,8 @@ The application helps users:
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
-- There is **no** multi-project albums model, plugin API, real Studio
-  playback/music-in-export/MP4 export, or CI-built multi-OS installer pipeline
+- There is **no** multi-project albums model, plugin API, Studio
+  music-in-export/MP4 export, or CI-built multi-OS installer pipeline
   in the current tree. Studio remains a single workspace.
 
 ## Product principles

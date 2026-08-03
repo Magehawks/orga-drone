@@ -22,8 +22,10 @@
          data-saved-label="{{ _('Saved')|e }}"
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
          data-export-unavailable="{{ _('Export is not available yet. No video is rendered in this build.')|e }}"
-         data-playback-note="{{ _('Preview transport updates the playhead only — media is not played back yet.')|e }}"
+         data-playback-note="{{ _('Preview plays Story media in order. Export and music sync are not available yet.')|e }}"
          data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
+         data-label-play="{{ _('Play')|e }}"
+         data-label-pause="{{ _('Pause')|e }}"
          data-transition-none="{{ _('None')|e }}"
          data-transition-fade="{{ _('Fade')|e }}"
          data-transition-crossfade="{{ _('Cross fade')|e }}"
@@ -142,9 +144,10 @@
         {% if items %}
         <div class="studio-preview-frame" id="studio-preview-frame">
           <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
+          <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
-            <p class="hint">{{ _('Preview transport updates the playhead only — media is not played back yet.') }}</p>
+            <p class="hint">{{ _('Preview plays Story media in order. Export and music sync are not available yet.') }}</p>
           </div>
         </div>
         {% else %}
@@ -209,7 +212,12 @@
                   data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
                   data-thumb="{% if item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
-                  style="--clip-flex: {{ row.effective_duration_s if row.effective_duration_s is not none else 3 }};">
+                  data-stream-url="{{ row.stream_url }}"
+                  data-proxy-url="{{ row.proxy_url }}"
+                  data-preview-url="{{ row.preview_url }}"
+                  data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
+                  data-can-play="{{ '1' if row.can_play else '0' }}"
+                  style="--clip-flex: {{ '%.4f'|format(row.effective_duration_s) if row.effective_duration_s is not none else 0 }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
                         aria-label="{{ _('Drag to reorder') }}" title="{{ _('Drag to reorder') }}">
                   <span aria-hidden="true">≡</span>

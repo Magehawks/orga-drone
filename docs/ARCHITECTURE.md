@@ -94,7 +94,8 @@ at a time.
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
 Studio page: Jinja layout + `static/js/studio.js` (reorder/duration APIs;
-playback/music/transitions/export are client UI state only).
+synced Story preview via `/stream`/`/proxy`; music/transitions/export remain
+client UI stubs only).
 
 Typical user flow:
 

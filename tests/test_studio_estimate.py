@@ -9,6 +9,7 @@ from orga_drone.studio_estimate import (
     effective_kind,
     effective_seconds,
     format_studio_duration,
+    resolve_project_time,
     summarize_studio_items,
 )
 
@@ -91,3 +92,31 @@ def test_summarize_and_hhmmss() -> None:
     assert summary.estimated_total_label == "00:01:12"
     assert format_studio_duration(107.5) == "00:01:48"
     assert format_studio_duration(0) == "00:00:00"
+
+
+def test_resolve_project_time_maps_clips() -> None:
+    assert resolve_project_time([], 0) is None
+    assert resolve_project_time([0, -1], 1) is None
+
+    hit = resolve_project_time([3.0, 10.0, 5.0], 0.0)
+    assert hit is not None
+    assert hit.index == 0 and hit.start_s == 0.0 and hit.local_s == 0.0
+    assert hit.at_end is False
+
+    hit = resolve_project_time([3.0, 10.0, 5.0], 3.0)
+    assert hit is not None
+    assert hit.index == 1 and hit.start_s == 3.0 and abs(hit.local_s - 0.0) < 1e-9
+
+    hit = resolve_project_time([3.0, 10.0, 5.0], 8.5)
+    assert hit is not None
+    assert hit.index == 1 and abs(hit.local_s - 5.5) < 1e-9
+
+    hit = resolve_project_time([3.0, 10.0, 5.0], 18.0)
+    assert hit is not None
+    assert hit.index == 2 and hit.at_end is True and hit.local_s == 5.0
+
+    # Zero-duration spans are skipped; indices refer to original list positions.
+    hit = resolve_project_time([0.0, 4.0, 0.0, 6.0], 4.0)
+    assert hit is not None
+    assert hit.index == 3 and hit.start_s == 4.0 and hit.local_s == 0.0
+

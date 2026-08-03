@@ -351,6 +351,8 @@ def test_http_studio_creator_shell_with_items(
     html = page.text
     assert "studio-creator" in html
     assert "studio-preview" in html
+    assert 'id="studio-preview-video"' in html
+    assert 'id="studio-preview-image"' in html
     assert "studio-transport" in html
     assert "studio-inspector" in html
     assert "studio-music-track" in html
@@ -359,9 +361,71 @@ def test_http_studio_creator_shell_with_items(
     assert "studio-transition" in html
     assert "A.MP4" in html
     assert "B.JPG" in html
+    assert f'data-stream-url="/media/{mid_a}/stream"' in html
+    assert f'data-stream-url="/media/{mid_b}/stream"' in html
+    assert f'data-preview-url="/media/{mid_b}/stream"' in html
+    assert 'data-can-play="1"' in html
     assert "studio.js" in html
     assert 'id="studio-export-dialog"' in html
     assert "not available yet" in html or "noch nicht verfügbar" in html
+    assert "Preview plays Story media" in html or "Preview spielt" in html
+    # Photo clips must expose an image preview source (not only video stream).
+    assert 'data-kind="photo"' in html
+    assert 'data-preview-url=' in html
+
+
+def test_http_studio_photo_first_has_preview_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    mid_photo = _seed_media(
+        db,
+        tmp_path / "lib",
+        filename="first.JPG",
+        content=b"jpeg",
+        kind="photo",
+        duration_s=None,
+    )
+    mid_video = _seed_media(
+        db,
+        tmp_path / "lib",
+        filename="second.MP4",
+        content=b"video",
+        kind="video",
+        duration_s=8.0,
+    )
+    id_photo, _ = _add_item(db, mid_photo)
+    id_video, _ = _add_item(db, mid_video)
+    db.reorder_studio_items([id_photo, id_video])
+    c = TestClient(app)
+    html = c.get("/studio").text
+    # First clip in DOM order should be the photo with a preview URL.
+    photo_idx = html.find('data-kind="photo"')
+    video_idx = html.find('data-kind="video"')
+    assert photo_idx != -1 and video_idx != -1
+    assert photo_idx < video_idx
+    photo_block = html[photo_idx : photo_idx + 900]
+    assert f'data-preview-url="/media/{mid_photo}/stream"' in photo_block
+    assert 'id="studio-preview-video"' in html
+    assert 'id="studio-preview-image"' in html
+
+    css_text = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "orga_drone"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+    assert ".studio-preview-media[hidden]" in css_text
+    assert "display: none !important" in css_text
 
 
 def test_http_add_remove_and_browse_markup(

@@ -800,6 +800,32 @@ def create_app() -> FastAPI:
                 duration_s=it.duration_s,
                 available=it.available,
             )
+            stream_url = ""
+            proxy_url = ""
+            preview_url = ""
+            has_proxy = False
+            can_play = False
+            if it.available and it.media_id is not None:
+                media_row = db.get_media(it.media_id)
+                if media_row is not None:
+                    media_path = resolve_media_file(db, media_row)
+                    can_play = media_path is not None
+                    if can_play:
+                        stream_url = f"/media/{it.media_id}/stream"
+                        kind = it.kind if it.kind in {"photo", "video"} else media_row.kind
+                        if kind == "video":
+                            proxy_path = resolve_proxy_file(db, media_row)
+                            has_proxy = proxy_path is not None
+                            if has_proxy:
+                                proxy_url = f"/media/{it.media_id}/proxy"
+                        elif kind == "photo":
+                            if browser_can_display_photo(media_path):
+                                preview_url = stream_url
+                            else:
+                                preview_url = f"/media/{it.media_id}/preview"
+                            # Always keep a JPEG thumb as last-resort preview source.
+                            if not preview_url:
+                                preview_url = f"/media/{it.media_id}/thumb"
             item_display.append(
                 {
                     "item": it,
@@ -813,6 +839,11 @@ def create_app() -> FastAPI:
                             else it.duration_s
                         )
                     ),
+                    "stream_url": stream_url,
+                    "proxy_url": proxy_url,
+                    "preview_url": preview_url,
+                    "has_proxy": has_proxy,
+                    "can_play": can_play,
                 }
             )
         studio_paths = {it.media_path for it in items}

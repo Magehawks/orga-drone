@@ -1,7 +1,8 @@
 /**
- * Creator Studio UI (#14).
+ * Creator Studio UI.
  * Persistence: reorder + photo duration via existing APIs.
- * Playback / transitions / music / export: local UI state only (no render pipeline).
+ * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
+ * Music / transitions / export remain UI stubs (no render pipeline).
  */
 (function () {
   const root = document.getElementById("studio-root");
@@ -12,6 +13,7 @@
   const saveStateEl = document.getElementById("studio-save-state");
   const titleInput = document.getElementById("studio-project-title");
   const previewImage = document.getElementById("studio-preview-image");
+  const previewVideo = document.getElementById("studio-preview-video");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
   const transportTime = document.getElementById("studio-transport-time");
   const playheadEl = document.getElementById("studio-playhead");
@@ -20,12 +22,15 @@
   const volumeInput = document.getElementById("studio-volume");
   const exportDialog = document.getElementById("studio-export-dialog");
   const previewFrame = document.getElementById("studio-preview-frame");
+  const toggleBtn = root.querySelector('[data-transport="toggle"]');
 
   const defaultPhotoDuration = Number(root.dataset.defaultPhotoDuration || "3") || 3;
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
   const labelSaved = root.dataset.savedLabel || "Saved";
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
+  const labelPlay = root.dataset.labelPlay || "Play";
+  const labelPause = root.dataset.labelPause || "Pause";
   const transitionLabels = {
     none: root.dataset.transitionNone || "None",
     fade: root.dataset.transitionFade || "Fade",
@@ -42,29 +47,35 @@
 
   /** @type {{
    *  selected: {type: 'clip'|'transition'|'music'|null, id: string|null},
-   *  playheadS: number,
+   *  projectTimeS: number,
    *  playing: boolean,
    *  volume: number,
    *  title: string,
    *  music: null | {name: string, volume: number, fadeIn: number, fadeOut: number},
-   *  transitions: Record<string, string>
+   *  transitions: Record<string, string>,
+   *  activeStudioId: string|null
    * }} */
   const state = {
     selected: { type: null, id: null },
-    playheadS: 0,
+    projectTimeS: 0,
     playing: false,
     volume: 0.8,
     title: titleInput ? titleInput.value : "Your story",
     music: null,
     transitions: {},
+    activeStudioId: null,
   };
 
   let dragCard = null;
   let dragOrderBefore = null;
-  let autoScrollRaf = 0;
-  let pointerDrag = null;
-  let playTimer = 0;
   let playheadDragging = false;
+  let playheadWasPlaying = false;
+  let wallClockRaf = 0;
+  let wallClockLastMs = 0;
+  let suppressVideoClock = false;
+  let loadedVideoSrc = "";
+  let loadedImageSrc = "";
+  let syncToken = 0;
 
   function clips() {
     return Array.from(grid.querySelectorAll(".studio-clip"));
@@ -106,6 +117,436 @@
 
   function totalDuration() {
     return clips().reduce((sum, clip) => sum + clipDuration(clip), 0);
+  }
+
+  function clipStartTime(clip) {
+    let cursor = 0;
+    for (const c of clips()) {
+      if (c === clip) return cursor;
+      cursor += clipDuration(c);
+    }
+    return 0;
+  }
+
+  /**
+   * Map global project time to active clip + local time.
+   * Skips zero-duration clips. At/past total → last clip, atEnd true.
+   */
+  function resolveAt(projectTimeS) {
+    const list = clips();
+    const spans = [];
+    let cursor = 0;
+    list.forEach((clip, index) => {
+      const dur = clipDuration(clip);
+      if (dur <= 0) return;
+      spans.push({ clip, index, start: cursor, duration: dur });
+      cursor += dur;
+    });
+    if (!spans.length) return null;
+    const total = cursor;
+    const t = Math.max(0, Number(projectTimeS) || 0);
+    if (t >= total) {
+      const last = spans[spans.length - 1];
+      return {
+        clip: last.clip,
+        index: last.index,
+        start: last.start,
+        duration: last.duration,
+        localS: last.duration,
+        atEnd: true,
+      };
+    }
+    for (const span of spans) {
+      if (t < span.start + span.duration) {
+        return {
+          clip: span.clip,
+          index: span.index,
+          start: span.start,
+          duration: span.duration,
+          localS: t - span.start,
+          atEnd: false,
+        };
+      }
+    }
+    const last = spans[spans.length - 1];
+    return {
+      clip: last.clip,
+      index: last.index,
+      start: last.start,
+      duration: last.duration,
+      localS: last.duration,
+      atEnd: true,
+    };
+  }
+
+  function videoSrcFor(clip) {
+    if (clip.dataset.hasProxy === "1" && clip.dataset.proxyUrl) {
+      return clip.dataset.proxyUrl;
+    }
+    return clip.dataset.streamUrl || "";
+  }
+
+  function imageSrcFor(clip) {
+    return (
+      clip.dataset.previewUrl ||
+      clip.dataset.streamUrl ||
+      clip.dataset.thumb ||
+      ""
+    );
+  }
+
+  function clearVideoElement() {
+    if (!previewVideo) return;
+    suppressVideoClock = true;
+    try {
+      previewVideo.pause();
+    } catch (_) {
+      /* ignore */
+    }
+    if (loadedVideoSrc || previewVideo.getAttribute("src")) {
+      loadedVideoSrc = "";
+      previewVideo.removeAttribute("src");
+      try {
+        previewVideo.load();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    previewVideo.hidden = true;
+  }
+
+  function applyVolume() {
+    if (previewVideo) previewVideo.volume = state.volume;
+  }
+
+  function setToggleLabel() {
+    if (toggleBtn) toggleBtn.textContent = state.playing ? labelPause : labelPlay;
+  }
+
+  function stopWallClock() {
+    if (wallClockRaf) {
+      cancelAnimationFrame(wallClockRaf);
+      wallClockRaf = 0;
+    }
+    wallClockLastMs = 0;
+  }
+
+  function pausePlayback() {
+    state.playing = false;
+    stopWallClock();
+    if (previewVideo) {
+      try {
+        previewVideo.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    setToggleLabel();
+  }
+
+  function updatePlayheadChrome() {
+    const total = totalDuration();
+    let t = state.projectTimeS;
+    if (total <= 0) t = 0;
+    else if (t > total) t = total;
+    else if (t < 0) t = 0;
+    state.projectTimeS = t;
+    const pct = total > 0 ? (t / total) * 100 : 0;
+    if (playheadEl) {
+      playheadEl.style.left = `calc(4.25rem + (100% - 4.25rem) * ${pct / 100})`;
+      playheadEl.setAttribute("aria-valuemax", String(total.toFixed(1)));
+      playheadEl.setAttribute("aria-valuenow", String(t.toFixed(1)));
+    }
+    if (transportTime) {
+      transportTime.textContent = `${formatTime(t)} / ${formatTime(total)}`;
+    }
+    root.dataset.totalS = String(total);
+    root.dataset.totalLabel = formatTime(total);
+  }
+
+  function showPlaceholder() {
+    if (previewImage) previewImage.hidden = true;
+    clearVideoElement();
+    if (previewPlaceholder) previewPlaceholder.hidden = false;
+  }
+
+  function showImage(src) {
+    if (!previewImage) return;
+    clearVideoElement();
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
+    previewImage.hidden = false;
+    if (!src) {
+      loadedImageSrc = "";
+      previewImage.removeAttribute("src");
+      return;
+    }
+    if (loadedImageSrc !== src) {
+      loadedImageSrc = src;
+      previewImage.src = src;
+    }
+  }
+
+  function seekVideoLocal(localS) {
+    if (!previewVideo) return;
+    const target = Math.max(0, localS);
+    const apply = () => {
+      try {
+        const max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
+        previewVideo.currentTime = Math.min(target, max > 0 ? max : target);
+      } catch (_) {
+        /* ignore seek errors while loading */
+      }
+    };
+    if (previewVideo.readyState >= 1) apply();
+    else {
+      previewVideo.addEventListener("loadedmetadata", apply, { once: true });
+    }
+  }
+
+  function showVideo(src, localS, { play } = { play: false }) {
+    if (!previewVideo) return;
+    if (previewImage) previewImage.hidden = true;
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
+    previewVideo.hidden = false;
+    applyVolume();
+    const needLoad = !src || loadedVideoSrc !== src;
+    if (needLoad) {
+      loadedVideoSrc = src || "";
+      suppressVideoClock = true;
+      previewVideo.src = src || "";
+      previewVideo.load();
+      const token = ++syncToken;
+      previewVideo.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (token !== syncToken) return;
+          seekVideoLocal(localS);
+          suppressVideoClock = false;
+          if (play && state.playing) {
+            previewVideo.play().catch(() => {
+              pausePlayback();
+            });
+          }
+        },
+        { once: true }
+      );
+      return;
+    }
+    suppressVideoClock = true;
+    seekVideoLocal(localS);
+    // Allow clock after seek settles.
+    window.setTimeout(() => {
+      suppressVideoClock = false;
+    }, 50);
+    if (play && state.playing) {
+      previewVideo.play().catch(() => {
+        pausePlayback();
+      });
+    }
+  }
+
+  function syncPreviewMedia({ seek = false } = {}) {
+    void seek;
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit) {
+      state.activeStudioId = null;
+      clips().forEach((c) => c.classList.remove("is-active"));
+      showPlaceholder();
+      return;
+    }
+    const { clip, localS, atEnd } = hit;
+    state.activeStudioId = clip.dataset.studioId || null;
+    clips().forEach((c) => c.classList.toggle("is-active", c === clip));
+
+    const kind = clip.dataset.kind || "unknown";
+    const canPlay = clip.dataset.canPlay === "1";
+
+    // Photos first: never leave a video layer covering the image.
+    if (kind === "photo") {
+      const src = imageSrcFor(clip);
+      if (src) {
+        showImage(src);
+        return;
+      }
+      showPlaceholder();
+      return;
+    }
+
+    if (kind === "video" && canPlay) {
+      const src = videoSrcFor(clip);
+      if (!src) {
+        const thumb = clip.dataset.thumb || "";
+        if (thumb) showImage(thumb);
+        else showPlaceholder();
+        return;
+      }
+      showVideo(src, localS, { play: state.playing && !atEnd });
+      return;
+    }
+
+    // Unavailable / unknown: show thumb if any for duration window.
+    const thumb = clip.dataset.thumb || "";
+    if (thumb) showImage(thumb);
+    else showPlaceholder();
+  }
+
+  function setProjectTime(t, { resume = false, fromVideo = false } = {}) {
+    const total = totalDuration();
+    let next = Math.max(0, Number(t) || 0);
+    if (total > 0 && next > total) next = total;
+    state.projectTimeS = next;
+    updatePlayheadChrome();
+
+    if (!fromVideo) {
+      syncPreviewMedia({ seek: true });
+    } else {
+      const hit = resolveAt(state.projectTimeS);
+      if (hit) {
+        state.activeStudioId = hit.clip.dataset.studioId || null;
+        clips().forEach((c) => c.classList.toggle("is-active", c === hit.clip));
+      }
+    }
+
+    if (total > 0 && state.projectTimeS >= total - 0.001) {
+      state.projectTimeS = total;
+      updatePlayheadChrome();
+      if (state.playing) pausePlayback();
+      return;
+    }
+
+    if (resume && !state.playing) {
+      startPlayback();
+    } else if (state.playing && !fromVideo) {
+      // After seek while playing, ensure the correct clock driver runs.
+      beginClockForActiveClip();
+    }
+  }
+
+  function advanceToNextOrStop(hit) {
+    const list = clips().filter((c) => clipDuration(c) > 0);
+    if (!hit || !list.length) {
+      pausePlayback();
+      return;
+    }
+    const idx = list.indexOf(hit.clip);
+    if (idx >= 0 && idx < list.length - 1) {
+      const next = list[idx + 1];
+      setProjectTime(clipStartTime(next));
+      if (state.playing) beginClockForActiveClip();
+      return;
+    }
+    setProjectTime(totalDuration());
+    pausePlayback();
+  }
+
+  function wallClockTick(nowMs) {
+    if (!state.playing) {
+      stopWallClock();
+      return;
+    }
+    if (!wallClockLastMs) wallClockLastMs = nowMs;
+    const dt = Math.max(0, (nowMs - wallClockLastMs) / 1000);
+    wallClockLastMs = nowMs;
+    const total = totalDuration();
+    const next = state.projectTimeS + dt;
+    if (next >= total) {
+      setProjectTime(total);
+      pausePlayback();
+      return;
+    }
+    const before = resolveAt(state.projectTimeS);
+    state.projectTimeS = next;
+    updatePlayheadChrome();
+    const after = resolveAt(state.projectTimeS);
+    if (!after) {
+      pausePlayback();
+      return;
+    }
+    if (!before || before.clip !== after.clip) {
+      syncPreviewMedia({ seek: true });
+      beginClockForActiveClip();
+      return;
+    }
+    wallClockRaf = requestAnimationFrame(wallClockTick);
+  }
+
+  function startWallClock() {
+    stopWallClock();
+    wallClockLastMs = 0;
+    wallClockRaf = requestAnimationFrame(wallClockTick);
+  }
+
+  function beginClockForActiveClip() {
+    if (!state.playing) return;
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || hit.atEnd) {
+      pausePlayback();
+      return;
+    }
+    const kind = hit.clip.dataset.kind || "unknown";
+    const canPlay = hit.clip.dataset.canPlay === "1";
+    if (kind === "video" && canPlay && videoSrcFor(hit.clip)) {
+      stopWallClock();
+      syncPreviewMedia({ seek: true });
+      if (previewVideo) {
+        previewVideo.play().catch(() => {
+          // Autoplay blocked or decode error → fall back to wall clock stills.
+          startWallClock();
+        });
+      }
+      return;
+    }
+    if (previewVideo) {
+      try {
+        previewVideo.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    syncPreviewMedia({ seek: true });
+    startWallClock();
+  }
+
+  function startPlayback() {
+    const total = totalDuration();
+    if (total <= 0) return;
+    if (state.projectTimeS >= total - 0.001) {
+      state.projectTimeS = 0;
+    }
+    state.playing = true;
+    setToggleLabel();
+    beginClockForActiveClip();
+  }
+
+  function onVideoTimeUpdate() {
+    if (!state.playing || suppressVideoClock || !previewVideo) return;
+    if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || hit.clip.dataset.kind !== "video") return;
+    if (String(hit.clip.dataset.studioId) !== String(state.activeStudioId)) return;
+    const local = previewVideo.currentTime || 0;
+    const next = hit.start + local;
+    if (Math.abs(next - state.projectTimeS) < 0.01) {
+      updatePlayheadChrome();
+      return;
+    }
+    state.projectTimeS = next;
+    updatePlayheadChrome();
+    // Clip boundary when video reports near end but ended event is late.
+    if (hit.duration > 0 && local >= hit.duration - 0.05) {
+      advanceToNextOrStop(hit);
+    }
+  }
+
+  function onVideoEnded() {
+    // Clearing/reloading the <video> when switching to a photo can fire "ended".
+    // Never advance Story time unless we are actually playing a video clip.
+    if (!state.playing || suppressVideoClock || !previewVideo) return;
+    if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || hit.clip.dataset.kind !== "video") return;
+    if (String(hit.clip.dataset.studioId) !== String(state.activeStudioId)) return;
+    advanceToNextOrStop(hit);
   }
 
   function loadUiState() {
@@ -189,59 +630,6 @@
     }
   }
 
-  function clipAtTime(t) {
-    let cursor = 0;
-    for (const clip of clips()) {
-      const dur = clipDuration(clip);
-      if (t < cursor + dur || clip === clips()[clips().length - 1]) {
-        return { clip, start: cursor, duration: dur };
-      }
-      cursor += dur;
-    }
-    return null;
-  }
-
-  function updatePreview() {
-    const hit = clipAtTime(state.playheadS);
-    if (!hit || !previewImage) return;
-    const clip = hit.clip;
-    const thumb = clip.dataset.thumb || "";
-    clips().forEach((c) => c.classList.toggle("is-active", c === clip));
-    if (thumb) {
-      previewImage.src = thumb;
-      previewImage.hidden = false;
-      if (previewPlaceholder) previewPlaceholder.hidden = true;
-    } else {
-      previewImage.hidden = true;
-      if (previewPlaceholder) previewPlaceholder.hidden = false;
-    }
-    if (
-      state.selected.type === "clip" &&
-      state.selected.id &&
-      String(clip.dataset.studioId) === String(state.selected.id)
-    ) {
-      /* keep */
-    }
-  }
-
-  function updatePlayheadUi() {
-    const total = totalDuration();
-    const t = Math.max(0, Math.min(total, state.playheadS));
-    state.playheadS = t;
-    const pct = total > 0 ? (t / total) * 100 : 0;
-    if (playheadEl) {
-      playheadEl.style.left = `calc(4.25rem + (100% - 4.25rem) * ${pct / 100})`;
-      playheadEl.setAttribute("aria-valuemax", String(total.toFixed(1)));
-      playheadEl.setAttribute("aria-valuenow", String(t.toFixed(1)));
-    }
-    if (transportTime) {
-      transportTime.textContent = `${formatTime(t)} / ${formatTime(total)}`;
-    }
-    root.dataset.totalS = String(total);
-    root.dataset.totalLabel = formatTime(total);
-    updatePreview();
-  }
-
   function buildRuler() {
     if (!rulerEl) return;
     const total = totalDuration();
@@ -304,16 +692,10 @@
     }
     if (removeForm) removeForm.action = `/studio/${clip.dataset.studioId}/remove`;
 
-    // Seek playhead to clip start for context.
-    let cursor = 0;
-    for (const c of clips()) {
-      if (c === clip) {
-        state.playheadS = cursor;
-        break;
-      }
-      cursor += clipDuration(c);
-    }
-    updatePlayheadUi();
+    const wasPlaying = state.playing;
+    if (wasPlaying) pausePlayback();
+    setProjectTime(clipStartTime(clip));
+    if (wasPlaying) startPlayback();
   }
 
   function selectTransition(el) {
@@ -387,7 +769,7 @@
       rebuildTransitions();
       applyTransitionsToDom();
       buildRuler();
-      updatePlayheadUi();
+      setProjectTime(state.projectTimeS);
       setSaveState(true);
       showFlash("");
       dragOrderBefore = null;
@@ -399,7 +781,6 @@
 
   function restoreOrder(ids) {
     const byId = new Map(clips().map((c) => [Number(c.dataset.studioId), c]));
-    // Remove transitions while restoring clip order.
     grid.querySelectorAll(".studio-transition").forEach((el) => el.remove());
     ids.forEach((id) => {
       const el = byId.get(id);
@@ -426,7 +807,7 @@
         data.effective_duration_s == null ? "" : String(data.effective_duration_s);
       const flex =
         data.effective_duration_s == null ? defaultPhotoDuration : data.effective_duration_s;
-      clip.style.setProperty("--clip-flex", String(flex));
+      clip.style.setProperty("--clip-flex", String(Number(flex).toFixed(4)));
       const label = clip.querySelector("[data-clip-duration]");
       if (label) {
         label.textContent =
@@ -443,7 +824,7 @@
         input.value = Number(shown).toFixed(1);
       }
       buildRuler();
-      updatePlayheadUi();
+      setProjectTime(state.projectTimeS);
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -452,35 +833,7 @@
     }
   }
 
-  function stopPlayback() {
-    state.playing = false;
-    if (playTimer) {
-      clearInterval(playTimer);
-      playTimer = 0;
-    }
-    const btn = root.querySelector('[data-transport="toggle"]');
-    if (btn) btn.textContent = "Play";
-  }
-
-  function startPlayback() {
-    if (totalDuration() <= 0) return;
-    state.playing = true;
-    const btn = root.querySelector('[data-transport="toggle"]');
-    if (btn) btn.textContent = "Pause";
-    if (playTimer) clearInterval(playTimer);
-    playTimer = window.setInterval(() => {
-      state.playheadS += 0.1;
-      if (state.playheadS >= totalDuration()) {
-        state.playheadS = totalDuration();
-        updatePlayheadUi();
-        stopPlayback();
-        return;
-      }
-      updatePlayheadUi();
-    }, 100);
-  }
-
-  function seekFromClientX(clientX) {
+  function seekFromClientX(clientX, { resumeAfter = false } = {}) {
     if (!tracksEl) return;
     const rect = tracksEl.getBoundingClientRect();
     const style = window.getComputedStyle(document.documentElement);
@@ -489,11 +842,16 @@
     const usable = rect.width - labelPx;
     if (usable <= 0) return;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left - labelPx) / usable));
-    state.playheadS = ratio * totalDuration();
-    updatePlayheadUi();
+    setProjectTime(ratio * totalDuration());
+    if (resumeAfter) startPlayback();
   }
 
   // ——— Events ———
+
+  if (previewVideo) {
+    previewVideo.addEventListener("timeupdate", onVideoTimeUpdate);
+    previewVideo.addEventListener("ended", onVideoEnded);
+  }
 
   root.querySelectorAll("[data-browser-tab]").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -525,33 +883,13 @@
     const transport = event.target.closest && event.target.closest("[data-transport]");
     if (transport) {
       const action = transport.getAttribute("data-transport");
-      const list = clips();
-      if (action === "start") state.playheadS = 0;
-      else if (action === "end") state.playheadS = totalDuration();
-      else if (action === "prev") {
-        const hit = clipAtTime(state.playheadS);
-        if (!hit) return;
-        const idx = list.indexOf(hit.clip);
-        if (state.playheadS > hit.start + 0.2) state.playheadS = hit.start;
-        else if (idx > 0) {
-          let cursor = 0;
-          for (let i = 0; i < idx - 1; i += 1) cursor += clipDuration(list[i]);
-          state.playheadS = cursor;
-        } else state.playheadS = 0;
-      } else if (action === "next") {
-        const hit = clipAtTime(state.playheadS);
-        if (!hit) return;
-        const idx = list.indexOf(hit.clip);
-        if (idx < list.length - 1) {
-          let cursor = 0;
-          for (let i = 0; i <= idx; i += 1) cursor += clipDuration(list[i]);
-          state.playheadS = cursor;
-        } else state.playheadS = totalDuration();
-      } else if (action === "toggle") {
-        if (state.playing) stopPlayback();
+      const list = clips().filter((c) => clipDuration(c) > 0);
+      if (action === "toggle") {
+        if (state.playing) pausePlayback();
         else startPlayback();
         return;
-      } else if (action === "fullscreen" && previewFrame) {
+      }
+      if (action === "fullscreen" && previewFrame) {
         if (!document.fullscreenElement) {
           previewFrame.requestFullscreen?.().catch(() => {});
         } else {
@@ -559,8 +897,27 @@
         }
         return;
       }
-      stopPlayback();
-      updatePlayheadUi();
+      const wasPlaying = state.playing;
+      if (wasPlaying) pausePlayback();
+      if (action === "start") setProjectTime(0);
+      else if (action === "end") setProjectTime(totalDuration());
+      else if (action === "prev") {
+        const hit = resolveAt(state.projectTimeS);
+        if (!hit) return;
+        if (state.projectTimeS > hit.start + 0.2) setProjectTime(hit.start);
+        else {
+          const idx = list.indexOf(hit.clip);
+          if (idx > 0) setProjectTime(clipStartTime(list[idx - 1]));
+          else setProjectTime(0);
+        }
+      } else if (action === "next") {
+        const hit = resolveAt(state.projectTimeS);
+        if (!hit) return;
+        const idx = list.indexOf(hit.clip);
+        if (idx >= 0 && idx < list.length - 1) setProjectTime(clipStartTime(list[idx + 1]));
+        else setProjectTime(totalDuration());
+      }
+      if (wasPlaying && state.projectTimeS < totalDuration() - 0.001) startPlayback();
     }
   });
 
@@ -576,6 +933,7 @@
   if (volumeInput) {
     volumeInput.addEventListener("input", () => {
       state.volume = Number(volumeInput.value) / 100;
+      applyVolume();
       persistUiState();
     });
   }
@@ -648,32 +1006,39 @@
     patchPhotoDuration(clip, null);
   });
 
-  // Playhead drag
   if (playheadEl && tracksEl) {
     const onMove = (event) => {
       if (!playheadDragging) return;
       seekFromClientX(event.clientX);
     };
     const onUp = () => {
+      if (!playheadDragging) return;
       playheadDragging = false;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (playheadWasPlaying && state.projectTimeS < totalDuration() - 0.001) {
+        startPlayback();
+      }
+      playheadWasPlaying = false;
     };
     playheadEl.addEventListener("pointerdown", (event) => {
       playheadDragging = true;
-      stopPlayback();
+      playheadWasPlaying = state.playing;
+      pausePlayback();
       playheadEl.setPointerCapture?.(event.pointerId);
       seekFromClientX(event.clientX);
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     });
     rulerEl?.addEventListener("click", (event) => {
-      stopPlayback();
-      seekFromClientX(event.clientX);
+      const wasPlaying = state.playing;
+      pausePlayback();
+      seekFromClientX(event.clientX, {
+        resumeAfter: wasPlaying && state.projectTimeS < totalDuration() - 0.001,
+      });
     });
   }
 
-  // DnD reorder (clip handles only)
   grid.addEventListener("dragstart", (event) => {
     const handle = event.target.closest && event.target.closest(".studio-drag-handle");
     if (!handle) {
@@ -713,7 +1078,6 @@
       } else {
         grid.insertBefore(dragCard, target.nextSibling);
       }
-      // Keep transitions out of the way while dragging; rebuild on persist.
       grid.querySelectorAll(".studio-transition").forEach((el) => {
         if (el !== dragCard) el.style.display = "none";
       });
@@ -726,13 +1090,16 @@
 
   // Init
   loadUiState();
+  applyVolume();
   applyTransitionsToDom();
   renderMusic();
   buildRuler();
-  updatePlayheadUi();
+  setToggleLabel();
   if (clips().length) {
     selectClip(clips()[0].dataset.studioId);
   } else {
+    updatePlayheadChrome();
+    showPlaceholder();
     showInspector("inspector-empty");
   }
   setSaveState(true);

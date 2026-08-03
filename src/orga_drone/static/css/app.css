@@ -1020,22 +1020,42 @@ body.studio-app { padding-bottom: 0; }
   height: 100%;
   object-fit: contain;
   display: block;
+  background: #000;
 }
-.studio-preview-placeholder,
-.studio-preview-empty {
+.studio-preview-media[hidden] {
+  display: none !important;
+}
+video.studio-preview-media,
+img.studio-preview-media {
+  position: absolute;
+  inset: 0;
+}
+.studio-preview-placeholder {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  height: 100%;
   padding: 1.5rem;
   text-align: center;
   color: var(--muted);
 }
+.studio-preview-placeholder[hidden] {
+  display: none !important;
+}
 .studio-preview-empty {
   width: min(100%, 32rem);
   background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--muted);
 }
 
 .studio-transport {
@@ -1159,14 +1179,16 @@ body.studio-app { padding-bottom: 0; }
 }
 .studio-clip {
   position: relative;
-  flex: var(--clip-flex, 3) 1 4.5rem;
-  min-width: 4.5rem;
+  /* Width must match duration share: grow by seconds, no fixed min size. */
+  flex: var(--clip-flex, 0) 0 0;
+  min-width: 0;
+  width: 0;
   display: flex;
   background: color-mix(in srgb, var(--kind-bg) 80%, var(--panel));
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
-  margin: 0 1px;
+  margin: 0;
 }
 .studio-clip.is-photo {
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));

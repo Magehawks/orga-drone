@@ -28,7 +28,7 @@ Highlights:
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   music slot, inspector, export stub; persisted: order + estimated runtime;
-  no real playback/render pipeline yet)
+  synced Story preview playback; music/export not rendered yet)
 
 ## Next (possible near-term)
 

@@ -20,7 +20,7 @@ behind their adventures.**
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(order + estimated runtime; preview/timeline chrome without real playback or export).
+(order + estimated runtime; synced Story preview playback; no MP4 export yet).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -129,7 +129,7 @@ professional video-editing knowledge.
 | Arrange order | **Available now** |
 | Estimated runtime (photo duration planning) | **Available now** |
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
-| Transport / playhead (UI state only) | **Available now** (no real media playback) |
+| Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Transition markers / one music slot (UI state only) | **Available now** (not rendered / not exported) |
 | Export dialog stub | **Available now** (no render pipeline) |
 | Build a story (real music in export, transitions, editing) | **Studio MVP (target)** / **Later** |
@@ -198,8 +198,9 @@ See `README.md` for the detailed feature status table. In short:
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
 - **Studio:** single workspace with Creator Studio UI (browser, preview,
   transport, Story track, music slot, inspector, export dialog stub). Persisted
-  today: order + estimated runtime. Playback, transitions, music, and export are
-  UI/state only — no render pipeline yet.
+  today: order + estimated runtime. Story preview plays photos/videos in sync
+  with the playhead. Transitions, music, and export remain UI stubs — no render
+  pipeline yet.
 - Local SQLite index; media files stay on disk
 
 ## Honest limitations
@@ -210,9 +211,9 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** multi-project albums model, plugin API, real Studio
-  playback/music-in-export/MP4 export, or CI-built multi-OS installer pipeline
-  in the current tree.
+- There is **no** multi-project albums model, plugin API, Studio
+  music-in-export/MP4 export, or CI-built multi-OS installer pipeline in the
+  current tree.
 
 ## Studio MVP (target)
 

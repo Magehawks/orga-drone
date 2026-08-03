@@ -45,13 +45,13 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
-- **Studio:** collect media, arrange order, estimate runtime; Creator Studio UI with preview/Story track (playback, music, and export are UI stubs — no render pipeline yet)
+- **Studio:** collect media, arrange order, estimate runtime; Creator Studio UI with synced Story preview playback (music and export are UI stubs — no render pipeline yet)
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
 - Export a local spot GeoJSON download when GPS is available
 - Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
 - UI in German and English; Dark / Light / Custom themes
 
-It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Real Studio playback, music-in-export, MP4 rendering, and social share destinations are **planned** (see vision / roadmap), not Available today.
+It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Studio music-in-export, MP4 rendering, and social share destinations are **planned** (see vision / roadmap), not Available today.
 
 ### Flows vs sessions
 
@@ -80,7 +80,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Creator Studio UI (preview, Story track, inspector, music/export stubs); persisted order + estimated runtime; single workspace, not multi-project albums |
+| Studio workspace | Available | Creator Studio UI with synced Story preview; persisted order + estimated runtime; music/export stubs; single workspace, not multi-project albums |
 | Studio MP4 export / music-in-export | Not available | Studio MVP target — see `docs/PRODUCT_VISION.md` |
 | Projects / albums | Not available | Possible future work (Studio is a first slice) |
 | Plugin API | Not available | Possible future work |

@@ -105,3 +105,64 @@ def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary
         estimated_total_s=total,
         estimated_total_label=format_studio_duration(total),
     )
+
+
+@dataclass(frozen=True)
+class ProjectTimeHit:
+    """Active Story clip for a global project time."""
+
+    index: int
+    start_s: float
+    duration_s: float
+    local_s: float
+    at_end: bool
+
+
+def resolve_project_time(
+    durations_s: Iterable[float],
+    project_time_s: float,
+) -> ProjectTimeHit | None:
+    """Map global Story time to clip index and local time within that clip.
+
+    Clips with non-positive duration are skipped. At or past the total length,
+    the last clip is returned with ``at_end=True`` and ``local_s`` clamped to
+    the clip duration (or 0 for an empty story).
+    """
+    spans: list[tuple[int, float, float]] = []
+    cursor = 0.0
+    for index, raw in enumerate(durations_s):
+        dur = float(raw)
+        if dur <= 0:
+            continue
+        spans.append((index, cursor, dur))
+        cursor += dur
+    if not spans:
+        return None
+    total = cursor
+    t = max(0.0, float(project_time_s))
+    if t >= total:
+        index, start, dur = spans[-1]
+        return ProjectTimeHit(
+            index=index,
+            start_s=start,
+            duration_s=dur,
+            local_s=dur,
+            at_end=True,
+        )
+    for index, start, dur in spans:
+        if t < start + dur:
+            return ProjectTimeHit(
+                index=index,
+                start_s=start,
+                duration_s=dur,
+                local_s=t - start,
+                at_end=False,
+            )
+    index, start, dur = spans[-1]
+    return ProjectTimeHit(
+        index=index,
+        start_s=start,
+        duration_s=dur,
+        local_s=dur,
+        at_end=True,
+    )
