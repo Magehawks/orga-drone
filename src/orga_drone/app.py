@@ -236,6 +236,21 @@ def create_app() -> FastAPI:
             pass
         return "/"
 
+    def studio_add_return_url(media_id: int, return_to: str | None) -> str:
+        """Allowlist redirect after Add to Studio (no open redirects)."""
+        raw = (return_to or "detail").strip()
+        target = raw.lower()
+        if target == "browse":
+            return "/browse"
+        if target == "detail":
+            return f"/media/{media_id}"
+        # Internal relative Browse URL with filters (Variant A allowlist extension).
+        if raw.startswith("/") and not raw.startswith("//") and "://" not in raw:
+            parsed = urlparse(raw)
+            if parsed.path in {"/browse", "/media"}:
+                return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+        return f"/media/{media_id}"
+
     def map_return_from_request(
         request: Request, media_id: int
     ) -> tuple[str | None, str]:
@@ -503,6 +518,7 @@ def create_app() -> FastAPI:
             limit=pagination["page_size"],
             offset=pagination["offset"],
         )
+        studio_paths = db.studio_paths_among([it.path for it in items])
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
@@ -526,6 +542,7 @@ def create_app() -> FastAPI:
             request,
             "index.html",
             items=items,
+            studio_paths=studio_paths,
             drones=db.distinct_drones(),
             view=current_view,
             nav_active="browse",
@@ -758,7 +775,55 @@ def create_app() -> FastAPI:
             browse_return_url=browse_return_url,
             browse_from_qs=browse_from_qs,
             return_qs=return_qs,
+            in_studio=db.is_in_studio(item.path),
         )
+
+    @app.get("/studio", response_class=HTMLResponse)
+    async def studio_page(
+        request: Request,
+        msg: str | None = None,
+    ) -> HTMLResponse:
+        items = db.list_studio_items()
+        return render(
+            request,
+            "studio.html",
+            items=items,
+            flash_msg=msg,
+            nav_active="studio",
+        )
+
+    @app.post("/media/{media_id}/studio/add")
+    async def studio_add(
+        media_id: int,
+        return_to: str = Form("detail"),
+    ) -> RedirectResponse:
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        _sid, created = db.add_studio_item(
+            item.path,
+            identity_key=make_identity_key(
+                item.filename, item.size_bytes, item.recorded_at
+            ),
+            filename=item.filename,
+            recorded_at=item.recorded_at,
+        )
+        base = studio_add_return_url(media_id, return_to)
+        msg = "studio_added" if created else "studio_already"
+        if base == "/browse" or base.startswith("/browse?"):
+            return RedirectResponse(url=base, status_code=303)
+        sep = "&" if "?" in base else "?"
+        return RedirectResponse(url=f"{base}{sep}msg={msg}", status_code=303)
+
+    @app.post("/studio/{studio_item_id}/remove")
+    async def studio_remove(studio_item_id: int) -> RedirectResponse:
+        db.remove_studio_item(studio_item_id)
+        return RedirectResponse(url="/studio?msg=studio_removed", status_code=303)
+
+    @app.post("/studio/clear")
+    async def studio_clear() -> RedirectResponse:
+        db.clear_studio()
+        return RedirectResponse(url="/studio?msg=studio_cleared", status_code=303)
 
     @app.post("/media/{media_id}/meta")
     async def media_meta_save(

@@ -33,6 +33,10 @@
     <div class="flash ok" role="status">{{ _('Flow merged into one file. Original clips were kept.') }}</div>
   {% elif flash_msg == 'meta_saved' %}
     <div class="flash ok" role="status">{{ _('Tags and notes saved.') }}</div>
+  {% elif flash_msg == 'studio_added' %}
+    <div class="flash ok" role="status">{{ _('Added to Studio.') }}</div>
+  {% elif flash_msg == 'studio_already' %}
+    <div class="flash ok" role="status">{{ _('Already in Studio.') }}</div>
   {% endif %}
   {% if flash_error %}
     <div class="flash err" role="alert">{{ flash_error }}</div>
@@ -138,6 +142,20 @@
       </label>
       <button type="submit">{{ _('Save') }}</button>
     </form>
+
+    <div class="action-form studio-form">
+      <h2>{{ _('Studio') }}</h2>
+      <p class="hint">{{ _('Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.') }}</p>
+      {% if in_studio %}
+        <p class="studio-status">{{ _('In Studio') }}</p>
+        <p class="hint"><a href="/studio">{{ _('Open Studio') }}</a></p>
+      {% else %}
+        <form method="post" action="/media/{{ item.id }}/studio/add">
+          <input type="hidden" name="return_to" value="detail">
+          <button type="submit">{{ _('Add to Studio') }}</button>
+        </form>
+      {% endif %}
+    </div>
 
     <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
       <h2>{{ _('Rename') }}</h2>

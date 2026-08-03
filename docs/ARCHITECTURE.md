@@ -66,6 +66,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
+| `studio_items` | Single Studio curation list (path + identity; survives rescan) |
 | `geocode_cache` | Offline place cache |
 
 ## Scan / index pipeline
@@ -73,9 +74,10 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
 1. Recursively find media files under a root
-2. Clear indexed media for that root (**full rescan**; `media_meta` kept)
+2. Clear indexed media for that root (**full rescan**; `media_meta` and
+   `studio_items` kept)
 3. Parse → upsert assets/media
-4. Relink user meta + apply auto-tags
+4. Relink user meta + Studio membership + apply auto-tags
 5. Rebuild flows, then sessions
 6. Mark root scanned
 
@@ -90,12 +92,13 @@ at a time.
 ## UI surfaces
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
-detail, map, duplicates, …). Static assets under `src/orga_drone/static/`.
+detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
 
 Typical user flow:
 
 ```text
 add folder → full scan/parse → SQLite index → browse / map / detail
+                                         → optional Studio curation
                                          → optional rename, merge, export, dupes
 ```
 
@@ -111,7 +114,7 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 1. Stay local-first; do not require cloud accounts.
 2. Do not claim plugins, albums, or incremental scan until implemented.
 3. Prefer small modules in existing package areas over new top-level frameworks.
-4. Preserve `media_meta` across rescans.
+4. Preserve `media_meta` and `studio_items` across rescans.
 5. Path operations must stay confined under library roots.
 6. Record significant architecture choices in `docs/decisions/`.
 

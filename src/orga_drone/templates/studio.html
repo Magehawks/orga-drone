@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Studio') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <h1>{{ _('Studio') }}</h1>
+  {% if items %}
+  <form method="post" action="/studio/clear" class="page-header-actions"
+        onsubmit="return confirm('{{ _('Remove all media from Studio? This does not delete your files.')|e }}');">
+    <button type="submit" class="button ghost">{{ _('Clear Studio') }}</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if flash_msg == 'studio_removed' %}
+  <div class="flash ok" role="status">{{ _('Removed from Studio.') }}</div>
+{% elif flash_msg == 'studio_cleared' %}
+  <div class="flash ok" role="status">{{ _('Studio cleared.') }}</div>
+{% endif %}
+
+{% if not items %}
+<section class="panel empty">
+  <h1>{{ _('No media in Studio yet') }}</h1>
+  <p>{{ _('Select photos or videos in Browse or on a media detail page and add them to Studio. Your library files stay unchanged.') }}</p>
+  <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
+</section>
+{% else %}
+<section class="studio-grid">
+  {% for item in items %}
+  <article class="studio-card {% if not item.available %}is-unavailable{% endif %}">
+    {% if item.available and item.media_id %}
+    <a class="studio-card-main" href="/media/{{ item.media_id }}">
+      <div class="thumb">
+        <img src="/media/{{ item.media_id }}/thumb" alt="" loading="lazy" decoding="async">
+        {% if item.kind == 'video' %}
+        <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <strong class="title">{{ item.filename }}</strong>
+        <div class="meta-line"><span>{{ item.recorded_at or '—' }}</span></div>
+      </div>
+    </a>
+    {% else %}
+    <div class="studio-card-main is-static">
+      <div class="thumb thumb-placeholder" aria-hidden="true"></div>
+      <div class="card-body">
+        <strong class="title">{{ item.filename }}</strong>
+        <div class="meta-line"><span>{{ item.recorded_at or '—' }}</span></div>
+        <span class="badge unavailable">{{ _('Unavailable') }}</span>
+        <p class="hint">{{ _('This file is missing from the library index. Remove it from Studio or rescan after restoring the file.') }}</p>
+      </div>
+    </div>
+    {% endif %}
+    <form method="post" action="/studio/{{ item.id }}/remove" class="studio-card-actions">
+      <button type="submit" class="button ghost">{{ _('Remove') }}</button>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -24,6 +24,7 @@ Highlights:
 - User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Library scan progress (live phase/counters during full rescan)
+- Studio workspace (single light curation list; not projects/albums or export)
 
 ## Next (possible near-term)
 
@@ -31,7 +32,7 @@ Not scheduled commitments — candidate improvements:
 
 1. **Incremental or cheaper rescans** (clearer scan progress is available)
 2. **Broader multi-brand parsers** beyond DJI-first depth
-3. **Projects or albums** for organizing media sets
+3. **Projects or albums** for organizing media sets (Studio is a first slice)
 4. **ffmpeg telemetry burn-in** into a short preview export
 5. **CI-built installers** (tests/releases automation; multi-OS later)
 6. Online geocoding providers (place tags are offline today)

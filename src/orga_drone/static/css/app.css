@@ -777,6 +777,102 @@ button.cta, .button.cta {
   text-decoration: none;
 }
 .card:active { transform: translateY(-1px) scale(1.005); }
+.card-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.card-main:hover { text-decoration: none; color: inherit; }
+.card-studio {
+  display: flex;
+  padding: 0.55rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, var(--surface-deep));
+}
+.card-studio button {
+  width: 100%;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.65rem;
+}
+.card-studio button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.inline-studio {
+  margin: 0;
+}
+.inline-studio button {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.page-header h1 { margin: 0; }
+.page-header-actions { margin: 0; }
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.studio-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.studio-card-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.studio-card-main.is-static { cursor: default; }
+.studio-card-main:hover { text-decoration: none; color: inherit; }
+.studio-card.is-unavailable {
+  border-style: dashed;
+  opacity: 0.92;
+}
+.thumb-placeholder {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--border) 55%, transparent),
+      color-mix(in srgb, var(--border) 55%, transparent) 8px,
+      transparent 8px,
+      transparent 16px
+    ),
+    var(--surface-deep);
+}
+.badge.unavailable {
+  display: inline-block;
+  margin-top: 0.35rem;
+  background: color-mix(in srgb, #c45c26 22%, var(--panel));
+  color: color-mix(in srgb, #c45c26 70%, var(--text));
+}
+.studio-card-actions {
+  margin: 0;
+  padding: 0.55rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.studio-card-actions button { width: 100%; }
+.studio-status {
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+.studio-form .hint a { color: var(--accent); }
 .thumb {
   position: relative;
   aspect-ratio: 16 / 9;

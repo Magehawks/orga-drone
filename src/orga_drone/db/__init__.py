@@ -121,6 +121,19 @@ CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
 CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);
 CREATE INDEX IF NOT EXISTS idx_media_meta_favorite ON media_meta(favorite);
 
+-- Studio workspace (single curation list). Survives clear_root_media / rescan.
+CREATE TABLE IF NOT EXISTS studio_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_path TEXT NOT NULL UNIQUE,
+    identity_key TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    filename_snapshot TEXT NOT NULL,
+    recorded_at_snapshot TEXT,
+    added_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key);
+CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position);
+
 CREATE TABLE IF NOT EXISTS geocode_cache (
     lat_key REAL NOT NULL,
     lon_key REAL NOT NULL,
@@ -221,6 +234,24 @@ class MediaRow:
     place: dict[str, Any] | None = None
 
 
+@dataclass
+class StudioItem:
+    """One Studio workspace entry (available or unavailable after rescan)."""
+
+    id: int
+    media_path: str
+    identity_key: str
+    position: int
+    filename_snapshot: str
+    recorded_at_snapshot: str | None
+    added_at: str
+    available: bool
+    media_id: int | None
+    filename: str
+    recorded_at: str | None
+    kind: str | None = None
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -312,6 +343,23 @@ class Database:
                 PRIMARY KEY (lat_key, lon_key)
             )"""
         )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                media_path TEXT NOT NULL UNIQUE,
+                identity_key TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                filename_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                added_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position)"
+        )
 
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
@@ -347,7 +395,10 @@ class Database:
             )
 
     def clear_root_media(self, root_id: int) -> None:
-        """Drop indexed media for a root. Does NOT touch media_meta (user data)."""
+        """Drop indexed media for a root.
+
+        Does NOT touch media_meta or studio_items (user curation data).
+        """
         with self.connect() as conn:
             # flows / sessions that only belong to this root
             conn.execute(
@@ -999,6 +1050,195 @@ class Database:
                     (media_path, now, orphan["id"]),
                 )
 
+    def add_studio_item(
+        self,
+        media_path: str,
+        *,
+        identity_key: str,
+        filename: str,
+        recorded_at: str | None,
+    ) -> tuple[int, bool]:
+        """Add media to Studio. Returns ``(studio_item_id, created)``.
+
+        Idempotent on ``media_path``: existing membership returns ``created=False``.
+        """
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM studio_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if existing:
+                return int(existing["id"]), False
+            pos_row = conn.execute(
+                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM studio_items"
+            ).fetchone()
+            position = int(pos_row["next_pos"])
+            cur = conn.execute(
+                """INSERT INTO studio_items(
+                     media_path, identity_key, position,
+                     filename_snapshot, recorded_at_snapshot, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    media_path,
+                    identity_key,
+                    position,
+                    filename,
+                    recorded_at,
+                    now,
+                ),
+            )
+            item_id = cur.lastrowid
+            assert item_id is not None
+            return int(item_id), True
+
+    def remove_studio_item(self, studio_item_id: int) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM studio_items WHERE id = ?",
+                (studio_item_id,),
+            )
+            return cur.rowcount > 0
+
+    def clear_studio(self) -> int:
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM studio_items")
+            return int(cur.rowcount)
+
+    def is_in_studio(self, media_path: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM studio_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+        return row is not None
+
+    def studio_paths_among(self, paths: list[str]) -> set[str]:
+        if not paths:
+            return set()
+        placeholders = ",".join("?" for _ in paths)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"SELECT media_path FROM studio_items WHERE media_path IN ({placeholders})",
+                paths,
+            ).fetchall()
+        return {str(r["media_path"]) for r in rows}
+
+    def list_studio_items(self) -> list[StudioItem]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT s.id, s.media_path, s.identity_key, s.position,
+                          s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
+                          m.id AS media_id, m.filename AS live_filename,
+                          m.recorded_at AS live_recorded_at, m.kind AS live_kind
+                   FROM studio_items s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   ORDER BY s.position ASC, s.id ASC"""
+            ).fetchall()
+        out: list[StudioItem] = []
+        for r in rows:
+            available = r["media_id"] is not None
+            out.append(
+                StudioItem(
+                    id=int(r["id"]),
+                    media_path=str(r["media_path"]),
+                    identity_key=str(r["identity_key"]),
+                    position=int(r["position"]),
+                    filename_snapshot=str(r["filename_snapshot"]),
+                    recorded_at_snapshot=r["recorded_at_snapshot"],
+                    added_at=str(r["added_at"]),
+                    available=available,
+                    media_id=int(r["media_id"]) if r["media_id"] is not None else None,
+                    filename=(
+                        str(r["live_filename"])
+                        if available and r["live_filename"]
+                        else str(r["filename_snapshot"])
+                    ),
+                    recorded_at=(
+                        r["live_recorded_at"]
+                        if available
+                        else r["recorded_at_snapshot"]
+                    ),
+                    kind=str(r["live_kind"]) if available and r["live_kind"] else None,
+                )
+            )
+        return out
+
+    def repath_studio_item(self, old_path: str, new_path: str) -> None:
+        if old_path == new_path:
+            return
+        with self.connect() as conn:
+            conflict = conn.execute(
+                "SELECT id FROM studio_items WHERE media_path = ?",
+                (new_path,),
+            ).fetchone()
+            if conflict:
+                conn.execute(
+                    "DELETE FROM studio_items WHERE media_path = ?",
+                    (old_path,),
+                )
+            else:
+                conn.execute(
+                    "UPDATE studio_items SET media_path = ? WHERE media_path = ?",
+                    (new_path, old_path),
+                )
+
+    def link_studio_item_for_path(
+        self,
+        media_path: str,
+        *,
+        filename: str,
+        size_bytes: int,
+        recorded_at: str | None,
+    ) -> None:
+        """After rescan/rename: refresh identity; relink orphan only if unambiguous.
+
+        Rules:
+        1. Exact ``media_path`` match → update ``identity_key``.
+        2. Otherwise consider orphans with the same identity whose path is not
+           currently in ``media``.
+        3. Relink only when exactly one such orphan exists (no guessing).
+        """
+        identity = make_identity_key(filename, size_bytes, recorded_at)
+        with self.connect() as conn:
+            by_path = conn.execute(
+                "SELECT id FROM studio_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if by_path:
+                conn.execute(
+                    "UPDATE studio_items SET identity_key = ? WHERE id = ?",
+                    (identity, by_path["id"]),
+                )
+                return
+            orphans = conn.execute(
+                """SELECT id FROM studio_items
+                   WHERE identity_key = ?
+                     AND media_path NOT IN (SELECT path FROM media)""",
+                (identity,),
+            ).fetchall()
+            if len(orphans) != 1:
+                return
+            conflict = conn.execute(
+                "SELECT id FROM studio_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if conflict:
+                return
+            conn.execute(
+                """UPDATE studio_items
+                   SET media_path = ?, identity_key = ?,
+                       filename_snapshot = ?, recorded_at_snapshot = ?
+                   WHERE id = ?""",
+                (
+                    media_path,
+                    identity,
+                    filename,
+                    recorded_at,
+                    orphans[0]["id"],
+                ),
+            )
+
     def distinct_drones(self) -> list[str]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -1157,6 +1397,7 @@ class Database:
                     (new_path, new_name, now, row["id"]),
                 )
         self.repath_media_meta(old_path, new_path)
+        self.repath_studio_item(old_path, new_path)
 
     def update_media_identity(
         self,
@@ -1178,8 +1419,15 @@ class Database:
             )
         if old and old["path"] != path:
             self.repath_media_meta(old["path"], path)
+            self.repath_studio_item(old["path"], path)
         if old:
             self.link_media_meta_for_path(
+                path,
+                filename=filename,
+                size_bytes=int(old["size_bytes"] or 0),
+                recorded_at=old["recorded_at"],
+            )
+            self.link_studio_item_for_path(
                 path,
                 filename=filename,
                 size_bytes=int(old["size_bytes"] or 0),

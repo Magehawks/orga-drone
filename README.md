@@ -77,7 +77,8 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Projects / albums | Not available | Possible future work |
+| Studio workspace | Available | Single curation list (add/remove/clear); not an editor or multi-project albums |
+| Projects / albums | Not available | Possible future work (Studio is a first slice) |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | CI-built multi-OS installers | Not available | Windows zip built/published manually today |
@@ -275,7 +276,7 @@ Known limitations:
 
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
-- No projects/albums, no plugin API, no content-hash duplicate detection
+- No multi-project albums (Studio is a single curation workspace), no plugin API, no content-hash duplicate detection
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
 - Telemetry **burn-in** into exported video is not included

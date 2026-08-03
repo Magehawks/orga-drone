@@ -240,6 +240,12 @@ def scan_root(
             size_bytes=parsed.size_bytes,
             recorded_at=recorded,
         )
+        db.link_studio_item_for_path(
+            str(path.resolve()),
+            filename=path.name,
+            size_bytes=parsed.size_bytes,
+            recorded_at=recorded,
+        )
         apply_auto_tags_to_media(
             db,
             media_id,

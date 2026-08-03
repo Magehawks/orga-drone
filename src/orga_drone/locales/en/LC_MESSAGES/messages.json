@@ -198,5 +198,22 @@
   "Zoom and pan to filter the list.": "Zoom and pan to filter the list.",
   "Media list": "Media list",
   "Back to map": "Back to map",
-  "Back to browse": "Back to browse"
+  "Back to browse": "Back to browse",
+  "Studio": "Studio",
+  "Add to Studio": "Add to Studio",
+  "In Studio": "In Studio",
+  "Open Studio": "Open Studio",
+  "Clear Studio": "Clear Studio",
+  "Remove": "Remove",
+  "Unavailable": "Unavailable",
+  "Go to Browse": "Go to Browse",
+  "No media in Studio yet": "No media in Studio yet",
+  "Select photos or videos in Browse or on a media detail page and add them to Studio. Your library files stay unchanged.": "Select photos or videos in Browse or on a media detail page and add them to Studio. Your library files stay unchanged.",
+  "Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.": "Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.",
+  "Added to Studio.": "Added to Studio.",
+  "Already in Studio.": "Already in Studio.",
+  "Removed from Studio.": "Removed from Studio.",
+  "Studio cleared.": "Studio cleared.",
+  "Remove all media from Studio? This does not delete your files.": "Remove all media from Studio? This does not delete your files.",
+  "This file is missing from the library index. Remove it from Studio or rescan after restoring the file.": "This file is missing from the library index. Remove it from Studio or rescan after restoring the file."
 }

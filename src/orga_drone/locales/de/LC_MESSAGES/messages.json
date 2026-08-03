@@ -198,5 +198,22 @@
   "Zoom and pan to filter the list.": "Zoomen und verschieben filtert die Liste.",
   "Media list": "Medienliste",
   "Back to map": "Zurück zur Karte",
-  "Back to browse": "Zurück zu Medien"
+  "Back to browse": "Zurück zu Medien",
+  "Studio": "Studio",
+  "Add to Studio": "Zum Studio hinzufügen",
+  "In Studio": "Im Studio",
+  "Open Studio": "Studio öffnen",
+  "Clear Studio": "Studio leeren",
+  "Remove": "Entfernen",
+  "Unavailable": "Nicht verfügbar",
+  "Go to Browse": "Zu Medien",
+  "No media in Studio yet": "Noch keine Medien im Studio",
+  "Select photos or videos in Browse or on a media detail page and add them to Studio. Your library files stay unchanged.": "Wähle Fotos oder Videos in der Medienübersicht oder auf der Detailseite und füge sie dem Studio hinzu. Deine Bibliotheksdateien bleiben unverändert.",
+  "Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.": "Das Studio ist ein leichter Workspace zum Zusammenstellen einer Auswahl. Es ist unabhängig von Favoriten und ändert deine Dateien nicht.",
+  "Added to Studio.": "Zum Studio hinzugefügt.",
+  "Already in Studio.": "Bereits im Studio.",
+  "Removed from Studio.": "Aus dem Studio entfernt.",
+  "Studio cleared.": "Studio geleert.",
+  "Remove all media from Studio? This does not delete your files.": "Alle Medien aus dem Studio entfernen? Deine Dateien werden nicht gelöscht.",
+  "This file is missing from the library index. Remove it from Studio or rescan after restoring the file.": "Diese Datei fehlt im Bibliotheksindex. Entferne sie aus dem Studio oder scanne erneut, nachdem die Datei wieder da ist."
 }

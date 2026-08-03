@@ -61,6 +61,8 @@ local-first workflow for drone-specific media and metadata.
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
 - filter, browse, and detect likely duplicate files (heuristics; no auto-delete)
+- collect selected media in a **Studio** workspace (single curation list; not
+  projects/albums, export, or editing)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 See `README.md` for the detailed feature status table.
@@ -73,8 +75,8 @@ See `README.md` for the detailed feature status table.
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
-- There is **no** projects/albums model, plugin API, or CI-built multi-OS
-  installer pipeline in the current tree.
+- There is **no** multi-project albums model, plugin API, or CI-built multi-OS
+  installer pipeline in the current tree. Studio is a single light workspace.
 
 ## Claims to avoid
 

@@ -26,4 +26,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| — | (none yet) | — |
+| [0001](0001-studio-workspace-persistence.md) | Studio workspace persistence | Accepted |
