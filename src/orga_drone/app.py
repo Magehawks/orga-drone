@@ -1074,7 +1074,7 @@ def create_app() -> FastAPI:
         item = db.get_media(media_id)
         if not item:
             raise HTTPException(status_code=404, detail="Not found")
-        _sid, created = db.add_studio_item(
+        _sid, _created = db.add_studio_item(
             item.path,
             identity_key=make_identity_key(
                 item.filename, item.size_bytes, item.recorded_at
@@ -1085,7 +1085,7 @@ def create_app() -> FastAPI:
             source_media_id=item.id,
         )
         base = studio_add_return_url(media_id, return_to)
-        msg = "studio_added" if created else "studio_already"
+        msg = "studio_added"
         if base == "/browse" or base.startswith("/browse?"):
             return RedirectResponse(url=base, status_code=303)
         if base == "/studio" or base.startswith("/studio?"):

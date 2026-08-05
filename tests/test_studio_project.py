@@ -51,6 +51,47 @@ def _seed_media(
     )
 
 
+def test_same_media_can_be_referenced_multiple_times(tmp_path: Path) -> None:
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(
+        db,
+        tmp_path / "lib",
+        filename="P.JPG",
+        content=b"photo",
+        kind="photo",
+        duration_s=None,
+    )
+    item = db.get_media(mid)
+    assert item is not None
+    path = Path(item.path)
+    before = path.read_bytes()
+
+    id1, c1 = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=mid,
+    )
+    id2, c2 = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=mid,
+    )
+    assert c1 and c2
+    assert id1 != id2
+    clips = db.list_studio_items()
+    assert len(clips) == 2
+    assert clips[0].source_media_id == clips[1].source_media_id == mid
+    assert clips[0].media_path == clips[1].media_path
+    assert path.read_bytes() == before
+    assert db.get_media(mid) is not None
+
+
 def test_default_project_created_and_title_persists(tmp_path: Path) -> None:
     db = Database(tmp_path / "t.sqlite3")
     project = db.ensure_default_studio_project()

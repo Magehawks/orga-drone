@@ -75,21 +75,22 @@ def test_add_remove_clear_and_append_order(tmp_path: Path) -> None:
     assert created_a and created_b and created_c
 
     again_id, created_again = _add_item(db, mid_a)
-    assert again_id == id_a
-    assert created_again is False
+    assert created_again is True
+    assert again_id != id_a
 
     items = db.list_studio_items()
-    assert [i.id for i in items] == [id_a, id_b, id_c]
-    assert [i.position for i in items] == [1, 2, 3]
+    assert [i.id for i in items] == [id_a, id_b, id_c, again_id]
+    assert [i.position for i in items] == [1, 2, 3, 4]
     assert all(i.available for i in items)
+    assert items[0].media_path == items[3].media_path
 
     assert db.remove_studio_item(id_b) is True
     assert db.remove_studio_item(id_b) is False
     remaining = db.list_studio_items()
-    assert [i.id for i in remaining] == [id_a, id_c]
+    assert [i.id for i in remaining] == [id_a, id_c, again_id]
 
     cleared = db.clear_studio()
-    assert cleared == 2
+    assert cleared == 3
     assert db.list_studio_items() == []
 
 
@@ -471,7 +472,7 @@ def test_http_add_remove_and_browse_markup(
         follow_redirects=False,
     )
     assert again.status_code == 303
-    assert "studio_already" in again.headers["location"]
+    assert "studio_added" in again.headers["location"]
 
     studio = c.get("/studio")
     assert studio.status_code == 200
@@ -479,19 +480,21 @@ def test_http_add_remove_and_browse_markup(
     assert f"/media/{mid}" in studio.text
 
     items = db.list_studio_items()
-    assert len(items) == 1
+    assert len(items) == 2
+    assert items[0].media_path == items[1].media_path
     sid = items[0].id
 
     remove = c.post(f"/studio/{sid}/remove", follow_redirects=False)
     assert remove.status_code == 303
     assert remove.headers["location"].startswith("/studio")
-    assert db.list_studio_items() == []
+    assert len(db.list_studio_items()) == 1
+    assert db.get_media(mid) is not None
 
-    _add_item(db, mid)
     clear = c.post("/studio/clear", follow_redirects=False)
     assert clear.status_code == 303
     assert clear.headers["location"].startswith("/studio")
     assert db.list_studio_items() == []
+    assert db.get_media(mid) is not None
 
     browse = c.get("/browse")
     assert browse.status_code == 200
@@ -796,10 +799,12 @@ def test_cut_studio_video_splits_same_source(tmp_path: Path) -> None:
     assert d_right == pytest.approx(12.5)
     assert d_left + d_right == pytest.approx(20.0)
     assert summarize_studio_items(items).estimated_total_s == pytest.approx(20.0)
-    # Idempotent add still treats path as already in Studio.
+    # Same source can be added again as another clip (Issue #16).
     again_id, created = _add_item(db, mid)
-    assert created is False
-    assert again_id in {left.id, right.id}
+    assert created is True
+    assert again_id not in {left.id, right.id}
+    assert len(db.list_studio_items()) == 3
+    assert all(c.media_path == left.media_path for c in db.list_studio_items())
 
 
 def test_cut_rejects_photo_and_ends(tmp_path: Path) -> None:

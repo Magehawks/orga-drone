@@ -1455,9 +1455,9 @@ class Database:
     ) -> tuple[int, bool]:
         """Add a clip to a Studio project. Returns ``(clip_id, created)``.
 
-        Idempotent on ``media_path`` within the project: existing membership
-        returns ``created=False``. Multiple clips of the same media are still
-        possible via Cut. Source files are never copied or modified.
+        Always inserts a new clip so the same source media can appear multiple
+        times in one project (Issue #16). Source files are never copied or
+        modified. ``created`` is always ``True`` on success.
         """
         kind_snapshot = kind if kind in {"photo", "video"} else "photo"
         now = datetime.now().isoformat(timespec="seconds")
@@ -1470,14 +1470,6 @@ class Database:
             raise ValueError("studio project not found")
         pid = project.id
         with self.connect() as conn:
-            existing = conn.execute(
-                """SELECT id FROM studio_clips
-                   WHERE project_id = ? AND media_path = ?
-                   ORDER BY id ASC LIMIT 1""",
-                (pid, media_path),
-            ).fetchone()
-            if existing:
-                return int(existing["id"]), False
             if source_media_id is None:
                 media_row = conn.execute(
                     "SELECT id FROM media WHERE path = ?",

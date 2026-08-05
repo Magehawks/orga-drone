@@ -13,7 +13,8 @@ same file after a split.
 ## Decision
 
 1. Drop the unique constraint on `studio_items.media_path`. Browse “In Studio”
-   and idempotent add still treat path presence as membership.
+   still treats path presence as membership. Add always inserts a new clip so
+   the same source can appear more than once (Issue #16).
 2. Store optional `source_in_s` / `source_out_s` on each Story row (NULL means
    the full media duration). Effective video duration is `out - in`.
 3. Cut updates the original row to the left range and inserts a new row for the

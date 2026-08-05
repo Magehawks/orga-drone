@@ -42,4 +42,4 @@ ADR 0001 stored a single global `studio_items` list keyed by `media_path` (becau
   estimate continue via start/end offsets; source files untouched.
 - Negative / trade-offs: `source_media_id` alone is not durable; path/identity
   remain required for relink.
-- Follow-up: project picker UI, duplicate-clip action, effect/transition render.
+- Follow-up: project picker UI, effect/transition render.
