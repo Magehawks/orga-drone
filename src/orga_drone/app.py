@@ -813,7 +813,7 @@ def create_app() -> FastAPI:
                 if media_row is not None:
                     media_path = resolve_media_file(db, media_row)
                     can_play = media_path is not None
-                    if can_play:
+                    if media_path is not None:
                         stream_url = f"/media/{it.media_id}/stream"
                         kind = it.kind if it.kind in {"photo", "video"} else media_row.kind
                         if kind == "video":

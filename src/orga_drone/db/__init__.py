@@ -598,7 +598,9 @@ class Database:
                    VALUES (?, ?, ?)""",
                 ("Your story", now, now),
             )
-            project_id = int(cur.lastrowid)
+            pid = cur.lastrowid
+            assert pid is not None
+            project_id = int(pid)
         else:
             project_id = int(project["id"])
 
