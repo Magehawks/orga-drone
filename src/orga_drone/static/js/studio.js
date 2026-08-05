@@ -25,8 +25,10 @@
   const toggleBtn = root.querySelector('[data-transport="toggle"]');
 
   const defaultPhotoDuration = Number(root.dataset.defaultPhotoDuration || "3") || 3;
+  const projectId = Number(root.dataset.projectId || "0") || 0;
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
+  const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
   const labelSaved = root.dataset.savedLabel || "Saved";
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
   const labelPlay = root.dataset.labelPlay || "Play";
@@ -108,6 +110,11 @@
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
+  const MIN_CUT_SEGMENT_S = 0.05;
+  const CUT_RESTORE_KEY = "orga-drone-studio-cut-restore";
+  const cutBtn = root.querySelector('[data-transport="cut"]');
+  const cutFailedMsg = root.dataset.cutFailed || "Could not cut clip.";
+
   function clipDuration(clip) {
     const raw = clip.dataset.effectiveDuration;
     if (raw === "" || raw == null) {
@@ -116,6 +123,24 @@
     }
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function sourceInS(clip) {
+    const raw = clip.dataset.sourceIn;
+    if (raw === "" || raw == null) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function sourceOutS(clip) {
+    const raw = clip.dataset.sourceOut;
+    if (raw !== "" && raw != null) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const media = Number(clip.dataset.mediaDuration);
+    if (Number.isFinite(media) && media > 0) return media;
+    return sourceInS(clip) + clipDuration(clip);
   }
 
   function totalDuration() {
@@ -271,6 +296,7 @@
     }
     root.dataset.totalS = String(total);
     root.dataset.totalLabel = formatTime(total);
+    updateCutEnabled();
   }
 
   function showPlaceholder() {
@@ -295,12 +321,17 @@
     }
   }
 
-  function seekVideoLocal(localS) {
+  function seekVideoLocal(localS, clip) {
     if (!previewVideo) return;
-    const target = Math.max(0, localS);
+    const inS = clip ? sourceInS(clip) : 0;
+    const outS = clip ? sourceOutS(clip) : null;
+    const target = Math.max(inS, inS + Math.max(0, localS));
     const apply = () => {
       try {
-        const max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
+        let max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
+        if (outS != null && Number.isFinite(outS)) {
+          max = Math.min(max > 0 ? max : outS, outS);
+        }
         previewVideo.currentTime = Math.min(target, max > 0 ? max : target);
       } catch (_) {
         /* ignore seek errors while loading */
@@ -312,7 +343,7 @@
     }
   }
 
-  function showVideo(src, localS, { play } = { play: false }) {
+  function showVideo(src, localS, { play, clip } = { play: false }) {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
     if (previewPlaceholder) previewPlaceholder.hidden = true;
@@ -329,7 +360,7 @@
         "loadedmetadata",
         () => {
           if (token !== syncToken) return;
-          seekVideoLocal(localS);
+          seekVideoLocal(localS, clip);
           suppressVideoClock = false;
           if (play && state.playing) {
             previewVideo.play().catch(() => {
@@ -342,7 +373,7 @@
       return;
     }
     suppressVideoClock = true;
-    seekVideoLocal(localS);
+    seekVideoLocal(localS, clip);
     // Allow clock after seek settles.
     window.setTimeout(() => {
       suppressVideoClock = false;
@@ -361,6 +392,7 @@
       state.activeStudioId = null;
       clips().forEach((c) => c.classList.remove("is-active"));
       showPlaceholder();
+      updateCutEnabled();
       return;
     }
     const { clip, localS, atEnd } = hit;
@@ -375,9 +407,11 @@
       const src = imageSrcFor(clip);
       if (src) {
         showImage(src);
+        updateCutEnabled();
         return;
       }
       showPlaceholder();
+      updateCutEnabled();
       return;
     }
 
@@ -387,9 +421,11 @@
         const thumb = clip.dataset.thumb || "";
         if (thumb) showImage(thumb);
         else showPlaceholder();
+        updateCutEnabled();
         return;
       }
-      showVideo(src, localS, { play: state.playing && !atEnd });
+      showVideo(src, localS, { play: state.playing && !atEnd, clip });
+      updateCutEnabled();
       return;
     }
 
@@ -397,6 +433,7 @@
     const thumb = clip.dataset.thumb || "";
     if (thumb) showImage(thumb);
     else showPlaceholder();
+    updateCutEnabled();
   }
 
   function setProjectTime(t, { resume = false, fromVideo = false } = {}) {
@@ -414,6 +451,7 @@
         state.activeStudioId = hit.clip.dataset.studioId || null;
         clips().forEach((c) => c.classList.toggle("is-active", c === hit.clip));
       }
+      updateCutEnabled();
     }
 
     if (total > 0 && state.projectTimeS >= total - 0.001) {
@@ -533,15 +571,23 @@
     const hit = resolveAt(state.projectTimeS);
     if (!hit || hit.clip.dataset.kind !== "video") return;
     if (String(hit.clip.dataset.studioId) !== String(state.activeStudioId)) return;
-    const local = previewVideo.currentTime || 0;
+    const inS = sourceInS(hit.clip);
+    const outS = sourceOutS(hit.clip);
+    const mediaTime = previewVideo.currentTime || 0;
+    const local = Math.max(0, mediaTime - inS);
     const next = hit.start + local;
     if (Math.abs(next - state.projectTimeS) < 0.01) {
       updatePlayheadChrome();
+    } else {
+      state.projectTimeS = next;
+      updatePlayheadChrome();
+    }
+    updateCutEnabled();
+    // Clip boundary at source out (trimmed) or near local duration.
+    if (outS != null && mediaTime >= outS - 0.05) {
+      advanceToNextOrStop(hit);
       return;
     }
-    state.projectTimeS = next;
-    updatePlayheadChrome();
-    // Clip boundary when video reports near end but ended event is late.
     if (hit.duration > 0 && local >= hit.duration - 0.05) {
       advanceToNextOrStop(hit);
     }
@@ -564,10 +610,7 @@
       if (!raw) return;
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
-        if (typeof data.title === "string" && titleInput) {
-          state.title = data.title;
-          titleInput.value = data.title;
-        }
+        // Title is persisted in SQLite (studio_projects); do not restore from session.
         if (data.music && typeof data.music.name === "string") {
           state.music = {
             name: data.music.name,
@@ -594,7 +637,6 @@
       sessionStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          title: state.title,
           music: state.music,
           transitions: state.transitions,
           volume: state.volume,
@@ -603,6 +645,44 @@
     } catch (_) {
       /* ignore */
     }
+  }
+
+  let titleSaveTimer = 0;
+  async function persistProjectTitle() {
+    if (!projectId || !titleInput) return;
+    const title = titleInput.value.trim();
+    if (!title) {
+      showFlash(msgTitleFailed);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash((data && data.detail) || msgTitleFailed);
+        setSaveState(false);
+        return;
+      }
+      state.title = data.title;
+      titleInput.value = data.title;
+      setSaveState(true);
+    } catch (_) {
+      showFlash(msgTitleFailed);
+      setSaveState(false);
+    }
+  }
+
+  function scheduleTitleSave() {
+    if (titleSaveTimer) window.clearTimeout(titleSaveTimer);
+    setSaveState(false);
+    titleSaveTimer = window.setTimeout(() => {
+      titleSaveTimer = 0;
+      persistProjectTitle();
+    }, 400);
   }
 
   function applyTransitionsToDom() {
@@ -663,7 +743,7 @@
     );
   }
 
-  function selectClip(id) {
+  function selectClip(id, { movePlayhead = true } = {}) {
     state.selected = { type: "clip", id: String(id) };
     const clip = clips().find((c) => String(c.dataset.studioId) === String(id));
     if (!clip) return;
@@ -701,10 +781,71 @@
     }
     if (removeForm) removeForm.action = `/studio/${clip.dataset.studioId}/remove`;
 
-    const wasPlaying = state.playing;
-    if (wasPlaying) pausePlayback();
-    setProjectTime(clipStartTime(clip));
-    if (wasPlaying) startPlayback();
+    if (movePlayhead) {
+      const wasPlaying = state.playing;
+      if (wasPlaying) pausePlayback();
+      setProjectTime(clipStartTime(clip));
+      if (wasPlaying) startPlayback();
+    } else {
+      updateCutEnabled();
+    }
+  }
+
+  function canCutAtHit(hit) {
+    if (!hit || hit.atEnd) return false;
+    if (!state.selected || state.selected.type !== "clip") return false;
+    if (String(state.selected.id) !== String(hit.clip.dataset.studioId)) return false;
+    if (hit.clip.dataset.kind !== "video") return false;
+    if (hit.clip.dataset.canPlay !== "1") return false;
+    if (hit.clip.dataset.available !== "1") return false;
+    const local = hit.localS;
+    const dur = hit.duration;
+    return local > MIN_CUT_SEGMENT_S && local < dur - MIN_CUT_SEGMENT_S;
+  }
+
+  function updateCutEnabled() {
+    if (!cutBtn) return;
+    const hit = resolveAt(state.projectTimeS);
+    const ok = canCutAtHit(hit);
+    cutBtn.disabled = !ok;
+  }
+
+  async function cutSelectedAtPlayhead() {
+    const hit = resolveAt(state.projectTimeS);
+    if (!canCutAtHit(hit)) return;
+    const studioId = hit.clip.dataset.studioId;
+    const localS = hit.localS;
+    const playhead = state.projectTimeS;
+    if (state.playing) pausePlayback();
+    cutBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/studio/${studioId}/cut`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ local_s: localS }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash((data && data.detail) || cutFailedMsg);
+        updateCutEnabled();
+        return;
+      }
+      try {
+        sessionStorage.setItem(
+          CUT_RESTORE_KEY,
+          JSON.stringify({
+            projectTimeS: playhead,
+            selectId: String(data.right_id),
+          })
+        );
+      } catch (_) {
+        /* ignore */
+      }
+      window.location.reload();
+    } catch (_) {
+      showFlash(cutFailedMsg);
+      updateCutEnabled();
+    }
   }
 
   function selectTransition(el) {
@@ -715,6 +856,7 @@
     showInspector("inspector-transition");
     const select = document.getElementById("inspector-transition-type");
     if (select) select.value = el.dataset.transitionType || "none";
+    updateCutEnabled();
   }
 
   function selectMusic() {
@@ -925,6 +1067,9 @@
         const idx = list.indexOf(hit.clip);
         if (idx >= 0 && idx < list.length - 1) setProjectTime(clipStartTime(list[idx + 1]));
         else setProjectTime(totalDuration());
+      } else if (action === "cut") {
+        cutSelectedAtPlayhead();
+        return;
       }
       if (wasPlaying && state.projectTimeS < totalDuration() - 0.001) startPlayback();
     }
@@ -933,10 +1078,15 @@
   if (titleInput) {
     titleInput.addEventListener("input", () => {
       state.title = titleInput.value;
-      persistUiState();
-      setSaveState(false);
+      scheduleTitleSave();
     });
-    titleInput.addEventListener("change", () => setSaveState(true));
+    titleInput.addEventListener("change", () => {
+      if (titleSaveTimer) {
+        window.clearTimeout(titleSaveTimer);
+        titleSaveTimer = 0;
+      }
+      persistProjectTitle();
+    });
   }
 
   if (volumeInput) {
@@ -1104,12 +1254,30 @@
   renderMusic();
   buildRuler();
   setToggleLabel();
-  if (clips().length) {
+  let cutRestore = null;
+  try {
+    const raw = sessionStorage.getItem(CUT_RESTORE_KEY);
+    if (raw) {
+      cutRestore = JSON.parse(raw);
+      sessionStorage.removeItem(CUT_RESTORE_KEY);
+    }
+  } catch (_) {
+    cutRestore = null;
+  }
+  if (
+    cutRestore &&
+    cutRestore.selectId &&
+    clips().some((c) => String(c.dataset.studioId) === String(cutRestore.selectId))
+  ) {
+    selectClip(cutRestore.selectId, { movePlayhead: false });
+    setProjectTime(Number(cutRestore.projectTimeS) || 0);
+  } else if (clips().length) {
     selectClip(clips()[0].dataset.studioId);
   } else {
     updatePlayheadChrome();
     showPlaceholder();
     showInspector("inspector-empty");
+    updateCutEnabled();
   }
   setSaveState(true);
 })();

@@ -128,8 +128,10 @@ professional video-editing knowledge.
 | Select media / add to Studio | **Available now** |
 | Arrange order | **Available now** |
 | Estimated runtime (photo duration planning) | **Available now** |
+| Persisted Studio project title (non-destructive project/clip model) | **Available now** |
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
+| Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers / one music slot (UI state only) | **Available now** (not rendered / not exported) |
 | Export dialog stub | **Available now** (no render pipeline) |
 | Build a story (real music in export, transitions, editing) | **Studio MVP (target)** / **Later** |
@@ -198,9 +200,11 @@ See `README.md` for the detailed feature status table. In short:
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
 - **Studio:** single workspace with Creator Studio UI (browser, preview,
   transport, Story track, music slot, inspector, export dialog stub). Persisted
-  today: order + estimated runtime. Story preview plays photos/videos in sync
-  with the playhead. Transitions, music, and export remain UI stubs — no render
-  pipeline yet.
+  today: `studio_projects` + `studio_clips` (editable project title; order;
+  estimated runtime; optional video source start/end after Cut). Story preview
+  plays photos/videos in sync with the playhead. Transitions, music, and export
+  remain UI stubs — no render pipeline yet. Media files are referenced, never
+  copied or modified.
 - Local SQLite index; media files stay on disk
 
 ## Honest limitations

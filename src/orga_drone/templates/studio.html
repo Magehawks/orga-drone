@@ -8,8 +8,8 @@
 {% block content %}
 {#
   Creator Studio UI foundation (GitHub #14).
-  Persistence: studio_items order + photo duration (existing APIs).
-  Playback, transitions, music, and export are UI/state only — no render pipeline.
+  Persistence: studio_projects + studio_clips (non-destructive refs to media).
+  Order, photo duration, video source start/end (cut), editable project title.
   Icons: Lucide (vendored) — see static/vendor/lucide/README.md
 #}
 <script>document.body.classList.add("studio-app");</script>
@@ -18,11 +18,14 @@
 
 <section class="studio-creator"
          id="studio-root"
+         data-project-id="{{ project.id }}"
          data-default-photo-duration="{{ default_photo_duration_s }}"
          data-total-s="{{ summary.estimated_total_s }}"
          data-total-label="{{ summary.estimated_total_label }}"
          data-reorder-failed="{{ _('Could not save Studio order.')|e }}"
          data-duration-failed="{{ _('Could not save photo duration.')|e }}"
+         data-cut-failed="{{ _('Could not cut clip.')|e }}"
+         data-title-failed="{{ _('Could not save project title.')|e }}"
          data-saved-label="{{ _('Saved')|e }}"
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
          data-export-unavailable="{{ _('Export is not available yet. No video is rendered in this build.')|e }}"
@@ -44,7 +47,7 @@
     <div class="studio-topbar-title">
       <label class="visually-hidden" for="studio-project-title">{{ _('Project title') }}</label>
       <input id="studio-project-title" class="studio-project-title" type="text"
-             value="{{ _('Your story') }}" maxlength="120"
+             value="{{ project.title|e }}" maxlength="120"
              aria-label="{{ _('Project title') }}">
       <span class="studio-save-state" id="studio-save-state" data-state="saved"
             title="{{ _('Saved') }}">
@@ -202,8 +205,8 @@
                 title="{{ _('Jump to end') }}" aria-label="{{ _('Jump to end') }}"
                 {% if not items %}disabled{% endif %}>{{ lucide('chevrons-right') }}</button>
         <button type="button" class="studio-transport-btn" data-transport="cut" disabled
-                title="{{ _('Cut clip — not available yet') }}"
-                aria-label="{{ _('Cut clip — not available yet') }}">{{ lucide('scissors') }}</button>
+                title="{{ _('Cut clip') }}"
+                aria-label="{{ _('Cut clip') }}">{{ lucide('scissors') }}</button>
         <span class="studio-transport-time" id="studio-transport-time" aria-live="polite">00:00:00 / {{ summary.estimated_total_label }}</span>
         <label class="studio-transport-volume">
           <span class="studio-transport-volume-icon" aria-hidden="true">{{ lucide('volume-2') }}</span>
@@ -253,6 +256,8 @@
                   data-recorded-at="{{ (item.recorded_at or '')|e }}"
                   data-photo-duration="{{ item.photo_duration_s if item.photo_duration_s is not none else '' }}"
                   data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+                  data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
+                  data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
                   data-thumb="{% if item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
                   data-stream-url="{{ row.stream_url }}"

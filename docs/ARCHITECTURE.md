@@ -67,7 +67,8 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
-| `studio_items` | Single Studio curation list (path + identity + order; `kind_snapshot`, optional `photo_duration_s`; survives rescan) |
+| `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
+| `studio_clips` | Story clips per project (path + identity + optional `source_media_id`; start/end, speed, volume, transition, effect_settings JSON; survives rescan) |
 | `geocode_cache` | Offline place cache |
 
 ## Scan / index pipeline
@@ -94,7 +95,7 @@ at a time.
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
-Studio page: Jinja layout + `static/js/studio.js` (reorder/duration APIs;
+Studio page: Jinja layout + `static/js/studio.js` (project title, reorder/duration/cut APIs;
 synced Story preview via `/stream`/`/proxy`; music/transitions/export remain
 client UI stubs only). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there).

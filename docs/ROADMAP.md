@@ -27,8 +27,9 @@ Highlights:
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
-  music slot, inspector, export stub; persisted: order + estimated runtime;
-  synced Story preview playback; music/export not rendered yet)
+  music slot, inspector, export stub; persisted: `studio_projects` +
+  `studio_clips` with editable title, order, estimated runtime, video Cut via
+  source start/end; synced Story preview playback; music/export not rendered yet)
 
 ## Next (possible near-term)
 

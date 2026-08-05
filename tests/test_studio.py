@@ -755,3 +755,107 @@ def test_http_reorder_and_photo_duration(
     )
     assert clamp.status_code == 200
     assert clamp.json()["photo_duration_s"] == 0.5
+
+
+def test_cut_studio_video_splits_same_source(tmp_path: Path) -> None:
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(
+        db, tmp_path / "lib", filename="CLIP.MP4", content=b"vid", duration_s=20.0
+    )
+    sid, _ = _add_item(db, mid)
+    left, right = db.cut_studio_video_item(sid, 7.5)
+    assert left.id == sid
+    assert right.id != sid
+    assert left.media_path == right.media_path
+    assert left.source_in_s == pytest.approx(0.0)
+    assert left.source_out_s == pytest.approx(7.5)
+    assert right.source_in_s == pytest.approx(7.5)
+    assert right.source_out_s == pytest.approx(20.0)
+    items = db.list_studio_items()
+    assert [i.id for i in items] == [left.id, right.id]
+    assert [i.position for i in items] == [1, 2]
+    from orga_drone.studio_estimate import effective_seconds, summarize_studio_items
+
+    d_left = effective_seconds(
+        kind="video",
+        photo_duration_s=None,
+        duration_s=left.duration_s,
+        available=True,
+        source_in_s=left.source_in_s,
+        source_out_s=left.source_out_s,
+    )
+    d_right = effective_seconds(
+        kind="video",
+        photo_duration_s=None,
+        duration_s=right.duration_s,
+        available=True,
+        source_in_s=right.source_in_s,
+        source_out_s=right.source_out_s,
+    )
+    assert d_left == pytest.approx(7.5)
+    assert d_right == pytest.approx(12.5)
+    assert d_left + d_right == pytest.approx(20.0)
+    assert summarize_studio_items(items).estimated_total_s == pytest.approx(20.0)
+    # Idempotent add still treats path as already in Studio.
+    again_id, created = _add_item(db, mid)
+    assert created is False
+    assert again_id in {left.id, right.id}
+
+
+def test_cut_rejects_photo_and_ends(tmp_path: Path) -> None:
+    db = Database(tmp_path / "t.sqlite3")
+    mid_v = _seed_media(
+        db, tmp_path / "lib", filename="V.MP4", content=b"v", duration_s=10.0
+    )
+    mid_p = _seed_media(
+        db,
+        tmp_path / "lib",
+        filename="P.JPG",
+        content=b"p",
+        kind="photo",
+        duration_s=None,
+    )
+    sid_v, _ = _add_item(db, mid_v)
+    sid_p, _ = _add_item(db, mid_p)
+    with pytest.raises(ValueError, match="only video"):
+        db.cut_studio_video_item(sid_p, 1.0)
+    with pytest.raises(ValueError, match="inside"):
+        db.cut_studio_video_item(sid_v, 0.0)
+    with pytest.raises(ValueError, match="inside"):
+        db.cut_studio_video_item(sid_v, 10.0)
+
+
+def test_http_studio_cut(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    mid = _seed_media(
+        db, tmp_path / "lib", filename="CUT.MP4", content=b"cutme", duration_s=15.0
+    )
+    sid, _ = _add_item(db, mid)
+    c = TestClient(app)
+
+    at_end = c.post(f"/api/studio/{sid}/cut", json={"local_s": 0.0})
+    assert at_end.status_code == 400
+
+    ok = c.post(f"/api/studio/{sid}/cut", json={"local_s": 5.0})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["ok"] is True
+    assert body["left_id"] == sid
+    assert body["right_id"] != sid
+    assert body["left"]["effective_duration_s"] == pytest.approx(5.0)
+    assert body["right"]["effective_duration_s"] == pytest.approx(10.0)
+    assert body["summary"]["estimated_total_s"] == pytest.approx(15.0)
+
+    page = c.get("/studio")
+    assert page.status_code == 200
+    assert "data-source-in=" in page.text
+    assert 'data-transport="cut"' in page.text

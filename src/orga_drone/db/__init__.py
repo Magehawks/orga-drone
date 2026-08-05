@@ -121,20 +121,40 @@ CREATE INDEX IF NOT EXISTS idx_media_flow ON media(flow_id);
 CREATE INDEX IF NOT EXISTS idx_media_meta_identity ON media_meta(identity_key);
 CREATE INDEX IF NOT EXISTS idx_media_meta_favorite ON media_meta(favorite);
 
--- Studio workspace (single curation list). Survives clear_root_media / rescan.
-CREATE TABLE IF NOT EXISTS studio_items (
+-- Studio projects (non-destructive; Issue #16 / ADR 0004).
+CREATE TABLE IF NOT EXISTS studio_projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    media_path TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Clips reference library media by path (+ optional media.id); never copy files.
+-- Multiple clips may share media_path / source_media_id.
+CREATE TABLE IF NOT EXISTS studio_clips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+    media_path TEXT NOT NULL,
     identity_key TEXT NOT NULL,
+    source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
     position INTEGER NOT NULL,
     filename_snapshot TEXT NOT NULL,
     recorded_at_snapshot TEXT,
     kind_snapshot TEXT NOT NULL,
     photo_duration_s REAL,
+    source_start REAL,
+    source_end REAL,
+    playback_speed REAL NOT NULL DEFAULT 1.0,
+    volume REAL NOT NULL DEFAULT 1.0,
+    transition TEXT,
+    effect_settings TEXT NOT NULL DEFAULT '{}',
     added_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key);
-CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position);
+CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
+CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
+CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position);
+CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
+CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
 
 CREATE TABLE IF NOT EXISTS geocode_cache (
     lat_key REAL NOT NULL,
@@ -237,10 +257,21 @@ class MediaRow:
 
 
 @dataclass
-class StudioItem:
-    """One Studio workspace entry (available or unavailable after rescan)."""
+class StudioProject:
+    """One Studio project (title + timestamps). Does not own media files."""
 
     id: int
+    title: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class StudioClip:
+    """One Story clip in a Studio project (references media; never copies it)."""
+
+    id: int
+    project_id: int
     media_path: str
     identity_key: str
     position: int
@@ -250,11 +281,35 @@ class StudioItem:
     photo_duration_s: float | None
     added_at: str
     available: bool
-    media_id: int | None
+    source_media_id: int | None
     filename: str
     recorded_at: str | None
     kind: str | None = None
     duration_s: float | None = None
+    source_start: float | None = None
+    source_end: float | None = None
+    playback_speed: float = 1.0
+    volume: float = 1.0
+    transition: str | None = None
+    effect_settings: str = "{}"
+
+    @property
+    def media_id(self) -> int | None:
+        """Live library id for streaming when the path resolves; else stored id."""
+        return self.source_media_id if self.available else None
+
+    @property
+    def source_in_s(self) -> float | None:
+        """Alias for estimate/cut helpers (ADR 0003 naming)."""
+        return self.source_start
+
+    @property
+    def source_out_s(self) -> float | None:
+        return self.source_end
+
+
+# Backward-compatible name used by older tests/call sites.
+StudioItem = StudioClip
 
 
 class Database:
@@ -349,15 +404,26 @@ class Database:
             )"""
         )
         conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        # Keep creating legacy studio_items for DBs mid-upgrade; migrated below.
+        conn.execute(
             """CREATE TABLE IF NOT EXISTS studio_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                media_path TEXT NOT NULL UNIQUE,
+                media_path TEXT NOT NULL,
                 identity_key TEXT NOT NULL,
                 position INTEGER NOT NULL,
                 filename_snapshot TEXT NOT NULL,
                 recorded_at_snapshot TEXT,
                 kind_snapshot TEXT NOT NULL DEFAULT 'photo',
                 photo_duration_s REAL,
+                source_in_s REAL,
+                source_out_s REAL,
                 added_at TEXT NOT NULL
             )"""
         )
@@ -370,7 +436,7 @@ class Database:
         studio_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
         }
-        if "kind_snapshot" not in studio_cols:
+        if studio_cols and "kind_snapshot" not in studio_cols:
             conn.execute("ALTER TABLE studio_items ADD COLUMN kind_snapshot TEXT")
             conn.execute(
                 """UPDATE studio_items
@@ -379,7 +445,6 @@ class Database:
                    )
                    WHERE kind_snapshot IS NULL"""
             )
-            # Legacy rows without a live media join: conservative photo fallback.
             conn.execute(
                 """UPDATE studio_items
                    SET kind_snapshot = 'photo'
@@ -388,8 +453,197 @@ class Database:
         studio_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
         }
-        if "photo_duration_s" not in studio_cols:
+        if studio_cols and "photo_duration_s" not in studio_cols:
             conn.execute("ALTER TABLE studio_items ADD COLUMN photo_duration_s REAL")
+        studio_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+        }
+        if studio_cols and "source_in_s" not in studio_cols:
+            conn.execute("ALTER TABLE studio_items ADD COLUMN source_in_s REAL")
+        if studio_cols and "source_out_s" not in studio_cols:
+            conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
+        Database._migrate_studio_items_drop_unique_media_path(conn)
+        Database._migrate_studio_projects_and_clips(conn)
+
+    @staticmethod
+    def _migrate_studio_items_drop_unique_media_path(conn: sqlite3.Connection) -> None:
+        """Allow multiple Story clips from one source file (video cut)."""
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='studio_items'"
+        ).fetchone()
+        if row is None or not row[0]:
+            return
+        sql_upper = str(row[0]).upper().replace("\n", " ")
+        if "MEDIA_PATH TEXT NOT NULL UNIQUE" not in sql_upper and (
+            "MEDIA_PATH TEXT UNIQUE" not in sql_upper
+        ):
+            return
+        cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+        }
+        select_source_in = "source_in_s" if "source_in_s" in cols else "NULL"
+        select_source_out = "source_out_s" if "source_out_s" in cols else "NULL"
+        select_photo = "photo_duration_s" if "photo_duration_s" in cols else "NULL"
+        select_kind = (
+            "kind_snapshot" if "kind_snapshot" in cols else "'photo'"
+        )
+        conn.executescript(
+            f"""
+            CREATE TABLE studio_items__cut_mig (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                media_path TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                filename_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                kind_snapshot TEXT NOT NULL DEFAULT 'photo',
+                photo_duration_s REAL,
+                source_in_s REAL,
+                source_out_s REAL,
+                added_at TEXT NOT NULL
+            );
+            INSERT INTO studio_items__cut_mig(
+                id, media_path, identity_key, position,
+                filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                photo_duration_s, source_in_s, source_out_s, added_at
+            )
+            SELECT id, media_path, identity_key, position,
+                   filename_snapshot, recorded_at_snapshot, {select_kind},
+                   {select_photo}, {select_source_in}, {select_source_out}, added_at
+            FROM studio_items;
+            DROP TABLE studio_items;
+            ALTER TABLE studio_items__cut_mig RENAME TO studio_items;
+            CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key);
+            CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position);
+            CREATE INDEX IF NOT EXISTS idx_studio_items_path ON studio_items(media_path);
+            """
+        )
+
+    @staticmethod
+    def _migrate_studio_projects_and_clips(conn: sqlite3.Connection) -> None:
+        """Create studio_projects/studio_clips; migrate legacy studio_items once."""
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_clips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                media_path TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                position INTEGER NOT NULL,
+                filename_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                kind_snapshot TEXT NOT NULL DEFAULT 'photo',
+                photo_duration_s REAL,
+                source_start REAL,
+                source_end REAL,
+                playback_speed REAL NOT NULL DEFAULT 1.0,
+                volume REAL NOT NULL DEFAULT 1.0,
+                transition TEXT,
+                effect_settings TEXT NOT NULL DEFAULT '{}',
+                added_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id)"
+        )
+
+        clip_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+        }
+        # Forward-compatible column adds if an older partial migrate exists.
+        alters = {
+            "source_media_id": "ALTER TABLE studio_clips ADD COLUMN source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL",
+            "source_start": "ALTER TABLE studio_clips ADD COLUMN source_start REAL",
+            "source_end": "ALTER TABLE studio_clips ADD COLUMN source_end REAL",
+            "playback_speed": "ALTER TABLE studio_clips ADD COLUMN playback_speed REAL NOT NULL DEFAULT 1.0",
+            "volume": "ALTER TABLE studio_clips ADD COLUMN volume REAL NOT NULL DEFAULT 1.0",
+            "transition": "ALTER TABLE studio_clips ADD COLUMN transition TEXT",
+            "effect_settings": "ALTER TABLE studio_clips ADD COLUMN effect_settings TEXT NOT NULL DEFAULT '{}'",
+            "photo_duration_s": "ALTER TABLE studio_clips ADD COLUMN photo_duration_s REAL",
+        }
+        for col, sql in alters.items():
+            if col not in clip_cols:
+                try:
+                    conn.execute(sql)
+                except sqlite3.OperationalError:
+                    pass
+
+        project = conn.execute(
+            "SELECT id FROM studio_projects ORDER BY id ASC LIMIT 1"
+        ).fetchone()
+        if project is None:
+            cur = conn.execute(
+                """INSERT INTO studio_projects(title, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                ("Your story", now, now),
+            )
+            project_id = int(cur.lastrowid)
+        else:
+            project_id = int(project["id"])
+
+        items_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
+        ).fetchone()
+        if not items_exists:
+            return
+        item_count = conn.execute("SELECT COUNT(*) AS n FROM studio_items").fetchone()
+        clip_count = conn.execute("SELECT COUNT(*) AS n FROM studio_clips").fetchone()
+        if int(item_count["n"]) > 0 and int(clip_count["n"]) == 0:
+            item_cols = {
+                r[1]
+                for r in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+            }
+            start_expr = (
+                "source_in_s" if "source_in_s" in item_cols else "NULL"
+            )
+            end_expr = "source_out_s" if "source_out_s" in item_cols else "NULL"
+            photo_expr = (
+                "photo_duration_s" if "photo_duration_s" in item_cols else "NULL"
+            )
+            kind_expr = (
+                "kind_snapshot" if "kind_snapshot" in item_cols else "'photo'"
+            )
+            conn.execute(
+                f"""
+                INSERT INTO studio_clips(
+                    id, project_id, media_path, identity_key, source_media_id,
+                    position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                    photo_duration_s, source_start, source_end,
+                    playback_speed, volume, transition, effect_settings, added_at
+                )
+                SELECT i.id, ?, i.media_path, i.identity_key, m.id,
+                       i.position, i.filename_snapshot, i.recorded_at_snapshot,
+                       COALESCE({kind_expr}, 'photo'),
+                       {photo_expr}, {start_expr}, {end_expr},
+                       1.0, 1.0, NULL, '{{}}', i.added_at
+                FROM studio_items i
+                LEFT JOIN media m ON m.path = i.media_path
+                """,
+                (project_id,),
+            )
+        conn.execute("DROP TABLE IF EXISTS studio_items")
+
 
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
@@ -427,7 +681,7 @@ class Database:
     def clear_root_media(self, root_id: int) -> None:
         """Drop indexed media for a root.
 
-        Does NOT touch media_meta or studio_items (user curation data).
+        Does NOT touch media_meta or studio_clips / studio_projects (user curation).
         """
         with self.connect() as conn:
             # flows / sessions that only belong to this root
@@ -1080,6 +1334,112 @@ class Database:
                     (media_path, now, orphan["id"]),
                 )
 
+    def ensure_default_studio_project(self, *, title: str = "Your story") -> StudioProject:
+        """Return the first Studio project, creating one if the table is empty."""
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, title, created_at, updated_at
+                   FROM studio_projects ORDER BY id ASC LIMIT 1"""
+            ).fetchone()
+            if row is not None:
+                return StudioProject(
+                    id=int(row["id"]),
+                    title=str(row["title"]),
+                    created_at=str(row["created_at"]),
+                    updated_at=str(row["updated_at"]),
+                )
+            now = datetime.now().isoformat(timespec="seconds")
+            cur = conn.execute(
+                """INSERT INTO studio_projects(title, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                (title, now, now),
+            )
+            pid = cur.lastrowid
+            assert pid is not None
+            return StudioProject(
+                id=int(pid), title=title, created_at=now, updated_at=now
+            )
+
+    def create_studio_project(self, title: str = "Your story") -> StudioProject:
+        """Create a new Studio project (does not touch media)."""
+        clean = (title or "").strip() or "Your story"
+        if len(clean) > 120:
+            clean = clean[:120]
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """INSERT INTO studio_projects(title, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                (clean, now, now),
+            )
+            pid = cur.lastrowid
+            assert pid is not None
+            return StudioProject(
+                id=int(pid), title=clean, created_at=now, updated_at=now
+            )
+
+    def get_studio_project(self, project_id: int) -> StudioProject | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, title, created_at, updated_at
+                   FROM studio_projects WHERE id = ?""",
+                (project_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return StudioProject(
+            id=int(row["id"]),
+            title=str(row["title"]),
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
+        )
+
+    def list_studio_projects(self) -> list[StudioProject]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT id, title, created_at, updated_at
+                   FROM studio_projects ORDER BY id ASC"""
+            ).fetchall()
+        return [
+            StudioProject(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                created_at=str(r["created_at"]),
+                updated_at=str(r["updated_at"]),
+            )
+            for r in rows
+        ]
+
+    def set_studio_project_title(self, project_id: int, title: str) -> StudioProject:
+        """Persist an editable project title. Never renames source media."""
+        clean = (title or "").strip()
+        if not clean:
+            raise ValueError("title must not be empty")
+        if len(clean) > 120:
+            clean = clean[:120]
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """UPDATE studio_projects
+                   SET title = ?, updated_at = ?
+                   WHERE id = ?""",
+                (clean, now, project_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("studio project not found")
+        project = self.get_studio_project(project_id)
+        assert project is not None
+        return project
+
+    def delete_studio_project(self, project_id: int) -> bool:
+        """Delete a project and its clips. Never deletes media assets or files."""
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM studio_projects WHERE id = ?",
+                (project_id,),
+            )
+            return cur.rowcount > 0
+
     def add_studio_item(
         self,
         media_path: str,
@@ -1088,34 +1448,59 @@ class Database:
         filename: str,
         recorded_at: str | None,
         kind: str,
+        project_id: int | None = None,
+        source_media_id: int | None = None,
     ) -> tuple[int, bool]:
-        """Add media to Studio. Returns ``(studio_item_id, created)``.
+        """Add a clip to a Studio project. Returns ``(clip_id, created)``.
 
-        Idempotent on ``media_path``: existing membership returns ``created=False``.
-        ``kind`` is snapshotted for unavailable / estimate use after rescan.
+        Idempotent on ``media_path`` within the project: existing membership
+        returns ``created=False``. Multiple clips of the same media are still
+        possible via Cut. Source files are never copied or modified.
         """
         kind_snapshot = kind if kind in {"photo", "video"} else "photo"
         now = datetime.now().isoformat(timespec="seconds")
+        project = (
+            self.get_studio_project(project_id)
+            if project_id is not None
+            else self.ensure_default_studio_project()
+        )
+        if project is None:
+            raise ValueError("studio project not found")
+        pid = project.id
         with self.connect() as conn:
             existing = conn.execute(
-                "SELECT id FROM studio_items WHERE media_path = ?",
-                (media_path,),
+                """SELECT id FROM studio_clips
+                   WHERE project_id = ? AND media_path = ?
+                   ORDER BY id ASC LIMIT 1""",
+                (pid, media_path),
             ).fetchone()
             if existing:
                 return int(existing["id"]), False
+            if source_media_id is None:
+                media_row = conn.execute(
+                    "SELECT id FROM media WHERE path = ?",
+                    (media_path,),
+                ).fetchone()
+                if media_row is not None:
+                    source_media_id = int(media_row["id"])
             pos_row = conn.execute(
-                "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM studio_items"
+                """SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+                   FROM studio_clips WHERE project_id = ?""",
+                (pid,),
             ).fetchone()
             position = int(pos_row["next_pos"])
             cur = conn.execute(
-                """INSERT INTO studio_items(
-                     media_path, identity_key, position,
+                """INSERT INTO studio_clips(
+                     project_id, media_path, identity_key, source_media_id, position,
                      filename_snapshot, recorded_at_snapshot, kind_snapshot,
-                     photo_duration_s, added_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?)""",
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, effect_settings, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 1.0, 1.0, NULL, '{}', ?)""",
                 (
+                    pid,
                     media_path,
                     identity_key,
+                    source_media_id,
                     position,
                     filename,
                     recorded_at,
@@ -1123,27 +1508,43 @@ class Database:
                     now,
                 ),
             )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, pid),
+            )
             item_id = cur.lastrowid
             assert item_id is not None
             return int(item_id), True
 
     def remove_studio_item(self, studio_item_id: int) -> bool:
+        """Remove one Studio clip. Never deletes media assets."""
         with self.connect() as conn:
             cur = conn.execute(
-                "DELETE FROM studio_items WHERE id = ?",
+                "DELETE FROM studio_clips WHERE id = ?",
                 (studio_item_id,),
             )
             return cur.rowcount > 0
 
-    def clear_studio(self) -> int:
+    def clear_studio(self, project_id: int | None = None) -> int:
+        """Remove all clips from a project (default project if omitted)."""
+        project = (
+            self.get_studio_project(project_id)
+            if project_id is not None
+            else self.ensure_default_studio_project()
+        )
+        if project is None:
+            return 0
         with self.connect() as conn:
-            cur = conn.execute("DELETE FROM studio_items")
+            cur = conn.execute(
+                "DELETE FROM studio_clips WHERE project_id = ?",
+                (project.id,),
+            )
             return int(cur.rowcount)
 
     def is_in_studio(self, media_path: str) -> bool:
         with self.connect() as conn:
             row = conn.execute(
-                "SELECT 1 FROM studio_items WHERE media_path = ?",
+                "SELECT 1 FROM studio_clips WHERE media_path = ?",
                 (media_path,),
             ).fetchone()
         return row is not None
@@ -1154,27 +1555,41 @@ class Database:
         placeholders = ",".join("?" for _ in paths)
         with self.connect() as conn:
             rows = conn.execute(
-                f"SELECT media_path FROM studio_items WHERE media_path IN ({placeholders})",
+                f"SELECT media_path FROM studio_clips WHERE media_path IN ({placeholders})",
                 paths,
             ).fetchall()
         return {str(r["media_path"]) for r in rows}
 
-    def list_studio_items(self) -> list[StudioItem]:
+    def list_studio_items(
+        self, project_id: int | None = None
+    ) -> list[StudioClip]:
         from orga_drone.studio_estimate import effective_kind
 
+        project = (
+            self.get_studio_project(project_id)
+            if project_id is not None
+            else self.ensure_default_studio_project()
+        )
+        if project is None:
+            return []
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT s.id, s.media_path, s.identity_key, s.position,
+                """SELECT s.id, s.project_id, s.media_path, s.identity_key, s.position,
                           s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
                           s.kind_snapshot, s.photo_duration_s,
+                          s.source_start, s.source_end,
+                          s.playback_speed, s.volume, s.transition, s.effect_settings,
+                          s.source_media_id AS stored_media_id,
                           m.id AS media_id, m.filename AS live_filename,
                           m.recorded_at AS live_recorded_at, m.kind AS live_kind,
                           m.duration_s AS live_duration_s
-                   FROM studio_items s
+                   FROM studio_clips s
                    LEFT JOIN media m ON m.path = s.media_path
-                   ORDER BY s.position ASC, s.id ASC"""
+                   WHERE s.project_id = ?
+                   ORDER BY s.position ASC, s.id ASC""",
+                (project.id,),
             ).fetchall()
-        out: list[StudioItem] = []
+        out: list[StudioClip] = []
         for r in rows:
             available = r["media_id"] is not None
             live_kind = (
@@ -1187,9 +1602,18 @@ class Database:
                 kind_snapshot=kind_snapshot,
             )
             photo_raw = r["photo_duration_s"]
+            start_raw = r["source_start"]
+            end_raw = r["source_end"]
+            live_id = int(r["media_id"]) if r["media_id"] is not None else None
+            stored_id = (
+                int(r["stored_media_id"])
+                if r["stored_media_id"] is not None
+                else None
+            )
             out.append(
-                StudioItem(
+                StudioClip(
                     id=int(r["id"]),
+                    project_id=int(r["project_id"]),
                     media_path=str(r["media_path"]),
                     identity_key=str(r["identity_key"]),
                     position=int(r["position"]),
@@ -1201,7 +1625,7 @@ class Database:
                     ),
                     added_at=str(r["added_at"]),
                     available=available,
-                    media_id=int(r["media_id"]) if r["media_id"] is not None else None,
+                    source_media_id=live_id if live_id is not None else stored_id,
                     filename=(
                         str(r["live_filename"])
                         if available and r["live_filename"]
@@ -1218,34 +1642,60 @@ class Database:
                         if available and r["live_duration_s"] is not None
                         else None
                     ),
+                    source_start=(
+                        float(start_raw) if start_raw is not None else None
+                    ),
+                    source_end=float(end_raw) if end_raw is not None else None,
+                    playback_speed=float(r["playback_speed"] or 1.0),
+                    volume=float(r["volume"] if r["volume"] is not None else 1.0),
+                    transition=(
+                        str(r["transition"]) if r["transition"] is not None else None
+                    ),
+                    effect_settings=str(r["effect_settings"] or "{}"),
                 )
             )
         return out
 
-    def reorder_studio_items(self, ordered_ids: list[int]) -> list[int]:
-        """Set ``position`` to 1..n for an exact permutation of all Studio IDs.
-
-        Raises ``ValueError`` if ``ordered_ids`` is not an exact permutation.
-        """
+    def reorder_studio_items(
+        self, ordered_ids: list[int], project_id: int | None = None
+    ) -> list[int]:
+        """Set ``position`` to 1..n for an exact permutation of project clip IDs."""
+        project = (
+            self.get_studio_project(project_id)
+            if project_id is not None
+            else self.ensure_default_studio_project()
+        )
+        if project is None:
+            raise ValueError("studio project not found")
         with self.connect() as conn:
             existing = {
                 int(r["id"])
-                for r in conn.execute("SELECT id FROM studio_items").fetchall()
+                for r in conn.execute(
+                    "SELECT id FROM studio_clips WHERE project_id = ?",
+                    (project.id,),
+                ).fetchall()
             }
             if len(ordered_ids) != len(existing) or set(ordered_ids) != existing:
-                raise ValueError("ordered_ids must be an exact permutation of studio items")
+                raise ValueError(
+                    "ordered_ids must be an exact permutation of studio clips"
+                )
             for position, item_id in enumerate(ordered_ids, start=1):
                 conn.execute(
-                    "UPDATE studio_items SET position = ? WHERE id = ?",
-                    (position, item_id),
+                    "UPDATE studio_clips SET position = ? WHERE id = ? AND project_id = ?",
+                    (position, item_id, project.id),
                 )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project.id),
+            )
         return list(ordered_ids)
 
     def set_studio_photo_duration(
         self,
         studio_item_id: int,
         duration_s: float | None,
-    ) -> StudioItem:
+    ) -> StudioClip:
         """Set or reset custom photo duration. Raises ``ValueError`` on bad input."""
         from orga_drone.studio_estimate import (
             clamp_photo_duration,
@@ -1254,14 +1704,16 @@ class Database:
 
         with self.connect() as conn:
             row = conn.execute(
-                """SELECT s.id, s.kind_snapshot, m.kind AS live_kind, m.id AS media_id
-                   FROM studio_items s
+                """SELECT s.id, s.project_id, s.kind_snapshot,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
                    LEFT JOIN media m ON m.path = s.media_path
                    WHERE s.id = ?""",
                 (studio_item_id,),
             ).fetchone()
             if row is None:
                 raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
             available = row["media_id"] is not None
             live_kind = (
                 str(row["live_kind"]) if available and row["live_kind"] else None
@@ -1278,28 +1730,164 @@ class Database:
             else:
                 value = clamp_photo_duration(float(duration_s))
             conn.execute(
-                "UPDATE studio_items SET photo_duration_s = ? WHERE id = ?",
+                "UPDATE studio_clips SET photo_duration_s = ? WHERE id = ?",
                 (value, studio_item_id),
             )
-        items = {i.id: i for i in self.list_studio_items()}
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
+
+    def cut_studio_video_item(
+        self,
+        studio_item_id: int,
+        local_cut_s: float,
+    ) -> tuple[StudioClip, StudioClip]:
+        """Split a video clip at ``local_cut_s`` within its trimmed range.
+
+        Updates the original row to the left segment and inserts a new clip for
+        the right segment (same source media). Source files are never modified.
+        """
+        from orga_drone.studio_cut import resolve_source_range, split_source_range
+        from orga_drone.studio_estimate import effective_kind
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.media_path, s.identity_key, s.position,
+                          s.filename_snapshot, s.recorded_at_snapshot,
+                          s.kind_snapshot, s.photo_duration_s,
+                          s.source_start, s.source_end, s.added_at,
+                          s.source_media_id, s.playback_speed, s.volume,
+                          s.transition, s.effect_settings,
+                          m.id AS media_id, m.kind AS live_kind,
+                          m.duration_s AS live_duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("only video clips can be cut")
+            if not available:
+                raise ValueError("unavailable clips cannot be cut")
+            media_duration = (
+                float(row["live_duration_s"])
+                if row["live_duration_s"] is not None
+                else None
+            )
+            rang = resolve_source_range(
+                source_in_s=(
+                    float(row["source_start"])
+                    if row["source_start"] is not None
+                    else None
+                ),
+                source_out_s=(
+                    float(row["source_end"])
+                    if row["source_end"] is not None
+                    else None
+                ),
+                media_duration_s=media_duration,
+            )
+            if rang is None:
+                raise ValueError("video duration unknown")
+            try:
+                left, right = split_source_range(rang, float(local_cut_s))
+            except ValueError as exc:
+                raise ValueError(str(exc)) from exc
+
+            position = int(row["position"])
+            project_id = int(row["project_id"])
+            conn.execute(
+                """UPDATE studio_clips
+                   SET position = position + 1
+                   WHERE project_id = ? AND position > ?""",
+                (project_id, position),
+            )
+            conn.execute(
+                """UPDATE studio_clips
+                   SET source_start = ?, source_end = ?
+                   WHERE id = ?""",
+                (left.source_in_s, left.source_out_s, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            source_media_id = (
+                int(row["media_id"])
+                if row["media_id"] is not None
+                else (
+                    int(row["source_media_id"])
+                    if row["source_media_id"] is not None
+                    else None
+                )
+            )
+            cur = conn.execute(
+                """INSERT INTO studio_clips(
+                     project_id, media_path, identity_key, source_media_id, position,
+                     filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, effect_settings, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    project_id,
+                    str(row["media_path"]),
+                    str(row["identity_key"]),
+                    source_media_id,
+                    position + 1,
+                    str(row["filename_snapshot"]),
+                    row["recorded_at_snapshot"],
+                    str(row["kind_snapshot"] or "video"),
+                    right.source_in_s,
+                    right.source_out_s,
+                    float(row["playback_speed"] or 1.0),
+                    float(row["volume"] if row["volume"] is not None else 1.0),
+                    row["transition"],
+                    str(row["effect_settings"] or "{}"),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+            right_id = cur.lastrowid
+            assert right_id is not None
+
+        by_id = {i.id: i for i in self.list_studio_items(project_id)}
+        left_item = by_id.get(studio_item_id)
+        right_item = by_id.get(int(right_id))
+        if left_item is None or right_item is None:
+            raise RuntimeError("cut succeeded but items missing from list")
+        return left_item, right_item
 
     def repath_studio_item(self, old_path: str, new_path: str) -> None:
         if old_path == new_path:
             return
         with self.connect() as conn:
             conflict = conn.execute(
-                "SELECT id FROM studio_items WHERE media_path = ?",
+                "SELECT id FROM studio_clips WHERE media_path = ?",
                 (new_path,),
             ).fetchone()
             if conflict:
                 conn.execute(
-                    "DELETE FROM studio_items WHERE media_path = ?",
+                    "DELETE FROM studio_clips WHERE media_path = ?",
                     (old_path,),
                 )
             else:
                 conn.execute(
-                    "UPDATE studio_items SET media_path = ? WHERE media_path = ?",
+                    "UPDATE studio_clips SET media_path = ? WHERE media_path = ?",
                     (new_path, old_path),
                 )
 
@@ -1314,48 +1902,61 @@ class Database:
         """After rescan/rename: refresh identity; relink orphan only if unambiguous.
 
         Rules:
-        1. Exact ``media_path`` match → update ``identity_key``.
+        1. Exact ``media_path`` match → update ``identity_key`` + ``source_media_id``.
         2. Otherwise consider orphans with the same identity whose path is not
            currently in ``media``.
-        3. Relink only when exactly one such orphan exists (no guessing).
+        3. Relink only when exactly one orphan path group exists (no guessing).
         """
         identity = make_identity_key(filename, size_bytes, recorded_at)
         with self.connect() as conn:
-            by_path = conn.execute(
-                "SELECT id FROM studio_items WHERE media_path = ?",
+            media_row = conn.execute(
+                "SELECT id FROM media WHERE path = ?",
                 (media_path,),
             ).fetchone()
+            live_id = int(media_row["id"]) if media_row is not None else None
+            by_path = conn.execute(
+                "SELECT id FROM studio_clips WHERE media_path = ?",
+                (media_path,),
+            ).fetchall()
             if by_path:
                 conn.execute(
-                    "UPDATE studio_items SET identity_key = ? WHERE id = ?",
-                    (identity, by_path["id"]),
+                    """UPDATE studio_clips
+                       SET identity_key = ?, source_media_id = ?
+                       WHERE media_path = ?""",
+                    (identity, live_id, media_path),
                 )
                 return
             orphans = conn.execute(
-                """SELECT id FROM studio_items
+                """SELECT id, media_path FROM studio_clips
                    WHERE identity_key = ?
                      AND media_path NOT IN (SELECT path FROM media)""",
                 (identity,),
             ).fetchall()
-            if len(orphans) != 1:
+            if not orphans:
+                return
+            orphan_paths = {str(r["media_path"]) for r in orphans}
+            if len(orphan_paths) != 1:
                 return
             conflict = conn.execute(
-                "SELECT id FROM studio_items WHERE media_path = ?",
+                "SELECT id FROM studio_clips WHERE media_path = ?",
                 (media_path,),
             ).fetchone()
             if conflict:
                 return
+            orphan_ids = [int(r["id"]) for r in orphans]
+            placeholders = ",".join("?" for _ in orphan_ids)
             conn.execute(
-                """UPDATE studio_items
-                   SET media_path = ?, identity_key = ?,
+                f"""UPDATE studio_clips
+                   SET media_path = ?, identity_key = ?, source_media_id = ?,
                        filename_snapshot = ?, recorded_at_snapshot = ?
-                   WHERE id = ?""",
+                   WHERE id IN ({placeholders})""",
                 (
                     media_path,
                     identity,
+                    live_id,
                     filename,
                     recorded_at,
-                    orphans[0]["id"],
+                    *orphan_ids,
                 ),
             )
 

@@ -15,7 +15,8 @@ model.
 
 1. Store Studio membership in a dedicated SQLite table `studio_items`, not as a
    flag on `media_meta` and not in a JSON file.
-2. Use `media_path` (resolved absolute path) as the primary membership key and
+2. Use `media_path` (resolved absolute path) as the membership key (multiple
+   Story rows may share a path after video cut; see ADR 0003) and
    `identity_key` (same hash as `media_meta`: filename + size + recorded_at) for
    controlled relinking after rescans.
 3. Keep snapshot filename / recorded_at on each row for unavailable UI when the
@@ -24,8 +25,10 @@ model.
    - Prefer exact `media_path` match and refresh `identity_key`.
    - If no path match, consider orphans with the same identity whose path is not
      currently in `media`.
-   - Automatically relink only when exactly one orphan candidate exists.
-   - If multiple candidates exist, do not guess; leave entries unavailable.
+   - Automatically relink when exactly one orphan path group exists for that
+     identity (including multiple cut segments that share one former path).
+   - If multiple distinct orphan paths exist for the same identity, do not
+     guess; leave entries unavailable.
 5. Rename repaths Studio rows the same way as `media_meta`.
 6. Favorites and Studio stay independent: Favorites are general bookmarks;
    Studio is an active curation workspace.

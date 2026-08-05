@@ -69,15 +69,26 @@ def effective_seconds(
     photo_duration_s: float | None,
     duration_s: float | None,
     available: bool,
+    source_in_s: float | None = None,
+    source_out_s: float | None = None,
 ) -> float | None:
     if kind == "photo":
         if photo_duration_s is not None:
             return float(photo_duration_s)
         return DEFAULT_PHOTO_DURATION_S
     if kind == "video":
-        if available and duration_s is not None:
-            return float(duration_s)
-        return None
+        if not available:
+            return None
+        from orga_drone.studio_cut import resolve_source_range
+
+        rang = resolve_source_range(
+            source_in_s=source_in_s,
+            source_out_s=source_out_s,
+            media_duration_s=duration_s,
+        )
+        if rang is None:
+            return None
+        return rang.duration_s
     return None
 
 
@@ -91,11 +102,15 @@ def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary
             photo_count += 1
         elif kind == "video":
             video_count += 1
+        source_in = getattr(item, "source_in_s", None)
+        source_out = getattr(item, "source_out_s", None)
         seconds = effective_seconds(
             kind=kind,
             photo_duration_s=item.photo_duration_s,
             duration_s=item.duration_s,
             available=item.available,
+            source_in_s=source_in,
+            source_out_s=source_out,
         )
         if seconds is not None:
             total += seconds

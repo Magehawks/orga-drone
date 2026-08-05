@@ -790,7 +790,8 @@ def create_app() -> FastAPI:
         request: Request,
         msg: str | None = None,
     ) -> HTMLResponse:
-        items = db.list_studio_items()
+        project = db.ensure_default_studio_project()
+        items = db.list_studio_items(project.id)
         summary = summarize_studio_items(items)
         item_display: list[dict[str, Any]] = []
         for it in items:
@@ -799,6 +800,8 @@ def create_app() -> FastAPI:
                 photo_duration_s=it.photo_duration_s,
                 duration_s=it.duration_s,
                 available=it.available,
+                source_in_s=it.source_start,
+                source_out_s=it.source_end,
             )
             stream_url = ""
             proxy_url = ""
@@ -836,7 +839,7 @@ def create_app() -> FastAPI:
                         else (
                             DEFAULT_PHOTO_DURATION_S
                             if it.kind == "photo"
-                            else it.duration_s
+                            else seconds
                         )
                     ),
                     "stream_url": stream_url,
@@ -857,12 +860,80 @@ def create_app() -> FastAPI:
             "studio.html",
             items=items,
             item_display=item_display,
+            project=project,
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             favorite_media=favorite_media,
             flash_msg=msg,
             nav_active="studio",
         )
+
+    @app.patch("/api/studio/projects/{project_id}")
+    async def api_studio_project_update(
+        project_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "title" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include title"
+            )
+        raw_title = payload.get("title")
+        if not isinstance(raw_title, str):
+            raise HTTPException(status_code=400, detail="title must be a string")
+        try:
+            project = db.set_studio_project_title(project_id, raw_title)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": project.id,
+                "title": project.title,
+                "updated_at": project.updated_at,
+            }
+        )
+
+    @app.post("/api/studio/projects")
+    async def api_studio_project_create(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_title = payload.get("title", "Your story")
+        if raw_title is not None and not isinstance(raw_title, str):
+            raise HTTPException(status_code=400, detail="title must be a string")
+        project = db.create_studio_project(
+            raw_title if isinstance(raw_title, str) else "Your story"
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": project.id,
+                "title": project.title,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            },
+            status_code=201,
+        )
+
+    @app.delete("/api/studio/projects/{project_id}")
+    async def api_studio_project_delete(project_id: int) -> JSONResponse:
+        """Delete a project and its clips. Never deletes media assets."""
+        deleted = db.delete_studio_project(project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="studio project not found")
+        return JSONResponse({"ok": True, "deleted": True})
 
     @app.post("/api/studio/reorder")
     async def api_studio_reorder(request: Request) -> JSONResponse:
@@ -922,6 +993,8 @@ def create_app() -> FastAPI:
             photo_duration_s=item.photo_duration_s,
             duration_s=item.duration_s,
             available=item.available,
+            source_in_s=item.source_in_s,
+            source_out_s=item.source_out_s,
         )
         return JSONResponse(
             {
@@ -929,6 +1002,66 @@ def create_app() -> FastAPI:
                 "id": item.id,
                 "photo_duration_s": item.photo_duration_s,
                 "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.post("/api/studio/{studio_item_id}/cut")
+    async def api_studio_cut(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "local_s" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include local_s"
+            )
+        raw = payload.get("local_s")
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+            raise HTTPException(status_code=400, detail="local_s must be a number")
+        try:
+            left, right = db.cut_studio_video_item(studio_item_id, float(raw))
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        return JSONResponse(
+            {
+                "ok": True,
+                "left_id": left.id,
+                "right_id": right.id,
+                "left": {
+                    "id": left.id,
+                    "source_in_s": left.source_in_s,
+                    "source_out_s": left.source_out_s,
+                    "effective_duration_s": effective_seconds(
+                        kind=left.kind or "unknown",
+                        photo_duration_s=left.photo_duration_s,
+                        duration_s=left.duration_s,
+                        available=left.available,
+                        source_in_s=left.source_in_s,
+                        source_out_s=left.source_out_s,
+                    ),
+                },
+                "right": {
+                    "id": right.id,
+                    "source_in_s": right.source_in_s,
+                    "source_out_s": right.source_out_s,
+                    "effective_duration_s": effective_seconds(
+                        kind=right.kind or "unknown",
+                        photo_duration_s=right.photo_duration_s,
+                        duration_s=right.duration_s,
+                        available=right.available,
+                        source_in_s=right.source_in_s,
+                        source_out_s=right.source_out_s,
+                    ),
+                },
                 "summary": summary.as_dict(),
             }
         )
@@ -949,6 +1082,7 @@ def create_app() -> FastAPI:
             filename=item.filename,
             recorded_at=item.recorded_at,
             kind=item.kind,
+            source_media_id=item.id,
         )
         base = studio_add_return_url(media_id, return_to)
         msg = "studio_added" if created else "studio_already"

@@ -4,7 +4,8 @@
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(manual order + estimated runtime; synced Story preview playback; no MP4
+(manual order + estimated runtime + simple video Cut + persisted project title;
+synced Story preview playback; no MP4
 export yet).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
@@ -46,7 +47,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate; synced Story preview playback; music/export stubs |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted project title; synced preview; music/export stubs |
 | Share | How do I share? | Local files on disk; Studio MP4 export = target MVP |
 
 ## Available now (implemented)
@@ -58,10 +59,11 @@ The application helps users:
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
 - filter, browse, and detect likely duplicate files (heuristics; no auto-delete)
-- collect selected media in a **Studio** workspace (single list with manual
-  order and estimated runtime; Creator Studio UI with preview/Story track/
-  inspector; Story preview plays photos/videos in sync with the playhead;
-  music and export remain UI stubs only — no render pipeline)
+- collect selected media in a **Studio** workspace (non-destructive
+  `studio_projects` / `studio_clips`; editable persisted title; manual order and
+  estimated runtime; simple video Cut via source start/end; Creator Studio UI
+  with preview/Story track/inspector; Story preview plays photos/videos in sync
+  with the playhead; music/export remain stubs only — no render pipeline)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
