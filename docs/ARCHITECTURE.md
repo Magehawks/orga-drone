@@ -14,6 +14,7 @@ Do not invent layers, services, or plugins that are not present.
 | Media | Streamed from configured library folders (not embedded) |
 | Thumbnails / merge | Pillow / pillow-heif; `imageio-ffmpeg` or system ffmpeg |
 | Maps | Leaflet (vendored) + OpenStreetMap tiles |
+| Studio icons | Lucide SVGs (vendored under `static/vendor/lucide/`, ISC) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
 | Tests | pytest under `tests/` |
 | CI | GitHub Actions: Ruff, MyPy, pytest on pull requests |
@@ -66,6 +67,8 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
+| `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
+| `studio_clips` | Story clips per project (path + identity + optional `source_media_id`; start/end, speed, volume, transition, effect_settings JSON; survives rescan) |
 | `geocode_cache` | Offline place cache |
 
 ## Scan / index pipeline
@@ -73,9 +76,10 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
 1. Recursively find media files under a root
-2. Clear indexed media for that root (**full rescan**; `media_meta` kept)
+2. Clear indexed media for that root (**full rescan**; `media_meta` and
+   `studio_items` kept)
 3. Parse → upsert assets/media
-4. Relink user meta + apply auto-tags
+4. Relink user meta + Studio membership + apply auto-tags
 5. Rebuild flows, then sessions
 6. Mark root scanned
 
@@ -90,12 +94,17 @@ at a time.
 ## UI surfaces
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
-detail, map, duplicates, …). Static assets under `src/orga_drone/static/`.
+detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
+Studio page: Jinja layout + `static/js/studio.js` (project title, reorder/duration/cut APIs;
+synced Story preview via `/stream`/`/proxy`; music/transitions/export remain
+client UI stubs only). Transport/editing controls use vendored Lucide icons
+(`static/vendor/lucide/`; see README there).
 
 Typical user flow:
 
 ```text
 add folder → full scan/parse → SQLite index → browse / map / detail
+                                         → optional Studio curation
                                          → optional rename, merge, export, dupes
 ```
 
@@ -111,7 +120,7 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 1. Stay local-first; do not require cloud accounts.
 2. Do not claim plugins, albums, or incremental scan until implemented.
 3. Prefer small modules in existing package areas over new top-level frameworks.
-4. Preserve `media_meta` across rescans.
+4. Preserve `media_meta` and `studio_items` across rescans.
 5. Path operations must stay confined under library roots.
 6. Record significant architecture choices in `docs/decisions/`.
 

@@ -145,70 +145,80 @@
 {% elif view == 'grid' %}
   <section class="media-grid">
     {% for item in items %}
-    <a class="card" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
-      <div class="thumb">
-        {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
-           (dozens of concurrent Range requests spike CPU/IO under Defender). #}
-        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
-        {% if item.kind == 'video' %}
-        <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
-        {% endif %}
-        <span class="badge">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ item.kind }}{% endif %}</span>
-        {% if item.session_video_count and item.session_video_count > 1 %}
-          <span class="badge session">{{ item.session_video_count }} {{ _('clips') }}</span>
-        {% elif item.clip_count and item.clip_count > 1 %}
-          <span class="badge flow">{{ item.clip_count }} {{ _('parts') }}</span>
-        {% endif %}
-        {% if item.favorite or item.stars %}
-          <span class="badge meta-badge">
-            {% if item.favorite %}♥{% endif %}
-            {% if item.stars %}{% for _ in range(item.stars) %}★{% endfor %}{% endif %}
-          </span>
-        {% endif %}
-      </div>
-      <div class="card-body">
-        <strong class="title">{{ item.filename }}</strong>
-        <div class="meta-line">
-          <span>{{ item.recorded_at or '—' }}</span>
-          <span>
-            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
-              {{ item.session_total_size|filesize }}
-            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
-              {{ item.flow_total_size|filesize }}
-            {% else %}
-              {{ item.size_bytes|filesize }}
-            {% endif %}
-          </span>
+    <article class="card">
+      <a class="card-main" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
+        <div class="thumb">
+          {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
+             (dozens of concurrent Range requests spike CPU/IO under Defender). #}
+          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+          {% if item.kind == 'video' %}
+          <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
+          {% endif %}
+          <span class="badge">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ item.kind }}{% endif %}</span>
+          {% if item.session_video_count and item.session_video_count > 1 %}
+            <span class="badge session">{{ item.session_video_count }} {{ _('clips') }}</span>
+          {% elif item.clip_count and item.clip_count > 1 %}
+            <span class="badge flow">{{ item.clip_count }} {{ _('parts') }}</span>
+          {% endif %}
+          {% if item.favorite or item.stars %}
+            <span class="badge meta-badge">
+              {% if item.favorite %}♥{% endif %}
+              {% if item.stars %}{% for _ in range(item.stars) %}★{% endfor %}{% endif %}
+            </span>
+          {% endif %}
         </div>
-        <div class="meta-line muted">
-          <span>{{ _(item.drone_model) if item.drone_model else '—' }}</span>
-          <span>
-            {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
-              {{ item.session_total_duration|duration }}
-            {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
-              {{ item.flow_total_duration|duration }}
-            {% else %}
-              {{ item.duration_s|duration }}
-            {% endif %}
-          </span>
+        <div class="card-body">
+          <strong class="title">{{ item.filename }}</strong>
+          <div class="meta-line">
+            <span>{{ item.recorded_at or '—' }}</span>
+            <span>
+              {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
+                {{ item.session_total_size|filesize }}
+              {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+                {{ item.flow_total_size|filesize }}
+              {% else %}
+                {{ item.size_bytes|filesize }}
+              {% endif %}
+            </span>
+          </div>
+          <div class="meta-line muted">
+            <span>{{ _(item.drone_model) if item.drone_model else '—' }}</span>
+            <span>
+              {% if item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+                {{ item.session_total_duration|duration }}
+              {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+                {{ item.flow_total_duration|duration }}
+              {% else %}
+                {{ item.duration_s|duration }}
+              {% endif %}
+            </span>
+          </div>
+          {% if item.tags %}
+          <div class="tag-line">
+            {% for tag in item.tags[:4] %}
+              <span class="tag-chip">{{ tag }}</span>
+            {% endfor %}
+            {% if item.tags|length > 4 %}<span class="tag-chip more">+{{ item.tags|length - 4 }}</span>{% endif %}
+          </div>
+          {% elif item.auto_tags %}
+          <div class="tag-line">
+            {% for tag in item.auto_tags[:3] %}
+              <span class="tag-chip auto">{{ tag }}</span>
+            {% endfor %}
+            {% if item.auto_tags|length > 3 %}<span class="tag-chip more auto">+{{ item.auto_tags|length - 3 }}</span>{% endif %}
+          </div>
+          {% endif %}
         </div>
-        {% if item.tags %}
-        <div class="tag-line">
-          {% for tag in item.tags[:4] %}
-            <span class="tag-chip">{{ tag }}</span>
-          {% endfor %}
-          {% if item.tags|length > 4 %}<span class="tag-chip more">+{{ item.tags|length - 4 }}</span>{% endif %}
-        </div>
-        {% elif item.auto_tags %}
-        <div class="tag-line">
-          {% for tag in item.auto_tags[:3] %}
-            <span class="tag-chip auto">{{ tag }}</span>
-          {% endfor %}
-          {% if item.auto_tags|length > 3 %}<span class="tag-chip more auto">+{{ item.auto_tags|length - 3 }}</span>{% endif %}
-        </div>
+      </a>
+      <form method="post" action="/media/{{ item.id }}/studio/add" class="card-studio">
+        <input type="hidden" name="return_to" value="/browse?{{ browse_qs }}">
+        {% if studio_paths is defined and item.path in studio_paths %}
+          <button type="submit" disabled>{{ _('In Studio') }}</button>
+        {% else %}
+          <button type="submit">{{ _('Add to Studio') }}</button>
         {% endif %}
-      </div>
-    </a>
+      </form>
+    </article>
     {% endfor %}
   </section>
   {% if pagination and pagination.total_pages > 1 %}
@@ -252,6 +262,7 @@
           <th>{{ _('GPS') }}</th>
           <th>{{ _('Session') }}</th>
           <th>{{ _('Flow') }}</th>
+          <th></th>
           <th></th>
         </tr>
       </thead>
@@ -330,6 +341,16 @@
             {% endif %}
           </td>
           <td><a href="/media/{{ item.id }}?{{ browse_detail_qs }}">{{ _('Open') }}</a></td>
+          <td>
+            <form method="post" action="/media/{{ item.id }}/studio/add" class="inline-studio">
+              <input type="hidden" name="return_to" value="/browse?{{ browse_qs }}">
+              {% if studio_paths is defined and item.path in studio_paths %}
+                <button type="submit" class="button ghost" disabled>{{ _('In Studio') }}</button>
+              {% else %}
+                <button type="submit" class="button ghost">{{ _('Add to Studio') }}</button>
+              {% endif %}
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

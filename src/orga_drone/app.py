@@ -23,6 +23,11 @@ from orga_drone.dupes import (
     find_duplicate_groups,
     media_row_to_fingerprint,
 )
+from orga_drone.studio_estimate import (
+    DEFAULT_PHOTO_DURATION_S,
+    effective_seconds,
+    summarize_studio_items,
+)
 from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.ffmpeg_bin import ffmpeg_available
 from orga_drone.flight_view import (
@@ -235,6 +240,23 @@ def create_app() -> FastAPI:
         except Exception:
             pass
         return "/"
+
+    def studio_add_return_url(media_id: int, return_to: str | None) -> str:
+        """Allowlist redirect after Add to Studio (no open redirects)."""
+        raw = (return_to or "detail").strip()
+        target = raw.lower()
+        if target == "browse":
+            return "/browse"
+        if target == "studio":
+            return "/studio"
+        if target == "detail":
+            return f"/media/{media_id}"
+        # Internal relative Browse URL with filters (Variant A allowlist extension).
+        if raw.startswith("/") and not raw.startswith("//") and "://" not in raw:
+            parsed = urlparse(raw)
+            if parsed.path in {"/browse", "/media", "/studio"}:
+                return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+        return f"/media/{media_id}"
 
     def map_return_from_request(
         request: Request, media_id: int
@@ -503,6 +525,7 @@ def create_app() -> FastAPI:
             limit=pagination["page_size"],
             offset=pagination["offset"],
         )
+        studio_paths = db.studio_paths_among([it.path for it in items])
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
@@ -526,6 +549,7 @@ def create_app() -> FastAPI:
             request,
             "index.html",
             items=items,
+            studio_paths=studio_paths,
             drones=db.distinct_drones(),
             view=current_view,
             nav_active="browse",
@@ -758,7 +782,326 @@ def create_app() -> FastAPI:
             browse_return_url=browse_return_url,
             browse_from_qs=browse_from_qs,
             return_qs=return_qs,
+            in_studio=db.is_in_studio(item.path),
         )
+
+    @app.get("/studio", response_class=HTMLResponse)
+    async def studio_page(
+        request: Request,
+        msg: str | None = None,
+    ) -> HTMLResponse:
+        project = db.ensure_default_studio_project()
+        items = db.list_studio_items(project.id)
+        summary = summarize_studio_items(items)
+        item_display: list[dict[str, Any]] = []
+        for it in items:
+            seconds = effective_seconds(
+                kind=it.kind or "unknown",
+                photo_duration_s=it.photo_duration_s,
+                duration_s=it.duration_s,
+                available=it.available,
+                source_in_s=it.source_start,
+                source_out_s=it.source_end,
+            )
+            stream_url = ""
+            proxy_url = ""
+            preview_url = ""
+            has_proxy = False
+            can_play = False
+            if it.available and it.media_id is not None:
+                media_row = db.get_media(it.media_id)
+                if media_row is not None:
+                    media_path = resolve_media_file(db, media_row)
+                    can_play = media_path is not None
+                    if media_path is not None:
+                        stream_url = f"/media/{it.media_id}/stream"
+                        kind = it.kind if it.kind in {"photo", "video"} else media_row.kind
+                        if kind == "video":
+                            proxy_path = resolve_proxy_file(db, media_row)
+                            has_proxy = proxy_path is not None
+                            if has_proxy:
+                                proxy_url = f"/media/{it.media_id}/proxy"
+                        elif kind == "photo":
+                            if browser_can_display_photo(media_path):
+                                preview_url = stream_url
+                            else:
+                                preview_url = f"/media/{it.media_id}/preview"
+                            # Always keep a JPEG thumb as last-resort preview source.
+                            if not preview_url:
+                                preview_url = f"/media/{it.media_id}/thumb"
+            item_display.append(
+                {
+                    "item": it,
+                    "effective_duration_s": seconds,
+                    "display_duration_s": (
+                        it.photo_duration_s
+                        if it.kind == "photo" and it.photo_duration_s is not None
+                        else (
+                            DEFAULT_PHOTO_DURATION_S
+                            if it.kind == "photo"
+                            else seconds
+                        )
+                    ),
+                    "stream_url": stream_url,
+                    "proxy_url": proxy_url,
+                    "preview_url": preview_url,
+                    "has_proxy": has_proxy,
+                    "can_play": can_play,
+                }
+            )
+        studio_paths = {it.media_path for it in items}
+        favorite_media = [
+            fav
+            for fav in db.list_media(favorite=True, sort="recorded_at", order="desc", limit=48)
+            if fav.path not in studio_paths
+        ]
+        return render(
+            request,
+            "studio.html",
+            items=items,
+            item_display=item_display,
+            project=project,
+            summary=summary,
+            default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
+            favorite_media=favorite_media,
+            flash_msg=msg,
+            nav_active="studio",
+        )
+
+    @app.patch("/api/studio/projects/{project_id}")
+    async def api_studio_project_update(
+        project_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "title" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include title"
+            )
+        raw_title = payload.get("title")
+        if not isinstance(raw_title, str):
+            raise HTTPException(status_code=400, detail="title must be a string")
+        try:
+            project = db.set_studio_project_title(project_id, raw_title)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": project.id,
+                "title": project.title,
+                "updated_at": project.updated_at,
+            }
+        )
+
+    @app.post("/api/studio/projects")
+    async def api_studio_project_create(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_title = payload.get("title", "Your story")
+        if raw_title is not None and not isinstance(raw_title, str):
+            raise HTTPException(status_code=400, detail="title must be a string")
+        project = db.create_studio_project(
+            raw_title if isinstance(raw_title, str) else "Your story"
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": project.id,
+                "title": project.title,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            },
+            status_code=201,
+        )
+
+    @app.delete("/api/studio/projects/{project_id}")
+    async def api_studio_project_delete(project_id: int) -> JSONResponse:
+        """Delete a project and its clips. Never deletes media assets."""
+        deleted = db.delete_studio_project(project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="studio project not found")
+        return JSONResponse({"ok": True, "deleted": True})
+
+    @app.post("/api/studio/reorder")
+    async def api_studio_reorder(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_ids = payload.get("ordered_ids")
+        if not isinstance(raw_ids, list) or not all(
+            isinstance(x, int) and not isinstance(x, bool) for x in raw_ids
+        ):
+            raise HTTPException(
+                status_code=400, detail="ordered_ids must be a list of integers"
+            )
+        try:
+            ordered = db.reorder_studio_items([int(x) for x in raw_ids])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        return JSONResponse(
+            {"ok": True, "ordered_ids": ordered, "summary": summary.as_dict()}
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/photo-duration")
+    async def api_studio_photo_duration(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "duration_s" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include duration_s"
+            )
+        raw = payload.get("duration_s")
+        if raw is not None and not isinstance(raw, (int, float)):
+            raise HTTPException(
+                status_code=400, detail="duration_s must be a number or null"
+            )
+        duration_s: float | None = None if raw is None else float(raw)
+        try:
+            item = db.set_studio_photo_duration(studio_item_id, duration_s)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        seconds = effective_seconds(
+            kind=item.kind or "unknown",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+            source_in_s=item.source_in_s,
+            source_out_s=item.source_out_s,
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "photo_duration_s": item.photo_duration_s,
+                "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.post("/api/studio/{studio_item_id}/cut")
+    async def api_studio_cut(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "local_s" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include local_s"
+            )
+        raw = payload.get("local_s")
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+            raise HTTPException(status_code=400, detail="local_s must be a number")
+        try:
+            left, right = db.cut_studio_video_item(studio_item_id, float(raw))
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items()
+        summary = summarize_studio_items(items)
+        return JSONResponse(
+            {
+                "ok": True,
+                "left_id": left.id,
+                "right_id": right.id,
+                "left": {
+                    "id": left.id,
+                    "source_in_s": left.source_in_s,
+                    "source_out_s": left.source_out_s,
+                    "effective_duration_s": effective_seconds(
+                        kind=left.kind or "unknown",
+                        photo_duration_s=left.photo_duration_s,
+                        duration_s=left.duration_s,
+                        available=left.available,
+                        source_in_s=left.source_in_s,
+                        source_out_s=left.source_out_s,
+                    ),
+                },
+                "right": {
+                    "id": right.id,
+                    "source_in_s": right.source_in_s,
+                    "source_out_s": right.source_out_s,
+                    "effective_duration_s": effective_seconds(
+                        kind=right.kind or "unknown",
+                        photo_duration_s=right.photo_duration_s,
+                        duration_s=right.duration_s,
+                        available=right.available,
+                        source_in_s=right.source_in_s,
+                        source_out_s=right.source_out_s,
+                    ),
+                },
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.post("/media/{media_id}/studio/add")
+    async def studio_add(
+        media_id: int,
+        return_to: str = Form("detail"),
+    ) -> RedirectResponse:
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        _sid, _created = db.add_studio_item(
+            item.path,
+            identity_key=make_identity_key(
+                item.filename, item.size_bytes, item.recorded_at
+            ),
+            filename=item.filename,
+            recorded_at=item.recorded_at,
+            kind=item.kind,
+            source_media_id=item.id,
+        )
+        base = studio_add_return_url(media_id, return_to)
+        msg = "studio_added"
+        if base == "/browse" or base.startswith("/browse?"):
+            return RedirectResponse(url=base, status_code=303)
+        if base == "/studio" or base.startswith("/studio?"):
+            return RedirectResponse(url=base, status_code=303)
+        sep = "&" if "?" in base else "?"
+        return RedirectResponse(url=f"{base}{sep}msg={msg}", status_code=303)
+
+    @app.post("/studio/{studio_item_id}/remove")
+    async def studio_remove(studio_item_id: int) -> RedirectResponse:
+        db.remove_studio_item(studio_item_id)
+        return RedirectResponse(url="/studio?msg=studio_removed", status_code=303)
+
+    @app.post("/studio/clear")
+    async def studio_clear() -> RedirectResponse:
+        db.clear_studio()
+        return RedirectResponse(url="/studio?msg=studio_cleared", status_code=303)
 
     @app.post("/media/{media_id}/meta")
     async def media_meta_save(

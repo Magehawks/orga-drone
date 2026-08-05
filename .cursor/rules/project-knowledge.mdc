@@ -18,7 +18,11 @@ Before product or architecture claims, prefer these sources over memory:
 
 Rules:
 
-- Distinguish **available now** from **roadmap/vision**.
-- Do not invent plugins, albums, incremental scan, or cloud services absent from the tree.
+- Distinguish **available now** from **roadmap/vision** / Studio MVP (target).
+- Before implementing a feature, verify it supports the user journey in
+  `docs/PRODUCT_VISION.md`; if it does not, challenge the requirement.
+- Do not invent plugins, albums, incremental scan, Studio MP4 export /
+  music-in-export, or cloud services absent from the tree.
 - Prefer small, reviewable changes; update tests and docs when behavior changes.
 - Keep `AGENTS.md` and `docs/PRODUCT_VISION.md` aligned when product truth changes.
+- Do not label rule-based features as AI.

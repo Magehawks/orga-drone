@@ -21,6 +21,7 @@
       <a href="{{ browse_return_url or '/browse' }}" class="nav-link {% if request.url.path.startswith('/browse') or request.url.path == '/media' or nav_active == 'browse' %}active{% endif %}">{{ _('Browse') }}</a>
       <a href="/map" class="nav-link {% if request.url.path.startswith('/map') or nav_active == 'map' %}active{% endif %}">{{ _('World map') }}</a>
       <a href="/library" class="nav-link {% if request.url.path.startswith('/library') %}active{% endif %}">{{ _('Library') }}</a>
+      <a href="/studio" class="nav-link {% if request.url.path.startswith('/studio') or nav_active == 'studio' %}active{% endif %}">{{ _('Studio') }}</a>
       <a href="/duplicates" class="nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">{{ _('Duplicates') }}</a>
     </nav>
     <div class="top-controls">
@@ -74,9 +75,9 @@
       <span class="bottom-nav-icon" aria-hidden="true">▤</span>
       <span>{{ _('Library') }}</span>
     </a>
-    <a href="/duplicates" class="bottom-nav-link {% if request.url.path.startswith('/duplicates') %}active{% endif %}">
-      <span class="bottom-nav-icon" aria-hidden="true">⧉</span>
-      <span>{{ _('Duplicates') }}</span>
+    <a href="/studio" class="bottom-nav-link {% if request.url.path.startswith('/studio') or nav_active == 'studio' %}active{% endif %}">
+      <span class="bottom-nav-icon" aria-hidden="true">✦</span>
+      <span>{{ _('Studio') }}</span>
     </a>
   </nav>
 

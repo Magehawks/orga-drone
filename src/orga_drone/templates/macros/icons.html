@@ -1,0 +1,6 @@
+﻿{# Lucide icon helper — page must include partials/lucide_sprite.html once. #}
+{% macro lucide(name, class_name='studio-icon') -%}
+<svg class="{{ class_name }}" aria-hidden="true" focusable="false" width="20" height="20">
+  <use href="#lucide-{{ name }}"></use>
+</svg>
+{%- endmacro %}

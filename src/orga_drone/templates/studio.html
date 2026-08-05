@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import lucide %}
+{% block title %}{{ _('Studio') }} · {{ _('orga-drone') }}{% endblock %}
+{% block head %}
+<style>body.studio-app main { padding: 0; } body.studio-app footer { display: none; }</style>
+<script>document.documentElement.classList.add("studio-boot");</script>
+{% endblock %}
+{% block content %}
+{#
+  Creator Studio UI foundation (GitHub #14).
+  Persistence: studio_projects + studio_clips (non-destructive refs to media).
+  Order, photo duration, video source start/end (cut), editable project title.
+  Icons: Lucide (vendored) — see static/vendor/lucide/README.md
+#}
+<script>document.body.classList.add("studio-app");</script>
+{# Inline Lucide sprite so <use href="#…"> works offline in WebView2. #}
+{% include "partials/lucide_sprite.html" %}
+
+<section class="studio-creator"
+         id="studio-root"
+         data-project-id="{{ project.id }}"
+         data-default-photo-duration="{{ default_photo_duration_s }}"
+         data-total-s="{{ summary.estimated_total_s }}"
+         data-total-label="{{ summary.estimated_total_label }}"
+         data-reorder-failed="{{ _('Could not save Studio order.')|e }}"
+         data-duration-failed="{{ _('Could not save photo duration.')|e }}"
+         data-cut-failed="{{ _('Could not cut clip.')|e }}"
+         data-title-failed="{{ _('Could not save project title.')|e }}"
+         data-saved-label="{{ _('Saved')|e }}"
+         data-unsaved-label="{{ _('Unsaved changes')|e }}"
+         data-export-unavailable="{{ _('Export is not available yet. No video is rendered in this build.')|e }}"
+         data-playback-note="{{ _('Preview plays Story media in order. Export and music sync are not available yet.')|e }}"
+         data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
+         data-label-play="{{ _('Play')|e }}"
+         data-label-pause="{{ _('Pause')|e }}"
+         data-transition-none="{{ _('None')|e }}"
+         data-transition-fade="{{ _('Fade')|e }}"
+         data-transition-crossfade="{{ _('Cross fade')|e }}"
+         data-transition-slide="{{ _('Slide')|e }}"
+         data-music-empty="{{ _('No music yet')|e }}"
+         data-kind-photo="{{ _('Photo')|e }}"
+         data-kind-video="{{ _('Video')|e }}"
+         data-kind-unknown="{{ _('Memory')|e }}">
+
+  <header class="studio-topbar">
+    <a class="button ghost studio-back" href="{{ browse_return_url or '/browse' }}">{{ _('Back to Browse') }}</a>
+    <div class="studio-topbar-title">
+      <label class="visually-hidden" for="studio-project-title">{{ _('Project title') }}</label>
+      <input id="studio-project-title" class="studio-project-title" type="text"
+             value="{{ project.title|e }}" maxlength="120"
+             aria-label="{{ _('Project title') }}">
+      <span class="studio-save-state" id="studio-save-state" data-state="saved"
+            title="{{ _('Saved') }}">
+        {{ lucide('save') }}
+        <span class="studio-save-state-text">{{ _('Saved') }}</span>
+      </span>
+    </div>
+    <div class="studio-topbar-actions">
+      {% if items %}
+      <form method="post" action="/studio/clear" class="studio-clear-form"
+            onsubmit="return confirm('{{ _('Remove all media from Studio? This does not delete your files.')|e }}');">
+        <button type="submit" class="button ghost studio-icon-button"
+                title="{{ _('Clear Studio') }}" aria-label="{{ _('Clear Studio') }}">
+          {{ lucide('trash-2') }}
+          <span class="studio-btn-label">{{ _('Clear Studio') }}</span>
+        </button>
+      </form>
+      {% endif %}
+      <button type="button" class="button studio-icon-button" id="studio-export-open"
+              title="{{ _('Export') }}" aria-label="{{ _('Export') }}"
+              {% if not items %}disabled{% endif %}>
+        {{ lucide('download') }}
+        <span class="studio-btn-label">{{ _('Export') }}</span>
+      </button>
+    </div>
+  </header>
+
+  {% if flash_msg == 'studio_removed' %}
+    <div class="flash ok studio-flash-inline" role="status">{{ _('Removed from Studio.') }}</div>
+  {% elif flash_msg == 'studio_cleared' %}
+    <div class="flash ok studio-flash-inline" role="status">{{ _('Studio cleared.') }}</div>
+  {% endif %}
+  <div id="studio-flash" class="flash error studio-flash-inline" role="alert" hidden></div>
+
+  <div class="studio-workspace">
+    <aside class="studio-browser" aria-label="{{ _('Media browser') }}">
+      <div class="studio-browser-tabs" role="tablist">
+        <button type="button" class="studio-browser-tab is-active" role="tab"
+                data-browser-tab="story" aria-selected="true">{{ _('Story') }}</button>
+        <button type="button" class="studio-browser-tab" role="tab"
+                data-browser-tab="favorites" aria-selected="false">{{ _('Favorites') }}</button>
+      </div>
+
+      <div class="studio-browser-panel is-active" data-browser-panel="story" role="tabpanel">
+        {% if items %}
+        <ul class="studio-browser-list" id="studio-browser-story">
+          {% for row in item_display %}
+          {% set item = row.item %}
+          <li class="studio-browser-item {% if not item.available %}is-unavailable{% endif %}"
+              data-studio-id="{{ item.id }}"
+              draggable="{{ 'true' if item.available else 'false' }}">
+            {% if item.available and item.media_id %}
+            <button type="button" class="studio-browser-pick"
+                    data-select-clip="{{ item.id }}">
+              <span class="studio-browser-thumb">
+                <img src="/media/{{ item.media_id }}/thumb" alt="" loading="lazy" decoding="async">
+                {% if item.kind == 'video' %}<span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>{% endif %}
+              </span>
+              <span class="studio-browser-meta">
+                <strong>{{ item.filename }}</strong>
+                <span>{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ _('Memory') }}{% endif %}</span>
+              </span>
+            </button>
+            {% else %}
+            <div class="studio-browser-pick is-static">
+              <span class="studio-browser-thumb thumb-placeholder" aria-hidden="true"></span>
+              <span class="studio-browser-meta">
+                <strong>{{ item.filename }}</strong>
+                <span class="badge unavailable">{{ _('Unavailable') }}</span>
+              </span>
+            </div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="studio-browser-empty">{{ _('No media in this story yet.') }}</p>
+        {% endif %}
+      </div>
+
+      <div class="studio-browser-panel" data-browser-panel="favorites" role="tabpanel" hidden>
+        {% if favorite_media %}
+        <ul class="studio-browser-list">
+          {% for fav in favorite_media %}
+          <li class="studio-browser-item">
+            <div class="studio-browser-pick is-static">
+              <span class="studio-browser-thumb">
+                <img src="/media/{{ fav.id }}/thumb" alt="" loading="lazy" decoding="async">
+                {% if fav.kind == 'video' %}<span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>{% endif %}
+              </span>
+              <span class="studio-browser-meta">
+                <strong>{{ fav.filename }}</strong>
+                <span>{% if fav.kind == 'video' %}{{ _('Video') }}{% else %}{{ _('Photo') }}{% endif %}</span>
+              </span>
+            </div>
+            <form method="post" action="/media/{{ fav.id }}/studio/add" class="studio-browser-add">
+              <input type="hidden" name="return_to" value="/studio">
+              <button type="submit" class="button ghost studio-icon-button"
+                      title="{{ _('Add') }}" aria-label="{{ _('Add') }}">
+                {{ lucide('plus') }}
+                <span class="studio-btn-label">{{ _('Add') }}</span>
+              </button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="studio-browser-empty">{{ _('No favorites available to add.') }}</p>
+        {% endif %}
+      </div>
+
+      <a class="button ghost studio-add-media studio-icon-button" href="{{ browse_return_url or '/browse' }}">
+        {{ lucide('plus') }}
+        <span class="studio-btn-label">{{ _('Add media from Browse') }}</span>
+      </a>
+    </aside>
+
+    <div class="studio-stage">
+      <div class="studio-preview" id="studio-preview">
+        {% if items %}
+        <div class="studio-preview-frame" id="studio-preview-frame">
+          <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
+          <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
+          <div id="studio-preview-placeholder" class="studio-preview-placeholder">
+            <p>{{ _('Select a clip in the Story track.') }}</p>
+            <p class="hint">{{ _('Preview plays Story media in order. Export and music sync are not available yet.') }}</p>
+          </div>
+        </div>
+        {% else %}
+        <div class="studio-preview-empty panel empty">
+          <h2>{{ _('Your story is empty') }}</h2>
+          <p>{{ _('Add photos or videos from Browse, then arrange them in the Story track.') }}</p>
+          <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="studio-transport" role="group" aria-label="{{ _('Playback controls') }}">
+        <button type="button" class="studio-transport-btn" data-transport="start"
+                title="{{ _('Jump to start') }}" aria-label="{{ _('Jump to start') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('chevrons-left') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="prev"
+                title="{{ _('Previous clip') }}" aria-label="{{ _('Previous clip') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('skip-back') }}</button>
+        <button type="button" class="studio-transport-btn studio-transport-play" data-transport="toggle"
+                title="{{ _('Play / pause') }}" aria-label="{{ _('Play') }}"
+                {% if not items %}disabled{% endif %}>
+          <span class="studio-transport-icon is-play" data-play-icon>{{ lucide('play') }}</span>
+          <span class="studio-transport-icon is-pause" data-pause-icon hidden>{{ lucide('pause') }}</span>
+        </button>
+        <button type="button" class="studio-transport-btn" data-transport="next"
+                title="{{ _('Next clip') }}" aria-label="{{ _('Next clip') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('skip-forward') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="end"
+                title="{{ _('Jump to end') }}" aria-label="{{ _('Jump to end') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('chevrons-right') }}</button>
+        <button type="button" class="studio-transport-btn" data-transport="cut" disabled
+                title="{{ _('Cut clip') }}"
+                aria-label="{{ _('Cut clip') }}">{{ lucide('scissors') }}</button>
+        <span class="studio-transport-time" id="studio-transport-time" aria-live="polite">00:00:00 / {{ summary.estimated_total_label }}</span>
+        <label class="studio-transport-volume">
+          <span class="studio-transport-volume-icon" aria-hidden="true">{{ lucide('volume-2') }}</span>
+          <span class="visually-hidden">{{ _('Volume') }}</span>
+          <input type="range" id="studio-volume" min="0" max="100" value="80"
+                 aria-label="{{ _('Volume') }}" {% if not items %}disabled{% endif %}>
+        </label>
+        <button type="button" class="studio-transport-btn" data-transport="fullscreen"
+                title="{{ _('Fullscreen') }}" aria-label="{{ _('Fullscreen') }}"
+                {% if not items %}disabled{% endif %}>{{ lucide('fullscreen') }}</button>
+      </div>
+
+      <section class="studio-story-area" aria-label="{{ _('Story') }}">
+        <div class="studio-ruler" id="studio-ruler" aria-hidden="true"></div>
+        <div class="studio-tracks" id="studio-tracks">
+          <div class="studio-playhead" id="studio-playhead" role="slider"
+               aria-label="{{ _('Playhead') }}"
+               aria-valuemin="0"
+               aria-valuemax="{{ '%.1f'|format(summary.estimated_total_s) }}"
+               aria-valuenow="0"
+               tabindex="0"></div>
+
+          <div class="studio-track studio-track-story">
+            <div class="studio-track-label">{{ _('Story') }}</div>
+            <ol class="studio-story-track" id="studio-grid"
+                {% if not items %}data-empty="1"{% endif %}>
+              {% if items %}
+              {% for row in item_display %}
+              {% set item = row.item %}
+              {% if not loop.first %}
+              <li class="studio-transition"
+                  data-transition-after="{{ item_display[loop.index0 - 1].item.id }}"
+                  data-transition-before="{{ item.id }}"
+                  data-transition-type="none"
+                  tabindex="0"
+                  role="button"
+                  aria-label="{{ _('Transition') }}">
+                <span class="studio-transition-chip" data-transition-label>{{ _('None') }}</span>
+              </li>
+              {% endif %}
+              <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
+                  data-studio-id="{{ item.id }}"
+                  data-kind="{{ item.kind or 'unknown' }}"
+                  data-available="{{ '1' if item.available else '0' }}"
+                  data-media-id="{{ item.media_id or '' }}"
+                  data-filename="{{ item.filename|e }}"
+                  data-recorded-at="{{ (item.recorded_at or '')|e }}"
+                  data-photo-duration="{{ item.photo_duration_s if item.photo_duration_s is not none else '' }}"
+                  data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+                  data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
+                  data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
+                  data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
+                  data-thumb="{% if item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
+                  data-stream-url="{{ row.stream_url }}"
+                  data-proxy-url="{{ row.proxy_url }}"
+                  data-preview-url="{{ row.preview_url }}"
+                  data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
+                  data-can-play="{{ '1' if row.can_play else '0' }}"
+                  style="--clip-flex: {{ '%.4f'|format(row.effective_duration_s) if row.effective_duration_s is not none else 0 }};">
+                <button type="button" class="studio-drag-handle" draggable="true"
+                        aria-label="{{ _('Drag to reorder') }}" title="{{ _('Drag to reorder') }}">
+                  <span aria-hidden="true">≡</span>
+                </button>
+                <button type="button" class="studio-clip-body" data-select-clip="{{ item.id }}">
+                  <span class="studio-clip-thumb">
+                    {% if item.available and item.media_id %}
+                    <img src="/media/{{ item.media_id }}/thumb" alt="" loading="lazy" decoding="async">
+                    {% else %}
+                    <span class="thumb-placeholder" aria-hidden="true"></span>
+                    {% endif %}
+                  </span>
+                  <span class="studio-clip-caption">
+                    <strong>{{ item.filename }}</strong>
+                    <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ _('Memory') }}{% endif %}</span>
+                    <span class="studio-clip-duration" data-clip-duration>
+                      {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% else %}—{% endif %}
+                    </span>
+                  </span>
+                </button>
+                <span class="studio-clip-resize studio-clip-resize-start" aria-hidden="true" title="{{ _('Duration editing later') }}"></span>
+                <span class="studio-clip-resize studio-clip-resize-end" aria-hidden="true" title="{{ _('Duration editing later') }}"></span>
+              </li>
+              {% endfor %}
+              {% else %}
+              <li class="studio-story-empty-track">{{ _('Drop or add media to build your story.') }}</li>
+              {% endif %}
+            </ol>
+          </div>
+
+          <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
+            <div class="studio-track-label">{{ _('Music') }}</div>
+            <div class="studio-music-body" id="studio-music-body">
+              <div class="studio-music-empty" id="studio-music-empty">
+                <label class="button ghost studio-music-add studio-icon-button">
+                  {{ lucide('plus') }}
+                  <span class="studio-btn-label">{{ _('Add music') }}</span>
+                  <input type="file" id="studio-music-file" accept="audio/*" hidden>
+                </label>
+                <p class="hint">{{ _('One music track only. File stays on this computer; not used for export yet.') }}</p>
+              </div>
+              <div class="studio-music-clip" id="studio-music-clip" hidden>
+                <button type="button" class="studio-music-select" id="studio-music-select">
+                  <strong id="studio-music-name"></strong>
+                  <span class="studio-music-wave" aria-hidden="true"></span>
+                  <span class="studio-music-fade studio-music-fade-in" aria-hidden="true"></span>
+                  <span class="studio-music-fade studio-music-fade-out" aria-hidden="true"></span>
+                  <span class="studio-music-handle studio-music-handle-start" aria-hidden="true"></span>
+                  <span class="studio-music-handle studio-music-handle-end" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="button ghost studio-icon-button" id="studio-music-remove"
+                        title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
+                  {{ lucide('trash-2') }}
+                  <span class="studio-btn-label">{{ _('Remove') }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="studio-track studio-track-voice is-disabled" aria-disabled="true">
+            <div class="studio-track-label">{{ _('Voice') }}</div>
+            <div class="studio-voice-placeholder">
+              <span>{{ _('Voice-over — coming later') }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="studio-inspector" id="studio-inspector" aria-label="{{ _('Inspector') }}">
+      <h2 class="studio-inspector-title">{{ _('Inspector') }}</h2>
+      <div class="studio-inspector-empty" id="inspector-empty">
+        <p>{{ _('Select a clip, transition, or music to edit its properties.') }}</p>
+      </div>
+
+      <div class="studio-inspector-panel" id="inspector-clip" hidden>
+        <p class="studio-inspector-kind"><span data-field="kind"></span></p>
+        <p><strong data-field="filename"></strong></p>
+        <p class="meta-line" data-field="recorded"></p>
+        <p class="meta-line" data-field="duration-line"></p>
+        <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
+          <span>{{ _('Duration (s)') }}</span>
+          <input type="number" id="inspector-photo-duration" class="studio-photo-duration"
+                 min="0.5" max="60" step="0.1" inputmode="decimal"
+                 aria-label="{{ _('Photo duration in seconds') }}">
+        </label>
+        <button type="button" class="button ghost" id="inspector-photo-reset" hidden>{{ _('Reset') }}</button>
+        <form method="post" id="inspector-remove-form" class="studio-inspector-remove">
+          <button type="submit" class="button ghost studio-icon-button"
+                  title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
+            {{ lucide('trash-2') }}
+            <span class="studio-btn-label">{{ _('Remove from story') }}</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="studio-inspector-panel" id="inspector-transition" hidden>
+        <label class="studio-inspector-field">
+          <span>{{ _('Transition') }}</span>
+          <select id="inspector-transition-type">
+            <option value="none">{{ _('None') }}</option>
+            <option value="fade">{{ _('Fade') }}</option>
+            <option value="crossfade">{{ _('Cross fade') }}</option>
+            <option value="slide">{{ _('Slide') }}</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Transition duration') }}</span>
+          <input type="number" id="inspector-transition-duration" min="0.1" max="5" step="0.1" value="0.5" disabled>
+          <span class="hint">{{ _('Placeholder — transitions are not rendered yet.') }}</span>
+        </label>
+      </div>
+
+      <div class="studio-inspector-panel" id="inspector-music" hidden>
+        <p><strong data-field="music-name"></strong></p>
+        <label class="studio-inspector-field">
+          <span>{{ _('Volume') }}</span>
+          <input type="range" id="inspector-music-volume" min="0" max="100" value="80">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Fade in (s)') }}</span>
+          <input type="number" id="inspector-music-fade-in" min="0" max="10" step="0.1" value="0">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Fade out (s)') }}</span>
+          <input type="number" id="inspector-music-fade-out" min="0" max="10" step="0.1" value="0">
+        </label>
+        <button type="button" class="button ghost studio-icon-button" id="inspector-music-remove"
+                title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
+          {{ lucide('trash-2') }}
+          <span class="studio-btn-label">{{ _('Remove') }}</span>
+        </button>
+        <p class="hint">{{ _('Music settings are local UI state only and are not exported yet.') }}</p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<dialog class="studio-export-dialog" id="studio-export-dialog">
+  <form method="dialog" class="studio-export-form">
+    <h2>{{ _('Export memory') }}</h2>
+    <p>{{ _('Export is not available yet. No video is rendered in this build.') }}</p>
+    <p class="hint">{{ _('Order and estimated duration are saved in Studio. A local MP4 export will connect here later.') }}</p>
+    <div class="studio-export-actions">
+      <button type="submit" class="button" value="cancel">{{ _('Close') }}</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/studio.js" defer></script>
+{% endblock %}
