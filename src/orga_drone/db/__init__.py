@@ -411,58 +411,47 @@ class Database:
                 updated_at TEXT NOT NULL
             )"""
         )
-        # Keep creating legacy studio_items for DBs mid-upgrade; migrated below.
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS studio_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                media_path TEXT NOT NULL,
-                identity_key TEXT NOT NULL,
-                position INTEGER NOT NULL,
-                filename_snapshot TEXT NOT NULL,
-                recorded_at_snapshot TEXT,
-                kind_snapshot TEXT NOT NULL DEFAULT 'photo',
-                photo_duration_s REAL,
-                source_in_s REAL,
-                source_out_s REAL,
-                added_at TEXT NOT NULL
-            )"""
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_studio_items_identity ON studio_items(identity_key)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_studio_items_position ON studio_items(position)"
-        )
-        studio_cols = {
-            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
-        }
-        if studio_cols and "kind_snapshot" not in studio_cols:
-            conn.execute("ALTER TABLE studio_items ADD COLUMN kind_snapshot TEXT")
-            conn.execute(
-                """UPDATE studio_items
-                   SET kind_snapshot = (
-                     SELECT m.kind FROM media m WHERE m.path = studio_items.media_path
-                   )
-                   WHERE kind_snapshot IS NULL"""
-            )
-            conn.execute(
-                """UPDATE studio_items
-                   SET kind_snapshot = 'photo'
-                   WHERE kind_snapshot IS NULL"""
-            )
-        studio_cols = {
-            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
-        }
-        if studio_cols and "photo_duration_s" not in studio_cols:
-            conn.execute("ALTER TABLE studio_items ADD COLUMN photo_duration_s REAL")
-        studio_cols = {
-            row[1] for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
-        }
-        if studio_cols and "source_in_s" not in studio_cols:
-            conn.execute("ALTER TABLE studio_items ADD COLUMN source_in_s REAL")
-        if studio_cols and "source_out_s" not in studio_cols:
-            conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
-        Database._migrate_studio_items_drop_unique_media_path(conn)
+        # Only touch legacy studio_items when upgrading an older DB that still
+        # has that table. Do not recreate it on every startup.
+        legacy_items = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
+        ).fetchone()
+        if legacy_items:
+            studio_cols = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+            }
+            if studio_cols and "kind_snapshot" not in studio_cols:
+                conn.execute("ALTER TABLE studio_items ADD COLUMN kind_snapshot TEXT")
+                conn.execute(
+                    """UPDATE studio_items
+                       SET kind_snapshot = (
+                         SELECT m.kind FROM media m WHERE m.path = studio_items.media_path
+                       )
+                       WHERE kind_snapshot IS NULL"""
+                )
+                conn.execute(
+                    """UPDATE studio_items
+                       SET kind_snapshot = 'photo'
+                       WHERE kind_snapshot IS NULL"""
+                )
+            studio_cols = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+            }
+            if studio_cols and "photo_duration_s" not in studio_cols:
+                conn.execute(
+                    "ALTER TABLE studio_items ADD COLUMN photo_duration_s REAL"
+                )
+            studio_cols = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(studio_items)").fetchall()
+            }
+            if studio_cols and "source_in_s" not in studio_cols:
+                conn.execute("ALTER TABLE studio_items ADD COLUMN source_in_s REAL")
+            if studio_cols and "source_out_s" not in studio_cols:
+                conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
+            Database._migrate_studio_items_drop_unique_media_path(conn)
         Database._migrate_studio_projects_and_clips(conn)
 
     @staticmethod

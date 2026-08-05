@@ -92,6 +92,100 @@ def test_same_media_can_be_referenced_multiple_times(tmp_path: Path) -> None:
     assert db.get_media(mid) is not None
 
 
+def test_studio_migration_idempotent_and_legacy_items(tmp_path: Path) -> None:
+    """Reopening the DB must not recreate legacy tables or duplicate projects."""
+    import sqlite3
+
+    db_path = tmp_path / "legacy.sqlite3"
+    # Simulate a pre-project Studio DB with unique media_path membership.
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE media (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_id INTEGER,
+            primary_asset_id INTEGER,
+            kind TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            path TEXT NOT NULL UNIQUE,
+            size_bytes INTEGER NOT NULL,
+            duration_s REAL,
+            recorded_at TEXT,
+            sequence INTEGER,
+            mode TEXT,
+            drone_model TEXT,
+            camera_model TEXT,
+            latitude REAL,
+            longitude REAL,
+            abs_alt REAL,
+            has_srt INTEGER NOT NULL DEFAULT 0,
+            has_lrf INTEGER NOT NULL DEFAULT 0,
+            track_json TEXT,
+            flow_id INTEGER,
+            session_id INTEGER,
+            source_type TEXT,
+            auto_tags_json TEXT NOT NULL DEFAULT '[]',
+            place_json TEXT
+        );
+        CREATE TABLE studio_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_path TEXT NOT NULL UNIQUE,
+            identity_key TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            filename_snapshot TEXT NOT NULL,
+            recorded_at_snapshot TEXT,
+            kind_snapshot TEXT NOT NULL DEFAULT 'video',
+            photo_duration_s REAL,
+            source_in_s REAL,
+            source_out_s REAL,
+            added_at TEXT NOT NULL
+        );
+        INSERT INTO media(
+            kind, filename, path, size_bytes, duration_s, recorded_at
+        ) VALUES ('video', 'LEGACY.MP4', '/tmp/LEGACY.MP4', 10, 9.0, '2024-01-01T00:00:00');
+        INSERT INTO studio_items(
+            media_path, identity_key, position, filename_snapshot,
+            kind_snapshot, source_in_s, source_out_s, added_at
+        ) VALUES (
+            '/tmp/LEGACY.MP4', 'abc', 1, 'LEGACY.MP4',
+            'video', 1.0, 8.0, '2024-01-01T00:00:00'
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    db1 = Database(db_path)
+    projects = db1.list_studio_projects()
+    assert len(projects) == 1
+    clips = db1.list_studio_items()
+    assert len(clips) == 1
+    assert clips[0].source_start == pytest.approx(1.0)
+    assert clips[0].source_end == pytest.approx(8.0)
+    assert clips[0].media_path == "/tmp/LEGACY.MP4"
+
+    with db1.connect() as c:
+        gone = c.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
+        ).fetchone()
+        assert gone is None
+
+    db2 = Database(db_path)
+    assert len(db2.list_studio_projects()) == 1
+    assert db2.list_studio_projects()[0].id == projects[0].id
+    assert len(db2.list_studio_items()) == 1
+    with db2.connect() as c:
+        assert (
+            c.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
+            ).fetchone()
+            is None
+        )
+    db3 = Database(db_path)
+    assert len(db3.list_studio_projects()) == 1
+    assert len(db3.list_studio_items()) == 1
+
+
 def test_default_project_created_and_title_persists(tmp_path: Path) -> None:
     db = Database(tmp_path / "t.sqlite3")
     project = db.ensure_default_studio_project()

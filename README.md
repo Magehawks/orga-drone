@@ -45,7 +45,9 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
-- **Studio:** collect media, arrange order, estimate runtime; Creator Studio UI with synced Story preview playback (music and export are UI stubs — no render pipeline yet)
+- **Studio:** collect media, arrange order, estimate runtime; editable project
+  title; simple video Cut (source start/end); Creator Studio UI with synced
+  Story preview (music and export are UI stubs — no render pipeline yet)
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
 - Export a local spot GeoJSON download when GPS is available
 - Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
@@ -80,9 +82,9 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Creator Studio UI with synced Story preview; persisted order + estimated runtime; music/export stubs; single workspace, not multi-project albums |
+| Studio workspace | Available | Creator Studio UI with synced Story preview; persisted project title + order + estimated runtime + video Cut offsets; music/export stubs; one active project (not multi-project albums) |
 | Studio MP4 export / music-in-export | Not available | Studio MVP target — see `docs/PRODUCT_VISION.md` |
-| Projects / albums | Not available | Possible future work (Studio is a first slice) |
+| Projects / albums | Not available | Multi-project albums UI remains future work; Studio already has one persisted project with editable title |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
@@ -284,7 +286,9 @@ Known limitations:
 
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
-- No multi-project albums (Studio is a single curation workspace), no plugin API, no content-hash duplicate detection
+- No multi-project albums UI (Studio uses one persisted project with editable
+  title and non-destructive clips), no plugin API, no content-hash duplicate
+  detection
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
 - Telemetry **burn-in** into exported video is not included
