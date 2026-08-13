@@ -26,10 +26,25 @@
          data-duration-failed="{{ _('Could not save photo duration.')|e }}"
          data-cut-failed="{{ _('Could not cut clip.')|e }}"
          data-title-failed="{{ _('Could not save project title.')|e }}"
+         data-export-failed="{{ _('Export failed.')|e }}"
+         data-export-cancelled="{{ _('Export cancelled.')|e }}"
+         data-export-no-resolution="{{ _('No exportable video resolution in this project.')|e }}"
+         data-export-overwrite="{{ _('A file with this name already exists. Overwrite it?')|e }}"
+         data-export-running="{{ _('Exporting…')|e }}"
+         data-export-done="{{ _('Export finished.')|e }}"
+         data-export-preparing="{{ _('Preparing export…')|e }}"
+         data-export-clip="{{ _('Clip {current} of {total}')|e }}"
+         data-export-combining="{{ _('Combining clips…')|e }}"
+         data-export-running-hint="{{ _('Export is running…')|e }}"
+         data-export-elapsed="{{ _('Elapsed {time}')|e }}"
+         data-export-eta="{{ _('About {time} left')|e }}"
+         data-export-estimating="{{ _('Estimating…')|e }}"
+         data-export-done-in="{{ _('Done in {time}')|e }}"
+         data-recommended-label="{{ _('recommended')|e }}"
          data-saved-label="{{ _('Saved')|e }}"
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
-         data-export-unavailable="{{ _('Export is not available yet. No video is rendered in this build.')|e }}"
-         data-playback-note="{{ _('Preview plays Story media in order. Export and music sync are not available yet.')|e }}"
+         data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
+         data-playback-note="{{ _('Preview plays Story media in order. Export writes a local MP4; music is not included yet.')|e }}"
          data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
          data-label-play="{{ _('Play')|e }}"
          data-label-pause="{{ _('Pause')|e }}"
@@ -173,7 +188,7 @@
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
-            <p class="hint">{{ _('Preview plays Story media in order. Export and music sync are not available yet.') }}</p>
+            <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4; music is not included yet.') }}</p>
           </div>
         </div>
         {% else %}
@@ -405,12 +420,28 @@
 </section>
 
 <dialog class="studio-export-dialog" id="studio-export-dialog">
-  <form method="dialog" class="studio-export-form">
+  <form method="dialog" class="studio-export-form" id="studio-export-form">
     <h2>{{ _('Export memory') }}</h2>
-    <p>{{ _('Export is not available yet. No video is rendered in this build.') }}</p>
-    <p class="hint">{{ _('Order and estimated duration are saved in Studio. A local MP4 export will connect here later.') }}</p>
+    <p class="hint">{{ _('Choose an export resolution up to your highest source video. Source files are never modified.') }}</p>
+    <label class="studio-inspector-field" for="studio-export-resolution">
+      <span>{{ _('Resolution') }}</span>
+      <select id="studio-export-resolution" aria-label="{{ _('Export resolution') }}"></select>
+    </label>
+    <p class="meta-line" id="studio-export-status" hidden></p>
+    <div class="studio-export-progress" id="studio-export-progress" hidden>
+      <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"
+           id="studio-export-progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+           aria-label="{{ _('Export progress') }}">
+        <div class="busy-progress-bar" id="studio-export-progress-bar" style="width: 0%"></div>
+      </div>
+      <p class="studio-export-progress-primary" id="studio-export-progress-label"></p>
+      <p class="hint studio-export-progress-meta" id="studio-export-progress-meta"></p>
+      <p class="hint" id="studio-export-progress-hint">{{ _('Keep this dialog open while exporting.') }}</p>
+    </div>
+    <p class="hint" id="studio-export-hint"></p>
     <div class="studio-export-actions">
-      <button type="submit" class="button" value="cancel">{{ _('Close') }}</button>
+      <button type="submit" class="button ghost" value="cancel" id="studio-export-cancel">{{ _('Cancel') }}</button>
+      <button type="button" class="button" id="studio-export-run">{{ _('Export MP4') }}</button>
     </div>
   </form>
 </dialog>

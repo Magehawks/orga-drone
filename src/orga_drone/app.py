@@ -43,6 +43,7 @@ from orga_drone.ops.rename import RenameError, rename_media
 from orga_drone.scan import scan_all_roots, scan_root
 from orga_drone.scan.jobs import ScanJobStore
 from orga_drone.scan.progress import ProgressCallback
+from orga_drone.export.jobs import ExportJobStore
 from orga_drone.search import (
     MediaSearch,
     media_search_from_payload,
@@ -197,6 +198,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="orga-drone", version=__version__)
     app.state.db = db
     app.state.scan_jobs = ScanJobStore()
+    app.state.export_jobs = ExportJobStore()
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["filesize"] = format_bytes
@@ -1066,6 +1068,101 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.get("/api/studio/export/options")
+    async def api_studio_export_options(
+        project_id: int | None = None,
+    ) -> JSONResponse:
+        from orga_drone.studio_export import build_export_options_payload
+
+        try:
+            payload = await asyncio.to_thread(build_export_options_payload, db, project_id)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse({"ok": True, **payload})
+
+    @app.post("/api/studio/export")
+    async def api_studio_export(request: Request) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_export import prepare_studio_export, run_studio_export
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        height = payload.get("height")
+        output_path = payload.get("output_path")
+        overwrite = bool(payload.get("overwrite"))
+        project_id = payload.get("project_id")
+        if not isinstance(height, int) or isinstance(height, bool):
+            raise HTTPException(status_code=400, detail="height must be an integer")
+        if not isinstance(output_path, str) or not output_path.strip():
+            raise HTTPException(status_code=400, detail="output_path is required")
+        if project_id is not None and (
+            not isinstance(project_id, int) or isinstance(project_id, bool)
+        ):
+            raise HTTPException(status_code=400, detail="project_id must be an integer")
+
+        store: ExportJobStore = app.state.export_jobs
+        # Pre-flight validation (incl. overwrite 409) before creating a job.
+        try:
+            await asyncio.to_thread(
+                prepare_studio_export,
+                db,
+                height=height,
+                output_path=Path(output_path),
+                overwrite=overwrite,
+                project_id=project_id,
+            )
+        except StudioExportError as exc:
+            msg = str(exc)
+            status = 409 if "already exists" in msg.lower() else 400
+            raise HTTPException(status_code=status, detail=msg) from exc
+
+        job = store.try_create()
+        if job is None:
+            raise HTTPException(
+                status_code=409,
+                detail="An export is already running. Wait for it to finish.",
+            )
+
+        def _worker() -> None:
+            store.mark_running(job.id)
+
+            def on_progress(progress: dict[str, Any]) -> None:
+                store.apply_progress(job.id, progress)
+
+            try:
+                result = run_studio_export(
+                    db,
+                    height=height,
+                    output_path=Path(output_path),
+                    overwrite=True,  # preflight already confirmed overwrite
+                    project_id=project_id,
+                    on_progress=on_progress,
+                )
+                store.complete(
+                    job.id,
+                    output_path=str(result),
+                    directory=str(result.parent),
+                )
+            except StudioExportError as exc:
+                store.fail(job.id, str(exc))
+            except Exception as exc:  # noqa: BLE001
+                store.fail(job.id, f"Export failed: {exc}")
+
+        threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
+        return JSONResponse({"ok": True, "job_id": job.id})
+
+    @app.get("/api/studio/export/jobs/{job_id}")
+    async def api_studio_export_job(job_id: str) -> JSONResponse:
+        store: ExportJobStore = app.state.export_jobs
+        job = store.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Export job not found")
+        return JSONResponse({"ok": True, **job.to_dict()})
+
     @app.post("/media/{media_id}/studio/add")
     async def studio_add(
         media_id: int,
@@ -1360,6 +1457,37 @@ def create_app() -> FastAPI:
                 {
                     "status": "unavailable",
                     "error": "folder_picker_unavailable",
+                },
+                status_code=503,
+            )
+        if path is None:
+            return JSONResponse({"status": "cancelled"})
+        return JSONResponse({"status": "ok", "path": path})
+
+    @app.post("/api/desktop/pick-save-file")
+    async def pick_save_file_dialog(request: Request) -> JSONResponse:
+        """Open a native save-file dialog (pywebview desktop shell only)."""
+        from orga_drone.desktop import SaveFilePickerError, pick_save_file
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        directory = payload.get("directory") if isinstance(payload.get("directory"), str) else ""
+        filename = (
+            payload.get("filename")
+            if isinstance(payload.get("filename"), str)
+            else "export.mp4"
+        )
+        try:
+            path = pick_save_file(directory=directory or "", save_filename=filename or "export.mp4")
+        except SaveFilePickerError:
+            return JSONResponse(
+                {
+                    "status": "unavailable",
+                    "error": "save_picker_unavailable",
                 },
                 status_code=503,
             )

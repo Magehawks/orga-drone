@@ -50,7 +50,8 @@ Media files stay on disk under user-chosen library roots.
 | `dupes/` | Heuristic duplicate detection |
 | `geocode/` | Offline reverse geocode + cache |
 | `ops/` | Rename, flow merge |
-| `export/` | Spot GeoJSON |
+| `export/` | Spot GeoJSON; Studio MP4 config + ffmpeg encoder adapter |
+| `studio_export*.py` / `app_prefs.py` | Studio export orchestration, resolution rules, last-dir prefs |
 | `thumbs.py` | Thumbnail / preview generation |
 | `i18n.py` + `locales/` | DE/EN strings |
 | `templates/` + `static/` | UI |
@@ -63,7 +64,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 |-------|---------|
 | `library_roots` | Indexed folders |
 | `assets` | Found files (incl. sidecars) |
-| `media` | Videos/photos + metadata, GPS, track JSON, auto-tags |
+| `media` | Videos/photos + metadata, GPS, track JSON, auto-tags; optional `width`/`height` |
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
@@ -96,9 +97,13 @@ at a time.
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
 Studio page: Jinja layout + `static/js/studio.js` (project title, reorder/duration/cut APIs;
-synced Story preview via `/stream`/`/proxy`; music/transitions/export remain
-client UI stubs only). Transport/editing controls use vendored Lucide icons
-(`static/vendor/lucide/`; see README there).
+synced Story preview via `/stream`/`/proxy`; local MP4 export via async job
+`POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
+determinate progress in the export dialog (elapsed time, ETA, current clip
+label; within-clip ffmpeg progress). Desktop save dialog; music/transitions
+remain client UI stubs). Transport/editing controls use vendored Lucide icons
+(`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
+scope.
 
 Typical user flow:
 

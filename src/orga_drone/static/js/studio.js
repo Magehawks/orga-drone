@@ -2,7 +2,7 @@
  * Creator Studio UI.
  * Persistence: reorder + photo duration via existing APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
- * Music / transitions / export remain UI stubs (no render pipeline).
+ * Music / transitions remain UI stubs. Export renders a local MP4 (no music).
  */
 (function () {
   const root = document.getElementById("studio-root");
@@ -29,6 +29,22 @@
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
   const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
+  const msgExportFailed = root.dataset.exportFailed || "Export failed.";
+  const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
+  const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
+  const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
+  const msgExportRunning = root.dataset.exportRunning || "Exporting…";
+  const msgExportDone = root.dataset.exportDone || "Export finished.";
+  const msgExportPreparing = root.dataset.exportPreparing || "Preparing export…";
+  const msgExportClip = root.dataset.exportClip || "Clip {current} of {total}";
+  const msgExportCombining = root.dataset.exportCombining || "Combining clips…";
+  const msgExportUnavailable = root.dataset.exportUnavailable || "Export needs the desktop app for the save dialog.";
+  const msgExportRunningHint = root.dataset.exportRunningHint || "Export is running…";
+  const msgExportElapsed = root.dataset.exportElapsed || "Elapsed {time}";
+  const msgExportEta = root.dataset.exportEta || "About {time} left";
+  const msgExportEstimating = root.dataset.exportEstimating || "Estimating…";
+  const msgExportDoneIn = root.dataset.exportDoneIn || "Done in {time}";
+  const recommendedLabel = root.dataset.recommendedLabel || "recommended";
   const labelSaved = root.dataset.savedLabel || "Saved";
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
   const labelPlay = root.dataset.labelPlay || "Play";
@@ -1098,7 +1114,353 @@
   }
 
   document.getElementById("studio-export-open")?.addEventListener("click", () => {
-    exportDialog?.showModal();
+    openExportDialog();
+  });
+
+  const exportResolution = document.getElementById("studio-export-resolution");
+  const exportStatus = document.getElementById("studio-export-status");
+  const exportHint = document.getElementById("studio-export-hint");
+  const exportRunBtn = document.getElementById("studio-export-run");
+  const exportCancelBtn = document.getElementById("studio-export-cancel");
+  const exportProgress = document.getElementById("studio-export-progress");
+  const exportProgressBar = document.getElementById("studio-export-progress-bar");
+  const exportProgressEl = document.getElementById("studio-export-progressbar");
+  const exportProgressLabel = document.getElementById("studio-export-progress-label");
+  const exportProgressMeta = document.getElementById("studio-export-progress-meta");
+  let exportOptionsCache = null;
+  let exportPollTimer = null;
+  let exportElapsedTimer = null;
+  let exportStartedAtMs = 0;
+  let exportLastJob = null;
+
+  function setExportStatus(message, { error = false } = {}) {
+    if (!exportStatus) return;
+    if (!message) {
+      exportStatus.hidden = true;
+      exportStatus.textContent = "";
+      return;
+    }
+    exportStatus.hidden = false;
+    exportStatus.textContent = message;
+    exportStatus.classList.toggle("is-error", !!error);
+  }
+
+  function setExportProgressVisible(visible) {
+    if (!exportProgress) return;
+    exportProgress.hidden = !visible;
+    if (!visible) {
+      exportProgress.classList.remove("is-working");
+    }
+  }
+
+  function formatExportDuration(totalSeconds) {
+    const sec = Math.max(0, Math.round(Number(totalSeconds) || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function exportPhaseLabel(job) {
+    if (job.phase === "preparing") return msgExportPreparing;
+    if (job.phase === "concat") return msgExportCombining;
+    if (job.phase === "done" || job.state === "completed") return msgExportDone;
+    if (job.phase === "rendering") {
+      const current = Number(job.clip_index) || 0;
+      const total = Number(job.clip_total) || 0;
+      let label = msgExportClip
+        .replace("{current}", String(current))
+        .replace("{total}", String(total));
+      if (job.current_label) {
+        label = `${label} · ${job.current_label}`;
+      }
+      return label;
+    }
+    return msgExportRunning;
+  }
+
+  function updateExportProgress(job, { localElapsedS = null } = {}) {
+    exportLastJob = job;
+    const percent = Math.max(0, Math.min(100, Number(job.percent) || 0));
+    if (exportProgressBar) exportProgressBar.style.width = `${percent}%`;
+    if (exportProgressEl) exportProgressEl.setAttribute("aria-valuenow", String(percent));
+    if (exportProgress) {
+      exportProgress.classList.toggle(
+        "is-working",
+        job.state === "running" || job.state === "pending"
+      );
+    }
+    const primary = `${exportPhaseLabel(job)} (${percent}%)`;
+    if (exportProgressLabel) exportProgressLabel.textContent = primary;
+
+    const elapsed =
+      localElapsedS != null
+        ? localElapsedS
+        : Number(job.elapsed_s) || 0;
+    const elapsedText = msgExportElapsed.replace(
+      "{time}",
+      formatExportDuration(elapsed)
+    );
+    let etaText = msgExportEstimating;
+    let etaS = job.eta_s;
+    if (etaS == null && percent >= 5 && elapsed > 0 && percent < 100) {
+      etaS = (elapsed / (percent / 100)) * (1 - percent / 100);
+    }
+    if (job.state === "completed") {
+      etaText = msgExportDoneIn.replace("{time}", formatExportDuration(elapsed));
+    } else if (etaS != null && Number.isFinite(Number(etaS))) {
+      etaText = msgExportEta.replace("{time}", formatExportDuration(etaS));
+    }
+    if (exportProgressMeta) {
+      exportProgressMeta.textContent = `${elapsedText} · ${etaText}`;
+    }
+  }
+
+  function setExportRunningUi(running) {
+    if (exportRunBtn) exportRunBtn.disabled = running;
+    if (exportResolution) exportResolution.disabled = running;
+    if (exportCancelBtn) exportCancelBtn.disabled = running;
+  }
+
+  function stopExportElapsedTimer() {
+    if (exportElapsedTimer) {
+      window.clearInterval(exportElapsedTimer);
+      exportElapsedTimer = null;
+    }
+  }
+
+  function startExportElapsedTimer() {
+    stopExportElapsedTimer();
+    exportStartedAtMs = Date.now();
+    exportElapsedTimer = window.setInterval(() => {
+      if (!exportLastJob) return;
+      const localElapsedS = (Date.now() - exportStartedAtMs) / 1000;
+      updateExportProgress(exportLastJob, { localElapsedS });
+    }, 1000);
+  }
+
+  function stopExportPoll() {
+    if (exportPollTimer) {
+      window.clearTimeout(exportPollTimer);
+      exportPollTimer = null;
+    }
+    stopExportElapsedTimer();
+  }
+
+  function pollExportJob(jobId) {
+    stopExportPoll();
+    startExportElapsedTimer();
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/studio/export/jobs/${encodeURIComponent(jobId)}`, {
+          headers: { Accept: "application/json" },
+        });
+        const data = await res.json().catch(() => null);
+        if (res.status === 404) {
+          stopExportElapsedTimer();
+          setExportStatus(msgExportFailed, { error: true });
+          setExportRunningUi(false);
+          setExportProgressVisible(false);
+          return;
+        }
+        if (!res.ok || !data || !data.ok) {
+          stopExportElapsedTimer();
+          setExportStatus((data && data.detail) || msgExportFailed, { error: true });
+          setExportRunningUi(false);
+          return;
+        }
+        setExportProgressVisible(true);
+        const localElapsedS = (Date.now() - exportStartedAtMs) / 1000;
+        updateExportProgress(data, { localElapsedS });
+        if (data.state === "completed") {
+          stopExportElapsedTimer();
+          if (exportProgress) exportProgress.classList.remove("is-working");
+          const doneMsg = msgExportDoneIn.replace(
+            "{time}",
+            formatExportDuration(data.elapsed_s || localElapsedS)
+          );
+          setExportStatus(`${doneMsg} — ${data.output_path || ""}`);
+          showFlash(msgExportDone);
+          setExportRunningUi(false);
+          if (exportOptionsCache) {
+            exportOptionsCache.default_directory =
+              data.directory || exportOptionsCache.default_directory;
+            exportOptionsCache.last_export_directory = data.directory || null;
+          }
+          return;
+        }
+        if (data.state === "failed") {
+          stopExportElapsedTimer();
+          if (exportProgress) exportProgress.classList.remove("is-working");
+          setExportStatus(data.error || msgExportFailed, { error: true });
+          setExportRunningUi(false);
+          return;
+        }
+        setExportStatus(msgExportRunningHint);
+        exportPollTimer = window.setTimeout(tick, 400);
+      } catch (_) {
+        exportPollTimer = window.setTimeout(tick, 1000);
+      }
+    };
+    tick();
+  }
+
+  async function openExportDialog() {
+    if (!exportDialog) return;
+    stopExportPoll();
+    exportLastJob = null;
+    setExportStatus("");
+    setExportProgressVisible(false);
+    if (exportProgressBar) exportProgressBar.style.width = "0%";
+    if (exportProgressLabel) exportProgressLabel.textContent = "";
+    if (exportProgressMeta) exportProgressMeta.textContent = "";
+    if (exportHint) exportHint.textContent = "";
+    setExportRunningUi(false);
+    if (exportRunBtn) exportRunBtn.disabled = true;
+    if (exportResolution) exportResolution.innerHTML = "";
+    exportDialog.showModal();
+    try {
+      const res = await fetch("/api/studio/export/options", {
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        setExportStatus((data && data.detail) || msgExportFailed, { error: true });
+        return;
+      }
+      exportOptionsCache = data;
+      const options = Array.isArray(data.options) ? data.options : [];
+      if (!options.length) {
+        setExportStatus(msgExportNoRes, { error: true });
+        if (exportHint) {
+          exportHint.textContent = msgExportNoRes;
+        }
+        return;
+      }
+      if (exportResolution) {
+        options.forEach((opt) => {
+          const option = document.createElement("option");
+          option.value = String(opt.height);
+          const rec =
+            opt.recommended || Number(opt.height) === Number(data.default_height)
+              ? ` (${recommendedLabel})`
+              : "";
+          option.textContent = `${opt.label}${rec}`;
+          if (Number(opt.height) === Number(data.default_height)) option.selected = true;
+          exportResolution.appendChild(option);
+        });
+      }
+      if (exportHint) {
+        exportHint.textContent = `${data.suggested_filename || "export.mp4"} → ${
+          data.default_directory || ""
+        }`;
+      }
+      if (exportRunBtn) exportRunBtn.disabled = false;
+    } catch (_) {
+      setExportStatus(msgExportFailed, { error: true });
+    }
+  }
+
+  async function runStudioExport() {
+    if (!exportOptionsCache || !exportResolution || !exportRunBtn) return;
+    const height = Number(exportResolution.value);
+    if (!Number.isFinite(height) || height <= 0) {
+      setExportStatus(msgExportNoRes, { error: true });
+      return;
+    }
+    setExportRunningUi(true);
+    setExportStatus(msgExportRunningHint);
+    setExportProgressVisible(false);
+    let pickedPath = null;
+    try {
+      const pickRes = await fetch("/api/desktop/pick-save-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          directory: exportOptionsCache.default_directory || "",
+          filename: exportOptionsCache.suggested_filename || "export.mp4",
+        }),
+      });
+      const pickData = await pickRes.json().catch(() => null);
+      if (pickRes.status === 503) {
+        setExportStatus(msgExportUnavailable, { error: true });
+        setExportRunningUi(false);
+        return;
+      }
+      if (!pickData || pickData.status === "cancelled") {
+        setExportStatus(msgExportCancelled);
+        setExportRunningUi(false);
+        return;
+      }
+      if (pickData.status !== "ok" || !pickData.path) {
+        setExportStatus(msgExportFailed, { error: true });
+        setExportRunningUi(false);
+        return;
+      }
+      pickedPath = pickData.path;
+    } catch (_) {
+      setExportStatus(msgExportFailed, { error: true });
+      setExportRunningUi(false);
+      return;
+    }
+
+    let overwrite = false;
+    const tryStart = async () => {
+      const res = await fetch("/api/studio/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          height,
+          output_path: pickedPath,
+          overwrite,
+          project_id: projectId || exportOptionsCache.project_id || null,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      return { res, data };
+    };
+
+    try {
+      let { res, data } = await tryStart();
+      if (res.status === 409 && data && String(data.detail || "").toLowerCase().includes("already exists")) {
+        const ok = window.confirm(msgExportOverwrite);
+        if (!ok) {
+          setExportStatus(msgExportCancelled);
+          setExportRunningUi(false);
+          return;
+        }
+        overwrite = true;
+        ({ res, data } = await tryStart());
+      }
+      if (!res.ok || !data || !data.ok || !data.job_id) {
+        setExportStatus((data && data.detail) || msgExportFailed, { error: true });
+        setExportRunningUi(false);
+        return;
+      }
+      setExportProgressVisible(true);
+      updateExportProgress({
+        phase: "preparing",
+        percent: 0,
+        clip_index: 0,
+        clip_total: 0,
+        state: "running",
+        elapsed_s: 0,
+        eta_s: null,
+      });
+      setExportStatus(msgExportRunningHint);
+      pollExportJob(data.job_id);
+    } catch (_) {
+      setExportStatus(msgExportFailed, { error: true });
+      setExportRunningUi(false);
+    }
+  }
+
+  exportRunBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    runStudioExport();
   });
 
   document.getElementById("studio-music-file")?.addEventListener("change", (event) => {

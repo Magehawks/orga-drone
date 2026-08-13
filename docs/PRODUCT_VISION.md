@@ -20,7 +20,8 @@ behind their adventures.**
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(order + estimated runtime; synced Story preview playback; no MP4 export yet).
+(order + estimated runtime; synced Story preview; local MP4 export with
+configurable resolution; music not included in export yet).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -133,9 +134,9 @@ professional video-editing knowledge.
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers / one music slot (UI state only) | **Available now** (not rendered / not exported) |
-| Export dialog stub | **Available now** (no render pipeline) |
+| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; no music) |
 | Build a story (real music in export, transitions, editing) | **Studio MVP (target)** / **Later** |
-| Export MP4 | **Studio MVP (target)** |
+| Music-in-export + share/reveal exported file | **Studio MVP (target)** |
 
 ### 4. Share
 
@@ -146,7 +147,7 @@ Sharing is the final step of the journey.
 | Example | Status |
 |---------|--------|
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
-| Simple Studio MP4 export | **Studio MVP (target)** |
+| Simple Studio MP4 export | **Available now** (local file; resolution choice; no music) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 
 ---
@@ -199,12 +200,13 @@ See `README.md` for the detailed feature status table. In short:
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
 - **Studio:** single workspace with Creator Studio UI (browser, preview,
-  transport, Story track, music slot, inspector, export dialog stub). Persisted
+  transport, Story track, music slot, inspector, export dialog). Persisted
   today: `studio_projects` + `studio_clips` (editable project title; order;
   estimated runtime; optional video source start/end after Cut). Story preview
-  plays photos/videos in sync with the playhead. Transitions, music, and export
-  remain UI stubs — no render pipeline yet. Media files are referenced, never
-  copied or modified.
+  plays photos/videos in sync with the playhead. Local MP4 export with
+  configurable resolution (desktop); music and transitions remain UI stubs and
+  are not included in the render. Media files are referenced, never copied or
+  modified.
 - Local SQLite index; media files stay on disk
 
 ## Honest limitations
@@ -216,7 +218,7 @@ See `README.md` for the detailed feature status table. In short:
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
 - There is **no** multi-project albums model, plugin API, Studio
-  music-in-export/MP4 export, or CI-built multi-OS installer pipeline in the
+  music-in-export, or CI-built multi-OS installer pipeline in the
   current tree.
 
 ## Studio MVP (target)
@@ -233,8 +235,9 @@ The first **complete** Studio MVP is achieved when a user can:
 8. Share the result with family or friends.
 
 If users can complete this journey without opening another application, that MVP
-is successful. Real music-in-export and MP4 rendering (steps 6–8) are **not**
-Available now; Studio already exposes UI stubs for those steps.
+is successful. Local MP4 export with resolution choice (step 7, without music)
+is **Available now** on desktop. Music-in-export and a polished share/reveal
+step (steps 6 and 8) remain **Studio MVP (target)**.
 
 ## What orga-drone is NOT
 
