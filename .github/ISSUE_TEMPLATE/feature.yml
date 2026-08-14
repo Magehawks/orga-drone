@@ -6,33 +6,75 @@ body:
   - type: markdown
     attributes:
       value: |
-        orga-drone is local-first — media stays on your machine. Ideas that fit that model are easiest to adopt.
+        orga-drone is local-first. Feature ideas move through PM → CTO → Development → Independent Review → Human Test before merge.
   - type: textarea
     id: problem
     attributes:
-      label: Problem or use case
-      description: What are you trying to do? Why is the current behavior insufficient?
-      placeholder: e.g. I index phone photos from vacations alongside DJI clips and want …
+      label: User problem
+      description: What concrete problem is the user trying to solve? Why is the current behavior insufficient?
+      placeholder: e.g. I have selected several drone clips for a memory and want …
+    validations:
+      required: true
+  - type: textarea
+    id: user
+    attributes:
+      label: Target user
+      description: Who has this problem (hobby pilot, creator, professional operator, etc.)?
+    validations:
+      required: true
+  - type: textarea
+    id: journey
+    attributes:
+      label: Journey / why now
+      description: Where does this improve Adventure → Capture → Import → Organize → Rediscover → Create → Share → Relive, and why does it belong in the current slice?
     validations:
       required: true
   - type: textarea
     id: solution
     attributes:
-      label: Proposed solution
-      description: How would you like it to work?
+      label: Proposed behavior
+      description: Describe the smallest useful user-facing solution. Avoid implementation detail unless it is a hard constraint.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable conditions that must be true before the feature is complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Explicit non-scope
+      description: What tempting related work must NOT be implemented in this issue?
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: technical
+    attributes:
+      label: CTO / technical constraints
+      description: Filled or refined during CTO review. Note compatibility, non-destructive behavior, architecture, performance, migration and test constraints.
     validations:
       required: false
   - type: textarea
-    id: alternatives
+    id: testing
     attributes:
-      label: Alternatives considered
+      label: Human test scenario
+      description: What should the Product Owner test with realistic drone media before merge?
     validations:
       required: false
   - type: checkboxes
-    id: scope
+    id: gates
     attributes:
-      label: Scope hints
+      label: Agent gates
       options:
-        - label: Fits MVP / near-term roadmap (parsers, UI, local export, search)
-        - label: Willing to open a PR
-        - label: Needs discussion before implementation
+        - label: PM product gate completed (`PM_APPROVED`)
+        - label: CTO engineering gate completed (`CTO_APPROVED`)
+        - label: Ready for developer agent
