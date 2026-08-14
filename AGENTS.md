@@ -19,7 +19,11 @@ Canonical narrative and journey: `docs/PRODUCT_VISION.md`.
 
 Help people **organize, rediscover, create and share** the memories behind their
 adventures — through Library, Browse, Studio, and Share — without becoming a
-professional video editor.
+professional video editor in the current product scope.
+
+Professional creator/post-production workflows may be a long-term ambition.
+They may influence clean architecture boundaries, but must not be treated as
+shipping behavior or used to inflate a current milestone without an approved issue.
 
 Treat Studio music/export, social share destinations, AI-assisted storytelling,
 plugins, and similar items as **planned or aspirational** unless the codebase
@@ -84,12 +88,13 @@ The application helps users:
 2. Open source
 3. Useful without cloud accounts
 4. Drone-specific rather than generic media management alone
-5. Storytelling over professional editing; simplicity first
+5. Storytelling and creator workflows with simplicity first; professional depth may evolve incrementally
 6. Clear workflows over feature clutter
 7. Prefer modular design; do not claim plugins until they exist
 8. Optional intelligent features must solve a real user problem
 9. Do not add AI merely for marketing, and do not label rule-based features as AI
 10. Prefer small, complete user-journey slices
+11. Limit the current scope, not the long-term vision
 
 ## Possible future capabilities (roadmap / vision)
 
@@ -100,6 +105,7 @@ The application helps users:
 - automatic highlight / quality suggestions
 - weather and airspace context
 - creator exports (e.g. DaVinci Resolve and other tools)
+- deeper creator/post-production workflows when justified by real users
 - battery and equipment analytics
 - additional drone manufacturers via dedicated parsers
 - incremental scanning and CI-built installers
@@ -113,7 +119,6 @@ These are future directions. Never describe them as already available.
 - photographers and videographers
 - professional operators with large local media libraries
 - anyone who wants to turn drone (and related) adventures into shareable memories
-  without learning a pro editor
 
 ## Positioning
 
@@ -129,8 +134,7 @@ and prepare memories to share.”
 
 **Longer-term vision (separate from current claims):**
 
-“orga-drone helps people organize, rediscover, create and share the memories
-behind their adventures.”
+“An open-source platform for drone media, flight intelligence and creator workflows.”
 
 Avoid exaggerated descriptions such as:
 
@@ -150,6 +154,8 @@ Before changing code:
 6. Add or update tests where appropriate.
 7. Update documentation when behavior changes.
 8. Do not invent technologies or architecture that are not present.
+9. Implement only issues that have passed the required product/engineering gates unless the human explicitly waives the process.
+10. Keep implementation and independent review roles separate.
 
 ## Communication style
 
@@ -178,18 +184,41 @@ listed above.
 | Product vision | `docs/PRODUCT_VISION.md` |
 | Roadmap | `docs/ROADMAP.md` |
 | Architecture | `docs/ARCHITECTURE.md` |
+| Agent workflow | `docs/AGENT_WORKFLOW.md` |
 | ADRs | `docs/decisions/` |
 | Cursor rules | `.cursor/rules/` |
 | Specialized agents | `.cursor/agents/` |
 
 Keep this file aligned with `docs/PRODUCT_VISION.md` when product truth changes.
 
-## Cursor agent roles
+## Agent roles and gates
 
-The main Cursor agent **implements**. Use these project subagents for gated work:
+GitHub issues and pull requests are the handoff boundary between roles. The canonical state machine is documented in `docs/AGENT_WORKFLOW.md`.
 
-1. **Product-Spec-Reviewer** (`.cursor/agents/product-spec-reviewer.md`) — review a product spec against the codebase; no code changes.
-2. **Engineering-Planner** (`.cursor/agents/engineering-planner.md`) — turn an approved spec into a technical plan (research first / Plan Mode).
-3. **Implementation-Reviewer** (`.cursor/agents/implementation-reviewer.md`) — review changes, tests, risks, and docs before commit.
+1. **PM Product Gate** — `product-spec-reviewer`
+   - validates user problem, target user, milestone fit, simplest useful slice, acceptance criteria and explicit non-scope
+   - read-only
+   - must return `PM_APPROVED` before normal CTO handoff
+2. **CTO Engineering Gate** — `engineering-planner`
+   - validates architecture, compatibility, data/migration impact, performance, security and test strategy
+   - read-only
+   - must return `CTO_APPROVED` before `ready-for-dev`
+3. **Developer** — main Cursor implementation agent
+   - implements only the approved issue
+   - runs Ruff, MyPy and pytest and updates docs/i18n when required
+4. **Independent Review Gate** — `implementation-reviewer`
+   - reviews issue + diff + tests independently
+   - read-only; never fixes its own findings
+   - returns `REVIEW_APPROVED`, `REVIEW_CHANGES_REQUESTED`, or `REVIEW_ARCHITECTURE_CONCERN`
+5. **Human Product Owner**
+   - performs realistic product testing
+   - is the final merge gate
 
-Typical flow: Spec → Product-Spec-Reviewer → Engineering-Planner → implement → Implementation-Reviewer → commit (only when explicitly requested).
+Typical flow:
+
+```text
+Idea → PM → CTO → ready-for-dev → Developer → PR → Independent Review
+     → (changes → Developer → Review) → human-test → Human merge decision
+```
+
+Do not automate the final human product test or merge decision. After three developer/reviewer correction loops, escalate to the human instead of looping indefinitely.
