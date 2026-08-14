@@ -421,12 +421,14 @@ class FfmpegStudioEncoder:
                 "-y",
                 "-i",
                 str(clip.source_path),
-                "-ss",
-                f"{start:.3f}",
                 "-f",
                 "lavfi",
                 "-i",
                 "anullsrc=channel_layout=stereo:sample_rate=48000",
+                # Keep decode-then-seek semantics: after both inputs, -ss is an
+                # output option and trims the video source rather than anullsrc.
+                "-ss",
+                f"{start:.3f}",
                 "-t",
                 f"{dur:.3f}",
                 "-vf",

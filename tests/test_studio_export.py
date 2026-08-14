@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,8 +12,12 @@ from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
-from orga_drone.export.studio_config import StudioExportConfig
-from orga_drone.export.studio_encoder import StudioExportError
+from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_encoder import (
+    FfmpegStudioEncoder,
+    StudioExportError,
+)
+from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_export import probe_video_dimensions, run_studio_export
 
 
@@ -270,6 +276,122 @@ def test_run_studio_export_refuses_missing_overwrite(
         encoder=fake,
     )
     assert out.read_bytes() == b"mp4-bytes"
+
+
+def test_encoder_silent_video_fallback_preserves_source_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+
+    source = tmp_path / "silent-source.mp4"
+    generated = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=64x48:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=blue:s=64x48:r=30:d=1",
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1:a=0,format=yuv420p",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            str(source),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert generated.returncode == 0, generated.stderr
+    source_bytes = source.read_bytes()
+
+    from orga_drone.export import studio_encoder as encoder_module
+
+    commands: list[list[str]] = []
+    real_run_ffmpeg = encoder_module._run_ffmpeg
+
+    def recording_run_ffmpeg(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        commands.append(cmd.copy())
+        return real_run_ffmpeg(cmd, **kwargs)
+
+    monkeypatch.setattr(encoder_module, "_run_ffmpeg", recording_run_ffmpeg)
+    output = tmp_path / "trimmed.mp4"
+    config = StudioExportConfig(
+        output_path=output,
+        width=64,
+        height=48,
+        clips=(
+            StudioExportClip(
+                source_path=source,
+                kind="video",
+                duration_s=2.0,
+                source_start_s=1.0,
+                source_end_s=1.6,
+            ),
+        ),
+    )
+
+    assert FfmpegStudioEncoder().render(config) == output
+    assert source.read_bytes() == source_bytes
+    assert any("0:a:0" in cmd for cmd in commands)
+    silent_commands = [
+        cmd
+        for cmd in commands
+        if "anullsrc=channel_layout=stereo:sample_rate=48000" in cmd
+    ]
+    assert len(silent_commands) == 1
+    silent_cmd = silent_commands[0]
+    assert silent_cmd.index("-ss") > silent_cmd.index(
+        "anullsrc=channel_layout=stereo:sample_rate=48000"
+    )
+
+    probed = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(output)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert "Audio: aac" in probed.stderr
+    duration_match = re.search(
+        r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", probed.stderr
+    )
+    assert duration_match is not None
+    hours, minutes, seconds = duration_match.groups()
+    duration_s = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    assert duration_s == pytest.approx(0.6, abs=0.15)
+
+    first_frame = subprocess.run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-i",
+            str(output),
+            "-map",
+            "0:v:0",
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "pipe:1",
+        ],
+        check=False,
+        capture_output=True,
+    )
+    assert first_frame.returncode == 0, first_frame.stderr.decode(errors="replace")
+    assert len(first_frame.stdout) == 64 * 48 * 3
+    center = (24 * 64 + 32) * 3
+    red, _green, blue = first_frame.stdout[center : center + 3]
+    assert blue > red + 100
 
 
 def test_materialize_photo_still_heic_like(tmp_path: Path) -> None:
