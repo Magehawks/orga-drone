@@ -83,10 +83,10 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Creator Studio UI with synced Story preview; persisted project title + order + estimated runtime + video Cut offsets; local MP4 export with resolution choice; music stub; one active project (not multi-project albums) |
+| Studio workspace | Available | Creator Studio UI with synced Story preview; multiple local edit projects (browser/switcher); persisted project title + order + estimated runtime + video Cut offsets; local MP4 export with resolution choice; music stub |
 | Studio MP4 export | Available | Configurable resolution up to source max; desktop save dialog; sources never modified; music not included |
 | Studio music-in-export | Not available | Studio MVP target — see `docs/PRODUCT_VISION.md` |
-| Projects / albums | Not available | Multi-project albums UI remains future work; Studio already has one persisted project with editable title |
+| Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
@@ -259,7 +259,8 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 - Optional one music track in Studio export + open/reveal exported file
   (basic local MP4 export with resolution choice is Available)
 - Open / reveal exported local files on desktop
-- Projects or albums for organizing media sets
+- Library albums for organizing media sets (Studio already has multiple local
+  edit projects)
 - Incremental or cheaper library rescans
 - Broader multi-brand parsers beyond the current DJI-first depth
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)
@@ -289,9 +290,8 @@ Known limitations:
 
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
-- No multi-project albums UI (Studio uses one persisted project with editable
-  title and non-destructive clips), no plugin API, no content-hash duplicate
-  detection
+- No Library albums UI, no plugin API, no content-hash duplicate
+  detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
 - Telemetry **burn-in** into exported video is not included

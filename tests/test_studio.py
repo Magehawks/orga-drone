@@ -310,11 +310,9 @@ def test_http_studio_empty_and_nav(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.text
     assert 'href="/studio"' in body
-    assert "Your story is empty" in body or "Deine Geschichte ist leer" in body
+    assert 'data-studio-mode="browser"' in body
+    assert "No Studio projects yet" in body or "Noch keine Studio-Projekte" in body
     assert "studio-creator" in body
-    assert "studio-story-track" in body or "Story" in body
-    assert "studio-export-dialog" in body
-    assert "Voice-over" in body or "coming later" in body or "folgt später" in body
     assert 'class="bottom-nav"' in body
     bottom = body.split('class="bottom-nav"', 1)[1].split("</nav>", 1)[0]
     assert "/studio" in bottom
@@ -460,6 +458,9 @@ def test_http_add_remove_and_browse_markup(
     db: Database = app.state.db
     mid = _seed_media(db, tmp_path / "lib2")
     c = TestClient(app)
+    project = db.ensure_default_studio_project()
+    opened = c.get(f"/studio?project_id={project.id}", follow_redirects=False)
+    assert opened.status_code == 303
 
     add = c.post(
         f"/media/{mid}/studio/add",
