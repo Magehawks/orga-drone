@@ -29,6 +29,7 @@ from orga_drone.studio_estimate import (
     effective_seconds,
     summarize_studio_items,
 )
+from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.ffmpeg_bin import ffmpeg_available
 from orga_drone.flight_view import (
@@ -841,6 +842,8 @@ def create_app() -> FastAPI:
         request: Request,
         msg: str | None = None,
         project_id: int | None = None,
+        select: int | None = None,
+        focus: str | None = None,
     ) -> Response:
         if project_id is not None:
             target = db.get_studio_project(project_id)
@@ -855,6 +858,7 @@ def create_app() -> FastAPI:
         studio_mode = "editor" if project is not None else "browser"
         items = db.list_studio_items(project.id) if project is not None else []
         summary = summarize_studio_items(items)
+        lang = lang_from_request(request)
         item_display: list[dict[str, Any]] = []
         favorite_media: list[Any] = []
         if project is not None:
@@ -866,13 +870,20 @@ def create_app() -> FastAPI:
                     available=it.available,
                     source_in_s=it.source_start,
                     source_out_s=it.source_end,
+                    card_duration_s=it.card_duration_s,
                 )
                 stream_url = ""
                 proxy_url = ""
                 preview_url = ""
                 has_proxy = False
                 can_play = False
-                if it.available and it.media_id is not None:
+                display_title = ""
+                display_subtitle = ""
+                if it.kind == TITLE_CARD_KIND:
+                    display_title, display_subtitle = display_lines(
+                        it.title_text, it.subtitle_text, lang
+                    )
+                elif it.available and it.media_id is not None:
                     media_row = db.get_media(it.media_id)
                     if media_row is not None:
                         media_path = resolve_media_file(db, media_row)
@@ -901,12 +912,16 @@ def create_app() -> FastAPI:
                         "item": it,
                         "effective_duration_s": seconds,
                         "display_duration_s": (
-                            it.photo_duration_s
-                            if it.kind == "photo" and it.photo_duration_s is not None
+                            it.card_duration_s
+                            if it.kind == TITLE_CARD_KIND and it.card_duration_s is not None
                             else (
-                                DEFAULT_PHOTO_DURATION_S
-                                if it.kind == "photo"
-                                else seconds
+                                it.photo_duration_s
+                                if it.kind == "photo" and it.photo_duration_s is not None
+                                else (
+                                    DEFAULT_PHOTO_DURATION_S
+                                    if it.kind == "photo"
+                                    else seconds
+                                )
                             )
                         ),
                         "stream_url": stream_url,
@@ -914,9 +929,11 @@ def create_app() -> FastAPI:
                         "preview_url": preview_url,
                         "has_proxy": has_proxy,
                         "can_play": can_play,
+                        "display_title": display_title,
+                        "display_subtitle": display_subtitle,
                     }
                 )
-            studio_paths = {it.media_path for it in items}
+            studio_paths = {it.media_path for it in items if it.media_path}
             favorite_media = [
                 fav
                 for fav in db.list_media(
@@ -943,6 +960,8 @@ def create_app() -> FastAPI:
             music_payload=music_payload,
             flash_msg=msg,
             nav_active="studio",
+            select_id=select,
+            focus_field=focus,
         )
 
     def _studio_project_json(project: Any) -> dict[str, Any]:
@@ -1165,6 +1184,89 @@ def create_app() -> FastAPI:
         summary = summarize_studio_items(items)
         return JSONResponse(
             {"ok": True, "ordered_ids": ordered, "summary": summary.as_dict()}
+        )
+
+    @app.post("/api/studio/title-cards")
+    async def api_studio_add_title_card() -> JSONResponse:
+        open_project = db.resolve_studio_page_project()
+        if open_project is None:
+            raise HTTPException(status_code=400, detail="no studio project open")
+        try:
+            clip = db.add_studio_title_card(
+                open_project.id, title_text=open_project.title
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        items = db.list_studio_items(open_project.id)
+        summary = summarize_studio_items(items)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": clip.id,
+                "title": clip.title_text or "",
+                "subtitle": clip.subtitle_text or "",
+                "duration_s": clip.card_duration_s,
+                "background": clip.background,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/title-card")
+    async def api_studio_patch_title_card(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        kwargs: dict[str, Any] = {}
+        if "title" in payload:
+            if payload["title"] is not None and not isinstance(payload["title"], str):
+                raise HTTPException(status_code=400, detail="title must be a string")
+            kwargs["title_text"] = payload.get("title") or ""
+        if "subtitle" in payload:
+            if payload["subtitle"] is not None and not isinstance(
+                payload["subtitle"], str
+            ):
+                raise HTTPException(status_code=400, detail="subtitle must be a string")
+            kwargs["subtitle_text"] = payload.get("subtitle") or ""
+        if "duration_s" in payload:
+            raw = payload.get("duration_s")
+            if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+                raise HTTPException(status_code=400, detail="duration_s must be a number")
+            kwargs["card_duration_s"] = float(raw)
+        if "background" in payload:
+            if not isinstance(payload["background"], str):
+                raise HTTPException(status_code=400, detail="background must be a string")
+            kwargs["background"] = payload["background"]
+        if not kwargs:
+            raise HTTPException(status_code=400, detail="no title card fields to update")
+        try:
+            clip = db.update_studio_title_card(studio_item_id, **kwargs)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(clip.project_id)
+        summary = summarize_studio_items(items)
+        lang = lang_from_request(request)
+        primary, secondary = display_lines(clip.title_text, clip.subtitle_text, lang)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": clip.id,
+                "title": clip.title_text or "",
+                "subtitle": clip.subtitle_text or "",
+                "duration_s": clip.card_duration_s,
+                "background": clip.background,
+                "display_title": primary,
+                "display_subtitle": secondary,
+                "summary": summary.as_dict(),
+            }
         )
 
     @app.patch("/api/studio/{studio_item_id}/photo-duration")

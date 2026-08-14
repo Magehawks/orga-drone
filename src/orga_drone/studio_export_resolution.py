@@ -70,6 +70,28 @@ def max_project_export_height(source_heights: list[int | None]) -> int | None:
     return max(usable) if usable else None
 
 
+def generated_only_export_resolutions() -> list[ExportResolutionOption]:
+    """720 and 1080 when the project has Title Cards but no video heights."""
+    return [
+        ExportResolutionOption(
+            height=720,
+            label="720p",
+            width=height_to_width(720),
+            recommended=False,
+        ),
+        ExportResolutionOption(
+            height=1080,
+            label="1080p",
+            width=height_to_width(1080),
+            recommended=True,
+        ),
+    ]
+
+
+def generated_only_default_height() -> int:
+    return RECOMMENDED_HEIGHT
+
+
 def available_export_resolutions(
     source_heights: list[int | None],
 ) -> list[ExportResolutionOption]:

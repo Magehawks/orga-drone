@@ -20,10 +20,13 @@ from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_secon
 from orga_drone.studio_export_resolution import (
     available_export_resolutions,
     default_export_height,
+    generated_only_default_height,
+    generated_only_export_resolutions,
     height_to_width,
     resolve_export_directory,
     suggested_export_filename,
 )
+from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 
 
 def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
@@ -169,11 +172,18 @@ def collect_project_video_heights(db: Database, project_id: int | None = None) -
     return heights
 
 
+def _project_has_title_cards(db: Database, project_id: int) -> bool:
+    return any(clip.item_kind == TITLE_CARD_KIND for clip in db.list_studio_items(project_id))
+
+
 def build_export_options_payload(db: Database, project_id: int | None = None) -> dict:
     project = _resolve_export_project(db, project_id)
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
     default_h = default_export_height(heights)
+    if not options and _project_has_title_cards(db, project.id):
+        options = generated_only_export_resolutions()
+        default_h = generated_only_default_height()
     last_dir = get_last_export_directory()
     directory = resolve_export_directory(last_dir)
     return {
@@ -188,7 +198,30 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
     }
 
 
-def _clip_to_export_clip(db: Database, clip: StudioClip) -> StudioExportClip | None:
+def _clip_to_export_clip(
+    db: Database, clip: StudioClip, *, locale: str = "en"
+) -> StudioExportClip | None:
+    if clip.item_kind == TITLE_CARD_KIND or clip.kind == TITLE_CARD_KIND:
+        seconds = effective_seconds(
+            kind=TITLE_CARD_KIND,
+            photo_duration_s=None,
+            duration_s=clip.duration_s,
+            available=True,
+            card_duration_s=clip.card_duration_s,
+        )
+        if seconds is None or seconds <= 0:
+            return None
+        primary, secondary = display_lines(clip.title_text, clip.subtitle_text, locale)
+        return StudioExportClip(
+            source_path=None,
+            kind=TITLE_CARD_KIND,
+            duration_s=float(seconds),
+            title_text=clip.title_text or "",
+            subtitle_text=clip.subtitle_text or "",
+            background=clip.background or "dark",
+            locale=locale,
+            label=primary or secondary or "Title card",
+        )
     if not clip.available or clip.media_id is None:
         return None
     media = db.get_media(clip.media_id)
@@ -238,6 +271,8 @@ def prepare_studio_export(
     project = _resolve_export_project(db, project_id)
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
+    if not options and _project_has_title_cards(db, project.id):
+        options = generated_only_export_resolutions()
     allowed = {o.height for o in options}
     if int(height) not in allowed:
         raise StudioExportError("Selected export resolution is not available for this project.")

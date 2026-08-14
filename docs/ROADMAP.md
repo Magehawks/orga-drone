@@ -32,7 +32,8 @@ Highlights:
   source start/end; project browser/switcher for multiple local edit projects;
   synced Story preview playback; local MP4 export with
   configurable resolution; after success, Open video / Show in folder on
-  Windows; one optional local music track in preview and export)
+  Windows; one optional local music track in preview and export; Title Cards
+  as generated Story items)
 
 ## Next (possible near-term)
 

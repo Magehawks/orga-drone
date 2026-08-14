@@ -65,6 +65,14 @@ class StudioExportError(Exception):
         self.code = code
 
 
+def _clip_progress_label(clip: StudioExportClip) -> str:
+    if clip.label:
+        return clip.label
+    if clip.source_path is not None:
+        return clip.source_path.name
+    return "Title card"
+
+
 class StudioVideoEncoder(Protocol):
     def render(
         self,
@@ -195,7 +203,7 @@ class FfmpegStudioEncoder:
             segments: list[Path] = []
             for index, clip in enumerate(config.clips):
                 clip_index = index + 1
-                label = clip.source_path.name
+                label = _clip_progress_label(clip)
                 _emit(
                     on_progress,
                     phase="rendering",
@@ -275,8 +283,21 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
     ) -> None:
-        if not clip.source_path.is_file():
-            raise StudioExportError(f"Missing source file: {clip.source_path.name}")
+        if clip.kind == "title_card":
+            self._render_title_card(
+                ffmpeg,
+                clip,
+                out,
+                width,
+                height,
+                on_progress=on_progress,
+                clip_index=clip_index,
+                clip_total=clip_total,
+            )
+            return
+        if clip.source_path is None or not clip.source_path.is_file():
+            name = clip.source_path.name if clip.source_path is not None else "clip"
+            raise StudioExportError(f"Missing source file: {name}")
         vf = _segment_vf(width, height)
         if clip.kind == "photo":
             self._render_photo(
@@ -299,6 +320,56 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
             )
 
+
+    def _render_title_card(
+        self,
+        ffmpeg: str,
+        clip: StudioExportClip,
+        out: Path,
+        width: int,
+        height: int,
+        *,
+        on_progress: ProgressCallback | None,
+        clip_index: int,
+        clip_total: int,
+    ) -> None:
+        from orga_drone.studio_title_card import TitleCardFontError, render_title_card_image
+
+        still = out.with_name(f"{out.stem}_card.jpg")
+        try:
+            img = render_title_card_image(
+                width=width,
+                height=height,
+                title=clip.title_text,
+                subtitle=clip.subtitle_text,
+                background=clip.background or "dark",
+                locale=clip.locale,
+            )
+            img.save(still, "JPEG", quality=92, optimize=True)
+        except TitleCardFontError as exc:
+            raise StudioExportError(
+                "Title Card export needs a system sans font.",
+                code="title_card_font_missing",
+            ) from exc
+        except OSError as exc:
+            raise StudioExportError("Could not render Title Card.") from exc
+        photo_clip = StudioExportClip(
+            source_path=still,
+            kind="photo",
+            duration_s=clip.duration_s,
+            label=_clip_progress_label(clip),
+        )
+        vf = _segment_vf(width, height)
+        self._render_photo(
+            ffmpeg,
+            photo_clip,
+            out,
+            vf,
+            on_progress=on_progress,
+            clip_index=clip_index,
+            clip_total=clip_total,
+        )
+
     def _progress_cb(
         self,
         on_progress: ProgressCallback | None,
@@ -310,7 +381,7 @@ class FfmpegStudioEncoder:
     ) -> Callable[[float], None] | None:
         if on_progress is None:
             return None
-        label = clip.source_path.name
+        label = _clip_progress_label(clip)
 
         def _on_time(media_s: float) -> None:
             frac = 0.0 if duration_s <= 0 else max(0.0, min(1.0, media_s / duration_s))
@@ -339,6 +410,8 @@ class FfmpegStudioEncoder:
         # Bundled ffmpeg often cannot -loop HEIC/HEIF (and some other stills).
         # Decode via Pillow (same HEIF path as the library), then loop a JPEG.
         still = out.with_name(f"{out.stem}_still.jpg")
+        if clip.source_path is None:
+            raise StudioExportError("Missing source file: clip")
         _materialize_photo_still(clip.source_path, still)
         dur = max(0.1, float(clip.duration_s))
         cmd = [

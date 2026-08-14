@@ -47,5 +47,7 @@ only an export UI stub (no render path).
   Studio MVP; desktop save dialog required for destination picking.
 - Follow-up: export cancel/abort. Open/reveal of the exported file is
   covered by ADR 0007. Music-in-export is covered by ADR 0008.
+  Title Cards (generated Story items) may unlock 720/1080 when a project has
+  no video heights; photos alone still do not (ADR 0009).
   Determinate export progress with elapsed/ETA/current clip label is Available now.
   Segment encodes force CFR 30fps + yuv420p so photo/video concat stays timeline-safe.

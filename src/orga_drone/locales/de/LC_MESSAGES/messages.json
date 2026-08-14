@@ -343,5 +343,13 @@
   "The selected music file could not be read.": "Die ausgewählte Musikdatei konnte nicht gelesen werden.",
   "The selected music file cannot be decoded.": "Die ausgewählte Musikdatei kann nicht dekodiert werden.",
   "One local music track for this project. The file stays on this computer and is mixed into export.": "Eine lokale Musikspur für dieses Projekt. Die Datei bleibt auf diesem Computer und wird in den Export gemischt.",
-  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden."
+  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden.",
+  "Title card": "Titelseite",
+  "Add title card": "Titelseite hinzufügen",
+  "Title": "Titel",
+  "Subtitle": "Untertitel",
+  "Title card duration in seconds": "Titelseiten-Dauer in Sekunden",
+  "Could not save title card.": "Titelseite konnte nicht gespeichert werden.",
+  "Or add a Title Card to start with a heading.": "Oder füge eine Titelseite als Überschrift hinzu.",
+  "Title Card export needs a system sans font.": "Der Titelseiten-Export braucht eine System-Sans-Schrift."
 }

@@ -127,3 +127,27 @@ msgstr "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erh
 msgid "Mixing music…"
 msgstr "Musik wird gemischt…"
 
+msgid "Title card"
+msgstr "Titelseite"
+
+msgid "Add title card"
+msgstr "Titelseite hinzufügen"
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "Subtitle"
+msgstr "Untertitel"
+
+msgid "Title card duration in seconds"
+msgstr "Titelseiten-Dauer in Sekunden"
+
+msgid "Could not save title card."
+msgstr "Titelseite konnte nicht gespeichert werden."
+
+msgid "Or add a Title Card to start with a heading."
+msgstr "Oder füge eine Titelseite als Überschrift hinzu."
+
+msgid "Title Card export needs a system sans font."
+msgstr "Der Titelseiten-Export braucht eine System-Sans-Schrift."
+

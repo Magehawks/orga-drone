@@ -102,7 +102,11 @@
          data-music-empty="{{ _('No music yet')|e }}"
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
-         data-kind-unknown="{{ _('Memory')|e }}">
+         data-kind-title-card="{{ _('Title card')|e }}"
+         data-kind-unknown="{{ _('Memory')|e }}"
+         data-title-card-failed="{{ _('Could not save title card.')|e }}"
+         data-select-id="{{ select_id if select_id else '' }}"
+         data-focus-field="{{ focus_field if focus_field else '' }}">
 
   <header class="studio-topbar">
     <a class="button ghost studio-back" href="{{ browse_return_url or '/browse' }}">{{ _('Back to Browse') }}</a>
@@ -184,10 +188,21 @@
         <ul class="studio-browser-list" id="studio-browser-story">
           {% for row in item_display %}
           {% set item = row.item %}
-          <li class="studio-browser-item {% if not item.available %}is-unavailable{% endif %}"
+          <li class="studio-browser-item {% if item.kind != 'title_card' and not item.available %}is-unavailable{% endif %}"
               data-studio-id="{{ item.id }}"
               draggable="{{ 'true' if item.available else 'false' }}">
-            {% if item.available and item.media_id %}
+            {% if item.kind == 'title_card' %}
+            <button type="button" class="studio-browser-pick"
+                    data-select-clip="{{ item.id }}">
+              <span class="studio-browser-thumb">
+                <span class="studio-titlecard-swatch" data-bg="{{ item.background or 'dark' }}" aria-hidden="true"></span>
+              </span>
+              <span class="studio-browser-meta">
+                <strong>{{ row.display_title }}</strong>
+                <span>{{ _('Title card') }}</span>
+              </span>
+            </button>
+            {% elif item.available and item.media_id %}
             <button type="button" class="studio-browser-pick"
                     data-select-clip="{{ item.id }}">
               <span class="studio-browser-thumb">
@@ -251,6 +266,10 @@
         {{ lucide('plus') }}
         <span class="studio-btn-label">{{ _('Add media from Browse') }}</span>
       </a>
+      <button type="button" class="button ghost studio-add-title-card studio-icon-button" id="studio-add-title-card">
+        {{ lucide('plus') }}
+        <span class="studio-btn-label">{{ _('Add title card') }}</span>
+      </button>
     </aside>
 
     <div class="studio-stage">
@@ -260,6 +279,10 @@
           <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
           <audio id="studio-music-audio" preload="metadata" hidden></audio>
+          <div id="studio-preview-titlecard" class="studio-preview-titlecard" hidden data-bg="dark">
+            <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-title"></p>
+            <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-subtitle"></p>
+          </div>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
             <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.') }}</p>
@@ -269,7 +292,9 @@
         <div class="studio-preview-empty panel empty">
           <h2>{{ _('Your story is empty') }}</h2>
           <p>{{ _('Add photos or videos from Browse, then arrange them in the Story track.') }}</p>
+          <p>{{ _('Or add a Title Card to start with a heading.') }}</p>
           <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
+          <button type="button" class="button ghost" id="studio-add-title-card-empty">{{ _('Add title card') }}</button>
         </div>
         {% endif %}
       </div>
@@ -336,7 +361,7 @@
                 <span class="studio-transition-chip" data-transition-label>{{ _('None') }}</span>
               </li>
               {% endif %}
-              <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
+              <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'title_card' %}is-title-card{% elif item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
                   data-studio-id="{{ item.id }}"
                   data-kind="{{ item.kind or 'unknown' }}"
                   data-available="{{ '1' if item.available else '0' }}"
@@ -348,7 +373,12 @@
                   data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
-                  data-thumb="{% if item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
+                  data-title="{{ (item.title_text or '')|e }}"
+                  data-subtitle="{{ (item.subtitle_text or '')|e }}"
+                  data-display-title="{{ (row.display_title or '')|e }}"
+                  data-display-subtitle="{{ (row.display_subtitle or '')|e }}"
+                  data-background="{{ (item.background or 'dark')|e }}"
+                  data-thumb="{% if item.kind != 'title_card' and item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
                   data-stream-url="{{ row.stream_url }}"
                   data-proxy-url="{{ row.proxy_url }}"
                   data-preview-url="{{ row.preview_url }}"
@@ -361,15 +391,17 @@
                 </button>
                 <button type="button" class="studio-clip-body" data-select-clip="{{ item.id }}">
                   <span class="studio-clip-thumb">
-                    {% if item.available and item.media_id %}
+                    {% if item.kind == 'title_card' %}
+                    <span class="studio-titlecard-swatch" data-bg="{{ item.background or 'dark' }}" aria-hidden="true"></span>
+                    {% elif item.available and item.media_id %}
                     <img src="/media/{{ item.media_id }}/thumb" alt="" loading="lazy" decoding="async">
                     {% else %}
                     <span class="thumb-placeholder" aria-hidden="true"></span>
                     {% endif %}
                   </span>
                   <span class="studio-clip-caption">
-                    <strong>{{ item.filename }}</strong>
-                    <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ _('Memory') }}{% endif %}</span>
+                    <strong>{% if item.kind == 'title_card' %}{{ row.display_title }}{% else %}{{ item.filename }}{% endif %}</strong>
+                    <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% elif item.kind == 'title_card' %}{{ _('Title card') }}{% else %}{{ _('Memory') }}{% endif %}</span>
                     <span class="studio-clip-duration" data-clip-duration>
                       {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% else %}—{% endif %}
                     </span>
@@ -496,6 +528,36 @@
           <span class="studio-btn-label">{{ _('Remove') }}</span>
         </button>
         <p class="hint">{{ _('Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
+      </div>
+
+      <div class="studio-inspector-panel" id="inspector-titlecard" hidden>
+        <p class="studio-inspector-kind">{{ _('Title card') }}</p>
+        <label class="studio-inspector-field">
+          <span>{{ _('Title') }}</span>
+          <input type="text" id="inspector-titlecard-title" maxlength="80" aria-label="{{ _('Title') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Subtitle') }}</span>
+          <input type="text" id="inspector-titlecard-subtitle" maxlength="120" aria-label="{{ _('Subtitle') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Duration (s)') }}</span>
+          <input type="number" id="inspector-titlecard-duration" min="1" max="10" step="0.1" inputmode="decimal"
+                 aria-label="{{ _('Title card duration in seconds') }}">
+        </label>
+        <fieldset class="studio-inspector-field studio-titlecard-bg">
+          <legend>{{ _('Background') }}</legend>
+          <label><input type="radio" name="inspector-titlecard-bg" value="dark"> {{ _('Dark') }}</label>
+          <label><input type="radio" name="inspector-titlecard-bg" value="light"> {{ _('Light') }}</label>
+          <label><input type="radio" name="inspector-titlecard-bg" value="accent"> {{ _('Accent') }}</label>
+        </fieldset>
+        <form method="post" id="inspector-titlecard-remove-form" class="studio-inspector-remove">
+          <button type="submit" class="button ghost studio-icon-button"
+                  title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
+            {{ lucide('trash-2') }}
+            <span class="studio-btn-label">{{ _('Remove from story') }}</span>
+          </button>
+        </form>
       </div>
     </aside>
   </div>
