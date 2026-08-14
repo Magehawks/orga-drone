@@ -20,9 +20,8 @@ behind their adventures.**
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(order + estimated runtime; multiple local Studio projects; synced Story
-preview; local MP4 export with configurable resolution; music not included
-in export yet).
+(order + estimated runtime; synced Story preview; local MP4 export with
+configurable resolution; music not included in export yet).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -131,7 +130,6 @@ professional video-editing knowledge.
 | Arrange order | **Available now** |
 | Estimated runtime (photo duration planning) | **Available now** |
 | Persisted Studio project title (non-destructive project/clip model) | **Available now** |
-| Multiple local Studio projects (browser, switch, rename, delete) | **Available now** |
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
@@ -201,12 +199,11 @@ See `README.md` for the detailed feature status table. In short:
 - Import and organize drone (and related) photos and videos from local folders
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
-- **Studio:** local project browser and switcher over `studio_projects` /
-  `studio_clips` (create, open, rename, delete; last-opened restored). Creator
-  Studio UI (browser, preview, transport, Story track, music slot, inspector,
-  export dialog) for the open project. Persisted today: editable project title;
-  order; estimated runtime; optional video source start/end after Cut. Story
-  preview plays photos/videos in sync with the playhead. Local MP4 export with
+- **Studio:** single workspace with Creator Studio UI (browser, preview,
+  transport, Story track, music slot, inspector, export dialog). Persisted
+  today: `studio_projects` + `studio_clips` (editable project title; order;
+  estimated runtime; optional video source start/end after Cut). Story preview
+  plays photos/videos in sync with the playhead. Local MP4 export with
   configurable resolution (desktop); music and transitions remain UI stubs and
   are not included in the render. Media files are referenced, never copied or
   modified.
@@ -220,10 +217,9 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, Studio
+- There is **no** multi-project albums model, plugin API, Studio
   music-in-export, or CI-built multi-OS installer pipeline in the
-  current tree. Studio supports multiple local edit projects; albums for
-  organizing the media library remain Later.
+  current tree.
 
 ## Studio MVP (target)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
 from orga_drone.config import settings
-from orga_drone.db import Database, StudioClip, StudioProject
+from orga_drone.db import Database, StudioClip
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.export.studio_encoder import (
     ProgressCallback,
@@ -130,20 +130,6 @@ def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
     return _best(pairs_ff)
 
 
-def _resolve_export_project(
-    db: Database, project_id: int | None
-) -> StudioProject:
-    if project_id is not None:
-        project = db.get_studio_project(project_id)
-        if project is None:
-            raise StudioExportError("Studio project not found.")
-        return project
-    project = db.resolve_studio_page_project()
-    if project is None:
-        raise StudioExportError("No Studio project is open.")
-    return project
-
-
 def collect_project_video_heights(db: Database, project_id: int | None = None) -> list[int | None]:
     """Heights for available video clips in the Studio project."""
     heights: list[int | None] = []
@@ -170,7 +156,13 @@ def collect_project_video_heights(db: Database, project_id: int | None = None) -
 
 
 def build_export_options_payload(db: Database, project_id: int | None = None) -> dict:
-    project = _resolve_export_project(db, project_id)
+    project = (
+        db.get_studio_project(project_id)
+        if project_id is not None
+        else db.ensure_default_studio_project()
+    )
+    if project is None:
+        raise StudioExportError("Studio project not found.")
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
     default_h = default_export_height(heights)
@@ -235,7 +227,13 @@ def prepare_studio_export(
     project_id: int | None = None,
 ) -> StudioExportConfig:
     """Validate export request and build a codec-agnostic config (no render)."""
-    project = _resolve_export_project(db, project_id)
+    project = (
+        db.get_studio_project(project_id)
+        if project_id is not None
+        else db.ensure_default_studio_project()
+    )
+    if project is None:
+        raise StudioExportError("Studio project not found.")
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
     allowed = {o.height for o in options}

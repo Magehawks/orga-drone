@@ -527,14 +527,7 @@ def create_app() -> FastAPI:
             limit=pagination["page_size"],
             offset=pagination["offset"],
         )
-        open_project = db.resolve_studio_page_project()
-        studio_paths = (
-            db.studio_paths_among(
-                [it.path for it in items], project_id=open_project.id
-            )
-            if open_project is not None
-            else set()
-        )
+        studio_paths = db.studio_paths_among([it.path for it in items])
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
@@ -756,12 +749,6 @@ def create_app() -> FastAPI:
         map_return_url, map_from_qs = map_return_from_request(request, item.id)
         browse_return_url, browse_from_qs = browse_return_from_request(request)
         return_qs = map_from_qs or browse_from_qs
-        open_detail = db.resolve_studio_page_project()
-        in_studio = (
-            db.is_in_studio(item.path, project_id=open_detail.id)
-            if open_detail is not None
-            else False
-        )
         return render(
             request,
             "detail.html",
@@ -797,141 +784,90 @@ def create_app() -> FastAPI:
             browse_return_url=browse_return_url,
             browse_from_qs=browse_from_qs,
             return_qs=return_qs,
-            in_studio=in_studio,
+            in_studio=db.is_in_studio(item.path),
         )
 
     @app.get("/studio", response_class=HTMLResponse)
     async def studio_page(
         request: Request,
         msg: str | None = None,
-        project_id: int | None = None,
-    ) -> Response:
-        if project_id is not None:
-            target = db.get_studio_project(project_id)
-            if target is None:
-                raise HTTPException(status_code=404, detail="studio project not found")
-            db.set_open_studio_project_id(target.id)
-            suffix = f"?msg={msg}" if msg else ""
-            return RedirectResponse(url=f"/studio{suffix}", status_code=303)
-
-        project = db.resolve_studio_page_project()
-        projects = db.list_studio_projects()
-        studio_mode = "editor" if project is not None else "browser"
-        items = db.list_studio_items(project.id) if project is not None else []
+    ) -> HTMLResponse:
+        project = db.ensure_default_studio_project()
+        items = db.list_studio_items(project.id)
         summary = summarize_studio_items(items)
         item_display: list[dict[str, Any]] = []
-        favorite_media: list[Any] = []
-        if project is not None:
-            for it in items:
-                seconds = effective_seconds(
-                    kind=it.kind or "unknown",
-                    photo_duration_s=it.photo_duration_s,
-                    duration_s=it.duration_s,
-                    available=it.available,
-                    source_in_s=it.source_start,
-                    source_out_s=it.source_end,
-                )
-                stream_url = ""
-                proxy_url = ""
-                preview_url = ""
-                has_proxy = False
-                can_play = False
-                if it.available and it.media_id is not None:
-                    media_row = db.get_media(it.media_id)
-                    if media_row is not None:
-                        media_path = resolve_media_file(db, media_row)
-                        can_play = media_path is not None
-                        if media_path is not None:
-                            stream_url = f"/media/{it.media_id}/stream"
-                            kind = (
-                                it.kind
-                                if it.kind in {"photo", "video"}
-                                else media_row.kind
-                            )
-                            if kind == "video":
-                                proxy_path = resolve_proxy_file(db, media_row)
-                                has_proxy = proxy_path is not None
-                                if has_proxy:
-                                    proxy_url = f"/media/{it.media_id}/proxy"
-                            elif kind == "photo":
-                                if browser_can_display_photo(media_path):
-                                    preview_url = stream_url
-                                else:
-                                    preview_url = f"/media/{it.media_id}/preview"
-                                if not preview_url:
-                                    preview_url = f"/media/{it.media_id}/thumb"
-                item_display.append(
-                    {
-                        "item": it,
-                        "effective_duration_s": seconds,
-                        "display_duration_s": (
-                            it.photo_duration_s
-                            if it.kind == "photo" and it.photo_duration_s is not None
-                            else (
-                                DEFAULT_PHOTO_DURATION_S
-                                if it.kind == "photo"
-                                else seconds
-                            )
-                        ),
-                        "stream_url": stream_url,
-                        "proxy_url": proxy_url,
-                        "preview_url": preview_url,
-                        "has_proxy": has_proxy,
-                        "can_play": can_play,
-                    }
-                )
-            studio_paths = {it.media_path for it in items}
-            favorite_media = [
-                fav
-                for fav in db.list_media(
-                    favorite=True, sort="recorded_at", order="desc", limit=48
-                )
-                if fav.path not in studio_paths
-            ]
+        for it in items:
+            seconds = effective_seconds(
+                kind=it.kind or "unknown",
+                photo_duration_s=it.photo_duration_s,
+                duration_s=it.duration_s,
+                available=it.available,
+                source_in_s=it.source_start,
+                source_out_s=it.source_end,
+            )
+            stream_url = ""
+            proxy_url = ""
+            preview_url = ""
+            has_proxy = False
+            can_play = False
+            if it.available and it.media_id is not None:
+                media_row = db.get_media(it.media_id)
+                if media_row is not None:
+                    media_path = resolve_media_file(db, media_row)
+                    can_play = media_path is not None
+                    if media_path is not None:
+                        stream_url = f"/media/{it.media_id}/stream"
+                        kind = it.kind if it.kind in {"photo", "video"} else media_row.kind
+                        if kind == "video":
+                            proxy_path = resolve_proxy_file(db, media_row)
+                            has_proxy = proxy_path is not None
+                            if has_proxy:
+                                proxy_url = f"/media/{it.media_id}/proxy"
+                        elif kind == "photo":
+                            if browser_can_display_photo(media_path):
+                                preview_url = stream_url
+                            else:
+                                preview_url = f"/media/{it.media_id}/preview"
+                            # Always keep a JPEG thumb as last-resort preview source.
+                            if not preview_url:
+                                preview_url = f"/media/{it.media_id}/thumb"
+            item_display.append(
+                {
+                    "item": it,
+                    "effective_duration_s": seconds,
+                    "display_duration_s": (
+                        it.photo_duration_s
+                        if it.kind == "photo" and it.photo_duration_s is not None
+                        else (
+                            DEFAULT_PHOTO_DURATION_S
+                            if it.kind == "photo"
+                            else seconds
+                        )
+                    ),
+                    "stream_url": stream_url,
+                    "proxy_url": proxy_url,
+                    "preview_url": preview_url,
+                    "has_proxy": has_proxy,
+                    "can_play": can_play,
+                }
+            )
+        studio_paths = {it.media_path for it in items}
+        favorite_media = [
+            fav
+            for fav in db.list_media(favorite=True, sort="recorded_at", order="desc", limit=48)
+            if fav.path not in studio_paths
+        ]
         return render(
             request,
             "studio.html",
             items=items,
             item_display=item_display,
             project=project,
-            projects=projects,
-            studio_mode=studio_mode,
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             favorite_media=favorite_media,
             flash_msg=msg,
             nav_active="studio",
-        )
-
-    def _studio_project_json(project: Any) -> dict[str, Any]:
-        return {
-            "id": project.id,
-            "title": project.title,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-            "clip_count": getattr(project, "clip_count", 0),
-        }
-
-    @app.get("/api/studio/projects")
-    async def api_studio_projects_list() -> JSONResponse:
-        projects = db.list_studio_projects()
-        opened = db.get_open_studio_project()
-        return JSONResponse(
-            {
-                "ok": True,
-                "current_id": opened.id if opened is not None else None,
-                "projects": [_studio_project_json(p) for p in projects],
-            }
-        )
-
-    @app.post("/api/studio/projects/{project_id}/open")
-    async def api_studio_project_open(project_id: int) -> JSONResponse:
-        project = db.get_studio_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="studio project not found")
-        db.set_open_studio_project_id(project.id)
-        return JSONResponse(
-            {"ok": True, "id": project.id, "title": project.title}
         )
 
     @app.patch("/api/studio/projects/{project_id}")
@@ -1017,15 +953,10 @@ def create_app() -> FastAPI:
                 status_code=400, detail="ordered_ids must be a list of integers"
             )
         try:
-            open_project = db.resolve_studio_page_project()
-            if open_project is None:
-                raise HTTPException(status_code=400, detail="no studio project open")
-            ordered = db.reorder_studio_items(
-                [int(x) for x in raw_ids], project_id=open_project.id
-            )
+            ordered = db.reorder_studio_items([int(x) for x in raw_ids])
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        items = db.list_studio_items(open_project.id)
+        items = db.list_studio_items()
         summary = summarize_studio_items(items)
         return JSONResponse(
             {"ok": True, "ordered_ids": ordered, "summary": summary.as_dict()}
@@ -1057,7 +988,7 @@ def create_app() -> FastAPI:
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        items = db.list_studio_items(item.project_id)
+        items = db.list_studio_items()
         summary = summarize_studio_items(items)
         seconds = effective_seconds(
             kind=item.kind or "unknown",
@@ -1100,7 +1031,7 @@ def create_app() -> FastAPI:
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        items = db.list_studio_items(left.project_id)
+        items = db.list_studio_items()
         summary = summarize_studio_items(items)
         return JSONResponse(
             {
@@ -1240,9 +1171,6 @@ def create_app() -> FastAPI:
         item = db.get_media(media_id)
         if not item:
             raise HTTPException(status_code=404, detail="Not found")
-        open_project = db.resolve_studio_page_project()
-        if open_project is None:
-            return RedirectResponse(url="/studio?msg=studio_need_project", status_code=303)
         _sid, _created = db.add_studio_item(
             item.path,
             identity_key=make_identity_key(
@@ -1251,7 +1179,6 @@ def create_app() -> FastAPI:
             filename=item.filename,
             recorded_at=item.recorded_at,
             kind=item.kind,
-            project_id=open_project.id,
             source_media_id=item.id,
         )
         base = studio_add_return_url(media_id, return_to)
@@ -1270,10 +1197,7 @@ def create_app() -> FastAPI:
 
     @app.post("/studio/clear")
     async def studio_clear() -> RedirectResponse:
-        open_project = db.resolve_studio_page_project()
-        if open_project is None:
-            return RedirectResponse(url="/studio?msg=studio_need_project", status_code=303)
-        db.clear_studio(open_project.id)
+        db.clear_studio()
         return RedirectResponse(url="/studio?msg=studio_cleared", status_code=303)
 
     @app.post("/media/{media_id}/meta")
