@@ -70,6 +70,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
 | `studio_clips` | Story clips per project (path + identity + optional `source_media_id`; start/end, speed, volume, transition, effect_settings JSON; survives rescan) |
+| `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
 
 ## Scan / index pipeline
@@ -78,7 +79,7 @@ Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
 1. Recursively find media files under a root
 2. Clear indexed media for that root (**full rescan**; `media_meta` and
-   `studio_items` kept)
+   `studio_clips` kept)
 3. Parse → upsert assets/media
 4. Relink user meta + Studio membership + apply auto-tags
 5. Rebuild flows, then sessions
@@ -96,8 +97,10 @@ at a time.
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
-Studio page: Jinja layout + `static/js/studio.js` (project title, reorder/duration/cut APIs;
-synced Story preview via `/stream`/`/proxy`; local MP4 export via async job
+Studio page: Jinja layout + `static/js/studio.js` (project browser/switcher,
+project title, reorder/duration/cut APIs; `GET /studio` restores the last-opened
+project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4
+export via async job
 `POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
 determinate progress in the export dialog (elapsed time, ETA, current clip
 label; within-clip ffmpeg progress). Desktop save dialog; music/transitions
@@ -125,7 +128,7 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 1. Stay local-first; do not require cloud accounts.
 2. Do not claim plugins, albums, or incremental scan until implemented.
 3. Prefer small modules in existing package areas over new top-level frameworks.
-4. Preserve `media_meta` and `studio_items` across rescans.
+4. Preserve `media_meta` and `studio_clips` across rescans.
 5. Path operations must stay confined under library roots.
 6. Record significant architecture choices in `docs/decisions/`.
 

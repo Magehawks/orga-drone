@@ -29,7 +29,8 @@ Highlights:
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   music slot, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
-  source start/end; synced Story preview playback; local MP4 export with
+  source start/end; project browser/switcher for multiple local edit projects;
+  synced Story preview playback; local MP4 export with
   configurable resolution; music not included in export yet)
 
 ## Next (possible near-term)
@@ -42,7 +43,8 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 3. Export cancel / abort during long renders
 4. **Incremental or cheaper rescans** (clearer scan progress is available)
 5. **Broader multi-brand parsers** beyond DJI-first depth
-6. **Projects or albums** for organizing media sets (Studio is a first slice)
+6. **Library albums** for organizing media sets (Studio already has multiple
+   local edit projects; albums are a separate library concern)
 7. **CI-built installers** (tests/releases automation; multi-OS later)
 8. Online geocoding providers (place tags are offline today)
 

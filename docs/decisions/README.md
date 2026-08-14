@@ -31,3 +31,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0003](0003-studio-video-cut-offsets.md) | Studio video cut via source in/out offsets | Accepted |
 | [0004](0004-studio-project-clip-model.md) | Studio non-destructive project and clip model | Accepted |
 | [0005](0005-studio-export-resolution.md) | Studio export resolution and encoder boundary | Accepted |
+| [0006](0006-studio-project-browser.md) | Studio project browser and last-opened project | Proposed |
