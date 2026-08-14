@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from orga_drone.export.jobs import ExportJobStore, estimate_eta_s
 from orga_drone.export.studio_encoder import (
     export_progress_percent,
@@ -104,4 +106,40 @@ def test_export_job_store_lifecycle() -> None:
     assert done.percent == 100
     assert done.output_path == "/tmp/a.mp4"
     assert done.to_dict()["eta_s"] is None
+    assert done.to_dict()["filename"] == "a.mp4"
+    last = store.get_last_success()
+    assert last is not None
+    assert last.job_id == job.id
+    assert last.filename == "a.mp4"
     assert store.try_create() is not None
+
+
+def test_last_success_survives_job_ttl() -> None:
+    store = ExportJobStore(finished_ttl_s=0.0, max_finished=0)
+    job = store.try_create()
+    assert job is not None
+    store.complete(job.id, output_path="/tmp/story.mp4", directory="/tmp")
+    assert store.get(job.id) is None
+    last = store.get_last_success()
+    assert last is not None
+    assert last.job_id == job.id
+    assert Path(last.output_path) == Path("/tmp/story.mp4")
+    assert last.filename == "story.mp4"
+    assert last.directory == "/tmp"
+
+
+def test_fail_does_not_clear_last_success() -> None:
+    store = ExportJobStore()
+    first = store.try_create()
+    assert first is not None
+    store.complete(first.id, output_path="/tmp/ok.mp4", directory="/tmp")
+    second = store.try_create()
+    assert second is not None
+    store.fail(second.id, "encoder failed")
+    last = store.get_last_success()
+    assert last is not None
+    assert last.job_id == first.id
+    assert last.filename == "ok.mp4"
+    failed = store.get(second.id)
+    assert failed is not None
+    assert failed.state == "failed"

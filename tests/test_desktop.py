@@ -7,12 +7,20 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
+import pytest
 import uvicorn
 
+from orga_drone import desktop
 from orga_drone.desktop import (
+    DesktopActionUnavailable,
+    can_open_local_file,
+    can_reveal_local_file,
     configure_stdio_and_logging,
     find_listen_port,
+    open_local_file,
+    reveal_local_file,
     uvicorn_log_config,
     wait_http,
     wait_server_ready,
@@ -95,3 +103,61 @@ def test_wait_tcp_times_out_on_closed_port() -> None:
     started = time.monotonic()
     assert wait_tcp("127.0.0.1", port, timeout_s=0.3) is False
     assert time.monotonic() - started >= 0.25
+
+
+def test_can_open_and_reveal_only_on_win32(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    assert can_open_local_file() is True
+    assert can_reveal_local_file() is True
+    monkeypatch.setattr(desktop.sys, "platform", "linux")
+    assert can_open_local_file() is False
+    assert can_reveal_local_file() is False
+
+
+def test_open_local_file_unavailable_off_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(desktop.sys, "platform", "darwin")
+    with pytest.raises(DesktopActionUnavailable):
+        open_local_file(Path("/tmp/a.mp4"))
+
+
+def test_reveal_local_file_unavailable_off_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(desktop.sys, "platform", "linux")
+    with pytest.raises(DesktopActionUnavailable):
+        reveal_local_file(Path("/tmp/a.mp4"))
+
+
+def test_open_local_file_uses_startfile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    called: list[str] = []
+    monkeypatch.setattr(
+        desktop.os, "startfile", lambda path: called.append(path), raising=False
+    )
+    path = tmp_path / "story.mp4"
+    open_local_file(path)
+    assert called == [str(path)]
+
+
+def test_reveal_local_file_explorer_argv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def fake_popen(args: list[str], **kwargs: object) -> object:
+        calls.append((list(args), kwargs))
+        return object()
+
+    monkeypatch.setattr(desktop.subprocess, "Popen", fake_popen)
+    path = tmp_path / "story.mp4"
+    path.write_bytes(b"mp4")
+    reveal_local_file(path)
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args == ["explorer", "/select,", str(path.resolve())]
+    assert kwargs.get("shell") is False

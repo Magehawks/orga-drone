@@ -31,7 +31,8 @@ Highlights:
   `studio_clips` with editable title, order, estimated runtime, video Cut via
   source start/end; project browser/switcher for multiple local edit projects;
   synced Story preview playback; local MP4 export with
-  configurable resolution; music not included in export yet)
+  configurable resolution; after success, Open video / Show in folder on
+  Windows; music not included in export yet)
 
 ## Next (possible near-term)
 
@@ -39,18 +40,17 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
 1. **Optional one music track** for Studio export (still no pro editor)
-2. **Open / reveal exported file** on desktop (share step without social APIs)
-3. Export cancel / abort during long renders
-4. **Incremental or cheaper rescans** (clearer scan progress is available)
-5. **Broader multi-brand parsers** beyond DJI-first depth
-6. **Library albums** for organizing media sets (Studio already has multiple
+2. Export cancel / abort during long renders
+3. **Incremental or cheaper rescans** (clearer scan progress is available)
+4. **Broader multi-brand parsers** beyond DJI-first depth
+5. **Library albums** for organizing media sets (Studio already has multiple
    local edit projects; albums are a separate library concern)
-7. **CI-built installers** (tests/releases automation; multi-OS later)
-8. Online geocoding providers (place tags are offline today)
+6. **CI-built installers** (tests/releases automation; multi-OS later)
+7. Online geocoding providers (place tags are offline today)
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
-dedicated product slice. Local MP4 export already exists; music-in-export and
-share/reveal polish remain next.
+dedicated product slice. Local MP4 export and open/reveal of the finished file
+already exist on Windows desktop; music-in-export remains next.
 
 ## Later (vision)
 

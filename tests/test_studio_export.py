@@ -227,6 +227,9 @@ def test_http_export_options_and_fake_export(
     assert job_body["state"] == "completed"
     assert job_body["percent"] == 100
     assert job_body["output_path"] == str(out.resolve())
+    assert job_body["filename"] == "Alps Cut.mp4"
+    assert "open_available" in job_body
+    assert "reveal_available" in job_body
     assert "elapsed_s" in job_body
     assert fake.progress and fake.progress[0].get("current_label")
     assert out.is_file()
@@ -504,3 +507,153 @@ def test_export_options_without_video_resolution(
     assert body["options"] == []
     assert body["default_height"] is None
     assert body["has_video_resolution"] is False
+
+
+def _studio_export_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    monkeypatch.setattr(
+        "orga_drone.app_prefs.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    app = create_app()
+    return app, TestClient(app)
+
+
+def test_export_open_uses_last_success_not_client_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, client = _studio_export_app(tmp_path, monkeypatch)
+    opened: list[Path] = []
+    monkeypatch.setattr("orga_drone.desktop.can_open_local_file", lambda: True)
+    monkeypatch.setattr(
+        "orga_drone.desktop.open_local_file", lambda path: opened.append(path)
+    )
+
+    exported = tmp_path / "Videos" / "story.mp4"
+    exported.parent.mkdir(parents=True)
+    exported.write_bytes(b"mp4-bytes")
+    decoy = tmp_path / "Videos" / "evil.mp4"
+    decoy.write_bytes(b"nope")
+
+    job = app.state.export_jobs.try_create()
+    assert job is not None
+    app.state.export_jobs.complete(
+        job.id,
+        output_path=str(exported.resolve()),
+        directory=str(exported.parent.resolve()),
+    )
+
+    res = client.post(
+        "/api/studio/export/open",
+        json={"path": str(decoy.resolve())},
+    )
+    assert res.status_code == 200
+    assert res.json() == {
+        "ok": True,
+        "action": "open",
+        "filename": "story.mp4",
+    }
+    assert opened == [Path(str(exported.resolve()))]
+
+
+def test_export_reveal_uses_last_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, client = _studio_export_app(tmp_path, monkeypatch)
+    revealed: list[Path] = []
+    monkeypatch.setattr("orga_drone.desktop.can_reveal_local_file", lambda: True)
+    monkeypatch.setattr(
+        "orga_drone.desktop.reveal_local_file", lambda path: revealed.append(path)
+    )
+
+    exported = tmp_path / "story.mp4"
+    exported.write_bytes(b"mp4-bytes")
+    job = app.state.export_jobs.try_create()
+    assert job is not None
+    app.state.export_jobs.complete(
+        job.id,
+        output_path=str(exported.resolve()),
+        directory=str(exported.parent.resolve()),
+    )
+
+    res = client.post("/api/studio/export/reveal")
+    assert res.status_code == 200
+    assert res.json() == {
+        "ok": True,
+        "action": "reveal",
+        "filename": "story.mp4",
+    }
+    assert revealed == [Path(str(exported.resolve()))]
+
+
+def test_export_open_404_when_file_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, client = _studio_export_app(tmp_path, monkeypatch)
+    monkeypatch.setattr("orga_drone.desktop.can_open_local_file", lambda: True)
+    opened: list[Path] = []
+    monkeypatch.setattr(
+        "orga_drone.desktop.open_local_file", lambda path: opened.append(path)
+    )
+
+    exported = tmp_path / "gone.mp4"
+    exported.write_bytes(b"mp4-bytes")
+    job = app.state.export_jobs.try_create()
+    assert job is not None
+    app.state.export_jobs.complete(
+        job.id,
+        output_path=str(exported.resolve()),
+        directory=str(exported.parent.resolve()),
+    )
+    exported.unlink()
+
+    res = client.post("/api/studio/export/open")
+    assert res.status_code == 404
+    body = res.json()
+    assert body["ok"] is False
+    assert body["error"] == "missing_file"
+    assert opened == []
+
+
+def test_export_open_404_without_last_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _app, client = _studio_export_app(tmp_path, monkeypatch)
+    monkeypatch.setattr("orga_drone.desktop.can_open_local_file", lambda: True)
+    res = client.post("/api/studio/export/open")
+    assert res.status_code == 404
+    assert res.json()["error"] == "missing_file"
+
+
+def test_export_open_503_when_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, client = _studio_export_app(tmp_path, monkeypatch)
+    monkeypatch.setattr("orga_drone.desktop.can_open_local_file", lambda: False)
+    exported = tmp_path / "story.mp4"
+    exported.write_bytes(b"mp4")
+    job = app.state.export_jobs.try_create()
+    assert job is not None
+    app.state.export_jobs.complete(
+        job.id,
+        output_path=str(exported.resolve()),
+        directory=str(exported.parent.resolve()),
+    )
+    res = client.post("/api/studio/export/open")
+    assert res.status_code == 503
+    assert res.json() == {"status": "unavailable", "error": "open_unavailable"}
+
+
+def test_export_reveal_503_when_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _app, client = _studio_export_app(tmp_path, monkeypatch)
+    monkeypatch.setattr("orga_drone.desktop.can_reveal_local_file", lambda: False)
+    res = client.post("/api/studio/export/reveal")
+    assert res.status_code == 503
+    assert res.json() == {"status": "unavailable", "error": "reveal_unavailable"}

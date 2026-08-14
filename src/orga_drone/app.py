@@ -1224,13 +1224,96 @@ def create_app() -> FastAPI:
         threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
         return JSONResponse({"ok": True, "job_id": job.id})
 
+    def _export_action_flags() -> dict[str, bool]:
+        from orga_drone.desktop import can_open_local_file, can_reveal_local_file
+
+        return {
+            "open_available": can_open_local_file(),
+            "reveal_available": can_reveal_local_file(),
+        }
+
+    def _studio_export_open_or_reveal(action: str) -> JSONResponse:
+        from orga_drone.desktop import (
+            DesktopActionUnavailable,
+            can_open_local_file,
+            can_reveal_local_file,
+            open_local_file,
+            reveal_local_file,
+        )
+
+        unavailable_error = (
+            "open_unavailable" if action == "open" else "reveal_unavailable"
+        )
+        available = can_open_local_file() if action == "open" else can_reveal_local_file()
+        if not available:
+            return JSONResponse(
+                {"status": "unavailable", "error": unavailable_error},
+                status_code=503,
+            )
+
+        store: ExportJobStore = app.state.export_jobs
+        last = store.get_last_success()
+        if last is None:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "missing_file",
+                    "detail": "No completed export is available.",
+                },
+                status_code=404,
+            )
+        path = Path(last.output_path)
+        if (
+            not path.is_absolute()
+            or path.suffix.lower() != ".mp4"
+            or not path.is_file()
+        ):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "missing_file",
+                    "detail": "The exported file is no longer available.",
+                },
+                status_code=404,
+            )
+        try:
+            if action == "open":
+                open_local_file(path)
+            else:
+                reveal_local_file(path)
+        except DesktopActionUnavailable:
+            return JSONResponse(
+                {"status": "unavailable", "error": unavailable_error},
+                status_code=503,
+            )
+        except OSError as exc:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "missing_file",
+                    "detail": str(exc) or "The exported file is no longer available.",
+                },
+                status_code=404,
+            )
+        return JSONResponse(
+            {"ok": True, "action": action, "filename": last.filename}
+        )
+
     @app.get("/api/studio/export/jobs/{job_id}")
     async def api_studio_export_job(job_id: str) -> JSONResponse:
         store: ExportJobStore = app.state.export_jobs
         job = store.get(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Export job not found")
-        return JSONResponse({"ok": True, **job.to_dict()})
+        return JSONResponse({"ok": True, **job.to_dict(), **_export_action_flags()})
+
+    @app.post("/api/studio/export/open")
+    async def api_studio_export_open() -> JSONResponse:
+        return await asyncio.to_thread(_studio_export_open_or_reveal, "open")
+
+    @app.post("/api/studio/export/reveal")
+    async def api_studio_export_reveal() -> JSONResponse:
+        return await asyncio.to_thread(_studio_export_open_or_reveal, "reveal")
 
     @app.post("/media/{media_id}/studio/add")
     async def studio_add(

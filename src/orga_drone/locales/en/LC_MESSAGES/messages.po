@@ -73,3 +73,24 @@ msgstr "Could not delete Studio project."
 msgid "Open another Studio project. Source media files stay unchanged."
 msgstr "Open another Studio project. Source media files stay unchanged."
 
+msgid "Exported {filename}."
+msgstr "Exported {filename}."
+
+msgid "Open video"
+msgstr "Open video"
+
+msgid "Show in folder"
+msgstr "Show in folder"
+
+msgid "Dismiss"
+msgstr "Dismiss"
+
+msgid "The exported file is no longer available."
+msgstr "The exported file is no longer available."
+
+msgid "Opening the exported video is not available on this device."
+msgstr "Opening the exported video is not available on this device."
+
+msgid "Showing the file in its folder is not available on this device."
+msgstr "Showing the file in its folder is not available on this device."
+
