@@ -6,7 +6,8 @@ Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
-with configurable resolution; music not included in export yet).
+with configurable resolution; after export, Open video / Show in folder on
+Windows desktop; music not included in export yet).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -52,7 +53,7 @@ Before implementing a feature, verify it improves this journey (see
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); music stub |
-| Share | How do I share? | Local files on disk; Studio MP4 export available; music-in-export / reveal = target MVP |
+| Share | How do I share? | Local files on disk; Studio MP4 export; Open video / Show in folder after export (Windows); music-in-export = target MVP |
 
 ## Available now (implemented)
 
@@ -69,6 +70,7 @@ The application helps users:
   estimated runtime; simple video Cut via source start/end; Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
   with the playhead; local MP4 export with configurable resolution on desktop;
+  after a successful export, Open video / Show in folder on Windows;
   music remains a UI stub and is not mixed into the render)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
@@ -100,8 +102,9 @@ The application helps users:
 
 ## Possible future capabilities (roadmap / vision)
 
-- Studio MVP target: optional music-in-export, share/reveal local result
-  (basic MP4 export with resolution choice is Available now)
+- Studio MVP target: optional music-in-export
+  (basic MP4 export with resolution choice and open/reveal of the finished
+  file are Available now on Windows desktop)
 - albums for organizing media sets (Studio edit projects are Available now)
 - plugin architecture and community integrations
 - semantic search or other optional intelligent features (only if justified)

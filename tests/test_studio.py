@@ -383,6 +383,11 @@ def test_http_studio_creator_shell_with_items(
     assert 'id="studio-export-dialog"' in html
     assert "studio-export-resolution" in html
     assert 'id="studio-export-progress"' in html
+    assert 'id="studio-export-success"' in html
+    assert "studio-export-success flash" not in html
+    success_idx = html.find('id="studio-export-success"')
+    success_tag = html[success_idx : html.find(">", success_idx) + 1]
+    assert "flash" not in success_tag
     assert "Export MP4" in html or "MP4 exportieren" in html
     assert "Preview plays Story media" in html or "Preview spielt" in html
     assert "music is not included yet" in html or "Musik ist noch nicht enthalten" in html

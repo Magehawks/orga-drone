@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -112,6 +114,40 @@ class FolderPickerError(Exception):
 
 class SaveFilePickerError(Exception):
     """Raised when a native save-file dialog cannot be shown."""
+
+
+class DesktopActionUnavailable(Exception):
+    """Raised when opening or revealing a local file is not supported."""
+
+
+def can_open_local_file() -> bool:
+    return sys.platform == "win32"
+
+
+def can_reveal_local_file() -> bool:
+    return sys.platform == "win32"
+
+
+def open_local_file(path: Path) -> None:
+    """Open ``path`` with the OS default application (Windows)."""
+    if not can_open_local_file():
+        raise DesktopActionUnavailable(
+            "Opening local files is not available on this platform."
+        )
+    os.startfile(str(path))  # type: ignore[attr-defined]
+
+
+def reveal_local_file(path: Path) -> None:
+    """Reveal ``path`` in the file manager (Windows Explorer)."""
+    if not can_reveal_local_file():
+        raise DesktopActionUnavailable(
+            "Revealing files in the folder is not available on this platform."
+        )
+    # Explorer often exits 1 even on success; do not treat that as failure.
+    subprocess.Popen(
+        ["explorer", "/select,", str(path.resolve())],
+        shell=False,
+    )
 
 
 def pick_folder(*, directory: str = "") -> str | None:

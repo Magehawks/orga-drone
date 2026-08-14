@@ -41,7 +41,7 @@ Media files stay on disk under user-chosen library roots.
 |------|----------------|
 | `app.py` | FastAPI routes (HTML + APIs) |
 | `config.py` | Settings, paths, env |
-| `desktop.py` | Desktop window / port discovery / native folder picker (pywebview) |
+| `desktop.py` | Desktop window / port discovery / native folder + save pickers; Windows open/reveal of local files |
 | `db/` | Schema, migrations, queries |
 | `scan/` | Full rescan of library roots |
 | `parse/` | Filenames, SRT, EXIF, generic media |
@@ -50,7 +50,7 @@ Media files stay on disk under user-chosen library roots.
 | `dupes/` | Heuristic duplicate detection |
 | `geocode/` | Offline reverse geocode + cache |
 | `ops/` | Rename, flow merge |
-| `export/` | Spot GeoJSON; Studio MP4 config + ffmpeg encoder adapter |
+| `export/` | Spot GeoJSON; Studio MP4 config + ffmpeg encoder; in-memory export jobs + last-success slot |
 | `studio_export*.py` / `app_prefs.py` | Studio export orchestration, resolution rules, last-dir prefs |
 | `thumbs.py` | Thumbnail / preview generation |
 | `i18n.py` + `locales/` | DE/EN strings |
@@ -103,7 +103,10 @@ project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4
 export via async job
 `POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
 determinate progress in the export dialog (elapsed time, ETA, current clip
-label; within-clip ffmpeg progress). Desktop save dialog; music/transitions
+label; within-clip ffmpeg progress). On success the dialog closes and Studio
+shows a dismissible banner with Open video / Show in folder
+(`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
+successful output only). Desktop save dialog; music/transitions
 remain client UI stubs). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.

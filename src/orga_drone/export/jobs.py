@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 ACTIVE_STATES = frozenset({"pending", "running"})
@@ -53,6 +54,7 @@ class ExportJob:
         eta: float | None = None
         if self.state in ACTIVE_STATES:
             eta = estimate_eta_s(elapsed_s, self.percent)
+        filename = Path(self.output_path).name if self.output_path else None
         return {
             "id": self.id,
             "state": self.state,
@@ -64,11 +66,23 @@ class ExportJob:
             "error": self.error,
             "output_path": self.output_path,
             "directory": self.directory,
+            "filename": filename,
             "started_at": self.started_at,
             "updated_at": self.updated_at,
             "elapsed_s": round(elapsed_s, 1),
             "eta_s": None if eta is None else round(eta, 1),
         }
+
+
+@dataclass
+class ExportLastSuccess:
+    """Last successful export in this process (independent of job TTL)."""
+
+    job_id: str
+    output_path: str
+    directory: str
+    filename: str
+    finished_at: float
 
 
 class ExportJobStore:
@@ -83,6 +97,7 @@ class ExportJobStore:
         self._lock = threading.Lock()
         self._jobs: dict[str, ExportJob] = {}
         self._active_id: str | None = None
+        self._last_success: ExportLastSuccess | None = None
         self.max_finished = max_finished
         self.finished_ttl_s = finished_ttl_s
 
@@ -100,6 +115,20 @@ class ExportJobStore:
             self._jobs[job.id] = job
             self._active_id = job.id
             return job
+
+    def get_last_success(self) -> ExportLastSuccess | None:
+        with self._lock:
+            self._cleanup_locked()
+            last = self._last_success
+            if last is None:
+                return None
+            return ExportLastSuccess(
+                job_id=last.job_id,
+                output_path=last.output_path,
+                directory=last.directory,
+                filename=last.filename,
+                finished_at=last.finished_at,
+            )
 
     def get(self, job_id: str) -> ExportJob | None:
         with self._lock:
@@ -166,6 +195,14 @@ class ExportJobStore:
             job.current_label = None
             job.updated_at = now
             job.finished_at = now
+            dest = Path(output_path)
+            self._last_success = ExportLastSuccess(
+                job_id=job_id,
+                output_path=str(dest),
+                directory=directory,
+                filename=dest.name,
+                finished_at=now,
+            )
             if self._active_id == job_id:
                 self._active_id = None
             self._cleanup_locked()

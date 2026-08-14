@@ -74,6 +74,12 @@
          data-export-eta="{{ _('About {time} left')|e }}"
          data-export-estimating="{{ _('Estimating…')|e }}"
          data-export-done-in="{{ _('Done in {time}')|e }}"
+         data-export-success="{{ _('Exported {filename}.')|e }}"
+         data-export-open-video="{{ _('Open video')|e }}"
+         data-export-show-folder="{{ _('Show in folder')|e }}"
+         data-export-file-missing="{{ _('The exported file is no longer available.')|e }}"
+         data-export-open-unavailable="{{ _('Opening the exported video is not available on this device.')|e }}"
+         data-export-reveal-unavailable="{{ _('Showing the file in its folder is not available on this device.')|e }}"
          data-recommended-label="{{ _('recommended')|e }}"
          data-saved-label="{{ _('Saved')|e }}"
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
@@ -142,6 +148,19 @@
     <div class="flash studio-flash-inline" role="status">{{ _('Pick or create a Studio project before adding media.') }}</div>
   {% endif %}
   <div id="studio-flash" class="flash error studio-flash-inline" role="alert" hidden></div>
+  <div id="studio-export-success" class="studio-export-success" hidden role="status">
+    <div class="studio-export-success-copy">
+      <p id="studio-export-success-title"></p>
+      <p class="meta-line" id="studio-export-success-path" hidden></p>
+      <p class="meta-line" id="studio-export-success-error" hidden></p>
+    </div>
+    <div class="studio-export-success-actions">
+      <button type="button" class="button" id="studio-export-open-file">{{ _('Open video') }}</button>
+      <button type="button" class="button ghost" id="studio-export-reveal-file">{{ _('Show in folder') }}</button>
+      <button type="button" class="studio-export-success-dismiss" id="studio-export-success-dismiss"
+              aria-label="{{ _('Dismiss') }}">×</button>
+    </div>
+  </div>
 
   {% if studio_mode == 'editor' and project %}
   <div class="studio-workspace">

@@ -195,6 +195,10 @@
   const msgExportEta = root.dataset.exportEta || "About {time} left";
   const msgExportEstimating = root.dataset.exportEstimating || "Estimating…";
   const msgExportDoneIn = root.dataset.exportDoneIn || "Done in {time}";
+  const msgExportSuccess = root.dataset.exportSuccess || "Exported {filename}.";
+  const msgExportFileMissing = root.dataset.exportFileMissing || "The exported file is no longer available.";
+  const msgExportOpenUnavailable = root.dataset.exportOpenUnavailable || "Opening the exported video is not available on this device.";
+  const msgExportRevealUnavailable = root.dataset.exportRevealUnavailable || "Showing the file in its folder is not available on this device.";
   const recommendedLabel = root.dataset.recommendedLabel || "recommended";
   const labelSaved = root.dataset.savedLabel || "Saved";
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
@@ -1267,6 +1271,15 @@
   document.getElementById("studio-export-open")?.addEventListener("click", () => {
     openExportDialog();
   });
+  document.getElementById("studio-export-open-file")?.addEventListener("click", () => {
+    requestExportAction("open");
+  });
+  document.getElementById("studio-export-reveal-file")?.addEventListener("click", () => {
+    requestExportAction("reveal");
+  });
+  document.getElementById("studio-export-success-dismiss")?.addEventListener("click", () => {
+    hideExportSuccess();
+  });
 
   const exportResolution = document.getElementById("studio-export-resolution");
   const exportStatus = document.getElementById("studio-export-status");
@@ -1393,6 +1406,73 @@
     }, 1000);
   }
 
+  function hideExportSuccess() {
+    const banner = document.getElementById("studio-export-success");
+    if (banner) banner.hidden = true;
+  }
+
+  function setExportSuccessError(message) {
+    const errEl = document.getElementById("studio-export-success-error");
+    if (!errEl) return;
+    if (!message) {
+      errEl.hidden = true;
+      errEl.textContent = "";
+      return;
+    }
+    errEl.hidden = false;
+    errEl.textContent = message;
+  }
+
+  function showExportSuccess(job) {
+    const banner = document.getElementById("studio-export-success");
+    const titleEl = document.getElementById("studio-export-success-title");
+    const pathEl = document.getElementById("studio-export-success-path");
+    const openBtn = document.getElementById("studio-export-open-file");
+    const revealBtn = document.getElementById("studio-export-reveal-file");
+    if (!banner || !titleEl) return;
+    const filename = job.filename || (job.output_path || "").split(/[/\\]/).pop() || "export.mp4";
+    titleEl.textContent = msgExportSuccess.replace("{filename}", filename);
+    if (pathEl) {
+      if (job.output_path) {
+        pathEl.hidden = false;
+        pathEl.textContent = job.output_path;
+        pathEl.title = job.output_path;
+      } else {
+        pathEl.hidden = true;
+        pathEl.textContent = "";
+      }
+    }
+    setExportSuccessError("");
+    if (openBtn) openBtn.hidden = job.open_available === false;
+    if (revealBtn) revealBtn.hidden = job.reveal_available === false;
+    banner.hidden = false;
+  }
+
+  async function requestExportAction(action) {
+    const unavailable =
+      action === "open" ? msgExportOpenUnavailable : msgExportRevealUnavailable;
+    try {
+      const res = await fetch(`/api/studio/export/${action}`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 503) {
+        setExportSuccessError(unavailable);
+        return;
+      }
+      if (!res.ok || !data || data.ok === false) {
+        setExportSuccessError(
+          (data && data.detail) || msgExportFileMissing
+        );
+        return;
+      }
+      setExportSuccessError("");
+    } catch (_) {
+      setExportSuccessError(msgExportFileMissing);
+    }
+  }
+
   function stopExportPoll() {
     if (exportPollTimer) {
       window.clearTimeout(exportPollTimer);
@@ -1429,13 +1509,11 @@
         if (data.state === "completed") {
           stopExportElapsedTimer();
           if (exportProgress) exportProgress.classList.remove("is-working");
-          const doneMsg = msgExportDoneIn.replace(
-            "{time}",
-            formatExportDuration(data.elapsed_s || localElapsedS)
-          );
-          setExportStatus(`${doneMsg} — ${data.output_path || ""}`);
-          showFlash(msgExportDone);
           setExportRunningUi(false);
+          if (exportDialog && typeof exportDialog.close === "function") {
+            exportDialog.close();
+          }
+          showExportSuccess(data);
           if (exportOptionsCache) {
             exportOptionsCache.default_directory =
               data.directory || exportOptionsCache.default_directory;
@@ -1461,6 +1539,7 @@
 
   async function openExportDialog() {
     if (!exportDialog) return;
+    hideExportSuccess();
     stopExportPoll();
     exportLastJob = null;
     setExportStatus("");

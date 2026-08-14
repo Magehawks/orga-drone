@@ -889,6 +889,43 @@ body.studio-app { padding-bottom: 0; }
 }
 .studio-clear-form { margin: 0; }
 .studio-flash-inline { margin: 0.5rem 1rem 0; }
+.studio-export-success {
+  margin: 0.5rem 1rem 0;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: var(--flash-ok-bg);
+  border: 1px solid var(--flash-ok-border);
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.studio-export-success[hidden] { display: none !important; }
+.studio-export-success-copy { min-width: 0; flex: 1 1 14rem; }
+.studio-export-success-copy p { margin: 0; }
+.studio-export-success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.studio-export-success-dismiss {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+.studio-export-success-dismiss:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
 .studio-project-heading {
   margin: 0;
   font-family: var(--display);

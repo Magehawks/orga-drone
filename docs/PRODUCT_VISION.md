@@ -21,8 +21,8 @@ behind their adventures.**
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (order + estimated runtime; multiple local Studio projects; synced Story
-preview; local MP4 export with configurable resolution; music not included
-in export yet).
+preview; local MP4 export with configurable resolution; after export, open
+or reveal the MP4 on desktop; music not included in export yet).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -137,8 +137,9 @@ professional video-editing knowledge.
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers / one music slot (UI state only) | **Available now** (not rendered / not exported) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; no music) |
+| Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Build a story (real music in export, transitions, editing) | **Studio MVP (target)** / **Later** |
-| Music-in-export + share/reveal exported file | **Studio MVP (target)** |
+| Music-in-export | **Studio MVP (target)** |
 
 ### 4. Share
 
@@ -150,6 +151,7 @@ Sharing is the final step of the journey.
 |---------|--------|
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
 | Simple Studio MP4 export | **Available now** (local file; resolution choice; no music) |
+| Open video / Show in folder after Studio export | **Available now** (Windows desktop) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 
 ---
@@ -240,8 +242,9 @@ The first **complete** Studio MVP is achieved when a user can:
 
 If users can complete this journey without opening another application, that MVP
 is successful. Local MP4 export with resolution choice (step 7, without music)
-is **Available now** on desktop. Music-in-export and a polished share/reveal
-step (steps 6 and 8) remain **Studio MVP (target)**.
+is **Available now** on desktop. After a successful export, Open video and
+Show in folder are **Available now** on Windows (step 8, without social
+upload). Music-in-export (step 6) remains **Studio MVP (target)**.
 
 ## What orga-drone is NOT
 
