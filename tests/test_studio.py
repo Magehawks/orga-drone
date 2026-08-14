@@ -390,7 +390,12 @@ def test_http_studio_creator_shell_with_items(
     assert "flash" not in success_tag
     assert "Export MP4" in html or "MP4 exportieren" in html
     assert "Preview plays Story media" in html or "Preview spielt" in html
-    assert "music is not included yet" in html or "Musik ist noch nicht enthalten" in html
+    assert "includes project music" in html or "mischt Projektmusik" in html
+    assert "inspector-music-loop" in html
+    assert 'id="studio-music-audio"' in html
+    assert 'id="studio-music-file"' not in html
+    assert "Voice-over" in html or "Voice-over" in html
+    assert "is-disabled" in html
     # Photo clips must expose an image preview source (not only video stream).
     assert 'data-kind="photo"' in html
     assert 'data-preview-url=' in html

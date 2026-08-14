@@ -12,13 +12,13 @@ from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig, StudioExportMusic
 from orga_drone.export.studio_encoder import (
     FfmpegStudioEncoder,
     StudioExportError,
 )
 from orga_drone.ffmpeg_bin import find_ffmpeg
-from orga_drone.studio_export import probe_video_dimensions, run_studio_export
+from orga_drone.studio_export import prepare_studio_export, probe_video_dimensions, run_studio_export
 
 
 _FFMPEG_I_STDERR = """
@@ -657,3 +657,227 @@ def test_export_reveal_503_when_unavailable(
     res = client.post("/api/studio/export/reveal")
     assert res.status_code == 503
     assert res.json() == {"status": "unavailable", "error": "reveal_unavailable"}
+
+
+def test_prepare_export_without_music_skips_mix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app_prefs.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(db, tmp_path / "lib", height=720, width=1280)
+    item = db.get_media(mid)
+    assert item is not None
+    db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=mid,
+    )
+    out = tmp_path / "out.mp4"
+    config = prepare_studio_export(db, height=720, output_path=out, overwrite=True)
+    assert config.music is None
+
+
+def test_prepare_export_missing_music_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app_prefs.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(db, tmp_path / "lib", height=720, width=1280)
+    item = db.get_media(mid)
+    assert item is not None
+    db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=mid,
+    )
+    song = tmp_path / "gone.mp3"
+    song.write_bytes(b"ID3")
+    project = db.ensure_default_studio_project()
+    db.set_studio_music(project.id, str(song.resolve()))
+    song.unlink()
+    with pytest.raises(StudioExportError) as exc:
+        prepare_studio_export(
+            db, height=720, output_path=tmp_path / "out.mp4", overwrite=True
+        )
+    assert exc.value.code == "music_missing"
+
+
+def test_fake_encoder_receives_music_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app_prefs.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(db, tmp_path / "lib", height=720, width=1280)
+    item = db.get_media(mid)
+    assert item is not None
+    source_bytes = Path(item.path).read_bytes()
+    db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=mid,
+    )
+    song = tmp_path / "bed.mp3"
+    song.write_bytes(b"ID3music")
+    project = db.ensure_default_studio_project()
+    db.set_studio_music(project.id, str(song.resolve()))
+    monkeypatch.setattr(
+        "orga_drone.export.music_mix.require_readable_music",
+        lambda path: 4.0,
+    )
+    monkeypatch.setattr(
+        "orga_drone.studio_export.require_readable_music",
+        lambda path: 4.0,
+        raising=False,
+    )
+    from orga_drone.export import music_mix as mix_mod
+
+    monkeypatch.setattr(mix_mod, "require_readable_music", lambda path: 4.0)
+
+    out = tmp_path / "out.mp4"
+    fake = _FakeEncoder()
+    result = run_studio_export(
+        db, height=720, output_path=out, overwrite=True, encoder=fake
+    )
+    assert result == out
+    assert fake.configs and fake.configs[0].music is not None
+    assert fake.configs[0].music.source_path == song.resolve()
+    assert fake.configs[0].music.volume == 0.8
+    assert Path(item.path).read_bytes() == source_bytes
+    assert song.read_bytes() == b"ID3music"
+
+
+def test_encoder_records_amix_when_music_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+
+    video = tmp_path / "clip.mp4"
+    made_video = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=64x48:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-c:a",
+            "aac",
+            str(video),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert made_video.returncode == 0, made_video.stderr
+    music = tmp_path / "bed.wav"
+    made_music = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:duration=0.4",
+            str(music),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert made_music.returncode == 0, made_music.stderr
+    source_bytes = video.read_bytes()
+    music_bytes = music.read_bytes()
+
+    from orga_drone.export import studio_encoder as encoder_module
+
+    commands: list[list[str]] = []
+    real_run = encoder_module._run_ffmpeg
+
+    def recording_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        commands.append(cmd.copy())
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(encoder_module, "_run_ffmpeg", recording_run)
+    output = tmp_path / "mixed.mp4"
+    config = StudioExportConfig(
+        output_path=output,
+        width=64,
+        height=48,
+        clips=(
+            StudioExportClip(
+                source_path=video,
+                kind="video",
+                duration_s=1.0,
+                source_start_s=0.0,
+                source_end_s=1.0,
+            ),
+        ),
+        music=StudioExportMusic(
+            source_path=music,
+            volume=0.5,
+            fade_in_s=0.1,
+            fade_out_s=0.1,
+            loop=False,
+            duration_s=0.4,
+        ),
+    )
+    assert FfmpegStudioEncoder().render(config) == output
+    assert video.read_bytes() == source_bytes
+    assert music.read_bytes() == music_bytes
+    mix_cmds = [cmd for cmd in commands if "-filter_complex" in cmd]
+    assert mix_cmds
+    graph = mix_cmds[-1][mix_cmds[-1].index("-filter_complex") + 1]
+    assert "volume=0.5" in graph
+    assert "afade=" in graph
+    assert "amix=" in graph
+    assert "-c:v" in mix_cmds[-1]
+    assert mix_cmds[-1][mix_cmds[-1].index("-c:v") + 1] == "copy"
+
+    looped = tmp_path / "looped.mp4"
+    loop_config = StudioExportConfig(
+        output_path=looped,
+        width=64,
+        height=48,
+        clips=config.clips,
+        music=StudioExportMusic(
+            source_path=music,
+            volume=0.5,
+            fade_in_s=0.0,
+            fade_out_s=0.0,
+            loop=True,
+            duration_s=0.4,
+        ),
+    )
+    assert FfmpegStudioEncoder().render(loop_config) == looped
+    loop_cmds = [cmd for cmd in commands if "-stream_loop" in cmd]
+    assert loop_cmds
+    assert loop_cmds[-1][loop_cmds[-1].index("-stream_loop") + 1] == "-1"

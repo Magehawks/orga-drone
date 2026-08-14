@@ -229,6 +229,50 @@ def pick_save_file(
     return path
 
 
+class OpenFilePickerError(Exception):
+    """Raised when a native open-file dialog cannot be shown."""
+
+
+def pick_open_file(
+    *,
+    directory: str = "",
+    file_types: tuple[str, ...] = (
+        "Audio Files (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg)",
+    ),
+) -> str | None:
+    """Open the OS file-open dialog via the active pywebview window.
+
+    Returns:
+        Selected file path, or ``None`` if the user cancelled.
+
+    Raises:
+        OpenFilePickerError: When pywebview is missing or no desktop window is open.
+    """
+    try:
+        import webview
+    except ImportError as exc:
+        raise OpenFilePickerError("pywebview is not available") from exc
+
+    windows = list(getattr(webview, "windows", []) or [])
+    if not windows:
+        raise OpenFilePickerError(
+            "Native file picker requires the desktop window "
+            "(not available in browser-only mode)"
+        )
+
+    result = windows[0].create_file_dialog(
+        webview.FileDialog.OPEN,
+        directory=directory or "",
+        file_types=file_types,
+    )
+    if not result:
+        return None
+    chosen = result[0] if isinstance(result, (list, tuple)) else result
+    if isinstance(chosen, bytes):
+        chosen = chosen.decode("utf-8")
+    return str(chosen)
+
+
 def find_listen_port(host: str, preferred: int) -> int:
     """Prefer ``preferred`` if free; otherwise bind an ephemeral port."""
     # Avoid SO_REUSEADDR on Windows — it can report a busy port as free.

@@ -56,6 +56,9 @@ def test_export_progress_percent_steps() -> None:
         == 75
     )
     assert export_progress_percent(clip_index=3, clip_total=3, phase="concat") == 75
+    mixing = export_progress_percent(clip_index=3, clip_total=3, phase="mixing")
+    assert mixing >= 75
+    assert mixing <= 99
     assert export_progress_percent(clip_index=3, clip_total=3, phase="done") == 100
 
 

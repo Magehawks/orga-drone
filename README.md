@@ -49,13 +49,13 @@ People fly drones for experiences, not for managing files. Footage piles up acro
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; local MP4 export with configurable resolution (desktop);
   after a successful export, Open video / Show in folder on Windows;
-  music remains a UI stub and is not included in the render
+  one optional local music track in preview and MP4 export
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
 - Export a local spot GeoJSON download when GPS is available
 - Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
 - UI in German and English; Dark / Light / Custom themes
 
-It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Studio music-in-export and social share destinations are **planned** (see vision / roadmap). Basic local MP4 export with resolution choice, plus Open video / Show in folder after success, is Available on Windows desktop.
+It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Social share destinations are **planned** (see vision / roadmap). Local MP4 export with resolution choice, optional music, and Open video / Show in folder after success is Available on Windows desktop.
 
 ### Flows vs sessions
 
@@ -84,9 +84,9 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Creator Studio UI with synced Story preview; multiple local edit projects (browser/switcher); persisted project title + order + estimated runtime + video Cut offsets; local MP4 export with resolution choice; music stub |
-| Studio MP4 export | Available | Configurable resolution up to source max; desktop save dialog; sources never modified; music not included; after success, Open video / Show in folder on Windows |
-| Studio music-in-export | Not available | Studio MVP target — see `docs/PRODUCT_VISION.md` |
+| Studio workspace | Available | Creator Studio UI with synced Story preview; multiple local edit projects (browser/switcher); persisted project title + order + estimated runtime + video Cut offsets; local MP4 export with resolution choice; one optional music track |
+| Studio MP4 export | Available | Configurable resolution up to source max; desktop save dialog; optional music mix; sources never modified; after success, Open video / Show in folder on Windows |
+| Studio music-in-export | Available | One local audio file per project (volume, fades, loop); preview + MP4 mix; desktop picker |
 | Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
@@ -257,9 +257,6 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 
 **Possible next steps** (not available now):
 
-- Optional one music track in Studio export
-  (basic local MP4 export with resolution choice is Available;
-  Open video / Show in folder after export is Available on Windows)
 - Library albums for organizing media sets (Studio already has multiple local
   edit projects)
 - Incremental or cheaper library rescans

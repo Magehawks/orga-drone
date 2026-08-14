@@ -2,7 +2,8 @@
  * Creator Studio UI.
  * Persistence: reorder + photo duration via existing APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
- * Music / transitions remain UI stubs. Export renders a local MP4 (no music).
+ * Music is a persisted per-project soundtrack mixed into MP4 export.
+ * Transitions remain UI stubs.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
 (function () {
@@ -166,6 +167,7 @@
   const titleInput = document.getElementById("studio-project-title");
   const previewImage = document.getElementById("studio-preview-image");
   const previewVideo = document.getElementById("studio-preview-video");
+  const musicAudio = document.getElementById("studio-music-audio");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
   const transportTime = document.getElementById("studio-transport-time");
   const playheadEl = document.getElementById("studio-playhead");
@@ -181,6 +183,9 @@
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
   const msgExportFailed = root.dataset.exportFailed || "Export failed.";
+  const msgMusicFailed = root.dataset.musicFailed || "Could not save music settings.";
+  const msgMusicPickerUnavailable = root.dataset.musicPickerUnavailable || "Choosing music needs the desktop app.";
+  const msgMusicMissing = root.dataset.musicMissing || "The selected music file is no longer available.";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
   const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
@@ -189,6 +194,7 @@
   const msgExportPreparing = root.dataset.exportPreparing || "Preparing export…";
   const msgExportClip = root.dataset.exportClip || "Clip {current} of {total}";
   const msgExportCombining = root.dataset.exportCombining || "Combining clips…";
+  const msgExportMixing = root.dataset.exportMixing || "Mixing music…";
   const msgExportUnavailable = root.dataset.exportUnavailable || "Export needs the desktop app for the save dialog.";
   const msgExportRunningHint = root.dataset.exportRunningHint || "Export is running…";
   const msgExportElapsed = root.dataset.exportElapsed || "Elapsed {time}";
@@ -224,7 +230,7 @@
    *  playing: boolean,
    *  volume: number,
    *  title: string,
-   *  music: null | {name: string, volume: number, fadeIn: number, fadeOut: number},
+   *  music: null | {name: string, volume: number, fadeIn: number, fadeOut: number, loop: boolean, available: boolean, streamUrl: string|null},
    *  transitions: Record<string, string>,
    *  activeStudioId: string|null
    * }} */
@@ -416,6 +422,7 @@
 
   function applyVolume() {
     if (previewVideo) previewVideo.volume = state.volume;
+    syncMusicAudio();
   }
 
   function setToggleLabel() {
@@ -446,6 +453,7 @@
         /* ignore */
       }
     }
+    pauseMusicAudio();
     setToggleLabel();
   }
 
@@ -638,6 +646,7 @@
       // After seek while playing, ensure the correct clock driver runs.
       beginClockForActiveClip();
     }
+    syncMusicAudio();
   }
 
   function advanceToNextOrStop(hit) {
@@ -683,8 +692,10 @@
     if (!before || before.clip !== after.clip) {
       syncPreviewMedia({ seek: true });
       beginClockForActiveClip();
+      syncMusicAudio();
       return;
     }
+    syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
   }
 
@@ -734,6 +745,7 @@
     state.playing = true;
     setToggleLabel();
     beginClockForActiveClip();
+    syncMusicAudio();
   }
 
   function onVideoTimeUpdate() {
@@ -754,6 +766,7 @@
       updatePlayheadChrome();
     }
     updateCutEnabled();
+    syncMusicAudio();
     // Clip boundary at source out (trimmed) or near local duration.
     if (outS != null && mediaTime >= outS - 0.05) {
       advanceToNextOrStop(hit);
@@ -782,14 +795,6 @@
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
         // Title is persisted in SQLite (studio_projects); do not restore from session.
-        if (data.music && typeof data.music.name === "string") {
-          state.music = {
-            name: data.music.name,
-            volume: Number(data.music.volume) || 0.8,
-            fadeIn: Number(data.music.fadeIn) || 0,
-            fadeOut: Number(data.music.fadeOut) || 0,
-          };
-        }
         if (data.transitions && typeof data.transitions === "object") {
           state.transitions = data.transitions;
         }
@@ -808,13 +813,149 @@
       sessionStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          music: state.music,
           transitions: state.transitions,
           volume: state.volume,
         })
       );
     } catch (_) {
       /* ignore */
+    }
+  }
+
+  function musicFromPayload(payload) {
+    if (!payload || !payload.present) return null;
+    const volume = Number(payload.volume);
+    const fadeIn = Number(payload.fade_in_s);
+    const fadeOut = Number(payload.fade_out_s);
+    return {
+      name: payload.display_name || "Music",
+      volume: Number.isFinite(volume) ? volume : 0.8,
+      fadeIn: Number.isFinite(fadeIn) ? fadeIn : 0,
+      fadeOut: Number.isFinite(fadeOut) ? fadeOut : 0,
+      loop: !!payload.loop,
+      available: payload.available !== false,
+      streamUrl: payload.stream_url || null,
+    };
+  }
+
+  function musicBedDuration(storyS, musicS, loop) {
+    if (loop) return Math.max(0, storyS);
+    if (!(musicS > 0)) return 0;
+    return Math.min(musicS, Math.max(0, storyS));
+  }
+
+  function scaledMusicFades(fadeIn, fadeOut, bedS) {
+    let fi = Math.max(0, fadeIn);
+    let fo = Math.max(0, fadeOut);
+    const bed = Math.max(0, bedS);
+    const total = fi + fo;
+    if (bed <= 0 || total <= 0) return { fadeIn: 0, fadeOut: 0 };
+    if (total > bed) {
+      const scale = bed / total;
+      return { fadeIn: fi * scale, fadeOut: fo * scale };
+    }
+    return { fadeIn: fi, fadeOut: fo };
+  }
+
+  function musicFadeGain(t, bedS, fadeIn, fadeOut) {
+    if (t < 0 || t >= bedS) return 0;
+    const scaled = scaledMusicFades(fadeIn, fadeOut, bedS);
+    let gain = 1;
+    if (scaled.fadeIn > 0 && t < scaled.fadeIn) gain = t / scaled.fadeIn;
+    const foStart = Math.max(0, bedS - scaled.fadeOut);
+    if (scaled.fadeOut > 0 && t > foStart) {
+      gain = Math.min(gain, Math.max(0, (bedS - t) / scaled.fadeOut));
+    }
+    return Math.max(0, Math.min(1, gain));
+  }
+
+  function pauseMusicAudio() {
+    if (!musicAudio) return;
+    try {
+      musicAudio.pause();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function ensureMusicAudioSrc() {
+    if (!musicAudio || !state.music || !state.music.available || !state.music.streamUrl) {
+      if (musicAudio) {
+        musicAudio.removeAttribute("src");
+        try {
+          musicAudio.load();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return false;
+    }
+    if (musicAudio.getAttribute("src") !== state.music.streamUrl) {
+      try {
+        musicAudio.pause();
+      } catch (_) {
+        /* ignore */
+      }
+      musicAudio.removeAttribute("src");
+      musicAudio.src = state.music.streamUrl;
+      musicAudio.load();
+    }
+    return true;
+  }
+
+  function syncMusicAudio() {
+    if (!musicAudio || !state.music || !state.music.available) {
+      pauseMusicAudio();
+      return;
+    }
+    if (!ensureMusicAudioSrc()) {
+      pauseMusicAudio();
+      return;
+    }
+    const story = totalDuration();
+    const t = state.projectTimeS;
+    const musDur = Number.isFinite(musicAudio.duration) ? musicAudio.duration : 0;
+    const bed = musicBedDuration(story, musDur, state.music.loop);
+    let playPos = 0;
+    let inBed = false;
+    if (story > 0 && t < story && musDur > 0) {
+      if (state.music.loop) {
+        inBed = true;
+        playPos = t % musDur;
+      } else if (t < musDur) {
+        inBed = true;
+        playPos = t;
+      }
+    }
+    const gain = inBed
+      ? musicFadeGain(t, bed, state.music.fadeIn, state.music.fadeOut)
+      : 0;
+    musicAudio.volume = Math.max(0, Math.min(1, state.volume * state.music.volume * gain));
+    if (!inBed || !state.playing) {
+      pauseMusicAudio();
+      if (inBed && Number.isFinite(playPos)) {
+        try {
+          if (Math.abs((musicAudio.currentTime || 0) - playPos) > 0.35) {
+            musicAudio.currentTime = playPos;
+          }
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return;
+    }
+    try {
+      if (Math.abs((musicAudio.currentTime || 0) - playPos) > 0.35) {
+        musicAudio.currentTime = playPos;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    const playPromise = musicAudio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {
+        /* autoplay / decode */
+      });
     }
   }
 
@@ -1043,37 +1184,126 @@
     const vol = document.getElementById("inspector-music-volume");
     const fadeIn = document.getElementById("inspector-music-fade-in");
     const fadeOut = document.getElementById("inspector-music-fade-out");
+    const loopEl = document.getElementById("inspector-music-loop");
     if (vol) vol.value = String(Math.round(state.music.volume * 100));
     if (fadeIn) fadeIn.value = String(state.music.fadeIn);
     if (fadeOut) fadeOut.value = String(state.music.fadeOut);
+    if (loopEl) loopEl.checked = !!state.music.loop;
   }
 
   function renderMusic() {
     const empty = document.getElementById("studio-music-empty");
     const clip = document.getElementById("studio-music-clip");
     const name = document.getElementById("studio-music-name");
+    const missing = document.getElementById("studio-music-missing");
     if (!empty || !clip) return;
     if (state.music) {
       empty.hidden = true;
       clip.hidden = false;
       if (name) name.textContent = state.music.name;
+      if (missing) missing.hidden = !!state.music.available;
     } else {
       empty.hidden = false;
       clip.hidden = true;
+      if (missing) missing.hidden = true;
       if (state.selected.type === "music") {
         state.selected = { type: null, id: null };
         showInspector("inspector-empty");
       }
     }
+    syncMusicAudio();
   }
 
-  function clearMusic() {
-    state.music = null;
-    persistUiState();
+  async function pickAndSetMusic() {
+    if (!projectId) return;
+    try {
+      const picked = await fetch("/api/desktop/pick-open-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({}),
+      });
+      const pickedBody = await picked.json().catch(() => null);
+      if (picked.status === 503) {
+        showFlash(msgMusicPickerUnavailable);
+        return;
+      }
+      if (!picked.ok || !pickedBody || pickedBody.status === "cancelled") return;
+      if (pickedBody.status !== "ok" || !pickedBody.path) {
+        showFlash(msgMusicFailed);
+        return;
+      }
+      setSaveState(false);
+      const saved = await fetch(`/api/studio/projects/${projectId}/music`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ path: pickedBody.path }),
+      });
+      const savedBody = await saved.json().catch(() => null);
+      if (!saved.ok || !savedBody || !savedBody.ok) {
+        showFlash((savedBody && savedBody.detail) || msgMusicFailed);
+        return;
+      }
+      state.music = musicFromPayload(savedBody);
+      renderMusic();
+      selectMusic();
+      setSaveState(true);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  async function patchMusicSettings() {
+    if (!projectId || !state.music) return;
     setSaveState(false);
-    renderMusic();
-    showInspector("inspector-empty");
-    document.getElementById("studio-music-track")?.classList.remove("is-selected");
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          volume: state.music.volume,
+          fade_in_s: state.music.fadeIn,
+          fade_out_s: state.music.fadeOut,
+          loop: !!state.music.loop,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash((data && data.detail) || msgMusicFailed);
+        return;
+      }
+      state.music = musicFromPayload(data);
+      renderMusic();
+      setSaveState(true);
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  async function clearMusic() {
+    if (!projectId) {
+      state.music = null;
+      renderMusic();
+      showInspector("inspector-empty");
+      document.getElementById("studio-music-track")?.classList.remove("is-selected");
+      return;
+    }
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error("delete music failed");
+      state.music = null;
+      renderMusic();
+      showInspector("inspector-empty");
+      document.getElementById("studio-music-track")?.classList.remove("is-selected");
+      setSaveState(true);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
   }
 
   async function persistOrder() {
@@ -1331,6 +1561,7 @@
   function exportPhaseLabel(job) {
     if (job.phase === "preparing") return msgExportPreparing;
     if (job.phase === "concat") return msgExportCombining;
+    if (job.phase === "mixing") return msgExportMixing;
     if (job.phase === "done" || job.state === "completed") return msgExportDone;
     if (job.phase === "rendering") {
       const current = Number(job.clip_index) || 0;
@@ -1694,23 +1925,14 @@
     runStudioExport();
   });
 
-  document.getElementById("studio-music-file")?.addEventListener("change", (event) => {
-    const input = event.target;
-    const file = input.files && input.files[0];
-    if (!file) return;
-    state.music = {
-      name: file.name,
-      volume: 0.8,
-      fadeIn: 0,
-      fadeOut: 0,
-    };
-    persistUiState();
-    setSaveState(false);
-    renderMusic();
-    selectMusic();
-    input.value = "";
+  document.getElementById("studio-music-add")?.addEventListener("click", () => {
+    pickAndSetMusic();
   });
-
+  document.getElementById("studio-music-replace")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    pickAndSetMusic();
+  });
   document.getElementById("studio-music-select")?.addEventListener("click", selectMusic);
   document.getElementById("studio-music-remove")?.addEventListener("click", clearMusic);
   document.getElementById("inspector-music-remove")?.addEventListener("click", clearMusic);
@@ -1734,11 +1956,19 @@
         state.music.volume = Number(vol?.value || 80) / 100;
         state.music.fadeIn = Number(fadeIn?.value || 0);
         state.music.fadeOut = Number(fadeOut?.value || 0);
-        persistUiState();
-        setSaveState(false);
+        syncMusicAudio();
+      });
+      document.getElementById(id)?.addEventListener("change", () => {
+        patchMusicSettings();
       });
     }
   );
+  document.getElementById("inspector-music-loop")?.addEventListener("change", (event) => {
+    if (!state.music) return;
+    state.music.loop = !!event.target.checked;
+    syncMusicAudio();
+    patchMusicSettings();
+  });
 
   document.getElementById("inspector-photo-duration")?.addEventListener("change", (event) => {
     if (state.selected.type !== "clip") return;
@@ -1842,6 +2072,12 @@
 
   // Init
   loadUiState();
+  try {
+    const boot = root.dataset.musicPayload;
+    if (boot) state.music = musicFromPayload(JSON.parse(boot));
+  } catch (_) {
+    state.music = null;
+  }
   applyVolume();
   applyTransitionsToDom();
   renderMusic();

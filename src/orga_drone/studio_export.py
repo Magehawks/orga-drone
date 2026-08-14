@@ -7,7 +7,7 @@ from pathlib import Path
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
 from orga_drone.config import settings
 from orga_drone.db import Database, StudioClip, StudioProject
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig, StudioExportMusic
 from orga_drone.export.studio_encoder import (
     ProgressCallback,
     StudioExportError,
@@ -261,12 +261,29 @@ def prepare_studio_export(
     if not export_clips:
         raise StudioExportError("No available media to export.")
 
+    music_cfg: StudioExportMusic | None = None
+    music_row = db.get_studio_music(project.id)
+    if music_row is not None:
+        from orga_drone.export.music_mix import require_readable_music
+
+        music_path = Path(music_row.file_path)
+        duration_s = require_readable_music(music_path)
+        music_cfg = StudioExportMusic(
+            source_path=music_path,
+            volume=float(music_row.volume),
+            fade_in_s=float(music_row.fade_in_s),
+            fade_out_s=float(music_row.fade_out_s),
+            loop=bool(music_row.loop),
+            duration_s=duration_s,
+        )
+
     return StudioExportConfig(
         output_path=dest,
         width=width,
         height=int(height),
         clips=tuple(export_clips),
         project_title=project.title,
+        music=music_cfg,
     )
 
 

@@ -53,5 +53,5 @@ desktop; other platforms must fail clearly rather than fake a reveal.
 - Negative / trade-offs: Last-success is process-local (lost on restart);
   browser-only and non-Windows desktops get 503 rather than a fake reveal;
   Explorer `/select,` may exit 1 even on success.
-- Follow-up: music-in-export remains Studio MVP (target); mid-render cancel
-  and an Exports history remain later.
+- Follow-up: mid-render cancel and an Exports history remain later.
+  Music-in-export is covered by ADR 0008.

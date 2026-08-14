@@ -94,3 +94,36 @@ msgstr "Das exportierte Video kann auf diesem Gerät nicht geöffnet werden."
 msgid "Showing the file in its folder is not available on this device."
 msgstr "Die Datei kann auf diesem Gerät nicht im Ordner angezeigt werden."
 
+msgid "Preview plays Story media in order. Export writes a local MP4 and includes project music when set."
+msgstr "Preview spielt Story-Medien der Reihe nach ab. Export schreibt eine lokale MP4 und mischt Projektmusik ein, wenn vorhanden."
+
+msgid "Loop"
+msgstr "Schleife"
+
+msgid "Replace"
+msgstr "Ersetzen"
+
+msgid "Could not save music settings."
+msgstr "Musikeinstellungen konnten nicht gespeichert werden."
+
+msgid "Choosing music needs the desktop app."
+msgstr "Musikauswahl braucht die Desktop-App."
+
+msgid "The selected music file is no longer available."
+msgstr "Die ausgewählte Musikdatei ist nicht mehr verfügbar."
+
+msgid "The selected music file could not be read."
+msgstr "Die ausgewählte Musikdatei konnte nicht gelesen werden."
+
+msgid "The selected music file cannot be decoded."
+msgstr "Die ausgewählte Musikdatei kann nicht dekodiert werden."
+
+msgid "One local music track for this project. The file stays on this computer and is mixed into export."
+msgstr "Eine lokale Musikspur für dieses Projekt. Die Datei bleibt auf diesem Computer und wird in den Export gemischt."
+
+msgid "Music is mixed into the exported MP4. Source video audio is kept when present."
+msgstr "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden."
+
+msgid "Mixing music…"
+msgstr "Musik wird gemischt…"
+
