@@ -158,6 +158,11 @@ CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id,
 CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
 CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
 
+CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS geocode_cache (
     lat_key REAL NOT NULL,
     lon_key REAL NOT NULL,
@@ -260,6 +265,9 @@ class MediaRow:
     height: int | None = None
 
 
+STUDIO_LAST_OPENED_KEY = "studio_last_opened_project_id"
+
+
 @dataclass
 class StudioProject:
     """One Studio project (title + timestamps). Does not own media files."""
@@ -268,6 +276,7 @@ class StudioProject:
     title: str
     created_at: str
     updated_at: str
+    clip_count: int = 0
 
 
 @dataclass
@@ -462,6 +471,12 @@ class Database:
                 conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
             Database._migrate_studio_items_drop_unique_media_path(conn)
         Database._migrate_studio_projects_and_clips(conn)
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS app_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )"""
+        )
 
     @staticmethod
     def _migrate_studio_items_drop_unique_media_path(conn: sqlite3.Connection) -> None:
@@ -587,10 +602,28 @@ class Database:
                 except sqlite3.OperationalError:
                     pass
 
+        items_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
+        ).fetchone()
+        item_count_n = 0
+        clip_count_n = 0
+        if items_exists:
+            item_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM studio_items"
+            ).fetchone()
+            clip_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM studio_clips"
+            ).fetchone()
+            item_count_n = int(item_count["n"])
+            clip_count_n = int(clip_count["n"])
+        need_legacy = item_count_n > 0 and clip_count_n == 0
+
         project = conn.execute(
             "SELECT id FROM studio_projects ORDER BY id ASC LIMIT 1"
         ).fetchone()
-        if project is None:
+        # Only create a default project when migrating leftover studio_items.
+        # Fresh DBs stay empty until the user creates or opens a project.
+        if project is None and need_legacy:
             cur = conn.execute(
                 """INSERT INTO studio_projects(title, created_at, updated_at)
                    VALUES (?, ?, ?)""",
@@ -599,17 +632,14 @@ class Database:
             pid = cur.lastrowid
             assert pid is not None
             project_id = int(pid)
-        else:
+        elif project is not None:
             project_id = int(project["id"])
+        else:
+            project_id = None
 
-        items_exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_items'"
-        ).fetchone()
         if not items_exists:
             return
-        item_count = conn.execute("SELECT COUNT(*) AS n FROM studio_items").fetchone()
-        clip_count = conn.execute("SELECT COUNT(*) AS n FROM studio_clips").fetchone()
-        if int(item_count["n"]) > 0 and int(clip_count["n"]) == 0:
+        if need_legacy and project_id is not None:
             item_cols = {
                 r[1]
                 for r in conn.execute("PRAGMA table_info(studio_items)").fetchall()
@@ -1413,11 +1443,67 @@ class Database:
             updated_at=str(row["updated_at"]),
         )
 
+    def get_app_state(self, key: str) -> str | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = ?",
+                (key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return str(row["value"])
+
+    def set_app_state(self, key: str, value: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO app_state(key, value) VALUES (?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+                (key, value),
+            )
+
+    def get_open_studio_project(self) -> StudioProject | None:
+        """Return the last-opened project when the stored id still exists."""
+        raw = self.get_app_state(STUDIO_LAST_OPENED_KEY)
+        if raw is None or raw == "":
+            return None
+        try:
+            project_id = int(raw)
+        except ValueError:
+            return None
+        return self.get_studio_project(project_id)
+
+    def set_open_studio_project_id(self, project_id: int | None) -> None:
+        """Remember the open Studio project. ``None`` means browser mode."""
+        self.set_app_state(
+            STUDIO_LAST_OPENED_KEY,
+            "" if project_id is None else str(int(project_id)),
+        )
+
+    def resolve_studio_page_project(self) -> StudioProject | None:
+        """Project shown in Studio: last opened, or most recently edited if never set."""
+        raw = self.get_app_state(STUDIO_LAST_OPENED_KEY)
+        if raw is None:
+            projects = self.list_studio_projects()
+            if not projects:
+                return None
+            self.set_open_studio_project_id(projects[0].id)
+            return projects[0]
+        opened = self.get_open_studio_project()
+        if opened is not None:
+            return opened
+        if raw != "":
+            self.set_open_studio_project_id(None)
+        return None
+
     def list_studio_projects(self) -> list[StudioProject]:
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT id, title, created_at, updated_at
-                   FROM studio_projects ORDER BY id ASC"""
+                """SELECT p.id, p.title, p.created_at, p.updated_at,
+                          COUNT(c.id) AS clip_count
+                   FROM studio_projects p
+                   LEFT JOIN studio_clips c ON c.project_id = p.id
+                   GROUP BY p.id
+                   ORDER BY p.updated_at DESC, p.id DESC"""
             ).fetchall()
         return [
             StudioProject(
@@ -1425,6 +1511,7 @@ class Database:
                 title=str(r["title"]),
                 created_at=str(r["created_at"]),
                 updated_at=str(r["updated_at"]),
+                clip_count=int(r["clip_count"] or 0),
             )
             for r in rows
         ]
@@ -1457,7 +1544,19 @@ class Database:
                 "DELETE FROM studio_projects WHERE id = ?",
                 (project_id,),
             )
-            return cur.rowcount > 0
+            if cur.rowcount == 0:
+                return False
+            opened = conn.execute(
+                "SELECT value FROM app_state WHERE key = ?",
+                (STUDIO_LAST_OPENED_KEY,),
+            ).fetchone()
+            if opened is not None and str(opened["value"]) == str(project_id):
+                conn.execute(
+                    """INSERT INTO app_state(key, value) VALUES (?, ?)
+                       ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+                    (STUDIO_LAST_OPENED_KEY, ""),
+                )
+            return True
 
     def add_studio_item(
         self,
@@ -1529,12 +1628,24 @@ class Database:
 
     def remove_studio_item(self, studio_item_id: int) -> bool:
         """Remove one Studio clip. Never deletes media assets."""
+        now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
-            cur = conn.execute(
+            row = conn.execute(
+                "SELECT project_id FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            project_id = int(row["project_id"])
+            conn.execute(
                 "DELETE FROM studio_clips WHERE id = ?",
                 (studio_item_id,),
             )
-            return cur.rowcount > 0
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+            return True
 
     def clear_studio(self, project_id: int | None = None) -> int:
         """Remove all clips from a project (default project if omitted)."""
@@ -1545,30 +1656,50 @@ class Database:
         )
         if project is None:
             return 0
+        now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
             cur = conn.execute(
                 "DELETE FROM studio_clips WHERE project_id = ?",
                 (project.id,),
             )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project.id),
+            )
             return int(cur.rowcount)
 
-    def is_in_studio(self, media_path: str) -> bool:
+    def is_in_studio(
+        self, media_path: str, project_id: int | None = None
+    ) -> bool:
         with self.connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM studio_clips WHERE media_path = ?",
-                (media_path,),
-            ).fetchone()
+            if project_id is None:
+                row = conn.execute(
+                    "SELECT 1 FROM studio_clips WHERE media_path = ?",
+                    (media_path,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """SELECT 1 FROM studio_clips
+                       WHERE media_path = ? AND project_id = ?""",
+                    (media_path, project_id),
+                ).fetchone()
         return row is not None
 
-    def studio_paths_among(self, paths: list[str]) -> set[str]:
+    def studio_paths_among(
+        self, paths: list[str], project_id: int | None = None
+    ) -> set[str]:
         if not paths:
             return set()
         placeholders = ",".join("?" for _ in paths)
+        sql = (
+            f"SELECT media_path FROM studio_clips WHERE media_path IN ({placeholders})"
+        )
+        params: list[Any] = list(paths)
+        if project_id is not None:
+            sql += " AND project_id = ?"
+            params.append(project_id)
         with self.connect() as conn:
-            rows = conn.execute(
-                f"SELECT media_path FROM studio_clips WHERE media_path IN ({placeholders})",
-                paths,
-            ).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return {str(r["media_path"]) for r in rows}
 
     def list_studio_items(

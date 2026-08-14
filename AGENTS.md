@@ -5,8 +5,8 @@
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + persisted project title;
-synced Story preview playback; local MP4 export with configurable resolution;
-music not included in export yet).
+multiple local Studio projects; synced Story preview playback; local MP4 export
+with configurable resolution; music not included in export yet).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -51,7 +51,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted project title; synced preview; local MP4 export (resolution); music stub |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); music stub |
 | Share | How do I share? | Local files on disk; Studio MP4 export available; music-in-export / reveal = target MVP |
 
 ## Available now (implemented)
@@ -64,7 +64,8 @@ The application helps users:
 - visualize GPS points and tracks on OpenStreetMap-based maps
 - filter, browse, and detect likely duplicate files (heuristics; no auto-delete)
 - collect selected media in a **Studio** workspace (non-destructive
-  `studio_projects` / `studio_clips`; editable persisted title; manual order and
+  `studio_projects` / `studio_clips`; multiple local edit projects with
+  browser/switcher; editable persisted title; manual order and
   estimated runtime; simple video Cut via source start/end; Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
   with the playhead; local MP4 export with configurable resolution on desktop;
@@ -79,9 +80,9 @@ The application helps users:
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
-- There is **no** multi-project albums model, plugin API, Studio
+- There is **no** Library albums model, plugin API, Studio
   music-in-export, or CI-built multi-OS installer pipeline
-  in the current tree. Studio remains a single workspace.
+  in the current tree. Studio supports multiple local edit projects.
 
 ## Product principles
 
@@ -101,7 +102,7 @@ The application helps users:
 
 - Studio MVP target: optional music-in-export, share/reveal local result
   (basic MP4 export with resolution choice is Available now)
-- projects or albums for organizing media sets
+- albums for organizing media sets (Studio edit projects are Available now)
 - plugin architecture and community integrations
 - semantic search or other optional intelligent features (only if justified)
 - automatic highlight / quality suggestions

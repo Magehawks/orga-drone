@@ -3,11 +3,163 @@
  * Persistence: reorder + photo duration via existing APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
  * Music / transitions remain UI stubs. Export renders a local MP4 (no music).
+ * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
 (function () {
   const root = document.getElementById("studio-root");
+  if (!root) return;
+
+  const studioMode = root.dataset.studioMode || "editor";
+  const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
+  const msgCreateFailed = root.dataset.createFailed || "Could not create Studio project.";
+  const msgOpenFailed = root.dataset.openFailed || "Could not open Studio project.";
+  const msgDeleteFailed = root.dataset.deleteFailed || "Could not delete Studio project.";
+  const msgDeleteConfirm =
+    root.dataset.deleteConfirm ||
+    "Delete this Studio project? Clips in this project are removed. Your media files are not deleted.";
+  const msgRenamePrompt = root.dataset.renamePrompt || "New project title";
+  const defaultProjectTitle = root.dataset.defaultTitle || "Your story";
+
+  function showRootFlash(message) {
+    const el = document.getElementById("studio-flash");
+    if (!el) {
+      window.alert(message);
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  async function readJson(res) {
+    try {
+      return await res.json();
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  async function createAndOpenProject(title) {
+    const clean = (title || "").trim() || defaultProjectTitle;
+    const created = await fetch("/api/studio/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ title: clean }),
+    });
+    const createdBody = await readJson(created);
+    if (!created.ok || !createdBody || !createdBody.id) {
+      throw new Error((createdBody && createdBody.detail) || msgCreateFailed);
+    }
+    const opened = await fetch(`/api/studio/projects/${createdBody.id}/open`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    const openedBody = await readJson(opened);
+    if (!opened.ok) {
+      throw new Error((openedBody && openedBody.detail) || msgOpenFailed);
+    }
+    window.location.assign("/studio");
+  }
+
+  async function openProject(projectId) {
+    const res = await fetch(`/api/studio/projects/${projectId}/open`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    const body = await readJson(res);
+    if (!res.ok) {
+      throw new Error((body && body.detail) || msgOpenFailed);
+    }
+    window.location.assign("/studio");
+  }
+
+  async function renameProject(projectId, currentTitle) {
+    const next = window.prompt(msgRenamePrompt, currentTitle || defaultProjectTitle);
+    if (next === null) return;
+    const clean = next.trim();
+    if (!clean) return;
+    const res = await fetch(`/api/studio/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ title: clean }),
+    });
+    const body = await readJson(res);
+    if (!res.ok) {
+      throw new Error((body && body.detail) || msgTitleFailed);
+    }
+    window.location.reload();
+  }
+
+  async function deleteProject(projectId) {
+    if (!window.confirm(msgDeleteConfirm)) return;
+    const res = await fetch(`/api/studio/projects/${projectId}`, {
+      method: "DELETE",
+      headers: { Accept: "application/json" },
+    });
+    const body = await readJson(res);
+    if (!res.ok) {
+      throw new Error((body && body.detail) || msgDeleteFailed);
+    }
+    window.location.assign("/studio");
+  }
+
+  function bindProjectUi(scope) {
+    if (!scope) return;
+    scope.querySelectorAll("[data-studio-project-create]").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const input = form.querySelector('input[name="title"]');
+        const title = input && "value" in input ? String(input.value) : defaultProjectTitle;
+        createAndOpenProject(title).catch((err) => showRootFlash(err.message || msgCreateFailed));
+      });
+    });
+  }
+
+  function handleProjectActionClick(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const openBtn = target.closest("[data-project-open]");
+    if (openBtn) {
+      event.preventDefault();
+      const id = Number(openBtn.getAttribute("data-project-open") || "0");
+      if (id) openProject(id).catch((err) => showRootFlash(err.message || msgOpenFailed));
+      return;
+    }
+    const renameBtn = target.closest("[data-project-rename]");
+    if (renameBtn) {
+      event.preventDefault();
+      const id = Number(renameBtn.getAttribute("data-project-rename") || "0");
+      const current = renameBtn.getAttribute("data-project-title") || "";
+      if (id) renameProject(id, current).catch((err) => showRootFlash(err.message || msgTitleFailed));
+      return;
+    }
+    const deleteBtn = target.closest("[data-project-delete]");
+    if (deleteBtn) {
+      event.preventDefault();
+      const id = Number(deleteBtn.getAttribute("data-project-delete") || "0");
+      if (id) deleteProject(id).catch((err) => showRootFlash(err.message || msgDeleteFailed));
+    }
+  }
+
+  root.addEventListener("click", handleProjectActionClick);
+  bindProjectUi(root);
+  const projectsDialog = document.getElementById("studio-projects-dialog");
+  bindProjectUi(projectsDialog);
+  if (projectsDialog) {
+    projectsDialog.addEventListener("click", handleProjectActionClick);
+  }
+  const projectsOpenBtn = document.getElementById("studio-projects-open");
+  if (projectsOpenBtn && projectsDialog) {
+    projectsOpenBtn.addEventListener("click", () => {
+      if (typeof projectsDialog.showModal === "function") projectsDialog.showModal();
+    });
+  }
+  const projectsCloseBtn = document.getElementById("studio-projects-close");
+  if (projectsCloseBtn && projectsDialog) {
+    projectsCloseBtn.addEventListener("click", () => projectsDialog.close());
+  }
+
   const grid = document.getElementById("studio-grid");
-  if (!root || !grid) return;
+  if (studioMode !== "editor" || !grid) return;
 
   const flashEl = document.getElementById("studio-flash");
   const saveStateEl = document.getElementById("studio-save-state");
@@ -28,7 +180,6 @@
   const projectId = Number(root.dataset.projectId || "0") || 0;
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
-  const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
   const msgExportFailed = root.dataset.exportFailed || "Export failed.";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
@@ -1323,7 +1474,8 @@
     if (exportResolution) exportResolution.innerHTML = "";
     exportDialog.showModal();
     try {
-      const res = await fetch("/api/studio/export/options", {
+      const qs = projectId ? `?project_id=${encodeURIComponent(String(projectId))}` : "";
+      const res = await fetch(`/api/studio/export/options${qs}`, {
         headers: { Accept: "application/json" },
       });
       const data = await res.json().catch(() => null);
