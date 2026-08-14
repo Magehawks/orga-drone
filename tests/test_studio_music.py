@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,31 @@ def _song(tmp_path: Path, name: str = "song.mp3") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"ID3fake-audio")
     return path.resolve()
+
+
+def _boot_music_payload(html: str) -> dict | None:
+    """Parse data-music-payload as a browser HTML attribute, then JSON."""
+
+    class _Parser(HTMLParser):
+        payload: str | None = None
+
+        def handle_starttag(
+            self, tag: str, attrs: list[tuple[str, str | None]]
+        ) -> None:
+            data = dict(attrs)
+            if tag == "section" and data.get("id") == "studio-root":
+                self.payload = data.get("data-music-payload")
+
+    parser = _Parser()
+    parser.feed(html)
+    raw = parser.payload
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def test_music_bed_and_fade_math() -> None:
@@ -87,6 +113,80 @@ def test_persist_reopen_and_isolation(tmp_path: Path) -> None:
     assert music_b.volume == 0.8
     assert music_b.loop is False
     assert song_a.read_bytes() == bytes_a
+
+
+def test_music_survives_real_app_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """create_app → persist music → new create_app (desktop restart) must boot it."""
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    song = _song(tmp_path)
+    song_bytes = song.read_bytes()
+
+    app1 = create_app()
+    with TestClient(app1) as client:
+        project = app1.state.db.create_studio_project("Alps")
+        project_id = project.id
+        put = client.put(
+            f"/api/studio/projects/{project_id}/music",
+            json={"path": str(song)},
+        )
+        assert put.status_code == 200
+        patched = client.patch(
+            f"/api/studio/projects/{project_id}/music",
+            json={
+                "volume": 0.5,
+                "fade_in_s": 1.0,
+                "fade_out_s": 2.0,
+                "loop": True,
+            },
+        )
+        assert patched.status_code == 200
+        opened = client.get(f"/studio?project_id={project_id}", follow_redirects=True)
+        assert opened.status_code == 200
+        before = app1.state.db.get_studio_music(project_id)
+        assert before is not None
+
+    app2 = create_app()
+    with TestClient(app2) as client:
+        with app2.state.db.connect() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) AS n FROM studio_audio_clips"
+            ).fetchone()
+            assert int(count["n"]) == 1
+        stored = app2.state.db.get_studio_music(project_id)
+        assert stored is not None
+        assert stored.file_path == str(song)
+        assert stored.volume == 0.5
+        assert stored.fade_in_s == 1.0
+        assert stored.fade_out_s == 2.0
+        assert stored.loop is True
+        restored = app2.state.db.resolve_studio_page_project()
+        assert restored is not None
+        assert restored.id == project_id
+        page = client.get("/studio")
+        assert page.status_code == 200
+        boot = _boot_music_payload(page.text)
+        assert boot is not None
+        assert boot.get("present") is True
+        assert boot.get("display_name") == "song.mp3"
+        assert boot.get("volume") == 0.5
+        assert boot.get("fade_in_s") == 1.0
+        assert boot.get("fade_out_s") == 2.0
+        assert boot.get("loop") is True
+        assert "file_path" not in boot
+        api = client.get(f"/api/studio/projects/{project_id}/music")
+        assert api.status_code == 200
+        body = api.json()
+        assert body["present"] is True
+        assert body["volume"] == 0.5
+        assert body["loop"] is True
+        assert song.read_bytes() == song_bytes
 
 
 def test_replace_remove_do_not_touch_file(tmp_path: Path) -> None:

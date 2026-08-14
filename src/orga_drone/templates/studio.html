@@ -87,7 +87,7 @@
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
          data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
          data-playback-note="{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.')|e }}"
-         data-music-payload="{{ music_payload|tojson|e }}"
+         data-music-payload='{{ music_payload|tojson }}'
          data-music-failed="{{ _('Could not save music settings.')|e }}"
          data-music-picker-unavailable="{{ _('Choosing music needs the desktop app.')|e }}"
          data-music-missing="{{ _('The selected music file is no longer available.')|e }}"
