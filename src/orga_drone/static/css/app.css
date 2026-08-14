@@ -1506,7 +1506,36 @@ img.studio-preview-media {
   gap: 0.65rem;
 }
 .studio-export-form h2 { margin: 0; font-family: var(--display); }
-.studio-export-actions { display: flex; justify-content: flex-end; }
+.studio-export-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.studio-export-dialog .meta-line.is-error { color: var(--danger, #b00020); }
+.studio-export-progress {
+  display: grid;
+  gap: 0.35rem;
+}
+.studio-export-progress .busy-progress {
+  width: 100%;
+}
+.studio-export-progress .hint {
+  margin: 0;
+}
+.studio-export-progress-primary {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.studio-export-progress-meta {
+  font-variant-numeric: tabular-nums;
+}
+.studio-export-progress.is-working .studio-export-progress-track {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.studio-export-progress.is-working .busy-progress-bar {
+  animation: studio-export-bar-pulse 1.4s ease-in-out infinite;
+}
+@keyframes studio-export-bar-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
 
 @media (max-width: 1100px) {
   .studio-workspace {

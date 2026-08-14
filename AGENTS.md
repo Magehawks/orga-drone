@@ -5,8 +5,8 @@
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + persisted project title;
-synced Story preview playback; no MP4
-export yet).
+synced Story preview playback; local MP4 export with configurable resolution;
+music not included in export yet).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -25,7 +25,7 @@ Professional creator/post-production workflows may be a long-term ambition.
 They may influence clean architecture boundaries, but must not be treated as
 shipping behavior or used to inflate a current milestone without an approved issue.
 
-Treat Studio music/export, social share destinations, AI-assisted storytelling,
+Treat Studio music-in-export, social share destinations, AI-assisted storytelling,
 plugins, and similar items as **planned or aspirational** unless the codebase
 already implements them. Never present vision items as shipping features.
 
@@ -51,8 +51,8 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted project title; synced preview; music/export stubs |
-| Share | How do I share? | Local files on disk; Studio MP4 export = target MVP |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted project title; synced preview; local MP4 export (resolution); music stub |
+| Share | How do I share? | Local files on disk; Studio MP4 export available; music-in-export / reveal = target MVP |
 
 ## Available now (implemented)
 
@@ -67,7 +67,8 @@ The application helps users:
   `studio_projects` / `studio_clips`; editable persisted title; manual order and
   estimated runtime; simple video Cut via source start/end; Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
-  with the playhead; music/export remain stubs only — no render pipeline)
+  with the playhead; local MP4 export with configurable resolution on desktop;
+  music remains a UI stub and is not mixed into the render)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
@@ -79,7 +80,7 @@ The application helps users:
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
 - There is **no** multi-project albums model, plugin API, Studio
-  music-in-export/MP4 export, or CI-built multi-OS installer pipeline
+  music-in-export, or CI-built multi-OS installer pipeline
   in the current tree. Studio remains a single workspace.
 
 ## Product principles
@@ -98,7 +99,8 @@ The application helps users:
 
 ## Possible future capabilities (roadmap / vision)
 
-- Studio MVP target: optional music, simple MP4 export, share local result
+- Studio MVP target: optional music-in-export, share/reveal local result
+  (basic MP4 export with resolution choice is Available now)
 - projects or albums for organizing media sets
 - plugin architecture and community integrations
 - semantic search or other optional intelligent features (only if justified)

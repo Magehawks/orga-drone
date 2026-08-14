@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS media (
     path TEXT NOT NULL UNIQUE,
     size_bytes INTEGER NOT NULL DEFAULT 0,
     duration_s REAL,
+    width INTEGER,
+    height INTEGER,
     recorded_at TEXT,
     sequence INTEGER,
     mode TEXT,
@@ -254,6 +256,8 @@ class MediaRow:
     notes: str = ""
     auto_tags: list[str] = field(default_factory=list)
     place: dict[str, Any] | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 @dataclass
@@ -389,6 +393,11 @@ class Database:
             )
         if "place_json" not in media_cols:
             conn.execute("ALTER TABLE media ADD COLUMN place_json TEXT")
+        media_cols = {row[1] for row in conn.execute("PRAGMA table_info(media)").fetchall()}
+        if "width" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN width INTEGER")
+        if "height" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN height INTEGER")
         conn.execute(
             """CREATE TABLE IF NOT EXISTS geocode_cache (
                 lat_key REAL NOT NULL,
@@ -731,6 +740,8 @@ class Database:
                 "path",
                 "size_bytes",
                 "duration_s",
+                "width",
+                "height",
                 "recorded_at",
                 "sequence",
                 "mode",
@@ -750,10 +761,11 @@ class Database:
                 sets = ", ".join(f"{c}=?" for c in cols)
                 conn.execute(f"UPDATE media SET {sets} WHERE id=?", (*values, row["id"]))
                 return int(row["id"])
-            insert_cols = [*cols[:19], "auto_tags_json", "place_json", "updated_at"]
+            base_cols = [c for c in cols if c != "updated_at"]
+            insert_cols = [*base_cols, "auto_tags_json", "place_json", "updated_at"]
             auto_tags = data.get("auto_tags_json") or "[]"
             place_json = data.get("place_json")
-            values = [data.get(c) for c in cols[:19]] + [auto_tags, place_json, now]
+            values = [data.get(c) for c in base_cols] + [auto_tags, place_json, now]
             placeholders = ", ".join("?" for _ in insert_cols)
             cur = conn.execute(
                 f"INSERT INTO media({', '.join(insert_cols)}) VALUES ({placeholders})",
@@ -762,6 +774,22 @@ class Database:
             media_id = cur.lastrowid
             assert media_id is not None
             return int(media_id)
+
+    def update_media_dimensions(
+        self,
+        media_id: int,
+        *,
+        width: int | None,
+        height: int | None,
+    ) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE media
+                   SET width = ?, height = ?, updated_at = ?
+                   WHERE id = ?""",
+                (width, height, now, media_id),
+            )
 
     def update_media_auto_tags(
         self,
@@ -2209,6 +2237,16 @@ class Database:
             notes=notes,
             auto_tags=auto_tags,
             place=place,
+            width=(
+                int(row["width"])
+                if "width" in keys and row["width"] is not None
+                else None
+            ),
+            height=(
+                int(row["height"])
+                if "height" in keys and row["height"] is not None
+                else None
+            ),
         )
 
 

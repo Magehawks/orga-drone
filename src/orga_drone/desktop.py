@@ -110,6 +110,10 @@ class FolderPickerError(Exception):
     """Raised when a native folder dialog cannot be shown."""
 
 
+class SaveFilePickerError(Exception):
+    """Raised when a native save-file dialog cannot be shown."""
+
+
 def pick_folder(*, directory: str = "") -> str | None:
     """Open the OS folder picker via the active pywebview window.
 
@@ -144,6 +148,49 @@ def pick_folder(*, directory: str = "") -> str | None:
     if isinstance(chosen, bytes):
         chosen = chosen.decode("utf-8")
     return str(chosen)
+
+
+def pick_save_file(
+    *,
+    directory: str = "",
+    save_filename: str = "export.mp4",
+    file_types: tuple[str, ...] = ("MP4 Files (*.mp4)",),
+) -> str | None:
+    """Open the OS save-file dialog via the active pywebview window.
+
+    Returns:
+        Selected file path, or ``None`` if the user cancelled.
+
+    Raises:
+        SaveFilePickerError: When pywebview is missing or no desktop window is open.
+    """
+    try:
+        import webview
+    except ImportError as exc:
+        raise SaveFilePickerError("pywebview is not available") from exc
+
+    windows = list(getattr(webview, "windows", []) or [])
+    if not windows:
+        raise SaveFilePickerError(
+            "Native save dialog requires the desktop window "
+            "(not available in browser-only mode)"
+        )
+
+    result = windows[0].create_file_dialog(
+        webview.FileDialog.SAVE,
+        directory=directory or "",
+        save_filename=save_filename or "export.mp4",
+        file_types=file_types,
+    )
+    if not result:
+        return None
+    chosen = result[0] if isinstance(result, (list, tuple)) else result
+    if isinstance(chosen, bytes):
+        chosen = chosen.decode("utf-8")
+    path = str(chosen)
+    if path and not path.lower().endswith(".mp4"):
+        path = f"{path}.mp4"
+    return path
 
 
 def find_listen_port(host: str, preferred: int) -> int:

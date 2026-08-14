@@ -383,8 +383,11 @@ def test_http_studio_creator_shell_with_items(
     assert 'data-can-play="1"' in html
     assert "studio.js" in html
     assert 'id="studio-export-dialog"' in html
-    assert "not available yet" in html or "noch nicht verfügbar" in html
+    assert "studio-export-resolution" in html
+    assert 'id="studio-export-progress"' in html
+    assert "Export MP4" in html or "MP4 exportieren" in html
     assert "Preview plays Story media" in html or "Preview spielt" in html
+    assert "music is not included yet" in html or "Musik ist noch nicht enthalten" in html
     # Photo clips must expose an image preview source (not only video stream).
     assert 'data-kind="photo"' in html
     assert 'data-preview-url=' in html

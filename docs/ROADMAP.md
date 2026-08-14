@@ -27,18 +27,19 @@ Highlights:
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
-  music slot, inspector, export stub; persisted: `studio_projects` +
+  music slot, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
-  source start/end; synced Story preview playback; music/export not rendered yet)
+  source start/end; synced Story preview playback; local MP4 export with
+  configurable resolution; music not included in export yet)
 
 ## Next (possible near-term)
 
 Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
-1. **Studio simple MP4 export** (local file; progress/cancel) after order + duration
-2. **Optional one music track** for Studio export (still no pro editor)
-3. **Open / reveal exported file** on desktop (share step without social APIs)
+1. **Optional one music track** for Studio export (still no pro editor)
+2. **Open / reveal exported file** on desktop (share step without social APIs)
+3. Export cancel / abort during long renders
 4. **Incremental or cheaper rescans** (clearer scan progress is available)
 5. **Broader multi-brand parsers** beyond DJI-first depth
 6. **Projects or albums** for organizing media sets (Studio is a first slice)
@@ -46,7 +47,8 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 8. Online geocoding providers (place tags are offline today)
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
-dedicated product slice. Local MP4 (or file) first.
+dedicated product slice. Local MP4 export already exists; music-in-export and
+share/reveal polish remain next.
 
 ## Later (vision)
 
