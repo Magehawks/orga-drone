@@ -45,7 +45,7 @@ only an export UI stub (no render path).
   encoder swappable later without UI churn.
 - Negative / trade-offs: Music and mid-export cancel remain incomplete vs full
   Studio MVP; desktop save dialog required for destination picking.
-- Follow-up: music-in-export, export cancel/abort. Open/reveal of the
-  exported file is covered by ADR 0007.
+- Follow-up: export cancel/abort. Open/reveal of the exported file is
+  covered by ADR 0007. Music-in-export is covered by ADR 0008.
   Determinate export progress with elapsed/ETA/current clip label is Available now.
   Segment encodes force CFR 30fps + yuv420p so photo/video concat stays timeline-safe.

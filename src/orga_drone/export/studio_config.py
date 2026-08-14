@@ -18,6 +18,18 @@ class StudioExportClip:
 
 
 @dataclass(frozen=True)
+class StudioExportMusic:
+    """One optional soundtrack mixed onto the concat audio (reference only)."""
+
+    source_path: Path
+    volume: float = 0.8
+    fade_in_s: float = 0.0
+    fade_out_s: float = 0.0
+    loop: bool = False
+    duration_s: float = 0.0
+
+
+@dataclass(frozen=True)
 class StudioExportConfig:
     """User-facing export intent without encoder/codec details."""
 
@@ -26,6 +38,7 @@ class StudioExportConfig:
     height: int
     clips: tuple[StudioExportClip, ...] = field(default_factory=tuple)
     project_title: str = "Your story"
+    music: StudioExportMusic | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -34,4 +47,5 @@ class StudioExportConfig:
             "height": self.height,
             "project_title": self.project_title,
             "clip_count": len(self.clips),
+            "has_music": self.music is not None,
         }

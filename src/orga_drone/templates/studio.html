@@ -9,6 +9,7 @@
 {#
   Creator Studio UI foundation (GitHub #14 / #19).
   Persistence: studio_projects + studio_clips (non-destructive refs to media).
+  Optional music: studio_audio_clips (read-only file reference per project).
   Project browser + switcher; order, photo duration, video cut, editable title.
   Icons: Lucide (vendored) — see static/vendor/lucide/README.md
 #}
@@ -69,6 +70,7 @@
          data-export-preparing="{{ _('Preparing export…')|e }}"
          data-export-clip="{{ _('Clip {current} of {total}')|e }}"
          data-export-combining="{{ _('Combining clips…')|e }}"
+         data-export-mixing="{{ _('Mixing music…')|e }}"
          data-export-running-hint="{{ _('Export is running…')|e }}"
          data-export-elapsed="{{ _('Elapsed {time}')|e }}"
          data-export-eta="{{ _('About {time} left')|e }}"
@@ -84,7 +86,12 @@
          data-saved-label="{{ _('Saved')|e }}"
          data-unsaved-label="{{ _('Unsaved changes')|e }}"
          data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
-         data-playback-note="{{ _('Preview plays Story media in order. Export writes a local MP4; music is not included yet.')|e }}"
+         data-playback-note="{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.')|e }}"
+         data-music-payload="{{ music_payload|tojson|e }}"
+         data-music-failed="{{ _('Could not save music settings.')|e }}"
+         data-music-picker-unavailable="{{ _('Choosing music needs the desktop app.')|e }}"
+         data-music-missing="{{ _('The selected music file is no longer available.')|e }}"
+         data-music-unsupported="{{ _('The selected music file cannot be decoded.')|e }}"
          data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
          data-label-play="{{ _('Play')|e }}"
          data-label-pause="{{ _('Pause')|e }}"
@@ -252,9 +259,10 @@
         <div class="studio-preview-frame" id="studio-preview-frame">
           <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
+          <audio id="studio-music-audio" preload="metadata" hidden></audio>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
-            <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4; music is not included yet.') }}</p>
+            <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.') }}</p>
           </div>
         </div>
         {% else %}
@@ -381,12 +389,11 @@
             <div class="studio-track-label">{{ _('Music') }}</div>
             <div class="studio-music-body" id="studio-music-body">
               <div class="studio-music-empty" id="studio-music-empty">
-                <label class="button ghost studio-music-add studio-icon-button">
+                <button type="button" class="button ghost studio-music-add studio-icon-button" id="studio-music-add">
                   {{ lucide('plus') }}
                   <span class="studio-btn-label">{{ _('Add music') }}</span>
-                  <input type="file" id="studio-music-file" accept="audio/*" hidden>
-                </label>
-                <p class="hint">{{ _('One music track only. File stays on this computer; not used for export yet.') }}</p>
+                </button>
+                <p class="hint">{{ _('One local music track for this project. The file stays on this computer and is mixed into export.') }}</p>
               </div>
               <div class="studio-music-clip" id="studio-music-clip" hidden>
                 <button type="button" class="studio-music-select" id="studio-music-select">
@@ -397,12 +404,17 @@
                   <span class="studio-music-handle studio-music-handle-start" aria-hidden="true"></span>
                   <span class="studio-music-handle studio-music-handle-end" aria-hidden="true"></span>
                 </button>
+                <button type="button" class="button ghost studio-icon-button" id="studio-music-replace"
+                        title="{{ _('Replace') }}" aria-label="{{ _('Replace') }}">
+                  <span class="studio-btn-label">{{ _('Replace') }}</span>
+                </button>
                 <button type="button" class="button ghost studio-icon-button" id="studio-music-remove"
                         title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
                   {{ lucide('trash-2') }}
                   <span class="studio-btn-label">{{ _('Remove') }}</span>
                 </button>
               </div>
+              <p class="hint" id="studio-music-missing" hidden>{{ _('The selected music file is no longer available.') }}</p>
             </div>
           </div>
 
@@ -474,12 +486,16 @@
           <span>{{ _('Fade out (s)') }}</span>
           <input type="number" id="inspector-music-fade-out" min="0" max="10" step="0.1" value="0">
         </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Loop') }}</span>
+          <input type="checkbox" id="inspector-music-loop">
+        </label>
         <button type="button" class="button ghost studio-icon-button" id="inspector-music-remove"
                 title="{{ _('Remove') }}" aria-label="{{ _('Remove') }}">
           {{ lucide('trash-2') }}
           <span class="studio-btn-label">{{ _('Remove') }}</span>
         </button>
-        <p class="hint">{{ _('Music settings are local UI state only and are not exported yet.') }}</p>
+        <p class="hint">{{ _('Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
       </div>
     </aside>
   </div>

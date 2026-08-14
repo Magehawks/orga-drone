@@ -7,7 +7,7 @@ metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution; after export, Open video / Show in folder on
-Windows desktop; music not included in export yet).
+Windows desktop; one optional local music track in preview and MP4 export).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -26,7 +26,7 @@ Professional creator/post-production workflows may be a long-term ambition.
 They may influence clean architecture boundaries, but must not be treated as
 shipping behavior or used to inflate a current milestone without an approved issue.
 
-Treat Studio music-in-export, social share destinations, AI-assisted storytelling,
+Treat social share destinations, AI-assisted storytelling,
 plugins, and similar items as **planned or aspirational** unless the codebase
 already implements them. Never present vision items as shipping features.
 
@@ -52,8 +52,8 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); music stub |
-| Share | How do I share? | Local files on disk; Studio MP4 export; Open video / Show in folder after export (Windows); music-in-export = target MVP |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); one optional music track |
+| Share | How do I share? | Local files on disk; Studio MP4 export with optional music; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
 
@@ -71,7 +71,7 @@ The application helps users:
   with preview/Story track/inspector; Story preview plays photos/videos in sync
   with the playhead; local MP4 export with configurable resolution on desktop;
   after a successful export, Open video / Show in folder on Windows;
-  music remains a UI stub and is not mixed into the render)
+  one optional local music track in preview and export)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
@@ -82,9 +82,9 @@ The application helps users:
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, Studio
-  music-in-export, or CI-built multi-OS installer pipeline
-  in the current tree. Studio supports multiple local edit projects.
+- There is **no** Library albums model, plugin API, or CI-built multi-OS
+  installer pipeline in the current tree. Studio supports multiple local
+  edit projects and one optional music track per project.
 
 ## Product principles
 
@@ -102,9 +102,6 @@ The application helps users:
 
 ## Possible future capabilities (roadmap / vision)
 
-- Studio MVP target: optional music-in-export
-  (basic MP4 export with resolution choice and open/reveal of the finished
-  file are Available now on Windows desktop)
 - albums for organizing media sets (Studio edit projects are Available now)
 - plugin architecture and community integrations
 - semantic search or other optional intelligent features (only if justified)

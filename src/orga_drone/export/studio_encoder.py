@@ -60,6 +60,10 @@ def _segment_vf(width: int, height: int) -> str:
 class StudioExportError(Exception):
     """User-facing export failure (message is safe to show)."""
 
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 class StudioVideoEncoder(Protocol):
     def render(
@@ -89,8 +93,11 @@ def export_progress_percent(
     total_steps = max(1, int(clip_total) + 1)
     if phase == "done":
         return 100
-    if phase == "concat":
-        return max(0, min(99, int(round(100 * clip_total / total_steps))))
+    if phase == "concat" or phase == "mixing":
+        concat_pct = max(0, min(99, int(round(100 * clip_total / total_steps))))
+        if phase == "mixing":
+            return min(99, concat_pct + 1)
+        return concat_pct
     if phase == "rendering":
         idx = max(1, min(int(clip_index), max(1, int(clip_total))))
         frac = max(0.0, min(1.0, float(clip_fraction)))
@@ -225,6 +232,17 @@ class FfmpegStudioEncoder:
                 current_label=None,
             )
             self._concat(ffmpeg, segments, tmp_out)
+            if config.music is not None:
+                _emit(
+                    on_progress,
+                    phase="mixing",
+                    clip_index=clip_total,
+                    clip_total=clip_total,
+                    current_label=config.music.source_path.name,
+                )
+                mixed = tmp_dir / "export_mixed.mp4"
+                self._mix_music(ffmpeg, tmp_out, mixed, config)
+                tmp_out = mixed
             if not tmp_out.is_file() or tmp_out.stat().st_size <= 0:
                 raise StudioExportError("Export failed: empty output.")
             if dest.exists():
@@ -493,6 +511,65 @@ class FfmpegStudioEncoder:
             "+faststart",
             str(out),
         ]
+        _run_ffmpeg(cmd)
+
+    def _mix_music(
+        self,
+        ffmpeg: str,
+        concat_path: Path,
+        out: Path,
+        config: StudioExportConfig,
+    ) -> None:
+        from orga_drone.export.music_mix import (
+            build_music_amix_filter,
+            require_readable_music,
+        )
+
+        music = config.music
+        if music is None:
+            raise StudioExportError("Music mix requested without a music track.")
+        duration_s = music.duration_s
+        if duration_s <= 0:
+            duration_s = require_readable_music(music.source_path)
+        else:
+            require_readable_music(music.source_path)
+        story_s = sum(max(0.0, float(clip.duration_s)) for clip in config.clips)
+        if story_s <= 0:
+            raise StudioExportError("Studio project has no exportable duration.")
+        filter_complex = build_music_amix_filter(
+            volume=music.volume,
+            fade_in_s=music.fade_in_s,
+            fade_out_s=music.fade_out_s,
+            story_s=story_s,
+            music_s=duration_s,
+            loop=music.loop,
+        )
+        cmd: list[str] = [ffmpeg, "-y", "-i", str(concat_path)]
+        if music.loop:
+            cmd.extend(["-stream_loop", "-1"])
+        cmd.extend(
+            [
+                "-i",
+                str(music.source_path),
+                "-filter_complex",
+                filter_complex,
+                "-map",
+                "0:v:0",
+                "-map",
+                "[a]",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "-movflags",
+                "+faststart",
+                str(out),
+            ]
+        )
         _run_ffmpeg(cmd)
 
 

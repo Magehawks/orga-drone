@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from orga_drone.desktop import FolderPickerError, pick_folder
+from orga_drone.desktop import FolderPickerError, pick_folder, pick_open_file
 
 
 def _make_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -135,3 +135,27 @@ def test_pick_folder_api_unavailable(
     body = resp.json()
     assert body["status"] == "unavailable"
     assert body["error"] == "folder_picker_unavailable"
+
+
+def test_pick_open_file_returns_selected_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _install_fake_webview(
+        monkeypatch, dialog_result=(r"D:\Music\song.mp3",)
+    )
+    assert pick_open_file() == r"D:\Music\song.mp3"
+    window.create_file_dialog.assert_called_once()
+    args, kwargs = window.create_file_dialog.call_args
+    assert args[0] == sys.modules["webview"].FileDialog.OPEN
+
+
+def test_pick_open_file_api_ok(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.desktop.pick_open_file",
+        lambda *, directory="", file_types=(): r"C:\Music\a.mp3",
+    )
+    app = _make_app(tmp_path, monkeypatch)
+    client = TestClient(app)
+    resp = client.post("/api/desktop/pick-open-file", json={})
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok", "path": r"C:\Music\a.mp3"}

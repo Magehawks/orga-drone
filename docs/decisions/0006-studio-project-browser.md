@@ -53,5 +53,5 @@ follow-up named in ADR 0004.
 - Positive: Multiple local Studio edit projects; existing ADR 0004 data remains
   listed; Add-to-Studio cannot land in the wrong project once one is open.
 - Negative / trade-offs: Users must pick or create a project before the first
-  Add on a fresh database; music/transition stubs are not per-project yet.
-- Follow-up: Library albums stay Later; per-project UI stubs if needed later.
+  Add on a fresh database; transition stubs are not per-project yet.
+- Follow-up: Library albums stay Later; music persistence is ADR 0008.

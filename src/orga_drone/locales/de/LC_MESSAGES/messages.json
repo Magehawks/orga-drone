@@ -250,6 +250,7 @@
   "Preview transport updates the playhead only — media is not played back yet.": "Die Transportsteuerung bewegt nur den Playhead — Medien werden noch nicht abgespielt.",
   "Preview plays Story media in order. Export and music sync are not available yet.": "Preview spielt Story-Medien der Reihe nach ab. Export und Musik-Sync sind noch nicht verfügbar.",
   "Preview plays Story media in order. Export writes a local MP4; music is not included yet.": "Preview spielt Story-Medien der Reihe nach ab. Export schreibt eine lokale MP4; Musik ist noch nicht enthalten.",
+  "Preview plays Story media in order. Export writes a local MP4 and includes project music when set.": "Preview spielt Story-Medien der Reihe nach ab. Export schreibt eine lokale MP4 und mischt Projektmusik ein, wenn vorhanden.",
   "Export failed.": "Export fehlgeschlagen.",
   "Export cancelled.": "Export abgebrochen.",
   "No exportable video resolution in this project.": "In diesem Projekt gibt es keine exportierbare Videoauflösung.",
@@ -266,6 +267,7 @@
   "Preparing export…": "Export wird vorbereitet…",
   "Clip {current} of {total}": "Clip {current} von {total}",
   "Combining clips…": "Clips werden zusammengefügt…",
+  "Mixing music…": "Musik wird gemischt…",
   "Export progress": "Exportfortschritt",
   "Export is running…": "Export läuft…",
   "Elapsed {time}": "Vergangen {time}",
@@ -332,5 +334,14 @@
   "Order and estimated duration are saved in Studio. A local MP4 export will connect here later.": "Reihenfolge und geschätzte Dauer sind im Studio gespeichert. Ein lokaler MP4-Export kommt später hierher.",
   "Cancel": "Abbrechen",
   "Close": "Schließen",
-  "No music yet": "Noch keine Musik"
+  "No music yet": "Noch keine Musik",
+  "Loop": "Schleife",
+  "Replace": "Ersetzen",
+  "Could not save music settings.": "Musikeinstellungen konnten nicht gespeichert werden.",
+  "Choosing music needs the desktop app.": "Musikauswahl braucht die Desktop-App.",
+  "The selected music file is no longer available.": "Die ausgewählte Musikdatei ist nicht mehr verfügbar.",
+  "The selected music file could not be read.": "Die ausgewählte Musikdatei konnte nicht gelesen werden.",
+  "The selected music file cannot be decoded.": "Die ausgewählte Musikdatei kann nicht dekodiert werden.",
+  "One local music track for this project. The file stays on this computer and is mixed into export.": "Eine lokale Musikspur für dieses Projekt. Die Datei bleibt auf diesem Computer und wird in den Export gemischt.",
+  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden."
 }

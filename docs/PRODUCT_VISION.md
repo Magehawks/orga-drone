@@ -22,7 +22,8 @@ Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (order + estimated runtime; multiple local Studio projects; synced Story
 preview; local MP4 export with configurable resolution; after export, open
-or reveal the MP4 on desktop; music not included in export yet).
+or reveal the MP4 on desktop; one optional local music track in preview and
+export).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -135,11 +136,11 @@ professional video-editing knowledge.
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
-| Transition markers / one music slot (UI state only) | **Available now** (not rendered / not exported) |
-| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; no music) |
+| Transition markers (UI state only) | **Available now** (not rendered) |
+| One optional music track (file, volume, fades, loop) | **Available now** (preview + MP4 export; desktop picker) |
+| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
-| Build a story (real music in export, transitions, editing) | **Studio MVP (target)** / **Later** |
-| Music-in-export | **Studio MVP (target)** |
+| Build a story (transitions rendered, light editing) | **Later** |
 
 ### 4. Share
 
@@ -150,7 +151,7 @@ Sharing is the final step of the journey.
 | Example | Status |
 |---------|--------|
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
-| Simple Studio MP4 export | **Available now** (local file; resolution choice; no music) |
+| Simple Studio MP4 export | **Available now** (local file; resolution choice; optional music) |
 | Open video / Show in folder after Studio export | **Available now** (Windows desktop) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 
@@ -209,9 +210,10 @@ See `README.md` for the detailed feature status table. In short:
   export dialog) for the open project. Persisted today: editable project title;
   order; estimated runtime; optional video source start/end after Cut. Story
   preview plays photos/videos in sync with the playhead. Local MP4 export with
-  configurable resolution (desktop); music and transitions remain UI stubs and
-  are not included in the render. Media files are referenced, never copied or
-  modified.
+  configurable resolution (desktop). One optional local music track persists
+  with the project, plays in preview, and is mixed into export. Transitions
+  remain UI stubs and are not rendered. Media files are referenced, never
+  copied or modified.
 - Local SQLite index; media files stay on disk
 
 ## Honest limitations
@@ -222,9 +224,9 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, Studio
-  music-in-export, or CI-built multi-OS installer pipeline in the
-  current tree. Studio supports multiple local edit projects; albums for
+- There is **no** Library albums model, plugin API, or CI-built multi-OS
+  installer pipeline in the current tree. Studio supports multiple local
+  edit projects and one optional music track per project; albums for
   organizing the media library remain Later.
 
 ## Studio MVP (target)
@@ -241,10 +243,10 @@ The first **complete** Studio MVP is achieved when a user can:
 8. Share the result with family or friends.
 
 If users can complete this journey without opening another application, that MVP
-is successful. Local MP4 export with resolution choice (step 7, without music)
-is **Available now** on desktop. After a successful export, Open video and
-Show in folder are **Available now** on Windows (step 8, without social
-upload). Music-in-export (step 6) remains **Studio MVP (target)**.
+is successful. Local MP4 export with resolution choice, one optional music
+track in preview/export, and Open video / Show in folder after export are
+**Available now** on Windows desktop (steps 6–8 without social upload).
+Rendered transitions and social share destinations remain **Later**.
 
 ## What orga-drone is NOT
 
@@ -259,7 +261,7 @@ mission-control system, or industry-leading solution.
 Future development should remain focused on storytelling. Possible areas
 (**Later** unless shipped):
 
-- Better Studio (music, simple transitions, light editing, export)
+- Better Studio (simple transitions, light editing)
 - Simple timeline improvements
 - AI-assisted storytelling **only if** justified by a real user problem
 - Plugins

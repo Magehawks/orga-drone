@@ -41,7 +41,7 @@ Media files stay on disk under user-chosen library roots.
 |------|----------------|
 | `app.py` | FastAPI routes (HTML + APIs) |
 | `config.py` | Settings, paths, env |
-| `desktop.py` | Desktop window / port discovery / native folder + save pickers; Windows open/reveal of local files |
+| `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files |
 | `db/` | Schema, migrations, queries |
 | `scan/` | Full rescan of library roots |
 | `parse/` | Filenames, SRT, EXIF, generic media |
@@ -50,7 +50,7 @@ Media files stay on disk under user-chosen library roots.
 | `dupes/` | Heuristic duplicate detection |
 | `geocode/` | Offline reverse geocode + cache |
 | `ops/` | Rename, flow merge |
-| `export/` | Spot GeoJSON; Studio MP4 config + ffmpeg encoder; in-memory export jobs + last-success slot |
+| `export/` | Spot GeoJSON; Studio MP4 config + ffmpeg encoder; in-memory export jobs + last-success slot; optional music mix |
 | `studio_export*.py` / `app_prefs.py` | Studio export orchestration, resolution rules, last-dir prefs |
 | `thumbs.py` | Thumbnail / preview generation |
 | `i18n.py` + `locales/` | DE/EN strings |
@@ -70,6 +70,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
 | `studio_clips` | Story clips per project (path + identity + optional `source_media_id`; start/end, speed, volume, transition, effect_settings JSON; survives rescan) |
+| `studio_audio_clips` | Optional per-project music reference (read-only path outside library roots allowed; volume/fades/loop; not library media) |
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
 
@@ -106,7 +107,8 @@ determinate progress in the export dialog (elapsed time, ETA, current clip
 label; within-clip ffmpeg progress). On success the dialog closes and Studio
 shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
-successful output only). Desktop save dialog; music/transitions
+successful output only). Desktop save dialog. Optional project music
+(`studio_audio_clips`) is previewed and mixed into the MP4; transitions
 remain client UI stubs). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.
@@ -132,7 +134,9 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 2. Do not claim plugins, albums, or incremental scan until implemented.
 3. Prefer small modules in existing package areas over new top-level frameworks.
 4. Preserve `media_meta` and `studio_clips` across rescans.
-5. Path operations must stay confined under library roots.
+5. Path operations for library media must stay confined under library roots.
+   Studio music is a documented exception: one read-only soundtrack path per
+   project, including files outside library folders (ADR 0008).
 6. Record significant architecture choices in `docs/decisions/`.
 
 ## Related docs

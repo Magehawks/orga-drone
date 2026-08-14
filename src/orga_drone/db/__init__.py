@@ -158,6 +158,29 @@ CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id,
 CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
 CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
 
+-- Optional soundtrack per project (Issue #25 / ADR 0008). Reference only; never copies files.
+CREATE TABLE IF NOT EXISTS studio_audio_clips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+    lane TEXT NOT NULL DEFAULT 'music',
+    position INTEGER NOT NULL DEFAULT 0,
+    file_path TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    volume REAL NOT NULL DEFAULT 0.8
+        CHECK (volume >= 0.0 AND volume <= 1.0),
+    fade_in_s REAL NOT NULL DEFAULT 0.0
+        CHECK (fade_in_s >= 0.0),
+    fade_out_s REAL NOT NULL DEFAULT 0.0
+        CHECK (fade_out_s >= 0.0),
+    loop INTEGER NOT NULL DEFAULT 0
+        CHECK (loop IN (0, 1)),
+    added_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_studio_audio_clips_project
+    ON studio_audio_clips(project_id, lane, position);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_audio_clips_one_music
+    ON studio_audio_clips(project_id) WHERE lane = 'music';
+
 CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -266,6 +289,23 @@ class MediaRow:
 
 
 STUDIO_LAST_OPENED_KEY = "studio_last_opened_project_id"
+
+
+@dataclass
+class StudioAudioClip:
+    """One optional soundtrack reference for a Studio project (never copies the file)."""
+
+    id: int
+    project_id: int
+    lane: str
+    position: int
+    file_path: str
+    display_name: str
+    volume: float
+    fade_in_s: float
+    fade_out_s: float
+    loop: bool
+    added_at: str
 
 
 @dataclass
@@ -471,6 +511,7 @@ class Database:
                 conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
             Database._migrate_studio_items_drop_unique_media_path(conn)
         Database._migrate_studio_projects_and_clips(conn)
+        Database._migrate_studio_audio_clips(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
@@ -674,6 +715,36 @@ class Database:
             )
         conn.execute("DROP TABLE IF EXISTS studio_items")
 
+    @staticmethod
+    def _migrate_studio_audio_clips(conn: sqlite3.Connection) -> None:
+        """Optional per-project music reference (Issue #25)."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_audio_clips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                lane TEXT NOT NULL DEFAULT 'music',
+                position INTEGER NOT NULL DEFAULT 0,
+                file_path TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                volume REAL NOT NULL DEFAULT 0.8
+                    CHECK (volume >= 0.0 AND volume <= 1.0),
+                fade_in_s REAL NOT NULL DEFAULT 0.0
+                    CHECK (fade_in_s >= 0.0),
+                fade_out_s REAL NOT NULL DEFAULT 0.0
+                    CHECK (fade_out_s >= 0.0),
+                loop INTEGER NOT NULL DEFAULT 0
+                    CHECK (loop IN (0, 1)),
+                added_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_studio_audio_clips_project
+               ON studio_audio_clips(project_id, lane, position)"""
+        )
+        conn.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_audio_clips_one_music
+               ON studio_audio_clips(project_id) WHERE lane = 'music'"""
+        )
 
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
@@ -1556,6 +1627,135 @@ class Database:
                        ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
                     (STUDIO_LAST_OPENED_KEY, ""),
                 )
+            return True
+
+    def _audio_clip_from_row(self, row: sqlite3.Row) -> StudioAudioClip:
+        return StudioAudioClip(
+            id=int(row["id"]),
+            project_id=int(row["project_id"]),
+            lane=str(row["lane"]),
+            position=int(row["position"]),
+            file_path=str(row["file_path"]),
+            display_name=str(row["display_name"]),
+            volume=float(row["volume"]),
+            fade_in_s=float(row["fade_in_s"]),
+            fade_out_s=float(row["fade_out_s"]),
+            loop=bool(int(row["loop"])),
+            added_at=str(row["added_at"]),
+        )
+
+    def get_studio_music(self, project_id: int) -> StudioAudioClip | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, project_id, lane, position, file_path, display_name,
+                          volume, fade_in_s, fade_out_s, loop, added_at
+                   FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = 'music'
+                   ORDER BY position ASC, id ASC
+                   LIMIT 1""",
+                (project_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._audio_clip_from_row(row)
+
+    def set_studio_music(self, project_id: int, file_path: str) -> StudioAudioClip:
+        """Upsert the project's one music clip. Never copies or modifies the file."""
+        dest = Path(file_path)
+        display = dest.name
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            project = conn.execute(
+                "SELECT id FROM studio_projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+            if project is None:
+                raise ValueError("studio project not found")
+            existing = conn.execute(
+                """SELECT id FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = 'music' LIMIT 1""",
+                (project_id,),
+            ).fetchone()
+            if existing is None:
+                conn.execute(
+                    """INSERT INTO studio_audio_clips(
+                           project_id, lane, position, file_path, display_name,
+                           volume, fade_in_s, fade_out_s, loop, added_at
+                       ) VALUES (?, 'music', 0, ?, ?, 0.8, 0.0, 0.0, 0, ?)""",
+                    (project_id, str(dest), display, now),
+                )
+            else:
+                conn.execute(
+                    """UPDATE studio_audio_clips
+                       SET file_path = ?, display_name = ?
+                       WHERE id = ?""",
+                    (str(dest), display, int(existing["id"])),
+                )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        clip = self.get_studio_music(project_id)
+        assert clip is not None
+        return clip
+
+    def patch_studio_music(
+        self,
+        project_id: int,
+        *,
+        volume: float | None = None,
+        fade_in_s: float | None = None,
+        fade_out_s: float | None = None,
+        loop: bool | None = None,
+    ) -> StudioAudioClip:
+        current = self.get_studio_music(project_id)
+        if current is None:
+            raise ValueError("studio music not found")
+        next_volume = current.volume if volume is None else max(0.0, min(1.0, float(volume)))
+        next_fade_in = (
+            current.fade_in_s if fade_in_s is None else max(0.0, min(10.0, float(fade_in_s)))
+        )
+        next_fade_out = (
+            current.fade_out_s if fade_out_s is None else max(0.0, min(10.0, float(fade_out_s)))
+        )
+        next_loop = current.loop if loop is None else bool(loop)
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE studio_audio_clips
+                   SET volume = ?, fade_in_s = ?, fade_out_s = ?, loop = ?
+                   WHERE project_id = ? AND lane = 'music'""",
+                (
+                    next_volume,
+                    next_fade_in,
+                    next_fade_out,
+                    1 if next_loop else 0,
+                    project_id,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        clip = self.get_studio_music(project_id)
+        assert clip is not None
+        return clip
+
+    def delete_studio_music(self, project_id: int) -> bool:
+        """Drop the music reference. Never deletes the audio file on disk."""
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """DELETE FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = 'music'""",
+                (project_id,),
+            )
+            if cur.rowcount == 0:
+                return False
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
             return True
 
     def add_studio_item(

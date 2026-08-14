@@ -250,6 +250,7 @@
   "Preview transport updates the playhead only — media is not played back yet.": "Preview transport updates the playhead only — media is not played back yet.",
   "Preview plays Story media in order. Export and music sync are not available yet.": "Preview plays Story media in order. Export and music sync are not available yet.",
   "Preview plays Story media in order. Export writes a local MP4; music is not included yet.": "Preview plays Story media in order. Export writes a local MP4; music is not included yet.",
+  "Preview plays Story media in order. Export writes a local MP4 and includes project music when set.": "Preview plays Story media in order. Export writes a local MP4 and includes project music when set.",
   "Export failed.": "Export failed.",
   "Export cancelled.": "Export cancelled.",
   "No exportable video resolution in this project.": "No exportable video resolution in this project.",
@@ -266,6 +267,7 @@
   "Preparing export…": "Preparing export…",
   "Clip {current} of {total}": "Clip {current} of {total}",
   "Combining clips…": "Combining clips…",
+  "Mixing music…": "Mixing music…",
   "Export progress": "Export progress",
   "Export is running…": "Export is running…",
   "Elapsed {time}": "Elapsed {time}",
@@ -332,5 +334,14 @@
   "Order and estimated duration are saved in Studio. A local MP4 export will connect here later.": "Order and estimated duration are saved in Studio. A local MP4 export will connect here later.",
   "Cancel": "Cancel",
   "Close": "Close",
-  "No music yet": "No music yet"
+  "No music yet": "No music yet",
+  "Loop": "Loop",
+  "Replace": "Replace",
+  "Could not save music settings.": "Could not save music settings.",
+  "Choosing music needs the desktop app.": "Choosing music needs the desktop app.",
+  "The selected music file is no longer available.": "The selected music file is no longer available.",
+  "The selected music file could not be read.": "The selected music file could not be read.",
+  "The selected music file cannot be decoded.": "The selected music file cannot be decoded.",
+  "One local music track for this project. The file stays on this computer and is mixed into export.": "One local music track for this project. The file stays on this computer and is mixed into export.",
+  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Music is mixed into the exported MP4. Source video audio is kept when present."
 }
