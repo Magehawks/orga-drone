@@ -343,5 +343,13 @@
   "The selected music file could not be read.": "The selected music file could not be read.",
   "The selected music file cannot be decoded.": "The selected music file cannot be decoded.",
   "One local music track for this project. The file stays on this computer and is mixed into export.": "One local music track for this project. The file stays on this computer and is mixed into export.",
-  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Music is mixed into the exported MP4. Source video audio is kept when present."
+  "Music is mixed into the exported MP4. Source video audio is kept when present.": "Music is mixed into the exported MP4. Source video audio is kept when present.",
+  "Title card": "Title card",
+  "Add title card": "Add title card",
+  "Title": "Title",
+  "Subtitle": "Subtitle",
+  "Title card duration in seconds": "Title card duration in seconds",
+  "Could not save title card.": "Could not save title card.",
+  "Or add a Title Card to start with a heading.": "Or add a Title Card to start with a heading.",
+  "Title Card export needs a system sans font.": "Title Card export needs a system sans font."
 }

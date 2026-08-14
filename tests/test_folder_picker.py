@@ -10,11 +10,15 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from orga_drone.config import Settings
 from orga_drone.desktop import FolderPickerError, pick_folder, pick_open_file
 
 
 def _make_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("ORGA_DRONE_DATA", str(tmp_path / "data"))
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
     from orga_drone.app import create_app
 
     return create_app()

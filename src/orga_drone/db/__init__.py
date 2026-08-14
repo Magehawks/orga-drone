@@ -131,13 +131,15 @@ CREATE TABLE IF NOT EXISTS studio_projects (
     updated_at TEXT NOT NULL
 );
 
--- Clips reference library media by path (+ optional media.id); never copy files.
--- Multiple clips may share media_path / source_media_id.
+-- Clips: media references OR generated Title Cards (Issue #26 / ADR 0009).
+-- Multiple media clips may share media_path / source_media_id.
+-- Title Cards have NULL media_path/identity_key and never pretend to be files.
 CREATE TABLE IF NOT EXISTS studio_clips (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
-    media_path TEXT NOT NULL,
-    identity_key TEXT NOT NULL,
+    item_kind TEXT NOT NULL DEFAULT 'media',
+    media_path TEXT,
+    identity_key TEXT,
     source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
     position INTEGER NOT NULL,
     filename_snapshot TEXT NOT NULL,
@@ -150,7 +152,22 @@ CREATE TABLE IF NOT EXISTS studio_clips (
     volume REAL NOT NULL DEFAULT 1.0,
     transition TEXT,
     effect_settings TEXT NOT NULL DEFAULT '{}',
-    added_at TEXT NOT NULL
+    title_text TEXT,
+    subtitle_text TEXT,
+    card_duration_s REAL,
+    background TEXT,
+    added_at TEXT NOT NULL,
+    CHECK (item_kind IN ('media', 'title_card')),
+    CHECK (
+        (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
+        OR (
+            item_kind = 'title_card'
+            AND media_path IS NULL
+            AND identity_key IS NULL
+            AND source_media_id IS NULL
+        )
+    ),
+    CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
 );
 CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
 CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
@@ -321,12 +338,12 @@ class StudioProject:
 
 @dataclass
 class StudioClip:
-    """One Story clip in a Studio project (references media; never copies it)."""
+    """One Story clip: media reference or generated Title Card (never copies files)."""
 
     id: int
     project_id: int
-    media_path: str
-    identity_key: str
+    media_path: str | None
+    identity_key: str | None
     position: int
     filename_snapshot: str
     recorded_at_snapshot: str | None
@@ -345,6 +362,11 @@ class StudioClip:
     volume: float = 1.0
     transition: str | None = None
     effect_settings: str = "{}"
+    item_kind: str = "media"
+    title_text: str | None = None
+    subtitle_text: str | None = None
+    card_duration_s: float | None = None
+    background: str | None = None
 
     @property
     def media_id(self) -> int | None:
@@ -511,6 +533,7 @@ class Database:
                 conn.execute("ALTER TABLE studio_items ADD COLUMN source_out_s REAL")
             Database._migrate_studio_items_drop_unique_media_path(conn)
         Database._migrate_studio_projects_and_clips(conn)
+        Database._migrate_studio_clips_title_cards(conn)
         Database._migrate_studio_audio_clips(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
@@ -714,6 +737,84 @@ class Database:
                 (project_id,),
             )
         conn.execute("DROP TABLE IF EXISTS studio_items")
+
+    @staticmethod
+    def _migrate_studio_clips_title_cards(conn: sqlite3.Connection) -> None:
+        """Allow generated Title Cards: nullable media identity + structured fields."""
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_clips'"
+        ).fetchone()
+        if not exists:
+            return
+        cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+        }
+        if "item_kind" in cols and "title_text" in cols and "card_duration_s" in cols:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind "
+                "ON studio_clips(project_id, item_kind)"
+            )
+            return
+        conn.executescript(
+            """
+            CREATE TABLE studio_clips__title_mig (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                item_kind TEXT NOT NULL DEFAULT 'media',
+                media_path TEXT,
+                identity_key TEXT,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                position INTEGER NOT NULL,
+                filename_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                kind_snapshot TEXT NOT NULL,
+                photo_duration_s REAL,
+                source_start REAL,
+                source_end REAL,
+                playback_speed REAL NOT NULL DEFAULT 1.0,
+                volume REAL NOT NULL DEFAULT 1.0,
+                transition TEXT,
+                effect_settings TEXT NOT NULL DEFAULT '{}',
+                title_text TEXT,
+                subtitle_text TEXT,
+                card_duration_s REAL,
+                background TEXT,
+                added_at TEXT NOT NULL,
+                CHECK (item_kind IN ('media', 'title_card')),
+                CHECK (
+                    (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
+                    OR (
+                        item_kind = 'title_card'
+                        AND media_path IS NULL
+                        AND identity_key IS NULL
+                        AND source_media_id IS NULL
+                    )
+                ),
+                CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
+            );
+            INSERT INTO studio_clips__title_mig(
+                id, project_id, item_kind, media_path, identity_key, source_media_id,
+                position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                photo_duration_s, source_start, source_end,
+                playback_speed, volume, transition, effect_settings,
+                title_text, subtitle_text, card_duration_s, background, added_at
+            )
+            SELECT id, project_id, 'media', media_path, identity_key, source_media_id,
+                   position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                   photo_duration_s, source_start, source_end,
+                   playback_speed, volume, transition, effect_settings,
+                   NULL, NULL, NULL, NULL, added_at
+            FROM studio_clips;
+            DROP TABLE studio_clips;
+            ALTER TABLE studio_clips__title_mig RENAME TO studio_clips;
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind ON studio_clips(project_id, item_kind);
+            """
+        )
 
     @staticmethod
     def _migrate_studio_audio_clips(conn: sqlite3.Connection) -> None:
@@ -1801,11 +1902,11 @@ class Database:
             position = int(pos_row["next_pos"])
             cur = conn.execute(
                 """INSERT INTO studio_clips(
-                     project_id, media_path, identity_key, source_media_id, position,
+                     project_id, item_kind, media_path, identity_key, source_media_id, position,
                      filename_snapshot, recorded_at_snapshot, kind_snapshot,
                      photo_duration_s, source_start, source_end,
                      playback_speed, volume, transition, effect_settings, added_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 1.0, 1.0, NULL, '{}', ?)""",
+                   ) VALUES (?, 'media', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 1.0, 1.0, NULL, '{}', ?)""",
                 (
                     pid,
                     media_path,
@@ -1825,6 +1926,146 @@ class Database:
             item_id = cur.lastrowid
             assert item_id is not None
             return int(item_id), True
+
+    def add_studio_title_card(
+        self,
+        project_id: int,
+        *,
+        title_text: str,
+        subtitle_text: str = "",
+        card_duration_s: float | None = None,
+        background: str | None = None,
+    ) -> StudioClip:
+        """Append a generated Title Card. Never copies or creates media files."""
+        from orga_drone.studio_title_card import (
+            DEFAULT_BACKGROUND,
+            DEFAULT_DURATION_S,
+            ITEM_KIND_TITLE_CARD,
+            TITLE_CARD_KIND,
+            clamp_card_duration,
+            normalize_background,
+            normalize_subtitle,
+            normalize_title,
+        )
+
+        project = self.get_studio_project(project_id)
+        if project is None:
+            raise ValueError("studio project not found")
+        title = normalize_title(title_text)
+        subtitle = normalize_subtitle(subtitle_text)
+        duration = clamp_card_duration(
+            DEFAULT_DURATION_S if card_duration_s is None else float(card_duration_s)
+        )
+        bg = normalize_background(background or DEFAULT_BACKGROUND)
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            pos_row = conn.execute(
+                """SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+                   FROM studio_clips WHERE project_id = ?""",
+                (project.id,),
+            ).fetchone()
+            position = int(pos_row["next_pos"])
+            cur = conn.execute(
+                """INSERT INTO studio_clips(
+                     project_id, item_kind, media_path, identity_key, source_media_id,
+                     position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, effect_settings,
+                     title_text, subtitle_text, card_duration_s, background, added_at
+                   ) VALUES (?, ?, NULL, NULL, NULL, ?, '', NULL, ?, NULL, NULL, NULL,
+                             1.0, 1.0, NULL, '{}', ?, ?, ?, ?, ?)""",
+                (
+                    project.id,
+                    ITEM_KIND_TITLE_CARD,
+                    position,
+                    TITLE_CARD_KIND,
+                    title,
+                    subtitle,
+                    duration,
+                    bg,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project.id),
+            )
+            item_id = cur.lastrowid
+            assert item_id is not None
+        items = {i.id: i for i in self.list_studio_items(project.id)}
+        clip = items.get(int(item_id))
+        assert clip is not None
+        return clip
+
+    def update_studio_title_card(
+        self,
+        studio_item_id: int,
+        *,
+        title_text: str | None = None,
+        subtitle_text: str | None = None,
+        card_duration_s: float | None = None,
+        background: str | None = None,
+    ) -> StudioClip:
+        """Patch Title Card fields. Raises ValueError if the row is not a card."""
+        from orga_drone.studio_title_card import (
+            ITEM_KIND_TITLE_CARD,
+            clamp_card_duration,
+            normalize_background,
+            normalize_subtitle,
+            normalize_title,
+        )
+
+        current = None
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT project_id, item_kind FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("studio item not found")
+        if str(row["item_kind"] or "") != ITEM_KIND_TITLE_CARD:
+            raise ValueError("not a title card")
+        items = {i.id: i for i in self.list_studio_items(int(row["project_id"]))}
+        current = items.get(studio_item_id)
+        if current is None:
+            raise ValueError("studio item not found")
+        if current.item_kind != ITEM_KIND_TITLE_CARD:
+            raise ValueError("not a title card")
+        next_title = (
+            current.title_text or "" if title_text is None else normalize_title(title_text)
+        )
+        next_sub = (
+            current.subtitle_text or ""
+            if subtitle_text is None
+            else normalize_subtitle(subtitle_text)
+        )
+        next_dur = (
+            current.card_duration_s
+            if card_duration_s is None
+            else clamp_card_duration(float(card_duration_s))
+        )
+        next_bg = (
+            current.background
+            if background is None
+            else normalize_background(background)
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE studio_clips
+                   SET title_text = ?, subtitle_text = ?, card_duration_s = ?, background = ?
+                   WHERE id = ? AND item_kind = ?""",
+                (next_title, next_sub, next_dur, next_bg, studio_item_id, ITEM_KIND_TITLE_CARD),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, current.project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(current.project_id)}
+        clip = items.get(studio_item_id)
+        if clip is None:
+            raise ValueError("studio item not found")
+        return clip
 
     def remove_studio_item(self, studio_item_id: int) -> bool:
         """Remove one Studio clip. Never deletes media assets."""
@@ -1874,13 +2115,13 @@ class Database:
         with self.connect() as conn:
             if project_id is None:
                 row = conn.execute(
-                    "SELECT 1 FROM studio_clips WHERE media_path = ?",
+                    "SELECT 1 FROM studio_clips WHERE media_path = ? AND item_kind = 'media'",
                     (media_path,),
                 ).fetchone()
             else:
                 row = conn.execute(
                     """SELECT 1 FROM studio_clips
-                       WHERE media_path = ? AND project_id = ?""",
+                       WHERE media_path = ? AND project_id = ? AND item_kind = 'media'""",
                     (media_path, project_id),
                 ).fetchone()
         return row is not None
@@ -1892,7 +2133,7 @@ class Database:
             return set()
         placeholders = ",".join("?" for _ in paths)
         sql = (
-            f"SELECT media_path FROM studio_clips WHERE media_path IN ({placeholders})"
+            f"SELECT media_path FROM studio_clips WHERE item_kind = 'media' AND media_path IN ({placeholders})"
         )
         params: list[Any] = list(paths)
         if project_id is not None:
@@ -1916,32 +2157,39 @@ class Database:
             return []
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT s.id, s.project_id, s.media_path, s.identity_key, s.position,
-                          s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
+                """SELECT s.id, s.project_id, s.item_kind, s.media_path, s.identity_key,
+                          s.position, s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
                           s.kind_snapshot, s.photo_duration_s,
                           s.source_start, s.source_end,
                           s.playback_speed, s.volume, s.transition, s.effect_settings,
+                          s.title_text, s.subtitle_text, s.card_duration_s, s.background,
                           s.source_media_id AS stored_media_id,
                           m.id AS media_id, m.filename AS live_filename,
                           m.recorded_at AS live_recorded_at, m.kind AS live_kind,
                           m.duration_s AS live_duration_s
                    FROM studio_clips s
-                   LEFT JOIN media m ON m.path = s.media_path
+                   LEFT JOIN media m ON s.item_kind = 'media' AND m.path = s.media_path
                    WHERE s.project_id = ?
                    ORDER BY s.position ASC, s.id ASC""",
                 (project.id,),
             ).fetchall()
         out: list[StudioClip] = []
         for r in rows:
-            available = r["media_id"] is not None
+            item_kind = str(r["item_kind"] or "media")
+            is_title = item_kind == "title_card"
+            available = True if is_title else r["media_id"] is not None
             live_kind = (
                 str(r["live_kind"]) if available and r["live_kind"] else None
             )
             kind_snapshot = str(r["kind_snapshot"] or "photo")
-            kind = effective_kind(
-                available=available,
-                live_kind=live_kind,
-                kind_snapshot=kind_snapshot,
+            kind = (
+                "title_card"
+                if is_title
+                else effective_kind(
+                    available=available,
+                    live_kind=live_kind,
+                    kind_snapshot=kind_snapshot,
+                )
             )
             photo_raw = r["photo_duration_s"]
             start_raw = r["source_start"]
@@ -1952,12 +2200,26 @@ class Database:
                 if r["stored_media_id"] is not None
                 else None
             )
+            title_text = (
+                str(r["title_text"]) if r["title_text"] is not None else None
+            )
+            subtitle_text = (
+                str(r["subtitle_text"]) if r["subtitle_text"] is not None else None
+            )
+            card_raw = r["card_duration_s"]
+            caption = title_text or ""
             out.append(
                 StudioClip(
                     id=int(r["id"]),
                     project_id=int(r["project_id"]),
-                    media_path=str(r["media_path"]),
-                    identity_key=str(r["identity_key"]),
+                    media_path=(
+                        None if is_title or r["media_path"] is None else str(r["media_path"])
+                    ),
+                    identity_key=(
+                        None
+                        if is_title or r["identity_key"] is None
+                        else str(r["identity_key"])
+                    ),
                     position=int(r["position"]),
                     filename_snapshot=str(r["filename_snapshot"]),
                     recorded_at_snapshot=r["recorded_at_snapshot"],
@@ -1967,22 +2229,34 @@ class Database:
                     ),
                     added_at=str(r["added_at"]),
                     available=available,
-                    source_media_id=live_id if live_id is not None else stored_id,
+                    source_media_id=None if is_title else (live_id if live_id is not None else stored_id),
                     filename=(
-                        str(r["live_filename"])
-                        if available and r["live_filename"]
-                        else str(r["filename_snapshot"])
+                        caption
+                        if is_title
+                        else (
+                            str(r["live_filename"])
+                            if available and r["live_filename"]
+                            else str(r["filename_snapshot"])
+                        )
                     ),
                     recorded_at=(
-                        r["live_recorded_at"]
-                        if available
-                        else r["recorded_at_snapshot"]
+                        None
+                        if is_title
+                        else (
+                            r["live_recorded_at"]
+                            if available
+                            else r["recorded_at_snapshot"]
+                        )
                     ),
                     kind=kind if kind != "unknown" else None,
                     duration_s=(
-                        float(r["live_duration_s"])
-                        if available and r["live_duration_s"] is not None
-                        else None
+                        float(card_raw)
+                        if is_title and card_raw is not None
+                        else (
+                            float(r["live_duration_s"])
+                            if available and r["live_duration_s"] is not None
+                            else None
+                        )
                     ),
                     source_start=(
                         float(start_raw) if start_raw is not None else None
@@ -1994,6 +2268,15 @@ class Database:
                         str(r["transition"]) if r["transition"] is not None else None
                     ),
                     effect_settings=str(r["effect_settings"] or "{}"),
+                    item_kind=item_kind,
+                    title_text=title_text if is_title else None,
+                    subtitle_text=subtitle_text if is_title else None,
+                    card_duration_s=(
+                        float(card_raw) if is_title and card_raw is not None else None
+                    ),
+                    background=(
+                        str(r["background"]) if is_title and r["background"] else None
+                    ),
                 )
             )
         return out
@@ -2219,17 +2502,17 @@ class Database:
             return
         with self.connect() as conn:
             conflict = conn.execute(
-                "SELECT id FROM studio_clips WHERE media_path = ?",
+                "SELECT id FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
                 (new_path,),
             ).fetchone()
             if conflict:
                 conn.execute(
-                    "DELETE FROM studio_clips WHERE media_path = ?",
+                    "DELETE FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
                     (old_path,),
                 )
             else:
                 conn.execute(
-                    "UPDATE studio_clips SET media_path = ? WHERE media_path = ?",
+                    "UPDATE studio_clips SET media_path = ? WHERE item_kind = 'media' AND media_path = ?",
                     (new_path, old_path),
                 )
 
@@ -2257,20 +2540,21 @@ class Database:
             ).fetchone()
             live_id = int(media_row["id"]) if media_row is not None else None
             by_path = conn.execute(
-                "SELECT id FROM studio_clips WHERE media_path = ?",
+                "SELECT id FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
                 (media_path,),
             ).fetchall()
             if by_path:
                 conn.execute(
                     """UPDATE studio_clips
                        SET identity_key = ?, source_media_id = ?
-                       WHERE media_path = ?""",
+                       WHERE item_kind = 'media' AND media_path = ?""",
                     (identity, live_id, media_path),
                 )
                 return
             orphans = conn.execute(
                 """SELECT id, media_path FROM studio_clips
-                   WHERE identity_key = ?
+                   WHERE item_kind = 'media'
+                     AND identity_key = ?
                      AND media_path NOT IN (SELECT path FROM media)""",
                 (identity,),
             ).fetchall()
@@ -2280,7 +2564,7 @@ class Database:
             if len(orphan_paths) != 1:
                 return
             conflict = conn.execute(
-                "SELECT id FROM studio_clips WHERE media_path = ?",
+                "SELECT id FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
                 (media_path,),
             ).fetchone()
             if conflict:

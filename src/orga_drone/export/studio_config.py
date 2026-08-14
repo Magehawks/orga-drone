@@ -10,11 +10,16 @@ from pathlib import Path
 class StudioExportClip:
     """One timeline clip for export (references source path; never copies media)."""
 
-    source_path: Path
-    kind: str  # photo | video
+    source_path: Path | None
+    kind: str  # photo | video | title_card
     duration_s: float
     source_start_s: float = 0.0
     source_end_s: float | None = None
+    title_text: str = ""
+    subtitle_text: str = ""
+    background: str = "dark"
+    locale: str = "en"
+    label: str = ""
 
 
 @dataclass(frozen=True)

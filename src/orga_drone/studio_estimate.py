@@ -56,6 +56,8 @@ def effective_kind(
     live_kind: str | None,
     kind_snapshot: str | None,
 ) -> str:
+    if kind_snapshot == "title_card":
+        return "title_card"
     if available and live_kind in {"photo", "video"}:
         return live_kind
     if kind_snapshot in {"photo", "video"}:
@@ -71,7 +73,14 @@ def effective_seconds(
     available: bool,
     source_in_s: float | None = None,
     source_out_s: float | None = None,
+    card_duration_s: float | None = None,
 ) -> float | None:
+    if kind == "title_card":
+        from orga_drone.studio_title_card import DEFAULT_DURATION_S, clamp_card_duration
+
+        if card_duration_s is not None:
+            return clamp_card_duration(float(card_duration_s))
+        return DEFAULT_DURATION_S
     if kind == "photo":
         if photo_duration_s is not None:
             return float(photo_duration_s)
@@ -97,13 +106,14 @@ def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary
     video_count = 0
     total = 0.0
     for item in items:
-        kind = item.kind if item.kind in {"photo", "video"} else "unknown"
+        kind = item.kind if item.kind in {"photo", "video", "title_card"} else "unknown"
         if kind == "photo":
             photo_count += 1
         elif kind == "video":
             video_count += 1
         source_in = getattr(item, "source_in_s", None)
         source_out = getattr(item, "source_out_s", None)
+        card_duration = getattr(item, "card_duration_s", None)
         seconds = effective_seconds(
             kind=kind,
             photo_duration_s=item.photo_duration_s,
@@ -111,6 +121,7 @@ def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary
             available=item.available,
             source_in_s=source_in,
             source_out_s=source_out,
+            card_duration_s=card_duration,
         )
         if seconds is not None:
             total += seconds

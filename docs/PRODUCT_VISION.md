@@ -137,6 +137,7 @@ professional video-editing knowledge.
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers (UI state only) | **Available now** (not rendered) |
+| Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | One optional music track (file, volume, fades, loop) | **Available now** (preview + MP4 export; desktop picker) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
@@ -209,8 +210,9 @@ See `README.md` for the detailed feature status table. In short:
   Studio UI (browser, preview, transport, Story track, music slot, inspector,
   export dialog) for the open project. Persisted today: editable project title;
   order; estimated runtime; optional video source start/end after Cut. Story
-  preview plays photos/videos in sync with the playhead. Local MP4 export with
-  configurable resolution (desktop). One optional local music track persists
+  preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
+  export with configurable resolution (desktop). Title Cards persist as generated
+  `studio_clips` (not media files). One optional local music track persists
   with the project, plays in preview, and is mixed into export. Transitions
   remain UI stubs and are not rendered. Media files are referenced, never
   copied or modified.
@@ -226,7 +228,7 @@ See `README.md` for the detailed feature status table. In short:
   an LLM or semantic search system.
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
-  edit projects and one optional music track per project; albums for
+  edit projects, Title Cards, and one optional music track per project; albums for
   organizing the media library remain Later.
 
 ## Studio MVP (target)

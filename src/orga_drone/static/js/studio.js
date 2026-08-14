@@ -11,7 +11,7 @@
   if (!root) return;
 
   const studioMode = root.dataset.studioMode || "editor";
-  const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
+  const msgTitleCardFailed = root.dataset.titleCardFailed || "Could not save title card.";
   const msgCreateFailed = root.dataset.createFailed || "Could not create Studio project.";
   const msgOpenFailed = root.dataset.openFailed || "Could not open Studio project.";
   const msgDeleteFailed = root.dataset.deleteFailed || "Could not delete Studio project.";
@@ -167,6 +167,9 @@
   const titleInput = document.getElementById("studio-project-title");
   const previewImage = document.getElementById("studio-preview-image");
   const previewVideo = document.getElementById("studio-preview-video");
+  const previewTitlecard = document.getElementById("studio-preview-titlecard");
+  const previewTitlecardTitle = document.getElementById("studio-preview-titlecard-title");
+  const previewTitlecardSubtitle = document.getElementById("studio-preview-titlecard-subtitle");
   const musicAudio = document.getElementById("studio-music-audio");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
   const transportTime = document.getElementById("studio-transport-time");
@@ -219,6 +222,7 @@
   const kindLabels = {
     photo: root.dataset.kindPhoto || "Photo",
     video: root.dataset.kindVideo || "Video",
+    title_card: root.dataset.kindTitleCard || "Title card",
     unknown: root.dataset.kindUnknown || "Memory",
   };
 
@@ -296,10 +300,13 @@
     const raw = clip.dataset.effectiveDuration;
     if (raw === "" || raw == null) {
       if (clip.dataset.kind === "photo") return defaultPhotoDuration;
+      if (clip.dataset.kind === "title_card") return 3;
       return 0;
     }
     const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    if (Number.isFinite(n) && n > 0) return n;
+    if (clip.dataset.kind === "title_card") return 3;
+    return 0;
   }
 
   function sourceInS(clip) {
@@ -478,15 +485,21 @@
     updateCutEnabled();
   }
 
+  function hideTitlecard() {
+    if (previewTitlecard) previewTitlecard.hidden = true;
+  }
+
   function showPlaceholder() {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
+    hideTitlecard();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
   }
 
   function showImage(src) {
     if (!previewImage) return;
     clearVideoElement();
+    hideTitlecard();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewImage.hidden = false;
     if (!src) {
@@ -525,6 +538,7 @@
   function showVideo(src, localS, { play, clip } = { play: false }) {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
+    hideTitlecard();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
@@ -564,6 +578,24 @@
     }
   }
 
+  function showTitlecard(clip) {
+    if (!previewTitlecard) return;
+    if (previewImage) previewImage.hidden = true;
+    clearVideoElement();
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
+    const bg = clip.dataset.background || "dark";
+    previewTitlecard.hidden = false;
+    previewTitlecard.setAttribute("data-bg", bg);
+    if (previewTitlecardTitle) {
+      previewTitlecardTitle.textContent = clip.dataset.displayTitle || clip.dataset.title || "";
+    }
+    if (previewTitlecardSubtitle) {
+      const sub = clip.dataset.displaySubtitle || clip.dataset.subtitle || "";
+      previewTitlecardSubtitle.textContent = sub;
+      previewTitlecardSubtitle.hidden = !sub;
+    }
+  }
+
   function syncPreviewMedia({ seek = false } = {}) {
     void seek;
     const hit = resolveAt(state.projectTimeS);
@@ -580,6 +612,12 @@
 
     const kind = clip.dataset.kind || "unknown";
     const canPlay = clip.dataset.canPlay === "1";
+
+    if (kind === "title_card") {
+      showTitlecard(clip);
+      updateCutEnabled();
+      return;
+    }
 
     // Photos first: never leave a video layer covering the image.
     if (kind === "photo") {
@@ -1047,12 +1085,27 @@
   }
 
   function showInspector(kind) {
-    ["inspector-empty", "inspector-clip", "inspector-transition", "inspector-music"].forEach(
+    ["inspector-empty", "inspector-clip", "inspector-transition", "inspector-music", "inspector-titlecard"].forEach(
       (id) => {
         const el = document.getElementById(id);
         if (el) el.hidden = id !== kind;
       }
     );
+  }
+
+  function fillTitlecardInspector(clip) {
+    const titleEl = document.getElementById("inspector-titlecard-title");
+    const subEl = document.getElementById("inspector-titlecard-subtitle");
+    const durEl = document.getElementById("inspector-titlecard-duration");
+    const removeForm = document.getElementById("inspector-titlecard-remove-form");
+    if (titleEl) titleEl.value = clip.dataset.title || "";
+    if (subEl) subEl.value = clip.dataset.subtitle || "";
+    if (durEl) durEl.value = String(clipDuration(clip).toFixed(1));
+    const bg = clip.dataset.background || "dark";
+    document.querySelectorAll('input[name="inspector-titlecard-bg"]').forEach((el) => {
+      el.checked = el.value === bg;
+    });
+    if (removeForm) removeForm.action = `/studio/${clip.dataset.studioId}/remove`;
   }
 
   function selectClip(id, { movePlayhead = true } = {}) {
@@ -1062,6 +1115,20 @@
     clips().forEach((c) => c.classList.toggle("is-selected", c === clip));
     grid.querySelectorAll(".studio-transition").forEach((el) => el.classList.remove("is-selected"));
     document.getElementById("studio-music-track")?.classList.remove("is-selected");
+
+    if (clip.dataset.kind === "title_card") {
+      showInspector("inspector-titlecard");
+      fillTitlecardInspector(clip);
+      if (movePlayhead) {
+        const wasPlaying = state.playing;
+        if (wasPlaying) pausePlayback();
+        setProjectTime(clipStartTime(clip));
+        if (wasPlaying) startPlayback();
+      } else {
+        updateCutEnabled();
+      }
+      return;
+    }
 
     showInspector("inspector-clip");
     const panel = document.getElementById("inspector-clip");
@@ -1937,6 +2004,95 @@
   document.getElementById("studio-music-remove")?.addEventListener("click", clearMusic);
   document.getElementById("inspector-music-remove")?.addEventListener("click", clearMusic);
 
+  async function addTitleCard() {
+    try {
+      const res = await fetch("/api/studio/title-cards", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const body = await readJson(res);
+      if (!res.ok || !body || !body.id) {
+        throw new Error((body && body.detail) || msgTitleCardFailed);
+      }
+      window.location.assign(`/studio?select=${body.id}&focus=title`);
+    } catch (err) {
+      showRootFlash(err.message || msgTitleCardFailed);
+    }
+  }
+
+  document.getElementById("studio-add-title-card")?.addEventListener("click", addTitleCard);
+  document.getElementById("studio-add-title-card-empty")?.addEventListener("click", addTitleCard);
+
+  async function persistTitlecard() {
+    const clip = clips().find(
+      (c) => state.selected.type === "clip" && String(c.dataset.studioId) === String(state.selected.id)
+    );
+    if (!clip || clip.dataset.kind !== "title_card") return;
+    const titleEl = document.getElementById("inspector-titlecard-title");
+    const subEl = document.getElementById("inspector-titlecard-subtitle");
+    const durEl = document.getElementById("inspector-titlecard-duration");
+    const bgEl = document.querySelector('input[name="inspector-titlecard-bg"]:checked');
+    const payload = {
+      title: titleEl ? titleEl.value : "",
+      subtitle: subEl ? subEl.value : "",
+      duration_s: durEl ? Number(durEl.value) : 3,
+      background: bgEl ? bgEl.value : "dark",
+    };
+    try {
+      const res = await fetch(`/api/studio/${clip.dataset.studioId}/title-card`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await readJson(res);
+      if (!res.ok) throw new Error((body && body.detail) || msgTitleCardFailed);
+      clip.dataset.title = payload.title;
+      clip.dataset.subtitle = payload.subtitle;
+      clip.dataset.background = payload.background;
+      const durationS =
+        body.duration_s != null ? Number(body.duration_s) : Number(payload.duration_s);
+      clip.dataset.effectiveDuration = String(durationS);
+      clip.style.setProperty("--clip-flex", durationS.toFixed(4));
+      clip.dataset.displayTitle = body.display_title || payload.title;
+      clip.dataset.displaySubtitle = body.display_subtitle || payload.subtitle;
+      const caption = clip.querySelector(".studio-clip-caption strong");
+      if (caption) caption.textContent = clip.dataset.displayTitle || "";
+      const swatch = clip.querySelector(".studio-titlecard-swatch");
+      if (swatch) swatch.setAttribute("data-bg", payload.background);
+      const durLabel = clip.querySelector("[data-clip-duration]");
+      if (durLabel && Number.isFinite(durationS)) {
+        durLabel.textContent = `${durationS.toFixed(1)}s`;
+      }
+      const browserRow = document.querySelector(
+        `#studio-browser-story [data-studio-id="${clip.dataset.studioId}"]`
+      );
+      if (browserRow) {
+        const browserCaption = browserRow.querySelector(".studio-browser-meta strong");
+        if (browserCaption) browserCaption.textContent = clip.dataset.displayTitle || "";
+        const browserSwatch = browserRow.querySelector(".studio-titlecard-swatch");
+        if (browserSwatch) browserSwatch.setAttribute("data-bg", payload.background);
+      }
+      if (body.summary && body.summary.estimated_total_s != null) {
+        root.dataset.totalS = String(body.summary.estimated_total_s);
+        root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
+      }
+      syncPreviewMedia();
+      buildRuler();
+      updatePlayheadChrome();
+      setSaveState(true);
+    } catch (err) {
+      showRootFlash(err.message || msgTitleCardFailed);
+    }
+  }
+
+  ["inspector-titlecard-title", "inspector-titlecard-subtitle"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", persistTitlecard);
+  });
+  document.getElementById("inspector-titlecard-duration")?.addEventListener("change", persistTitlecard);
+  document.querySelectorAll('input[name="inspector-titlecard-bg"]').forEach((el) => {
+    el.addEventListener("change", persistTitlecard);
+  });
+
   document.getElementById("inspector-transition-type")?.addEventListener("change", (event) => {
     const value = event.target.value;
     if (state.selected.type !== "transition" || !state.selected.id) return;
@@ -2100,6 +2256,15 @@
   ) {
     selectClip(cutRestore.selectId, { movePlayhead: false });
     setProjectTime(Number(cutRestore.projectTimeS) || 0);
+  } else if (root.dataset.selectId && clips().some((c) => String(c.dataset.studioId) === String(root.dataset.selectId))) {
+    selectClip(root.dataset.selectId);
+    if (root.dataset.focusField === "title") {
+      const titleEl = document.getElementById("inspector-titlecard-title");
+      if (titleEl) {
+        titleEl.focus();
+        titleEl.select();
+      }
+    }
   } else if (clips().length) {
     selectClip(clips()[0].dataset.studioId);
   } else {

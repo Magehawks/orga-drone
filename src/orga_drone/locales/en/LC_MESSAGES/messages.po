@@ -127,3 +127,27 @@ msgstr "Music is mixed into the exported MP4. Source video audio is kept when pr
 msgid "Mixing music…"
 msgstr "Mixing music…"
 
+msgid "Title card"
+msgstr "Title card"
+
+msgid "Add title card"
+msgstr "Add title card"
+
+msgid "Title"
+msgstr "Title"
+
+msgid "Subtitle"
+msgstr "Subtitle"
+
+msgid "Title card duration in seconds"
+msgstr "Title card duration in seconds"
+
+msgid "Could not save title card."
+msgstr "Could not save title card."
+
+msgid "Or add a Title Card to start with a heading."
+msgstr "Or add a Title Card to start with a heading."
+
+msgid "Title Card export needs a system sans font."
+msgstr "Title Card export needs a system sans font."
+
