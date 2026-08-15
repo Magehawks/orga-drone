@@ -47,7 +47,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Manual favorites, stars, tags, and notes that survive a library rescan
 - **Studio:** collect media, arrange order, estimate runtime; editable project
   title; simple video Cut (source start/end); Creator Studio UI with synced
-  Story preview; Title Cards as generated Story items; Cut / Fade through black /
+  Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
   Crossfade between Story items; local MP4 export with
   configurable resolution (desktop); after a successful export, Open video /
   Show in folder on Windows; one optional local music track in preview and MP4 export
@@ -85,7 +85,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| Studio workspace | Available | Creator Studio UI with synced Story preview; multiple local edit projects (browser/switcher); persisted project title + order + estimated runtime + video Cut offsets; Title Cards; Cut / Fade through black / Crossfade; local MP4 export with resolution choice; one optional music track |
+| Studio workspace | Available | Creator Studio UI with synced Story preview; time-based Story canvas (Fit/zoom); multiple local edit projects (browser/switcher); persisted project title + order + estimated runtime + video Cut offsets; Title Cards; Cut / Fade through black / Crossfade; local MP4 export with resolution choice; one optional music track |
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
 | Studio MP4 export | Available | Configurable resolution up to source max; desktop save dialog; optional music mix; sources never modified; after success, Open video / Show in folder on Windows |

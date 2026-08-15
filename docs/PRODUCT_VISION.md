@@ -134,6 +134,7 @@ professional video-editing knowledge.
 | Persisted Studio project title (non-destructive project/clip model) | **Available now** |
 | Multiple local Studio projects (browser, switch, rename, delete) | **Available now** |
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
+| Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s) |
@@ -142,6 +143,7 @@ professional video-editing knowledge.
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Light editing, extra transition types | **Later** |
+| Inspector / selection grammar and music-lane time mapping | **Later** (Issue #34; not a professional NLE) |
 
 ### 4. Share
 
@@ -208,7 +210,9 @@ See `README.md` for the detailed feature status table. In short:
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, music slot, inspector,
-  export dialog) for the open project. Persisted today: editable project title;
+  export dialog) for the open project. The Story track is a shared time canvas
+  (Fit to story / zoom; ruler, clips and playhead share one mapping; zoom is
+  UI state, not project data). Persisted today: editable project title;
   order; estimated runtime; optional video source start/end after Cut. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop). Title Cards persist as generated
@@ -229,9 +233,9 @@ See `README.md` for the detailed feature status table. In short:
   an LLM or semantic search system.
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
-  edit projects, Title Cards, one optional music track, and basic rendered
-  visual transitions; albums for
-  organizing the media library remain Later.
+  edit projects, Title Cards, one optional music track, a time-based Story
+  canvas with Fit/zoom, and basic rendered visual transitions (not a
+  professional NLE). Albums for organizing the media library remain Later.
 
 ## Studio MVP (target)
 
