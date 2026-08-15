@@ -57,6 +57,118 @@ def _segment_vf(width: int, height: int) -> str:
     )
 
 
+def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str:
+    vf = _segment_vf(width, height)
+    fades: list[str] = []
+    fade_in = max(0.0, float(clip.fade_in_s))
+    fade_out = max(0.0, float(clip.fade_out_s))
+    if fade_in > 0:
+        fades.append(f"fade=t=in:st=0:d={fade_in:.4f}")
+    if fade_out > 0:
+        start = max(0.0, float(clip.duration_s) - fade_out)
+        fades.append(f"fade=t=out:st={start:.4f}:d={fade_out:.4f}")
+    if fades:
+        return f"{vf},{','.join(fades)}"
+    return vf
+
+
+def _has_crossfade(clips: tuple[StudioExportClip, ...]) -> bool:
+    for clip in clips[:-1]:
+        if clip.transition_type == "crossfade" and float(clip.transition_s) > 0:
+            return True
+    return False
+
+
+def _export_story_length_s(clips: tuple[StudioExportClip, ...]) -> float:
+    from orga_drone.studio_transition import AppliedTransition, story_length_s
+
+    durations = [max(0.0, float(c.duration_s)) for c in clips]
+    applied = [
+        AppliedTransition(
+            type=clip.transition_type,
+            duration_s=float(clip.transition_s),
+            stored_type=clip.transition_type,
+            stored_duration_s=float(clip.transition_s),
+            fallback_cut=False,
+            clamped=False,
+        )
+        for clip in clips[:-1]
+    ]
+    return story_length_s(durations, applied)
+
+
+def _norm_video_pad(src: str, alias: str) -> str:
+    """Force a shared CFR timebase so chained xfade/concat graphs can configure.
+
+    xfade of a previous xfade/concat pad uses 1/1000000 while segment files use
+    the MP4 tbn (e.g. 1/15360). FFmpeg then fails with encoder-EOF symptoms.
+    """
+    return f"[{src}]fps={EXPORT_FPS},format=yuv420p,settb=1/{EXPORT_FPS}[{alias}]"
+
+
+def _norm_audio_pad(src: str, alias: str) -> str:
+    return (
+        f"[{src}]aformat=sample_rates=48000:channel_layouts=stereo,"
+        f"aresample=async=1:first_pts=0[{alias}]"
+    )
+
+
+def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
+    """Build concat/xfade filter_complex steps. Audio is hard-cut, never acrossfade."""
+    if len(clips) < 2:
+        return []
+    filters: list[str] = []
+    current_v = "0:v"
+    current_a = "0:a"
+    current_dur = float(clips[0].duration_s)
+    for index in range(len(clips) - 1):
+        nxt = index + 1
+        next_v = f"{nxt}:v"
+        next_a = f"{nxt}:a"
+        next_dur = float(clips[nxt].duration_s)
+        left_v = f"vl{index}"
+        right_v = f"vr{index}"
+        left_a = f"al{index}"
+        right_a = f"ar{index}"
+        v_out = f"xv{index}"
+        a_out = f"xa{index}"
+        filters.append(_norm_video_pad(current_v, left_v))
+        filters.append(_norm_video_pad(next_v, right_v))
+        filters.append(_norm_audio_pad(current_a, left_a))
+        filters.append(_norm_audio_pad(next_a, right_a))
+        outgoing = clips[index]
+        if outgoing.transition_type == "crossfade" and outgoing.transition_s > 0:
+            overlap = float(outgoing.transition_s)
+            offset = max(0.0, current_dur - overlap)
+            filters.append(
+                f"[{left_v}][{right_v}]xfade=transition=fade:"
+                f"duration={overlap:.4f}:offset={offset:.4f}[{v_out}]"
+            )
+            a_keep = max(0.0, current_dur - overlap / 2.0)
+            b_start = overlap / 2.0
+            filters.append(
+                f"[{left_a}]atrim=0:{a_keep:.4f},asetpts=PTS-STARTPTS[at{index}l]"
+            )
+            filters.append(
+                f"[{right_a}]atrim={b_start:.4f},asetpts=PTS-STARTPTS[at{index}r]"
+            )
+            filters.append(
+                f"[at{index}l][at{index}r]concat=n=2:v=0:a=1[{a_out}]"
+            )
+            current_dur = current_dur + next_dur - overlap
+        else:
+            filters.append(
+                f"[{left_v}][{right_v}]concat=n=2:v=1:a=0[{v_out}]"
+            )
+            filters.append(
+                f"[{left_a}][{right_a}]concat=n=2:v=0:a=1[{a_out}]"
+            )
+            current_dur += next_dur
+        current_v = v_out
+        current_a = a_out
+    return filters
+
+
 class StudioExportError(Exception):
     """User-facing export failure (message is safe to show)."""
 
@@ -239,7 +351,7 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
                 current_label=None,
             )
-            self._concat(ffmpeg, segments, tmp_out)
+            self._concat_or_stitch(ffmpeg, segments, tmp_out, config)
             if config.music is not None:
                 _emit(
                     on_progress,
@@ -298,7 +410,7 @@ class FfmpegStudioEncoder:
         if clip.source_path is None or not clip.source_path.is_file():
             name = clip.source_path.name if clip.source_path is not None else "clip"
             raise StudioExportError(f"Missing source file: {name}")
-        vf = _segment_vf(width, height)
+        vf = _segment_vf_for_clip(width, height, clip)
         if clip.kind == "photo":
             self._render_photo(
                 ffmpeg,
@@ -358,8 +470,10 @@ class FfmpegStudioEncoder:
             kind="photo",
             duration_s=clip.duration_s,
             label=_clip_progress_label(clip),
+            fade_in_s=clip.fade_in_s,
+            fade_out_s=clip.fade_out_s,
         )
-        vf = _segment_vf(width, height)
+        vf = _segment_vf_for_clip(width, height, photo_clip)
         self._render_photo(
             ffmpeg,
             photo_clip,
@@ -586,6 +700,69 @@ class FfmpegStudioEncoder:
         ]
         _run_ffmpeg(cmd)
 
+    def _concat_or_stitch(
+        self,
+        ffmpeg: str,
+        segments: list[Path],
+        out: Path,
+        config: StudioExportConfig,
+    ) -> None:
+        if _has_crossfade(config.clips):
+            self._stitch(ffmpeg, segments, out, config)
+            return
+        self._concat(ffmpeg, segments, out)
+
+    def _stitch(
+        self,
+        ffmpeg: str,
+        segments: list[Path],
+        out: Path,
+        config: StudioExportConfig,
+    ) -> None:
+        """Join segments with concat and xfade. Source audio hard-cuts only."""
+        clips = config.clips
+        if len(segments) != len(clips):
+            raise StudioExportError("Export stitch mismatch.")
+        if len(segments) == 1:
+            shutil.copyfile(segments[0], out)
+            return
+        filters = build_stitch_filters(clips)
+        last = len(clips) - 2
+        cmd: list[str] = [ffmpeg, "-y"]
+        for seg in segments:
+            cmd.extend(["-i", str(seg)])
+        cmd.extend(
+            [
+                "-filter_complex",
+                ";".join(filters),
+                "-map",
+                f"[xv{last}]",
+                "-map",
+                f"[xa{last}]",
+                *_x264_video_args(),
+                "-c:a",
+                "aac",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "-movflags",
+                "+faststart",
+                str(out),
+            ]
+        )
+        try:
+            _run_ffmpeg(cmd)
+        except StudioExportError as exc:
+            # Only remap a missing xfade filter — not timebase / configure errors
+            # whose messages also mention "xfade".
+            if "no such filter" in str(exc).lower():
+                raise StudioExportError(
+                    "This ffmpeg build cannot render Crossfade.",
+                    code="xfade_unavailable",
+                ) from exc
+            raise
+
     def _mix_music(
         self,
         ffmpeg: str,
@@ -606,7 +783,7 @@ class FfmpegStudioEncoder:
             duration_s = require_readable_music(music.source_path)
         else:
             require_readable_music(music.source_path)
-        story_s = sum(max(0.0, float(clip.duration_s)) for clip in config.clips)
+        story_s = _export_story_length_s(config.clips)
         if story_s <= 0:
             raise StudioExportError("Studio project has no exportable duration.")
         filter_complex = build_music_amix_filter(
@@ -677,17 +854,43 @@ def os_access_writable(directory: Path) -> bool:
 
 
 _FFMPEG_ERR_HINT = re.compile(
-    r"(error|option\b.+\bnot|invalid|failed|could not|no such|unknown|not found)",
+    r"(error|option\b.+\bnot|invalid|failed|could not|no such|unknown|not found|timebase)",
     re.IGNORECASE,
 )
 
 
 def _ffmpeg_error_message(stderr: str) -> str:
     lines = [ln.strip() for ln in stderr.splitlines() if ln.strip()]
+    for line in lines:
+        lower = line.lower()
+        if "timebase" in lower or "failed to configure" in lower:
+            return line[-400:]
     interesting = [ln for ln in lines if _FFMPEG_ERR_HINT.search(ln)]
     chosen = interesting[-4:] if interesting else lines[-2:]
     text = " ".join(chosen).strip() if chosen else "unknown ffmpeg error"
     return text[-400:]
+
+
+def _persist_ffmpeg_failure(cmd: list[str], stderr: str) -> None:
+    """Keep the full ffmpeg command + stderr for review (not just the last line)."""
+    try:
+        from datetime import datetime, timezone
+
+        from orga_drone.config import settings
+
+        log_dir = settings.data_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        path = log_dir / "studio-export-ffmpeg.log"
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        command = subprocess.list2cmdline([str(part) for part in cmd])
+        body = (
+            f"{stamp}\nCMD {command}\n--- stderr ---\n{stderr.rstrip()}\n"
+            f"{'=' * 72}\n"
+        )
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(body)
+    except OSError:
+        return
 
 
 def _run_ffmpeg(
@@ -710,6 +913,7 @@ def _run_ffmpeg(
             raise StudioExportError(f"Export failed: {exc}") from exc
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
+            _persist_ffmpeg_failure(cmd, err)
             raise StudioExportError(f"Export failed: {_ffmpeg_error_message(err)}")
         return
 
@@ -766,6 +970,7 @@ def _run_ffmpeg(
         except OSError:
             stderr = ""
         if returncode != 0:
+            _persist_ffmpeg_failure(progress_cmd, stderr)
             raise StudioExportError(f"Export failed: {_ffmpeg_error_message(stderr)}")
         if last_emit < 0 and duration_s is not None:
             on_time(duration_s)

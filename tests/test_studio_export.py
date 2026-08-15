@@ -471,6 +471,21 @@ def test_ffmpeg_error_message_strips_banner() -> None:
     assert "IMG_9323.HEIC" in msg
 
 
+def test_ffmpeg_error_message_prefers_timebase_over_encoder_eof() -> None:
+    from orga_drone.export.studio_encoder import _ffmpeg_error_message
+
+    stderr = (
+        "[Parsed_xfade_8 @ 0] First input link main timebase (1/1000000) "
+        "do not match the corresponding second input link xfade timebase (1/15360)\n"
+        "[Parsed_xfade_8 @ 0] Failed to configure output pad on Parsed_xfade_8\n"
+        "[aost#0:1/aac @ 0] Could not open encoder before EOF\n"
+        "Conversion failed!\n"
+    )
+    msg = _ffmpeg_error_message(stderr)
+    assert "timebase" in msg.lower()
+    assert "aost#0:1" not in msg
+
+
 def test_export_options_without_video_resolution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

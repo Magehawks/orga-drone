@@ -102,29 +102,19 @@ def effective_seconds(
 
 
 def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary:
+    from orga_drone.studio_transition import apply_for_items, story_length_s
+
+    rows = list(items)
     photo_count = 0
     video_count = 0
-    total = 0.0
-    for item in items:
+    for item in rows:
         kind = item.kind if item.kind in {"photo", "video", "title_card"} else "unknown"
         if kind == "photo":
             photo_count += 1
         elif kind == "video":
             video_count += 1
-        source_in = getattr(item, "source_in_s", None)
-        source_out = getattr(item, "source_out_s", None)
-        card_duration = getattr(item, "card_duration_s", None)
-        seconds = effective_seconds(
-            kind=kind,
-            photo_duration_s=item.photo_duration_s,
-            duration_s=item.duration_s,
-            available=item.available,
-            source_in_s=source_in,
-            source_out_s=source_out,
-            card_duration_s=card_duration,
-        )
-        if seconds is not None:
-            total += seconds
+    durations, applied, _indexes = apply_for_items(rows)
+    total = story_length_s(durations, applied)
     return StudioSummary(
         photo_count=photo_count,
         video_count=video_count,

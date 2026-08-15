@@ -438,7 +438,7 @@ def test_http_studio_photo_first_has_preview_url(
     video_idx = html.find('data-kind="video"')
     assert photo_idx != -1 and video_idx != -1
     assert photo_idx < video_idx
-    photo_block = html[photo_idx : photo_idx + 900]
+    photo_block = html[photo_idx : photo_idx + 1800]
     assert f'data-preview-url="/media/{mid_photo}/stream"' in photo_block
     assert 'id="studio-preview-video"' in html
     assert 'id="studio-preview-image"' in html

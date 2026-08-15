@@ -8,7 +8,7 @@ metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution; after export, Open video / Show in folder on
 Windows desktop; one optional local music track in preview and MP4 export;
-Title Cards as generated Story items).
+Title Cards as generated Story items; basic rendered visual transitions).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -53,7 +53,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); one optional music track; Title Cards |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; local MP4 export (resolution); one optional music track; Title Cards; Cut / Fade through black / Crossfade |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional music; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -71,7 +71,8 @@ The application helps users:
   estimated runtime; simple video Cut via source start/end; Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
   with the playhead; Title Cards as generated Story items (title, subtitle,
-  duration, solid background; preview + MP4); local MP4 export with configurable
+  duration, solid background; preview + MP4); basic visual transitions
+  (Cut, Fade through black, Crossfade) in preview and MP4; local MP4 export with configurable
   resolution on desktop; after a successful export, Open video / Show in folder
   on Windows; one optional local music track in preview and export)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
@@ -86,7 +87,8 @@ The application helps users:
   not an LLM or semantic search system.
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
-  edit projects, Title Cards, and one optional music track per project.
+  edit projects, Title Cards, one optional music track per project, and basic
+  rendered visual transitions (not a professional effects editor).
 
 ## Product principles
 

@@ -95,10 +95,15 @@
          data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
          data-label-play="{{ _('Play')|e }}"
          data-label-pause="{{ _('Pause')|e }}"
-         data-transition-none="{{ _('None')|e }}"
-         data-transition-fade="{{ _('Fade')|e }}"
-         data-transition-crossfade="{{ _('Cross fade')|e }}"
-         data-transition-slide="{{ _('Slide')|e }}"
+         data-transition-cut="{{ _('Cut')|e }}"
+         data-transition-fade-black="{{ _('Fade through black')|e }}"
+         data-transition-crossfade="{{ _('Crossfade')|e }}"
+         data-transition-chip-cut="{{ _('Cut')|e }}"
+         data-transition-chip-fade-black="{{ _('Fade')|e }}"
+         data-transition-chip-crossfade="{{ _('Crossfade')|e }}"
+         data-transition-fallback="{{ _('This transition was skipped because a neighboring clip is too short.')|e }}"
+         data-transition-clamped="{{ _('Duration was shortened to fit the neighboring clips.')|e }}"
+         data-transition-failed="{{ _('Could not save the transition.')|e }}"
          data-music-empty="{{ _('No music yet')|e }}"
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
@@ -277,12 +282,19 @@
         {% if items %}
         <div class="studio-preview-frame" id="studio-preview-frame">
           <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
+          <img id="studio-preview-image-b" class="studio-preview-media studio-preview-layer-b" alt="" hidden>
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
+          <video id="studio-preview-video-b" class="studio-preview-media studio-preview-layer-b" playsinline preload="metadata" muted hidden></video>
           <audio id="studio-music-audio" preload="metadata" hidden></audio>
           <div id="studio-preview-titlecard" class="studio-preview-titlecard" hidden data-bg="dark">
             <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-title"></p>
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-subtitle"></p>
           </div>
+          <div id="studio-preview-titlecard-b" class="studio-preview-titlecard studio-preview-layer-b" hidden data-bg="dark">
+            <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-b-title"></p>
+            <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
+          </div>
+          <div id="studio-preview-fade-black" class="studio-preview-fade-black" hidden aria-hidden="true"></div>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
             <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.') }}</p>
@@ -351,14 +363,23 @@
               {% for row in item_display %}
               {% set item = row.item %}
               {% if not loop.first %}
+              {% set prev_row = item_display[loop.index0 - 1] %}
+              {% set applied = prev_row.applied_transition %}
+              {% set ttype = applied.type if applied else prev_row.stored_transition %}
               <li class="studio-transition"
-                  data-transition-after="{{ item_display[loop.index0 - 1].item.id }}"
+                  data-transition-after="{{ prev_row.item.id }}"
                   data-transition-before="{{ item.id }}"
-                  data-transition-type="none"
+                  data-transition-type="{{ ttype }}"
+                  data-stored-type="{{ prev_row.stored_transition }}"
+                  data-stored-duration="{{ prev_row.stored_transition_duration_s if prev_row.stored_transition_duration_s is not none else '' }}"
+                  data-applied-type="{{ ttype }}"
+                  data-applied-duration="{{ '%.4f'|format(applied.duration_s) if applied else '0' }}"
+                  data-fallback-cut="{{ '1' if applied and applied.fallback_cut else '0' }}"
+                  data-clamped="{{ '1' if applied and applied.clamped else '0' }}"
                   tabindex="0"
                   role="button"
                   aria-label="{{ _('Transition') }}">
-                <span class="studio-transition-chip" data-transition-label>{{ _('None') }}</span>
+                <span class="studio-transition-chip" data-transition-label>{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% else %}{{ _('Cut') }}{% endif %}</span>
               </li>
               {% endif %}
               <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'title_card' %}is-title-card{% elif item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
@@ -373,6 +394,11 @@
                   data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
+                  data-transition-type="{{ row.stored_transition }}"
+                  data-transition-duration="{{ row.stored_transition_duration_s if row.stored_transition_duration_s is not none else '' }}"
+                  data-applied-type="{{ row.applied_transition.type if row.applied_transition else 'cut' }}"
+                  data-applied-duration="{{ '%.4f'|format(row.applied_transition.duration_s) if row.applied_transition else '0' }}"
+                  data-fallback-cut="{{ '1' if row.applied_transition and row.applied_transition.fallback_cut else '0' }}"
                   data-title="{{ (item.title_text or '')|e }}"
                   data-subtitle="{{ (item.subtitle_text or '')|e }}"
                   data-display-title="{{ (row.display_title or '')|e }}"
@@ -384,7 +410,7 @@
                   data-preview-url="{{ row.preview_url }}"
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
-                  style="--clip-flex: {{ '%.4f'|format(row.effective_duration_s) if row.effective_duration_s is not none else 0 }};">
+                  style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
                         aria-label="{{ _('Drag to reorder') }}" title="{{ _('Drag to reorder') }}">
                   <span aria-hidden="true">≡</span>
@@ -461,6 +487,7 @@
     </div>
 
     <aside class="studio-inspector" id="studio-inspector" aria-label="{{ _('Inspector') }}">
+      {% set initial_remove_id = select_id if select_id else (items[0].id if items else none) %}
       <h2 class="studio-inspector-title">{{ _('Inspector') }}</h2>
       <div class="studio-inspector-empty" id="inspector-empty">
         <p>{{ _('Select a clip, transition, or music to edit its properties.') }}</p>
@@ -478,8 +505,10 @@
                  aria-label="{{ _('Photo duration in seconds') }}">
         </label>
         <button type="button" class="button ghost" id="inspector-photo-reset" hidden>{{ _('Reset') }}</button>
-        <form method="post" id="inspector-remove-form" class="studio-inspector-remove">
+        <form method="post" id="inspector-remove-form" class="studio-inspector-remove"
+              {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
           <button type="submit" class="button ghost studio-icon-button"
+                  {% if initial_remove_id %}formaction="/studio/{{ initial_remove_id }}/remove"{% endif %}
                   title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
             {{ lucide('trash-2') }}
             <span class="studio-btn-label">{{ _('Remove from story') }}</span>
@@ -491,17 +520,16 @@
         <label class="studio-inspector-field">
           <span>{{ _('Transition') }}</span>
           <select id="inspector-transition-type">
-            <option value="none">{{ _('None') }}</option>
-            <option value="fade">{{ _('Fade') }}</option>
-            <option value="crossfade">{{ _('Cross fade') }}</option>
-            <option value="slide">{{ _('Slide') }}</option>
+            <option value="cut">{{ _('Cut') }}</option>
+            <option value="fade_black">{{ _('Fade through black') }}</option>
+            <option value="crossfade">{{ _('Crossfade') }}</option>
           </select>
         </label>
-        <label class="studio-inspector-field">
+        <label class="studio-inspector-field" id="inspector-transition-duration-wrap">
           <span>{{ _('Transition duration') }}</span>
-          <input type="number" id="inspector-transition-duration" min="0.1" max="5" step="0.1" value="0.5" disabled>
-          <span class="hint">{{ _('Placeholder — transitions are not rendered yet.') }}</span>
+          <input type="number" id="inspector-transition-duration" min="0.1" max="2" step="0.1" value="0.5">
         </label>
+        <p class="hint" id="inspector-transition-hint" hidden></p>
       </div>
 
       <div class="studio-inspector-panel" id="inspector-music" hidden>
@@ -551,8 +579,10 @@
           <label><input type="radio" name="inspector-titlecard-bg" value="light"> {{ _('Light') }}</label>
           <label><input type="radio" name="inspector-titlecard-bg" value="accent"> {{ _('Accent') }}</label>
         </fieldset>
-        <form method="post" id="inspector-titlecard-remove-form" class="studio-inspector-remove">
+        <form method="post" id="inspector-titlecard-remove-form" class="studio-inspector-remove"
+              {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
           <button type="submit" class="button ghost studio-icon-button"
+                  {% if initial_remove_id %}formaction="/studio/{{ initial_remove_id }}/remove"{% endif %}
                   title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
             {{ lucide('trash-2') }}
             <span class="studio-btn-label">{{ _('Remove from story') }}</span>

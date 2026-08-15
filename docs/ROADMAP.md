@@ -33,7 +33,7 @@ Highlights:
   synced Story preview playback; local MP4 export with
   configurable resolution; after success, Open video / Show in folder on
   Windows; one optional local music track in preview and export; Title Cards
-  as generated Story items)
+  as generated Story items; basic rendered visual transitions)
 
 ## Next (possible near-term)
 
@@ -54,7 +54,7 @@ open/reveal of the finished file already exist on Windows desktop.
 
 ## Later (vision)
 
-- Studio: simple transitions, light editing, timeline improvements
+- Studio: light editing, extra transition types, timeline improvements
 - Plugin / extension hooks for parsers and exports
 - Optional opt-in community sharing of flight spots
 - Social / messenger share destinations beyond “local file”
