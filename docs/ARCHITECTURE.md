@@ -114,7 +114,8 @@ successful output only). Desktop save dialog. Optional project music
 generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
 visual transitions Cut / Fade through black / Crossfade persist on the outgoing
 clip and render in preview + MP4). The Story timeline is a shared time canvas
-(`px/s` Fit/zoom; ruler, clips and playhead share one mapping; transitions are
+(`px/s` Fit/zoom; ruler, clips, playhead and the read-only soundtrack coverage
+span share one mapping; transitions are
 boundary overlays). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.

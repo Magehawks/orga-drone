@@ -23,7 +23,8 @@ metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (order + estimated runtime; multiple local Studio projects; synced Story
 preview; local MP4 export with configurable resolution; after export, open
 or reveal the MP4 on desktop; one optional local music track in preview and
-export; Title Cards; basic visual transitions).
+export; Title Cards; basic visual transitions; read-only soundtrack coverage
+on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -139,7 +140,7 @@ professional video-editing knowledge.
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
-| One optional music track (file, volume, fades, loop) | **Available now** (preview + MP4 export; desktop picker) |
+| One optional music track (file, volume, fades, loop) | **Available now** (preview + MP4 export; desktop picker; read-only coverage on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Light editing, extra transition types | **Later** |
@@ -217,8 +218,10 @@ See `README.md` for the detailed feature status table. In short:
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop). Title Cards persist as generated
   `studio_clips` (not media files). One optional local music track persists
-  with the project, plays in preview, and is mixed into export. Visual
-  transitions (Cut, Fade through black, Crossfade) persist per outgoing clip
+  with the project, plays in preview, and is mixed into export. Coverage is
+  shown as a read-only span on the Story time canvas (same Fit/zoom mapping;
+  not trim/slip/waveform editing). Visual transitions (Cut, Fade through black,
+  Crossfade) persist per outgoing clip
   and render in preview and MP4. Media files are referenced, never
   copied or modified.
 - Local SQLite index; media files stay on disk
@@ -234,7 +237,8 @@ See `README.md` for the detailed feature status table. In short:
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
   edit projects, Title Cards, one optional music track, a time-based Story
-  canvas with Fit/zoom, and basic rendered visual transitions (not a
+  canvas with Fit/zoom, read-only soundtrack coverage on that canvas, and
+  basic rendered visual transitions (not a
   professional NLE). Albums for organizing the media library remain Later.
 
 ## Studio MVP (target)

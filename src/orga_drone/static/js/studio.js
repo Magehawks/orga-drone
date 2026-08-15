@@ -3,6 +3,7 @@
  * Persistence: reorder, photo duration, Title Cards, music, and transitions via APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
  * Music is a persisted per-project soundtrack mixed into MP4 export.
+ * The soundtrack lane is a read-only coverage span on the Story time canvas.
  * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
@@ -437,6 +438,7 @@
     buildRuler();
     updatePlayheadChrome();
     updateZoomControls();
+    layoutMusicSpan();
   }
 
   function centerPlayheadInView() {
@@ -1275,6 +1277,120 @@
     return Math.min(musicS, Math.max(0, storyS));
   }
 
+  let cachedMusicDurationS = 0;
+
+  function formatLaneTime(seconds) {
+    return formatTime(seconds).replace(/^00:/, "");
+  }
+
+  function musicDurationKnownS() {
+    if (!musicAudio || !state.music || !state.music.available) return 0;
+    const d = musicAudio.duration;
+    if (Number.isFinite(d) && d > 0) {
+      cachedMusicDurationS = d;
+      return d;
+    }
+    return cachedMusicDurationS > 0 ? cachedMusicDurationS : 0;
+  }
+
+  function layoutMusicSpan() {
+    const select = document.getElementById("studio-music-select");
+    const fadeInEl = document.getElementById("studio-music-fade-in");
+    const fadeOutEl = document.getElementById("studio-music-fade-out");
+    const meta = document.getElementById("studio-music-meta");
+    const badge = document.getElementById("studio-music-badge");
+    if (!select) return;
+
+    const hideFades = () => {
+      if (fadeInEl) {
+        fadeInEl.hidden = true;
+        fadeInEl.style.width = "";
+      }
+      if (fadeOutEl) {
+        fadeOutEl.hidden = true;
+        fadeOutEl.style.width = "";
+      }
+    };
+    const setBadge = (text) => {
+      if (!badge) return;
+      if (text) {
+        badge.hidden = false;
+        badge.textContent = text;
+      } else {
+        badge.hidden = true;
+        badge.textContent = "";
+      }
+    };
+
+    select.classList.remove("is-coverage", "is-pending", "is-missing");
+    select.style.width = "";
+    select.style.left = "";
+    hideFades();
+    if (meta) meta.textContent = "";
+    setBadge("");
+
+    if (!state.music) return;
+
+    const story = totalDuration();
+    const loop = !!state.music.loop;
+    const available = !!state.music.available;
+    const musDur = available ? musicDurationKnownS() : 0;
+    const known = musDur > 0;
+    const msgLoop = root.dataset.musicLoopBadge || "Loop · repeats to Story end";
+    const msgSilence = root.dataset.musicSilenceBadge || "then silence";
+    const msgPending = root.dataset.musicPending || "Duration unknown";
+    const msgCoverage = root.dataset.musicCoverage || "{music} of {story}";
+
+    if (!available) {
+      select.classList.add("is-missing");
+      return;
+    }
+
+    if (!known && !loop) {
+      select.classList.add("is-pending");
+      setBadge(msgPending);
+      return;
+    }
+
+    const bed = musicBedDuration(story, musDur, loop);
+    const widthPx = timeToX(bed);
+    if (!(bed > 0) || widthPx < 1) {
+      select.classList.add("is-pending");
+      if (loop) setBadge(msgLoop);
+      else if (!known) setBadge(msgPending);
+      return;
+    }
+
+    select.classList.add("is-coverage");
+    select.style.left = "0px";
+    select.style.width = `${widthPx}px`;
+
+    if (known && story > 0 && meta) {
+      meta.textContent = msgCoverage
+        .replace("{music}", formatLaneTime(musDur))
+        .replace("{story}", formatLaneTime(story));
+    }
+
+    if (loop) setBadge(msgLoop);
+    else if (known && musDur < story) setBadge(msgSilence);
+
+    const scaled = scaledMusicFades(state.music.fadeIn, state.music.fadeOut, bed);
+    if (fadeInEl) {
+      const fiPx = timeToX(scaled.fadeIn);
+      if (scaled.fadeIn > 0 && fiPx >= TIMELINE_HIT_MIN_PX) {
+        fadeInEl.hidden = false;
+        fadeInEl.style.width = `${fiPx}px`;
+      }
+    }
+    if (fadeOutEl) {
+      const foPx = timeToX(scaled.fadeOut);
+      if (scaled.fadeOut > 0 && foPx >= TIMELINE_HIT_MIN_PX) {
+        fadeOutEl.hidden = false;
+        fadeOutEl.style.width = `${foPx}px`;
+      }
+    }
+  }
+
   function scaledMusicFades(fadeIn, fadeOut, bedS) {
     let fi = Math.max(0, fadeIn);
     let fo = Math.max(0, fadeOut);
@@ -1311,6 +1427,7 @@
 
   function ensureMusicAudioSrc() {
     if (!musicAudio || !state.music || !state.music.available || !state.music.streamUrl) {
+      cachedMusicDurationS = 0;
       if (musicAudio) {
         musicAudio.removeAttribute("src");
         try {
@@ -1322,6 +1439,7 @@
       return false;
     }
     if (musicAudio.getAttribute("src") !== state.music.streamUrl) {
+      cachedMusicDurationS = 0;
       try {
         musicAudio.pause();
       } catch (_) {
@@ -1713,6 +1831,7 @@
       }
     }
     syncMusicAudio();
+    layoutTimeline();
   }
 
   async function pickAndSetMusic() {
@@ -1784,6 +1903,7 @@
   async function clearMusic() {
     if (!projectId) {
       state.music = null;
+      cachedMusicDurationS = 0;
       renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
@@ -1797,6 +1917,7 @@
       });
       if (!res.ok) throw new Error("delete music failed");
       state.music = null;
+      cachedMusicDurationS = 0;
       renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
@@ -2423,17 +2544,30 @@
     runStudioExport();
   });
 
-  document.getElementById("studio-music-add")?.addEventListener("click", () => {
-    pickAndSetMusic();
-  });
-  document.getElementById("studio-music-replace")?.addEventListener("click", (event) => {
-    event.preventDefault();
+  document.getElementById("studio-music-add")?.addEventListener("click", (event) => {
     event.stopPropagation();
     pickAndSetMusic();
   });
-  document.getElementById("studio-music-select")?.addEventListener("click", selectMusic);
-  document.getElementById("studio-music-remove")?.addEventListener("click", clearMusic);
+  document.getElementById("studio-music-track")?.addEventListener("click", (event) => {
+    if (event.target.closest("#studio-music-add")) return;
+    event.stopPropagation();
+    if (state.music) selectMusic();
+  });
+  document.getElementById("inspector-music-replace")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    pickAndSetMusic();
+  });
   document.getElementById("inspector-music-remove")?.addEventListener("click", clearMusic);
+  if (musicAudio) {
+    const onMusicDuration = () => {
+      if (Number.isFinite(musicAudio.duration) && musicAudio.duration > 0) {
+        cachedMusicDurationS = musicAudio.duration;
+      }
+      layoutTimeline();
+    };
+    musicAudio.addEventListener("loadedmetadata", onMusicDuration);
+    musicAudio.addEventListener("durationchange", onMusicDuration);
+  }
 
   async function addTitleCard() {
     try {
@@ -2605,6 +2739,7 @@
         state.music.fadeIn = Number(fadeIn?.value || 0);
         state.music.fadeOut = Number(fadeOut?.value || 0);
         syncMusicAudio();
+        layoutMusicSpan();
       });
       document.getElementById(id)?.addEventListener("change", () => {
         patchMusicSettings();
@@ -2615,6 +2750,7 @@
     if (!state.music) return;
     state.music.loop = !!event.target.checked;
     syncMusicAudio();
+    layoutTimeline();
     patchMusicSettings();
   });
 
@@ -2681,7 +2817,7 @@
       });
     });
     timelineCanvasEl?.addEventListener("click", (event) => {
-      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler")) return;
+      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler, #studio-music-track")) return;
       const wasPlaying = state.playing;
       pausePlayback();
       seekFromClientX(event.clientX, {

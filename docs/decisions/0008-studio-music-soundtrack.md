@@ -56,4 +56,7 @@ ffmpeg.
   pick a file; last-success / music history is not stored.
 - Follow-up: ordered music collection (drop the unique index), voice-over
   lane, per-clip mixer / ducking, music in/out trim. UI for this issue
-  stays one slot.
+  stays one slot. The Studio timeline shows that slot as a **read-only
+  coverage span** on the Story time canvas (Issue #38): width follows
+  existing `musicBedDuration` playback/export rules. That is display honesty,
+  not the Later music-lane time-mapping (trim/slip) feature.

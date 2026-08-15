@@ -34,7 +34,8 @@ Highlights:
   configurable resolution; after success, Open video / Show in folder on
   Windows; one optional local music track in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; time-based
-  Story canvas with Fit to story / zoom)
+  Story canvas with Fit to story / zoom; read-only soundtrack coverage on
+  that canvas)
 
 ## Next (possible near-term)
 

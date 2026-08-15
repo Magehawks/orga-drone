@@ -9,7 +9,8 @@ multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution; after export, Open video / Show in folder on
 Windows desktop; one optional local music track in preview and MP4 export;
 Title Cards as generated Story items; basic rendered visual transitions;
-time-based Story canvas with Fit to story / zoom).
+time-based Story canvas with Fit to story / zoom; read-only soundtrack
+coverage on that canvas).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
@@ -54,7 +55,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; time-based Story canvas (Fit/zoom); local MP4 export (resolution); one optional music track; Title Cards; Cut / Fade through black / Crossfade |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; time-based Story canvas (Fit/zoom); local MP4 export (resolution); one optional music track with read-only coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional music; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -76,7 +77,8 @@ The application helps users:
   duration, solid background; preview + MP4); basic visual transitions
   (Cut, Fade through black, Crossfade) in preview and MP4; local MP4 export with configurable
   resolution on desktop; after a successful export, Open video / Show in folder
-  on Windows; one optional local music track in preview and export)
+  on Windows; one optional local music track in preview and export, shown as a
+  read-only coverage span on the Story time canvas)
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
@@ -90,8 +92,9 @@ The application helps users:
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
   edit projects, Title Cards, one optional music track per project, a
-  time-based Story canvas with Fit/zoom, and basic rendered visual
-  transitions (not a professional effects editor or NLE).
+  time-based Story canvas with Fit/zoom, read-only soundtrack coverage on that
+  canvas, and basic rendered visual transitions (not a professional effects
+  editor or NLE).
 
 ## Product principles
 
