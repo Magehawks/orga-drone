@@ -25,7 +25,7 @@ Assume you did **not** write the implementation. Be adversarial but practical: l
 
 ## Review checklist
 
-1. **Issue alignment** — all acceptance criteria implemented; no hidden scope expansion.
+1. **Issue alignment** — all acceptance criteria implemented; no hidden scope expansion; UI matches the PM-selected UX concept when one exists.
 2. **Correctness** — realistic edge cases, error paths and regressions.
 3. **Non-destructive behavior** — Studio must not modify source media.
 4. **Compatibility** — existing projects/data/workflows remain valid unless explicitly migrated.

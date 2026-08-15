@@ -205,26 +205,33 @@ GitHub issues and pull requests are the handoff boundary between roles. The cano
 1. **PM Product Gate** — `product-spec-reviewer`
    - validates user problem, target user, milestone fit, simplest useful slice, acceptance criteria and explicit non-scope
    - read-only
-   - must return `PM_APPROVED` before normal CTO handoff
-2. **CTO Engineering Gate** — `engineering-planner`
+   - must return `PM_APPROVED` before UX (when UI) or CTO (when UX is not required)
+   - after UX discovery, PM selects the product direction on the same issue
+2. **UX Discovery** — `product-ux-designer`
+   - usability and interaction design when the slice has meaningful UI work
+   - read-only; alternatives, trade-offs, explicit non-scope; no application code
+   - does **not** create implementation issues
+   - skip for simple bug fixes, backend-only work, CI/tooling, and migrations without user-facing impact
+3. **CTO Engineering Gate** — `engineering-planner`
    - validates architecture, compatibility, data/migration impact, performance, security and test strategy
    - read-only
    - must return `CTO_APPROVED` before `ready-for-dev`
-3. **Developer** — main Cursor implementation agent
+4. **Developer** — main Cursor implementation agent
    - implements only the approved issue
    - runs Ruff, MyPy and pytest and updates docs/i18n when required
-4. **Independent Review Gate** — `implementation-reviewer`
+5. **Independent Review Gate** — `implementation-reviewer`
    - reviews issue + diff + tests independently
    - read-only; never fixes its own findings
    - returns `REVIEW_APPROVED`, `REVIEW_CHANGES_REQUESTED`, or `REVIEW_ARCHITECTURE_CONCERN`
-5. **Human Product Owner**
+6. **Human Product Owner**
    - performs realistic product testing
    - is the final merge gate
 
 Typical flow:
 
 ```text
-Idea → PM → CTO → ready-for-dev → Developer → PR → Independent Review
+Idea → PM → UX (if UI/interaction) → PM selects concept → CTO
+     → ready-for-dev → Developer → PR → Independent Review
      → (changes → Developer → Review) → human-test → Human merge decision
 ```
 

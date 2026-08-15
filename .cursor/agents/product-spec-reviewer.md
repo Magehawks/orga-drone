@@ -82,9 +82,20 @@ PM_APPROVED | PM_CHANGES_REQUESTED | PM_REJECTED
 ## Risks / assumptions
 - ...
 
-## Handoff to CTO
-What engineering must validate before this can become `ready-for-dev`.
+## Handoff
+UX (`product-ux-designer`) | CTO (`engineering-planner`) — and why
 ```
+
+## Handoff rules
+
+If `PM_APPROVED` and the slice has **meaningful UI or interaction** work, hand
+off to `product-ux-designer` before CTO. After UX, PM selects one concept on the
+same issue; that selected direction is what CTO reviews.
+
+If UX is not required (simple bug-adjacent work, backend-only, CI/tooling,
+migrations without user-facing impact), hand off to CTO (`engineering-planner`).
+
+Do not create implementation issues from this gate.
 
 ## Hard rules
 
@@ -94,3 +105,4 @@ What engineering must validate before this can become `ready-for-dev`.
 - Do not silently expand the requested feature.
 - Repository artifacts are written in English; user-facing discussion may be German.
 - A feature may be ambitious long-term while still requiring a deliberately small current slice.
+- Do not skip `product-ux-designer` when the approved slice has meaningful UI/interaction work unless the human waives it.
