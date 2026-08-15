@@ -182,6 +182,8 @@
   const playheadEl = document.getElementById("studio-playhead");
   const tracksEl = document.getElementById("studio-tracks");
   const rulerEl = document.getElementById("studio-ruler");
+  const timelineScrollEl = document.getElementById("studio-timeline-scroll");
+  const timelineCanvasEl = document.getElementById("studio-timeline-canvas");
   const volumeInput = document.getElementById("studio-volume");
   const exportDialog = document.getElementById("studio-export-dialog");
   const previewFrame = document.getElementById("studio-preview-frame");
@@ -253,6 +255,8 @@
     title: titleInput ? titleInput.value : "Your story",
     music: null,
     activeStudioId: null,
+    timelineMode: "fit",
+    zoomIndex: 1,
   };
 
   let dragCard = null;
@@ -343,6 +347,155 @@
       }
     });
     return Math.max(0, total);
+  }
+
+  const TIMELINE_ZOOM_PX_S = [20, 40, 80, 160, 320];
+  const TIMELINE_HIT_MIN_PX = 12;
+
+  function clipOccupancyS(clip, index, listLength) {
+    // Same last-clip rule as totalDuration(): only a non-last Crossfade shrinks occupancy.
+    let duration = clipDuration(clip);
+    if (
+      index < listLength - 1 &&
+      (clip.dataset.appliedType || "cut") === "crossfade"
+    ) {
+      duration -= Number(clip.dataset.appliedDuration) || 0;
+    }
+    return Math.max(0, duration);
+  }
+
+  function timelineViewportPx() {
+    return timelineScrollEl ? timelineScrollEl.clientWidth : 0;
+  }
+
+  function timelineFitPxPerSecond() {
+    const total = totalDuration();
+    const view = timelineViewportPx();
+    if (total <= 0 || view <= 0) return TIMELINE_ZOOM_PX_S[1];
+    return view / total;
+  }
+
+  function nextZoomIndexAbove(fitPps) {
+    for (let i = 0; i < TIMELINE_ZOOM_PX_S.length; i += 1) {
+      if (TIMELINE_ZOOM_PX_S[i] > fitPps + 0.5) return i;
+    }
+    return -1;
+  }
+
+  function timelinePxPerSecond() {
+    const total = totalDuration();
+    const view = timelineViewportPx();
+    if (total <= 0) return TIMELINE_ZOOM_PX_S[1];
+    if (state.timelineMode === "fit") {
+      return view > 0 ? view / total : TIMELINE_ZOOM_PX_S[1];
+    }
+    const idx = Math.max(0, Math.min(TIMELINE_ZOOM_PX_S.length - 1, state.zoomIndex));
+    return TIMELINE_ZOOM_PX_S[idx];
+  }
+
+  function timeToX(timeS) {
+    return Math.max(0, Number(timeS) || 0) * timelinePxPerSecond();
+  }
+
+  function xToTime(xPx) {
+    const pps = timelinePxPerSecond();
+    if (pps <= 0) return 0;
+    return Math.max(0, xPx) / pps;
+  }
+
+  function layoutTimeline() {
+    if (!timelineCanvasEl || !grid) return;
+    const total = totalDuration();
+    const pps = timelinePxPerSecond();
+    const view = timelineViewportPx();
+    const width =
+      state.timelineMode === "fit" || total <= 0
+        ? Math.max(view, 1)
+        : Math.max(view, total * pps);
+    timelineCanvasEl.style.width = `${width}px`;
+    let x = 0;
+    const list = clips();
+    list.forEach((clip, index) => {
+      const occ = clipOccupancyS(clip, index, list.length);
+      const w = occ * pps;
+      clip.dataset.occupancyS = occ.toFixed(4);
+      clip.style.left = `${x}px`;
+      clip.style.width = `${w}px`;
+      clip.style.setProperty("--clip-width-px", `${w}px`);
+      clip.classList.toggle("is-narrow", w > 0 && w < TIMELINE_HIT_MIN_PX);
+      x += w;
+    });
+    grid.querySelectorAll(".studio-transition").forEach((el) => {
+      const afterId = el.dataset.transitionAfter;
+      const prev = clips().find((c) => String(c.dataset.studioId) === String(afterId));
+      if (!prev) return;
+      const left = Number.parseFloat(prev.style.left) || 0;
+      const w = Number.parseFloat(prev.style.width) || 0;
+      el.style.left = `${left + w}px`;
+      el.style.display = dragCard ? "none" : "";
+    });
+    buildRuler();
+    updatePlayheadChrome();
+    updateZoomControls();
+  }
+
+  function centerPlayheadInView() {
+    if (!timelineScrollEl || state.timelineMode === "fit") {
+      if (timelineScrollEl) timelineScrollEl.scrollLeft = 0;
+      return;
+    }
+    const x = timeToX(state.projectTimeS);
+    const view = timelineViewportPx();
+    timelineScrollEl.scrollLeft = Math.max(0, x - view / 2);
+  }
+
+  function fitTimeline() {
+    state.timelineMode = "fit";
+    persistUiState();
+    layoutTimeline();
+    if (timelineScrollEl) timelineScrollEl.scrollLeft = 0;
+  }
+
+  function updateZoomControls() {
+    const empty = clips().length === 0;
+    const fitBtn = document.getElementById("studio-timeline-fit");
+    const inBtn = document.getElementById("studio-timeline-zoom-in");
+    const outBtn = document.getElementById("studio-timeline-zoom-out");
+    const denser = nextZoomIndexAbove(timelineFitPxPerSecond());
+    if (fitBtn) fitBtn.disabled = empty || state.timelineMode === "fit";
+    if (outBtn) outBtn.disabled = empty || state.timelineMode === "fit";
+    if (inBtn) {
+      const atMaxZoom =
+        state.timelineMode === "zoom" &&
+        state.zoomIndex >= TIMELINE_ZOOM_PX_S.length - 1;
+      inBtn.disabled = empty || atMaxZoom || (state.timelineMode === "fit" && denser < 0);
+    }
+  }
+
+  function zoomTimeline(direction) {
+    const fitPps = timelineFitPxPerSecond();
+    if (direction > 0) {
+      if (state.timelineMode === "fit") {
+        const next = nextZoomIndexAbove(fitPps);
+        if (next < 0) return;
+        state.timelineMode = "zoom";
+        state.zoomIndex = next;
+      } else {
+        state.zoomIndex = Math.min(TIMELINE_ZOOM_PX_S.length - 1, state.zoomIndex + 1);
+      }
+    } else if (state.timelineMode === "fit") {
+      return;
+    } else {
+      const nextIndex = state.zoomIndex - 1;
+      if (nextIndex < 0 || TIMELINE_ZOOM_PX_S[nextIndex] <= fitPps + 0.01) {
+        state.timelineMode = "fit";
+      } else {
+        state.zoomIndex = nextIndex;
+      }
+    }
+    persistUiState();
+    layoutTimeline();
+    centerPlayheadInView();
   }
 
   function clipStartTime(clip) {
@@ -576,9 +729,8 @@
     else if (t > total) t = total;
     else if (t < 0) t = 0;
     state.projectTimeS = t;
-    const pct = total > 0 ? (t / total) * 100 : 0;
     if (playheadEl) {
-      playheadEl.style.left = `calc(4.25rem + (100% - 4.25rem) * ${pct / 100})`;
+      playheadEl.style.left = `${timeToX(t)}px`;
       playheadEl.setAttribute("aria-valuemax", String(total.toFixed(1)));
       playheadEl.setAttribute("aria-valuenow", String(t.toFixed(1)));
     }
@@ -1061,6 +1213,22 @@
           state.volume = Math.max(0, Math.min(1, data.volume));
           if (volumeInput) volumeInput.value = String(Math.round(state.volume * 100));
         }
+        const timeline = data.timeline;
+        if (
+          timeline &&
+          typeof timeline === "object" &&
+          Number(timeline.projectId) === projectId
+        ) {
+          if (timeline.mode === "fit" || timeline.mode === "zoom") {
+            state.timelineMode = timeline.mode;
+          }
+          if (typeof timeline.zoomIndex === "number") {
+            state.zoomIndex = Math.max(
+              0,
+              Math.min(TIMELINE_ZOOM_PX_S.length - 1, Math.round(timeline.zoomIndex))
+            );
+          }
+        }
       }
     } catch (_) {
       /* ignore */
@@ -1073,6 +1241,11 @@
         STORAGE_KEY,
         JSON.stringify({
           volume: state.volume,
+          timeline: {
+            projectId,
+            mode: state.timelineMode,
+            zoomIndex: state.zoomIndex,
+          },
         })
       );
     } catch (_) {
@@ -1300,11 +1473,15 @@
     const total = totalDuration();
     rulerEl.innerHTML = "";
     if (total <= 0) return;
-    const step = total <= 30 ? 5 : total <= 120 ? 10 : 30;
-    for (let s = 0; s <= total; s += step) {
+    const pps = timelinePxPerSecond();
+    let step = 30;
+    if (pps >= 80) step = 1;
+    else if (pps >= 40) step = 5;
+    else if (pps >= 20) step = 10;
+    for (let s = 0; s <= total + 0.0001; s += step) {
       const mark = document.createElement("span");
       mark.className = "studio-ruler-mark";
-      mark.style.left = `${(s / total) * 100}%`;
+      mark.style.left = `${timeToX(s)}px`;
       mark.textContent = formatTime(s).replace(/^00:/, "");
       rulerEl.appendChild(mark);
     }
@@ -1644,7 +1821,7 @@
       await res.json();
       rebuildTransitions();
       applyTransitionsToDom();
-      buildRuler();
+      layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
       showFlash("");
@@ -1663,6 +1840,7 @@
       if (el) grid.appendChild(el);
     });
     rebuildTransitions();
+    layoutTimeline();
   }
 
   async function patchPhotoDuration(clip, durationS) {
@@ -1699,7 +1877,7 @@
           data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
         input.value = Number(shown).toFixed(1);
       }
-      buildRuler();
+      layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
       showFlash("");
@@ -1710,15 +1888,11 @@
   }
 
   function seekFromClientX(clientX, { resumeAfter = false } = {}) {
-    if (!tracksEl) return;
-    const rect = tracksEl.getBoundingClientRect();
-    const style = window.getComputedStyle(document.documentElement);
-    const rootFont = Number.parseFloat(style.fontSize) || 16;
-    const labelPx = 4.25 * rootFont;
-    const usable = rect.width - labelPx;
-    if (usable <= 0) return;
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left - labelPx) / usable));
-    setProjectTime(ratio * totalDuration());
+    const originEl = timelineCanvasEl || tracksEl;
+    if (!originEl) return;
+    const rect = originEl.getBoundingClientRect();
+    const t = xToTime(clientX - rect.left);
+    setProjectTime(Math.max(0, Math.min(totalDuration(), t)));
     if (resumeAfter) startPlayback();
   }
 
@@ -2334,8 +2508,7 @@
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
       syncPreviewMedia();
-      buildRuler();
-      updatePlayheadChrome();
+      layoutTimeline();
       setSaveState(true);
     } catch (err) {
       showRootFlash(err.message || msgTitleCardFailed);
@@ -2413,8 +2586,7 @@
         root.dataset.totalS = String(body.summary.estimated_total_s);
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
-      buildRuler();
-      updatePlayheadChrome();
+      layoutTimeline();
       syncPreviewMedia();
       setSaveState(true);
     } catch (err) {
@@ -2488,7 +2660,28 @@
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     });
+    playheadEl.addEventListener("keydown", (event) => {
+      const total = totalDuration();
+      if (total <= 0) return;
+      const step = event.shiftKey ? 5 : 1;
+      let next = state.projectTimeS;
+      if (event.key === "ArrowLeft") next -= step;
+      else if (event.key === "ArrowRight") next += step;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = total;
+      else return;
+      event.preventDefault();
+      setProjectTime(Math.max(0, Math.min(total, next)));
+    });
     rulerEl?.addEventListener("click", (event) => {
+      const wasPlaying = state.playing;
+      pausePlayback();
+      seekFromClientX(event.clientX, {
+        resumeAfter: wasPlaying && state.projectTimeS < totalDuration() - 0.001,
+      });
+    });
+    timelineCanvasEl?.addEventListener("click", (event) => {
+      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler")) return;
       const wasPlaying = state.playing;
       pausePlayback();
       seekFromClientX(event.clientX, {
@@ -2522,7 +2715,10 @@
       dragOrderBefore && dragOrderBefore.join(",") !== orderedIds().join(",");
     dragCard = null;
     if (changed) persistOrder();
-    else dragOrderBefore = null;
+    else {
+      dragOrderBefore = null;
+      layoutTimeline();
+    }
   });
 
   grid.addEventListener("dragover", (event) => {
@@ -2539,12 +2735,32 @@
       grid.querySelectorAll(".studio-transition").forEach((el) => {
         if (el !== dragCard) el.style.display = "none";
       });
+      layoutTimeline();
     }
   });
 
   grid.addEventListener("drop", (event) => {
     event.preventDefault();
   });
+
+  root.querySelectorAll("[data-timeline-zoom]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.getAttribute("data-timeline-zoom");
+      if (action === "fit") fitTimeline();
+      else if (action === "in") zoomTimeline(1);
+      else if (action === "out") zoomTimeline(-1);
+    });
+  });
+  if (timelineScrollEl && typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => {
+      if (state.timelineMode === "fit") layoutTimeline();
+    });
+    ro.observe(timelineScrollEl);
+  } else {
+    window.addEventListener("resize", () => {
+      if (state.timelineMode === "fit") layoutTimeline();
+    });
+  }
 
   // Init
   loadUiState();
@@ -2557,7 +2773,7 @@
   applyVolume();
   applyTransitionsToDom();
   renderMusic();
-  buildRuler();
+  layoutTimeline();
   setToggleLabel();
   let cutRestore = null;
   try {

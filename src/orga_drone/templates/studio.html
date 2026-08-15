@@ -346,19 +346,38 @@
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">
-        <div class="studio-ruler" id="studio-ruler" aria-hidden="true"></div>
-        <div class="studio-tracks" id="studio-tracks">
-          <div class="studio-playhead" id="studio-playhead" role="slider"
-               aria-label="{{ _('Playhead') }}"
-               aria-valuemin="0"
-               aria-valuemax="{{ '%.1f'|format(summary.estimated_total_s) }}"
-               aria-valuenow="0"
-               tabindex="0"></div>
-
-          <div class="studio-track studio-track-story">
+        <div class="studio-timeline-toolbar" role="toolbar" aria-label="{{ _('Timeline zoom') }}">
+          <button type="button" class="studio-transport-btn" id="studio-timeline-fit"
+                  data-timeline-zoom="fit"
+                  title="{{ _('Fit to story') }}" aria-label="{{ _('Fit to story') }}"
+                  {% if not items %}disabled{% endif %}>{{ _('Fit to story') }}</button>
+          <button type="button" class="studio-transport-btn" id="studio-timeline-zoom-out"
+                  data-timeline-zoom="out"
+                  title="{{ _('Zoom out') }}" aria-label="{{ _('Zoom out') }}"
+                  {% if not items %}disabled{% endif %}>−</button>
+          <button type="button" class="studio-transport-btn" id="studio-timeline-zoom-in"
+                  data-timeline-zoom="in"
+                  title="{{ _('Zoom in') }}" aria-label="{{ _('Zoom in') }}"
+                  {% if not items %}disabled{% endif %}>+</button>
+        </div>
+        <div class="studio-timeline-row">
+          <div class="studio-timeline-gutter" aria-hidden="true">
+            <div class="studio-ruler-gutter"></div>
             <div class="studio-track-label">{{ _('Story') }}</div>
-            <ol class="studio-story-track" id="studio-grid"
-                {% if not items %}data-empty="1"{% endif %}>
+          </div>
+          <div class="studio-timeline-scroll" id="studio-timeline-scroll">
+            <div class="studio-timeline-canvas" id="studio-timeline-canvas">
+              <div class="studio-ruler" id="studio-ruler" aria-hidden="true"></div>
+              <div class="studio-tracks" id="studio-tracks">
+                <div class="studio-playhead" id="studio-playhead" role="slider"
+                     aria-label="{{ _('Playhead') }}"
+                     aria-valuemin="0"
+                     aria-valuemax="{{ '%.1f'|format(summary.estimated_total_s) }}"
+                     aria-valuenow="0"
+                     tabindex="0"></div>
+                <div class="studio-track studio-track-story">
+                  <ol class="studio-story-track" id="studio-grid"
+                      {% if not items %}data-empty="1"{% endif %}>
               {% if items %}
               {% for row in item_display %}
               {% set item = row.item %}
@@ -410,6 +429,7 @@
                   data-preview-url="{{ row.preview_url }}"
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
+                  data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
                         aria-label="{{ _('Drag to reorder') }}" title="{{ _('Drag to reorder') }}">
@@ -440,10 +460,14 @@
               {% else %}
               <li class="studio-story-empty-track">{{ _('Drop or add media to build your story.') }}</li>
               {% endif %}
-            </ol>
+                  </ol>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
+        <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
             <div class="studio-track-label">{{ _('Music') }}</div>
             <div class="studio-music-body" id="studio-music-body">
               <div class="studio-music-empty" id="studio-music-empty">
@@ -476,11 +500,10 @@
             </div>
           </div>
 
-          <div class="studio-track studio-track-voice is-disabled" aria-disabled="true">
-            <div class="studio-track-label">{{ _('Voice') }}</div>
-            <div class="studio-voice-placeholder">
-              <span>{{ _('Voice-over — coming later') }}</span>
-            </div>
+        <div class="studio-track studio-track-voice is-disabled" aria-disabled="true">
+          <div class="studio-track-label">{{ _('Voice') }}</div>
+          <div class="studio-voice-placeholder">
+            <span>{{ _('Voice-over — coming later') }}</span>
           </div>
         </div>
       </section>
