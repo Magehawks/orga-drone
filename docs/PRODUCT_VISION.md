@@ -139,13 +139,14 @@ professional video-editing knowledge.
 | Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
-| Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s) |
+| Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
+| Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Light editing, extra transition types | **Later** |
-| Inspector / selection grammar and music-lane time mapping | **Later** (Issue #34; not a professional NLE) |
+| Music-lane time mapping | **Later** |
 
 ### 4. Share
 
@@ -214,7 +215,9 @@ See `README.md` for the detailed feature status table. In short:
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
   export dialog) for the open project. The Story track is a shared time canvas
   (Fit to story / zoom; ruler, clips and playhead share one mapping; zoom is
-  UI state, not project data). Persisted today: editable project title;
+  UI state, not project data). Selected Story objects are distinct from the
+  playhead-active clip; transition chips show Cut / Fade / Crossfade and name
+  neighbors in the Inspector. Persisted today: editable project title;
   order; estimated runtime; optional video source start/end after Cut. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop). Title Cards persist as generated
@@ -277,7 +280,7 @@ Future development should remain focused on storytelling. Possible areas
 (**Later** unless shipped):
 
 - Better Studio (light editing, extra transition types)
-- Simple timeline improvements
+- Music-lane time mapping
 - AI-assisted storytelling **only if** justified by a real user problem
 - Plugins
 - Sharing destinations beyond local files

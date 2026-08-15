@@ -58,8 +58,8 @@ open/reveal of the finished file already exist on Windows desktop.
 
 ## Later (vision)
 
-- Studio: light editing, extra transition types, Inspector/selection clarity
-  (Issue #34) — not a professional NLE
+- Studio: light editing, extra transition types, music-lane time mapping
+  — not a professional NLE
 - Plugin / extension hooks for parsers and exports
 - Optional opt-in community sharing of flight spots
 - Social / messenger share destinations beyond “local file”

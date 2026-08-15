@@ -116,6 +116,16 @@
          data-kind-video="{{ _('Video')|e }}"
          data-kind-title-card="{{ _('Title card')|e }}"
          data-kind-unknown="{{ _('Memory')|e }}"
+         data-inspector-story="{{ _('Story')|e }}"
+         data-inspector-music="{{ _('Music')|e }}"
+         data-transition-between="{{ _('Between {a} and {b}')|e }}"
+         data-transition-aria="{{ _('{type} between {a} and {b}')|e }}"
+         data-story-summary="{{ _('{count} items · {duration}')|e }}"
+         data-source-in="{{ _('Source in')|e }}"
+         data-source-out="{{ _('Source out')|e }}"
+         data-in-story="{{ _('In story')|e }}"
+         data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
+         data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
          data-focus-field="{{ focus_field if focus_field else '' }}">
@@ -413,7 +423,7 @@
                   data-clamped="{{ '1' if applied and applied.clamped else '0' }}"
                   tabindex="0"
                   role="button"
-                  aria-label="{{ _('Transition') }}">
+                  aria-label="{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% else %}{{ _('Cut') }}{% endif %}">
                 <span class="studio-transition-chip" data-transition-label>{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% else %}{{ _('Cut') }}{% endif %}</span>
               </li>
               {% endif %}
@@ -467,10 +477,9 @@
                     <span class="studio-clip-duration" data-clip-duration>
                       {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% else %}—{% endif %}
                     </span>
+                    <span class="visually-hidden studio-clip-playing-label" hidden>{{ _('Now playing') }}</span>
                   </span>
                 </button>
-                <span class="studio-clip-resize studio-clip-resize-start" aria-hidden="true" title="{{ _('Duration editing later') }}"></span>
-                <span class="studio-clip-resize studio-clip-resize-end" aria-hidden="true" title="{{ _('Duration editing later') }}"></span>
               </li>
               {% endfor %}
               {% else %}
@@ -491,20 +500,18 @@
           </div>
         </div>
 
-        <div class="studio-track studio-track-voice is-disabled" aria-disabled="true">
-          <div class="studio-track-label">{{ _('Voice') }}</div>
-          <div class="studio-voice-placeholder">
-            <span>{{ _('Voice-over — coming later') }}</span>
-          </div>
-        </div>
       </section>
     </div>
 
     <aside class="studio-inspector" id="studio-inspector" aria-label="{{ _('Inspector') }}">
       {% set initial_remove_id = select_id if select_id else (items[0].id if items else none) %}
-      <h2 class="studio-inspector-title">{{ _('Inspector') }}</h2>
+      <h2 class="studio-inspector-title" id="studio-inspector-heading">{{ _('Story') }}</h2>
       <div class="studio-inspector-empty" id="inspector-empty">
-        <p>{{ _('Select a clip, transition, or soundtrack to edit its properties.') }}</p>
+        <p><strong id="inspector-empty-title">{{ project.title if project else _('Your story') }}</strong></p>
+        <p class="meta-line" id="inspector-empty-summary">
+          {{ items|length }} · {{ summary.estimated_total_label }}
+        </p>
+        <p class="hint">{{ _('Select a clip, transition, or soundtrack to edit its properties.') }}</p>
       </div>
 
       <div class="studio-inspector-panel" id="inspector-clip" hidden>
@@ -512,6 +519,11 @@
         <p><strong data-field="filename"></strong></p>
         <p class="meta-line" data-field="recorded"></p>
         <p class="meta-line" data-field="duration-line"></p>
+        <div id="inspector-video-timing" hidden>
+          <p class="meta-line" data-field="source-in"></p>
+          <p class="meta-line" data-field="source-out"></p>
+          <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
+        </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>
           <input type="number" id="inspector-photo-duration" class="studio-photo-duration"
@@ -531,6 +543,7 @@
       </div>
 
       <div class="studio-inspector-panel" id="inspector-transition" hidden>
+        <p class="meta-line" id="inspector-transition-between"></p>
         <label class="studio-inspector-field">
           <span>{{ _('Transition') }}</span>
           <select id="inspector-transition-type">

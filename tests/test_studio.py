@@ -370,7 +370,7 @@ def test_http_studio_creator_shell_with_items(
     assert "|&lt;" not in html
     assert "studio-inspector" in html
     assert "studio-music-track" in html
-    assert "studio-track-voice" in html
+    assert "studio-track-voice" not in html
     assert "studio-playhead" in html
     assert "studio-transition" in html
     assert "A.MP4" in html
@@ -403,8 +403,11 @@ def test_http_studio_creator_shell_with_items(
     assert "studio-music-wave" not in html
     assert "studio-music-handle" not in html
     assert 'id="studio-music-replace"' not in html
-    assert "Voice-over" in html or "Voice-over" in html
-    assert "is-disabled" in html
+    assert "Voice-over" not in html
+    assert "studio-clip-resize" not in html
+    assert "inspector-video-timing" in html
+    assert "inspector-transition-between" in html
+    assert "Cut splits this video at the playhead" in html or "Schnitt teilt dieses Video" in html
     # Photo clips must expose an image preview source (not only video stream).
     assert 'data-kind="photo"' in html
     assert 'data-preview-url=' in html

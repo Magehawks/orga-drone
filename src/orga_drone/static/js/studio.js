@@ -240,6 +240,15 @@
     title_card: root.dataset.kindTitleCard || "Title card",
     unknown: root.dataset.kindUnknown || "Memory",
   };
+  const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
+  const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
+  const msgStorySummary = root.dataset.storySummary || "{count} items · {duration}";
+  const msgSourceIn = root.dataset.sourceIn || "Source in";
+  const msgSourceOut = root.dataset.sourceOut || "Source out";
+  const labelInspectorStory = root.dataset.inspectorStory || "Story";
+  const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
+  const labelInStory = root.dataset.inStory || "In story";
+  const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
 
   const STORAGE_KEY = "orga-drone-studio-ui-v1";
 
@@ -280,6 +289,87 @@
 
   function orderedIds() {
     return clips().map((el) => Number(el.dataset.studioId));
+  }
+
+  function formatTemplate(tmpl, vars) {
+    return String(tmpl || "").replace(/\{(\w+)\}/g, (_, key) =>
+      vars[key] != null ? String(vars[key]) : ""
+    );
+  }
+
+  function clipDisplayName(clip) {
+    if (!clip) return "—";
+    if (clip.dataset.kind === "title_card") {
+      const title = (clip.dataset.displayTitle || "").trim();
+      return title || kindLabels.title_card;
+    }
+    const name = (clip.dataset.filename || "").trim();
+    return name || kindLabels.unknown;
+  }
+
+  function playheadTouchesClip(clip) {
+    if (!clip) return false;
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit) return false;
+    const id = String(clip.dataset.studioId);
+    if (String(hit.clip.dataset.studioId) === id) return true;
+    return !!(hit.overlapClip && String(hit.overlapClip.dataset.studioId) === id);
+  }
+
+  function markActiveClips(primary, overlap) {
+    clips().forEach((c) => {
+      const on = c === primary || c === overlap;
+      c.classList.toggle("is-active", on);
+      const playing = c.querySelector(".studio-clip-playing-label");
+      if (c === primary) {
+        c.setAttribute("aria-current", "true");
+        if (playing) playing.hidden = false;
+      } else {
+        c.removeAttribute("aria-current");
+        if (playing) playing.hidden = true;
+      }
+    });
+  }
+
+  function setInspectorHeading(text) {
+    const el = document.getElementById("studio-inspector-heading");
+    if (el) el.textContent = text;
+  }
+
+  function fillEmptyInspector() {
+    setInspectorHeading(labelInspectorStory);
+    const titleEl = document.getElementById("inspector-empty-title");
+    const summaryEl = document.getElementById("inspector-empty-summary");
+    if (titleEl) titleEl.textContent = state.title || defaultProjectTitle;
+    if (summaryEl) {
+      summaryEl.textContent = formatTemplate(msgStorySummary, {
+        count: String(clips().length),
+        duration: formatTime(totalDuration()),
+      });
+    }
+  }
+
+  function transitionNeighbors(el) {
+    const after = clips().find(
+      (c) => String(c.dataset.studioId) === String(el.dataset.transitionAfter)
+    );
+    const before = clips().find(
+      (c) => String(c.dataset.studioId) === String(el.dataset.transitionBefore)
+    );
+    return { after, before };
+  }
+
+  function refreshTransitionChrome(el) {
+    const type = el.dataset.transitionType || "cut";
+    const typeLabel = transitionLabels[type] || type;
+    const { after, before } = transitionNeighbors(el);
+    const a = clipDisplayName(after);
+    const b = clipDisplayName(before);
+    const label = formatTemplate(msgTransitionAria, { type: typeLabel, a, b });
+    const dur = Number(el.dataset.appliedDuration) || 0;
+    el.setAttribute("aria-label", type !== "cut" && dur > 0 ? `${label}, ${dur.toFixed(1)}s` : label);
+    const chip = el.querySelector("[data-transition-label]");
+    if (chip) chip.textContent = typeLabel;
   }
 
   function showFlash(message) {
@@ -964,14 +1054,14 @@
     const hit = resolveAt(state.projectTimeS);
     if (!hit) {
       state.activeStudioId = null;
-      clips().forEach((c) => c.classList.remove("is-active"));
+      markActiveClips(null, null);
       showPlaceholder();
       updateCutEnabled();
       return;
     }
     const { clip, localS, atEnd } = hit;
     state.activeStudioId = clip.dataset.studioId || null;
-    clips().forEach((c) => c.classList.toggle("is-active", c === clip || c === hit.overlapClip));
+    markActiveClips(clip, hit.overlapClip);
 
     const kind = clip.dataset.kind || "unknown";
     const canPlay = clip.dataset.canPlay === "1";
@@ -1028,7 +1118,7 @@
       const hit = resolveAt(state.projectTimeS);
       if (hit) {
         state.activeStudioId = hit.clip.dataset.studioId || null;
-        clips().forEach((c) => c.classList.toggle("is-active", c === hit.clip || c === hit.overlapClip));
+        markActiveClips(hit.clip, hit.overlapClip);
         applyTransitionPreview(hit);
       }
       updateCutEnabled();
@@ -1667,8 +1757,7 @@
       const prev = clips().find((c) => String(c.dataset.studioId) === String(afterId));
       const type = (prev && prev.dataset.appliedType) || el.dataset.appliedType || "cut";
       el.dataset.transitionType = type;
-      const label = el.querySelector("[data-transition-label]");
-      if (label) label.textContent = transitionLabels[type] || type;
+      refreshTransitionChrome(el);
     });
   }
 
@@ -1691,12 +1780,11 @@
       li.dataset.fallbackCut = prev.dataset.fallbackCut || "0";
       li.tabIndex = 0;
       li.setAttribute("role", "button");
-      li.setAttribute("aria-label", "Transition");
       const chip = document.createElement("span");
       chip.className = "studio-transition-chip";
       chip.dataset.transitionLabel = "";
-      chip.textContent = transitionLabels[type] || type;
       li.appendChild(chip);
+      refreshTransitionChrome(li);
       grid.insertBefore(li, next);
     }
   }
@@ -1727,6 +1815,7 @@
         if (el) el.hidden = id !== kind;
       }
     );
+    if (kind === "inspector-empty") fillEmptyInspector();
   }
 
   function setClipRemoveAction(form, studioId) {
@@ -1753,65 +1842,84 @@
     setClipRemoveAction(removeForm, clip.dataset.studioId);
   }
 
-  function selectClip(id, { movePlayhead = true } = {}) {
+  function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
     state.selected = { type: "clip", id: String(id) };
     const clip = clips().find((c) => String(c.dataset.studioId) === String(id));
     if (!clip) return;
-    clips().forEach((c) => c.classList.toggle("is-selected", c === clip));
+    clips().forEach((c) => {
+      c.classList.toggle("is-selected", c === clip);
+      if (c === clip) c.setAttribute("aria-selected", "true");
+      else c.removeAttribute("aria-selected");
+    });
     grid.querySelectorAll(".studio-transition").forEach((el) => el.classList.remove("is-selected"));
-    document.getElementById("studio-music-track")?.classList.remove("is-selected");
+    layoutMusicSpans();
 
     if (clip.dataset.kind === "title_card") {
       showInspector("inspector-titlecard");
+      setInspectorHeading(kindLabels.title_card);
       fillTitlecardInspector(clip);
-      if (movePlayhead) {
-        const wasPlaying = state.playing;
-        if (wasPlaying) pausePlayback();
-        setProjectTime(clipStartTime(clip));
-        if (wasPlaying) startPlayback();
-      } else {
-        updateCutEnabled();
+    } else {
+      showInspector("inspector-clip");
+      setInspectorHeading(kindLabels[clip.dataset.kind] || kindLabels.unknown);
+      const panel = document.getElementById("inspector-clip");
+      if (!panel) return;
+      panel.querySelector('[data-field="kind"]').textContent =
+        kindLabels[clip.dataset.kind] || kindLabels.unknown;
+      panel.querySelector('[data-field="filename"]').textContent = clip.dataset.filename || "";
+      panel.querySelector('[data-field="recorded"]').textContent = clip.dataset.recordedAt || "—";
+      const dur = clipDuration(clip);
+      const durationLine = panel.querySelector('[data-field="duration-line"]');
+      if (durationLine) {
+        durationLine.textContent =
+          dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
       }
-      return;
+
+      const photoWrap = document.getElementById("inspector-photo-duration-wrap");
+      const photoInput = document.getElementById("inspector-photo-duration");
+      const photoReset = document.getElementById("inspector-photo-reset");
+      const videoTiming = document.getElementById("inspector-video-timing");
+      const removeForm = document.getElementById("inspector-remove-form");
+      const isPhoto = clip.dataset.kind === "photo";
+      const isVideo = clip.dataset.kind === "video";
+      if (photoWrap) photoWrap.hidden = !isPhoto;
+      if (photoReset) {
+        photoReset.hidden = !isPhoto;
+        photoReset.disabled = clip.dataset.photoDuration === "";
+      }
+      if (photoInput && isPhoto) {
+        const shown =
+          clip.dataset.photoDuration === ""
+            ? defaultPhotoDuration
+            : Number(clip.dataset.photoDuration);
+        photoInput.value = Number(shown).toFixed(1);
+      }
+      if (videoTiming) {
+        videoTiming.hidden = !isVideo;
+        if (isVideo) {
+          const inEl = panel.querySelector('[data-field="source-in"]');
+          const outEl = panel.querySelector('[data-field="source-out"]');
+          const hintEl = panel.querySelector('[data-field="cut-hint"]');
+          if (inEl) inEl.textContent = `${msgSourceIn}: ${sourceInS(clip).toFixed(1)} s`;
+          if (outEl) outEl.textContent = `${msgSourceOut}: ${sourceOutS(clip).toFixed(1)} s`;
+          if (hintEl) hintEl.textContent = msgCutHint;
+        }
+      }
+      setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
-    showInspector("inspector-clip");
-    const panel = document.getElementById("inspector-clip");
-    if (!panel) return;
-    panel.querySelector('[data-field="kind"]').textContent =
-      kindLabels[clip.dataset.kind] || kindLabels.unknown;
-    panel.querySelector('[data-field="filename"]').textContent = clip.dataset.filename || "";
-    panel.querySelector('[data-field="recorded"]').textContent = clip.dataset.recordedAt || "—";
-    const dur = clipDuration(clip);
-    panel.querySelector('[data-field="duration-line"]').textContent =
-      dur > 0 ? `${dur.toFixed(1)} s` : "—";
-
-    const photoWrap = document.getElementById("inspector-photo-duration-wrap");
-    const photoInput = document.getElementById("inspector-photo-duration");
-    const photoReset = document.getElementById("inspector-photo-reset");
-    const removeForm = document.getElementById("inspector-remove-form");
-    const isPhoto = clip.dataset.kind === "photo";
-    if (photoWrap) photoWrap.hidden = !isPhoto;
-    if (photoReset) {
-      photoReset.hidden = !isPhoto;
-      photoReset.disabled = clip.dataset.photoDuration === "";
-    }
-    if (photoInput && isPhoto) {
-      const shown =
-        clip.dataset.photoDuration === ""
-          ? defaultPhotoDuration
-          : Number(clip.dataset.photoDuration);
-      photoInput.value = Number(shown).toFixed(1);
-    }
-    setClipRemoveAction(removeForm, clip.dataset.studioId);
-
-    if (movePlayhead) {
+    if (movePlayhead && !playheadTouchesClip(clip)) {
+      const start = clipStartTime(clip);
+      const end = start + clipDuration(clip);
+      let t = seekTimeS != null && Number.isFinite(seekTimeS) ? seekTimeS : start;
+      if (end > start) t = Math.max(start, Math.min(end - 0.001, t));
+      else t = start;
       const wasPlaying = state.playing;
       if (wasPlaying) pausePlayback();
-      setProjectTime(clipStartTime(clip));
+      setProjectTime(t);
       if (wasPlaying) startPlayback();
     } else {
-      updateCutEnabled();
+      // Keep selection from stealing the playhead, but still sync preview/active chrome.
+      syncPreviewMedia({ seek: true });
     }
   }
 
@@ -1874,10 +1982,23 @@
 
   function selectTransition(el) {
     state.selected = { type: "transition", id: el.dataset.transitionAfter || "" };
-    clips().forEach((c) => c.classList.remove("is-selected"));
+    clips().forEach((c) => {
+      c.classList.remove("is-selected");
+      c.removeAttribute("aria-selected");
+    });
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.toggle("is-selected", t === el));
-    document.getElementById("studio-music-track")?.classList.remove("is-selected");
+    layoutMusicSpans();
     showInspector("inspector-transition");
+    const headingType = transitionLabels[el.dataset.transitionType || "cut"] || "Transition";
+    setInspectorHeading(headingType);
+    const betweenEl = document.getElementById("inspector-transition-between");
+    if (betweenEl) {
+      const { after, before } = transitionNeighbors(el);
+      betweenEl.textContent = formatTemplate(msgBetween, {
+        a: clipDisplayName(after),
+        b: clipDisplayName(before),
+      });
+    }
     const select = document.getElementById("inspector-transition-type");
     const stored = el.dataset.storedType || el.dataset.transitionType || "cut";
     if (select) select.value = stored === "cut" || stored === "fade_black" || stored === "crossfade" ? stored : "cut";
@@ -1916,10 +2037,14 @@
     const track = state.tracks.find((item) => String(item.id) === String(trackId));
     if (!track) return;
     state.selected = { type: "music", id: String(track.id) };
-    clips().forEach((c) => c.classList.remove("is-selected"));
+    clips().forEach((c) => {
+      c.classList.remove("is-selected");
+      c.removeAttribute("aria-selected");
+    });
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.remove("is-selected"));
-    document.getElementById("studio-music-track")?.classList.add("is-selected");
     showInspector("inspector-music");
+    setInspectorHeading(labelInspectorMusic);
+    layoutMusicSpans();
     const panel = document.getElementById("inspector-music");
     if (!panel) return;
     const nameEl = panel.querySelector('[data-field="music-name"]');
@@ -2284,7 +2409,11 @@
   root.addEventListener("click", (event) => {
     const pick = event.target.closest && event.target.closest("[data-select-clip]");
     if (pick) {
-      selectClip(pick.getAttribute("data-select-clip"));
+      let seekTimeS = null;
+      if (timelineCanvasEl) {
+        seekTimeS = xToTime(event.clientX - timelineCanvasEl.getBoundingClientRect().left);
+      }
+      selectClip(pick.getAttribute("data-select-clip"), { seekTimeS });
       return;
     }
     const transition = event.target.closest && event.target.closest(".studio-transition");
@@ -3007,11 +3136,7 @@
         chip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
         chip.dataset.clamped = body.clamped ? "1" : "0";
         chip.dataset.transitionType = body.applied_type || "cut";
-        const label = chip.querySelector("[data-transition-label]");
-        if (label) {
-          label.textContent =
-            transitionLabels[chip.dataset.transitionType] || chip.dataset.transitionType;
-        }
+        refreshTransitionChrome(chip);
         selectTransition(chip);
       }
       if (body.summary && body.summary.estimated_total_s != null) {
