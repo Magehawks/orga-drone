@@ -289,12 +289,41 @@ def prepare_studio_export(
         raise StudioExportError("File already exists. Confirm overwrite to continue.")
 
     export_clips: list[StudioExportClip] = []
+    source_items: list[StudioClip] = []
     for clip in db.list_studio_items(project.id):
         built = _clip_to_export_clip(db, clip)
         if built is not None:
             export_clips.append(built)
+            source_items.append(clip)
     if not export_clips:
         raise StudioExportError("No available media to export.")
+
+    from dataclasses import replace
+
+    from orga_drone.studio_transition import (
+        apply_boundaries,
+        fade_in_s,
+        fade_out_s,
+    )
+
+    durs = [c.duration_s for c in export_clips]
+    types = [it.transition for it in source_items]
+    stored_d = [it.transition_duration_s for it in source_items]
+    applied = apply_boundaries(durs, types, stored_d)
+    decorated: list[StudioExportClip] = []
+    for index, built in enumerate(export_clips):
+        incoming = applied[index - 1] if index > 0 else None
+        outgoing = applied[index] if index < len(applied) else None
+        decorated.append(
+            replace(
+                built,
+                transition_type=outgoing.type if outgoing is not None else "cut",
+                transition_s=outgoing.duration_s if outgoing is not None else 0.0,
+                fade_in_s=fade_in_s(incoming),
+                fade_out_s=fade_out_s(outgoing),
+            )
+        )
+    export_clips = decorated
 
     music_cfg: StudioExportMusic | None = None
     music_row = db.get_studio_music(project.id)

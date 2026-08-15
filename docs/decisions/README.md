@@ -35,3 +35,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0007](0007-studio-export-open-reveal.md) | Studio export open / reveal after completion | Proposed |
 | [0008](0008-studio-music-soundtrack.md) | Studio music as a read-only project soundtrack | Proposed |
 | [0009](0009-studio-title-cards.md) | Studio Title Cards as generated timeline items | Proposed |
+| [0010](0010-studio-visual-transitions.md) | Studio visual transitions | Proposed |

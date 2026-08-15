@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -185,6 +186,87 @@ def test_http_add_patch_reorder_remove(
     assert removed.status_code in {200, 303}
     left = db.list_studio_items(project.id)
     assert [i.id for i in left] == [card_id]
+
+
+def _start_tag(html: str, element_id: str) -> str:
+    match = re.search(
+        rf"<[a-zA-Z]+\b[^>]*\sid=[\"']{re.escape(element_id)}[\"'][^>]*>",
+        html,
+    )
+    assert match is not None, f"missing element id={element_id}"
+    return match.group(0)
+
+
+def _attr(tag: str, name: str) -> str | None:
+    match = re.search(rf"\b{re.escape(name)}=[\"']([^\"']*)[\"']", tag)
+    return match.group(1) if match else None
+
+
+def test_title_card_inspector_remove_posts_item_url_not_studio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Browser submit path: the Title Card inspector form must POST the existing remove URL.
+
+    A missing action submits POST /studio (current page) → 405 Method Not Allowed.
+    Direct client.post('/studio/{id}/remove') does not catch that wiring failure.
+    """
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.create_studio_project("Keep")
+    db.set_open_studio_project_id(project.id)
+    media_id = _seed_video(db, tmp_path / "media")
+    media = db.get_media(media_id)
+    assert media is not None
+    source_bytes = Path(media.path).read_bytes()
+    video_id, _created = db.add_studio_item(
+        media.path,
+        identity_key=make_identity_key(media.filename, media.size_bytes, media.recorded_at),
+        filename=media.filename,
+        recorded_at=media.recorded_at,
+        kind="video",
+        project_id=project.id,
+        source_media_id=media.id,
+    )
+    keep = db.add_studio_title_card(project.id, title_text="Keep me")
+    added = client.post("/api/studio/title-cards")
+    assert added.status_code == 200
+    remove_id = added.json()["id"]
+    expected = f"/studio/{remove_id}/remove"
+
+    bare = client.post("/studio", follow_redirects=False)
+    assert bare.status_code == 405
+    assert bare.json()["detail"] == "Method Not Allowed"
+
+    page = client.get(f"/studio?select={remove_id}&focus=title")
+    assert page.status_code == 200
+    form_tag = _start_tag(page.text, "inspector-titlecard-remove-form")
+    action = _attr(form_tag, "action")
+    method = (_attr(form_tag, "method") or "").lower()
+    assert method == "post"
+    assert action == expected
+    assert action not in {None, "", "/studio", "/studio/"}
+    form_chunk = page.text[page.text.index(form_tag) : page.text.index(form_tag) + 900]
+    assert f'formaction="{expected}"' in form_chunk
+    clip_form = _start_tag(page.text, "inspector-remove-form")
+    assert _attr(clip_form, "action") == expected
+
+    removed = client.post(action, follow_redirects=False)
+    assert removed.status_code == 303
+    location = removed.headers["location"]
+    assert location.startswith("/studio")
+    left_ids = [i.id for i in db.list_studio_items(project.id)]
+    assert remove_id not in left_ids
+    assert video_id in left_ids
+    assert keep.id in left_ids
+    assert Path(media.path).read_bytes() == source_bytes
+    assert db.get_media(media_id) is not None
+
+    studio = client.get(location)
+    assert studio.status_code == 200
+    assert "Method Not Allowed" not in studio.text
+    assert f'data-studio-id="{keep.id}"' in studio.text
+    assert f'data-studio-id="{video_id}"' in studio.text
+    assert f'data-studio-id="{remove_id}"' not in studio.text
+    assert "Removed from Studio." in studio.text or "Aus dem Studio entfernt." in studio.text
 
 
 def test_title_card_survives_rescan(

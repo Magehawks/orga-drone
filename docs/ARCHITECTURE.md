@@ -69,7 +69,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
-| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, transition, effect_settings JSON; survives rescan |
+| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, effect_settings JSON; survives rescan |
 | `studio_audio_clips` | Optional per-project music reference (read-only path outside library roots allowed; volume/fades/loop; not library media) |
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
@@ -110,7 +110,8 @@ shows a dismissible banner with Open video / Show in folder
 successful output only). Desktop save dialog. Optional project music
 (`studio_audio_clips`) is previewed and mixed into the MP4; Title Cards are
 generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
-transitions remain client UI stubs). Transport/editing controls use vendored Lucide icons
+visual transitions Cut / Fade through black / Crossfade persist on the outgoing
+clip and render in preview + MP4). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.
 

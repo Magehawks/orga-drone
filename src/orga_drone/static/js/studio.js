@@ -1,9 +1,9 @@
 /**
  * Creator Studio UI.
- * Persistence: reorder + photo duration via existing APIs.
+ * Persistence: reorder, photo duration, Title Cards, music, and transitions via APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
  * Music is a persisted per-project soundtrack mixed into MP4 export.
- * Transitions remain UI stubs.
+ * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
 (function () {
@@ -166,10 +166,16 @@
   const saveStateEl = document.getElementById("studio-save-state");
   const titleInput = document.getElementById("studio-project-title");
   const previewImage = document.getElementById("studio-preview-image");
+  const previewImageB = document.getElementById("studio-preview-image-b");
   const previewVideo = document.getElementById("studio-preview-video");
+  const previewVideoB = document.getElementById("studio-preview-video-b");
   const previewTitlecard = document.getElementById("studio-preview-titlecard");
+  const previewTitlecardB = document.getElementById("studio-preview-titlecard-b");
   const previewTitlecardTitle = document.getElementById("studio-preview-titlecard-title");
   const previewTitlecardSubtitle = document.getElementById("studio-preview-titlecard-subtitle");
+  const previewTitlecardBTitle = document.getElementById("studio-preview-titlecard-b-title");
+  const previewTitlecardBSubtitle = document.getElementById("studio-preview-titlecard-b-subtitle");
+  const previewFadeBlack = document.getElementById("studio-preview-fade-black");
   const musicAudio = document.getElementById("studio-music-audio");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
   const transportTime = document.getElementById("studio-transport-time");
@@ -213,11 +219,13 @@
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
   const labelPlay = root.dataset.labelPlay || "Play";
   const labelPause = root.dataset.labelPause || "Pause";
+  const msgTransitionFailed = root.dataset.transitionFailed || "Could not save the transition.";
+  const msgTransitionFallback = root.dataset.transitionFallback || "";
+  const msgTransitionClamped = root.dataset.transitionClamped || "";
   const transitionLabels = {
-    none: root.dataset.transitionNone || "None",
-    fade: root.dataset.transitionFade || "Fade",
-    crossfade: root.dataset.transitionCrossfade || "Cross fade",
-    slide: root.dataset.transitionSlide || "Slide",
+    cut: root.dataset.transitionChipCut || root.dataset.transitionCut || "Cut",
+    fade_black: root.dataset.transitionChipFadeBlack || "Fade",
+    crossfade: root.dataset.transitionChipCrossfade || "Crossfade",
   };
   const kindLabels = {
     photo: root.dataset.kindPhoto || "Photo",
@@ -235,7 +243,6 @@
    *  volume: number,
    *  title: string,
    *  music: null | {name: string, volume: number, fadeIn: number, fadeOut: number, loop: boolean, available: boolean, streamUrl: string|null},
-   *  transitions: Record<string, string>,
    *  activeStudioId: string|null
    * }} */
   const state = {
@@ -245,7 +252,6 @@
     volume: 0.8,
     title: titleInput ? titleInput.value : "Your story",
     music: null,
-    transitions: {},
     activeStudioId: null,
   };
 
@@ -328,66 +334,138 @@
   }
 
   function totalDuration() {
-    return clips().reduce((sum, clip) => sum + clipDuration(clip), 0);
+    const list = clips();
+    let total = 0;
+    list.forEach((clip, index) => {
+      total += clipDuration(clip);
+      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
+        total -= Number(clip.dataset.appliedDuration) || 0;
+      }
+    });
+    return Math.max(0, total);
   }
 
   function clipStartTime(clip) {
     let cursor = 0;
-    for (const c of clips()) {
+    const list = clips();
+    for (let i = 0; i < list.length; i += 1) {
+      const c = list[i];
       if (c === clip) return cursor;
       cursor += clipDuration(c);
+      if (i < list.length - 1 && (c.dataset.appliedType || "cut") === "crossfade") {
+        cursor -= Number(c.dataset.appliedDuration) || 0;
+      }
     }
     return 0;
   }
 
   /**
    * Map global project time to active clip + local time.
-   * Skips zero-duration clips. At/past total → last clip, atEnd true.
+   * During a crossfade both items are returned so preview can stack them.
    */
   function resolveAt(projectTimeS) {
-    const list = clips();
-    const spans = [];
+    const list = clips().filter((c) => clipDuration(c) > 0);
+    if (!list.length) return null;
+    const starts = [];
     let cursor = 0;
     list.forEach((clip, index) => {
-      const dur = clipDuration(clip);
-      if (dur <= 0) return;
-      spans.push({ clip, index, start: cursor, duration: dur });
-      cursor += dur;
+      starts.push(cursor);
+      cursor += clipDuration(clip);
+      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
+        cursor -= Number(clip.dataset.appliedDuration) || 0;
+      }
     });
-    if (!spans.length) return null;
     const total = cursor;
     const t = Math.max(0, Number(projectTimeS) || 0);
+    const last = list[list.length - 1];
     if (t >= total) {
-      const last = spans[spans.length - 1];
       return {
-        clip: last.clip,
-        index: last.index,
-        start: last.start,
-        duration: last.duration,
-        localS: last.duration,
+        clip: last,
+        index: list.length - 1,
+        start: starts[starts.length - 1],
+        duration: clipDuration(last),
+        localS: clipDuration(last),
         atEnd: true,
+        overlapClip: null,
+        overlapLocalS: 0,
+        crossfadeProgress: null,
+        fadeBlackOpacity: 0,
       };
     }
-    for (const span of spans) {
-      if (t < span.start + span.duration) {
+    let primary = 0;
+    for (let i = 0; i < list.length; i += 1) {
+      const start = starts[i];
+      const end = start + clipDuration(list[i]);
+      if (t >= start && t < end) primary = i;
+    }
+    const clip = list[primary];
+    const start = starts[primary];
+    const dur = clipDuration(clip);
+    const localS = t - start;
+    let fadeBlackOpacity = 0;
+    const incoming = primary > 0 ? list[primary - 1] : null;
+    const outgoingType = clip.dataset.appliedType || "cut";
+    const outgoingD = Number(clip.dataset.appliedDuration) || 0;
+    if (outgoingType === "fade_black" && outgoingD > 0) {
+      const half = outgoingD / 2;
+      const fadeStart = dur - half;
+      if (localS >= fadeStart) fadeBlackOpacity = half <= 0 ? 0 : Math.min(1, (localS - fadeStart) / half);
+    }
+    if (incoming && (incoming.dataset.appliedType || "cut") === "fade_black") {
+      const half = (Number(incoming.dataset.appliedDuration) || 0) / 2;
+      if (half > 0 && localS <= half) {
+        fadeBlackOpacity = Math.max(fadeBlackOpacity, 1 - localS / half);
+      }
+    }
+    if (incoming && (incoming.dataset.appliedType || "cut") === "crossfade") {
+      const d = Number(incoming.dataset.appliedDuration) || 0;
+      const intoIncoming = t - start;
+      if (d > 0 && intoIncoming <= d) {
+        const progress = Math.max(0, Math.min(1, intoIncoming / d));
         return {
-          clip: span.clip,
-          index: span.index,
-          start: span.start,
-          duration: span.duration,
-          localS: t - span.start,
+          clip,
+          index: primary,
+          start,
+          duration: dur,
+          localS,
           atEnd: false,
+          overlapClip: incoming,
+          overlapLocalS: t - starts[primary - 1],
+          crossfadeProgress: progress,
+          fadeBlackOpacity: 0,
         };
       }
     }
-    const last = spans[spans.length - 1];
+    if (outgoingType === "crossfade" && outgoingD > 0 && primary < list.length - 1) {
+      const nextStart = starts[primary + 1];
+      if (t >= nextStart) {
+        const next = list[primary + 1];
+        const progress = Math.max(0, Math.min(1, (t - nextStart) / outgoingD));
+        return {
+          clip: next,
+          index: primary + 1,
+          start: nextStart,
+          duration: clipDuration(next),
+          localS: t - nextStart,
+          atEnd: false,
+          overlapClip: clip,
+          overlapLocalS: localS,
+          crossfadeProgress: progress,
+          fadeBlackOpacity: 0,
+        };
+      }
+    }
     return {
-      clip: last.clip,
-      index: last.index,
-      start: last.start,
-      duration: last.duration,
-      localS: last.duration,
-      atEnd: true,
+      clip,
+      index: primary,
+      start,
+      duration: dur,
+      localS,
+      atEnd: false,
+      overlapClip: null,
+      overlapLocalS: 0,
+      crossfadeProgress: null,
+      fadeBlackOpacity,
     };
   }
 
@@ -425,6 +503,33 @@
       }
     }
     previewVideo.hidden = true;
+  }
+
+  function hideOverlayLayers() {
+    if (previewImageB) {
+      previewImageB.hidden = true;
+      previewImageB.style.opacity = "";
+    }
+    if (previewVideoB) {
+      try {
+        previewVideoB.pause();
+      } catch (_) {
+        /* ignore */
+      }
+      previewVideoB.hidden = true;
+      previewVideoB.style.opacity = "";
+    }
+    if (previewTitlecardB) {
+      previewTitlecardB.hidden = true;
+      previewTitlecardB.style.opacity = "";
+    }
+    if (previewImage) previewImage.style.opacity = "";
+    if (previewVideo) previewVideo.style.opacity = "";
+    if (previewTitlecard) previewTitlecard.style.opacity = "";
+    if (previewFadeBlack) {
+      previewFadeBlack.hidden = true;
+      previewFadeBlack.style.opacity = "0";
+    }
   }
 
   function applyVolume() {
@@ -493,6 +598,7 @@
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
+    hideOverlayLayers();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
   }
 
@@ -596,6 +702,106 @@
     }
   }
 
+  function fillTitlecardEl(el, titleEl, subEl, clip) {
+    if (!el) return;
+    const bg = clip.dataset.background || "dark";
+    el.hidden = false;
+    el.setAttribute("data-bg", bg);
+    if (titleEl) titleEl.textContent = clip.dataset.displayTitle || clip.dataset.title || "";
+    if (subEl) {
+      const sub = clip.dataset.displaySubtitle || clip.dataset.subtitle || "";
+      subEl.textContent = sub;
+      subEl.hidden = !sub;
+    }
+  }
+
+  function showOutgoingLayer(clip, localS) {
+    const kind = clip.dataset.kind || "unknown";
+    if (kind === "title_card") {
+      fillTitlecardEl(previewTitlecardB, previewTitlecardBTitle, previewTitlecardBSubtitle, clip);
+      if (previewTitlecardB) previewTitlecardB.style.opacity = "1";
+      return;
+    }
+    if (kind === "photo" || kind === "unknown") {
+      const src = imageSrcFor(clip) || clip.dataset.thumb || "";
+      if (previewImageB && src) {
+        previewImageB.hidden = false;
+        previewImageB.src = src;
+        previewImageB.style.opacity = "1";
+      }
+      return;
+    }
+    if (kind === "video") {
+      const thumb = clip.dataset.thumb || "";
+      const src = videoSrcFor(clip);
+      if (previewVideoB && src && clip.dataset.canPlay === "1") {
+        previewVideoB.hidden = false;
+        previewVideoB.muted = true;
+        previewVideoB.style.opacity = "1";
+        if (previewVideoB.getAttribute("src") !== src) {
+          previewVideoB.src = src;
+          previewVideoB.load();
+        }
+        const inS = sourceInS(clip);
+        const target = inS + Math.max(0, localS);
+        const apply = () => {
+          try {
+            previewVideoB.currentTime = target;
+          } catch (_) {
+            /* ignore */
+          }
+        };
+        if (previewVideoB.readyState >= 1) apply();
+        else previewVideoB.addEventListener("loadedmetadata", apply, { once: true });
+        return;
+      }
+      if (previewImageB && thumb) {
+        previewImageB.hidden = false;
+        previewImageB.src = thumb;
+        previewImageB.style.opacity = "1";
+      }
+    }
+  }
+
+  function applyTransitionPreview(hit) {
+    const overlap = hit && hit.overlapClip && hit.crossfadeProgress != null;
+    if (!overlap) {
+      if (previewImageB) {
+        previewImageB.hidden = true;
+        previewImageB.style.opacity = "";
+      }
+      if (previewVideoB) {
+        try {
+          previewVideoB.pause();
+        } catch (_) {
+          /* ignore */
+        }
+        previewVideoB.hidden = true;
+        previewVideoB.style.opacity = "";
+      }
+      if (previewTitlecardB) {
+        previewTitlecardB.hidden = true;
+        previewTitlecardB.style.opacity = "";
+      }
+      if (previewImage) previewImage.style.opacity = "";
+      if (previewVideo) previewVideo.style.opacity = "";
+      if (previewTitlecard) previewTitlecard.style.opacity = "";
+    } else {
+      showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
+      const progress = hit.crossfadeProgress;
+      if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
+      if (previewVideo && !previewVideo.hidden) previewVideo.style.opacity = String(progress);
+      if (previewTitlecard && !previewTitlecard.hidden) previewTitlecard.style.opacity = String(progress);
+    }
+    if (hit && hit.fadeBlackOpacity > 0.001 && previewFadeBlack) {
+      previewFadeBlack.hidden = false;
+      previewFadeBlack.style.opacity = String(hit.fadeBlackOpacity);
+    } else if (previewFadeBlack) {
+      previewFadeBlack.hidden = true;
+      previewFadeBlack.style.opacity = "0";
+    }
+  }
+
   function syncPreviewMedia({ seek = false } = {}) {
     void seek;
     const hit = resolveAt(state.projectTimeS);
@@ -608,26 +814,23 @@
     }
     const { clip, localS, atEnd } = hit;
     state.activeStudioId = clip.dataset.studioId || null;
-    clips().forEach((c) => c.classList.toggle("is-active", c === clip));
+    clips().forEach((c) => c.classList.toggle("is-active", c === clip || c === hit.overlapClip));
 
     const kind = clip.dataset.kind || "unknown";
     const canPlay = clip.dataset.canPlay === "1";
 
     if (kind === "title_card") {
       showTitlecard(clip);
+      applyTransitionPreview(hit);
       updateCutEnabled();
       return;
     }
 
-    // Photos first: never leave a video layer covering the image.
     if (kind === "photo") {
       const src = imageSrcFor(clip);
-      if (src) {
-        showImage(src);
-        updateCutEnabled();
-        return;
-      }
-      showPlaceholder();
+      if (src) showImage(src);
+      else showPlaceholder();
+      applyTransitionPreview(hit);
       updateCutEnabled();
       return;
     }
@@ -638,18 +841,20 @@
         const thumb = clip.dataset.thumb || "";
         if (thumb) showImage(thumb);
         else showPlaceholder();
+        applyTransitionPreview(hit);
         updateCutEnabled();
         return;
       }
       showVideo(src, localS, { play: state.playing && !atEnd, clip });
+      applyTransitionPreview(hit);
       updateCutEnabled();
       return;
     }
 
-    // Unavailable / unknown: show thumb if any for duration window.
     const thumb = clip.dataset.thumb || "";
     if (thumb) showImage(thumb);
     else showPlaceholder();
+    applyTransitionPreview(hit);
     updateCutEnabled();
   }
 
@@ -666,7 +871,8 @@
       const hit = resolveAt(state.projectTimeS);
       if (hit) {
         state.activeStudioId = hit.clip.dataset.studioId || null;
-        clips().forEach((c) => c.classList.toggle("is-active", c === hit.clip));
+        clips().forEach((c) => c.classList.toggle("is-active", c === hit.clip || c === hit.overlapClip));
+        applyTransitionPreview(hit);
       }
       updateCutEnabled();
     }
@@ -733,6 +939,7 @@
       syncMusicAudio();
       return;
     }
+    applyTransitionPreview(after);
     syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
   }
@@ -789,40 +996,57 @@
   function onVideoTimeUpdate() {
     if (!state.playing || suppressVideoClock || !previewVideo) return;
     if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
-    const hit = resolveAt(state.projectTimeS);
-    if (!hit || hit.clip.dataset.kind !== "video") return;
-    if (String(hit.clip.dataset.studioId) !== String(state.activeStudioId)) return;
-    const inS = sourceInS(hit.clip);
-    const outS = sourceOutS(hit.clip);
-    const mediaTime = previewVideo.currentTime || 0;
-    const local = Math.max(0, mediaTime - inS);
-    const next = hit.start + local;
-    if (Math.abs(next - state.projectTimeS) < 0.01) {
-      updatePlayheadChrome();
-    } else {
-      state.projectTimeS = next;
-      updatePlayheadChrome();
-    }
-    updateCutEnabled();
-    syncMusicAudio();
-    // Clip boundary at source out (trimmed) or near local duration.
-    if (outS != null && mediaTime >= outS - 0.05) {
-      advanceToNextOrStop(hit);
+    const playing = clips().find(
+      (c) => String(c.dataset.studioId) === String(state.activeStudioId)
+    );
+    if (!playing || playing.dataset.kind !== "video") {
+      applyTransitionPreview(resolveAt(state.projectTimeS));
       return;
     }
-    if (hit.duration > 0 && local >= hit.duration - 0.05) {
-      advanceToNextOrStop(hit);
+    const inS = sourceInS(playing);
+    const outS = sourceOutS(playing);
+    const mediaTime = previewVideo.currentTime || 0;
+    const local = Math.max(0, mediaTime - inS);
+    const next = clipStartTime(playing) + local;
+    if (Math.abs(next - state.projectTimeS) >= 0.01) {
+      state.projectTimeS = next;
+    }
+    updatePlayheadChrome();
+    const after = resolveAt(state.projectTimeS);
+    applyTransitionPreview(after);
+    updateCutEnabled();
+    syncMusicAudio();
+    if (!after) {
+      pausePlayback();
+      return;
+    }
+    if (after.clip !== playing) {
+      syncPreviewMedia({ seek: true });
+      beginClockForActiveClip();
+      return;
+    }
+    if (outS != null && mediaTime >= outS - 0.05) {
+      advanceToNextOrStop(after);
+      return;
+    }
+    if (clipDuration(playing) > 0 && local >= clipDuration(playing) - 0.05) {
+      advanceToNextOrStop(after);
     }
   }
 
   function onVideoEnded() {
-    // Clearing/reloading the <video> when switching to a photo can fire "ended".
-    // Never advance Story time unless we are actually playing a video clip.
     if (!state.playing || suppressVideoClock || !previewVideo) return;
     if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
     const hit = resolveAt(state.projectTimeS);
-    if (!hit || hit.clip.dataset.kind !== "video") return;
-    if (String(hit.clip.dataset.studioId) !== String(state.activeStudioId)) return;
+    if (!hit) {
+      pausePlayback();
+      return;
+    }
+    if (hit.clip.dataset.kind !== "video") {
+      syncPreviewMedia({ seek: true });
+      beginClockForActiveClip();
+      return;
+    }
     advanceToNextOrStop(hit);
   }
 
@@ -832,10 +1056,7 @@
       if (!raw) return;
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
-        // Title is persisted in SQLite (studio_projects); do not restore from session.
-        if (data.transitions && typeof data.transitions === "object") {
-          state.transitions = data.transitions;
-        }
+        // Title and transitions are persisted in SQLite; do not restore from session.
         if (typeof data.volume === "number") {
           state.volume = Math.max(0, Math.min(1, data.volume));
           if (volumeInput) volumeInput.value = String(Math.round(state.volume * 100));
@@ -851,7 +1072,6 @@
       sessionStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          transitions: state.transitions,
           volume: state.volume,
         })
       );
@@ -1038,7 +1258,8 @@
   function applyTransitionsToDom() {
     grid.querySelectorAll(".studio-transition").forEach((el) => {
       const afterId = el.dataset.transitionAfter;
-      const type = state.transitions[afterId] || "none";
+      const prev = clips().find((c) => String(c.dataset.studioId) === String(afterId));
+      const type = (prev && prev.dataset.appliedType) || el.dataset.appliedType || "cut";
       el.dataset.transitionType = type;
       const label = el.querySelector("[data-transition-label]");
       if (label) label.textContent = transitionLabels[type] || type;
@@ -1055,15 +1276,20 @@
       li.className = "studio-transition";
       li.dataset.transitionAfter = prev.dataset.studioId || "";
       li.dataset.transitionBefore = next.dataset.studioId || "";
-      li.dataset.transitionType = state.transitions[prev.dataset.studioId] || "none";
+      const type = prev.dataset.appliedType || prev.dataset.transitionType || "cut";
+      li.dataset.transitionType = type;
+      li.dataset.storedType = prev.dataset.transitionType || "cut";
+      li.dataset.storedDuration = prev.dataset.transitionDuration || "";
+      li.dataset.appliedType = type;
+      li.dataset.appliedDuration = prev.dataset.appliedDuration || "0";
+      li.dataset.fallbackCut = prev.dataset.fallbackCut || "0";
       li.tabIndex = 0;
       li.setAttribute("role", "button");
       li.setAttribute("aria-label", "Transition");
       const chip = document.createElement("span");
       chip.className = "studio-transition-chip";
       chip.dataset.transitionLabel = "";
-      chip.textContent =
-        transitionLabels[li.dataset.transitionType] || li.dataset.transitionType;
+      chip.textContent = transitionLabels[type] || type;
       li.appendChild(chip);
       grid.insertBefore(li, next);
     }
@@ -1093,6 +1319,15 @@
     );
   }
 
+  function setClipRemoveAction(form, studioId) {
+    if (!form || studioId == null || studioId === "") return;
+    const url = `/studio/${studioId}/remove`;
+    form.setAttribute("action", url);
+    form.querySelectorAll('button[type="submit"]').forEach((btn) => {
+      btn.setAttribute("formaction", url);
+    });
+  }
+
   function fillTitlecardInspector(clip) {
     const titleEl = document.getElementById("inspector-titlecard-title");
     const subEl = document.getElementById("inspector-titlecard-subtitle");
@@ -1105,7 +1340,7 @@
     document.querySelectorAll('input[name="inspector-titlecard-bg"]').forEach((el) => {
       el.checked = el.value === bg;
     });
-    if (removeForm) removeForm.action = `/studio/${clip.dataset.studioId}/remove`;
+    setClipRemoveAction(removeForm, clip.dataset.studioId);
   }
 
   function selectClip(id, { movePlayhead = true } = {}) {
@@ -1158,7 +1393,7 @@
           : Number(clip.dataset.photoDuration);
       photoInput.value = Number(shown).toFixed(1);
     }
-    if (removeForm) removeForm.action = `/studio/${clip.dataset.studioId}/remove`;
+    setClipRemoveAction(removeForm, clip.dataset.studioId);
 
     if (movePlayhead) {
       const wasPlaying = state.playing;
@@ -1234,7 +1469,29 @@
     document.getElementById("studio-music-track")?.classList.remove("is-selected");
     showInspector("inspector-transition");
     const select = document.getElementById("inspector-transition-type");
-    if (select) select.value = el.dataset.transitionType || "none";
+    const stored = el.dataset.storedType || el.dataset.transitionType || "cut";
+    if (select) select.value = stored === "cut" || stored === "fade_black" || stored === "crossfade" ? stored : "cut";
+    const durWrap = document.getElementById("inspector-transition-duration-wrap");
+    const durInput = document.getElementById("inspector-transition-duration");
+    const isCut = (select ? select.value : stored) === "cut";
+    if (durWrap) durWrap.hidden = isCut;
+    if (durInput) {
+      const raw = el.dataset.storedDuration;
+      durInput.value = raw ? Number(raw).toFixed(1) : "0.5";
+    }
+    const hint = document.getElementById("inspector-transition-hint");
+    if (hint) {
+      if (el.dataset.fallbackCut === "1") {
+        hint.hidden = false;
+        hint.textContent = msgTransitionFallback;
+      } else if (el.dataset.clamped === "1") {
+        hint.hidden = false;
+        hint.textContent = msgTransitionClamped;
+      } else {
+        hint.hidden = true;
+        hint.textContent = "";
+      }
+    }
     updateCutEnabled();
   }
 
@@ -2096,11 +2353,74 @@
   document.getElementById("inspector-transition-type")?.addEventListener("change", (event) => {
     const value = event.target.value;
     if (state.selected.type !== "transition" || !state.selected.id) return;
-    state.transitions[state.selected.id] = value;
-    persistUiState();
-    setSaveState(false);
-    applyTransitionsToDom();
+    const durWrap = document.getElementById("inspector-transition-duration-wrap");
+    if (durWrap) durWrap.hidden = value === "cut";
+    persistTransition();
   });
+  document.getElementById("inspector-transition-duration")?.addEventListener("change", () => {
+    persistTransition();
+  });
+
+  async function persistTransition() {
+    if (state.selected.type !== "transition" || !state.selected.id) return;
+    const select = document.getElementById("inspector-transition-type");
+    const durInput = document.getElementById("inspector-transition-duration");
+    const payload = {
+      type: select ? select.value : "cut",
+      duration_s: durInput ? Number(durInput.value) : 0.5,
+    };
+    try {
+      const res = await fetch(`/api/studio/${state.selected.id}/transition`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await readJson(res);
+      if (!res.ok) throw new Error((body && body.detail) || msgTransitionFailed);
+      const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
+      if (clip) {
+        clip.dataset.transitionType = body.type || payload.type;
+        clip.dataset.transitionDuration =
+          body.duration_s == null ? "" : String(body.duration_s);
+        clip.dataset.appliedType = body.applied_type || "cut";
+        clip.dataset.appliedDuration = String(body.applied_duration_s || 0);
+        clip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
+        const flex =
+          clipDuration(clip) -
+          ((body.applied_type === "crossfade" ? Number(body.applied_duration_s) : 0) || 0);
+        clip.style.setProperty("--clip-flex", String(Math.max(0, flex).toFixed(4)));
+      }
+      const chip = grid.querySelector(
+        `.studio-transition[data-transition-after="${state.selected.id}"]`
+      );
+      if (chip) {
+        chip.dataset.storedType = body.type || payload.type;
+        chip.dataset.storedDuration =
+          body.duration_s == null ? "" : String(body.duration_s);
+        chip.dataset.appliedType = body.applied_type || "cut";
+        chip.dataset.appliedDuration = String(body.applied_duration_s || 0);
+        chip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
+        chip.dataset.clamped = body.clamped ? "1" : "0";
+        chip.dataset.transitionType = body.applied_type || "cut";
+        const label = chip.querySelector("[data-transition-label]");
+        if (label) {
+          label.textContent =
+            transitionLabels[chip.dataset.transitionType] || chip.dataset.transitionType;
+        }
+        selectTransition(chip);
+      }
+      if (body.summary && body.summary.estimated_total_s != null) {
+        root.dataset.totalS = String(body.summary.estimated_total_s);
+        root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
+      }
+      buildRuler();
+      updatePlayheadChrome();
+      syncPreviewMedia();
+      setSaveState(true);
+    } catch (err) {
+      showRootFlash(err.message || msgTransitionFailed);
+    }
+  }
 
   ["inspector-music-volume", "inspector-music-fade-in", "inspector-music-fade-out"].forEach(
     (id) => {

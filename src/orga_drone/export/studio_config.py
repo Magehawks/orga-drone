@@ -20,6 +20,10 @@ class StudioExportClip:
     background: str = "dark"
     locale: str = "en"
     label: str = ""
+    transition_type: str = "cut"
+    transition_s: float = 0.0
+    fade_in_s: float = 0.0
+    fade_out_s: float = 0.0
 
 
 @dataclass(frozen=True)

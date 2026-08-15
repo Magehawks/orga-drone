@@ -30,6 +30,11 @@ from orga_drone.studio_estimate import (
     summarize_studio_items,
 )
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
+from orga_drone.studio_transition import (
+    apply_for_items,
+    clip_flex_s,
+    normalize_type,
+)
 from orga_drone.export import build_spot_geojson, spot_download_filename
 from orga_drone.ffmpeg_bin import ffmpeg_available
 from orga_drone.flight_view import (
@@ -861,7 +866,12 @@ def create_app() -> FastAPI:
         lang = lang_from_request(request)
         item_display: list[dict[str, Any]] = []
         favorite_media: list[Any] = []
+        applied_by_id: dict[int, Any] = {}
         if project is not None:
+            _durs, applied_list, source_indexes = apply_for_items(items)
+            for seq_i, item_idx in enumerate(source_indexes):
+                if seq_i < len(applied_list):
+                    applied_by_id[items[item_idx].id] = applied_list[seq_i]
             for it in items:
                 seconds = effective_seconds(
                     kind=it.kind or "unknown",
@@ -931,6 +941,12 @@ def create_app() -> FastAPI:
                         "can_play": can_play,
                         "display_title": display_title,
                         "display_subtitle": display_subtitle,
+                        "stored_transition": normalize_type(it.transition),
+                        "stored_transition_duration_s": it.transition_duration_s,
+                        "applied_transition": applied_by_id.get(it.id),
+                        "clip_flex_s": clip_flex_s(
+                            seconds or 0.0, applied_by_id.get(it.id)
+                        ),
                     }
                 )
             studio_paths = {it.media_path for it in items if it.media_path}
@@ -1311,6 +1327,63 @@ def create_app() -> FastAPI:
                 "id": item.id,
                 "photo_duration_s": item.photo_duration_s,
                 "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/transition")
+    async def api_studio_transition(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "type" not in payload:
+            raise HTTPException(status_code=400, detail="JSON body must include type")
+        raw_type = payload.get("type")
+        if raw_type is not None and not isinstance(raw_type, str):
+            raise HTTPException(status_code=400, detail="type must be a string")
+        raw_dur = payload.get("duration_s", None)
+        if "duration_s" in payload and raw_dur is not None and not isinstance(
+            raw_dur, (int, float)
+        ):
+            raise HTTPException(
+                status_code=400, detail="duration_s must be a number or null"
+            )
+        duration_s: float | None
+        if "duration_s" not in payload:
+            duration_s = None
+        else:
+            duration_s = None if raw_dur is None else float(raw_dur)
+        try:
+            item = db.set_studio_transition(
+                studio_item_id, raw_type, duration_s
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(item.project_id)
+        summary = summarize_studio_items(items)
+        _durs, applied_list, source_indexes = apply_for_items(items)
+        applied = None
+        for seq_i, item_idx in enumerate(source_indexes):
+            if items[item_idx].id == item.id and seq_i < len(applied_list):
+                applied = applied_list[seq_i]
+                break
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "type": normalize_type(item.transition),
+                "duration_s": item.transition_duration_s,
+                "applied_type": applied.type if applied is not None else "cut",
+                "applied_duration_s": applied.duration_s if applied is not None else 0.0,
+                "fallback_cut": bool(applied.fallback_cut) if applied is not None else False,
+                "clamped": bool(applied.clamped) if applied is not None else False,
                 "summary": summary.as_dict(),
             }
         )

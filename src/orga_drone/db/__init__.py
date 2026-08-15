@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS studio_clips (
     playback_speed REAL NOT NULL DEFAULT 1.0,
     volume REAL NOT NULL DEFAULT 1.0,
     transition TEXT,
+    transition_duration_s REAL,
     effect_settings TEXT NOT NULL DEFAULT '{}',
     title_text TEXT,
     subtitle_text TEXT,
@@ -361,6 +362,7 @@ class StudioClip:
     playback_speed: float = 1.0
     volume: float = 1.0
     transition: str | None = None
+    transition_duration_s: float | None = None
     effect_settings: str = "{}"
     item_kind: str = "media"
     title_text: str | None = None
@@ -534,6 +536,7 @@ class Database:
             Database._migrate_studio_items_drop_unique_media_path(conn)
         Database._migrate_studio_projects_and_clips(conn)
         Database._migrate_studio_clips_title_cards(conn)
+        Database._migrate_studio_clips_transition_duration(conn)
         Database._migrate_studio_audio_clips(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
@@ -815,6 +818,22 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind ON studio_clips(project_id, item_kind);
             """
         )
+
+    @staticmethod
+    def _migrate_studio_clips_transition_duration(conn: sqlite3.Connection) -> None:
+        """Outgoing transition duration (Issue #27). Type stays in ``transition``."""
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_clips'"
+        ).fetchone()
+        if not exists:
+            return
+        cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+        }
+        if "transition_duration_s" not in cols:
+            conn.execute(
+                "ALTER TABLE studio_clips ADD COLUMN transition_duration_s REAL"
+            )
 
     @staticmethod
     def _migrate_studio_audio_clips(conn: sqlite3.Connection) -> None:
@@ -2161,7 +2180,8 @@ class Database:
                           s.position, s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
                           s.kind_snapshot, s.photo_duration_s,
                           s.source_start, s.source_end,
-                          s.playback_speed, s.volume, s.transition, s.effect_settings,
+                          s.playback_speed, s.volume, s.transition, s.transition_duration_s,
+                          s.effect_settings,
                           s.title_text, s.subtitle_text, s.card_duration_s, s.background,
                           s.source_media_id AS stored_media_id,
                           m.id AS media_id, m.filename AS live_filename,
@@ -2267,6 +2287,11 @@ class Database:
                     transition=(
                         str(r["transition"]) if r["transition"] is not None else None
                     ),
+                    transition_duration_s=(
+                        float(r["transition_duration_s"])
+                        if r["transition_duration_s"] is not None
+                        else None
+                    ),
                     effect_settings=str(r["effect_settings"] or "{}"),
                     item_kind=item_kind,
                     title_text=title_text if is_title else None,
@@ -2366,6 +2391,57 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_transition(
+        self,
+        studio_item_id: int,
+        type_raw: str | None,
+        duration_s: float | None = None,
+    ) -> StudioClip:
+        """Persist outgoing transition type + remembered duration on one clip."""
+        from orga_drone.studio_transition import (
+            DEFAULT_DURATION_S,
+            TYPE_CUT,
+            clamp_user_duration,
+            normalize_type,
+        )
+
+        stored_type = normalize_type(type_raw)
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, project_id, transition_duration_s
+                   FROM studio_clips WHERE id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            current_dur = (
+                float(row["transition_duration_s"])
+                if row["transition_duration_s"] is not None
+                else None
+            )
+            if duration_s is not None:
+                new_dur: float | None = clamp_user_duration(float(duration_s))
+            elif stored_type == TYPE_CUT:
+                new_dur = current_dur
+            elif current_dur is not None:
+                new_dur = clamp_user_duration(current_dur)
+            else:
+                new_dur = DEFAULT_DURATION_S
+            conn.execute(
+                """UPDATE studio_clips
+                   SET transition = ?, transition_duration_s = ?
+                   WHERE id = ?""",
+                (stored_type, new_dur, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def cut_studio_video_item(
         self,
         studio_item_id: int,
@@ -2386,7 +2462,7 @@ class Database:
                           s.kind_snapshot, s.photo_duration_s,
                           s.source_start, s.source_end, s.added_at,
                           s.source_media_id, s.playback_speed, s.volume,
-                          s.transition, s.effect_settings,
+                          s.transition, s.transition_duration_s, s.effect_settings,
                           m.id AS media_id, m.kind AS live_kind,
                           m.duration_s AS live_duration_s
                    FROM studio_clips s
@@ -2444,7 +2520,7 @@ class Database:
             )
             conn.execute(
                 """UPDATE studio_clips
-                   SET source_start = ?, source_end = ?
+                   SET source_start = ?, source_end = ?, transition = 'cut'
                    WHERE id = ?""",
                 (left.source_in_s, left.source_out_s, studio_item_id),
             )
@@ -2463,8 +2539,9 @@ class Database:
                      project_id, media_path, identity_key, source_media_id, position,
                      filename_snapshot, recorded_at_snapshot, kind_snapshot,
                      photo_duration_s, source_start, source_end,
-                     playback_speed, volume, transition, effect_settings, added_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)""",
+                     playback_speed, volume, transition, transition_duration_s,
+                     effect_settings, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     project_id,
                     str(row["media_path"]),
@@ -2479,6 +2556,11 @@ class Database:
                     float(row["playback_speed"] or 1.0),
                     float(row["volume"] if row["volume"] is not None else 1.0),
                     row["transition"],
+                    (
+                        float(row["transition_duration_s"])
+                        if row["transition_duration_s"] is not None
+                        else None
+                    ),
                     str(row["effect_settings"] or "{}"),
                     now,
                 ),
