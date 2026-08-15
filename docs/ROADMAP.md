@@ -78,9 +78,12 @@ open/reveal of the finished file already exist on Windows desktop.
 1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
 2. **Product-Spec-Reviewer** checks the spec against code and vision docs
    (`docs/PRODUCT_VISION.md` journey filter).
-3. After approval, **Engineering-Planner** produces a technical plan
+3. When the slice has meaningful UI/interaction work, **Product-UX-Designer**
+   audits the current interaction model and proposes alternatives. PM then
+   selects a concept. UX does not file implementation issues.
+4. After approval, **Engineering-Planner** produces a technical plan
    (prefer Cursor Plan Mode for research-first planning).
-4. The main Cursor agent **implements** against the approved plan.
-5. **Implementation-Reviewer** reviews diff, tests, risks, and docs before commit.
+5. The main Cursor agent **implements** against the approved plan.
+6. **Implementation-Reviewer** reviews diff, tests, risks, and docs before commit.
 
 Canonical agent roles live under `.cursor/agents/`.

@@ -1,26 +1,29 @@
 ---
-description: When to delegate to Product-Spec-Reviewer, Engineering-Planner, or Implementation-Reviewer
+description: When to delegate to Product-Spec-Reviewer, Product-UX-Designer, Engineering-Planner, or Implementation-Reviewer
 alwaysApply: true
 ---
 
 # Agent roles
 
-Orga Drone uses three specialized project subagents under `.cursor/agents/`.
+Orga Drone uses four specialized project subagents under `.cursor/agents/`.
 The main agent remains the implementer.
 
 | Role | Subagent | Use when |
 |------|----------|----------|
 | Product-Spec-Reviewer | `product-spec-reviewer` | Review an existing product spec vs code/docs; no code changes |
-| Engineering-Planner | `engineering-planner` | Approved spec → technical plan; research first (Plan Mode) |
+| Product-UX-Designer | `product-ux-designer` | Meaningful UI/interaction work after PM; usability discovery; no code; no implementation issues |
+| Engineering-Planner | `engineering-planner` | Approved spec (and PM-selected UX concept when UI) → technical plan; research first (Plan Mode) |
 | Implementation-Reviewer | `implementation-reviewer` | Review diff/tests/docs/risks before commit |
 
 Workflow:
 
 1. Spec written (human / product)
 2. Product-Spec-Reviewer → approve / revise
-3. Engineering-Planner → plan
-4. Main agent → implement
-5. Implementation-Reviewer → pre-commit review
-6. Commit only when the user explicitly asks
+3. Product-UX-Designer → discovery/audit when UI/interaction is meaningful (skip otherwise)
+4. PM selects the product direction (same issue)
+5. Engineering-Planner → plan
+6. Main agent → implement
+7. Implementation-Reviewer → pre-commit review
+8. Commit only when the user explicitly asks
 
-Delegate to these subagents when the user names the role or the task clearly matches. Do not skip Product-Spec-Reviewer for large product claims unless the user waives it.
+Delegate to these subagents when the user names the role or the task clearly matches. Do not skip Product-Spec-Reviewer for large product claims unless the user waives it. Do not skip Product-UX-Designer for meaningful UI/interaction work unless the user waives it or the change is a simple bug fix, backend-only, CI/tooling, or a migration without user-facing impact.

@@ -15,7 +15,8 @@ but they must not implement speculative platform scope unless the current issue 
 | Role | Cursor role | Responsibility | May change application code? |
 |---|---|---|---|
 | Product Owner | Human | Idea, product judgment, real-world test, merge decision | Yes, manually |
-| PM | `product-spec-reviewer` | User problem, target user, milestone fit, simplest slice, acceptance criteria, non-scope | No |
+| PM | `product-spec-reviewer` | User problem, target user, milestone fit, simplest slice, acceptance criteria, non-scope; selects UX concept when UI work applied | No |
+| UX | `product-ux-designer` | Usability / interaction discovery when UI work is meaningful; alternatives and trade-offs; no implementation issues | No |
 | CTO | `engineering-planner` | Architecture, compatibility, performance, security, test strategy, technical AC | No |
 | Developer | Main Cursor agent | Implement only the approved issue and run required checks | Yes |
 | Reviewer | `implementation-reviewer` | Independent adversarial review of the completed branch/PR | No |
@@ -26,6 +27,10 @@ but they must not implement speculative platform scope unless the current issue 
 idea
   ↓
 pm-review
+  ↓
+ux-review          (only when meaningful UI / interaction work)
+  ↓
+PM selects concept (same issue; UX does not file implementation issues)
   ↓
 cto-review
   ↓
@@ -44,6 +49,9 @@ human-test
 merge / done
 ```
 
+Skip `ux-review` for simple bug fixes, backend-only changes, CI/tooling, and
+migrations without user-facing impact unless the human explicitly requests UX.
+
 A maximum of three developer ↔ reviewer correction loops is recommended. After that,
 a human should decide whether the issue/spec or architecture needs to change.
 
@@ -53,6 +61,7 @@ Recommended labels:
 
 - `status:idea`
 - `status:pm-review`
+- `status:ux-review`
 - `status:cto-review`
 - `status:ready-for-dev`
 - `status:in-development`
@@ -71,6 +80,10 @@ Exactly one `status:*` label should describe the current workflow state.
 ## Issue contract
 
 An issue is `ready-for-dev` only when PM and CTO gates are complete.
+When the slice has meaningful UI or interaction work, UX discovery must also be
+complete and PM must have selected a concept. UX output is advisory: it does
+**not** create implementation issues by itself.
+
 The issue must contain or link to:
 
 - concrete user problem
@@ -79,11 +92,28 @@ The issue must contain or link to:
 - proposed behavior
 - acceptance criteria
 - explicit non-scope
+- UX discovery (concepts, recommendation, non-scope) when UI/interaction applies
+- PM-selected concept when UX ran
 - relevant technical constraints
 - automated and manual test expectations
 
 The developer must not infer missing product decisions by silently expanding scope.
 If a missing decision materially changes behavior, return the issue to the appropriate gate.
+Do not implement unselected UX alternatives.
+
+## UX contract
+
+`product-ux-designer` is discovery, not an implementation gate.
+
+- It evaluates the **existing** interaction model before proposing redesigns.
+- It prefers progressive improvements over wholesale redesigns.
+- It separates usability problems from visual preference.
+- It must not claim roadmap/vision features already exist.
+- It must not create implementation issues or mark work `ready-for-dev`.
+- After `UX_RECOMMENDED`, PM selects a concept on the **same** issue, then CTO reviews feasibility.
+
+UX is **not** required for simple bug fixes, backend-only changes, CI/tooling, or
+migrations without user-facing impact.
 
 ## Developer contract
 
