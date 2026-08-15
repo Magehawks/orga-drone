@@ -32,6 +32,8 @@ Override: `ORGA_DRONE_DATA_DIR`.
 | `{data_dir}/orga-drone.sqlite3` | Library index |
 | `{data_dir}/thumbs/` | Generated thumbnails/previews |
 | `{data_dir}/theme.json` | Theme preference |
+| `{data_dir}/logs/studio-export.log` | Short Studio export job lines |
+| `{data_dir}/logs/studio-export-ffmpeg.log` | Full ffmpeg command + stderr on export failure |
 
 Media files stay on disk under user-chosen library roots.
 

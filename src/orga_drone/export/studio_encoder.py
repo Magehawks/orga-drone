@@ -97,6 +97,22 @@ def _export_story_length_s(clips: tuple[StudioExportClip, ...]) -> float:
     return story_length_s(durations, applied)
 
 
+def _norm_video_pad(src: str, alias: str) -> str:
+    """Force a shared CFR timebase so chained xfade/concat graphs can configure.
+
+    xfade of a previous xfade/concat pad uses 1/1000000 while segment files use
+    the MP4 tbn (e.g. 1/15360). FFmpeg then fails with encoder-EOF symptoms.
+    """
+    return f"[{src}]fps={EXPORT_FPS},format=yuv420p,settb=1/{EXPORT_FPS}[{alias}]"
+
+
+def _norm_audio_pad(src: str, alias: str) -> str:
+    return (
+        f"[{src}]aformat=sample_rates=48000:channel_layouts=stereo,"
+        f"aresample=async=1:first_pts=0[{alias}]"
+    )
+
+
 def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
     """Build concat/xfade filter_complex steps. Audio is hard-cut, never acrossfade."""
     if len(clips) < 2:
@@ -110,34 +126,42 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
         next_v = f"{nxt}:v"
         next_a = f"{nxt}:a"
         next_dur = float(clips[nxt].duration_s)
+        left_v = f"vl{index}"
+        right_v = f"vr{index}"
+        left_a = f"al{index}"
+        right_a = f"ar{index}"
         v_out = f"xv{index}"
         a_out = f"xa{index}"
+        filters.append(_norm_video_pad(current_v, left_v))
+        filters.append(_norm_video_pad(next_v, right_v))
+        filters.append(_norm_audio_pad(current_a, left_a))
+        filters.append(_norm_audio_pad(next_a, right_a))
         outgoing = clips[index]
         if outgoing.transition_type == "crossfade" and outgoing.transition_s > 0:
             overlap = float(outgoing.transition_s)
             offset = max(0.0, current_dur - overlap)
             filters.append(
-                f"[{current_v}][{next_v}]xfade=transition=fade:"
+                f"[{left_v}][{right_v}]xfade=transition=fade:"
                 f"duration={overlap:.4f}:offset={offset:.4f}[{v_out}]"
             )
             a_keep = max(0.0, current_dur - overlap / 2.0)
             b_start = overlap / 2.0
             filters.append(
-                f"[{current_a}]atrim=0:{a_keep:.4f},asetpts=PTS-STARTPTS[al{index}]"
+                f"[{left_a}]atrim=0:{a_keep:.4f},asetpts=PTS-STARTPTS[at{index}l]"
             )
             filters.append(
-                f"[{next_a}]atrim={b_start:.4f},asetpts=PTS-STARTPTS[ar{index}]"
+                f"[{right_a}]atrim={b_start:.4f},asetpts=PTS-STARTPTS[at{index}r]"
             )
             filters.append(
-                f"[al{index}][ar{index}]concat=n=2:v=0:a=1[{a_out}]"
+                f"[at{index}l][at{index}r]concat=n=2:v=0:a=1[{a_out}]"
             )
             current_dur = current_dur + next_dur - overlap
         else:
             filters.append(
-                f"[{current_v}][{next_v}]concat=n=2:v=1:a=0[{v_out}]"
+                f"[{left_v}][{right_v}]concat=n=2:v=1:a=0[{v_out}]"
             )
             filters.append(
-                f"[{current_a}][{next_a}]concat=n=2:v=0:a=1[{a_out}]"
+                f"[{left_a}][{right_a}]concat=n=2:v=0:a=1[{a_out}]"
             )
             current_dur += next_dur
         current_v = v_out
@@ -730,8 +754,9 @@ class FfmpegStudioEncoder:
         try:
             _run_ffmpeg(cmd)
         except StudioExportError as exc:
-            msg = str(exc).lower()
-            if "xfade" in msg or "no such filter" in msg:
+            # Only remap a missing xfade filter — not timebase / configure errors
+            # whose messages also mention "xfade".
+            if "no such filter" in str(exc).lower():
                 raise StudioExportError(
                     "This ffmpeg build cannot render Crossfade.",
                     code="xfade_unavailable",
@@ -829,17 +854,43 @@ def os_access_writable(directory: Path) -> bool:
 
 
 _FFMPEG_ERR_HINT = re.compile(
-    r"(error|option\b.+\bnot|invalid|failed|could not|no such|unknown|not found)",
+    r"(error|option\b.+\bnot|invalid|failed|could not|no such|unknown|not found|timebase)",
     re.IGNORECASE,
 )
 
 
 def _ffmpeg_error_message(stderr: str) -> str:
     lines = [ln.strip() for ln in stderr.splitlines() if ln.strip()]
+    for line in lines:
+        lower = line.lower()
+        if "timebase" in lower or "failed to configure" in lower:
+            return line[-400:]
     interesting = [ln for ln in lines if _FFMPEG_ERR_HINT.search(ln)]
     chosen = interesting[-4:] if interesting else lines[-2:]
     text = " ".join(chosen).strip() if chosen else "unknown ffmpeg error"
     return text[-400:]
+
+
+def _persist_ffmpeg_failure(cmd: list[str], stderr: str) -> None:
+    """Keep the full ffmpeg command + stderr for review (not just the last line)."""
+    try:
+        from datetime import datetime, timezone
+
+        from orga_drone.config import settings
+
+        log_dir = settings.data_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        path = log_dir / "studio-export-ffmpeg.log"
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        command = subprocess.list2cmdline([str(part) for part in cmd])
+        body = (
+            f"{stamp}\nCMD {command}\n--- stderr ---\n{stderr.rstrip()}\n"
+            f"{'=' * 72}\n"
+        )
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(body)
+    except OSError:
+        return
 
 
 def _run_ffmpeg(
@@ -862,6 +913,7 @@ def _run_ffmpeg(
             raise StudioExportError(f"Export failed: {exc}") from exc
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
+            _persist_ffmpeg_failure(cmd, err)
             raise StudioExportError(f"Export failed: {_ffmpeg_error_message(err)}")
         return
 
@@ -918,6 +970,7 @@ def _run_ffmpeg(
         except OSError:
             stderr = ""
         if returncode != 0:
+            _persist_ffmpeg_failure(progress_cmd, stderr)
             raise StudioExportError(f"Export failed: {_ffmpeg_error_message(stderr)}")
         if last_emit < 0 and duration_s is not None:
             on_time(duration_s)

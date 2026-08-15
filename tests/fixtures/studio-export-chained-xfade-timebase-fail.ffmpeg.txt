@@ -1,0 +1,50 @@
+Captured failing Studio stitch command (Issue #27 human test / synthetic 4-clip
+reproduction, 2026-08-15). Segment encodes succeeded. Music mix never ran: the
+stitch step failed first.
+
+aost#0:1 is the AAC encoder for mapped filter pad [xa2] (stitched source
+audio), not the optional music bed. Music would be a later -map [a] mix on
+concat output 0:a.
+
+Human-test topology (same filter shape): photo Crossfade 1.2s → photo Cut →
+Title Card Crossfade 0.5s → video. Synthetic repro used four 3.0s 1080p clips.
+
+--- stitch command ---
+
+ffmpeg -y
+  -i seg_0000.mp4 -i seg_0001.mp4 -i seg_0002.mp4 -i seg_0003.mp4
+  -filter_complex [0:v][1:v]xfade=transition=fade:duration=1.2000:offset=1.8000[xv0];[0:a]atrim=0:2.4000,asetpts=PTS-STARTPTS[al0];[1:a]atrim=0.6000,asetpts=PTS-STARTPTS[ar0];[al0][ar0]concat=n=2:v=0:a=1[xa0];[xv0][2:v]concat=n=2:v=1:a=0[xv1];[xa0][2:a]concat=n=2:v=0:a=1[xa1];[xv1][3:v]xfade=transition=fade:duration=0.5000:offset=7.3000[xv2];[xa1]atrim=0:7.5500,asetpts=PTS-STARTPTS[al2];[3:a]atrim=0.2500,asetpts=PTS-STARTPTS[ar2];[al2][ar2]concat=n=2:v=0:a=1[xa2]
+  -map [xv2] -map [xa2]
+  -c:v libx264 -preset veryfast -pix_fmt yuv420p
+  -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv
+  -c:a aac -ac 2 -ar 48000 -movflags +faststart
+  export_tmp.mp4
+
+--- stream mapping (from stderr) ---
+
+Stream mapping:
+  Stream #0:0 (h264) -> xfade
+  Stream #0:1 (aac) -> atrim:default
+  Stream #1:0 (h264) -> xfade
+  Stream #1:1 (aac) -> atrim:default
+  Stream #2:0 (h264) -> concat
+  Stream #2:1 (aac) -> concat
+  Stream #3:0 (h264) -> xfade
+  Stream #3:1 (aac) -> atrim:default
+  xfade:default -> Stream #0:0 (libx264)
+  concat:out:a0 -> Stream #0:1 (aac)
+
+--- failing filter ---
+
+[xv1][3:v]xfade=transition=fade:duration=0.5000:offset=7.3000[xv2]
+Parsed_xfade_8: First input link main timebase (1/1000000) do not match
+the corresponding second input link xfade timebase (1/15360)
+Failed to configure output pad on Parsed_xfade_8
+Error reinitializing filters!
+Task finished with error code: -22 (Invalid argument)
+[vost#0:0/libx264] Could not open encoder before EOF
+[aost#0:1/aac] Could not open encoder before EOF
+Conversion failed!
+
+The UI truncated to the last AAC encoder-EOF lines; the timebase mismatch is
+the root cause.

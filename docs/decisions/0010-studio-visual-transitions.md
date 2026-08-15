@@ -27,7 +27,9 @@ timing: one is sequential, the other overlaps and shortens the Story.
 4. Export bakes fade-through-black with ffmpeg `fade=` on segments then concat.
    Crossfade uses `xfade=transition=fade` only. Source audio hard-cuts (midpoint
    of a crossfade overlap; clip edge otherwise). Music is not faded by this
-   feature.
+   feature. Before each xfade/concat, video pads are normalized with
+   `fps` + `settb=1/30` so a chained xfade after concat does not hit FFmpeg 7's
+   mismatched timebase (`1/1000000` vs MP4 `tbn`) and encoder-EOF failure.
 5. Preview uses stacked layers / CSS opacity and a black overlay. It is close
    enough to judge type and duration, not pixel-identical to export.
 

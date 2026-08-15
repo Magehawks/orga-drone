@@ -360,3 +360,37 @@ def test_stitch_filters_use_xfade_fade_and_audio_hardcut() -> None:
     assert "acrossfade" not in joined
     assert "atrim=0:2.7500" in joined
     assert "atrim=0.2500" in joined
+    assert "settb=1/30" in joined
+
+
+def test_stitch_filters_normalize_timebase_before_second_xfade() -> None:
+    """Chained xfade after concat must reset timebase (FFmpeg 7 encoder-EOF)."""
+    from orga_drone.export.studio_config import StudioExportClip
+    from orga_drone.export.studio_encoder import build_stitch_filters
+
+    clips = (
+        StudioExportClip(
+            source_path=None,
+            kind="video",
+            duration_s=3.0,
+            transition_type=TYPE_CROSSFADE,
+            transition_s=1.2,
+        ),
+        StudioExportClip(source_path=None, kind="video", duration_s=3.0),
+        StudioExportClip(
+            source_path=None,
+            kind="video",
+            duration_s=3.0,
+            transition_type=TYPE_CROSSFADE,
+            transition_s=0.5,
+        ),
+        StudioExportClip(source_path=None, kind="video", duration_s=3.0),
+    )
+    joined = ";".join(build_stitch_filters(clips))
+    assert joined.count("xfade=transition=fade") == 2
+    assert "offset=7.3000" in joined
+    assert joined.count("settb=1/30") >= 6
+    # Pre-fix graph fed the concat pad straight into the second xfade.
+    assert "[xv1][3:v]xfade" not in joined
+    assert "[xv1]fps=30,format=yuv420p,settb=1/30[vl2]" in joined
+    assert "[vl2][vr2]xfade=transition=fade:duration=0.5000:offset=7.3000[xv2]" in joined
