@@ -55,3 +55,6 @@ follow-up named in ADR 0004.
 - Negative / trade-offs: Users must pick or create a project before the first
   Add on a fresh database; transition stubs are not per-project yet.
 - Follow-up: Library albums stay Later; music persistence is ADR 0008.
+  Issue #39 only regrouped Studio chrome (Projects with the open-project title,
+  Clear Studio on the Story toolbar). The persistence and last-opened model
+  in this ADR did not change.

@@ -56,7 +56,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects; synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with read-only coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -80,8 +80,10 @@ The application helps users:
   (Cut, Fade through black, Crossfade) in preview and MP4; local MP4 export with configurable
   resolution on desktop; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
-  in preview and export, shown as read-only coverage spans on the Story time
-  canvas; loop still repeats a single song to Story end)
+  in preview and export, shown as time-proportional coverage spans on the Story time
+  canvas; loop still repeats a single song to Story end). The open project is
+  named in the Studio header; **Projects** opens the local project list;
+  **Clear Studio** lives on the Story toolbar and empties clips only.
 - keep ownership of data through local SQLite indexing (media files stay on disk)
 
 ## Limitations (honest)
@@ -98,8 +100,8 @@ The application helps users:
   (up to 8 local songs; loop for a one-song playlist), a
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector
   headings that distinguish selection from playhead-active clips, read-only
-  soundtrack coverage on that canvas, and basic rendered visual transitions
-  (not a professional effects editor or NLE).
+  time-proportional soundtrack coverage on that canvas, and basic rendered visual
+  transitions (not a professional effects editor or NLE).
 
 ## Product principles
 

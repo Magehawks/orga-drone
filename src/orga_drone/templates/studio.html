@@ -18,7 +18,12 @@
     {% for p in projects %}
     <li class="studio-project-row {% if current_id == p.id %}is-current{% endif %}">
       <div class="studio-project-row-main">
-        <strong>{{ p.title }}</strong>
+        <div class="studio-project-row-title">
+          <strong>{{ p.title }}</strong>
+          {% if current_id == p.id %}
+          <span class="studio-project-current-badge">{{ _('Current') }}</span>
+          {% endif %}
+        </div>
         <span class="meta-line">{{ p.clip_count }} {{ _('clips') }} · {{ p.updated_at.replace('T', ' ') }}</span>
       </div>
       <div class="studio-project-row-actions">
@@ -134,31 +139,23 @@
     <a class="button ghost studio-back" href="{{ browse_return_url or '/browse' }}">{{ _('Back to Browse') }}</a>
     {% if studio_mode == 'editor' and project %}
     <div class="studio-topbar-title">
-      <label class="visually-hidden" for="studio-project-title">{{ _('Project title') }}</label>
-      <input id="studio-project-title" class="studio-project-title" type="text"
-             value="{{ project.title|e }}" maxlength="120"
-             aria-label="{{ _('Project title') }}">
+      <div class="studio-project-identity">
+        <label class="studio-project-identity-label" for="studio-project-title">{{ _('Project') }}</label>
+        <input id="studio-project-title" class="studio-project-title" type="text"
+               value="{{ project.title|e }}" maxlength="120"
+               aria-label="{{ _('Project title') }}">
+      </div>
       <span class="studio-save-state" id="studio-save-state" data-state="saved"
             title="{{ _('Saved') }}">
         {{ lucide('save') }}
         <span class="studio-save-state-text">{{ _('Saved') }}</span>
       </span>
-    </div>
-    <div class="studio-topbar-actions">
       <button type="button" class="button ghost studio-icon-button" id="studio-projects-open"
               title="{{ _('Projects') }}" aria-label="{{ _('Projects') }}">
         <span class="studio-btn-label">{{ _('Projects') }}</span>
       </button>
-      {% if items %}
-      <form method="post" action="/studio/clear" class="studio-clear-form"
-            onsubmit="return confirm('{{ _('Remove all media from Studio? This does not delete your files.')|e }}');">
-        <button type="submit" class="button ghost studio-icon-button"
-                title="{{ _('Clear Studio') }}" aria-label="{{ _('Clear Studio') }}">
-          {{ lucide('trash-2') }}
-          <span class="studio-btn-label">{{ _('Clear Studio') }}</span>
-        </button>
-      </form>
-      {% endif %}
+    </div>
+    <div class="studio-topbar-actions">
       <button type="button" class="button studio-icon-button" id="studio-export-open"
               title="{{ _('Export') }}" aria-label="{{ _('Export') }}"
               {% if not items %}disabled{% endif %}>
@@ -382,6 +379,16 @@
             {{ lucide('plus') }}
             <span class="studio-btn-label">{{ _('Add soundtrack') }}</span>
           </button>
+          {% if items %}
+          <form method="post" action="/studio/clear" class="studio-clear-form"
+                onsubmit="return confirm('{{ _('Remove all clips from this Story? This does not delete the project or your files.')|e }}');">
+            <button type="submit" class="button ghost studio-icon-button"
+                    title="{{ _('Clear Studio') }}" aria-label="{{ _('Clear Studio') }}">
+              {{ lucide('trash-2') }}
+              <span class="studio-btn-label">{{ _('Clear Studio') }}</span>
+            </button>
+          </form>
+          {% endif %}
         </div>
         <div class="studio-timeline-row">
           <div class="studio-timeline-gutter" aria-hidden="true">
@@ -630,6 +637,7 @@
   </div>
   {% else %}
   <div class="studio-project-landing">
+    <p class="hint">{{ _('Switch, create, or manage Studio projects. Source media files stay unchanged.') }}</p>
     {{ studio_project_create_form('studio-new-title-landing') }}
     {% if projects %}
       {{ studio_project_list(projects, none) }}
@@ -672,7 +680,7 @@
 <dialog class="studio-export-dialog studio-projects-dialog" id="studio-projects-dialog">
   <div class="studio-export-form">
     <h2>{{ _('Projects') }}</h2>
-    <p class="hint">{{ _('Open another Studio project. Source media files stay unchanged.') }}</p>
+    <p class="hint">{{ _('Switch, create, or manage Studio projects. Source media files stay unchanged.') }}</p>
     {{ studio_project_create_form('studio-new-title-dialog') }}
     {% if projects %}
       {{ studio_project_list(projects, project.id if project else none) }}

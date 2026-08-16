@@ -29,13 +29,13 @@ Highlights:
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
-  source start/end; project browser/switcher for multiple local edit projects;
-  synced Story preview playback; local MP4 export with
+  source start/end; Projects switcher beside the open project title; Clear Studio
+  on the Story toolbar (clips only); synced Story preview playback; local MP4 export with
   configurable resolution; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; time-based
-  Story canvas with Fit to story / zoom; read-only soundtrack coverage on
+  Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
   that canvas)
 
 ## Next (possible near-term)

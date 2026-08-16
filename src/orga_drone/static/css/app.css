@@ -855,6 +855,21 @@ body.studio-app { padding-bottom: 0; }
   gap: 0.75rem;
   min-width: 0;
 }
+.studio-project-identity {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.studio-project-identity-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.4rem;
+}
 .studio-project-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -888,6 +903,26 @@ body.studio-app { padding-bottom: 0; }
   gap: 0.5rem;
 }
 .studio-clear-form { margin: 0; }
+.studio-timeline-toolbar .studio-clear-form {
+  margin-left: auto;
+}
+.studio-project-row-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.studio-project-current-badge {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
 .studio-flash-inline { margin: 0.5rem 1rem 0; }
 .studio-export-success {
   margin: 0.5rem 1rem 0;
@@ -1699,6 +1734,13 @@ video.studio-preview-media.studio-preview-layer-b {
   opacity: 0.55;
   outline: 2px dashed var(--accent);
   z-index: 3;
+}
+.studio-music-select.is-narrow {
+  overflow: visible;
+  z-index: 2;
+}
+.studio-music-select.is-narrow .studio-music-clip-body {
+  min-width: 12px;
 }
 .studio-music-clip-body {
   flex: 1;

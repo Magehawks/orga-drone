@@ -66,4 +66,4 @@ Story t=0, not a DAW. Existing one-song projects must keep working.
   ping-pong preview may leave a residual tens-of-ms gap at song boundaries.
 - Explicit non-scope: overlapping tracks, arbitrary start times, waveforms,
   trim/slip, audio crossfades, mixer/ducking, per-song loop, playlist-loop,
-  voice-over, Issue #39 Projects chrome.
+  voice-over.
