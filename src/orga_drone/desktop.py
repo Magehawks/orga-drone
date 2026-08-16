@@ -89,7 +89,7 @@ def prepare_pythonnet_runtime() -> Path | None:
     that will be loaded, or None if pythonnet is not installed.
     """
     try:
-        import pythonnet  # type: ignore[import-untyped]
+        import pythonnet  # type: ignore[import-untyped,import-not-found]
     except ImportError:
         return None
 
