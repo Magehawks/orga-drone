@@ -16,6 +16,8 @@ datas = [
     (str(SRC / "locales"), "orga_drone/locales"),
 ]
 datas += collect_data_files("imageio_ffmpeg")
+# pythonnet.load() needs filesystem __init__.py next to runtime/*.dll in the EXE.
+datas += collect_data_files("pythonnet", include_py_files=True)
 
 hiddenimports = [
     "uvicorn.logging",

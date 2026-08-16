@@ -45,8 +45,9 @@ def _prepare_runtime() -> None:
     from orga_drone.desktop import configure_stdio_and_logging, prepare_pythonnet_runtime
 
     configure_stdio_and_logging()
-    # Must run before import webview: CLR cannot load Python.Runtime.dll from
-    # paths with parentheses (Windows "Copy (2)" of the GitHub zip).
+    # Must run before import webview: pythonnet.load() uses
+    # Path(__file__).parent/runtime/Python.Runtime.dll with no public override.
+    # Unsafe unzip paths and Mark-of-the-Web copies need a full package relocate.
     prepare_pythonnet_runtime()
 
 

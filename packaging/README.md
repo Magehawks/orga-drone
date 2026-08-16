@@ -83,14 +83,23 @@ usually trusted already. A folder exclusion is the practical mitigation.
 Packaged mode sets `ORGA_DRONE_PACKAGED=1` (also detectable via `sys.frozen`) and
 disables Uvicorn access logs so Range requests do not flood logs.
 
-The Windows desktop window uses pywebview + pythonnet (`Python.Runtime.dll`).
-.NET cannot load that DLL from paths that contain parentheses — including the
-common Windows download name `orga-drone-windows-x64 (2)`. On startup the
-packaged app copies the DLL to `%APPDATA%\orga-drone\clr-runtime\` when needed.
-If the desktop window still cannot start, the app logs the exception to
-`orga-drone.log` and `startup-crash.log` and shows an error dialog; it does
-**not** silently open the system browser (native Studio pickers would not work).
-Force browser mode only with `ORGA_DRONE_BROWSER=1`.
+The Windows desktop window uses pywebview 6.x + pythonnet 3.x (`clr_loader`).
+`pythonnet.load()` always loads `Path(__file__).parent / "runtime" / "Python.Runtime.dll"`
+and has no public DLL-path override. .NET Framework cannot LoadFrom that path when it
+contains parentheses (Windows “Copy (2)” unzip) and also needs the full `runtime/`
+facade set (not just `Python.Runtime.dll`). Downloaded zips may add a
+`Zone.Identifier` stream that blocks LoadFrom.
+
+When the installed path is unsafe, **or** a frozen build still has
+`Zone.Identifier` on `Python.Runtime.dll`, the packaged app copies the whole
+`pythonnet` package to a CLR-safe home (`%APPDATA%\orga-drone\pythonnet-home\`
+when that path is safe) without Mark-of-the-Web, then binds that copy with
+`importlib.util.spec_from_file_location` so PyInstaller's FrozenImporter does not
+keep `pythonnet.__file__` on the unzip path. Stock `import clr` / `pythonnet.load()`
+then load the relocated `runtime/` tree. If the desktop window still cannot start,
+the app logs the exception to `orga-drone.log` and `startup-crash.log` and shows
+an error dialog; it does **not** silently open the system browser (native Studio
+pickers would not work). Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 
 UI fonts (Outfit, Sora, IBM Plex Mono) are bundled under `static/fonts/` and
 served locally. The desktop UI does not load Google Fonts from the network.

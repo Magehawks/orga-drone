@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.util
 import socket
 import sys
 import threading
 import time
-import types
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -27,6 +27,20 @@ from orga_drone.desktop import (
     wait_server_ready,
     wait_tcp,
 )
+
+
+def _snapshot_pythonnet_modules() -> dict[str, object]:
+    return {
+        n: sys.modules[n]
+        for n in list(sys.modules)
+        if n == "pythonnet" or n.startswith("pythonnet.")
+    }
+
+
+def _restore_pythonnet_modules(saved: dict[str, object]) -> None:
+    for name in [k for k in sys.modules if k == "pythonnet" or k.startswith("pythonnet.")]:
+        del sys.modules[name]
+    sys.modules.update(saved)  # type: ignore[arg-type]
 
 
 def test_windowed_stdio_uvicorn_logging(monkeypatch, tmp_path) -> None:
@@ -179,40 +193,204 @@ def test_clr_dll_path_is_unsafe_for_windows_copy_suffix() -> None:
     assert clr_dll_path_is_unsafe(good) is False
 
 
-def test_prepare_pythonnet_relocates_parenthesized_path(
+def test_pythonnet_runtime_dll_matches_stock_load_formula() -> None:
+    from orga_drone.desktop import pythonnet_runtime_dll
+
+    pkg = Path("/tmp/pythonnet")
+    assert pythonnet_runtime_dll(pkg) == pkg / "runtime" / "Python.Runtime.dll"
+
+
+def test_prepare_pythonnet_copies_full_package_onto_sys_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Stock pythonnet.load() uses Path(__file__).parent/runtime/*.dll — copy that tree."""
+    from orga_drone.config import Settings
+    from orga_drone.desktop import (
+        prepare_pythonnet_runtime,
+        pythonnet_runtime_dll,
+    )
+
+    src_pkg = tmp_path / "orga-drone-windows-x64(2)" / "pythonnet"
+    runtime = src_pkg / "runtime"
+    runtime.mkdir(parents=True)
+    (src_pkg / "__init__.py").write_text("# pythonnet stub\n", encoding="utf-8")
+    (runtime / "Python.Runtime.dll").write_bytes(b"dll")
+    (runtime / "Python.Runtime.deps.json").write_text("{}", encoding="utf-8")
+    (runtime / "netstandard.dll").write_bytes(b"facade")
+
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "orga_drone.desktop._find_pythonnet_package", lambda: src_pkg
+    )
+    monkeypatch.setattr("orga_drone.desktop.settings", Settings(data_dir=data_dir))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    saved = _snapshot_pythonnet_modules()
+
+    dest = prepare_pythonnet_runtime()
+    try:
+        home = data_dir / "pythonnet-home"
+        dest_pkg = home / "pythonnet"
+        expected_dll = pythonnet_runtime_dll(dest_pkg)
+        assert dest == expected_dll
+        assert expected_dll.is_file()
+        assert expected_dll.read_bytes() == b"dll"
+        assert (dest_pkg / "runtime" / "netstandard.dll").read_bytes() == b"facade"
+        assert (dest_pkg / "runtime" / "Python.Runtime.deps.json").read_text(
+            encoding="utf-8"
+        ) == "{}"
+        assert (dest_pkg / "__init__.py").is_file()
+        assert sys.path[0] == str(home)
+        spec = importlib.util.find_spec("pythonnet")
+        assert spec is not None and spec.origin is not None
+        assert Path(spec.origin).resolve().parent == dest_pkg.resolve()
+        import pythonnet
+
+        assert Path(pythonnet.__file__).resolve() == (dest_pkg / "__init__.py").resolve()
+        assert pythonnet_runtime_dll(Path(pythonnet.__file__).parent) == expected_dll
+    finally:
+        _restore_pythonnet_modules(saved)
+
+
+def test_bind_wins_over_meta_path_finder_claiming_pythonnet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PyInstaller FrozenImporter claims pythonnet before PathFinder; bind must win."""
     from orga_drone.config import Settings
     from orga_drone.desktop import prepare_pythonnet_runtime
 
-    pkg = tmp_path / "orga-drone-windows-x64(2)" / "pythonnet"
-    runtime = pkg / "runtime"
+    src_pkg = tmp_path / "orga-drone-windows-x64(2)" / "pythonnet"
+    runtime = src_pkg / "runtime"
     runtime.mkdir(parents=True)
-    (pkg / "__init__.py").write_text("#", encoding="utf-8")
+    (src_pkg / "__init__.py").write_text("MARKER = 'copied'\n", encoding="utf-8")
     (runtime / "Python.Runtime.dll").write_bytes(b"dll")
-    (runtime / "Python.Runtime.deps.json").write_text("{}", encoding="utf-8")
 
-    stub = types.ModuleType("pythonnet")
-    stub.__file__ = str(pkg / "__init__.py")
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        "orga_drone.desktop._find_pythonnet_package", lambda: src_pkg
+    )
+    monkeypatch.setattr("orga_drone.desktop.settings", Settings(data_dir=data_dir))
+    monkeypatch.setattr(sys, "path", list(sys.path))
 
-    def _load(*_a: object, **_k: object) -> None:
-        return None
+    class ClaimPythonnet:
+        def find_spec(self, fullname: str, path: object = None, target: object = None):
+            if fullname != "pythonnet":
+                return None
+            return importlib.util.spec_from_file_location(
+                "pythonnet",
+                src_pkg / "__init__.py",
+                submodule_search_locations=[str(src_pkg)],
+            )
 
-    stub.load = _load  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "pythonnet", stub)
+    monkeypatch.setattr(sys, "meta_path", [ClaimPythonnet(), *list(sys.meta_path)])
+    saved = _snapshot_pythonnet_modules()
+    for n in list(saved):
+        del sys.modules[n]
+    try:
+        dest_pkg = data_dir / "pythonnet-home" / "pythonnet"
+        prepare_pythonnet_runtime()
+        import pythonnet
+
+        assert Path(pythonnet.__file__).resolve() == (dest_pkg / "__init__.py").resolve()
+        assert "orga-drone-windows-x64(2)" not in pythonnet.__file__
+    finally:
+        _restore_pythonnet_modules(saved)
+
+
+def test_materialize_init_when_src_package_has_no_py(tmp_path: Path) -> None:
+    """Need the real installed pythonnet; skip on Linux CI where it is absent."""
+    saved = _snapshot_pythonnet_modules()
+    _restore_pythonnet_modules({})
+    spec = importlib.util.find_spec("pythonnet")
+    origin = Path(spec.origin) if spec is not None and spec.origin else None
+    if origin is None or not origin.is_file():
+        pytest.skip("pythonnet not installed")
+    source = origin.read_text(encoding="utf-8")
+    if "def load(" not in source or "Python.Runtime.dll" not in source:
+        pytest.skip("pythonnet package is not the installed runtime module")
+    from orga_drone.desktop import _materialize_pythonnet_init
+
+    src_pkg = tmp_path / "pythonnet"
+    (src_pkg / "runtime").mkdir(parents=True)
+    dest_pkg = tmp_path / "dest" / "pythonnet"
+    dest_pkg.mkdir(parents=True)
+    try:
+        init = _materialize_pythonnet_init(src_pkg, dest_pkg)
+        assert init.is_file()
+        text = init.read_text(encoding="utf-8")
+        assert "def load(" in text
+        assert "Python.Runtime.dll" in text
+    finally:
+        _restore_pythonnet_modules(saved)
+
+
+def test_frozen_zone_identifier_triggers_relocate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    from orga_drone.config import Settings
+    from orga_drone.desktop import (
+        clr_dll_path_is_unsafe,
+        prepare_pythonnet_runtime,
+        pythonnet_runtime_dll,
+    )
+
+    src_pkg = tmp_path / "pythonnet"
+    runtime = src_pkg / "runtime"
+    runtime.mkdir(parents=True)
+    (src_pkg / "__init__.py").write_text("#\n", encoding="utf-8")
+    (runtime / "Python.Runtime.dll").write_bytes(b"dll")
+    src_dll = pythonnet_runtime_dll(src_pkg)
+    assert clr_dll_path_is_unsafe(src_dll) is False
+
+    monkeypatch.setattr("orga_drone.desktop._find_pythonnet_package", lambda: src_pkg)
     monkeypatch.setattr(
         "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
     )
+    monkeypatch.setattr("orga_drone.desktop.sys.frozen", True, raising=False)
+    monkeypatch.setattr("orga_drone.desktop.sys.platform", "win32")
+    monkeypatch.setattr(sys, "path", list(sys.path))
 
-    dest = prepare_pythonnet_runtime()
-    expected = tmp_path / "data" / "clr-runtime" / "Python.Runtime.dll"
-    assert dest == expected
-    assert expected.is_file()
-    assert expected.read_bytes() == b"dll"
-    assert (tmp_path / "data" / "clr-runtime" / "Python.Runtime.deps.json").read_text(
-        encoding="utf-8"
-    ) == "{}"
-    assert stub.load is not _load
+    real_stat = os.stat
+
+    def fake_stat(path: str, *args: object, **kwargs: object) -> os.stat_result:
+        if str(path).endswith(":Zone.Identifier"):
+            return os.stat_result((0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr("orga_drone.desktop.os.stat", fake_stat)
+    saved = _snapshot_pythonnet_modules()
+    try:
+        dest = prepare_pythonnet_runtime()
+        expected = pythonnet_runtime_dll(
+            tmp_path / "data" / "pythonnet-home" / "pythonnet"
+        )
+        assert dest == expected
+        assert expected.is_file()
+    finally:
+        _restore_pythonnet_modules(saved)
+
+
+def test_copy_file_strips_zone_identifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.desktop import _copy_file_without_zone, _strip_zone_identifier
+
+    src = tmp_path / "src.dll"
+    dest = tmp_path / "dest.dll"
+    src.write_bytes(b"payload")
+    monkeypatch.setattr("orga_drone.desktop.sys.platform", "win32")
+    removed: list[str] = []
+
+    def fake_remove(path: str) -> None:
+        removed.append(path)
+
+    monkeypatch.setattr("orga_drone.desktop.os.remove", fake_remove)
+    _copy_file_without_zone(src, dest)
+    assert dest.read_bytes() == b"payload"
+    assert removed == [f"{dest}:Zone.Identifier"]
+    _strip_zone_identifier(dest)
+    assert removed[-1] == f"{dest}:Zone.Identifier"
 
 
 def test_log_desktop_failure_writes_startup_crash_log(
