@@ -6,6 +6,7 @@ import socket
 import sys
 import threading
 import time
+import types
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -181,7 +182,6 @@ def test_clr_dll_path_is_unsafe_for_windows_copy_suffix() -> None:
 def test_prepare_pythonnet_relocates_parenthesized_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import pythonnet
     from orga_drone.config import Settings
     from orga_drone.desktop import prepare_pythonnet_runtime
 
@@ -192,22 +192,27 @@ def test_prepare_pythonnet_relocates_parenthesized_path(
     (runtime / "Python.Runtime.dll").write_bytes(b"dll")
     (runtime / "Python.Runtime.deps.json").write_text("{}", encoding="utf-8")
 
-    data_dir = tmp_path / "data"
-    monkeypatch.setattr(pythonnet, "__file__", str(pkg / "__init__.py"))
-    monkeypatch.setattr("orga_drone.desktop.settings", Settings(data_dir=data_dir))
-    original_load = pythonnet.load
-    try:
-        dest = prepare_pythonnet_runtime()
-        expected = data_dir / "clr-runtime" / "Python.Runtime.dll"
-        assert dest == expected
-        assert expected.is_file()
-        assert expected.read_bytes() == b"dll"
-        assert (data_dir / "clr-runtime" / "Python.Runtime.deps.json").read_text(
-            encoding="utf-8"
-        ) == "{}"
-        assert pythonnet.load is not original_load
-    finally:
-        pythonnet.load = original_load
+    stub = types.ModuleType("pythonnet")
+    stub.__file__ = str(pkg / "__init__.py")
+
+    def _load(*_a: object, **_k: object) -> None:
+        return None
+
+    stub.load = _load  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pythonnet", stub)
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+
+    dest = prepare_pythonnet_runtime()
+    expected = tmp_path / "data" / "clr-runtime" / "Python.Runtime.dll"
+    assert dest == expected
+    assert expected.is_file()
+    assert expected.read_bytes() == b"dll"
+    assert (tmp_path / "data" / "clr-runtime" / "Python.Runtime.deps.json").read_text(
+        encoding="utf-8"
+    ) == "{}"
+    assert stub.load is not _load
 
 
 def test_log_desktop_failure_writes_startup_crash_log(
