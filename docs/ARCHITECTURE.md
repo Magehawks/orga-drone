@@ -15,6 +15,7 @@ Do not invent layers, services, or plugins that are not present.
 | Thumbnails / merge | Pillow / pillow-heif; `imageio-ffmpeg` or system ffmpeg |
 | Maps | Leaflet (vendored) + OpenStreetMap tiles |
 | Studio icons | Lucide SVGs (vendored under `static/vendor/lucide/`, ISC) |
+| App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
 | Tests | pytest under `tests/` |
 | CI | GitHub Actions: Ruff, MyPy, pytest on pull requests |
