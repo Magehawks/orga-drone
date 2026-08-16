@@ -392,8 +392,17 @@ def test_http_studio_creator_shell_with_items(
     assert "Preview plays Story media" in html or "Preview spielt" in html
     assert "includes project music" in html or "mischt Projektmusik" in html
     assert "inspector-music-loop" in html
+    assert 'id="inspector-music-replace"' in html
     assert 'id="studio-music-audio"' in html
+    assert 'id="studio-music-audio-next"' in html
+    assert 'id="studio-music-add"' in html
+    assert 'id="inspector-music-move-up"' in html
+    assert 'id="inspector-music-move-down"' in html
+    assert 'id="inspector-music-loop-wrap"' in html
     assert 'id="studio-music-file"' not in html
+    assert "studio-music-wave" not in html
+    assert "studio-music-handle" not in html
+    assert 'id="studio-music-replace"' not in html
     assert "Voice-over" in html or "Voice-over" in html
     assert "is-disabled" in html
     # Photo clips must expose an image preview source (not only video stream).

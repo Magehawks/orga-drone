@@ -109,12 +109,14 @@ determinate progress in the export dialog (elapsed time, ETA, current clip
 label; within-clip ffmpeg progress). On success the dialog closes and Studio
 shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
-successful output only). Desktop save dialog. Optional project music
-(`studio_audio_clips`) is previewed and mixed into the MP4; Title Cards are
+successful output only). Desktop save dialog. Optional project soundtrack
+playlist (`studio_audio_clips`, up to 8 songs) is previewed and mixed into the
+MP4; Title Cards are
 generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
 visual transitions Cut / Fade through black / Crossfade persist on the outgoing
 clip and render in preview + MP4). The Story timeline is a shared time canvas
-(`px/s` Fit/zoom; ruler, clips and playhead share one mapping; transitions are
+(`px/s` Fit/zoom; ruler, clips, playhead and the read-only soundtrack coverage
+spans share one mapping; transitions are
 boundary overlays). Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.
@@ -141,8 +143,9 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 3. Prefer small modules in existing package areas over new top-level frameworks.
 4. Preserve `media_meta` and `studio_clips` across rescans.
 5. Path operations for library media must stay confined under library roots.
-   Studio music is a documented exception: one read-only soundtrack path per
-   project, including files outside library folders (ADR 0008).
+   Studio music is a documented exception: read-only soundtrack paths (up to 8
+   sequential songs per project), including files outside library folders
+   (ADR 0008).
 6. Record significant architecture choices in `docs/decisions/`.
 
 ## Related docs

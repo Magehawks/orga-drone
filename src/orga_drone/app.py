@@ -7,7 +7,7 @@ import hashlib
 import json
 import threading
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 from urllib.parse import parse_qsl, quote, urlencode, urlparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
@@ -447,9 +447,7 @@ def create_app() -> FastAPI:
             kwargs["filename"] = path.name
         return FileResponse(path, **kwargs)
 
-    def _music_client_payload(project_id: int, clip: Any) -> dict[str, Any]:
-        if clip is None:
-            return {"present": False}
+    def _music_track_client_payload(project_id: int, clip: Any) -> dict[str, Any]:
         path = Path(clip.file_path)
         available = path.is_file()
         token = "0"
@@ -457,24 +455,59 @@ def create_app() -> FastAPI:
             try:
                 st = path.stat()
                 token = hashlib.sha256(
-                    f"{clip.file_path}:{int(st.st_mtime)}:{st.st_size}".encode()
+                    f"{clip.id}:{clip.file_path}:{int(st.st_mtime)}:{st.st_size}".encode()
                 ).hexdigest()[:16]
             except OSError:
                 token = "0"
         return {
-            "present": True,
+            "id": clip.id,
+            "position": clip.position,
             "available": available,
             "display_name": clip.display_name,
             "volume": clip.volume,
             "fade_in_s": clip.fade_in_s,
             "fade_out_s": clip.fade_out_s,
             "loop": bool(clip.loop),
+            "duration_s": clip.duration_s,
             "stream_url": (
-                f"/api/studio/projects/{project_id}/music/stream?v={token}"
+                f"/api/studio/projects/{project_id}/music/{clip.id}/stream?v={token}"
                 if available
                 else None
             ),
         }
+
+    def _music_tracks_client_payload(project_id: int) -> dict[str, Any]:
+        return {
+            "tracks": [
+                _music_track_client_payload(project_id, clip)
+                for clip in db.list_studio_music(project_id)
+            ]
+        }
+
+    def _raise_music_value_error(exc: ValueError) -> NoReturn:
+        msg = str(exc)
+        if msg == "music_limit":
+            raise HTTPException(status_code=409, detail="music_limit") from exc
+        if msg == "loop_single_only":
+            raise HTTPException(status_code=400, detail="loop_single_only") from exc
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+
+    def _music_path_from_payload(payload: dict[str, Any]) -> Path:
+        from orga_drone.export.music_mix import validate_music_file_path
+
+        if not isinstance(payload.get("path"), str):
+            raise HTTPException(status_code=400, detail="path is required")
+        try:
+            return validate_music_file_path(payload["path"])
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail="The selected music file is no longer available.",
+            ) from None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> HTMLResponse:
@@ -958,9 +991,9 @@ def create_app() -> FastAPI:
                 if fav.path not in studio_paths
             ]
         music_payload = (
-            _music_client_payload(project.id, db.get_studio_music(project.id))
+            _music_tracks_client_payload(project.id)
             if project is not None
-            else {"present": False}
+            else {"tracks": []}
         )
         return render(
             request,
@@ -1020,34 +1053,49 @@ def create_app() -> FastAPI:
     @app.get("/api/studio/projects/{project_id}/music")
     async def api_studio_music_get(project_id: int) -> JSONResponse:
         _require_studio_project(project_id)
-        clip = db.get_studio_music(project_id)
-        return JSONResponse({"ok": True, **_music_client_payload(project_id, clip)})
+        return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
 
-    @app.put("/api/studio/projects/{project_id}/music")
-    async def api_studio_music_put(project_id: int, request: Request) -> JSONResponse:
-        from orga_drone.export.music_mix import validate_music_file_path
-
+    @app.post("/api/studio/projects/{project_id}/music")
+    async def api_studio_music_post(project_id: int, request: Request) -> JSONResponse:
         _require_studio_project(project_id)
         try:
             payload = await request.json()
         except Exception:
             payload = None
-        if not isinstance(payload, dict) or not isinstance(payload.get("path"), str):
-            raise HTTPException(status_code=400, detail="path is required")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        path = _music_path_from_payload(payload)
         try:
-            path = validate_music_file_path(payload["path"])
-        except FileNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail="The selected music file is no longer available.",
-            ) from None
+            db.append_studio_music(project_id, str(path))
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        clip = db.set_studio_music(project_id, str(path))
-        return JSONResponse({"ok": True, **_music_client_payload(project_id, clip)})
+            _raise_music_value_error(exc)
+        return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
 
-    @app.patch("/api/studio/projects/{project_id}/music")
-    async def api_studio_music_patch(project_id: int, request: Request) -> JSONResponse:
+    @app.put("/api/studio/projects/{project_id}/music/reorder")
+    async def api_studio_music_reorder(project_id: int, request: Request) -> JSONResponse:
+        _require_studio_project(project_id)
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or not isinstance(payload.get("ids"), list):
+            raise HTTPException(status_code=400, detail="ids is required")
+        ids: list[int] = []
+        for raw in payload["ids"]:
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="ids must be integers") from None
+        try:
+            db.reorder_studio_music(project_id, ids)
+        except ValueError as exc:
+            _raise_music_value_error(exc)
+        return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
+
+    @app.patch("/api/studio/projects/{project_id}/music/{clip_id}")
+    async def api_studio_music_patch(
+        project_id: int, clip_id: int, request: Request
+    ) -> JSONResponse:
         _require_studio_project(project_id)
         try:
             payload = await request.json()
@@ -1065,30 +1113,37 @@ def create_app() -> FastAPI:
             try:
                 kwargs["fade_in_s"] = float(payload["fade_in_s"])
             except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail="fade_in_s must be a number") from None
+                raise HTTPException(
+                    status_code=400, detail="fade_in_s must be a number"
+                ) from None
         if "fade_out_s" in payload:
             try:
                 kwargs["fade_out_s"] = float(payload["fade_out_s"])
             except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail="fade_out_s must be a number") from None
+                raise HTTPException(
+                    status_code=400, detail="fade_out_s must be a number"
+                ) from None
         if "loop" in payload:
             kwargs["loop"] = bool(payload["loop"])
+        if "path" in payload:
+            kwargs["file_path"] = str(_music_path_from_payload(payload))
         try:
-            clip = db.patch_studio_music(project_id, **kwargs)
+            db.patch_studio_music_clip(project_id, clip_id, **kwargs)
         except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return JSONResponse({"ok": True, **_music_client_payload(project_id, clip)})
+            _raise_music_value_error(exc)
+        return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
 
-    @app.delete("/api/studio/projects/{project_id}/music")
-    async def api_studio_music_delete(project_id: int) -> JSONResponse:
+    @app.delete("/api/studio/projects/{project_id}/music/{clip_id}")
+    async def api_studio_music_delete(project_id: int, clip_id: int) -> JSONResponse:
         _require_studio_project(project_id)
-        db.delete_studio_music(project_id)
-        return JSONResponse({"ok": True, "present": False})
+        if not db.delete_studio_music_clip(project_id, clip_id):
+            raise HTTPException(status_code=404, detail="studio music not found")
+        return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
 
-    @app.get("/api/studio/projects/{project_id}/music/stream")
-    async def api_studio_music_stream(project_id: int) -> Response:
+    @app.get("/api/studio/projects/{project_id}/music/{clip_id}/stream")
+    async def api_studio_music_stream(project_id: int, clip_id: int) -> Response:
         _require_studio_project(project_id)
-        clip = db.get_studio_music(project_id)
+        clip = db.get_studio_music_clip(project_id, clip_id)
         if clip is None:
             raise HTTPException(status_code=404, detail="music_missing")
         path = Path(clip.file_path)

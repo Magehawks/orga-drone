@@ -1,4 +1,4 @@
-"""Studio time-canvas foundation (Issue #33 / slice 1)."""
+"""Studio time-canvas foundation (Issue #33) and soundtrack coverage (Issue #38)."""
 
 from __future__ import annotations
 
@@ -123,7 +123,36 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'role="slider"' in html
     assert "studio-music-track" in html
     assert "studio-track-voice" in html
-    assert html.find("studio-timeline-canvas") < html.find("studio-music-track")
+    canvas_to_voice = html.split('id="studio-timeline-canvas"', 1)[1].split(
+        "studio-track-voice", 1
+    )[0]
+    assert 'id="studio-music-track"' in canvas_to_voice
+    assert 'id="studio-tracks"' in canvas_to_voice
+    tracks_inner = html.split('id="studio-tracks"', 1)[1].split(
+        "studio-track-voice", 1
+    )[0]
+    assert 'id="studio-music-track"' in tracks_inner
+    gutter = html.split("studio-timeline-gutter", 1)[1].split(
+        "studio-timeline-scroll", 1
+    )[0]
+    assert "Story" in gutter
+    assert "Soundtrack" in gutter
+    music_block = html.split('id="studio-music-track"', 1)[1].split(
+        "studio-track-voice", 1
+    )[0]
+    assert "studio-track-label" not in music_block
+    assert "studio-music-wave" not in html
+    assert "studio-music-handle" not in html
+    assert 'id="studio-music-replace"' not in html
+    assert 'id="inspector-music-replace"' in html
+    assert "draggable" not in music_block
+    assert 'id="studio-music-add"' not in music_block
+    toolbar = html.split("studio-timeline-toolbar", 1)[1].split(
+        "studio-timeline-row", 1
+    )[0]
+    assert 'id="studio-music-add"' in toolbar
+    assert "One local music track for this project" not in html
+    assert "Eine lokale Musikspur" not in html
     assert 'data-occupancy-s="3.0000"' in html
     assert 'data-occupancy-s="30.0000"' in html
     root = Path(__file__).resolve().parents[1]
@@ -152,6 +181,35 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "function nextZoomIndexAbove" in js
     assert "function updateZoomControls" in js
     assert "if (next < 0) return;" in js
+    layout_src = js.split("function layoutTimeline", 1)[1].split(
+        "function centerPlayheadInView", 1
+    )[0]
+    assert "layoutMusicSpans()" in layout_src
+    music_span_src = js.split("function layoutMusicSpans", 1)[1].split(
+        "function scaledMusicFades", 1
+    )[0]
+    assert "musicBedDuration" in music_span_src
+    assert "timeToX" in music_span_src
+    assert "TIMELINE_HIT_MIN_PX" in music_span_src
+    assert 'addEventListener("loadedmetadata"' in js
+    assert 'addEventListener("durationchange"' in js
+    assert "studio-music-audio-next" in js
+    assert "studio-music-wave" not in js
+    assert "studio-music-handle" not in js
+    assert "studio-drag-handle" in js
+    assert "persistMusicOrder" in js
+    assert "#studio-music-track" in js
+    assert "inspector-music-replace" in js
+    css_music = css.split(".studio-music-fade {", 1)[1].split(
+        ".studio-music-fade-in", 1
+    )[0]
+    assert "pointer-events: none" in css_music
+    assert "cursor: default" in css_music
+    assert "width: 12%" not in css_music
+    music_select_css = css.split(".studio-music-select {", 1)[1].split("}", 1)[0]
+    assert "position: absolute" in music_select_css
+    pending_css = css.split(".studio-music-select.is-pending,", 1)[1].split("}", 1)[0]
+    assert "position: relative" not in pending_css
 
 
 def test_crossfade_occupancy_shrinks_html_not_fade_black(

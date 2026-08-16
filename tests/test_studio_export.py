@@ -773,6 +773,7 @@ def test_fake_encoder_receives_music_config(
     )
     assert result == out
     assert fake.configs and fake.configs[0].music is not None
+    assert fake.configs[0].music_tracks
     assert fake.configs[0].music.source_path == song.resolve()
     assert fake.configs[0].music.volume == 0.8
     assert Path(item.path).read_bytes() == source_bytes
@@ -896,3 +897,104 @@ def test_encoder_records_amix_when_music_present(
     loop_cmds = [cmd for cmd in commands if "-stream_loop" in cmd]
     assert loop_cmds
     assert loop_cmds[-1][loop_cmds[-1].index("-stream_loop") + 1] == "-1"
+
+
+def test_encoder_playlist_concat_when_two_songs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+
+    video = tmp_path / "clip.mp4"
+    made_video = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=64x48:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-c:a",
+            "aac",
+            str(video),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert made_video.returncode == 0, made_video.stderr
+    songs = []
+    for name, freq in (("a.wav", "880"), ("b.wav", "660")):
+        dest = tmp_path / name
+        made = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"sine=frequency={freq}:duration=0.4",
+                str(dest),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert made.returncode == 0, made.stderr
+        songs.append(dest)
+
+    from orga_drone.export import studio_encoder as encoder_module
+
+    commands: list[list[str]] = []
+    real_run = encoder_module._run_ffmpeg
+
+    def recording_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        commands.append(cmd.copy())
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(encoder_module, "_run_ffmpeg", recording_run)
+    output = tmp_path / "playlist.mp4"
+    config = StudioExportConfig(
+        output_path=output,
+        width=64,
+        height=48,
+        clips=(
+            StudioExportClip(
+                source_path=video,
+                kind="video",
+                duration_s=1.0,
+                source_start_s=0.0,
+                source_end_s=1.0,
+            ),
+        ),
+        music_tracks=(
+            StudioExportMusic(
+                source_path=songs[0],
+                volume=0.5,
+                duration_s=0.4,
+            ),
+            StudioExportMusic(
+                source_path=songs[1],
+                volume=0.8,
+                duration_s=0.4,
+            ),
+        ),
+    )
+    assert FfmpegStudioEncoder().render(config) == output
+    mix_cmds = [cmd for cmd in commands if "-filter_complex" in cmd]
+    assert mix_cmds
+    graph = mix_cmds[-1][mix_cmds[-1].index("-filter_complex") + 1]
+    assert "concat=n=2:v=0:a=1" in graph
+    assert "-stream_loop" not in mix_cmds[-1]
+    assert str(songs[0]) in mix_cmds[-1]
+    assert str(songs[1]) in mix_cmds[-1]

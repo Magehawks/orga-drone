@@ -22,8 +22,10 @@ Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (order + estimated runtime; multiple local Studio projects; synced Story
 preview; local MP4 export with configurable resolution; after export, open
-or reveal the MP4 on desktop; one optional local music track in preview and
-export; Title Cards; basic visual transitions).
+or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
+local songs; loop when there is one song) in preview and
+export; Title Cards; basic visual transitions; read-only soundtrack coverage
+on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -139,7 +141,7 @@ professional video-editing knowledge.
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
-| One optional music track (file, volume, fades, loop) | **Available now** (preview + MP4 export; desktop picker) |
+| Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Light editing, extra transition types | **Later** |
@@ -209,16 +211,19 @@ See `README.md` for the detailed feature status table. In short:
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
-  Studio UI (browser, preview, transport, Story track, music slot, inspector,
+  Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
   export dialog) for the open project. The Story track is a shared time canvas
   (Fit to story / zoom; ruler, clips and playhead share one mapping; zoom is
   UI state, not project data). Persisted today: editable project title;
   order; estimated runtime; optional video source start/end after Cut. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop). Title Cards persist as generated
-  `studio_clips` (not media files). One optional local music track persists
-  with the project, plays in preview, and is mixed into export. Visual
-  transitions (Cut, Fade through black, Crossfade) persist per outgoing clip
+  `studio_clips` (not media files). An optional sequential soundtrack playlist
+  (up to 8 local songs) persists with the project, plays in preview, and is mixed
+  into export. Coverage is shown as read-only spans on the Story time canvas
+  (same Fit/zoom mapping; not trim/slip/waveform editing). Loop still applies
+  only to a one-song playlist. Visual transitions (Cut, Fade through black,
+  Crossfade) persist per outgoing clip
   and render in preview and MP4. Media files are referenced, never
   copied or modified.
 - Local SQLite index; media files stay on disk
@@ -233,8 +238,10 @@ See `README.md` for the detailed feature status table. In short:
   an LLM or semantic search system.
 - There is **no** Library albums model, plugin API, or CI-built multi-OS
   installer pipeline in the current tree. Studio supports multiple local
-  edit projects, Title Cards, one optional music track, a time-based Story
-  canvas with Fit/zoom, and basic rendered visual transitions (not a
+  edit projects, Title Cards, an optional sequential soundtrack playlist
+  (up to 8 local songs; loop for a one-song playlist), a time-based Story
+  canvas with Fit/zoom, read-only soundtrack coverage on that canvas, and
+  basic rendered visual transitions (not a
   professional NLE). Albums for organizing the media library remain Later.
 
 ## Studio MVP (target)
@@ -246,13 +253,13 @@ The first **complete** Studio MVP is achieved when a user can:
 3. Select photos, videos or complete flight sessions.
 4. Open Studio.
 5. Arrange the story.
-6. Add one optional music track.
+6. Add optional soundtrack songs.
 7. Export a simple MP4.
 8. Share the result with family or friends.
 
 If users can complete this journey without opening another application, that MVP
-is successful. Local MP4 export with resolution choice, one optional music
-track in preview/export, and Open video / Show in folder after export are
+is successful. Local MP4 export with resolution choice, an optional sequential
+soundtrack playlist in preview/export, and Open video / Show in folder after export are
 **Available now** on Windows desktop (steps 6–8 without social upload).
 Rendered extra transition types, audio crossfades, and social share destinations remain **Later**.
 
