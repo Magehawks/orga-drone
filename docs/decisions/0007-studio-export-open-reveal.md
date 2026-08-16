@@ -1,6 +1,6 @@
 # ADR 0007: Studio export open / reveal after completion
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-14
 - **Deciders:** Issue #22
 

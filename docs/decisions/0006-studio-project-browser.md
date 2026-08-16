@@ -1,6 +1,6 @@
 # ADR 0006: Studio project browser and last-opened project
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-14
 - **Deciders:** Issue #19
 
