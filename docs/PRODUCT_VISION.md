@@ -213,7 +213,11 @@ See `README.md` for the detailed feature status table. In short:
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
-  export dialog) for the open project. The Story track is a shared time canvas
+  export dialog) for the open project. The open project title is labeled as the
+  current Project; **Projects** opens the same local list used on the empty
+  landing. **Export** stays the share action; **Clear Studio** is on the Story
+  toolbar and empties clips only (not the project or soundtrack). The Story track
+  is a shared time canvas
   (Fit to story / zoom; ruler, clips and playhead share one mapping; zoom is
   UI state, not project data). Selected Story objects are distinct from the
   playhead-active clip; transition chips show Cut / Fade / Crossfade and name
@@ -223,8 +227,8 @@ See `README.md` for the detailed feature status table. In short:
   export with configurable resolution (desktop). Title Cards persist as generated
   `studio_clips` (not media files). An optional sequential soundtrack playlist
   (up to 8 local songs) persists with the project, plays in preview, and is mixed
-  into export. Coverage is shown as read-only spans on the Story time canvas
-  (same Fit/zoom mapping; not trim/slip/waveform editing). Loop still applies
+  into export. Coverage is shown as read-only, time-proportional spans on the
+  Story time canvas (same Fit/zoom mapping; not trim/slip/waveform editing). Loop still applies
   only to a one-song playlist. Visual transitions (Cut, Fade through black,
   Crossfade) persist per outgoing clip
   and render in preview and MP4. Media files are referenced, never
@@ -243,7 +247,8 @@ See `README.md` for the detailed feature status table. In short:
   installer pipeline in the current tree. Studio supports multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
-  canvas with Fit/zoom, read-only soundtrack coverage on that canvas, and
+  canvas with Fit/zoom, labeled transition overlays, Inspector selection
+  headings, read-only time-proportional soundtrack coverage on that canvas, and
   basic rendered visual transitions (not a
   professional NLE). Albums for organizing the media library remain Later.
 

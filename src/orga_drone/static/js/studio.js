@@ -149,9 +149,11 @@
   if (projectsDialog) {
     projectsDialog.addEventListener("click", handleProjectActionClick);
   }
+  let flushPendingTitleSave = () => {};
   const projectsOpenBtn = document.getElementById("studio-projects-open");
   if (projectsOpenBtn && projectsDialog) {
     projectsOpenBtn.addEventListener("click", () => {
+      flushPendingTitleSave();
       if (typeof projectsDialog.showModal === "function") projectsDialog.showModal();
     });
   }
@@ -1519,11 +1521,8 @@
     const msgSilence = root.dataset.musicSilenceBadge || "then silence";
     const msgPending = root.dataset.musicPending || "Duration unknown";
     const msgCoverage = root.dataset.musicCoverage || "{music} of {story}";
-    const gapPx = 8;
-    const minTilePx = 56;
     const cards = musicClipEls();
     let cursor = 0;
-    let nextLeftPx = 0;
     cards.forEach((card, index) => {
       const track = state.tracks.find((item) => String(item.id) === String(card.dataset.musicId));
       if (!track) return;
@@ -1573,18 +1572,13 @@
         spanS = musicBedDuration(story, musDur, true);
       } else if (musDur > 0 && remaining > 0) {
         spanS = Math.min(musDur, remaining);
-      } else if (!known && remaining > 0) {
-        spanS = remaining / Math.max(1, cards.length - index);
       }
-      let leftPx = Math.max(timeToX(cursor), nextLeftPx);
-      let widthPx = spanS > 0 ? Math.max(0, timeToX(cursor + spanS) - timeToX(cursor)) : 0;
-      if (widthPx < minTilePx) widthPx = minTilePx;
-      if (index < cards.length - 1) widthPx = Math.max(minTilePx, widthPx - gapPx);
+      const leftPx = timeToX(cursor);
+      const widthPx = spanS > 0 ? Math.max(0, timeToX(cursor + spanS) - timeToX(cursor)) : 0;
       card.style.left = `${leftPx}px`;
       card.style.width = `${widthPx}px`;
-      nextLeftPx = leftPx + widthPx + gapPx;
+      card.classList.toggle("is-narrow", widthPx < TIMELINE_HIT_MIN_PX);
       if (spanS > 0) cursor += spanS;
-      else cursor += xToTime(widthPx + gapPx);
       if (known && story > 0 && meta) {
         meta.textContent = msgCoverage
           .replace("{music}", formatLaneTime(musDur))
@@ -1750,6 +1744,13 @@
       persistProjectTitle();
     }, 400);
   }
+
+  flushPendingTitleSave = () => {
+    if (!titleSaveTimer) return;
+    window.clearTimeout(titleSaveTimer);
+    titleSaveTimer = 0;
+    persistProjectTitle();
+  };
 
   function applyTransitionsToDom() {
     grid.querySelectorAll(".studio-transition").forEach((el) => {

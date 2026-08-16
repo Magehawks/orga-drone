@@ -116,9 +116,12 @@ generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
 visual transitions Cut / Fade through black / Crossfade persist on the outgoing
 clip and render in preview + MP4). The Story timeline is a shared time canvas
 (`px/s` Fit/zoom; ruler, clips, playhead and the read-only soundtrack coverage
-spans share one mapping; transitions are labeled boundary overlays). Selected vs
+spans share one mapping; soundtrack tile width follows each song’s effective
+duration; transitions are labeled boundary overlays). Selected vs
 playhead-active clips use distinct chrome; the Inspector names the selected
-object. Transport/editing controls use vendored Lucide icons
+object. The open project title sits with a labeled **Projects** switcher;
+**Export** is the share action; **Clear Studio** is on the Story toolbar and
+clears `studio_clips` only. Transport/editing controls use vendored Lucide icons
 (`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
 scope.
 

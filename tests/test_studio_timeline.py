@@ -152,6 +152,7 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
         "studio-timeline-row", 1
     )[0]
     assert 'id="studio-music-add"' in toolbar
+    assert "studio-clear-form" in toolbar
     assert "One local music track for this project" not in html
     assert "Eine lokale Musikspur" not in html
     assert 'data-occupancy-s="3.0000"' in html
@@ -192,6 +193,10 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "musicBedDuration" in music_span_src
     assert "timeToX" in music_span_src
     assert "TIMELINE_HIT_MIN_PX" in music_span_src
+    assert "minTilePx" not in music_span_src
+    assert "gapPx" not in music_span_src
+    assert "is-narrow" in music_span_src
+    assert "remaining / Math.max" not in music_span_src
     assert 'addEventListener("loadedmetadata"' in js
     assert 'addEventListener("durationchange"' in js
     assert "studio-music-audio-next" in js
@@ -211,6 +216,8 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "position: absolute" in music_select_css
     pending_css = css.split(".studio-music-select.is-pending,", 1)[1].split("}", 1)[0]
     assert "position: relative" not in pending_css
+    narrow_css = css.split(".studio-music-select.is-narrow {", 1)[1].split("}", 1)[0]
+    assert "overflow: visible" in narrow_css
 
 
 def test_crossfade_occupancy_shrinks_html_not_fade_black(

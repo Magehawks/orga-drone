@@ -258,6 +258,9 @@ def test_delete_project_leaves_media_and_shows_browser(
     assert page.status_code == 200
     assert 'data-studio-mode="browser"' in page.text
     assert "Keep" in page.text
+    assert "Switch, create, or manage Studio projects" in page.text or (
+        "Wechsle, erstelle oder verwalte Studio-Projekte" in page.text
+    )
 
 
 def test_delete_last_project_does_not_recreate_default(
@@ -310,6 +313,8 @@ def test_http_project_api_list_create_open_update_delete(
     listed2 = c.get("/api/studio/projects").json()
     assert listed2["current_id"] == second_id
 
+    mid = _seed_media(db, tmp_path / "lib")
+    _add_clip(db, mid, second_id)
     page = c.get("/studio")
     assert page.status_code == 200
     assert f'data-project-id="{second_id}"' in page.text
@@ -318,6 +323,39 @@ def test_http_project_api_list_create_open_update_delete(
     after_creator = page.text.split('class="studio-creator"', 1)[1]
     assert 'id="studio-projects-dialog"' in after_creator
     assert 'data-project-open="' in after_creator
+    title_cluster = after_creator.split("studio-topbar-title", 1)[1].split(
+        "studio-topbar-actions", 1
+    )[0]
+    assert 'id="studio-projects-open"' in title_cluster
+    assert 'id="studio-project-title"' in title_cluster
+    assert "studio-project-identity-label" in title_cluster
+    actions = after_creator.split("studio-topbar-actions", 1)[1].split(
+        "</div>", 1
+    )[0]
+    assert 'id="studio-export-open"' in actions
+    assert "studio-clear-form" not in actions
+    assert 'id="studio-projects-open"' not in actions
+    toolbar = after_creator.split("studio-timeline-toolbar", 1)[1].split(
+        "studio-timeline-row", 1
+    )[0]
+    assert "studio-clear-form" in toolbar
+    assert "Clear Studio" in toolbar or "Studio leeren" in toolbar
+    assert "Remove all clips from this Story" in after_creator or (
+        "Alle Clips aus dieser Story" in after_creator
+    )
+    assert "studio-project-current-badge" in after_creator
+    assert "Switch, create, or manage Studio projects" in after_creator or (
+        "Wechsle, erstelle oder verwalte Studio-Projekte" in after_creator
+    )
+    js = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "orga_drone"
+        / "static"
+        / "js"
+        / "studio.js"
+    ).read_text(encoding="utf-8")
+    assert "flushPendingTitleSave" in js
 
     missing = c.post("/api/studio/projects/99999/open")
     assert missing.status_code == 404
@@ -398,6 +436,7 @@ def test_clear_only_affects_open_project(
     assert cleared.status_code == 303
     assert db.list_studio_items(b.id) == []
     assert len(db.list_studio_items(a.id)) == 1
+    assert db.get_studio_project(b.id) is not None
     assert db.get_media(mid_a) is not None
     assert db.get_media(mid_b) is not None
 
