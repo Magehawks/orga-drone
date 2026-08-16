@@ -146,7 +146,13 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'id="studio-music-replace"' not in html
     assert 'id="inspector-music-replace"' in html
     assert "draggable" not in music_block
-    assert "One local music track for this project" in html or "Eine lokale Musikspur" in html
+    assert 'id="studio-music-add"' not in music_block
+    toolbar = html.split("studio-timeline-toolbar", 1)[1].split(
+        "studio-timeline-row", 1
+    )[0]
+    assert 'id="studio-music-add"' in toolbar
+    assert "One local music track for this project" not in html
+    assert "Eine lokale Musikspur" not in html
     assert 'data-occupancy-s="3.0000"' in html
     assert 'data-occupancy-s="30.0000"' in html
     root = Path(__file__).resolve().parents[1]
@@ -178,15 +184,16 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     layout_src = js.split("function layoutTimeline", 1)[1].split(
         "function centerPlayheadInView", 1
     )[0]
-    assert "layoutMusicSpan()" in layout_src
-    music_span_src = js.split("function layoutMusicSpan", 1)[1].split(
+    assert "layoutMusicSpans()" in layout_src
+    music_span_src = js.split("function layoutMusicSpans", 1)[1].split(
         "function scaledMusicFades", 1
     )[0]
     assert "musicBedDuration" in music_span_src
     assert "timeToX" in music_span_src
     assert "TIMELINE_HIT_MIN_PX" in music_span_src
-    assert 'musicAudio.addEventListener("loadedmetadata"' in js
-    assert 'musicAudio.addEventListener("durationchange"' in js
+    assert 'addEventListener("loadedmetadata"' in js
+    assert 'addEventListener("durationchange"' in js
+    assert "studio-music-audio-next" in js
     assert "studio-music-wave" not in js
     assert "studio-music-handle" not in js
     assert "#studio-music-track" in js

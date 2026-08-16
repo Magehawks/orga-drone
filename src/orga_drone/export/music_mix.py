@@ -40,6 +40,25 @@ def music_bed_duration_s(*, story_s: float, music_s: float, loop: bool) -> float
     return min(music, story) if music > 0 else 0.0
 
 
+def playlist_span_durations(
+    *,
+    story_s: float,
+    music_durations: list[float],
+    loop: bool,
+) -> list[float]:
+    """Contiguous audible spans from Story t=0. Loop applies only for N=1."""
+    story = max(0.0, float(story_s))
+    if len(music_durations) == 1 and loop:
+        return [story]
+    remaining = story
+    spans: list[float] = []
+    for music_s in music_durations:
+        audible = min(max(0.0, float(music_s)), remaining) if remaining > 0 else 0.0
+        spans.append(audible)
+        remaining = max(0.0, remaining - audible)
+    return spans
+
+
 def scaled_fades(fade_in_s: float, fade_out_s: float, bed_s: float) -> tuple[float, float]:
     fade_in = max(0.0, float(fade_in_s))
     fade_out = max(0.0, float(fade_out_s))
@@ -107,6 +126,59 @@ def build_music_amix_filter(
     music_chain = ",".join(parts) + "[mus]"
     return (
         f"{music_chain};"
+        "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[src];"
+        "[src][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]"
+    )
+
+
+def build_playlist_amix_filter(
+    *,
+    story_s: float,
+    tracks: list[dict[str, float]],
+) -> str:
+    """Mix concat audio [0:a] with N sequential music inputs [1:a]..[N:a]."""
+    story = max(0.0, float(story_s))
+    remaining = story
+    chains: list[str] = []
+    labels: list[str] = []
+    for index, track in enumerate(tracks):
+        music_s = max(0.0, float(track.get("music_s") or 0.0))
+        audible = min(music_s, remaining) if remaining > 0 else 0.0
+        remaining = max(0.0, remaining - audible)
+        if audible <= 0:
+            continue
+        fade_in, fade_out = scaled_fades(
+            float(track.get("fade_in_s") or 0.0),
+            float(track.get("fade_out_s") or 0.0),
+            audible,
+        )
+        volume = clamp_music_volume(float(track.get("volume") or DEFAULT_MUSIC_VOLUME))
+        parts = [
+            f"[{index + 1}:a]aformat=sample_rates=48000:channel_layouts=stereo,"
+            f"volume={_fmt(volume)}",
+            f"atrim=0:{_fmt(audible)}",
+            "asetpts=PTS-STARTPTS",
+        ]
+        if fade_in > 0:
+            parts.append(f"afade=t=in:st=0:d={_fmt(fade_in)}")
+        if fade_out > 0:
+            parts.append(
+                f"afade=t=out:st={_fmt(fade_out_start_s(audible, fade_out))}:"
+                f"d={_fmt(fade_out)}"
+            )
+        label = f"s{index}"
+        chains.append(",".join(parts) + f"[{label}]")
+        labels.append(f"[{label}]")
+    if not labels:
+        return (
+            "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
+        )
+    concat = (
+        f"{''.join(labels)}concat=n={len(labels)}:v=0:a=1,"
+        f"atrim=0:{_fmt(story)},asetpts=PTS-STARTPTS[mus]"
+    )
+    return (
+        f"{';'.join(chains)};{concat};"
         "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[src];"
         "[src][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]"
     )

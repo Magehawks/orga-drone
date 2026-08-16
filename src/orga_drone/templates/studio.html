@@ -109,6 +109,8 @@
          data-music-silence-badge="{{ _('then silence')|e }}"
          data-music-pending="{{ _('Duration unknown')|e }}"
          data-music-coverage="{{ _('{music} of {story}')|e }}"
+         data-music-limit="{{ _('This story already has 8 soundtrack songs.')|e }}"
+         data-music-song-of="{{ _('Song {current} of {total}')|e }}"
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
          data-kind-title-card="{{ _('Title card')|e }}"
@@ -290,6 +292,7 @@
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
           <video id="studio-preview-video-b" class="studio-preview-media studio-preview-layer-b" playsinline preload="metadata" muted hidden></video>
           <audio id="studio-music-audio" preload="metadata" hidden></audio>
+          <audio id="studio-music-audio-next" preload="metadata" hidden></audio>
           <div id="studio-preview-titlecard" class="studio-preview-titlecard" hidden data-bg="dark">
             <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-title"></p>
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-subtitle"></p>
@@ -350,7 +353,7 @@
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">
-        <div class="studio-timeline-toolbar" role="toolbar" aria-label="{{ _('Timeline zoom') }}">
+        <div class="studio-timeline-toolbar" role="toolbar" aria-label="{{ _('Timeline') }}">
           <button type="button" class="studio-transport-btn" id="studio-timeline-fit"
                   data-timeline-zoom="fit"
                   title="{{ _('Fit to story') }}" aria-label="{{ _('Fit to story') }}"
@@ -363,6 +366,11 @@
                   data-timeline-zoom="in"
                   title="{{ _('Zoom in') }}" aria-label="{{ _('Zoom in') }}"
                   {% if not items %}disabled{% endif %}>+</button>
+          <button type="button" class="studio-transport-btn studio-icon-button" id="studio-music-add"
+                  title="{{ _('Add soundtrack') }}" aria-label="{{ _('Add soundtrack') }}">
+            {{ lucide('plus') }}
+            <span class="studio-btn-label">{{ _('Add soundtrack') }}</span>
+          </button>
         </div>
         <div class="studio-timeline-row">
           <div class="studio-timeline-gutter" aria-hidden="true">
@@ -472,23 +480,9 @@
                 <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
                   <div class="studio-music-body" id="studio-music-body">
                     <div class="studio-music-empty" id="studio-music-empty">
-                      <button type="button" class="button ghost studio-music-add studio-icon-button" id="studio-music-add">
-                        {{ lucide('plus') }}
-                        <span class="studio-btn-label">{{ _('Add soundtrack') }}</span>
-                      </button>
-                      <p class="hint">{{ _('One local music track for this project. The file stays on this computer and is mixed into export.') }}</p>
+                      <span class="visually-hidden">{{ _('No music yet') }}</span>
                     </div>
-                    <div class="studio-music-clip" id="studio-music-clip" hidden>
-                      <button type="button" class="studio-music-select" id="studio-music-select"
-                              aria-label="{{ _('Soundtrack') }}">
-                        <strong id="studio-music-name"></strong>
-                        <span class="studio-music-meta" id="studio-music-meta"></span>
-                        <span class="studio-music-badge" id="studio-music-badge" hidden></span>
-                        <span class="studio-music-fade studio-music-fade-in" id="studio-music-fade-in" hidden aria-hidden="true"></span>
-                        <span class="studio-music-fade studio-music-fade-out" id="studio-music-fade-out" hidden aria-hidden="true"></span>
-                      </button>
-                    </div>
-                    <p class="hint" id="studio-music-missing" hidden>{{ _('The selected music file is no longer available.') }}</p>
+                    <div class="studio-music-clips" id="studio-music-clips"></div>
                   </div>
                 </div>
               </div>
@@ -553,6 +547,7 @@
 
       <div class="studio-inspector-panel" id="inspector-music" hidden>
         <p class="studio-inspector-kind">{{ _('Soundtrack') }}</p>
+        <p class="meta-line" id="inspector-music-index" hidden></p>
         <p><strong data-field="music-name"></strong></p>
         <label class="studio-inspector-field">
           <span>{{ _('Volume') }}</span>
@@ -566,10 +561,14 @@
           <span>{{ _('Fade out (s)') }}</span>
           <input type="number" id="inspector-music-fade-out" min="0" max="10" step="0.1" value="0">
         </label>
-        <label class="studio-inspector-field">
+        <label class="studio-inspector-field" id="inspector-music-loop-wrap">
           <span>{{ _('Loop') }}</span>
           <input type="checkbox" id="inspector-music-loop">
         </label>
+        <div class="studio-inspector-music-order">
+          <button type="button" class="button ghost" id="inspector-music-move-up">{{ _('Move up') }}</button>
+          <button type="button" class="button ghost" id="inspector-music-move-down">{{ _('Move down') }}</button>
+        </div>
         <button type="button" class="button ghost studio-icon-button" id="inspector-music-replace"
                 title="{{ _('Replace') }}" aria-label="{{ _('Replace') }}">
           <span class="studio-btn-label">{{ _('Replace') }}</span>
@@ -579,7 +578,7 @@
           {{ lucide('trash-2') }}
           <span class="studio-btn-label">{{ _('Remove') }}</span>
         </button>
-        <p class="hint">{{ _('Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
+        <p class="hint">{{ _('Soundtrack songs play one after another from the start of the story. Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
       </div>
 
       <div class="studio-inspector-panel" id="inspector-titlecard" hidden>

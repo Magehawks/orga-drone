@@ -325,20 +325,23 @@ def prepare_studio_export(
         )
     export_clips = decorated
 
-    music_cfg: StudioExportMusic | None = None
-    music_row = db.get_studio_music(project.id)
-    if music_row is not None:
-        from orga_drone.export.music_mix import require_readable_music
+    from orga_drone.export.music_mix import require_readable_music
 
+    music_rows = db.list_studio_music(project.id)
+    music_tracks: list[StudioExportMusic] = []
+    single_loop = len(music_rows) == 1
+    for music_row in music_rows:
         music_path = Path(music_row.file_path)
         duration_s = require_readable_music(music_path)
-        music_cfg = StudioExportMusic(
-            source_path=music_path,
-            volume=float(music_row.volume),
-            fade_in_s=float(music_row.fade_in_s),
-            fade_out_s=float(music_row.fade_out_s),
-            loop=bool(music_row.loop),
-            duration_s=duration_s,
+        music_tracks.append(
+            StudioExportMusic(
+                source_path=music_path,
+                volume=float(music_row.volume),
+                fade_in_s=float(music_row.fade_in_s),
+                fade_out_s=float(music_row.fade_out_s),
+                loop=bool(music_row.loop) and single_loop,
+                duration_s=duration_s,
+            )
         )
 
     return StudioExportConfig(
@@ -347,7 +350,7 @@ def prepare_studio_export(
         height=int(height),
         clips=tuple(export_clips),
         project_title=project.title,
-        music=music_cfg,
+        music_tracks=tuple(music_tracks),
     )
 
 

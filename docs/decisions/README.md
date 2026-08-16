@@ -33,6 +33,6 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0005](0005-studio-export-resolution.md) | Studio export resolution and encoder boundary | Accepted |
 | [0006](0006-studio-project-browser.md) | Studio project browser and last-opened project | Proposed |
 | [0007](0007-studio-export-open-reveal.md) | Studio export open / reveal after completion | Proposed |
-| [0008](0008-studio-music-soundtrack.md) | Studio music as a read-only project soundtrack | Proposed |
+| [0008](0008-studio-music-soundtrack.md) | Studio music as a sequential soundtrack playlist | Accepted |
 | [0009](0009-studio-title-cards.md) | Studio Title Cards as generated timeline items | Proposed |
 | [0010](0010-studio-visual-transitions.md) | Studio visual transitions | Proposed |

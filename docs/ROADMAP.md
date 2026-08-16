@@ -27,12 +27,13 @@ Highlights:
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
-  music slot, inspector, export dialog; persisted: `studio_projects` +
+  soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
   source start/end; project browser/switcher for multiple local edit projects;
   synced Story preview playback; local MP4 export with
   configurable resolution; after success, Open video / Show in folder on
-  Windows; one optional local music track in preview and export; Title Cards
+  Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
+  when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; time-based
   Story canvas with Fit to story / zoom; read-only soundtrack coverage on
   that canvas)
@@ -51,7 +52,8 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 6. Online geocoding providers (place tags are offline today)
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
-dedicated product slice. Local MP4 export, optional music-in-export, and
+dedicated product slice. Local MP4 export, optional soundtrack playlist in
+export, and
 open/reveal of the finished file already exist on Windows desktop.
 
 ## Later (vision)

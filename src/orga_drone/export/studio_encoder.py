@@ -352,13 +352,13 @@ class FfmpegStudioEncoder:
                 current_label=None,
             )
             self._concat_or_stitch(ffmpeg, segments, tmp_out, config)
-            if config.music is not None:
+            if config.music_tracks:
                 _emit(
                     on_progress,
                     phase="mixing",
                     clip_index=clip_total,
                     clip_total=clip_total,
-                    current_label=config.music.source_path.name,
+                    current_label=config.music_tracks[0].source_path.name,
                 )
                 mixed = tmp_dir / "export_mixed.mp4"
                 self._mix_music(ffmpeg, tmp_out, mixed, config)
@@ -772,35 +772,54 @@ class FfmpegStudioEncoder:
     ) -> None:
         from orga_drone.export.music_mix import (
             build_music_amix_filter,
+            build_playlist_amix_filter,
             require_readable_music,
         )
 
-        music = config.music
-        if music is None:
+        tracks = config.music_tracks
+        if not tracks:
             raise StudioExportError("Music mix requested without a music track.")
-        duration_s = music.duration_s
-        if duration_s <= 0:
-            duration_s = require_readable_music(music.source_path)
-        else:
-            require_readable_music(music.source_path)
         story_s = _export_story_length_s(config.clips)
         if story_s <= 0:
             raise StudioExportError("Studio project has no exportable duration.")
-        filter_complex = build_music_amix_filter(
-            volume=music.volume,
-            fade_in_s=music.fade_in_s,
-            fade_out_s=music.fade_out_s,
-            story_s=story_s,
-            music_s=duration_s,
-            loop=music.loop,
-        )
+        probed: list[float] = []
+        for music in tracks:
+            duration_s = music.duration_s
+            if duration_s <= 0:
+                duration_s = require_readable_music(music.source_path)
+            else:
+                require_readable_music(music.source_path)
+            probed.append(duration_s)
+        single = tracks[0]
+        use_loop = len(tracks) == 1 and bool(single.loop)
         cmd: list[str] = [ffmpeg, "-y", "-i", str(concat_path)]
-        if music.loop:
-            cmd.extend(["-stream_loop", "-1"])
+        if use_loop:
+            filter_complex = build_music_amix_filter(
+                volume=single.volume,
+                fade_in_s=single.fade_in_s,
+                fade_out_s=single.fade_out_s,
+                story_s=story_s,
+                music_s=probed[0],
+                loop=True,
+            )
+            cmd.extend(["-stream_loop", "-1", "-i", str(single.source_path)])
+        else:
+            filter_complex = build_playlist_amix_filter(
+                story_s=story_s,
+                tracks=[
+                    {
+                        "volume": music.volume,
+                        "fade_in_s": music.fade_in_s,
+                        "fade_out_s": music.fade_out_s,
+                        "music_s": duration_s,
+                    }
+                    for music, duration_s in zip(tracks, probed, strict=True)
+                ],
+            )
+            for music in tracks:
+                cmd.extend(["-i", str(music.source_path)])
         cmd.extend(
             [
-                "-i",
-                str(music.source_path),
                 "-filter_complex",
                 filter_complex,
                 "-map",

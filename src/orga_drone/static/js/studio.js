@@ -178,6 +178,7 @@
   const previewTitlecardBSubtitle = document.getElementById("studio-preview-titlecard-b-subtitle");
   const previewFadeBlack = document.getElementById("studio-preview-fade-black");
   const musicAudio = document.getElementById("studio-music-audio");
+  const musicAudioNext = document.getElementById("studio-music-audio-next");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
   const transportTime = document.getElementById("studio-transport-time");
   const playheadEl = document.getElementById("studio-playhead");
@@ -198,6 +199,8 @@
   const msgMusicFailed = root.dataset.musicFailed || "Could not save music settings.";
   const msgMusicPickerUnavailable = root.dataset.musicPickerUnavailable || "Choosing music needs the desktop app.";
   const msgMusicMissing = root.dataset.musicMissing || "The selected music file is no longer available.";
+  const msgMusicLimit = root.dataset.musicLimit || "This story already has 8 soundtrack songs.";
+  const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
   const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
@@ -242,10 +245,7 @@
   /** @type {{
    *  selected: {type: 'clip'|'transition'|'music'|null, id: string|null},
    *  projectTimeS: number,
-   *  playing: boolean,
-   *  volume: number,
-   *  title: string,
-   *  music: null | {name: string, volume: number, fadeIn: number, fadeOut: number, loop: boolean, available: boolean, streamUrl: string|null},
+   *  tracks: Array<{id: number, name: string, volume: number, fadeIn: number, fadeOut: number, loop: boolean, available: boolean, streamUrl: string|null, durationS: number}>,
    *  activeStudioId: string|null
    * }} */
   const state = {
@@ -254,7 +254,7 @@
     playing: false,
     volume: 0.8,
     title: titleInput ? titleInput.value : "Your story",
-    music: null,
+    tracks: [],
     activeStudioId: null,
     timelineMode: "fit",
     zoomIndex: 1,
@@ -438,7 +438,7 @@
     buildRuler();
     updatePlayheadChrome();
     updateZoomControls();
-    layoutMusicSpan();
+    layoutMusicSpans();
   }
 
   function centerPlayheadInView() {
@@ -1255,12 +1255,17 @@
     }
   }
 
+  const MUSIC_MAX_TRACKS = 8;
+
   function musicFromPayload(payload) {
-    if (!payload || !payload.present) return null;
+    if (!payload) return null;
     const volume = Number(payload.volume);
     const fadeIn = Number(payload.fade_in_s);
     const fadeOut = Number(payload.fade_out_s);
+    const durationS = Number(payload.duration_s);
+    const id = Number(payload.id);
     return {
+      id: Number.isFinite(id) ? id : 0,
       name: payload.display_name || "Music",
       volume: Number.isFinite(volume) ? volume : 0.8,
       fadeIn: Number.isFinite(fadeIn) ? fadeIn : 0,
@@ -1268,7 +1273,22 @@
       loop: !!payload.loop,
       available: payload.available !== false,
       streamUrl: payload.stream_url || null,
+      durationS: Number.isFinite(durationS) && durationS > 0 ? durationS : 0,
     };
+  }
+
+  function applyTracksPayload(payload) {
+    const list = payload && Array.isArray(payload.tracks) ? payload.tracks : [];
+    state.tracks = list.map(musicFromPayload).filter(Boolean);
+  }
+
+  function selectedMusicTrack() {
+    if (state.selected.type !== "music") return null;
+    return state.tracks.find((t) => String(t.id) === String(state.selected.id)) || null;
+  }
+
+  function musicLoopEnabled() {
+    return state.tracks.length === 1 && !!state.tracks[0].loop;
   }
 
   function musicBedDuration(storyS, musicS, loop) {
@@ -1277,118 +1297,160 @@
     return Math.min(musicS, Math.max(0, storyS));
   }
 
-  let cachedMusicDurationS = 0;
-
   function formatLaneTime(seconds) {
     return formatTime(seconds).replace(/^00:/, "");
   }
 
-  function musicDurationKnownS() {
-    if (!musicAudio || !state.music || !state.music.available) return 0;
-    const d = musicAudio.duration;
-    if (Number.isFinite(d) && d > 0) {
-      cachedMusicDurationS = d;
-      return d;
+  function trackDurationS(track) {
+    if (!track || !track.available) return 0;
+    if (track.durationS > 0) return track.durationS;
+    for (const el of [musicAudio, musicAudioNext]) {
+      if (
+        el &&
+        el.getAttribute("src") === track.streamUrl &&
+        Number.isFinite(el.duration) &&
+        el.duration > 0
+      ) {
+        track.durationS = el.duration;
+        return el.duration;
+      }
     }
-    return cachedMusicDurationS > 0 ? cachedMusicDurationS : 0;
+    return 0;
   }
 
-  function layoutMusicSpan() {
-    const select = document.getElementById("studio-music-select");
-    const fadeInEl = document.getElementById("studio-music-fade-in");
-    const fadeOutEl = document.getElementById("studio-music-fade-out");
-    const meta = document.getElementById("studio-music-meta");
-    const badge = document.getElementById("studio-music-badge");
-    if (!select) return;
+  function updateMusicAddEnabled() {
+    const btn = document.getElementById("studio-music-add");
+    if (!btn) return;
+    btn.disabled = state.tracks.length >= MUSIC_MAX_TRACKS;
+  }
 
-    const hideFades = () => {
-      if (fadeInEl) {
-        fadeInEl.hidden = true;
-        fadeInEl.style.width = "";
+  function playlistHit(t) {
+    const story = totalDuration();
+    if (!(story > 0) || t < 0 || t >= story || !state.tracks.length) return null;
+    if (musicLoopEnabled()) {
+      const track = state.tracks[0];
+      const mus = trackDurationS(track);
+      if (!(mus > 0) || !track.available) return null;
+      return { track, index: 0, offset: t % mus, startS: 0, spanS: story };
+    }
+    let cursor = 0;
+    for (let i = 0; i < state.tracks.length; i += 1) {
+      const track = state.tracks[i];
+      const mus = trackDurationS(track);
+      const remaining = Math.max(0, story - cursor);
+      const span = track.available ? Math.min(Math.max(0, mus), remaining) : 0;
+      if (span > 0 && t >= cursor && t < cursor + span) {
+        return { track, index: i, offset: t - cursor, startS: cursor, spanS: span };
       }
-      if (fadeOutEl) {
-        fadeOutEl.hidden = true;
-        fadeOutEl.style.width = "";
-      }
-    };
-    const setBadge = (text) => {
-      if (!badge) return;
-      if (text) {
-        badge.hidden = false;
-        badge.textContent = text;
-      } else {
-        badge.hidden = true;
-        badge.textContent = "";
-      }
-    };
+      cursor += span;
+      if (cursor >= story) break;
+    }
+    return null;
+  }
 
-    select.classList.remove("is-coverage", "is-pending", "is-missing");
-    select.style.width = "";
-    select.style.left = "";
-    hideFades();
-    if (meta) meta.textContent = "";
-    setBadge("");
-
-    if (!state.music) return;
+  function layoutMusicSpans() {
+    const clipsEl = document.getElementById("studio-music-clips");
+    const empty = document.getElementById("studio-music-empty");
+    const trackEl = document.getElementById("studio-music-track");
+    if (!clipsEl) return;
+    if (empty) empty.hidden = state.tracks.length > 0;
+    if (trackEl) {
+      trackEl.classList.toggle("is-selected", state.selected.type === "music");
+    }
+    updateMusicAddEnabled();
+    clipsEl.replaceChildren();
+    if (!state.tracks.length) return;
 
     const story = totalDuration();
-    const loop = !!state.music.loop;
-    const available = !!state.music.available;
-    const musDur = available ? musicDurationKnownS() : 0;
-    const known = musDur > 0;
+    const loop = musicLoopEnabled();
     const msgLoop = root.dataset.musicLoopBadge || "Loop · repeats to Story end";
     const msgSilence = root.dataset.musicSilenceBadge || "then silence";
     const msgPending = root.dataset.musicPending || "Duration unknown";
     const msgCoverage = root.dataset.musicCoverage || "{music} of {story}";
-
-    if (!available) {
-      select.classList.add("is-missing");
-      return;
-    }
-
-    if (!known && !loop) {
-      select.classList.add("is-pending");
-      setBadge(msgPending);
-      return;
-    }
-
-    const bed = musicBedDuration(story, musDur, loop);
-    const widthPx = timeToX(bed);
-    if (!(bed > 0) || widthPx < 1) {
-      select.classList.add("is-pending");
-      if (loop) setBadge(msgLoop);
-      else if (!known) setBadge(msgPending);
-      return;
-    }
-
-    select.classList.add("is-coverage");
-    select.style.left = "0px";
-    select.style.width = `${widthPx}px`;
-
-    if (known && story > 0 && meta) {
-      meta.textContent = msgCoverage
-        .replace("{music}", formatLaneTime(musDur))
-        .replace("{story}", formatLaneTime(story));
-    }
-
-    if (loop) setBadge(msgLoop);
-    else if (known && musDur < story) setBadge(msgSilence);
-
-    const scaled = scaledMusicFades(state.music.fadeIn, state.music.fadeOut, bed);
-    if (fadeInEl) {
-      const fiPx = timeToX(scaled.fadeIn);
-      if (scaled.fadeIn > 0 && fiPx >= TIMELINE_HIT_MIN_PX) {
-        fadeInEl.hidden = false;
-        fadeInEl.style.width = `${fiPx}px`;
+    let cursor = 0;
+    state.tracks.forEach((track, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "studio-music-select";
+      btn.dataset.musicId = String(track.id);
+      btn.setAttribute("aria-label", track.name);
+      if (String(state.selected.id) === String(track.id) && state.selected.type === "music") {
+        btn.classList.add("is-selected");
       }
-    }
-    if (fadeOutEl) {
-      const foPx = timeToX(scaled.fadeOut);
-      if (scaled.fadeOut > 0 && foPx >= TIMELINE_HIT_MIN_PX) {
-        fadeOutEl.hidden = false;
-        fadeOutEl.style.width = `${foPx}px`;
+      const nameEl = document.createElement("strong");
+      nameEl.textContent = track.name;
+      const meta = document.createElement("span");
+      meta.className = "studio-music-meta";
+      const badge = document.createElement("span");
+      badge.className = "studio-music-badge";
+      badge.hidden = true;
+      const fadeInEl = document.createElement("span");
+      fadeInEl.className = "studio-music-fade studio-music-fade-in";
+      fadeInEl.hidden = true;
+      fadeInEl.setAttribute("aria-hidden", "true");
+      const fadeOutEl = document.createElement("span");
+      fadeOutEl.className = "studio-music-fade studio-music-fade-out";
+      fadeOutEl.hidden = true;
+      fadeOutEl.setAttribute("aria-hidden", "true");
+      btn.append(nameEl, meta, badge, fadeInEl, fadeOutEl);
+
+      const musDur = trackDurationS(track);
+      const known = musDur > 0;
+      const remaining = Math.max(0, story - cursor);
+      let spanS = 0;
+      if (!track.available) {
+        btn.classList.add("is-missing");
+        badge.hidden = false;
+        badge.textContent = msgMusicMissing;
+      } else if (!known && !loop) {
+        btn.classList.add("is-pending");
+        badge.hidden = false;
+        badge.textContent = msgPending;
+      } else {
+        spanS = musicBedDuration(remaining, musDur, loop);
+        const leftPx = timeToX(cursor);
+        const widthPx = Math.max(0, timeToX(cursor + spanS) - leftPx);
+        if (spanS > 0 && widthPx >= 1) {
+          btn.classList.add("is-coverage");
+          btn.style.left = `${leftPx}px`;
+          btn.style.width = `${widthPx}px`;
+          if (known && story > 0) {
+            meta.textContent = msgCoverage
+              .replace("{music}", formatLaneTime(musDur))
+              .replace("{story}", formatLaneTime(story));
+          }
+          if (loop) {
+            badge.hidden = false;
+            badge.textContent = msgLoop;
+          } else if (index === state.tracks.length - 1 && cursor + spanS < story) {
+            badge.hidden = false;
+            badge.textContent = msgSilence;
+          }
+          const scaled = scaledMusicFades(track.fadeIn, track.fadeOut, spanS);
+          const fiPx = timeToX(scaled.fadeIn);
+          const foPx = timeToX(scaled.fadeOut);
+          if (scaled.fadeIn > 0 && fiPx >= TIMELINE_HIT_MIN_PX) {
+            fadeInEl.hidden = false;
+            fadeInEl.style.width = `${fiPx}px`;
+          }
+          if (scaled.fadeOut > 0 && foPx >= TIMELINE_HIT_MIN_PX) {
+            fadeOutEl.hidden = false;
+            fadeOutEl.style.width = `${foPx}px`;
+          }
+        } else {
+          btn.classList.add("is-pending");
+          if (loop) {
+            badge.hidden = false;
+            badge.textContent = msgLoop;
+          } else if (!known) {
+            badge.hidden = false;
+            badge.textContent = msgPending;
+          }
+        }
       }
-    }
+      clipsEl.appendChild(btn);
+      if (spanS > 0) cursor += spanS;
+    });
   }
 
   function scaledMusicFades(fadeIn, fadeOut, bedS) {
@@ -1416,91 +1478,70 @@
     return Math.max(0, Math.min(1, gain));
   }
 
-  function pauseMusicAudio() {
-    if (!musicAudio) return;
+  function pauseMusicElement(el) {
+    if (!el) return;
     try {
-      musicAudio.pause();
+      el.pause();
     } catch (_) {
       /* ignore */
     }
   }
 
-  function ensureMusicAudioSrc() {
-    if (!musicAudio || !state.music || !state.music.available || !state.music.streamUrl) {
-      cachedMusicDurationS = 0;
-      if (musicAudio) {
-        musicAudio.removeAttribute("src");
-        try {
-          musicAudio.load();
-        } catch (_) {
-          /* ignore */
-        }
-      }
-      return false;
-    }
-    if (musicAudio.getAttribute("src") !== state.music.streamUrl) {
-      cachedMusicDurationS = 0;
-      try {
-        musicAudio.pause();
-      } catch (_) {
-        /* ignore */
-      }
-      musicAudio.removeAttribute("src");
-      musicAudio.src = state.music.streamUrl;
-      musicAudio.load();
+  function pauseMusicAudio() {
+    pauseMusicElement(musicAudio);
+    pauseMusicElement(musicAudioNext);
+  }
+
+  function ensureMusicSrc(el, url) {
+    if (!el || !url) return false;
+    if (el.getAttribute("src") !== url) {
+      pauseMusicElement(el);
+      el.removeAttribute("src");
+      el.src = url;
+      el.load();
     }
     return true;
   }
 
   function syncMusicAudio() {
-    if (!musicAudio || !state.music || !state.music.available) {
+    const hit = playlistHit(state.projectTimeS);
+    if (!hit || !hit.track.streamUrl) {
       pauseMusicAudio();
       return;
     }
-    if (!ensureMusicAudioSrc()) {
+    const active = hit.index % 2 === 0 ? musicAudio : musicAudioNext;
+    const idle = hit.index % 2 === 0 ? musicAudioNext : musicAudio;
+    if (!active) {
       pauseMusicAudio();
       return;
     }
-    const story = totalDuration();
-    const t = state.projectTimeS;
-    const musDur = Number.isFinite(musicAudio.duration) ? musicAudio.duration : 0;
-    const bed = musicBedDuration(story, musDur, state.music.loop);
-    let playPos = 0;
-    let inBed = false;
-    if (story > 0 && t < story && musDur > 0) {
-      if (state.music.loop) {
-        inBed = true;
-        playPos = t % musDur;
-      } else if (t < musDur) {
-        inBed = true;
-        playPos = t;
-      }
+    ensureMusicSrc(active, hit.track.streamUrl);
+    const nextTrack = !musicLoopEnabled() ? state.tracks[hit.index + 1] : null;
+    if (idle && nextTrack && nextTrack.available && nextTrack.streamUrl) {
+      ensureMusicSrc(idle, nextTrack.streamUrl);
     }
-    const gain = inBed
-      ? musicFadeGain(t, bed, state.music.fadeIn, state.music.fadeOut)
-      : 0;
-    musicAudio.volume = Math.max(0, Math.min(1, state.volume * state.music.volume * gain));
-    if (!inBed || !state.playing) {
-      pauseMusicAudio();
-      if (inBed && Number.isFinite(playPos)) {
-        try {
-          if (Math.abs((musicAudio.currentTime || 0) - playPos) > 0.35) {
-            musicAudio.currentTime = playPos;
-          }
-        } catch (_) {
-          /* ignore */
+    const localT = state.projectTimeS - hit.startS;
+    const gain = musicFadeGain(localT, hit.spanS, hit.track.fadeIn, hit.track.fadeOut);
+    active.volume = Math.max(0, Math.min(1, state.volume * hit.track.volume * gain));
+    const playPos = hit.offset;
+    pauseMusicElement(idle);
+    const seekIfNeeded = (el) => {
+      if (!el || !Number.isFinite(playPos)) return;
+      try {
+        if (Math.abs((el.currentTime || 0) - playPos) > 0.35) {
+          el.currentTime = playPos;
         }
+      } catch (_) {
+        /* ignore */
       }
+    };
+    if (!state.playing) {
+      pauseMusicElement(active);
+      seekIfNeeded(active);
       return;
     }
-    try {
-      if (Math.abs((musicAudio.currentTime || 0) - playPos) > 0.35) {
-        musicAudio.currentTime = playPos;
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    const playPromise = musicAudio.play();
+    seekIfNeeded(active);
+    const playPromise = active.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(() => {
         /* autoplay / decode */
@@ -1790,82 +1831,134 @@
     updateCutEnabled();
   }
 
-  function selectMusic() {
-    if (!state.music) return;
-    state.selected = { type: "music", id: "music" };
+  function musicErrorDetail(body) {
+    const detail = body && body.detail;
+    if (detail === "music_limit") return msgMusicLimit;
+    if (typeof detail === "string" && detail) return detail;
+    return msgMusicFailed;
+  }
+
+  function selectMusic(trackId) {
+    const track = state.tracks.find((item) => String(item.id) === String(trackId));
+    if (!track) return;
+    state.selected = { type: "music", id: String(track.id) };
     clips().forEach((c) => c.classList.remove("is-selected"));
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.remove("is-selected"));
     document.getElementById("studio-music-track")?.classList.add("is-selected");
     showInspector("inspector-music");
     const panel = document.getElementById("inspector-music");
     if (!panel) return;
-    panel.querySelector('[data-field="music-name"]').textContent = state.music.name;
+    const nameEl = panel.querySelector('[data-field="music-name"]');
+    if (nameEl) nameEl.textContent = track.name;
+    const indexEl = document.getElementById("inspector-music-index");
+    const index = state.tracks.findIndex((item) => item.id === track.id);
+    if (indexEl) {
+      indexEl.hidden = false;
+      indexEl.textContent = msgMusicSongOf
+        .replace("{current}", String(index + 1))
+        .replace("{total}", String(state.tracks.length));
+    }
     const vol = document.getElementById("inspector-music-volume");
     const fadeIn = document.getElementById("inspector-music-fade-in");
     const fadeOut = document.getElementById("inspector-music-fade-out");
     const loopEl = document.getElementById("inspector-music-loop");
-    if (vol) vol.value = String(Math.round(state.music.volume * 100));
-    if (fadeIn) fadeIn.value = String(state.music.fadeIn);
-    if (fadeOut) fadeOut.value = String(state.music.fadeOut);
-    if (loopEl) loopEl.checked = !!state.music.loop;
+    const loopWrap = document.getElementById("inspector-music-loop-wrap");
+    if (vol) vol.value = String(Math.round(track.volume * 100));
+    if (fadeIn) fadeIn.value = String(track.fadeIn);
+    if (fadeOut) fadeOut.value = String(track.fadeOut);
+    if (loopWrap) loopWrap.hidden = state.tracks.length !== 1;
+    if (loopEl) loopEl.checked = !!track.loop && state.tracks.length === 1;
+    const upBtn = document.getElementById("inspector-music-move-up");
+    const downBtn = document.getElementById("inspector-music-move-down");
+    if (upBtn) upBtn.disabled = index <= 0;
+    if (downBtn) downBtn.disabled = index < 0 || index >= state.tracks.length - 1;
   }
 
   function renderMusic() {
-    const empty = document.getElementById("studio-music-empty");
-    const clip = document.getElementById("studio-music-clip");
-    const name = document.getElementById("studio-music-name");
-    const missing = document.getElementById("studio-music-missing");
-    if (!empty || !clip) return;
-    if (state.music) {
-      empty.hidden = true;
-      clip.hidden = false;
-      if (name) name.textContent = state.music.name;
-      if (missing) missing.hidden = !!state.music.available;
-    } else {
-      empty.hidden = false;
-      clip.hidden = true;
-      if (missing) missing.hidden = true;
-      if (state.selected.type === "music") {
-        state.selected = { type: null, id: null };
-        showInspector("inspector-empty");
-      }
+    if (state.selected.type === "music" && !selectedMusicTrack()) {
+      state.selected = { type: null, id: null };
+      showInspector("inspector-empty");
+      document.getElementById("studio-music-track")?.classList.remove("is-selected");
     }
     syncMusicAudio();
     layoutTimeline();
+    if (state.selected.type === "music") selectMusic(state.selected.id);
   }
 
-  async function pickAndSetMusic() {
+  async function pickMusicPath() {
+    const picked = await fetch("/api/desktop/pick-open-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({}),
+    });
+    const pickedBody = await picked.json().catch(() => null);
+    if (picked.status === 503) {
+      showFlash(msgMusicPickerUnavailable);
+      return null;
+    }
+    if (!picked.ok || !pickedBody || pickedBody.status === "cancelled") return null;
+    if (pickedBody.status !== "ok" || !pickedBody.path) {
+      showFlash(msgMusicFailed);
+      return null;
+    }
+    return pickedBody.path;
+  }
+
+  async function addMusicTrack() {
     if (!projectId) return;
+    if (state.tracks.length >= MUSIC_MAX_TRACKS) {
+      showFlash(msgMusicLimit);
+      return;
+    }
     try {
-      const picked = await fetch("/api/desktop/pick-open-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({}),
-      });
-      const pickedBody = await picked.json().catch(() => null);
-      if (picked.status === 503) {
-        showFlash(msgMusicPickerUnavailable);
-        return;
-      }
-      if (!picked.ok || !pickedBody || pickedBody.status === "cancelled") return;
-      if (pickedBody.status !== "ok" || !pickedBody.path) {
-        showFlash(msgMusicFailed);
-        return;
-      }
+      const path = await pickMusicPath();
+      if (!path) return;
       setSaveState(false);
       const saved = await fetch(`/api/studio/projects/${projectId}/music`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ path: pickedBody.path }),
+        body: JSON.stringify({ path }),
       });
       const savedBody = await saved.json().catch(() => null);
       if (!saved.ok || !savedBody || !savedBody.ok) {
-        showFlash((savedBody && savedBody.detail) || msgMusicFailed);
+        showFlash(musicErrorDetail(savedBody));
         return;
       }
-      state.music = musicFromPayload(savedBody);
+      applyTracksPayload(savedBody);
+      const last = state.tracks[state.tracks.length - 1];
       renderMusic();
-      selectMusic();
+      if (last) selectMusic(last.id);
+      setSaveState(true);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  async function replaceSelectedMusic() {
+    if (!projectId) return;
+    const track = selectedMusicTrack();
+    if (!track) return;
+    try {
+      const path = await pickMusicPath();
+      if (!path) return;
+      setSaveState(false);
+      const saved = await fetch(
+        `/api/studio/projects/${projectId}/music/${track.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ path }),
+        }
+      );
+      const savedBody = await saved.json().catch(() => null);
+      if (!saved.ok || !savedBody || !savedBody.ok) {
+        showFlash(musicErrorDetail(savedBody));
+        return;
+      }
+      applyTracksPayload(savedBody);
+      renderMusic();
+      selectMusic(track.id);
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -1874,26 +1967,29 @@
   }
 
   async function patchMusicSettings() {
-    if (!projectId || !state.music) return;
+    const track = selectedMusicTrack();
+    if (!projectId || !track) return;
     setSaveState(false);
+    const payload = {
+      volume: track.volume,
+      fade_in_s: track.fadeIn,
+      fade_out_s: track.fadeOut,
+    };
+    if (state.tracks.length === 1) payload.loop = !!track.loop;
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/music`, {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${track.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          volume: state.music.volume,
-          fade_in_s: state.music.fadeIn,
-          fade_out_s: state.music.fadeOut,
-          loop: !!state.music.loop,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok) {
-        showFlash((data && data.detail) || msgMusicFailed);
+        showFlash(musicErrorDetail(data));
         return;
       }
-      state.music = musicFromPayload(data);
+      applyTracksPayload(data);
       renderMusic();
+      selectMusic(track.id);
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -1901,28 +1997,65 @@
   }
 
   async function clearMusic() {
+    const track = selectedMusicTrack();
     if (!projectId) {
-      state.music = null;
-      cachedMusicDurationS = 0;
+      state.tracks = [];
       renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
       return;
     }
+    if (!track) return;
     setSaveState(false);
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/music`, {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${track.id}`, {
         method: "DELETE",
         headers: { Accept: "application/json" },
       });
-      if (!res.ok) throw new Error("delete music failed");
-      state.music = null;
-      cachedMusicDurationS = 0;
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash(musicErrorDetail(data));
+        return;
+      }
+      applyTracksPayload(data);
+      state.selected = { type: null, id: null };
       renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
       setSaveState(true);
       showFlash("");
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  async function moveSelectedMusic(delta) {
+    const track = selectedMusicTrack();
+    if (!projectId || !track) return;
+    const ids = state.tracks.map((item) => item.id);
+    const index = ids.indexOf(track.id);
+    const next = index + delta;
+    if (index < 0 || next < 0 || next >= ids.length) return;
+    const swapped = ids.slice();
+    const tmp = swapped[index];
+    swapped[index] = swapped[next];
+    swapped[next] = tmp;
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ ids: swapped }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash(musicErrorDetail(data));
+        return;
+      }
+      applyTracksPayload(data);
+      renderMusic();
+      selectMusic(track.id);
+      setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
     }
@@ -2546,28 +2679,41 @@
 
   document.getElementById("studio-music-add")?.addEventListener("click", (event) => {
     event.stopPropagation();
-    pickAndSetMusic();
+    addMusicTrack();
   });
-  document.getElementById("studio-music-track")?.addEventListener("click", (event) => {
-    if (event.target.closest("#studio-music-add")) return;
+  document.getElementById("studio-music-clips")?.addEventListener("click", (event) => {
+    const btn = event.target.closest(".studio-music-select");
+    if (!btn) return;
     event.stopPropagation();
-    if (state.music) selectMusic();
+    selectMusic(btn.dataset.musicId);
   });
   document.getElementById("inspector-music-replace")?.addEventListener("click", (event) => {
     event.preventDefault();
-    pickAndSetMusic();
+    replaceSelectedMusic();
   });
   document.getElementById("inspector-music-remove")?.addEventListener("click", clearMusic);
-  if (musicAudio) {
-    const onMusicDuration = () => {
-      if (Number.isFinite(musicAudio.duration) && musicAudio.duration > 0) {
-        cachedMusicDurationS = musicAudio.duration;
-      }
-      layoutTimeline();
-    };
-    musicAudio.addEventListener("loadedmetadata", onMusicDuration);
-    musicAudio.addEventListener("durationchange", onMusicDuration);
-  }
+  document.getElementById("inspector-music-move-up")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    moveSelectedMusic(-1);
+  });
+  document.getElementById("inspector-music-move-down")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    moveSelectedMusic(1);
+  });
+  const onMusicDuration = (event) => {
+    const el = event.target;
+    if (!el || !(Number.isFinite(el.duration) && el.duration > 0)) return;
+    const src = el.getAttribute("src");
+    state.tracks.forEach((track) => {
+      if (track.streamUrl && track.streamUrl === src) track.durationS = el.duration;
+    });
+    layoutTimeline();
+  };
+  [musicAudio, musicAudioNext].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("loadedmetadata", onMusicDuration);
+    el.addEventListener("durationchange", onMusicDuration);
+  });
 
   async function addTitleCard() {
     try {
@@ -2731,15 +2877,16 @@
   ["inspector-music-volume", "inspector-music-fade-in", "inspector-music-fade-out"].forEach(
     (id) => {
       document.getElementById(id)?.addEventListener("input", () => {
-        if (!state.music) return;
+        const track = selectedMusicTrack();
+        if (!track) return;
         const vol = document.getElementById("inspector-music-volume");
         const fadeIn = document.getElementById("inspector-music-fade-in");
         const fadeOut = document.getElementById("inspector-music-fade-out");
-        state.music.volume = Number(vol?.value || 80) / 100;
-        state.music.fadeIn = Number(fadeIn?.value || 0);
-        state.music.fadeOut = Number(fadeOut?.value || 0);
+        track.volume = Number(vol?.value || 80) / 100;
+        track.fadeIn = Number(fadeIn?.value || 0);
+        track.fadeOut = Number(fadeOut?.value || 0);
         syncMusicAudio();
-        layoutMusicSpan();
+        layoutMusicSpans();
       });
       document.getElementById(id)?.addEventListener("change", () => {
         patchMusicSettings();
@@ -2747,8 +2894,9 @@
     }
   );
   document.getElementById("inspector-music-loop")?.addEventListener("change", (event) => {
-    if (!state.music) return;
-    state.music.loop = !!event.target.checked;
+    const track = selectedMusicTrack();
+    if (!track) return;
+    track.loop = !!event.target.checked;
     syncMusicAudio();
     layoutTimeline();
     patchMusicSettings();
@@ -2902,9 +3050,9 @@
   loadUiState();
   try {
     const boot = root.dataset.musicPayload;
-    if (boot) state.music = musicFromPayload(JSON.parse(boot));
+    if (boot) applyTracksPayload(JSON.parse(boot));
   } catch (_) {
-    state.music = null;
+    state.tracks = [];
   }
   applyVolume();
   applyTransitionsToDom();

@@ -47,7 +47,14 @@ class StudioExportConfig:
     height: int
     clips: tuple[StudioExportClip, ...] = field(default_factory=tuple)
     project_title: str = "Your story"
+    music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
     music: StudioExportMusic | None = None
+
+    def __post_init__(self) -> None:
+        if self.music is not None and not self.music_tracks:
+            object.__setattr__(self, "music_tracks", (self.music,))
+        elif self.music_tracks and self.music is None:
+            object.__setattr__(self, "music", self.music_tracks[0])
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -56,5 +63,5 @@ class StudioExportConfig:
             "height": self.height,
             "project_title": self.project_title,
             "clip_count": len(self.clips),
-            "has_music": self.music is not None,
+            "has_music": bool(self.music_tracks),
         }
