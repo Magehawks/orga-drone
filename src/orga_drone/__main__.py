@@ -41,10 +41,13 @@ def _load_app():
 
 
 def _prepare_runtime() -> None:
-    """Fix windowed-EXE stdio (None when console=False) before uvicorn touches isatty."""
-    from orga_drone.desktop import configure_stdio_and_logging
+    """Fix windowed-EXE stdio and pythonnet CLR path before pywebview imports."""
+    from orga_drone.desktop import configure_stdio_and_logging, prepare_pythonnet_runtime
 
     configure_stdio_and_logging()
+    # Must run before import webview: CLR cannot load Python.Runtime.dll from
+    # paths with parentheses (Windows "Copy (2)" of the GitHub zip).
+    prepare_pythonnet_runtime()
 
 
 def _run_browser(host: str, port: int, *, packaged: bool) -> None:
@@ -86,6 +89,18 @@ def _run_browser(host: str, port: int, *, packaged: bool) -> None:
         )
 
 
+def _report_desktop_failure(exc: BaseException) -> None:
+    from orga_drone.desktop import log_desktop_failure, show_error_dialog
+
+    crash = log_desktop_failure(exc)
+    show_error_dialog(
+        "orga-drone",
+        "The desktop window could not start. Native file dialogs "
+        "(library folder, soundtrack, export) need this window.\n\n"
+        f"{type(exc).__name__}: {exc}\n\nDetails: {crash}",
+    )
+
+
 def _run_desktop(host: str, port: int) -> None:
     from orga_drone.desktop import run_desktop
 
@@ -119,8 +134,15 @@ def main() -> None:
         try:
             _run_desktop(host, port)
             return
-        except Exception as exc:  # noqa: BLE001 — fall back to browser UX
-            print(f"Desktop window unavailable ({exc}); opening system browser.", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001 — log; packaged EXE must not hide this
+            _report_desktop_failure(exc)
+            if packaged and not _want_browser():
+                return
+    elif packaged and not _want_browser():
+        _report_desktop_failure(
+            RuntimeError("pywebview is not available in this packaged build")
+        )
+        return
 
     _run_browser(host, port, packaged=packaged)
 

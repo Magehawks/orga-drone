@@ -10,8 +10,10 @@ orga-drone is distributed in two ways:
 **Double-click `orga-drone.exe`** → a native desktop window opens (pywebview + Edge WebView2).
 No system browser is launched. Closing the window stops the local server.
 
-If WebView2 / pywebview cannot start, the app falls back to the system browser.
-Force browser mode with `ORGA_DRONE_BROWSER=1`.
+If WebView2 / pywebview cannot start, the packaged app shows an error dialog and
+writes `orga-drone.log` plus `startup-crash.log`. It does **not** open the system
+browser (native folder / soundtrack / export dialogs need the desktop window).
+Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 
 First launch with an empty library opens the **Library** page so “Add folder” is obvious.
 
@@ -80,6 +82,18 @@ usually trusted already. A folder exclusion is the practical mitigation.
 
 Packaged mode sets `ORGA_DRONE_PACKAGED=1` (also detectable via `sys.frozen`) and
 disables Uvicorn access logs so Range requests do not flood logs.
+
+The Windows desktop window uses pywebview + pythonnet (`Python.Runtime.dll`).
+.NET cannot load that DLL from paths that contain parentheses — including the
+common Windows download name `orga-drone-windows-x64 (2)`. On startup the
+packaged app copies the DLL to `%APPDATA%\orga-drone\clr-runtime\` when needed.
+If the desktop window still cannot start, the app logs the exception to
+`orga-drone.log` and `startup-crash.log` and shows an error dialog; it does
+**not** silently open the system browser (native Studio pickers would not work).
+Force browser mode only with `ORGA_DRONE_BROWSER=1`.
+
+UI fonts (Outfit, Sora, IBM Plex Mono) are bundled under `static/fonts/` and
+served locally. The desktop UI does not load Google Fonts from the network.
 
 ## CI idea
 

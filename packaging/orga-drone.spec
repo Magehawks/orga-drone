@@ -32,6 +32,12 @@ hiddenimports = [
     "orga_drone.__main__",
     "orga_drone.desktop",
     "webview",
+    "webview.platforms.winforms",
+    "webview.platforms.edgechromium",
+    "webview.platforms.win32",
+    "clr",
+    "clr_loader",
+    "pythonnet",
 ]
 
 tmp_ret = collect_all("orga_drone")
@@ -49,6 +55,16 @@ binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]
 
 tmp_ret = collect_all("webview")
+datas += tmp_ret[0]
+binaries += tmp_ret[1]
+hiddenimports += tmp_ret[2]
+
+tmp_ret = collect_all("pythonnet")
+datas += tmp_ret[0]
+binaries += tmp_ret[1]
+hiddenimports += tmp_ret[2]
+
+tmp_ret = collect_all("clr_loader")
 datas += tmp_ret[0]
 binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]

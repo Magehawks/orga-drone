@@ -1,0 +1,2 @@
+Outfit, Sora, and IBM Plex Mono (SIL Open Font License 1.1).
+Latin woff2 files from Fontsource (https://fontsource.org/), originally Google Fonts.
