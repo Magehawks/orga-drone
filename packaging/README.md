@@ -48,6 +48,10 @@ export already falls back to `ffmpeg -i` when ffprobe is absent.
 The exe is built with `console=False` (no black console window). For debugging a build,
 temporarily set `console=True` in `orga-drone.spec`.
 
+The Windows EXE icon is `packaging/assets/orga-drone.ico` (16–256px). The same
+artwork is served as `/static/icons/orga-drone.png` (favicon) and
+`/static/icons/orga-drone.ico` (pywebview `start(icon=…)` on Windows).
+
 Release layout (local, not committed as binaries):
 
 ```text

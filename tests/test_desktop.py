@@ -16,6 +16,7 @@ import uvicorn
 from orga_drone import desktop
 from orga_drone.desktop import (
     DesktopActionUnavailable,
+    app_window_icon_path,
     can_open_local_file,
     can_reveal_local_file,
     configure_stdio_and_logging,
@@ -69,6 +70,24 @@ def test_windowed_stdio_uvicorn_logging(monkeypatch, tmp_path) -> None:
     )
     config.configure_logging()  # must not raise AttributeError/ValueError
 
+
+def test_app_window_icon_path_points_at_packaged_ico() -> None:
+    path = app_window_icon_path()
+    assert path is not None
+    assert path.name == "orga-drone.ico"
+    assert path.is_file()
+    assert path.stat().st_size > 1000
+
+
+def test_webview_start_accepts_icon_kwarg() -> None:
+    """WinForms reads start(icon=); create_window has no icon parameter."""
+    webview = pytest.importorskip("webview")
+    import inspect
+
+    start_params = inspect.signature(webview.start).parameters
+    window_params = inspect.signature(webview.create_window).parameters
+    assert "icon" in start_params
+    assert "icon" not in window_params
 
 
 def test_find_listen_port_prefers_free_preferred() -> None:

@@ -1,6 +1,8 @@
-"""UI fonts are local application assets, not a Google Fonts CDN request."""
+"""UI fonts and local app icon assets."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from orga_drone.app import PACKAGE_DIR, STATIC_DIR
 
@@ -36,3 +38,31 @@ def test_ui_font_files_exist() -> None:
         path = fonts / name
         assert path.is_file(), path
         assert path.stat().st_size > 1000
+
+
+def test_base_template_uses_local_favicon() -> None:
+    html = (PACKAGE_DIR / "templates" / "base.html").read_text(encoding="utf-8")
+    assert 'href="/static/icons/orga-drone.png"' in html
+    assert 'href="/static/icons/orga-drone.ico"' in html
+    assert "fonts.googleapis.com" not in html
+
+
+def test_app_icon_png_exists() -> None:
+    png = STATIC_DIR / "icons" / "orga-drone.png"
+    assert png.is_file()
+    assert png.stat().st_size > 1000
+
+
+def test_packaging_ico_has_standard_sizes() -> None:
+    from PIL import Image
+
+    repo = Path(__file__).resolve().parents[1]
+    ico = repo / "packaging" / "assets" / "orga-drone.ico"
+    static_ico = STATIC_DIR / "icons" / "orga-drone.ico"
+    assert ico.is_file()
+    assert static_ico.is_file()
+    assert ico.read_bytes() == static_ico.read_bytes()
+    with Image.open(ico) as image:
+        assert image.format == "ICO"
+        sizes = sorted(image.ico.sizes())
+    assert sizes == [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]

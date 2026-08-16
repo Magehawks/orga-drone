@@ -26,6 +26,17 @@ _LOG = logging.getLogger("orga_drone.desktop")
 _UNSAFE_CLR_PATH_CHARS = frozenset("()[]#&")
 
 
+def app_window_icon_path() -> Path | None:
+    """Local ``.ico`` for the desktop window (packaged and unpackaged).
+
+    pywebview 6.x has no ``icon=`` on ``create_window``. WinForms reads
+    ``webview.start(icon=...)`` via ``_state['icon']``; if that is unset it
+    extracts the first icon from ``sys.executable``.
+    """
+    path = Path(__file__).resolve().parent / "static" / "icons" / "orga-drone.ico"
+    return path if path.is_file() else None
+
+
 def startup_log_path() -> Path:
     settings.ensure_dirs()
     return settings.data_dir / "orga-drone.log"
@@ -612,7 +623,11 @@ def run_desktop(
             window.destroy()
 
     try:
-        webview.start(_navigate)
+        icon = app_window_icon_path()
+        if icon is not None:
+            webview.start(_navigate, icon=str(icon))
+        else:
+            webview.start(_navigate)
     finally:
         if server_box[0] is not None:
             server_box[0].should_exit = True

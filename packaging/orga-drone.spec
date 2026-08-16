@@ -106,6 +106,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(ROOT / "packaging" / "assets" / "orga-drone.ico"),
 )
 
 coll = COLLECT(
