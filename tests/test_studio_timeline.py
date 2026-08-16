@@ -122,14 +122,15 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'id="studio-playhead"' in html
     assert 'role="slider"' in html
     assert "studio-music-track" in html
-    assert "studio-track-voice" in html
-    canvas_to_voice = html.split('id="studio-timeline-canvas"', 1)[1].split(
-        "studio-track-voice", 1
+    assert "studio-track-voice" not in html
+    assert html.find("studio-timeline-canvas") < html.find("studio-music-track")
+    canvas_to_inspector = html.split('id="studio-timeline-canvas"', 1)[1].split(
+        'id="studio-inspector"', 1
     )[0]
-    assert 'id="studio-music-track"' in canvas_to_voice
-    assert 'id="studio-tracks"' in canvas_to_voice
+    assert 'id="studio-music-track"' in canvas_to_inspector
+    assert 'id="studio-tracks"' in canvas_to_inspector
     tracks_inner = html.split('id="studio-tracks"', 1)[1].split(
-        "studio-track-voice", 1
+        'id="studio-inspector"', 1
     )[0]
     assert 'id="studio-music-track"' in tracks_inner
     gutter = html.split("studio-timeline-gutter", 1)[1].split(
@@ -138,7 +139,7 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "Story" in gutter
     assert "Soundtrack" in gutter
     music_block = html.split('id="studio-music-track"', 1)[1].split(
-        "studio-track-voice", 1
+        'id="studio-inspector"', 1
     )[0]
     assert "studio-track-label" not in music_block
     assert "studio-music-wave" not in html
