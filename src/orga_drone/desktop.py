@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -18,6 +19,11 @@ import uvicorn
 from orga_drone.config import settings
 
 _LOG = logging.getLogger("orga_drone.desktop")
+
+# .NET Assembly.LoadFrom cannot resolve Python.Runtime.Loader.Initialize when
+# the DLL path contains these characters. Windows "Copy (2)" of the GitHub zip
+# is the usual trigger: …\orga-drone-windows-x64(2)\orga-drone\_internal\…
+_UNSAFE_CLR_PATH_CHARS = frozenset("()[]#&")
 
 
 def startup_log_path() -> Path:
@@ -52,6 +58,92 @@ def configure_stdio_and_logging() -> Path:
             root.setLevel(logging.INFO)
 
     return log_path
+
+
+def clr_dll_path_is_unsafe(path: Path) -> bool:
+    """True when pythonnet/CLR cannot load Python.Runtime.dll from ``path``."""
+    return any(ch in str(path) for ch in _UNSAFE_CLR_PATH_CHARS)
+
+
+def startup_crash_log_path() -> Path:
+    settings.ensure_dirs()
+    return settings.data_dir / "startup-crash.log"
+
+
+def log_desktop_failure(exc: BaseException) -> Path:
+    """Persist the desktop-shell exception so windowed EXEs are diagnosable."""
+    configure_stdio_and_logging()
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    _LOG.error("desktop shell failed:\n%s", tb)
+    crash = startup_crash_log_path()
+    crash.parent.mkdir(parents=True, exist_ok=True)
+    crash.write_text(tb, encoding="utf-8")
+    print(f"Desktop window unavailable ({exc})", file=sys.stderr)
+    return crash
+
+
+def prepare_pythonnet_runtime() -> Path | None:
+    """Point pythonnet at a CLR-safe copy of Python.Runtime.dll if needed.
+
+    Must run before ``import webview`` / ``import clr``. Returns the DLL path
+    that will be loaded, or None if pythonnet is not installed.
+    """
+    try:
+        import pythonnet  # type: ignore[import-untyped,import-not-found]
+    except ImportError:
+        return None
+
+    src = Path(pythonnet.__file__).resolve().parent / "runtime" / "Python.Runtime.dll"
+    if not src.is_file():
+        _LOG.warning("Python.Runtime.dll missing at %s", src)
+        return None
+
+    dest = src
+    if clr_dll_path_is_unsafe(src):
+        dest_dir = settings.data_dir / "clr-runtime"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / "Python.Runtime.dll"
+        try:
+            shutil.copy2(src, dest)
+            deps = src.parent / "Python.Runtime.deps.json"
+            if deps.is_file():
+                shutil.copy2(deps, dest_dir / deps.name)
+        except OSError as exc:
+            if not dest.is_file():
+                raise
+            _LOG.warning(
+                "could not refresh CLR DLL copy at %s (%s); using existing file",
+                dest,
+                exc,
+            )
+        else:
+            _LOG.info("relocated Python.Runtime.dll for CLR: %s -> %s", src, dest)
+
+    if dest == src:
+        return dest
+
+    def load(runtime: object | None = None, **params: str) -> None:
+        if pythonnet._LOADED:  # noqa: SLF001
+            return
+        if pythonnet._RUNTIME is None:  # noqa: SLF001
+            if runtime is None:
+                pythonnet.set_runtime_from_env()
+            else:
+                pythonnet.set_runtime(runtime, **params)  # type: ignore[arg-type]
+        if pythonnet._RUNTIME is None:  # noqa: SLF001
+            raise RuntimeError("No valid runtime selected")
+        assembly = pythonnet._RUNTIME.get_assembly(str(dest))  # noqa: SLF001
+        func = assembly.get_function("Python.Runtime.Loader.Initialize")
+        if func(b"") != 0:
+            raise RuntimeError("Failed to initialize Python.Runtime.dll")
+        pythonnet._LOADED = True  # noqa: SLF001
+        pythonnet._LOADER_ASSEMBLY = assembly  # noqa: SLF001
+        import atexit
+
+        atexit.register(pythonnet.unload)
+
+    pythonnet.load = load  # type: ignore[method-assign]
+    return dest
 
 
 def uvicorn_log_config() -> dict[str, Any]:

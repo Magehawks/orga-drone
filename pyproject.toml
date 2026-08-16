@@ -68,5 +68,6 @@ module = [
   "reverse_geocoder",
   "imageio_ffmpeg",
   "pillow_heif",
+  "pythonnet",
 ]
 ignore_missing_imports = true

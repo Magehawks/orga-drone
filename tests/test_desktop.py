@@ -6,6 +6,7 @@ import socket
 import sys
 import threading
 import time
+import types
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -161,3 +162,157 @@ def test_reveal_local_file_explorer_argv(
     args, kwargs = calls[0]
     assert args == ["explorer", "/select,", str(path.resolve())]
     assert kwargs.get("shell") is False
+
+
+def test_clr_dll_path_is_unsafe_for_windows_copy_suffix() -> None:
+    from orga_drone.desktop import clr_dll_path_is_unsafe
+
+    bad = Path(
+        r"D:\downloads\orga-drone-windows-x64(2)\orga-drone"
+        r"\_internal\pythonnet\runtime\Python.Runtime.dll"
+    )
+    good = Path(
+        r"C:\Users\me\orga-drone\dist\orga-drone"
+        r"\_internal\pythonnet\runtime\Python.Runtime.dll"
+    )
+    assert clr_dll_path_is_unsafe(bad) is True
+    assert clr_dll_path_is_unsafe(good) is False
+
+
+def test_prepare_pythonnet_relocates_parenthesized_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.config import Settings
+    from orga_drone.desktop import prepare_pythonnet_runtime
+
+    pkg = tmp_path / "orga-drone-windows-x64(2)" / "pythonnet"
+    runtime = pkg / "runtime"
+    runtime.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("#", encoding="utf-8")
+    (runtime / "Python.Runtime.dll").write_bytes(b"dll")
+    (runtime / "Python.Runtime.deps.json").write_text("{}", encoding="utf-8")
+
+    stub = types.ModuleType("pythonnet")
+    stub.__file__ = str(pkg / "__init__.py")
+
+    def _load(*_a: object, **_k: object) -> None:
+        return None
+
+    stub.load = _load  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pythonnet", stub)
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+
+    dest = prepare_pythonnet_runtime()
+    expected = tmp_path / "data" / "clr-runtime" / "Python.Runtime.dll"
+    assert dest == expected
+    assert expected.is_file()
+    assert expected.read_bytes() == b"dll"
+    assert (tmp_path / "data" / "clr-runtime" / "Python.Runtime.deps.json").read_text(
+        encoding="utf-8"
+    ) == "{}"
+    assert stub.load is not _load
+
+
+def test_log_desktop_failure_writes_startup_crash_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.config import Settings
+    from orga_drone.desktop import log_desktop_failure
+
+    settings = Settings(data_dir=tmp_path / "data")
+    monkeypatch.setattr("orga_drone.desktop.settings", settings)
+    path = log_desktop_failure(RuntimeError("clr boom"))
+    assert path.name == "startup-crash.log"
+    text = path.read_text(encoding="utf-8")
+    assert "RuntimeError" in text
+    assert "clr boom" in text
+
+
+def test_packaged_desktop_failure_does_not_open_browser(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone import __main__ as mainmod
+    from orga_drone.config import Settings
+
+    browser_calls: list[int] = []
+    monkeypatch.setattr(mainmod, "_prefer_desktop", lambda: True)
+    monkeypatch.setattr(
+        mainmod,
+        "_run_desktop",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("clr boom")),
+    )
+    monkeypatch.setattr(
+        mainmod, "_run_browser", lambda *a, **k: browser_calls.append(1)
+    )
+    monkeypatch.setattr(mainmod, "_want_browser", lambda: False)
+    monkeypatch.setattr(mainmod, "_prepare_runtime", lambda: None)
+    monkeypatch.setattr(
+        "orga_drone.desktop.show_error_dialog", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+    monkeypatch.setattr("orga_drone.config.is_packaged", lambda: True)
+    monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=tmp_path / "data"))
+
+    mainmod.main()
+    assert browser_calls == []
+
+
+def test_packaged_missing_webview_does_not_open_browser(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone import __main__ as mainmod
+    from orga_drone.config import Settings
+
+    browser_calls: list[int] = []
+    monkeypatch.setattr(mainmod, "_prefer_desktop", lambda: False)
+    monkeypatch.setattr(
+        mainmod, "_run_browser", lambda *a, **k: browser_calls.append(1)
+    )
+    monkeypatch.setattr(mainmod, "_want_browser", lambda: False)
+    monkeypatch.setattr(mainmod, "_prepare_runtime", lambda: None)
+    monkeypatch.setattr(
+        "orga_drone.desktop.show_error_dialog", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+    monkeypatch.setattr("orga_drone.config.is_packaged", lambda: True)
+    monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=tmp_path / "data"))
+
+    mainmod.main()
+    assert browser_calls == []
+
+
+def test_unpackaged_desktop_failure_falls_back_to_browser(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone import __main__ as mainmod
+    from orga_drone.config import Settings
+
+    browser_calls: list[int] = []
+    monkeypatch.setattr(mainmod, "_prefer_desktop", lambda: True)
+    monkeypatch.setattr(
+        mainmod,
+        "_run_desktop",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("clr boom")),
+    )
+    monkeypatch.setattr(
+        mainmod, "_run_browser", lambda *a, **k: browser_calls.append(1)
+    )
+    monkeypatch.setattr(mainmod, "_want_browser", lambda: False)
+    monkeypatch.setattr(mainmod, "_prepare_runtime", lambda: None)
+    monkeypatch.setattr(
+        "orga_drone.desktop.show_error_dialog", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+    monkeypatch.setattr("orga_drone.config.is_packaged", lambda: False)
+
+    mainmod.main()
+    assert browser_calls == [1]
+
