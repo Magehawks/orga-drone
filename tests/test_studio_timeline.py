@@ -196,6 +196,8 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "studio-music-audio-next" in js
     assert "studio-music-wave" not in js
     assert "studio-music-handle" not in js
+    assert "studio-drag-handle" in js
+    assert "persistMusicOrder" in js
     assert "#studio-music-track" in js
     assert "inspector-music-replace" in js
     css_music = css.split(".studio-music-fade {", 1)[1].split(
@@ -204,6 +206,10 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "pointer-events: none" in css_music
     assert "cursor: default" in css_music
     assert "width: 12%" not in css_music
+    music_select_css = css.split(".studio-music-select {", 1)[1].split("}", 1)[0]
+    assert "position: absolute" in music_select_css
+    pending_css = css.split(".studio-music-select.is-pending,", 1)[1].split("}", 1)[0]
+    assert "position: relative" not in pending_css
 
 
 def test_crossfade_occupancy_shrinks_html_not_fade_black(

@@ -111,6 +111,7 @@
          data-music-coverage="{{ _('{music} of {story}')|e }}"
          data-music-limit="{{ _('This story already has 8 soundtrack songs.')|e }}"
          data-music-song-of="{{ _('Song {current} of {total}')|e }}"
+         data-drag-reorder="{{ _('Drag to reorder')|e }}"
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
          data-kind-title-card="{{ _('Title card')|e }}"
@@ -578,7 +579,7 @@
           {{ lucide('trash-2') }}
           <span class="studio-btn-label">{{ _('Remove') }}</span>
         </button>
-        <p class="hint">{{ _('Soundtrack songs play one after another from the start of the story. Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
+        <p class="hint">{{ _('Soundtrack songs play one after another from the start of the story. Adjacent songs meet with a cut. Fade and Crossfade stay on the Story track. Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
       </div>
 
       <div class="studio-inspector-panel" id="inspector-titlecard" hidden>

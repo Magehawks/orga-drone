@@ -201,6 +201,7 @@
   const msgMusicMissing = root.dataset.musicMissing || "The selected music file is no longer available.";
   const msgMusicLimit = root.dataset.musicLimit || "This story already has 8 soundtrack songs.";
   const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
+  const msgDragReorder = root.dataset.dragReorder || "Drag to reorder";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
   const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
@@ -262,6 +263,8 @@
 
   let dragCard = null;
   let dragOrderBefore = null;
+  let musicDragCard = null;
+  let musicDragOrderBefore = null;
   let playheadDragging = false;
   let playheadWasPlaying = false;
   let wallClockRaf = 0;
@@ -1348,6 +1351,58 @@
     return null;
   }
 
+  function musicClipEls() {
+    const clipsEl = document.getElementById("studio-music-clips");
+    if (!clipsEl) return [];
+    return Array.from(clipsEl.querySelectorAll(":scope > .studio-music-select"));
+  }
+
+  function syncTracksFromMusicDom() {
+    const byId = new Map(state.tracks.map((track) => [String(track.id), track]));
+    const next = [];
+    musicClipEls().forEach((el) => {
+      const track = byId.get(String(el.dataset.musicId));
+      if (track) next.push(track);
+    });
+    if (next.length === state.tracks.length) state.tracks = next;
+  }
+
+  function createMusicClipEl(track) {
+    const card = document.createElement("div");
+    card.className = "studio-music-select";
+    card.dataset.musicId = String(track.id);
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "studio-drag-handle";
+    handle.draggable = true;
+    handle.setAttribute("aria-label", msgDragReorder);
+    handle.title = msgDragReorder;
+    const handleMark = document.createElement("span");
+    handleMark.setAttribute("aria-hidden", "true");
+    handleMark.textContent = "≡";
+    handle.appendChild(handleMark);
+    const body = document.createElement("button");
+    body.type = "button";
+    body.className = "studio-music-clip-body";
+    const nameEl = document.createElement("strong");
+    const meta = document.createElement("span");
+    meta.className = "studio-music-meta";
+    const badge = document.createElement("span");
+    badge.className = "studio-music-badge";
+    badge.hidden = true;
+    const fadeInEl = document.createElement("span");
+    fadeInEl.className = "studio-music-fade studio-music-fade-in";
+    fadeInEl.hidden = true;
+    fadeInEl.setAttribute("aria-hidden", "true");
+    const fadeOutEl = document.createElement("span");
+    fadeOutEl.className = "studio-music-fade studio-music-fade-out";
+    fadeOutEl.hidden = true;
+    fadeOutEl.setAttribute("aria-hidden", "true");
+    body.append(nameEl, meta, badge, fadeInEl, fadeOutEl);
+    card.append(handle, body);
+    return card;
+  }
+
   function layoutMusicSpans() {
     const clipsEl = document.getElementById("studio-music-clips");
     const empty = document.getElementById("studio-music-empty");
@@ -1358,7 +1413,14 @@
       trackEl.classList.toggle("is-selected", state.selected.type === "music");
     }
     updateMusicAddEnabled();
-    clipsEl.replaceChildren();
+    if (!musicDragCard) {
+      const ids = state.tracks.map((track) => String(track.id));
+      const existing = musicClipEls().map((el) => String(el.dataset.musicId));
+      if (existing.join(",") !== ids.join(",")) {
+        clipsEl.replaceChildren();
+        state.tracks.forEach((track) => clipsEl.appendChild(createMusicClipEl(track)));
+      }
+    }
     if (!state.tracks.length) return;
 
     const story = totalDuration();
@@ -1367,89 +1429,101 @@
     const msgSilence = root.dataset.musicSilenceBadge || "then silence";
     const msgPending = root.dataset.musicPending || "Duration unknown";
     const msgCoverage = root.dataset.musicCoverage || "{music} of {story}";
+    const gapPx = 8;
+    const minTilePx = 56;
+    const cards = musicClipEls();
     let cursor = 0;
-    state.tracks.forEach((track, index) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "studio-music-select";
-      btn.dataset.musicId = String(track.id);
-      btn.setAttribute("aria-label", track.name);
-      if (String(state.selected.id) === String(track.id) && state.selected.type === "music") {
-        btn.classList.add("is-selected");
+    let nextLeftPx = 0;
+    cards.forEach((card, index) => {
+      const track = state.tracks.find((item) => String(item.id) === String(card.dataset.musicId));
+      if (!track) return;
+      const nameEl = card.querySelector("strong");
+      const meta = card.querySelector(".studio-music-meta");
+      const badge = card.querySelector(".studio-music-badge");
+      const fadeInEl = card.querySelector(".studio-music-fade-in");
+      const fadeOutEl = card.querySelector(".studio-music-fade-out");
+      const body = card.querySelector(".studio-music-clip-body");
+      card.classList.remove("is-pending", "is-missing", "is-selected");
+      if (nameEl) nameEl.textContent = track.name;
+      if (body) body.setAttribute("aria-label", track.name);
+      if (meta) meta.textContent = "";
+      if (badge) {
+        badge.hidden = true;
+        badge.textContent = "";
       }
-      const nameEl = document.createElement("strong");
-      nameEl.textContent = track.name;
-      const meta = document.createElement("span");
-      meta.className = "studio-music-meta";
-      const badge = document.createElement("span");
-      badge.className = "studio-music-badge";
-      badge.hidden = true;
-      const fadeInEl = document.createElement("span");
-      fadeInEl.className = "studio-music-fade studio-music-fade-in";
-      fadeInEl.hidden = true;
-      fadeInEl.setAttribute("aria-hidden", "true");
-      const fadeOutEl = document.createElement("span");
-      fadeOutEl.className = "studio-music-fade studio-music-fade-out";
-      fadeOutEl.hidden = true;
-      fadeOutEl.setAttribute("aria-hidden", "true");
-      btn.append(nameEl, meta, badge, fadeInEl, fadeOutEl);
-
+      if (fadeInEl) {
+        fadeInEl.hidden = true;
+        fadeInEl.style.width = "";
+      }
+      if (fadeOutEl) {
+        fadeOutEl.hidden = true;
+        fadeOutEl.style.width = "";
+      }
+      if (String(state.selected.id) === String(track.id) && state.selected.type === "music") {
+        card.classList.add("is-selected");
+      }
       const musDur = trackDurationS(track);
       const known = musDur > 0;
       const remaining = Math.max(0, story - cursor);
       let spanS = 0;
       if (!track.available) {
-        btn.classList.add("is-missing");
-        badge.hidden = false;
-        badge.textContent = msgMusicMissing;
+        card.classList.add("is-missing");
+        if (badge) {
+          badge.hidden = false;
+          badge.textContent = msgMusicMissing;
+        }
       } else if (!known && !loop) {
-        btn.classList.add("is-pending");
-        badge.hidden = false;
-        badge.textContent = msgPending;
-      } else {
-        spanS = musicBedDuration(remaining, musDur, loop);
-        const leftPx = timeToX(cursor);
-        const widthPx = Math.max(0, timeToX(cursor + spanS) - leftPx);
-        if (spanS > 0 && widthPx >= 1) {
-          btn.classList.add("is-coverage");
-          btn.style.left = `${leftPx}px`;
-          btn.style.width = `${widthPx}px`;
-          if (known && story > 0) {
-            meta.textContent = msgCoverage
-              .replace("{music}", formatLaneTime(musDur))
-              .replace("{story}", formatLaneTime(story));
-          }
-          if (loop) {
-            badge.hidden = false;
-            badge.textContent = msgLoop;
-          } else if (index === state.tracks.length - 1 && cursor + spanS < story) {
-            badge.hidden = false;
-            badge.textContent = msgSilence;
-          }
-          const scaled = scaledMusicFades(track.fadeIn, track.fadeOut, spanS);
-          const fiPx = timeToX(scaled.fadeIn);
-          const foPx = timeToX(scaled.fadeOut);
-          if (scaled.fadeIn > 0 && fiPx >= TIMELINE_HIT_MIN_PX) {
-            fadeInEl.hidden = false;
-            fadeInEl.style.width = `${fiPx}px`;
-          }
-          if (scaled.fadeOut > 0 && foPx >= TIMELINE_HIT_MIN_PX) {
-            fadeOutEl.hidden = false;
-            fadeOutEl.style.width = `${foPx}px`;
-          }
-        } else {
-          btn.classList.add("is-pending");
-          if (loop) {
-            badge.hidden = false;
-            badge.textContent = msgLoop;
-          } else if (!known) {
-            badge.hidden = false;
-            badge.textContent = msgPending;
-          }
+        card.classList.add("is-pending");
+        if (badge) {
+          badge.hidden = false;
+          badge.textContent = msgPending;
         }
       }
-      clipsEl.appendChild(btn);
+      if (loop) {
+        spanS = musicBedDuration(story, musDur, true);
+      } else if (musDur > 0 && remaining > 0) {
+        spanS = Math.min(musDur, remaining);
+      } else if (!known && remaining > 0) {
+        spanS = remaining / Math.max(1, cards.length - index);
+      }
+      let leftPx = Math.max(timeToX(cursor), nextLeftPx);
+      let widthPx = spanS > 0 ? Math.max(0, timeToX(cursor + spanS) - timeToX(cursor)) : 0;
+      if (widthPx < minTilePx) widthPx = minTilePx;
+      if (index < cards.length - 1) widthPx = Math.max(minTilePx, widthPx - gapPx);
+      card.style.left = `${leftPx}px`;
+      card.style.width = `${widthPx}px`;
+      nextLeftPx = leftPx + widthPx + gapPx;
       if (spanS > 0) cursor += spanS;
+      else cursor += xToTime(widthPx + gapPx);
+      if (known && story > 0 && meta) {
+        meta.textContent = msgCoverage
+          .replace("{music}", formatLaneTime(musDur))
+          .replace("{story}", formatLaneTime(story));
+      }
+      if (loop && badge && track.available) {
+        badge.hidden = false;
+        badge.textContent = msgLoop;
+      } else if (
+        index === cards.length - 1 &&
+        known &&
+        cursor < story &&
+        badge &&
+        !card.classList.contains("is-missing")
+      ) {
+        badge.hidden = false;
+        badge.textContent = msgSilence;
+      }
+      const scaled = scaledMusicFades(track.fadeIn, track.fadeOut, spanS || xToTime(widthPx));
+      const fiPx = timeToX(scaled.fadeIn);
+      const foPx = timeToX(scaled.fadeOut);
+      if (fadeInEl && scaled.fadeIn > 0 && fiPx >= TIMELINE_HIT_MIN_PX) {
+        fadeInEl.hidden = false;
+        fadeInEl.style.width = `${fiPx}px`;
+      }
+      if (fadeOutEl && scaled.fadeOut > 0 && foPx >= TIMELINE_HIT_MIN_PX) {
+        fadeOutEl.hidden = false;
+        fadeOutEl.style.width = `${foPx}px`;
+      }
     });
   }
 
@@ -2055,6 +2129,40 @@
       applyTracksPayload(data);
       renderMusic();
       selectMusic(track.id);
+      setSaveState(true);
+    } catch (_) {
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  async function persistMusicOrder() {
+    if (!projectId) return;
+    const ids = musicClipEls().map((el) => Number(el.dataset.musicId));
+    const previous = musicDragOrderBefore;
+    musicDragOrderBefore = null;
+    if (!previous || previous.join(",") === ids.join(",")) {
+      layoutTimeline();
+      return;
+    }
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        if (previous) {
+          const byId = new Map(state.tracks.map((track) => [track.id, track]));
+          state.tracks = previous.map((id) => byId.get(id)).filter(Boolean);
+        }
+        showFlash(musicErrorDetail(data));
+        layoutTimeline();
+        return;
+      }
+      applyTracksPayload(data);
+      renderMusic();
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -2681,11 +2789,55 @@
     event.stopPropagation();
     addMusicTrack();
   });
-  document.getElementById("studio-music-clips")?.addEventListener("click", (event) => {
-    const btn = event.target.closest(".studio-music-select");
-    if (!btn) return;
+  const musicClipsEl = document.getElementById("studio-music-clips");
+  musicClipsEl?.addEventListener("click", (event) => {
+    if (event.target.closest(".studio-drag-handle")) return;
+    const card = event.target.closest(".studio-music-select");
+    if (!card) return;
     event.stopPropagation();
-    selectMusic(btn.dataset.musicId);
+    selectMusic(card.dataset.musicId);
+  });
+  musicClipsEl?.addEventListener("dragstart", (event) => {
+    const handle = event.target.closest && event.target.closest(".studio-drag-handle");
+    if (!handle) {
+      event.preventDefault();
+      return;
+    }
+    const card = handle.closest(".studio-music-select");
+    if (!card) return;
+    musicDragCard = card;
+    musicDragOrderBefore = musicClipEls().map((el) => Number(el.dataset.musicId));
+    card.classList.add("is-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    try {
+      event.dataTransfer.setData("text/plain", card.dataset.musicId || "");
+    } catch (_) {
+      /* older WebViews */
+    }
+  });
+  musicClipsEl?.addEventListener("dragend", () => {
+    if (musicDragCard) musicDragCard.classList.remove("is-dragging");
+    musicDragCard = null;
+    syncTracksFromMusicDom();
+    persistMusicOrder();
+  });
+  musicClipsEl?.addEventListener("dragover", (event) => {
+    if (!musicDragCard || !musicClipsEl) return;
+    event.preventDefault();
+    const target = event.target.closest && event.target.closest(".studio-music-select");
+    if (target && target !== musicDragCard) {
+      const rect = target.getBoundingClientRect();
+      if (event.clientX < rect.left + rect.width / 2) {
+        musicClipsEl.insertBefore(musicDragCard, target);
+      } else {
+        musicClipsEl.insertBefore(musicDragCard, target.nextSibling);
+      }
+      syncTracksFromMusicDom();
+      layoutMusicSpans();
+    }
+  });
+  musicClipsEl?.addEventListener("drop", (event) => {
+    event.preventDefault();
   });
   document.getElementById("inspector-music-replace")?.addEventListener("click", (event) => {
     event.preventDefault();

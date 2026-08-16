@@ -361,7 +361,7 @@
   "Move up": "Move up",
   "Move down": "Move down",
   "Timeline": "Timeline",
-  "Soundtrack songs play one after another from the start of the story. Music is mixed into the exported MP4. Source video audio is kept when present.": "Soundtrack songs play one after another from the start of the story. Music is mixed into the exported MP4. Source video audio is kept when present.",
+  "Soundtrack songs play one after another from the start of the story. Adjacent songs meet with a cut. Fade and Crossfade stay on the Story track. Music is mixed into the exported MP4. Source video audio is kept when present.": "Soundtrack songs play one after another from the start of the story. Adjacent songs meet with a cut. Fade and Crossfade stay on the Story track. Music is mixed into the exported MP4. Source video audio is kept when present.",
   "Title card": "Title card",
   "Add title card": "Add title card",
   "Title": "Title",

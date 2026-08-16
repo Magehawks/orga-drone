@@ -361,7 +361,7 @@
   "Move up": "Nach oben",
   "Move down": "Nach unten",
   "Timeline": "Zeitleiste",
-  "Soundtrack songs play one after another from the start of the story. Music is mixed into the exported MP4. Source video audio is kept when present.": "Soundtrack-Titel spielen nacheinander vom Story-Anfang. Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden.",
+  "Soundtrack songs play one after another from the start of the story. Adjacent songs meet with a cut. Fade and Crossfade stay on the Story track. Music is mixed into the exported MP4. Source video audio is kept when present.": "Soundtrack-Titel spielen nacheinander vom Story-Anfang. Benachbarte Titel stoßen mit einem Cut aneinander. Fade und Crossfade bleiben auf der Story-Spur. Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erhalten, wenn vorhanden.",
   "Title card": "Titelseite",
   "Add title card": "Titelseite hinzufügen",
   "Title": "Titel",
