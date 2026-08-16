@@ -8,7 +8,7 @@ Status language used below:
 | Label | Meaning |
 |-------|---------|
 | **Available now** | Implemented in the current tree / releases |
-| **Studio MVP (target)** | First complete Create → Share journey; not fully shipped yet |
+| **Studio MVP** | First complete local Create → Share journey; **Available now** on Windows desktop (social upload destinations remain Later) |
 | **Later** | Aspirational; never present as shipping |
 
 ## Vision statement
@@ -33,8 +33,9 @@ sync service, or generic drone administration suite.
 **Short positioning:** “Organize drone footage, metadata and flights in one
 local-first application — and prepare memories to share.”
 
-Treat everything labeled Studio MVP (target) or Later as **planned** unless the
-codebase already implements it.
+Treat everything labeled Later as **planned** unless the codebase already
+implements it. The Studio MVP local journey (import → arrange → optional music
+→ MP4 → open/reveal the file) is **Available now** on Windows desktop.
 
 ---
 
@@ -252,9 +253,9 @@ See `README.md` for the detailed feature status table. In short:
   basic rendered visual transitions (not a
   professional NLE). Albums for organizing the media library remain Later.
 
-## Studio MVP (target)
+## Studio MVP (local Create → Share)
 
-The first **complete** Studio MVP is achieved when a user can:
+The first complete Studio MVP is a user who can:
 
 1. Import media.
 2. Rediscover memories.
@@ -265,11 +266,9 @@ The first **complete** Studio MVP is achieved when a user can:
 7. Export a simple MP4.
 8. Share the result with family or friends.
 
-If users can complete this journey without opening another application, that MVP
-is successful. Local MP4 export with resolution choice, an optional sequential
-soundtrack playlist in preview/export, and Open video / Show in folder after export are
-**Available now** on Windows desktop (steps 6–8 without social upload).
-Rendered extra transition types, audio crossfades, and social share destinations remain **Later**.
+Steps 1–7 plus local-file share (open or reveal the MP4 on Windows) are
+**Available now**. Social / messenger upload destinations remain **Later**.
+Rendered extra transition types and audio crossfades remain **Later**.
 
 ## What orga-drone is NOT
 
@@ -302,7 +301,8 @@ outside the project.
 
 When writing or reviewing a product spec:
 
-1. Separate **now** vs **Studio MVP (target)** vs **later**.
+1. Separate **now** vs **later**. The local Studio Create → Share journey is
+   Available now; do not describe it as unshipped.
 2. Name the user problem and success criteria.
 3. State non-goals explicitly.
 4. Check claims against `README.md` feature status and the codebase.

@@ -1,6 +1,6 @@
 # ADR 0009: Studio Title Cards as generated timeline items
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-14
 - **Deciders:** Issue #26
 

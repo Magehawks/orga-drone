@@ -34,7 +34,14 @@ The spec bundles `pywebview` (`collect_all("webview")`). On Windows, **Edge WebV
 Runtime** must be present (preinstalled on current Windows 10/11; otherwise install the
 [Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)).
 
-Output: `dist/orga-drone/` (exe + `_internal` deps, including `templates` / `static` / `locales`).
+Output: `dist/orga-drone/` (exe + `_internal` deps, including `templates` /
+`static` / `locales`, and the bundled **ffmpeg** binary from `imageio-ffmpeg`).
+
+Studio MP4 export, video thumbnails, and flow merge use that bundled ffmpeg.
+End users of the Windows zip do **not** need ffmpeg on PATH. `find_ffmpeg()`
+still prefers a system ffmpeg if one is present, then falls back to the
+bundled binary. imageio-ffmpeg typically ships ffmpeg only (no ffprobe);
+export already falls back to `ffmpeg -i` when ffprobe is absent.
 
 The exe is built with `console=False` (no black console window). For debugging a build,
 temporarily set `console=True` in `orga-drone.spec`.
@@ -42,9 +49,9 @@ temporarily set `console=True` in `orga-drone.spec`.
 Release layout (local, not committed as binaries):
 
 ```text
-releases/1.2.0/orga-drone/          # copy of dist/orga-drone
-releases/1.2.0/orga-drone-windows-x64.zip
-releases/1.2.0/README.md            # points to the GitHub Release
+releases/1.8.0/orga-drone/          # copy of dist/orga-drone (gitignored)
+releases/1.8.0/orga-drone-windows-x64.zip
+releases/1.8.0/README.md            # points to the GitHub Release
 ```
 
 **Note:** Existing GitHub Release zips (before the desktop-shell change) still open the

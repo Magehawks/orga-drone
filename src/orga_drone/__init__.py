@@ -1,3 +1,3 @@
 """orga-drone – local drone video library manager."""
 
-__version__ = "1.7.1"
+__version__ = "1.8.0"
