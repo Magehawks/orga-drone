@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -82,68 +82,179 @@ def log_desktop_failure(exc: BaseException) -> Path:
     return crash
 
 
-def prepare_pythonnet_runtime() -> Path | None:
-    """Point pythonnet at a CLR-safe copy of Python.Runtime.dll if needed.
+def pythonnet_runtime_dll(package_dir: Path) -> Path:
+    """DLL path used by stock ``pythonnet.load()`` (no public override exists)."""
+    return package_dir / "runtime" / "Python.Runtime.dll"
 
-    Must run before ``import webview`` / ``import clr``. Returns the DLL path
-    that will be loaded, or None if pythonnet is not installed.
-    """
+
+def _strip_zone_identifier(path: Path) -> None:
+    """Remove NTFS Mark-of-the-Web so .NET Framework can LoadFrom the copy."""
+    if sys.platform != "win32":
+        return
     try:
-        import pythonnet  # type: ignore[import-untyped,import-not-found]
-    except ImportError:
+        os.remove(f"{path}:Zone.Identifier")
+    except OSError:
+        pass
+
+
+def _copy_file_without_zone(src: Path, dest: Path) -> None:
+    """Byte-copy a file so Windows does not preserve Zone.Identifier ADS."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(src.read_bytes())
+    _strip_zone_identifier(dest)
+
+
+def _copy_pythonnet_package(src_pkg: Path, dest_pkg: Path) -> None:
+    """Copy pythonnet + its full ``runtime/`` facade set (not just the one DLL)."""
+    dest_pkg.mkdir(parents=True, exist_ok=True)
+    runtime_src = src_pkg / "runtime"
+    if runtime_src.is_dir():
+        runtime_dest = dest_pkg / "runtime"
+        runtime_dest.mkdir(parents=True, exist_ok=True)
+        for item in runtime_src.iterdir():
+            if item.is_file():
+                _copy_file_without_zone(item, runtime_dest / item.name)
+    for item in src_pkg.iterdir():
+        if item.is_file() and (item.suffix == ".py" or item.name == "py.typed"):
+            _copy_file_without_zone(item, dest_pkg / item.name)
+
+
+def _find_pythonnet_package() -> Path | None:
+    """Locate the installed pythonnet package without importing it."""
+    import importlib.util
+
+    spec = importlib.util.find_spec("pythonnet")
+    if spec is None or not spec.origin:
+        return None
+    pkg = Path(spec.origin).resolve().parent
+    if not pythonnet_runtime_dll(pkg).is_file():
+        return None
+    return pkg
+
+
+def _clr_safe_home() -> Path:
+    """Directory whose path is safe for .NET LoadFrom (no ``()[]#&``)."""
+    local_app = os.environ.get("LOCALAPPDATA", "").strip()
+    candidates = [
+        settings.data_dir / "pythonnet-home",
+        Path(local_app) / "orga-drone" / "pythonnet-home" if local_app else None,
+        Path(tempfile.gettempdir()) / "orga-drone-pythonnet-home",
+    ]
+    for home in candidates:
+        if home is not None and str(home) and not clr_dll_path_is_unsafe(home):
+            return home
+    raise RuntimeError(
+        "No CLR-safe directory available for pythonnet "
+        "(data dir, LOCALAPPDATA, and TEMP all contain ()[]#&)."
+    )
+
+
+def _drop_imported_pythonnet() -> None:
+    for name in [n for n in sys.modules if n == "pythonnet" or n.startswith("pythonnet.")]:
+        del sys.modules[name]
+
+
+def _has_zone_identifier(path: Path) -> bool:
+    if sys.platform != "win32":
+        return False
+    try:
+        os.stat(f"{path}:Zone.Identifier")
+        return True
+    except OSError:
+        return False
+
+
+def _materialize_pythonnet_init(src_pkg: Path, dest_pkg: Path) -> Path:
+    """Ensure dest has ``__init__.py`` even if PyInstaller only stored it in the PYZ."""
+    dest_init = dest_pkg / "__init__.py"
+    src_init = src_pkg / "__init__.py"
+    if src_init.is_file():
+        _copy_file_without_zone(src_init, dest_init)
+        return dest_init
+    import inspect
+
+    import pythonnet  # type: ignore[import-untyped]
+
+    dest_init.write_text(inspect.getsource(pythonnet), encoding="utf-8")
+    _strip_zone_identifier(dest_init)
+    return dest_init
+
+
+def _bind_pythonnet_from_path(dest_pkg: Path) -> None:
+    """Load relocated pythonnet so stock ``load()`` uses dest ``__file__``.
+
+    PyInstaller's FrozenImporter sits on ``sys.meta_path`` ahead of PathFinder,
+    so ``sys.path.insert`` is not enough in a frozen EXE.
+    """
+    import importlib.util
+
+    init_py = dest_pkg / "__init__.py"
+    if not init_py.is_file():
+        raise RuntimeError(f"relocated pythonnet package missing {init_py}")
+    _drop_imported_pythonnet()
+    spec = importlib.util.spec_from_file_location(
+        "pythonnet",
+        init_py,
+        submodule_search_locations=[str(dest_pkg)],
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not create import spec for {init_py}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["pythonnet"] = module
+    spec.loader.exec_module(module)
+    _LOG.info("bound stock pythonnet from %s", init_py)
+
+
+def prepare_pythonnet_runtime() -> Path | None:
+    """Ensure stock ``pythonnet.load()`` sees a CLR-safe package path.
+
+    Must run before ``import webview`` / ``import clr``. pythonnet 3.x
+    ``load()`` always uses ``Path(__file__).parent / "runtime" / "Python.Runtime.dll"``
+    and has no public DLL-path argument. Relocating only that DLL is not enough:
+    ``runtime/`` also contains netstandard facade assemblies, and a downloaded zip
+    copy may carry a ``Zone.Identifier`` stream that blocks LoadFrom.
+
+    When the installed path is unsafe (or a frozen build carries Mark-of-the-Web),
+    the whole package is copied to a CLR-safe home and bound with
+    ``importlib.util.spec_from_file_location`` so PyInstaller's FrozenImporter
+    cannot keep ``pythonnet.__file__`` on the unzip path. Stock ``pythonnet.load()``
+    then uses the relocated ``runtime/`` tree.
+    """
+    src_pkg = _find_pythonnet_package()
+    if src_pkg is None:
         return None
 
-    src = Path(pythonnet.__file__).resolve().parent / "runtime" / "Python.Runtime.dll"
-    if not src.is_file():
-        _LOG.warning("Python.Runtime.dll missing at %s", src)
+    src_dll = pythonnet_runtime_dll(src_pkg)
+    need_relocate = clr_dll_path_is_unsafe(src_dll) or (
+        bool(getattr(sys, "frozen", False)) and _has_zone_identifier(src_dll)
+    )
+    if not need_relocate:
+        return src_dll
+
+    home = _clr_safe_home()
+    dest_pkg = home / "pythonnet"
+    dest_dll = pythonnet_runtime_dll(dest_pkg)
+    try:
+        _copy_pythonnet_package(src_pkg, dest_pkg)
+        _materialize_pythonnet_init(src_pkg, dest_pkg)
+    except OSError as exc:
+        dest_init = dest_pkg / "__init__.py"
+        if not dest_dll.is_file() or not dest_init.is_file():
+            raise
+        _LOG.warning("could not refresh pythonnet copy at %s (%s)", dest_pkg, exc)
+    else:
+        _LOG.info("relocated pythonnet package for CLR: %s -> %s", src_pkg, dest_pkg)
+
+    if not dest_dll.is_file():
+        _LOG.warning("relocated Python.Runtime.dll missing at %s", dest_dll)
+        return None
+    if clr_dll_path_is_unsafe(dest_dll):
+        _LOG.error("relocated pythonnet path is still CLR-unsafe: %s", dest_dll)
         return None
 
-    dest = src
-    if clr_dll_path_is_unsafe(src):
-        dest_dir = settings.data_dir / "clr-runtime"
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / "Python.Runtime.dll"
-        try:
-            shutil.copy2(src, dest)
-            deps = src.parent / "Python.Runtime.deps.json"
-            if deps.is_file():
-                shutil.copy2(deps, dest_dir / deps.name)
-        except OSError as exc:
-            if not dest.is_file():
-                raise
-            _LOG.warning(
-                "could not refresh CLR DLL copy at %s (%s); using existing file",
-                dest,
-                exc,
-            )
-        else:
-            _LOG.info("relocated Python.Runtime.dll for CLR: %s -> %s", src, dest)
-
-    if dest == src:
-        return dest
-
-    def load(runtime: object | None = None, **params: str) -> None:
-        if pythonnet._LOADED:  # noqa: SLF001
-            return
-        if pythonnet._RUNTIME is None:  # noqa: SLF001
-            if runtime is None:
-                pythonnet.set_runtime_from_env()
-            else:
-                pythonnet.set_runtime(runtime, **params)  # type: ignore[arg-type]
-        if pythonnet._RUNTIME is None:  # noqa: SLF001
-            raise RuntimeError("No valid runtime selected")
-        assembly = pythonnet._RUNTIME.get_assembly(str(dest))  # noqa: SLF001
-        func = assembly.get_function("Python.Runtime.Loader.Initialize")
-        if func(b"") != 0:
-            raise RuntimeError("Failed to initialize Python.Runtime.dll")
-        pythonnet._LOADED = True  # noqa: SLF001
-        pythonnet._LOADER_ASSEMBLY = assembly  # noqa: SLF001
-        import atexit
-
-        atexit.register(pythonnet.unload)
-
-    pythonnet.load = load  # type: ignore[method-assign]
-    return dest
+    sys.path.insert(0, str(home))
+    _bind_pythonnet_from_path(dest_pkg)
+    return dest_dll
 
 
 def uvicorn_log_config() -> dict[str, Any]:
