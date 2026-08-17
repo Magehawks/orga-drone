@@ -41,14 +41,21 @@ def _load_app():
 
 
 def _prepare_runtime() -> None:
-    """Fix windowed-EXE stdio and pythonnet CLR path before pywebview imports."""
-    from orga_drone.desktop import configure_stdio_and_logging, prepare_pythonnet_runtime
+    """Fix windowed-EXE stdio and CLR assembly paths before pywebview imports."""
+    from orga_drone.desktop import (
+        configure_stdio_and_logging,
+        prepare_pythonnet_runtime,
+        prepare_webview_runtime,
+    )
 
     configure_stdio_and_logging()
     # Must run before import webview: pythonnet.load() uses
     # Path(__file__).parent/runtime/Python.Runtime.dll with no public override.
     # Unsafe unzip paths and Mark-of-the-Web copies need a full package relocate.
     prepare_pythonnet_runtime()
+    # GitHub zip + Explorer extract stamps WebView2 DLLs with Mark-of-the-Web;
+    # .NET LoadFrom then fails with HRESULT 0x80131515. Copy + patch before start.
+    prepare_webview_runtime()
 
 
 def _run_browser(host: str, port: int, *, packaged: bool) -> None:

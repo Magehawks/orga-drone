@@ -100,10 +100,21 @@ When the installed path is unsafe, **or** a frozen build still has
 when that path is safe) without Mark-of-the-Web, then binds that copy with
 `importlib.util.spec_from_file_location` so PyInstaller's FrozenImporter does not
 keep `pythonnet.__file__` on the unzip path. Stock `import clr` / `pythonnet.load()`
-then load the relocated `runtime/` tree. If the desktop window still cannot start,
-the app logs the exception to `orga-drone.log` and `startup-crash.log` and shows
-an error dialog; it does **not** silently open the system browser (native Studio
-pickers would not work). Force browser mode only with `ORGA_DRONE_BROWSER=1`.
+then load the relocated `runtime/` tree.
+
+Windows Explorer also stamps **every** file extracted from a browser-downloaded
+zip with `Zone.Identifier` (`ZoneId=3`). `.NET` then refuses
+`clr.AddReference` of `_internal/webview/lib/Microsoft.Web.WebView2.Core.dll`
+(`HRESULT 0x80131515`). In a frozen build that still has that stream, the app
+byte-copies `webview/lib/*.dll` (Core, WinForms, interop, `WebView2Loader`) to
+`%APPDATA%\orga-drone\webview-lib\` and patches `webview.util.interop_dll_path`
+so LoadFrom uses the local copy. It does **not** enable `loadFromRemoteSources`.
+Users are never asked to Unblock files.
+
+If the desktop window still cannot start, the app logs the exception to
+`orga-drone.log` and `startup-crash.log` and shows an error dialog; it does
+**not** silently open the system browser (native Studio pickers would not work).
+Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 
 UI fonts (Outfit, Sora, IBM Plex Mono) are bundled under `static/fonts/` and
 served locally. The desktop UI does not load Google Fonts from the network.
