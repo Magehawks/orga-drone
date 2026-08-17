@@ -44,7 +44,7 @@ Media files stay on disk under user-chosen library roots.
 |------|----------------|
 | `app.py` | FastAPI routes (HTML + APIs) |
 | `config.py` | Settings, paths, env |
-| `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files |
+| `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files; MOTW-safe copy of WebView2 DLLs (see `packaging/README.md`) |
 | `db/` | Schema, migrations, queries |
 | `scan/` | Full rescan of library roots |
 | `parse/` | Filenames, SRT, EXIF, generic media |

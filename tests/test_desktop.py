@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import socket
 import sys
 import threading
@@ -42,6 +43,28 @@ def _restore_pythonnet_modules(saved: dict[str, object]) -> None:
     for name in [k for k in sys.modules if k == "pythonnet" or k.startswith("pythonnet.")]:
         del sys.modules[name]
     sys.modules.update(saved)  # type: ignore[arg-type]
+
+
+def _fake_webview_lib(root: Path) -> Path:
+    lib = root / "lib"
+    (lib / "runtimes" / "win-x64" / "native").mkdir(parents=True)
+    (lib / "Microsoft.Web.WebView2.Core.dll").write_bytes(b"core")
+    (lib / "Microsoft.Web.WebView2.WinForms.dll").write_bytes(b"winforms")
+    (lib / "WebBrowserInterop.x64.dll").write_bytes(b"interop")
+    (lib / "runtimes" / "win-x64" / "native" / "WebView2Loader.dll").write_bytes(b"loader")
+    return lib
+
+
+def _fake_motw_stat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Report a Zone.Identifier stream for every probed file (Explorer unzip)."""
+    real_stat = os.stat
+
+    def fake_stat(path: object, *args: object, **kwargs: object) -> os.stat_result:
+        if str(path).endswith(":Zone.Identifier"):
+            return os.stat_result((0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+        return real_stat(path, *args, **kwargs)  # type: ignore[arg-type, call-overload]
+
+    monkeypatch.setattr("orga_drone.desktop.os.stat", fake_stat)
 
 
 def test_windowed_stdio_uvicorn_logging(monkeypatch, tmp_path) -> None:
@@ -345,8 +368,6 @@ def test_materialize_init_when_src_package_has_no_py(tmp_path: Path) -> None:
 def test_frozen_zone_identifier_triggers_relocate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import os
-
     from orga_drone.config import Settings
     from orga_drone.desktop import (
         clr_dll_path_is_unsafe,
@@ -370,14 +391,7 @@ def test_frozen_zone_identifier_triggers_relocate(
     monkeypatch.setattr("orga_drone.desktop.sys.platform", "win32")
     monkeypatch.setattr(sys, "path", list(sys.path))
 
-    real_stat = os.stat
-
-    def fake_stat(path: str, *args: object, **kwargs: object) -> os.stat_result:
-        if str(path).endswith(":Zone.Identifier"):
-            return os.stat_result((0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-        return real_stat(path, *args, **kwargs)
-
-    monkeypatch.setattr("orga_drone.desktop.os.stat", fake_stat)
+    _fake_motw_stat(monkeypatch)
     saved = _snapshot_pythonnet_modules()
     try:
         dest = prepare_pythonnet_runtime()
@@ -388,6 +402,90 @@ def test_frozen_zone_identifier_triggers_relocate(
         assert expected.is_file()
     finally:
         _restore_pythonnet_modules(saved)
+
+
+def test_frozen_motw_copies_webview_lib_and_patches_interop_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HRESULT 0x80131515: LoadFrom of MOTW-stamped WebView2.Core.dll."""
+    pytest.importorskip("webview")
+    import webview.util as util
+    from orga_drone.config import Settings
+    from orga_drone.desktop import prepare_webview_runtime
+
+    src_lib = _fake_webview_lib(tmp_path / "unzipped" / "webview")
+    dest_lib = tmp_path / "data" / "webview-lib"
+    monkeypatch.setattr("orga_drone.desktop._webview_lib_dir", lambda: src_lib)
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+    monkeypatch.setattr("orga_drone.desktop.sys.frozen", True, raising=False)
+    monkeypatch.setattr("orga_drone.desktop.sys.platform", "win32")
+    _fake_motw_stat(monkeypatch)
+    stripped: list[str] = []
+    monkeypatch.setattr("orga_drone.desktop.os.remove", stripped.append)
+    original = util.interop_dll_path
+    try:
+        result = prepare_webview_runtime()
+        assert result == dest_lib
+        assert (dest_lib / "Microsoft.Web.WebView2.Core.dll").read_bytes() == b"core"
+        assert (dest_lib / "Microsoft.Web.WebView2.WinForms.dll").read_bytes() == b"winforms"
+        assert (dest_lib / "WebBrowserInterop.x64.dll").read_bytes() == b"interop"
+        native = dest_lib / "runtimes" / "win-x64" / "native" / "WebView2Loader.dll"
+        assert native.read_bytes() == b"loader"
+        assert f"{dest_lib / 'Microsoft.Web.WebView2.Core.dll'}:Zone.Identifier" in stripped
+        assert util.interop_dll_path("Microsoft.Web.WebView2.Core.dll") == str(
+            dest_lib / "Microsoft.Web.WebView2.Core.dll"
+        )
+        assert util.interop_dll_path("win-x64") == str(
+            dest_lib / "runtimes" / "win-x64" / "native"
+        )
+    finally:
+        util.interop_dll_path = original
+
+
+def test_webview_lib_stays_in_place_without_motw(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("webview")
+    import webview.util as util
+    from orga_drone.config import Settings
+    from orga_drone.desktop import prepare_webview_runtime
+
+    src_lib = _fake_webview_lib(tmp_path / "dist" / "webview")
+    monkeypatch.setattr("orga_drone.desktop._webview_lib_dir", lambda: src_lib)
+    monkeypatch.setattr(
+        "orga_drone.desktop.settings", Settings(data_dir=tmp_path / "data")
+    )
+    monkeypatch.setattr("orga_drone.desktop.sys.frozen", True, raising=False)
+    original = util.interop_dll_path
+    try:
+        assert prepare_webview_runtime() == src_lib
+        assert not (tmp_path / "data" / "webview-lib").exists()
+        assert util.interop_dll_path is original
+    finally:
+        util.interop_dll_path = original
+
+
+def test_prepare_runtime_copies_webview_lib_before_desktop_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import orga_drone.__main__ as mainmod
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "orga_drone.desktop.configure_stdio_and_logging", lambda: calls.append("stdio")
+    )
+    monkeypatch.setattr(
+        "orga_drone.desktop.prepare_pythonnet_runtime", lambda: calls.append("pythonnet")
+    )
+    monkeypatch.setattr(
+        "orga_drone.desktop.prepare_webview_runtime", lambda: calls.append("webview")
+    )
+
+    mainmod._prepare_runtime()
+
+    assert calls == ["stdio", "pythonnet", "webview"]
 
 
 def test_copy_file_strips_zone_identifier(

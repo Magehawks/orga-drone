@@ -268,6 +268,92 @@ def prepare_pythonnet_runtime() -> Path | None:
     return dest_dll
 
 
+def _webview_lib_dir() -> Path | None:
+    """On-disk ``webview/lib`` that ``interop_dll_path()`` resolves against."""
+    import importlib.util
+
+    spec = importlib.util.find_spec("webview")
+    if spec is None or not spec.origin:
+        return None
+    lib = Path(spec.origin).resolve().parent / "lib"
+    if not (lib / "Microsoft.Web.WebView2.Core.dll").is_file():
+        return None
+    return lib
+
+
+def _copy_webview_lib(src_lib: Path, dest_lib: Path) -> None:
+    """Copy every DLL under ``webview/lib`` without preserving Zone.Identifier."""
+    for src in src_lib.rglob("*.dll"):
+        if src.is_file():
+            _copy_file_without_zone(src, dest_lib / src.relative_to(src_lib))
+
+
+def _patch_interop_dll_path(dest_lib: Path) -> None:
+    """Point pywebview's assembly lookup at the MOTW-free copy.
+
+    ``edgechromium`` calls ``clr.AddReference(interop_dll_path(...))`` at import
+    time. Patching this function is enough; the rest of pywebview stays in place.
+    """
+    import webview.util as util
+
+    original = util.interop_dll_path
+
+    def interop_dll_path(dll_name: str) -> str:
+        direct = dest_lib / dll_name
+        if direct.exists():
+            return str(direct)
+        native = dest_lib / "runtimes" / dll_name / "native"
+        if native.exists():
+            return str(native)
+        return original(dll_name)
+
+    util.interop_dll_path = interop_dll_path  # type: ignore[method-assign]
+    _LOG.info("webview interop_dll_path now uses %s", dest_lib)
+
+
+def prepare_webview_runtime() -> Path | None:
+    """Load WebView2 assemblies from a MOTW-free copy under app data.
+
+    Reproduced GitHub-download failure: Explorer stamps extracted files with
+    ``Zone.Identifier`` (ZoneId=3). ``clr.AddReference`` then LoadFroms
+    ``_internal/webview/lib/Microsoft.Web.WebView2.Core.dll`` and .NET Framework
+    raises HRESULT 0x80131515. Local ``dist/`` builds have no MOTW, so they work.
+
+    Copies the ``webview/lib`` DLL tree (Core, WinForms, interop, WebView2Loader)
+    to ``%APPDATA%/orga-drone/webview-lib`` and patches ``interop_dll_path``.
+    Does not copy pywebview Python sources or change PyInstaller layout.
+    """
+    src_lib = _webview_lib_dir()
+    if src_lib is None:
+        return None
+    core = src_lib / "Microsoft.Web.WebView2.Core.dll"
+    if not (getattr(sys, "frozen", False) and _has_zone_identifier(core)):
+        return src_lib
+
+    dest_lib = settings.data_dir / "webview-lib"
+    if clr_dll_path_is_unsafe(dest_lib):
+        local_app = os.environ.get("LOCALAPPDATA", "").strip()
+        dest_lib = (
+            Path(local_app) / "orga-drone" / "webview-lib" if local_app else dest_lib
+        )
+    if clr_dll_path_is_unsafe(dest_lib):
+        _LOG.error("no CLR-safe directory for WebView2 assemblies: %s", dest_lib)
+        return None
+    try:
+        _copy_webview_lib(src_lib, dest_lib)
+    except OSError as exc:
+        _LOG.warning("could not copy WebView2 assemblies to %s (%s)", dest_lib, exc)
+        if not (dest_lib / "Microsoft.Web.WebView2.Core.dll").is_file():
+            return None
+    dest_core = dest_lib / "Microsoft.Web.WebView2.Core.dll"
+    if not dest_core.is_file():
+        return None
+    _strip_zone_identifier(dest_core)
+    _patch_interop_dll_path(dest_lib)
+    _LOG.info("relocated WebView2 assemblies for CLR: %s -> %s", src_lib, dest_lib)
+    return dest_lib
+
+
 def uvicorn_log_config() -> dict[str, Any]:
     """Uvicorn logging that never relies on a TTY (safe for console=False)."""
     log_path = str(startup_log_path())
