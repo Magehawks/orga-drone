@@ -119,6 +119,83 @@ Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 UI fonts (Outfit, Sora, IBM Plex Mono) are bundled under `static/fonts/` and
 served locally. The desktop UI does not load Google Fonts from the network.
 
+## Windows pre-release smoke test (mandatory)
+
+Every Windows release **must** pass this checklist before tagging or attaching
+`orga-drone-windows-x64.zip` to a GitHub Release. A green smoke test from
+`dist\orga-drone\` alone is **not sufficient** — that path never carries
+Mark-of-the-Web (MOTW).
+
+Windows release PRs must reference completion of this checklist before merge or
+tag. Record the zip SHA256, git commit, and test date in
+`releases/<version>/RELEASE_NOTES.md`.
+
+### Why MOTW matters
+
+When users download the zip from GitHub in a browser, Windows adds an NTFS
+`Zone.Identifier` alternate data stream (Mark-of-the-Web, `ZoneId=3`). Extracting
+with **Windows Explorer** copies that stamp onto every extracted file. .NET
+`Assembly.LoadFrom` then refuses pywebview's bundled WebView2 assemblies
+(`HRESULT 0x80131515`) unless the app relocates them — behaviour covered in the
+notes above. Each release must re-verify that path.
+
+### Checklist
+
+#### 1. Build the candidate zip
+
+Follow [Windows build (PyInstaller)](#windows-build-pyinstaller) above. Package
+the onefolder output as `orga-drone-windows-x64.zip` (for example under
+`releases/<version>/`).
+
+#### 2. Obtain a MOTW-marked zip (**mandatory**)
+
+The zip used for smoke testing **must** carry Mark-of-the-Web before extract.
+
+- **Preferred:** Upload the candidate to a GitHub Release (draft or
+  pre-release), then **download `orga-drone-windows-x64.zip` in a browser**
+  (Edge or Chrome). Do **not** use `curl`, `gh release download`, or a direct
+  copy from `dist/` — those paths skip MOTW.
+- **Acceptable dev equivalent:** Apply MOTW to the locally built zip the same
+  way a browser download would (for example by copying a `Zone.Identifier`
+  stream onto the zip file).
+
+Confirm MOTW on the zip **before** extract:
+
+```powershell
+Get-Content -Path "$env:USERPROFILE\Downloads\orga-drone-windows-x64.zip" -Stream Zone.Identifier
+```
+
+Expected: `[ZoneTransfer]` with `ZoneId=3`.
+
+#### 3. Extract with Windows Explorer (**mandatory**)
+
+- Delete any previous test folder.
+- Right-click the MOTW-marked zip → **Extract All…** (not 7-Zip, WinRAR, or
+  `Expand-Archive` for this step).
+- Extract into a path that includes parentheses, for example
+  `C:\temp\orga-drone-windows-x64(2)\`.
+- Spot-check that extracted files still carry MOTW, for example:
+
+```powershell
+Get-Content -Path "C:\temp\orga-drone-windows-x64(2)\orga-drone\orga-drone.exe" -Stream Zone.Identifier
+```
+
+#### 4. Functional smoke checks (**mandatory**)
+
+Launch `orga-drone.exe` from the extracted folder and verify:
+
+- [ ] Native desktop window opens (WinForms / pywebview); **no** system-browser
+  fallback. `%APPDATA%\orga-drone\startup-crash.log` must **not** appear.
+- [ ] App icon and bundled fonts load locally (no Google Fonts network fetch).
+- [ ] **Library:** native folder picker opens (Add folder).
+- [ ] **Studio:** native open picker for a soundtrack file works.
+- [ ] **Studio:** native Save dialog for MP4 export works.
+- [ ] A small **1080p** Studio export completes successfully.
+- [ ] Close and relaunch — the open Studio project and soundtrack playlist are
+  preserved.
+
+Do **not** publish the release if any step fails.
+
 ## CI idea
 
 On git tags, GitHub Actions can build Windows (then macOS/Linux) artifacts and attach them to a Release. No secrets are required for a basic public build.
