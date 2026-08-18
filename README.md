@@ -113,7 +113,10 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 2. Unzip
 3. **Double-click `orga-drone.exe`** — a desktop window opens; add a library folder when prompted
 
-See [`packaging/README.md`](packaging/README.md) for build notes. Prebuilt binaries ship **only the application**, never your videos or database.
+See [`packaging/README.md`](packaging/README.md) for build notes and the
+**mandatory** Windows pre-release smoke test (browser-downloaded MOTW zip +
+Explorer extract). Prebuilt binaries ship **only the application**, never your
+videos or database.
 
 ### Python application
 
