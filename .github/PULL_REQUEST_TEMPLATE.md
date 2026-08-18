@@ -46,6 +46,13 @@ Reviewer verdict:
 
 - [ ] Manual product test completed by human Product Owner
 
+### Windows release PRs only
+
+If this PR tags or attaches `orga-drone-windows-x64.zip`, confirm the
+[mandatory MOTW smoke test](packaging/README.md#windows-pre-release-smoke-test-mandatory)
+passed (browser-downloaded zip + Explorer extract into a parentheses path).
+Record zip SHA256, commit, and test date in `releases/<version>/RELEASE_NOTES.md`.
+
 ## Follow-ups (not part of this PR)
 
 <!-- Performance improvements, future profiles, cleanup, etc. Keep them out of the current diff unless required for correctness. -->
