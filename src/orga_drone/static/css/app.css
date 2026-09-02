@@ -959,6 +959,9 @@ body.studio-app { padding-bottom: 0; }
   align-items: center;
   gap: 0.5rem;
 }
+.studio-topbar .studio-app-version {
+  margin-left: auto;
+}
 .studio-clear-form { margin: 0; }
 .studio-timeline-toolbar .studio-clear-form {
   margin-left: auto;
@@ -2929,6 +2932,12 @@ video.studio-preview-media.studio-preview-layer-b {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+}
+
+.app-version {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 footer {
