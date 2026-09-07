@@ -127,6 +127,74 @@ def test_browse_pages_limit_dom_cards(
     assert "Mini 4 Pro" in filtered.text
     assert "browse-pager" not in filtered.text
 
+
+def test_browse_studio_add_return_to_preserves_page_and_filters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rendered Add-to-Studio return_to must keep Browse page + filters."""
+    import re
+
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    # Enough Avata rows for a second filtered page (odd indices in _seed_many).
+    total = (BROWSE_PAGE_SIZE * 2) + 4
+    _seed_many(db, tmp_path / "lib", total)
+    project = db.ensure_default_studio_project()
+    db.set_open_studio_project_id(project.id)
+
+    client = TestClient(app)
+    browse = client.get(
+        "/browse",
+        params={
+            "kind": "video",
+            "drone": "Avata 2",
+            "page": 2,
+            "view": "grid",
+            "sort": "filename",
+            "order": "asc",
+        },
+    )
+    assert browse.status_code == 200
+    html = browse.text
+    assert "browse-pager" in html
+
+    match = re.search(r'action="/media/(\d+)/studio/add"', html)
+    assert match is not None
+    mid = int(match.group(1))
+
+    marker = f'action="/media/{mid}/studio/add"'
+    form_start = html.index(marker)
+    form_chunk = html[form_start : form_start + 450]
+    assert 'name="return_to"' in form_chunk
+    assert "page=2" in form_chunk
+    assert "kind=video" in form_chunk
+    assert "drone=Avata+2" in form_chunk or "drone=Avata%202" in form_chunk
+
+    return_to_prefix = 'name="return_to" value="'
+    assert return_to_prefix in form_chunk
+    value_start = form_chunk.index(return_to_prefix) + len(return_to_prefix)
+    value_end = form_chunk.index('"', value_start)
+    return_to = form_chunk[value_start:value_end]
+    assert return_to.startswith("/browse?")
+    assert "page=2" in return_to
+
+    add = client.post(
+        f"/media/{mid}/studio/add",
+        data={"return_to": return_to},
+        follow_redirects=False,
+    )
+    assert add.status_code == 303
+    location = add.headers["location"]
+    assert location == return_to
+    assert "page=2" in location
+
+    after = client.get(location)
+    assert after.status_code == 200
+    assert after.text.count('class="card"') >= 1
+    assert f'action="/media/{mid}/studio/add"' in after.text
+    # Membership badge / disabled control for the added path.
+    assert "In Studio" in after.text or "Im Studio" in after.text
+
 def test_browse_filter_and_sort_with_pagination(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
