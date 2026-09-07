@@ -641,7 +641,7 @@ def create_app() -> FastAPI:
             ask_summary=search.summary_parts() if ask_text else [],
             filters=filters,
             pagination=pagination,
-            browse_qs=browse_filter_query(filters),
+            browse_qs=browse_filter_query(filters, page=pagination["page"]),
             browse_qs_prev=browse_filter_query(
                 filters, page=pagination["prev_page"]
             ),
