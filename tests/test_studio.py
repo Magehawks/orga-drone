@@ -322,6 +322,43 @@ def test_http_studio_empty_and_nav(client: TestClient) -> None:
     assert "/studio" in primary
 
 
+def test_studio_browser_layout_containment_css() -> None:
+    """Desktop shell pins height; panel scrolls; mobile keeps max-height list."""
+    css = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "orga_drone"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+
+    assert "@media (min-width: 801px)" in css
+    assert ".studio-creator:has(.studio-workspace)" in css
+    assert "max-height: calc(100vh - 4.5rem)" in css
+
+    # Desktop browser: flex column shell + independently scrolling panel.
+    desktop_idx = css.index("@media (min-width: 801px)")
+    desktop_browser_idx = css.index(".studio-browser {", desktop_idx)
+    desktop_panel_idx = css.index(".studio-browser-panel {", desktop_browser_idx)
+    desktop_browser = css[desktop_browser_idx:desktop_panel_idx]
+    assert "flex-direction: column" in desktop_browser
+    assert "overflow: hidden" in desktop_browser
+    desktop_panel = css[desktop_panel_idx : desktop_panel_idx + 120]
+    assert "overflow: auto" in desktop_panel
+    assert "min-height: 0" in desktop_panel
+
+    mobile = css[css.index("@media (max-width: 800px)") :]
+    assert "max-height: 12rem" in mobile
+    mobile_creator = mobile.split(".studio-creator:has(.studio-workspace) {", 1)[1].split(
+        "}", 1
+    )[0]
+    assert "height: auto" in mobile_creator
+    assert "overflow: visible" in mobile_creator
+    mobile_browser = mobile.split(".studio-browser {", 1)[1].split("}", 1)[0]
+    assert "overflow: auto" in mobile_browser
+
+
 def test_http_studio_creator_shell_with_items(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

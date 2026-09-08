@@ -896,6 +896,14 @@ body.studio-app { padding-bottom: 0; }
   min-height: calc(100vh - 4.5rem);
   background: color-mix(in srgb, var(--bg) 92%, var(--surface-deep));
 }
+/* Desktop editor: pin shell height so sidebar overflow can clamp. */
+@media (min-width: 801px) {
+  .studio-creator:has(.studio-workspace) {
+    height: calc(100vh - 4.5rem);
+    max-height: calc(100vh - 4.5rem);
+    overflow: hidden;
+  }
+}
 .studio-topbar {
   display: flex;
   flex-wrap: wrap;
@@ -1113,6 +1121,24 @@ body.studio-app { padding-bottom: 0; }
 .studio-inspector {
   border-right: none;
   border-left: 1px solid var(--border);
+}
+/* Desktop: tabs/actions stay put; only the active panel scrolls. */
+@media (min-width: 801px) {
+  .studio-browser {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .studio-browser-tabs,
+  .studio-add-media,
+  .studio-add-title-card {
+    flex-shrink: 0;
+  }
+  .studio-browser-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
 }
 .studio-browser-tabs {
   display: flex;
@@ -1987,13 +2013,26 @@ video.studio-preview-media.studio-preview-layer-b {
   }
 }
 @media (max-width: 800px) {
+  /* Keep mobile page scroll; do not inherit the desktop viewport lock. */
+  .studio-creator:has(.studio-workspace) {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
   .studio-workspace {
     grid-template-columns: 1fr;
   }
   .studio-browser {
+    display: block;
     border-right: none;
     border-bottom: 1px solid var(--border);
     max-height: 12rem;
+    overflow: auto;
+  }
+  .studio-browser-panel {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
   }
   .studio-timeline-toolbar { margin-left: 3rem; }
   .studio-timeline-row { grid-template-columns: 3rem minmax(0, 1fr); }
