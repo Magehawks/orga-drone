@@ -104,9 +104,7 @@ def test_classify_source_type() -> None:
         == "phone"
     )
     assert (
-        classify_source_type(
-            filename="DSC_1.JPG", make="Canon", camera_model="EOS R50"
-        )
+        classify_source_type(filename="DSC_1.JPG", make="Canon", camera_model="EOS R50")
         == "camera"
     )
     assert classify_source_type(filename="mystery.mp4") == "unknown"
@@ -205,9 +203,7 @@ def test_scan_and_source_filter(tmp_path: Path) -> None:
     lib = tmp_path / "lib"
     lib.mkdir()
     _write_gps_image(lib / "beach.jpg", make="Google", model="Pixel 8")
-    _write_gps_image(
-        lib / "DJI_20240615123000_0001_D.JPG", make="DJI", model="FC8485"
-    )
+    _write_gps_image(lib / "DJI_20240615123000_0001_D.JPG", make="DJI", model="FC8485")
     (lib / "clip.mp4").write_bytes(b"\x00\x00\x00\x14ftypmp42" + b"\x00" * 32)
 
     db = Database(tmp_path / "t.sqlite3")
@@ -259,6 +255,103 @@ def test_live_photo_pair_detected(tmp_path: Path) -> None:
     assert alone.resolve() not in sidecars
 
 
+def test_live_photo_pairing_is_per_directory(tmp_path: Path) -> None:
+    """Same IMG_#### stem in two folders must pair independently."""
+    from orga_drone.parse import live_photo_video_sidecars
+
+    a = tmp_path / "202310_a"
+    b = tmp_path / "202607_a"
+    a.mkdir()
+    b.mkdir()
+    (a / "IMG_9322.HEIC").write_bytes(b"still-a")
+    (a / "IMG_9322.MOV").write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    (b / "IMG_9322.HEIC").write_bytes(b"still-b")
+    (b / "IMG_9322.MOV").write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+
+    paths = [
+        a / "IMG_9322.HEIC",
+        a / "IMG_9322.MOV",
+        b / "IMG_9322.HEIC",
+        b / "IMG_9322.MOV",
+    ]
+    sidecars = live_photo_video_sidecars(paths)
+    assert (a / "IMG_9322.MOV").resolve() in sidecars
+    assert (b / "IMG_9322.MOV").resolve() in sidecars
+
+
+def test_ffmpeg_i_still_picture_not_library_video() -> None:
+    from orga_drone.parse import _streams_from_ffmpeg_i_stderr
+
+    still_stderr = """
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'IMG_0055.MOV':
+  Duration: N/A, start: 0.000000, bitrate: N/A
+  Stream #0:35[0x25]: Video: hevc (Main Still Picture) (hvc1 / 0x31637668), yuvj420p(pc), 320x240, 1 fps
+"""
+    streams = _streams_from_ffmpeg_i_stderr(still_stderr)
+    assert streams is not None
+    assert len(streams) == 1
+    assert streams[0].is_still_picture is True
+
+    real_stderr = """
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'IMG_0054.MOV':
+  Duration: 00:00:14.20, start: 0.000000, bitrate: 10030 kb/s
+  Stream #0:0[0x1](und): Video: hevc (Main 10) (hvc1 / 0x31637668), yuv420p10le(tv, bt2020nc/bt2020/arib-std-b67), 1920x1080, 29.99 fps
+  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo
+"""
+    real_streams = _streams_from_ffmpeg_i_stderr(real_stderr)
+    assert real_streams is not None
+    assert any(not s.is_still_picture for s in real_streams)
+
+    invalid = _streams_from_ffmpeg_i_stderr(
+        "moov atom not found\nError opening input: Invalid data found when processing input\n"
+    )
+    assert invalid is None
+
+
+def test_scan_skips_still_picture_mov(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone import parse as parse_mod
+    from orga_drone import scan as scan_mod
+
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    still_mov = lib / "IMG_STILL.MOV"
+    real_mov = lib / "clip.MOV"
+    still_mov.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    real_mov.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+
+    def fake_should(path: Path) -> bool:
+        return path.name != "IMG_STILL.MOV"
+
+    monkeypatch.setattr(parse_mod, "should_index_as_library_video", fake_should)
+    monkeypatch.setattr(scan_mod, "should_index_as_library_video", fake_should)
+
+    db = Database(tmp_path / "still.sqlite3")
+    root_id = db.add_root(lib, label="t")
+    counts = scan_root(db, root_id, lib)
+    assert counts["videos"] == 1
+    assert counts.get("non_video", 0) == 1
+    names = {i.filename for i in db.list_media()}
+    assert "clip.MOV" in names
+    assert "IMG_STILL.MOV" not in names
+    assets = (
+        {Path(a.path).name: a.kind for a in db.list_assets(root_id)}
+        if hasattr(db, "list_assets")
+        else None
+    )
+    # Asset kind check via raw SQL if no list_assets helper.
+    if assets is None:
+        import sqlite3
+
+        con = sqlite3.connect(tmp_path / "still.sqlite3")
+        rows = {
+            Path(r[0]).name: r[1] for r in con.execute("select path, kind from assets")
+        }
+        assert rows["IMG_STILL.MOV"] == "other"
+        assert rows["clip.MOV"] == "video"
+
+
 def test_scan_skips_live_photo_mov_as_video(tmp_path: Path) -> None:
     lib = tmp_path / "lib"
     lib.mkdir()
@@ -283,3 +376,25 @@ def test_scan_skips_live_photo_mov_as_video(tmp_path: Path) -> None:
     assert "IMG_0042.MOV" not in by_name
     assert "clip.MOV" in by_name
     assert by_name["clip.MOV"].kind == "video"
+
+
+def test_scan_live_photo_same_stem_two_dirs(tmp_path: Path) -> None:
+    lib = tmp_path / "lib"
+    a = lib / "dir_a"
+    b = lib / "dir_b"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    _write_gps_image(a / "IMG_9322.JPG", make="Apple", model="iPhone")
+    _write_gps_image(b / "IMG_9322.JPG", make="Apple", model="iPhone")
+    (a / "IMG_9322.MOV").write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    (b / "IMG_9322.MOV").write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+    alone = lib / "holiday.MOV"
+    alone.write_bytes(b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 32)
+
+    db = Database(tmp_path / "live2.sqlite3")
+    root_id = db.add_root(lib, label="iphone")
+    counts = scan_root(db, root_id, lib)
+    assert counts.get("live_sidecars", 0) == 2
+    assert counts["videos"] == 1
+    names = {i.filename for i in db.list_media() if i.kind == "video"}
+    assert names == {"holiday.MOV"}

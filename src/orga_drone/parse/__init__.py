@@ -180,13 +180,20 @@ def live_photo_video_sidecars(paths: list[Path]) -> set[Path]:
     iPhone Live Photos are typically exported as ``IMG_1234.HEIC`` (or ``.JPG``)
     plus a short ``IMG_1234.MOV``. The still is the primary photo; the MOV is a
     motion sidecar and should not appear as a standalone video in the library.
+
+    Pairing is **per directory**: the same stem in another folder is a different
+    asset (common when iPhone exports reset ``IMG_####`` numbering).
     """
-    by_stem: dict[str, list[Path]] = {}
+    by_key: dict[tuple[str, str], list[Path]] = {}
     for path in paths:
-        by_stem.setdefault(path.stem, []).append(path)
+        try:
+            parent = str(path.parent.resolve())
+        except OSError:
+            parent = str(path.parent)
+        by_key.setdefault((parent, path.stem), []).append(path)
 
     sidecars: set[Path] = set()
-    for group in by_stem.values():
+    for group in by_key.values():
         still = None
         mov = None
         for path in group:
@@ -207,8 +214,175 @@ def is_live_photo_video_sidecar(path: Path, siblings: list[Path] | None = None) 
     """True when ``path`` is a .MOV paired with a same-stem HEIC/JPG still."""
     if path.suffix.lower() not in LIVE_PHOTO_VIDEO_EXTS:
         return False
-    group = siblings if siblings is not None else list(path.parent.glob(f"{path.stem}.*"))
+    group = (
+        siblings if siblings is not None else list(path.parent.glob(f"{path.stem}.*"))
+    )
     return path.resolve() in live_photo_video_sidecars(group) if group else False
+
+
+@dataclass(frozen=True)
+class VideoStreamInfo:
+    """One decoded video stream summary from ffprobe / ffmpeg -i."""
+
+    codec_name: str | None
+    profile: str | None
+    width: int | None
+    height: int | None
+    is_still_picture: bool
+
+
+def _profile_is_still_picture(
+    profile: str | None, codec_long: str | None = None
+) -> bool:
+    blob = f"{profile or ''} {codec_long or ''}".casefold()
+    return "still picture" in blob
+
+
+def _streams_from_ffprobe_json(data: dict) -> list[VideoStreamInfo] | None:
+    streams_out: list[VideoStreamInfo] = []
+    found_any_stream = False
+    for stream in data.get("streams") or []:
+        found_any_stream = True
+        if stream.get("codec_type") != "video":
+            continue
+        profile = stream.get("profile")
+        long_name = stream.get("codec_long_name")
+        try:
+            width = int(stream["width"]) if stream.get("width") is not None else None
+        except (TypeError, ValueError):
+            width = None
+        try:
+            height = int(stream["height"]) if stream.get("height") is not None else None
+        except (TypeError, ValueError):
+            height = None
+        streams_out.append(
+            VideoStreamInfo(
+                codec_name=stream.get("codec_name"),
+                profile=str(profile) if profile is not None else None,
+                width=width,
+                height=height,
+                is_still_picture=_profile_is_still_picture(
+                    str(profile) if profile is not None else None,
+                    str(long_name) if long_name is not None else None,
+                ),
+            )
+        )
+    if not found_any_stream and not streams_out:
+        return []
+    return streams_out
+
+
+def _streams_from_ffmpeg_i_stderr(stderr: str) -> list[VideoStreamInfo] | None:
+    """Parse ``ffmpeg -i`` stderr. Return None when the container could not be opened."""
+    text = stderr or ""
+    if re.search(
+        r"Error opening input|Invalid data found when processing input|moov atom not found",
+        text,
+        re.IGNORECASE,
+    ):
+        return None
+    if not re.search(r"Input #0", text):
+        return None
+    streams: list[VideoStreamInfo] = []
+    for line in text.splitlines():
+        if "Video:" not in line:
+            continue
+        # Example: Video: hevc (Main Still Picture) (hvc1 / 0x31637668), ..., 320x240,
+        codec = None
+        m_codec = re.search(r"Video:\s*([A-Za-z0-9_]+)", line)
+        if m_codec:
+            codec = m_codec.group(1)
+        profile = None
+        m_prof = re.search(r"Video:\s*[A-Za-z0-9_]+\s*\(([^)]+)\)", line)
+        if m_prof:
+            profile = m_prof.group(1).strip()
+        width = height = None
+        m_wh = re.search(r"(\d{2,5})x(\d{2,5})", line)
+        if m_wh:
+            width, height = int(m_wh.group(1)), int(m_wh.group(2))
+        streams.append(
+            VideoStreamInfo(
+                codec_name=codec,
+                profile=profile,
+                width=width,
+                height=height,
+                is_still_picture=_profile_is_still_picture(profile, line),
+            )
+        )
+    return streams
+
+
+def probe_video_streams(path: Path) -> list[VideoStreamInfo] | None:
+    """Return video streams, or None when probing is unavailable / inconclusive.
+
+    Uses ffprobe JSON when present, otherwise ``ffmpeg -i`` stderr. A ``None``
+    result means \"do not change extension-based classification\".
+    """
+    from orga_drone.ffmpeg_bin import (
+        find_ffmpeg,
+        find_ffprobe,
+        subprocess_no_window_kwargs,
+    )
+
+    ffprobe = find_ffprobe()
+    if ffprobe:
+        cmd = [
+            ffprobe,
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_streams",
+            str(path),
+        ]
+        try:
+            proc = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                **subprocess_no_window_kwargs(),
+            )
+        except (OSError, subprocess.SubprocessError):
+            proc = None
+        if proc is not None and proc.returncode == 0 and proc.stdout:
+            try:
+                data = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                data = None
+            if data is not None:
+                return _streams_from_ffprobe_json(data)
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        return None
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-hide_banner", "-i", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            **subprocess_no_window_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return _streams_from_ffmpeg_i_stderr(f"{proc.stderr or ''}\n{proc.stdout or ''}")
+
+
+def should_index_as_library_video(path: Path) -> bool:
+    """False only when probe clearly shows no real (non-still) video stream.
+
+    Extension-only candidates remain accepted when ffmpeg/ffprobe is missing or
+    the container cannot be opened (inconclusive), so scan stays available
+    without tools and stub fixtures keep working.
+    """
+    streams = probe_video_streams(path)
+    if streams is None:
+        return True
+    real = [s for s in streams if not s.is_still_picture]
+    return len(real) > 0
 
 
 def parse_filename(path: Path) -> FilenameMeta:
@@ -254,7 +428,9 @@ def _file_mtime(path: Path) -> datetime | None:
         return None
 
 
-def _drone_label_from_make_model(make: str, model: str) -> tuple[str | None, str | None]:
+def _drone_label_from_make_model(
+    make: str, model: str
+) -> tuple[str | None, str | None]:
     """Return (drone_model, camera_model) from EXIF/Make-Model style fields."""
     camera = model or None
     drone = CAMERA_MODEL_MAP.get(model) if model else None
@@ -350,9 +526,9 @@ def parse_exif(
     make = str(tags.get("Make") or "").strip()
     model = str(tags.get("Model") or "").strip()
     drone, camera = _drone_label_from_make_model(make, model)
-    recorded = _parse_exif_datetime(tags.get("DateTimeOriginal")) or _parse_exif_datetime(
-        tags.get("DateTime")
-    )
+    recorded = _parse_exif_datetime(
+        tags.get("DateTimeOriginal")
+    ) or _parse_exif_datetime(tags.get("DateTime"))
 
     gps_info = tags.get("GPSInfo")
     if not gps_info:
@@ -372,7 +548,9 @@ def _srt_timecode_to_seconds(h: str, m: str, s: str, ms: str) -> float:
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
 
 
-def parse_srt(path: Path, *, max_track_points: int = 200) -> tuple[GpsPoint | None, list[GpsPoint], float | None]:
+def parse_srt(
+    path: Path, *, max_track_points: int = 200
+) -> tuple[GpsPoint | None, list[GpsPoint], float | None]:
     """Parse DJI SRT: start GPS, sampled track, approximate duration from last cue."""
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -388,8 +566,12 @@ def parse_srt(path: Path, *, max_track_points: int = 200) -> tuple[GpsPoint | No
         r"(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})",
         text,
     ):
-        t0 = _srt_timecode_to_seconds(tm.group(1), tm.group(2), tm.group(3), tm.group(4))
-        t1 = _srt_timecode_to_seconds(tm.group(5), tm.group(6), tm.group(7), tm.group(8))
+        t0 = _srt_timecode_to_seconds(
+            tm.group(1), tm.group(2), tm.group(3), tm.group(4)
+        )
+        t1 = _srt_timecode_to_seconds(
+            tm.group(5), tm.group(6), tm.group(7), tm.group(8)
+        )
         cue_times.append((tm.start(), t0))
         duration_s = t1
 
@@ -473,7 +655,9 @@ def _normalize_tag_datetime(value: str) -> datetime | None:
     cleaned = value.replace("Z", "").strip().replace("T", " ", 1)
     if len(cleaned) >= 10 and cleaned[4] == ":" and cleaned[7] == ":":
         cleaned = f"{cleaned[0:4]}-{cleaned[5:7]}-{cleaned[8:]}"
-    return _parse_exif_datetime(cleaned[:19]) or _parse_creation_time(f"creation_time {value}")
+    return _parse_exif_datetime(cleaned[:19]) or _parse_creation_time(
+        f"creation_time {value}"
+    )
 
 
 def probe_video_with_ffprobe(
@@ -553,7 +737,9 @@ def probe_video_with_ffprobe(
     return gps, recorded, duration_s
 
 
-def detect_drone_from_mp4(path: Path, *, read_bytes: int = 2_000_000) -> tuple[str | None, str | None]:
+def detect_drone_from_mp4(
+    path: Path, *, read_bytes: int = 2_000_000
+) -> tuple[str | None, str | None]:
     """Best-effort scan of MP4 header/meta for DJI model strings."""
     drone, camera, _gps, _created = scan_video_header(path, read_bytes=read_bytes)
     return drone, camera
@@ -654,7 +840,11 @@ def parse_media_file(path: Path) -> ParsedMedia:
                 media.abs_alt = start.abs_alt
         else:
             # No SRT required: optional ffprobe for GPS / date / duration
-            if media.latitude is None or media.recorded_at is None or media.duration_s is None:
+            if (
+                media.latitude is None
+                or media.recorded_at is None
+                or media.duration_s is None
+            ):
                 probe_gps, probe_dt, probe_dur = probe_video_with_ffprobe(path)
                 if media.latitude is None and probe_gps:
                     media.latitude = probe_gps.lat
