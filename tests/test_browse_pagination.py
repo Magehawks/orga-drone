@@ -9,9 +9,11 @@ from fastapi.testclient import TestClient
 
 from orga_drone.app import (
     BROWSE_PAGE_SIZE,
+    BROWSE_PAGE_SIZES,
     browse_filter_query,
     browse_page_clamp,
     browse_pagination,
+    browse_resolve_page_size,
 )
 from orga_drone.config import Settings
 from orga_drone.db import Database
@@ -63,20 +65,41 @@ def _seed_many(db: Database, root: Path, count: int) -> list[int]:
     return ids
 
 
+def test_browse_resolve_page_size() -> None:
+    assert browse_resolve_page_size(None) == BROWSE_PAGE_SIZE
+    assert browse_resolve_page_size("") == BROWSE_PAGE_SIZE
+    assert browse_resolve_page_size("nope") == BROWSE_PAGE_SIZE
+    assert browse_resolve_page_size(999999) == BROWSE_PAGE_SIZE
+    assert browse_resolve_page_size("999999") == BROWSE_PAGE_SIZE
+    for size in BROWSE_PAGE_SIZES:
+        assert browse_resolve_page_size(size) == size
+        assert browse_resolve_page_size(str(size)) == size
+
+
 def test_browse_pagination_helpers() -> None:
     assert browse_page_clamp(0, total=100) == 1
-    assert browse_page_clamp(99, total=100, page_size=48) == 3
-    meta = browse_pagination(total=100, page=2, page_size=48)
+    assert browse_page_clamp(99, total=100, page_size=50) == 2
+    meta = browse_pagination(total=100, page=2, page_size=50)
     assert meta["page"] == 2
-    assert meta["offset"] == 48
+    assert meta["offset"] == 50
     assert meta["has_prev"] is True
-    assert meta["has_next"] is True
-    assert meta["showing_from"] == 49
-    assert meta["showing_to"] == 96
-    qs = browse_filter_query({"view": "grid", "kind": "video", "q": ""}, page=2)
+    assert meta["has_next"] is False
+    assert meta["showing_from"] == 51
+    assert meta["showing_to"] == 100
+    mid = browse_pagination(total=125, page=2, page_size=50)
+    assert mid["has_next"] is True
+    assert mid["showing_to"] == 100
+    assert browse_pagination(total=125, page=1, page_size=50)["total_pages"] == 3
+    assert browse_pagination(total=125, page=1, page_size=100)["total_pages"] == 2
+    assert browse_pagination(total=125, page=1, page_size=200)["total_pages"] == 1
+    qs = browse_filter_query(
+        {"view": "grid", "kind": "video", "q": "", "page_size": "100"},
+        page=2,
+    )
     assert "view=grid" in qs
     assert "kind=video" in qs
     assert "page=2" in qs
+    assert "page_size=100" in qs
     assert "q=" not in qs
 
 
@@ -110,6 +133,7 @@ def test_browse_pages_limit_dom_cards(
     assert page1.status_code == 200
     assert page1.text.count('class="card"') == BROWSE_PAGE_SIZE
     assert "browse-pager" in page1.text
+    assert "Items per page" in page1.text or "Elemente pro Seite" in page1.text
     assert f"/{(total + BROWSE_PAGE_SIZE - 1) // BROWSE_PAGE_SIZE}" in page1.text or (
         str((total + BROWSE_PAGE_SIZE - 1) // BROWSE_PAGE_SIZE) in page1.text
     )
@@ -122,10 +146,95 @@ def test_browse_pages_limit_dom_cards(
 
     filtered = client.get("/browse?kind=video&drone=Mini+4+Pro&page=1")
     assert filtered.status_code == 200
-    # Even indices only → ceil(55/2) or floor depending on range(55)
-    assert filtered.text.count('class="card"') == 28
+    assert filtered.text.count('class="card"') == (total + 1) // 2
     assert "Mini 4 Pro" in filtered.text
     assert "browse-pager" not in filtered.text
+
+
+def test_browse_page_size_options_and_invalid_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    total = 125
+    _seed_many(db, tmp_path / "lib", total)
+    client = TestClient(app)
+
+    default = client.get("/browse")
+    assert default.status_code == 200
+    assert default.text.count('class="card"') == BROWSE_PAGE_SIZE
+
+    for size in (100, 200):
+        resp = client.get("/browse", params={"page_size": size})
+        assert resp.status_code == 200
+        assert resp.text.count('class="card"') == min(size, total)
+        assert f"page_size={size}" in resp.text
+        expected_pages = (total + size - 1) // size
+        assert f"/{expected_pages}" in resp.text or str(expected_pages) in resp.text
+
+    invalid = client.get("/browse", params={"page_size": 999999})
+    assert invalid.status_code == 200
+    assert invalid.text.count('class="card"') == BROWSE_PAGE_SIZE
+
+
+def test_browse_page_size_change_resets_to_page_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    _seed_many(db, tmp_path / "lib", 125)
+    client = TestClient(app)
+    # Filter form has no page field — submitting a new page_size lands on page 1.
+    resp = client.get(
+        "/browse",
+        params={"page_size": 100, "kind": "video", "sort": "filename", "order": "asc"},
+    )
+    assert resp.status_code == 200
+    assert resp.text.count('class="card"') == 100
+    assert "page=2" in resp.text
+    assert "page_size=100" in resp.text
+
+
+def test_browse_prev_next_preserve_page_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    _seed_many(db, tmp_path / "lib", 125)
+    client = TestClient(app)
+    page1 = client.get("/browse", params={"page_size": 100, "view": "grid"})
+    assert page1.status_code == 200
+    assert "page_size=100" in page1.text
+    assert "page=2" in page1.text
+
+    page2 = client.get("/browse", params={"page": 2, "page_size": 100, "view": "grid"})
+    assert page2.status_code == 200
+    assert page2.text.count('class="card"') == 25
+    assert "page_size=100" in page2.text
+
+
+def test_browse_filter_sort_view_preserve_page_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    _seed_many(db, tmp_path / "lib", 20)
+    client = TestClient(app)
+    resp = client.get(
+        "/browse",
+        params={
+            "sort": "filename",
+            "order": "asc",
+            "drone": "Avata 2",
+            "kind": "video",
+            "page_size": 100,
+            "view": "list",
+        },
+    )
+    assert resp.status_code == 200
+    assert "page_size=100" in resp.text
+    assert "view=list" in resp.text
+    assert "list-thumb" in resp.text
 
 
 def test_browse_studio_add_return_to_preserves_page_and_filters(
@@ -136,8 +245,8 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
 
     app = _app(tmp_path, monkeypatch)
     db: Database = app.state.db
-    # Enough Avata rows for a second filtered page (odd indices in _seed_many).
-    total = (BROWSE_PAGE_SIZE * 2) + 4
+    # Enough Avata rows for page 2 at page_size=100 (odd indices in _seed_many).
+    total = 210
     _seed_many(db, tmp_path / "lib", total)
     project = db.ensure_default_studio_project()
     db.set_open_studio_project_id(project.id)
@@ -149,6 +258,7 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
             "kind": "video",
             "drone": "Avata 2",
             "page": 2,
+            "page_size": 100,
             "view": "grid",
             "sort": "filename",
             "order": "asc",
@@ -156,7 +266,6 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
     )
     assert browse.status_code == 200
     html = browse.text
-    assert "browse-pager" in html
 
     match = re.search(r'action="/media/(\d+)/studio/add"', html)
     assert match is not None
@@ -164,9 +273,10 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
 
     marker = f'action="/media/{mid}/studio/add"'
     form_start = html.index(marker)
-    form_chunk = html[form_start : form_start + 450]
+    form_chunk = html[form_start : form_start + 500]
     assert 'name="return_to"' in form_chunk
     assert "page=2" in form_chunk
+    assert "page_size=100" in form_chunk
     assert "kind=video" in form_chunk
     assert "drone=Avata+2" in form_chunk or "drone=Avata%202" in form_chunk
 
@@ -177,6 +287,7 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
     return_to = form_chunk[value_start:value_end]
     assert return_to.startswith("/browse?")
     assert "page=2" in return_to
+    assert "page_size=100" in return_to
 
     add = client.post(
         f"/media/{mid}/studio/add",
@@ -187,6 +298,7 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
     location = add.headers["location"]
     assert location == return_to
     assert "page=2" in location
+    assert "page_size=100" in location
 
     after = client.get(location)
     assert after.status_code == 200
@@ -194,6 +306,7 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
     assert f'action="/media/{mid}/studio/add"' in after.text
     # Membership badge / disabled control for the added path.
     assert "In Studio" in after.text or "Im Studio" in after.text
+
 
 def test_browse_filter_and_sort_with_pagination(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
