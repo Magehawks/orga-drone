@@ -22,6 +22,7 @@ from orga_drone.parse import (
     SUBTITLE_EXTS,
     live_photo_video_sidecars,
     parse_media_file,
+    should_index_as_library_video,
 )
 from orga_drone.scan.progress import ProgressCallback, ScanProgress, display_scan_path
 
@@ -77,8 +78,8 @@ def _parse_recorded(raw: str | None) -> datetime | None:
 
 
 def _clip_for_session(mid: int, row: dict) -> ClipForSession:
-    start_rel, end_rel, start_lat, start_lon, end_lat, end_lon = altitude_edges_from_track(
-        track_from_json(row.get("track_json"))
+    start_rel, end_rel, start_lat, start_lon, end_lat, end_lon = (
+        altitude_edges_from_track(track_from_json(row.get("track_json")))
     )
     # Fall back to media abs_alt as a coarse start hint when SRT track lacks rel_alt.
     if start_rel is None and row.get("abs_alt") is not None:
@@ -148,7 +149,13 @@ def scan_root(
     # Clear previous index for this root (simple full rescan for MVP)
     db.clear_root_media(root_id)
 
-    counts = {"assets": 0, "videos": 0, "photos": 0, "live_sidecars": 0}
+    counts = {
+        "assets": 0,
+        "videos": 0,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+    }
 
     for index, path in enumerate(files, start=1):
         parsed = parse_media_file(path)
@@ -161,6 +168,10 @@ def scan_root(
         asset_kind = parsed.kind
         if resolved in live_sidecars:
             asset_kind = "live_sidecar"
+        elif parsed.kind == "video" and not should_index_as_library_video(path):
+            # Video extension without a real motion video stream (e.g. HEVC
+            # "Main Still Picture" poster MOVs). Keep as asset, skip media.
+            asset_kind = "other"
 
         try:
             mtime = path.stat().st_mtime
@@ -178,6 +189,18 @@ def scan_root(
 
         if asset_kind == "live_sidecar":
             counts["live_sidecars"] += 1
+            _emit(
+                on_progress,
+                phase="indexing",
+                discovered=discovered,
+                processed=index,
+                current_path=display_scan_path(path, root_path),
+                root_id=root_id,
+            )
+            continue
+
+        if asset_kind == "other" and parsed.kind == "video":
+            counts["non_video"] += 1
             _emit(
                 on_progress,
                 phase="indexing",
@@ -208,7 +231,11 @@ def scan_root(
             # already handled in parser with .SRT/.srt
             pass
 
-        recorded = parsed.recorded_at.isoformat(timespec="seconds") if parsed.recorded_at else None
+        recorded = (
+            parsed.recorded_at.isoformat(timespec="seconds")
+            if parsed.recorded_at
+            else None
+        )
 
         media_id = db.upsert_media(
             {
@@ -334,7 +361,9 @@ def scan_all_roots(
     for root in db.list_roots():
         path = Path(root["path"])
         if not path.exists():
-            results.append({"root_id": root["id"], "path": root["path"], "error": "missing"})
+            results.append(
+                {"root_id": root["id"], "path": root["path"], "error": "missing"}
+            )
             continue
         counts = scan_root(db, int(root["id"]), path, on_progress=on_progress)
         results.append({"root_id": root["id"], "path": root["path"], **counts})
