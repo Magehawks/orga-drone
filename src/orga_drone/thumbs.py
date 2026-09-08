@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from orga_drone.config import settings
-from orga_drone.ffmpeg_bin import find_ffmpeg
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -28,7 +28,11 @@ def thumbs_dir() -> Path:
 
 
 def sibling_with_suffix(path: Path, suffix: str) -> Path | None:
-    for candidate in (path.with_suffix(suffix), path.with_suffix(suffix.lower()), path.with_suffix(suffix.upper())):
+    for candidate in (
+        path.with_suffix(suffix),
+        path.with_suffix(suffix.lower()),
+        path.with_suffix(suffix.upper()),
+    ):
         if candidate.exists():
             return candidate
     return None
@@ -58,7 +62,9 @@ def _placeholder(kind: str, label: str) -> Image.Image:
 
     img = Image.new("RGB", THUMB_SIZE, (18, 28, 36))
     draw = ImageDraw.Draw(img)
-    draw.rectangle((0, 0, THUMB_SIZE[0] - 1, THUMB_SIZE[1] - 1), outline=(45, 70, 82), width=2)
+    draw.rectangle(
+        (0, 0, THUMB_SIZE[0] - 1, THUMB_SIZE[1] - 1), outline=(45, 70, 82), width=2
+    )
     text = label[:28] or kind.upper()
     draw.text((16, THUMB_SIZE[1] // 2 - 10), text, fill=(180, 200, 210))
     return img
@@ -113,6 +119,7 @@ def _ffmpeg_frame(source: Path, dest: Path) -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=60,
+            **subprocess_no_window_kwargs(),
         )
         return dest.exists() and dest.stat().st_size > 0
     except (OSError, subprocess.SubprocessError):

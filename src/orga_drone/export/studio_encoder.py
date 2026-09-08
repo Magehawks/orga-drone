@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
-from orga_drone.ffmpeg_bin import find_ffmpeg
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -152,17 +152,11 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
             filters.append(
                 f"[{right_a}]atrim={b_start:.4f},asetpts=PTS-STARTPTS[at{index}r]"
             )
-            filters.append(
-                f"[at{index}l][at{index}r]concat=n=2:v=0:a=1[{a_out}]"
-            )
+            filters.append(f"[at{index}l][at{index}r]concat=n=2:v=0:a=1[{a_out}]")
             current_dur = current_dur + next_dur - overlap
         else:
-            filters.append(
-                f"[{left_v}][{right_v}]concat=n=2:v=1:a=0[{v_out}]"
-            )
-            filters.append(
-                f"[{left_a}][{right_a}]concat=n=2:v=0:a=1[{a_out}]"
-            )
+            filters.append(f"[{left_v}][{right_v}]concat=n=2:v=1:a=0[{v_out}]")
+            filters.append(f"[{left_a}][{right_a}]concat=n=2:v=0:a=1[{a_out}]")
             current_dur += next_dur
         current_v = v_out
         current_a = a_out
@@ -432,7 +426,6 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
             )
 
-
     def _render_title_card(
         self,
         ffmpeg: str,
@@ -445,7 +438,10 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
     ) -> None:
-        from orga_drone.studio_title_card import TitleCardFontError, render_title_card_image
+        from orga_drone.studio_title_card import (
+            TitleCardFontError,
+            render_title_card_image,
+        )
 
         still = out.with_name(f"{out.stem}_card.jpg")
         try:
@@ -903,8 +899,7 @@ def _persist_ffmpeg_failure(cmd: list[str], stderr: str) -> None:
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         command = subprocess.list2cmdline([str(part) for part in cmd])
         body = (
-            f"{stamp}\nCMD {command}\n--- stderr ---\n{stderr.rstrip()}\n"
-            f"{'=' * 72}\n"
+            f"{stamp}\nCMD {command}\n--- stderr ---\n{stderr.rstrip()}\n{'=' * 72}\n"
         )
         with path.open("a", encoding="utf-8") as fh:
             fh.write(body)
@@ -927,6 +922,7 @@ def _run_ffmpeg(
                 capture_output=True,
                 text=True,
                 timeout=3600,
+                **subprocess_no_window_kwargs(),
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise StudioExportError(f"Export failed: {exc}") from exc
@@ -955,6 +951,7 @@ def _run_ffmpeg(
                     stderr=err_file,
                     text=True,
                     bufsize=1,
+                    **subprocess_no_window_kwargs(),
                 )
             except OSError as exc:
                 raise StudioExportError(f"Export failed: {exc}") from exc

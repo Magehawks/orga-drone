@@ -7,7 +7,11 @@ from pathlib import Path
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
 from orga_drone.config import settings
 from orga_drone.db import Database, StudioClip, StudioProject
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig, StudioExportMusic
+from orga_drone.export.studio_config import (
+    StudioExportClip,
+    StudioExportConfig,
+    StudioExportMusic,
+)
 from orga_drone.export.studio_encoder import (
     ProgressCallback,
     StudioExportError,
@@ -39,7 +43,11 @@ def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
     import re
     import subprocess
 
-    from orga_drone.ffmpeg_bin import find_ffmpeg, find_ffprobe
+    from orga_drone.ffmpeg_bin import (
+        find_ffmpeg,
+        find_ffprobe,
+        subprocess_no_window_kwargs,
+    )
 
     def _best(pairs: list[tuple[int, int]]) -> tuple[int | None, int | None]:
         if not pairs:
@@ -62,7 +70,12 @@ def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
         ]
         try:
             proc = subprocess.run(
-                cmd, check=False, capture_output=True, text=True, timeout=30
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                **subprocess_no_window_kwargs(),
             )
         except (OSError, subprocess.SubprocessError):
             proc = None
@@ -109,6 +122,7 @@ def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
             capture_output=True,
             text=True,
             timeout=30,
+            **subprocess_no_window_kwargs(),
         )
     except (OSError, subprocess.SubprocessError):
         return None, None
@@ -133,9 +147,7 @@ def probe_video_dimensions(path: Path) -> tuple[int | None, int | None]:
     return _best(pairs_ff)
 
 
-def _resolve_export_project(
-    db: Database, project_id: int | None
-) -> StudioProject:
+def _resolve_export_project(db: Database, project_id: int | None) -> StudioProject:
     if project_id is not None:
         project = db.get_studio_project(project_id)
         if project is None:
@@ -147,7 +159,9 @@ def _resolve_export_project(
     return project
 
 
-def collect_project_video_heights(db: Database, project_id: int | None = None) -> list[int | None]:
+def collect_project_video_heights(
+    db: Database, project_id: int | None = None
+) -> list[int | None]:
     """Heights for available video clips in the Studio project."""
     heights: list[int | None] = []
     for clip in db.list_studio_items(project_id):
@@ -173,7 +187,9 @@ def collect_project_video_heights(db: Database, project_id: int | None = None) -
 
 
 def _project_has_title_cards(db: Database, project_id: int) -> bool:
-    return any(clip.item_kind == TITLE_CARD_KIND for clip in db.list_studio_items(project_id))
+    return any(
+        clip.item_kind == TITLE_CARD_KIND for clip in db.list_studio_items(project_id)
+    )
 
 
 def _project_has_available_photos(db: Database, project_id: int) -> bool:
@@ -289,7 +305,9 @@ def prepare_studio_export(
         options = generated_only_export_resolutions()
     allowed = {o.height for o in options}
     if int(height) not in allowed:
-        raise StudioExportError("Selected export resolution is not available for this project.")
+        raise StudioExportError(
+            "Selected export resolution is not available for this project."
+        )
     width = height_to_width(int(height))
     dest = Path(output_path).expanduser()
     if dest.suffix.lower() != ".mp4":

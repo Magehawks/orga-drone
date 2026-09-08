@@ -59,7 +59,9 @@ def playlist_span_durations(
     return spans
 
 
-def scaled_fades(fade_in_s: float, fade_out_s: float, bed_s: float) -> tuple[float, float]:
+def scaled_fades(
+    fade_in_s: float, fade_out_s: float, bed_s: float
+) -> tuple[float, float]:
     fade_in = max(0.0, float(fade_in_s))
     fade_out = max(0.0, float(fade_out_s))
     bed = max(0.0, float(bed_s))
@@ -170,9 +172,7 @@ def build_playlist_amix_filter(
         chains.append(",".join(parts) + f"[{label}]")
         labels.append(f"[{label}]")
     if not labels:
-        return (
-            "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
-        )
+        return "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
     concat = (
         f"{''.join(labels)}concat=n={len(labels)}:v=0:a=1,"
         f"atrim=0:{_fmt(story)},asetpts=PTS-STARTPTS[mus]"
@@ -186,7 +186,12 @@ def build_playlist_amix_filter(
 
 def probe_audio_duration_s(path: Path) -> float | None:
     """Return audio duration in seconds, or None if no decodable audio stream."""
-    from orga_drone.ffmpeg_bin import find_ffmpeg, find_ffprobe
+    from orga_drone.ffmpeg_bin import (
+        find_ffmpeg,
+        find_ffprobe,
+        subprocess_no_window_kwargs,
+    )
+
     ffprobe = find_ffprobe()
     if ffprobe:
         cmd = [
@@ -203,7 +208,12 @@ def probe_audio_duration_s(path: Path) -> float | None:
         ]
         try:
             proc = subprocess.run(
-                cmd, check=False, capture_output=True, text=True, timeout=30
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                **subprocess_no_window_kwargs(),
             )
         except (OSError, subprocess.SubprocessError):
             proc = None
@@ -237,6 +247,7 @@ def probe_audio_duration_s(path: Path) -> float | None:
             capture_output=True,
             text=True,
             timeout=30,
+            **subprocess_no_window_kwargs(),
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -266,6 +277,7 @@ def require_readable_music(path: Path) -> float:
         StudioExportError: missing / unreadable / unsupported.
     """
     from orga_drone.export.studio_encoder import StudioExportError
+
     if not path.is_file():
         raise StudioExportError(
             "The selected music file is no longer available.",

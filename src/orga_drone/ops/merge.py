@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from orga_drone.db import Database, MediaRow
-from orga_drone.ffmpeg_bin import ffmpeg_available, find_ffmpeg
+from orga_drone.ffmpeg_bin import (
+    ffmpeg_available,
+    find_ffmpeg,
+    subprocess_no_window_kwargs,
+)
 from orga_drone.media_files import is_under_root, resolve_media_file
 from orga_drone.scan import scan_root
 
@@ -108,6 +112,7 @@ def merge_flow(
                 text=True,
                 timeout=60 * 60,
                 check=False,
+                **subprocess_no_window_kwargs(),
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise MergeError(str(exc)) from exc
