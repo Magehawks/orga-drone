@@ -1,6 +1,7 @@
 /**
  * Persist browse scroll position when opening a media detail link, and restore
  * it when returning to the same browse URL (filters included).
+ * Also enables the current-page Studio bulk-add control.
  */
 (function () {
   const KEY = "orga-drone:browse-scroll";
@@ -50,4 +51,47 @@
       /* ignore */
     }
   });
+
+  const bulkForm = document.getElementById("browse-bulk-studio");
+  const bulkSubmit = document.getElementById("browse-bulk-submit");
+  const bulkCount = document.getElementById("browse-bulk-count");
+  if (bulkForm && bulkSubmit) {
+    const syncBulk = () => {
+      const selected = document.querySelectorAll(
+        'input.browse-select-input[name="media_ids"][form="browse-bulk-studio"]:checked:not(:disabled)'
+      );
+      const n = selected.length;
+      bulkSubmit.disabled = n === 0;
+      if (bulkCount) {
+        if (n > 0) {
+          bulkCount.hidden = false;
+          bulkCount.textContent = String(n);
+        } else {
+          bulkCount.hidden = true;
+          bulkCount.textContent = "";
+        }
+      }
+    };
+    document.addEventListener("change", (event) => {
+      const t = event.target;
+      if (
+        t &&
+        t.classList &&
+        t.classList.contains("browse-select-input") &&
+        t.getAttribute("form") === "browse-bulk-studio"
+      ) {
+        syncBulk();
+      }
+    });
+    bulkForm.addEventListener("submit", (event) => {
+      const n = document.querySelectorAll(
+        'input.browse-select-input[name="media_ids"][form="browse-bulk-studio"]:checked:not(:disabled)'
+      ).length;
+      if (n === 0) {
+        event.preventDefault();
+        syncBulk();
+      }
+    });
+    syncBulk();
+  }
 })();

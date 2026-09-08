@@ -8,7 +8,7 @@ import json
 import threading
 from pathlib import Path
 from typing import Any, Callable, NoReturn
-from urllib.parse import parse_qsl, quote, urlencode, urlparse
+from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -272,6 +272,31 @@ def create_app() -> FastAPI:
             if parsed.path in {"/browse", "/media", "/studio"}:
                 return parsed.path + (f"?{parsed.query}" if parsed.query else "")
         return f"/media/{media_id}"
+
+    def studio_bulk_return_url(return_to: str | None) -> str:
+        """Allowlist redirect after Browse bulk Add to Studio."""
+        raw = (return_to or "browse").strip()
+        target = raw.lower()
+        if target in {"browse", "studio"}:
+            return f"/{target}"
+        if raw.startswith("/") and not raw.startswith("//") and "://" not in raw:
+            parsed = urlparse(raw)
+            if parsed.path in {"/browse", "/media", "/studio"}:
+                return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+        return "/browse"
+
+    def append_query_params(url: str, **params: Any) -> str:
+        """Append query params to an internal relative URL (no open redirects)."""
+        parsed = urlparse(url)
+        q = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        for key, value in params.items():
+            if value is None or value == "":
+                continue
+            q[str(key)] = str(value)
+        new_query = urlencode(q)
+        return urlunparse(
+            (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+        )
 
     def map_return_from_request(
         request: Request, media_id: int
@@ -545,6 +570,9 @@ def create_app() -> FastAPI:
         ask: str | None = None,
         view: str | None = None,
         page: int = Query(1, ge=1),
+        msg: str | None = None,
+        added: int | None = None,
+        skipped: int | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
@@ -648,6 +676,9 @@ def create_app() -> FastAPI:
             browse_qs_next=browse_filter_query(
                 filters, page=pagination["next_page"]
             ),
+            flash_msg=msg,
+            flash_added=added,
+            flash_skipped=skipped,
         )
         if view in {"grid", "list"}:
             response.set_cookie("view", view, max_age=365 * 24 * 3600)
@@ -1712,6 +1743,41 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=base, status_code=303)
         sep = "&" if "?" in base else "?"
         return RedirectResponse(url=f"{base}{sep}msg={msg}", status_code=303)
+
+    @app.post("/studio/add-bulk")
+    async def studio_add_bulk(request: Request) -> RedirectResponse:
+        """Add selected Browse media IDs to the open Studio project (skip existing)."""
+        form = await request.form()
+        return_to = str(form.get("return_to") or "browse")
+        raw_ids = form.getlist("media_ids")
+        media_ids: list[int] = []
+        for raw in raw_ids:
+            try:
+                mid = int(str(raw))
+            except (TypeError, ValueError):
+                continue
+            if mid > 0:
+                media_ids.append(mid)
+        # Cap to one oversized page worth of IDs (current-page selection only).
+        media_ids = media_ids[: max(BROWSE_PAGE_SIZE * 2, 100)]
+
+        base = studio_bulk_return_url(return_to)
+        open_project = db.resolve_studio_page_project()
+        if open_project is None:
+            return RedirectResponse(url="/studio?msg=studio_need_project", status_code=303)
+        if not media_ids:
+            return RedirectResponse(url=base, status_code=303)
+
+        added_n, skipped_n = db.add_studio_media_ids(
+            media_ids, project_id=open_project.id
+        )
+        dest = append_query_params(
+            base,
+            msg="studio_bulk_added",
+            added=added_n,
+            skipped=skipped_n,
+        )
+        return RedirectResponse(url=dest, status_code=303)
 
     @app.post("/studio/{studio_item_id}/remove")
     async def studio_remove(studio_item_id: int) -> RedirectResponse:

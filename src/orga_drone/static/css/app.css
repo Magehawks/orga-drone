@@ -815,6 +815,7 @@ button.cta, .button.cta {
 .card {
   display: flex;
   flex-direction: column;
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -864,6 +865,55 @@ button.cta, .button.cta {
 .inline-studio button {
   font-size: 0.8rem;
   white-space: nowrap;
+}
+.browse-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.browse-bulk-bar .button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.browse-bulk-hint { font-size: 0.85rem; }
+.browse-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  cursor: pointer;
+}
+.browse-select.is-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.browse-select-input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.card > .browse-select {
+  position: absolute;
+  z-index: 3;
+  top: 0.45rem;
+  right: 0.45rem;
+  left: auto;
+  padding: 0.2rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+}
+.browse-select-col {
+  width: 2rem;
+  text-align: center;
+  vertical-align: middle;
 }
 .page-header {
   display: flex;
