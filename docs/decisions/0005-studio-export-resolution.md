@@ -14,9 +14,11 @@ only an export UI stub (no render path).
 ## Decision
 
 1. Derive available export heights from the highest **video** source height in
-   the project (photos alone do not unlock a resolution). Classify heights to
-   the nearest supported level without inventing upscaling beyond the project
-   max.
+   the project. Classify heights to the nearest supported level without inventing
+   upscaling beyond the project max. When a project has **no video heights** but
+   has available **photos** and/or **Title Cards**, unlock the generated-only
+   set **720 and 1080** (default 1080) — same fallback for both generated stills
+   and photo-only slideshows.
 2. Offer 720p → max; mark 1080 as **recommended** when available; otherwise
    default to the highest available level.
 3. Persist optional `media.width` / `media.height` for caching; probe on demand
@@ -47,7 +49,7 @@ only an export UI stub (no render path).
   Studio MVP; desktop save dialog required for destination picking.
 - Follow-up: export cancel/abort. Open/reveal of the exported file is
   covered by ADR 0007. Music-in-export is covered by ADR 0008.
-  Title Cards (generated Story items) may unlock 720/1080 when a project has
-  no video heights; photos alone still do not (ADR 0009).
+  Title Cards and available photos unlock generated-only 720/1080 when a
+  project has no video heights (ADR 0009).
   Determinate export progress with elapsed/ETA/current clip label is Available now.
   Segment encodes force CFR 30fps + yuv420p so photo/video concat stays timeline-safe.

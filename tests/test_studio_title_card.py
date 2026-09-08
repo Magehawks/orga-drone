@@ -324,7 +324,9 @@ def test_export_options_generated_only(
     assert opts.json()["default_height"] == 1080
 
 
-def test_export_options_photo_only_without_cards_stay_empty(tmp_path: Path) -> None:
+def test_export_options_photo_only_unlock_generated_resolutions(
+    tmp_path: Path,
+) -> None:
     from orga_drone.studio_export import build_export_options_payload
 
     db = Database(tmp_path / "t.sqlite3")
@@ -368,7 +370,10 @@ def test_export_options_photo_only_without_cards_stay_empty(tmp_path: Path) -> N
         source_media_id=media.id,
     )
     payload = build_export_options_payload(db, project.id)
-    assert payload["options"] == []
+    heights = {o["height"] for o in payload["options"]}
+    assert heights == {720, 1080}
+    assert payload["default_height"] == 1080
+    assert payload["has_video_resolution"] is True
 
 
 def test_render_title_card_uses_locked_colors() -> None:

@@ -176,12 +176,26 @@ def _project_has_title_cards(db: Database, project_id: int) -> bool:
     return any(clip.item_kind == TITLE_CARD_KIND for clip in db.list_studio_items(project_id))
 
 
+def _project_has_available_photos(db: Database, project_id: int) -> bool:
+    return any(
+        clip.kind == "photo" and clip.available and clip.media_id is not None
+        for clip in db.list_studio_items(project_id)
+    )
+
+
+def _unlock_generated_only_resolutions(db: Database, project_id: int) -> bool:
+    """Title cards or photos may unlock 720/1080 when no video heights exist."""
+    return _project_has_title_cards(db, project_id) or _project_has_available_photos(
+        db, project_id
+    )
+
+
 def build_export_options_payload(db: Database, project_id: int | None = None) -> dict:
     project = _resolve_export_project(db, project_id)
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
     default_h = default_export_height(heights)
-    if not options and _project_has_title_cards(db, project.id):
+    if not options and _unlock_generated_only_resolutions(db, project.id):
         options = generated_only_export_resolutions()
         default_h = generated_only_default_height()
     last_dir = get_last_export_directory()
@@ -271,7 +285,7 @@ def prepare_studio_export(
     project = _resolve_export_project(db, project_id)
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
-    if not options and _project_has_title_cards(db, project.id):
+    if not options and _unlock_generated_only_resolutions(db, project.id):
         options = generated_only_export_resolutions()
     allowed = {o.height for o in options}
     if int(height) not in allowed:

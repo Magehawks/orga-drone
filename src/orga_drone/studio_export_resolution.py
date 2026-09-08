@@ -71,7 +71,7 @@ def max_project_export_height(source_heights: list[int | None]) -> int | None:
 
 
 def generated_only_export_resolutions() -> list[ExportResolutionOption]:
-    """720 and 1080 when the project has Title Cards but no video heights."""
+    """720 and 1080 when the project has photos/Title Cards but no video heights."""
     return [
         ExportResolutionOption(
             height=720,

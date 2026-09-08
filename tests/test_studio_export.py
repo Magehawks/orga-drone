@@ -486,7 +486,7 @@ def test_ffmpeg_error_message_prefers_timebase_over_encoder_eof() -> None:
     assert "aost#0:1" not in msg
 
 
-def test_export_options_without_video_resolution(
+def test_export_options_photo_only_unlock_generated_resolutions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
@@ -519,9 +519,10 @@ def test_export_options_without_video_resolution(
     )
     c = TestClient(app)
     body = c.get("/api/studio/export/options").json()
-    assert body["options"] == []
-    assert body["default_height"] is None
-    assert body["has_video_resolution"] is False
+    heights = {o["height"] for o in body["options"]}
+    assert heights == {720, 1080}
+    assert body["default_height"] == 1080
+    assert body["has_video_resolution"] is True
 
 
 def _studio_export_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
