@@ -136,6 +136,22 @@
   </div>
 </section>
 
+{% if flash_msg == 'studio_bulk_added' %}
+  <div class="flash ok" role="status">
+    {{ _('Added %(added)s to Studio (%(skipped)s already there).')|format(added=(flash_added or 0), skipped=(flash_skipped or 0)) }}
+  </div>
+{% endif %}
+
+{% if items %}
+<form id="browse-bulk-studio" method="post" action="/studio/add-bulk" class="browse-bulk-bar">
+  <input type="hidden" name="return_to" value="/browse?{{ browse_qs }}">
+  <button type="submit" class="button" id="browse-bulk-submit" disabled>
+    {{ _('Add selected to Studio') }}
+  </button>
+  <span class="browse-bulk-hint muted" id="browse-bulk-count" hidden></span>
+</form>
+{% endif %}
+
 {% if not items %}
   <section class="library-hero">
     <h1>{{ _('No media yet') }}</h1>
@@ -146,6 +162,13 @@
   <section class="media-grid">
     {% for item in items %}
     <article class="card">
+      {% set in_studio = studio_paths is defined and item.path in studio_paths %}
+      <label class="browse-select {% if in_studio %}is-disabled{% endif %}">
+        <input type="checkbox" name="media_ids" value="{{ item.id }}"
+               form="browse-bulk-studio" class="browse-select-input"
+               {% if in_studio %}disabled{% endif %}
+               aria-label="{{ _('Select for Studio') }}">
+      </label>
       <a class="card-main" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
         <div class="thumb">
           {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
@@ -252,6 +275,7 @@
     <table>
       <thead>
         <tr>
+          <th class="browse-select-col"></th>
           <th></th>
           <th>{{ _('Date') }}</th>
           <th>{{ _('Filename') }}</th>
@@ -268,7 +292,16 @@
       </thead>
       <tbody>
         {% for item in items %}
+        {% set in_studio = studio_paths is defined and item.path in studio_paths %}
         <tr>
+          <td class="browse-select-col">
+            <label class="browse-select {% if in_studio %}is-disabled{% endif %}">
+              <input type="checkbox" name="media_ids" value="{{ item.id }}"
+                     form="browse-bulk-studio" class="browse-select-input"
+                     {% if in_studio %}disabled{% endif %}
+                     aria-label="{{ _('Select for Studio') }}">
+            </label>
+          </td>
           <td class="thumb-cell">
             <a href="/media/{{ item.id }}?{{ browse_detail_qs }}">
               <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">

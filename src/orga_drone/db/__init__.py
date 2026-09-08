@@ -2093,6 +2093,65 @@ class Database:
             assert item_id is not None
             return int(item_id), True
 
+    def add_studio_media_ids(
+        self,
+        media_ids: list[int],
+        *,
+        project_id: int,
+    ) -> tuple[int, int]:
+        """Add media to a Studio project, skipping paths already present.
+
+        Reuses :meth:`add_studio_item` for each new clip. Invalid / missing
+        media IDs are ignored. Returns ``(added_count, skipped_existing)``.
+        Source files are never copied. Unlike repeated single-add (which may
+        insert duplicate rows for Issue #16), this bulk path is membership-safe.
+        """
+        if self.get_studio_project(project_id) is None:
+            raise ValueError("studio project not found")
+
+        seen_ids: set[int] = set()
+        ordered_ids: list[int] = []
+        for raw in media_ids:
+            try:
+                mid = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if mid <= 0 or mid in seen_ids:
+                continue
+            seen_ids.add(mid)
+            ordered_ids.append(mid)
+
+        items: list[Any] = []
+        for mid in ordered_ids:
+            item = self.get_media(mid)
+            if item is not None:
+                items.append(item)
+
+        known_paths = self.studio_paths_among(
+            [item.path for item in items],
+            project_id=project_id,
+        )
+        added = 0
+        skipped = 0
+        for item in items:
+            if item.path in known_paths:
+                skipped += 1
+                continue
+            self.add_studio_item(
+                item.path,
+                identity_key=make_identity_key(
+                    item.filename, item.size_bytes, item.recorded_at
+                ),
+                filename=item.filename,
+                recorded_at=item.recorded_at,
+                kind=item.kind,
+                project_id=project_id,
+                source_media_id=item.id,
+            )
+            known_paths.add(item.path)
+            added += 1
+        return added, skipped
+
     def add_studio_title_card(
         self,
         project_id: int,
