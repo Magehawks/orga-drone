@@ -25,9 +25,12 @@ and user text is unsafe in filter graphs.
 3. Preview is an HTML overlay with hardcoded preset colors (not live UI theme).
    Export rasterizes an ephemeral Pillow still in the export temp dir, then
    reuses the existing photo-segment encode (`-loop 1`). No `drawtext`.
-4. Photo-only projects still do not unlock resolution (ADR 0005). If a project
-   has **no video heights** but **at least one Title Card**, offer **720 and
-   1080** only (default 1080). Mixed video + cards still use video heights.
+4. Photo-only and Title-Card-only projects unlock the same generated-only
+   export heights when there are **no video heights**: offer **720 and 1080**
+   (default 1080). Mixed video + photos/cards still use video heights.
+   Photo display duration remains the existing Studio planning value
+   (`photo_duration_s` / default 3.0s from ADR 0002); export reuses that
+   effective duration via the shared timeline helpers.
 
 ## Alternatives considered
 
