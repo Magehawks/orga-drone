@@ -129,10 +129,18 @@
     <span>{{ _('View') }}</span>
     <div class="seg-control" role="group" aria-label="{{ _('View') }}">
       <a class="seg-item {% if view=='grid' %}active{% endif %}"
-         href="/browse?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}">{{ _('Grid') }}</a>
+         href="/browse?view=grid&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}&page_size={{ filters.page_size }}">{{ _('Grid') }}</a>
       <a class="seg-item {% if view=='list' %}active{% endif %}"
-         href="/browse?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}">{{ _('List') }}</a>
+         href="/browse?view=list&sort={{ filters.sort }}&order={{ filters.order }}&drone={{ filters.drone }}&kind={{ filters.kind }}&source={{ filters.source }}&gps={{ filters.gps }}&sessions={{ filters.sessions }}&flows={{ filters.flows }}&favorite={{ filters.favorite }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&ask={{ filters.ask }}&page_size={{ filters.page_size }}">{{ _('List') }}</a>
     </div>
+    <label class="browse-page-size">
+      {{ _('Items per page') }}
+      <select name="page_size" form="filter-form" onchange="this.form.requestSubmit()">
+        {% for size in browse_page_sizes %}
+          <option value="{{ size }}" {% if filters.page_size == size|string %}selected{% endif %}>{{ size }}</option>
+        {% endfor %}
+      </select>
+    </label>
   </div>
 </section>
 

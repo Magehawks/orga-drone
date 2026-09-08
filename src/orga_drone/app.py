@@ -150,7 +150,19 @@ def format_place(place: dict[str, Any] | None) -> str:
 
 
 # Cap DOM size in Browse (WebView2 keeps decoded thumbs for every card).
-BROWSE_PAGE_SIZE = 48
+BROWSE_PAGE_SIZE = 50
+BROWSE_PAGE_SIZES = (50, 100, 200)
+
+
+def browse_resolve_page_size(raw: Any) -> int:
+    """Allowlist Browse page length; unknown values fall back to the default."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return BROWSE_PAGE_SIZE
+    if value in BROWSE_PAGE_SIZES:
+        return value
+    return BROWSE_PAGE_SIZE
 
 
 def browse_page_clamp(page: int, *, total: int, page_size: int = BROWSE_PAGE_SIZE) -> int:
@@ -355,6 +367,7 @@ def create_app() -> FastAPI:
         "ask",
         "view",
         "page",
+        "page_size",
     )
 
     def browse_detail_qs_from_request(request: Request) -> str:
@@ -570,6 +583,7 @@ def create_app() -> FastAPI:
         ask: str | None = None,
         view: str | None = None,
         page: int = Query(1, ge=1),
+        page_size: str | None = None,
         msg: str | None = None,
         added: int | None = None,
         skipped: int | None = None,
@@ -624,7 +638,8 @@ def create_app() -> FastAPI:
             date_from=list_kwargs["date_from"],
             date_to=list_kwargs["date_to"],
         )
-        pagination = browse_pagination(total=total, page=page)
+        size = browse_resolve_page_size(page_size)
+        pagination = browse_pagination(total=total, page=page, page_size=size)
         items = db.list_media(
             **list_kwargs,
             limit=pagination["page_size"],
@@ -656,6 +671,7 @@ def create_app() -> FastAPI:
             "date_to": resolved_to or "",
             "ask": ask_text,
             "view": current_view,
+            "page_size": str(pagination["page_size"]),
         }
         response = render(
             request,
@@ -668,6 +684,7 @@ def create_app() -> FastAPI:
             browse_detail_qs=browse_detail_qs_from_request(request),
             ask_summary=search.summary_parts() if ask_text else [],
             filters=filters,
+            browse_page_sizes=BROWSE_PAGE_SIZES,
             pagination=pagination,
             browse_qs=browse_filter_query(filters, page=pagination["page"]),
             browse_qs_prev=browse_filter_query(
@@ -1759,7 +1776,7 @@ def create_app() -> FastAPI:
             if mid > 0:
                 media_ids.append(mid)
         # Cap to one oversized page worth of IDs (current-page selection only).
-        media_ids = media_ids[: max(BROWSE_PAGE_SIZE * 2, 100)]
+        media_ids = media_ids[: max(BROWSE_PAGE_SIZES)]
 
         base = studio_bulk_return_url(return_to)
         open_project = db.resolve_studio_page_project()

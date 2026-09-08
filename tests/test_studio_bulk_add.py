@@ -8,7 +8,6 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from fastapi.testclient import TestClient
 
-from orga_drone.app import BROWSE_PAGE_SIZE
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
 from orga_drone.i18n import clear_catalog_cache
@@ -140,7 +139,7 @@ def test_bulk_add_preserves_browse_state(
 ) -> None:
     app = _app(tmp_path, monkeypatch)
     db: Database = app.state.db
-    total = (BROWSE_PAGE_SIZE * 2) + 4
+    total = 210
     _seed_many(db, tmp_path / "lib", total)
     client = TestClient(app)
     _open_project(db, client)
@@ -151,6 +150,7 @@ def test_bulk_add_preserves_browse_state(
             "kind": "video",
             "drone": "Avata 2",
             "page": 2,
+            "page_size": 100,
             "view": "grid",
             "sort": "filename",
             "order": "asc",
@@ -162,18 +162,20 @@ def test_bulk_add_preserves_browse_state(
     assert 'action="/studio/add-bulk"' in html
     assert 'name="return_to" value="/browse?' in html
     assert "page=2" in html
+    assert "page_size=100" in html
     assert 'class="browse-select-input"' in html
     assert "Add selected to Studio" in html or "Auswahl zum Studio hinzufügen" in html
 
     # Extract return_to from bulk form and one selectable media id.
     form_idx = html.index('id="browse-bulk-studio"')
-    form_chunk = html[form_idx : form_idx + 500]
+    form_chunk = html[form_idx : form_idx + 550]
     rt_prefix = 'name="return_to" value="'
     assert rt_prefix in form_chunk
     rt_start = form_chunk.index(rt_prefix) + len(rt_prefix)
     return_to = form_chunk[rt_start : form_chunk.index('"', rt_start)]
     assert return_to.startswith("/browse?")
     assert "page=2" in return_to
+    assert "page_size=100" in return_to
     assert "kind=video" in return_to
     assert "sort=filename" in return_to
 
@@ -199,6 +201,7 @@ def test_bulk_add_preserves_browse_state(
     assert add.status_code == 303
     loc = add.headers["location"]
     assert "page=2" in loc
+    assert "page_size=100" in loc
     assert "kind=video" in loc
     assert "sort=filename" in loc
     assert "msg=studio_bulk_added" in loc

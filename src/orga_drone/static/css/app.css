@@ -765,8 +765,9 @@ button.cta, .button.cta {
 
 .view-toggle {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.65rem 1rem;
   margin-top: 1rem;
   color: var(--muted);
   font-size: 0.85rem;
@@ -776,6 +777,17 @@ button.cta, .button.cta {
 .view-toggle .seg-item.active {
   background: var(--accent);
   color: var(--on-accent);
+}
+.browse-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  margin-left: auto;
+  font-weight: 500;
+}
+.browse-page-size select {
+  min-width: 4.5rem;
 }
 
 /* Preview-first media grid */
