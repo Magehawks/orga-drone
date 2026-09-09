@@ -46,12 +46,12 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
 - **Studio:** collect media, arrange order, estimate runtime; editable project
-  title; simple video Cut (source start/end); Creator Studio UI with synced
-  Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
-  Crossfade between Story items; local MP4 export with
-  configurable resolution (desktop); after a successful export, Open video /
-  Show in folder on Windows; optional sequential soundtrack playlist (up to 8
-  local songs) in preview and MP4 export
+title; simple video Cut (source start/end); Creator Studio UI with synced
+Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
+Crossfade between Story items; local MP4 export with
+configurable resolution (desktop); after a successful export, Open video /
+Show in folder on Windows; optional sequential soundtrack playlist (up to 8
+local songs) in preview and MP4 export
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
 - Export a local spot GeoJSON download when GPS is available
 - Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
@@ -115,8 +115,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 See [`packaging/README.md`](packaging/README.md) for build notes and the
 **mandatory** Windows pre-release smoke test (browser-downloaded MOTW zip +
-Explorer extract). Prebuilt binaries ship **only the application**, never your
-videos or database.
+Explorer extract). Prebuilt binaries ship **only the application**, never your videos or database.
 
 ### Python application
 
@@ -256,7 +255,7 @@ Leaflet + MarkerCluster are vendored under `/static/vendor/` (no CDN required fo
 
 High-level flow: add folder → full scan/parse → SQLite index → browse/map/detail → optional rename, merge, export. Domain code lives under `src/orga_drone/` (`parse`, `scan`, `group`, `search`, `geocode`, `dupes`, `export`, `ops`, …).
 
-Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and agent context in [`AGENTS.md`](AGENTS.md).
+Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), and agent context in [`AGENTS.md`](AGENTS.md).
 
 ## Roadmap
 
@@ -296,7 +295,7 @@ Known limitations:
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
 - No Library albums UI, no plugin API, no content-hash duplicate
-  detection (Studio supports multiple local edit projects)
+detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
 - Telemetry **burn-in** into exported video is not included
