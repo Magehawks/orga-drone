@@ -34,9 +34,9 @@ and the Orga Drone icon. Downloaded zips still relocate pythonnet and WebView2
 when Mark-of-the-Web blocks LoadFrom.
 
 SHA256 (`orga-drone-windows-x64.zip`):
-`PENDING`
+`DB79717444EDD34A26DD43BE53E4420FCDA3075D4430F3F78292640716B70D88`
 
-Built from `main` at `PENDING`.
+Built from `main` at `9eb28b0`.
 
 ## Upgrade notes
 
