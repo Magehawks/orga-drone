@@ -55,9 +55,9 @@ artwork is served as `/static/icons/orga-drone.png` (favicon) and
 Release layout (local, not committed as binaries):
 
 ```text
-releases/1.8.0/orga-drone/          # copy of dist/orga-drone (gitignored)
-releases/1.8.0/orga-drone-windows-x64.zip
-releases/1.8.0/README.md            # points to the GitHub Release
+releases/1.9.0/orga-drone/          # copy of dist/orga-drone (gitignored)
+releases/1.9.0/orga-drone-windows-x64.zip
+releases/1.9.0/README.md            # points to the GitHub Release
 ```
 
 **Note:** Existing GitHub Release zips (before the desktop-shell change) still open the

@@ -31,7 +31,7 @@ Highlights:
   `studio_clips` with editable title, order, estimated runtime, video Cut via
   source start/end; Projects switcher beside the open project title; Clear Studio
   on the Story toolbar (clips only); synced Story preview playback; local MP4 export with
-  configurable resolution; after success, Open video / Show in folder on
+  configurable resolution, including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; time-based

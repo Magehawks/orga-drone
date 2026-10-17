@@ -37,7 +37,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 ## What Orga Drone currently provides
 
 - Index one or more local folders into a single library (SQLite index; media files stay on disk)
-- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session
+- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio)
 - Index DJI media plus everyday vacation/hobby photos and videos (phones, cameras, action cams — no `DJI_` filename required)
 - Extract GPS and related metadata from DJI `.SRT` telemetry, photo EXIF, and best-effort video container tags
 - Group FAT32 **split clips** into a **flow**, and heuristically group a logical **flight session** (takeoff → landing)
@@ -49,7 +49,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
   Crossfade between Story items; local MP4 export with
-  configurable resolution (desktop); after a successful export, Open video /
+  configurable resolution (desktop), including photo-only stories at 720/1080; after a successful export, Open video /
   Show in folder on Windows; optional sequential soundtrack playlist (up to 8
   local songs) in preview and MP4 export
 - Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
@@ -73,7 +73,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI |
+| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
 | iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
@@ -89,7 +89,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio workspace | Available | Creator Studio UI with synced Story preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selected object; multiple local edit projects (Projects switcher beside the open project title; Clear Studio is Story-scoped); persisted project title + order + estimated runtime + video Cut offsets; Title Cards; Cut / Fade through black / Crossfade; local MP4 export with resolution choice; optional sequential soundtrack playlist (up to 8 songs; time-proportional coverage) |
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
-| Studio MP4 export | Available | Configurable resolution up to source max; desktop save dialog; optional soundtrack mix; sources never modified; after success, Open video / Show in folder on Windows |
+| Studio MP4 export | Available | Configurable resolution up to source max; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
 | Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
 | Plugin API | Not available | Possible future work |
