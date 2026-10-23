@@ -36,3 +36,5 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0008](0008-studio-music-soundtrack.md) | Studio music as a sequential soundtrack playlist | Accepted |
 | [0009](0009-studio-title-cards.md) | Studio Title Cards as generated timeline items | Accepted |
 | [0010](0010-studio-visual-transitions.md) | Studio visual transitions | Accepted |
+| [0011](0011-studio-image-adjust.md) | Studio per-clip image adjustment | Accepted |
+| [0012](0012-windows-release-workflow.md) | Windows release workflow with a draft publish gate | Accepted |

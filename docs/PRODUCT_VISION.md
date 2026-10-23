@@ -250,8 +250,11 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, or CI-built multi-OS
-  installer pipeline in the current tree. Studio supports multiple local
+- There is **no** Library albums model, plugin API, or multi-OS installer
+  pipeline in the current tree. A Windows onefolder zip can be built in
+  GitHub Actions; a maintainer publishes the GitHub Release only after the
+  MOTW smoke test (`packaging/README.md`). It is not an in-app updater, an
+  MSIX installer, or a macOS/Linux build. Studio supports multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection

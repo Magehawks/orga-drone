@@ -25,6 +25,9 @@ Highlights:
 - Flows, heuristic sessions, maps, rule-based Ask the library
 - User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
+- Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
+  `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
+  publishes it only after the MOTW smoke test in `packaging/README.md`
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
@@ -49,7 +52,9 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 3. **Broader multi-brand parsers** beyond DJI-first depth
 4. **Library albums** for organizing media sets (Studio already has multiple
    local edit projects; albums are a separate library concern)
-5. **CI-built installers** (tests/releases automation; multi-OS later)
+5. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
+   The Windows onefolder zip Actions workflow is available; it is not an
+   installer and it does not publish on merge.
 6. Online geocoding providers (place tags are offline today)
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
