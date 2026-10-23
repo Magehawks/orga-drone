@@ -394,5 +394,16 @@
   "Saturation": "Saturation",
   "Warmth": "Warmth",
   "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.": "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.",
-  "Could not save image adjustments.": "Could not save image adjustments."
+  "Could not save image adjustments.": "Could not save image adjustments.",
+  "About": "About",
+  "About Orga Drone": "About Orga Drone",
+  "Installed version": "Installed version",
+  "Check for updates at startup": "Check for updates at startup",
+  "Check for updates": "Check for updates",
+  "Checking for updates…": "Checking for updates…",
+  "You're up to date.": "You're up to date.",
+  "Version {version} is available.": "Version {version} is available.",
+  "Could not check for updates.": "Could not check for updates.",
+  "Download": "Download",
+  "A check only asks for the latest published Windows release. Your library stays on this computer.": "A check only asks for the latest published Windows release. Your library stays on this computer."
 }

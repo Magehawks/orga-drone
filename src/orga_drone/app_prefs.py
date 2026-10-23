@@ -44,3 +44,14 @@ def set_last_export_directory(directory: str | Path) -> None:
     data = load_prefs()
     data["last_export_directory"] = str(Path(directory))
     save_prefs(data)
+
+
+def get_check_updates() -> bool:
+    """Startup update check. Missing or non-true values stay off."""
+    return load_prefs().get("check_updates") is True
+
+
+def set_check_updates(enabled: bool) -> None:
+    data = load_prefs()
+    data["check_updates"] = bool(enabled)
+    save_prefs(data)

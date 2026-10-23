@@ -394,5 +394,16 @@
   "Saturation": "Sättigung",
   "Warmth": "Wärme",
   "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.": "Gilt nur für diesen Story-Clip. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
-  "Could not save image adjustments.": "Bildkorrekturen konnten nicht gespeichert werden."
+  "Could not save image adjustments.": "Bildkorrekturen konnten nicht gespeichert werden.",
+  "About": "Über",
+  "About Orga Drone": "Über Orga Drone",
+  "Installed version": "Installierte Version",
+  "Check for updates at startup": "Beim Start nach Updates suchen",
+  "Check for updates": "Nach Updates suchen",
+  "Checking for updates…": "Updates werden geprüft…",
+  "You're up to date.": "Diese Version ist aktuell.",
+  "Version {version} is available.": "Version {version} ist verfügbar.",
+  "Could not check for updates.": "Die Update-Prüfung war nicht möglich.",
+  "Download": "Herunterladen",
+  "A check only asks for the latest published Windows release. Your library stays on this computer.": "Die Prüfung fragt nur die letzte veröffentlichte Windows-Version ab. Die Bibliothek bleibt auf diesem Computer."
 }

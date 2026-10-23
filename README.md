@@ -99,6 +99,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
 | CI-built multi-OS installers | Not available | Windows onefolder zip is built in GitHub Actions (draft release; maintainer publishes after the MOTW smoke test). No MSIX, macOS, or Linux installer. |
+| Update notice | Available | About shows the installed version. Check for updates is off by default. A manual or opt-in startup check reads the published GitHub Release only and links to that page. No download, no install, no background polling. |
 
 ## Installation and first start
 

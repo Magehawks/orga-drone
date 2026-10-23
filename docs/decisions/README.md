@@ -40,3 +40,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0012](0012-windows-release-workflow.md) | Windows release workflow with a draft publish gate | Accepted |
 | [0013](0013-itch-windows-channel.md) | itch.io Windows channel via butler | Accepted |
 | [0014](0014-studio-export-cancel.md) | Studio export cancellation | Accepted |
+| [0015](0015-update-notice.md) | Optional published-release notice | Accepted |
