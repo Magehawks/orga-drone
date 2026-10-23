@@ -87,6 +87,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
 | Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
 | Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
+| itch.io app updates | Not available | Butler process for a future Draft/Restricted Windows test channel (`packaging/itch/`). No in-app updater. ZIP installs do not auto-update. Not a public paid launch |
 | Studio workspace | Available | Creator Studio UI with synced Story preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selected object; multiple local edit projects (Projects switcher beside the open project title; Clear Studio is Story-scoped); persisted project title + order + estimated runtime + video Cut offsets; Title Cards; Cut / Fade through black / Crossfade; local MP4 export with resolution choice; optional sequential soundtrack playlist (up to 8 songs; time-proportional coverage) |
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
@@ -118,6 +119,20 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 See [`packaging/README.md`](packaging/README.md) for build notes and the
 **mandatory** Windows pre-release smoke test (browser-downloaded MOTW zip +
 Explorer extract). Prebuilt binaries ship **only the application**, never your videos or database.
+
+The source in this repository is **free (MIT)**. GitHub Release zips are a
+convenience package of that same app. An itch.io page, if one is published
+later, would be another convenience copy — not a different license and not a
+public launch in this tree. The process is [`packaging/itch/README.md`](packaging/itch/README.md).
+
+- Installing with the **itch.io desktop app** on the Windows channel is the
+  path that can receive later builds from that app.
+- Installing by **unzipping a ZIP** (GitHub, the itch.io website, or any
+  other download) does not enroll that folder. The itch.io app will not
+  update it.
+- There is no updater inside Orga Drone. The library, Studio projects, and
+  settings stay in `%APPDATA%\orga-drone`. Photos and videos stay in the
+  folders you added.
 
 ### Python application
 
@@ -284,7 +299,7 @@ Bug reports, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTR
 ```bash
 pip install -e ".[dev]"
 ruff check .
-mypy src
+mypy src packaging/itch_channel.py
 pytest
 ```
 
@@ -300,6 +315,9 @@ Known limitations:
 detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI covers Ruff, MyPy, and pytest on pull requests. A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
+- No in-app updater. itch.io desktop-app updates apply only to copies that
+  app installed; ZIP installs stay as they are until you replace them
+  (`packaging/itch/README.md`)
 - Telemetry **burn-in** into exported video is not included
 
 If video browsing feels heavy under Windows Defender, exclude the unzipped `orga-drone` folder (see [`packaging/README.md`](packaging/README.md)).

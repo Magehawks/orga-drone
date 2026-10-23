@@ -16,7 +16,7 @@ Do not invent layers, services, or plugins that are not present.
 | Maps | Leaflet (vendored) + OpenStreetMap tiles |
 | Studio icons | Lucide SVGs (vendored under `static/vendor/lucide/`, ISC) |
 | App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
-| Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
+| Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip. itch.io butler process is documented in `packaging/itch/` and is not an in-app updater |
 | Tests | pytest under `tests/` |
 | CI | GitHub Actions: Ruff, MyPy, pytest on pull requests. Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `packaging/README.md`. |
 
@@ -37,6 +37,11 @@ Override: `ORGA_DRONE_DATA_DIR`.
 | `{data_dir}/logs/studio-export-ffmpeg.log` | Full ffmpeg command + stderr on export failure |
 
 Media files stay on disk under user-chosen library roots.
+
+An itch.io app update, when a maintainer later publishes one, replaces the
+install folder only. It does not write the library database. Direct ZIP
+installs (GitHub or the itch.io website) are not tracked by the itch.io app,
+so they do not auto-update. See `packaging/itch/README.md`.
 
 ## Package layout (`src/orga_drone/`)
 

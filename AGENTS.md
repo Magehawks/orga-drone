@@ -101,8 +101,11 @@ The application helps users:
 - There is **no** Library albums model, plugin API, or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
-  MOTW smoke test (`packaging/README.md`). It is not an in-app updater, an
-  MSIX installer, or a macOS/Linux build. Studio supports multiple local
+  MOTW smoke test (`packaging/README.md`). A Windows itch.io butler process
+  is documented for a Draft/Restricted test channel and is not a public paid
+  launch. ZIP installs do not receive itch.io app updates. It is not an
+  in-app updater, an MSIX installer, or a macOS/Linux build. Studio supports
+  multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector
@@ -137,6 +140,8 @@ The application helps users:
 - battery and equipment analytics
 - additional drone manufacturers via dedicated parsers
 - incremental scanning and multi-OS / MSIX installers
+- itch.io Windows convenience channel via butler (documented test process;
+  not a public launch; no custom in-app updater)
 
 These are future directions. Never describe them as already available.
 

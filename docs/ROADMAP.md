@@ -56,6 +56,9 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
    The Windows onefolder zip Actions workflow is available; it is not an
    installer and it does not publish on merge.
 6. Online geocoding providers (place tags are offline today)
+7. **itch.io Windows channel** via butler for the existing onefolder build.
+   The process is documented for a Draft/Restricted test. A public paid
+   launch waits on the A→B app-update record. This is not an in-app updater.
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
 dedicated product slice. Local MP4 export, optional soundtrack playlist in
