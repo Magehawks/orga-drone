@@ -451,5 +451,13 @@
   "Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.": "Deckt diesen Story-Clip für die gesamte Dauer ab. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
   "Could not save privacy masks.": "Datenschutzmasken konnten nicht gespeichert werden.",
   "A clip can have up to 8 privacy masks.": "Ein Clip kann höchstens 8 Datenschutzmasken haben.",
-  "A privacy mask could not be rendered. Make the region larger and export again.": "Eine Datenschutzmaske konnte nicht gerendert werden. Vergrößere den Bereich und exportiere erneut."
+  "A privacy mask could not be rendered. Make the region larger and export again.": "Eine Datenschutzmaske konnte nicht gerendert werden. Vergrößere den Bereich und exportiere erneut.",
+  "Framing": "Bildausschnitt",
+  "Zoom": "Zoom",
+  "Motion": "Bewegung",
+  "End zoom": "Endzoom",
+  "Start": "Start",
+  "End": "Ende",
+  "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Ziehen Sie die Vorschau, um den Ausschnitt zu verschieben. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau entspricht dem exportierten Bild.",
+  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden."
 }

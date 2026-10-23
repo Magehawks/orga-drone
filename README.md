@@ -51,7 +51,8 @@ People fly drones for experiences, not for managing files. Footage piles up acro
   Crossfade between Story items; basic per-clip image adjustment for photos and videos
   (brightness, contrast, saturation, warmth); timed text, shape, and image overlays
   with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy
-  masks (up to 8 per photo or video clip, fixed for the whole clip); local MP4 export with
+  masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan
+  (1×–3×, optional start/end motion); local MP4 export with
   configurable resolution (desktop), including photo-only stories at 720/1080; after a successful export, Open video /
   Show in folder on Windows; optional sequential soundtrack playlist (up to 8
   local songs) in preview and MP4 export
@@ -96,6 +97,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
 | Studio overlays | Available | Up to 8 text, arrow, circle, rectangle, or PNG/JPG overlays per photo or video clip; clip-relative timing; Fade in, Fade out, or Slide in; preview approximates export |
 | Studio privacy masks | Available | Up to 8 rectangular blur or pixelate masks per photo or video clip; fixed for the whole clip; preview approximates export; source files stay unchanged |
+| Studio framing | Available | Per photo or video clip: zoom 1×–3× and pan; optional start/end motion across the clip; preview matches the exported frame; source files stay unchanged |
 | Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
 | Library albums | Not available | Later; Studio edit projects are not a media-library albums model |

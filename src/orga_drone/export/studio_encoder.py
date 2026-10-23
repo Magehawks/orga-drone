@@ -20,6 +20,7 @@ from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
 from orga_drone.studio_image import ffmpeg_grade_chain
 
 ProgressCallback = Callable[[dict[str, Any]], None]
@@ -63,10 +64,36 @@ def _segment_vf(width: int, height: int) -> str:
 
 
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
-    """Grade plus scale/pad. Fades stay separate so overlays can sit before them."""
+    """Grade, optional zoom/pan, then scale/pad.
+
+    Fades stay separate so privacy masks and overlays can sit on the framed
+    picture before them.
+    """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
-    return f"{grade},{base}" if grade else base
+    prefix = ""
+    suffix = ""
+    if clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
+        source_w, source_h = _source_frame_size(clip)
+        prefix = ffmpeg_frame_prefix(
+            clip.frame,
+            source_width=source_w,
+            source_height=source_h,
+            kind=clip.kind,
+            source_start_s=clip.source_start_s,
+            duration_s=clip.duration_s,
+        )
+        suffix = ffmpeg_frame_suffix(
+            clip.frame,
+            frame_width=width,
+            frame_height=height,
+            source_width=source_w,
+            source_height=source_h,
+            kind=clip.kind,
+            source_start_s=clip.source_start_s,
+            duration_s=clip.duration_s,
+        )
+    return ",".join(part for part in (grade, prefix, base, suffix) if part)
 
 
 def _fade_filters(clip: StudioExportClip) -> list[str]:
@@ -87,6 +114,7 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
     Photo and video grades are applied on the decoded frame, then the existing
     scale, timebase, and fade filters run. Title cards stay ungraded.
     A neutral clip adds nothing, so the chain matches ``_segment_vf``.
+    Zoom and pan, when set, crop the fitted frame before fades.
     Overlays and privacy masks are not part of this string.
     """
     if clip.masks:
@@ -99,7 +127,7 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
 
 
 def _source_frame_size(clip: StudioExportClip) -> tuple[int, int]:
-    """Pixel size of the media ffmpeg will scale. Zero means unknown."""
+    """Pixel size of the media being fitted. Zero lets the frame stand in."""
     path = clip.source_path
     if path is None or not path.is_file():
         return 0, 0
@@ -279,12 +307,11 @@ def _segment_filter_invocation(
 def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:
     """``-vf`` for an unmasked clip, or ``-filter_complex`` when masks exist.
 
-    Masks are applied after grade and scale and before fades. A failure raises
-    ``StudioExportError`` instead of falling back to an unmasked chain.
+    Masks are applied after grade, zoom/pan, and scale, and before fades.
+    A failure raises ``StudioExportError`` instead of falling back to an
+    unmasked chain.
     """
-    base = _segment_vf(width, height)
-    grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
-    chain = f"{grade},{base}" if grade else base
+    chain = _segment_chain(width, height, clip)
     fades = _fade_filters(clip)
     masks = clip.masks if clip.kind in {"photo", "video"} else ()
     if not masks:

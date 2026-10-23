@@ -1330,6 +1330,24 @@ img.studio-preview-media.studio-preview-layer-b,
 video.studio-preview-media.studio-preview-layer-b {
   z-index: 1;
 }
+.studio-preview-frame.is-framing {
+  cursor: grab;
+}
+.studio-preview-frame.is-framing.is-panning {
+  cursor: grabbing;
+}
+.studio-frame-motion {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.studio-frame-target {
+  display: flex;
+  gap: 0.35rem;
+}
+.studio-frame-target .button.is-active {
+  border-color: var(--accent, currentColor);
+}
 .studio-preview-placeholder {
   position: absolute;
   inset: 0;
