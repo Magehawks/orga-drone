@@ -5,7 +5,7 @@
  * Music is a persisted per-project soundtrack mixed into MP4 export.
  * The soundtrack lane is a read-only coverage span on the Story time canvas.
  * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
- * Video image adjustments persist per clip and approximate the export grade.
+ * Photo and video image adjustments persist per clip and approximate the export grade.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
 (function () {
@@ -964,7 +964,8 @@
 
   function gradePreviewElement(el, clip, filterId, matrixId) {
     if (!el) return;
-    const active = clip && clip.dataset.kind === "video" && !el.hidden;
+    const kind = clip && clip.dataset.kind;
+    const active = clip && (kind === "video" || kind === "photo") && !el.hidden;
     if (!active) {
       el.style.filter = "";
       return;
@@ -1019,10 +1020,10 @@
     ["warmth", "inspector-image-warmth", "inspector-image-warmth-value"],
   ];
 
-  function selectedVideoClip() {
+  function selectedAdjustableClip() {
     if (!state.selected || state.selected.type !== "clip") return null;
     const clip = clips().find((item) => String(item.dataset.studioId) === String(state.selected.id));
-    if (!clip || clip.dataset.kind !== "video") return null;
+    if (!clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) return null;
     return clip;
   }
 
@@ -2150,8 +2151,8 @@
         }
       }
       const imageWrap = document.getElementById("inspector-image-adjust");
-      if (imageWrap) imageWrap.hidden = !isVideo;
-      if (isVideo) fillImageAdjust(clip);
+      if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
+      if (isPhoto || isVideo) fillImageAdjust(clip);
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -3403,21 +3404,21 @@
     const input = document.getElementById(inputId);
     if (!input) return;
     input.addEventListener("input", () => {
-      const clip = selectedVideoClip();
+      const clip = selectedAdjustableClip();
       if (!clip) return;
       writeImageAdjust(clip, imageAdjustFromControls());
       applyPreviewGrades(resolveAt(state.projectTimeS));
       setSaveState(false);
     });
     input.addEventListener("change", () => {
-      const clip = selectedVideoClip();
+      const clip = selectedAdjustableClip();
       if (!clip) return;
       writeImageAdjust(clip, imageAdjustFromControls());
       queueImageAdjustSave(clip);
     });
   });
   document.getElementById("inspector-image-reset")?.addEventListener("click", () => {
-    const clip = selectedVideoClip();
+    const clip = selectedAdjustableClip();
     if (!clip) return;
     writeImageAdjust(clip, neutralImageAdjust());
     fillImageAdjust(clip);

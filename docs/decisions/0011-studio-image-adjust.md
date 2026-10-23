@@ -16,7 +16,7 @@ for later media effects. ADR 0010 kept transitions out of that JSON.
 1. Store four integer sliders per Story clip in `effect_settings.image`:
    `exposure`, `contrast`, `saturation`, `warmth`. Each is -100…100. Missing,
    empty, or invalid JSON renders as 0. The same source added twice may differ.
-   Photos and Title Cards do not accept these controls.
+   Photos and videos accept the controls. Title Cards do not.
 2. The server rejects non-numbers, booleans, non-finite values, and anything
    outside the slider range. Filter text is built only from formatted numbers.
 3. Export prepends ffmpeg filters to the existing segment chain, before scale
@@ -45,4 +45,4 @@ for later media effects. ADR 0010 kept transitions out of that JSON.
   the JSON onto the new clip. Fades still go to black.
 - Negative / trade-offs: Preview and MP4 can disagree in color, especially
   contrast. This is not a LUT, curve, or D-Log workflow.
-- Follow-up: photo correction, presets, and keyframes stay out of scope.
+- Follow-up: presets and keyframes stay out of scope.

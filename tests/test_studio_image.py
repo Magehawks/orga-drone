@@ -171,7 +171,16 @@ def test_neutral_segment_matches_existing_chain_and_grade_precedes_fades() -> No
         duration_s=3.0,
         image=ImageAdjust(exposure=100),
     )
-    assert "exposure=" not in _segment_vf_for_clip(1280, 720, photo)
+    photo_vf = _segment_vf_for_clip(1280, 720, photo)
+    assert photo_vf.startswith("exposure=exposure=1.0000,")
+    assert photo_vf.index("exposure=") < photo_vf.index("scale=")
+    card = StudioExportClip(
+        source_path=None,
+        kind="title_card",
+        duration_s=3.0,
+        image=ImageAdjust(exposure=100),
+    )
+    assert "exposure=" not in _segment_vf_for_clip(1280, 720, card)
 
 
 def test_crossfade_keeps_grade_on_each_segment() -> None:
@@ -268,10 +277,13 @@ def test_settings_persist_per_clip_and_survive_cut(tmp_path: Path) -> None:
             reopened, tmp_path / "lib", filename="still.JPG", kind="photo", duration_s=None
         ),
     )
-    with pytest.raises(ValueError, match="video"):
-        reopened.set_studio_image_adjust(photo_id, {"exposure": 10})
+    photo_item = reopened.set_studio_image_adjust(photo_id, {"exposure": 10, "warmth": 20})
+    assert image_adjust_from_effect_settings(photo_item.effect_settings).exposure == 10
+    photo_export = _clip_to_export_clip(reopened, photo_item)
+    assert photo_export is not None
+    assert photo_export.image.warmth == 20
     card = reopened.add_studio_title_card(reopened.list_studio_projects()[0].id, title_text="Hi")
-    with pytest.raises(ValueError, match="video"):
+    with pytest.raises(ValueError, match="photos and videos"):
         reopened.set_studio_image_adjust(card.id, {"exposure": 10})
 
 
@@ -302,7 +314,7 @@ def test_http_image_adjust_validation_and_inspector(
     assert ("Bild optimieren" in page.text) or ("Adjust image" in page.text)
     assert 'data-image-adjust=' in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
-    assert "imageWrap.hidden = !isVideo" in script
+    assert "imageWrap.hidden = !(isPhoto || isVideo)" in script
 
     rejected = client.patch(
         f"/api/studio/{video_id}/image",
@@ -314,8 +326,10 @@ def test_http_image_adjust_validation_and_inspector(
 
     out_of_range = client.patch(f"/api/studio/{video_id}/image", json={"warmth": -150})
     assert out_of_range.status_code == 400
-    photo = client.patch(f"/api/studio/{photo_id}/image", json={"exposure": 10})
-    assert photo.status_code == 400
+    photo = client.patch(f"/api/studio/{photo_id}/image", json={"exposure": 10, "saturation": -5})
+    assert photo.status_code == 200
+    assert photo.json()["image"]["exposure"] == 10
+    assert photo.json()["image"]["saturation"] == -5
     missing = client.patch("/api/studio/999999/image", json={"exposure": 1})
     assert missing.status_code == 404
 

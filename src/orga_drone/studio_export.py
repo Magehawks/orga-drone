@@ -283,7 +283,7 @@ def _clip_to_export_clip(
     end = float(clip.source_end) if clip.source_end is not None else None
     image = (
         image_adjust_from_effect_settings(clip.effect_settings)
-        if kind == "video"
+        if kind in {"photo", "video"}
         else ImageAdjust()
     )
     return StudioExportClip(

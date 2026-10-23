@@ -2604,7 +2604,7 @@ class Database:
     ) -> StudioClip:
         """Store per-clip image sliders. Raises ``ValueError`` on bad input.
 
-        Only video clips accept a grade. Settings are clip instance data in
+        Photos and videos accept a grade. Settings are clip instance data in
         ``effect_settings`` and do not change the source file.
         """
         from orga_drone.studio_estimate import effective_kind
@@ -2629,7 +2629,7 @@ class Database:
                 raise ValueError("studio item not found")
             project_id = int(row["project_id"])
             if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
-                raise ValueError("image adjustment only applies to video clips")
+                raise ValueError("image adjustment only applies to photos and videos")
             available = row["media_id"] is not None
             live_kind = (
                 str(row["live_kind"]) if available and row["live_kind"] else None
@@ -2639,8 +2639,8 @@ class Database:
                 live_kind=live_kind,
                 kind_snapshot=str(row["kind_snapshot"] or "photo"),
             )
-            if kind != "video":
-                raise ValueError("image adjustment only applies to video clips")
+            if kind not in {"photo", "video"}:
+                raise ValueError("image adjustment only applies to photos and videos")
             current = image_adjust_from_effect_settings(str(row["effect_settings"] or ""))
             updated = parse_image_adjust_patch(patch, current)
             blob = dump_effect_settings(str(row["effect_settings"] or ""), updated)

@@ -25,8 +25,8 @@ preview; local MP4 export with configurable resolution, including photo-only
 stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
-export; Title Cards; basic visual transitions; basic per-clip video image
-adjustment (brightness, contrast, saturation, warmth); read-only soundtrack
+export; Title Cards; basic visual transitions; basic per-clip image
+adjustment for photos and videos (brightness, contrast, saturation, warmth); read-only soundtrack
 coverage on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
@@ -142,7 +142,7 @@ professional video-editing knowledge.
 | Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
-| Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (video clips only; preview approximates export; not a color grade) |
+| Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -236,7 +236,7 @@ See `README.md` for the detailed feature status table. In short:
   Story time canvas (same Fit/zoom mapping; not trim/slip/waveform editing). Loop still applies
   only to a one-song playlist. Visual transitions (Cut, Fade through black,
   Crossfade) persist per outgoing clip
-  and render in preview and MP4. Video clips can store a basic image adjustment
+  and render in preview and MP4. Photo and video clips can store a basic image adjustment
   (brightness, contrast, saturation, warmth) on that Story clip; preview
   approximates the exported picture and is not a color-managed grade. Media
   files are referenced, never copied or modified.
@@ -256,7 +256,7 @@ See `README.md` for the detailed feature status table. In short:
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
   headings, read-only time-proportional soundtrack coverage on that canvas,
-  basic rendered visual transitions, and basic per-clip video image adjustment
+  basic rendered visual transitions, and basic per-clip image adjustment
   (preview approximates export; not a professional grade or NLE). Albums for
   organizing the media library remain Later.
 

@@ -2,7 +2,7 @@
 
 Four sliders, each an integer from -100 to 100. Neutral is 0. Values live in
 ``studio_clips.effect_settings`` under the ``image`` object and apply to that
-Story clip only. Source files are never modified.
+Story clip only, for photos and videos. Source files are never modified.
 
 Export mapping (ffmpeg 7.1 filters, numbers only — never raw user text):
 
