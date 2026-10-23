@@ -1,0 +1,275 @@
+# Windows onefolder release candidate.
+# Manual runs upload a zip artifact only.
+# A vX.Y.Z tag whose version matches pyproject.toml also opens a draft
+# GitHub Release. Nothing in this workflow publishes a public release.
+# See packaging/README.md for the MOTW smoke gate and publish / rollback steps.
+
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      # Starts the workflow only. packaging/verify_release_version.py
+      # rejects anything other than v{pyproject version} before packaging.
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-version:
+    name: Tag matches pyproject.toml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify version
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_TAG}" ]; then
+            python3 packaging/verify_release_version.py --tag "${RELEASE_TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            python3 packaging/verify_release_version.py | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "commit=${GITHUB_SHA}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  quality:
+    name: Ruff, MyPy and unit tests
+    needs: verify-version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: PyInstaller onefolder zip
+    needs: [verify-version, quality]
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+
+      - name: Log version and commit
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $versionLine = python packaging/verify_release_version.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $versionLine | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "commit=${{ github.sha }}" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Install project and PyInstaller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install "pyinstaller==6.22.3"
+
+      - name: Build onefolder app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          pyinstaller packaging/orga-drone.spec --noconfirm --clean --distpath dist
+
+      - name: Check bundle layout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = Join-Path (Get-Location) "dist\orga-drone"
+          if (-not (Test-Path (Join-Path $root "orga-drone.exe"))) {
+            throw "dist/orga-drone/orga-drone.exe is missing"
+          }
+          foreach ($rel in @(
+            "_internal",
+            "_internal\orga_drone\templates",
+            "_internal\orga_drone\static",
+            "_internal\orga_drone\locales"
+          )) {
+            if (-not (Test-Path (Join-Path $root $rel))) {
+              throw "Missing bundled path: $rel"
+            }
+          }
+          $ffmpeg = Get-ChildItem -Path $root -Recurse -File -Filter "ffmpeg*.exe" |
+            Select-Object -First 1
+          if (-not $ffmpeg) { throw "Bundled ffmpeg executable is missing" }
+          $webview = Get-ChildItem -Path $root -Recurse -File -Filter "Microsoft.Web.WebView2.Core.dll" |
+            Select-Object -First 1
+          if (-not $webview) { throw "WebView2 Core assembly is missing" }
+          $runtime = Get-ChildItem -Path $root -Recurse -File -Filter "Python.Runtime.dll" |
+            Select-Object -First 1
+          if (-not $runtime) { throw "Python.Runtime.dll is missing" }
+          $banned = Get-ChildItem -Path $root -Recurse -File | Where-Object {
+            $_.Extension -in ".sqlite", ".sqlite3", ".db" -or
+              $_.Name -eq ".env" -or
+              $_.Extension -in ".mp4", ".mov", ".lrv", ".insv", ".dng"
+          }
+          if ($banned) {
+            throw ("Bundle must not contain a database, .env, or source media: " +
+              ($banned.FullName -join ", "))
+          }
+
+      - name: Zip and checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path "orga-drone-windows-x64.zip") {
+            Remove-Item "orga-drone-windows-x64.zip" -Force
+          }
+          tar.exe -a -c -f orga-drone-windows-x64.zip -C dist orga-drone
+          $names = @(tar.exe -tf orga-drone-windows-x64.zip)
+          $normalized = $names | ForEach-Object { $_.Replace("\", "/").TrimStart("./") }
+          if ($normalized -notcontains "orga-drone/orga-drone.exe") {
+            throw "Zip is missing orga-drone/orga-drone.exe"
+          }
+          if (-not ($normalized | Where-Object { $_.StartsWith("orga-drone/_internal/") })) {
+            throw "Zip is missing orga-drone/_internal/"
+          }
+          $hash = (Get-FileHash -Algorithm SHA256 -Path "orga-drone-windows-x64.zip").Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "orga-drone-windows-x64.zip.sha256"),
+            "$hash  orga-drone-windows-x64.zip`n"
+          )
+          $versionLine = python packaging/verify_release_version.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @(
+            $versionLine,
+            "commit=${{ github.sha }}",
+            "sha256=$hash"
+          ) | Set-Content -Encoding ascii release-build.txt
+          $versionLine | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "commit=${{ github.sha }}" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "sha256=$hash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orga-drone-windows-x64
+          path: |
+            orga-drone-windows-x64.zip
+            orga-drone-windows-x64.zip.sha256
+            release-build.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  draft-release:
+    name: Draft GitHub Release
+    needs: package
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: orga-drone-windows-x64
+          path: release-assets
+
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum -c orga-drone-windows-x64.zip.sha256
+          version="$(sed -n 's/^version=//p' release-build.txt)"
+          commit="$(sed -n 's/^commit=//p' release-build.txt)"
+          sha="$(awk '{print $1}' orga-drone-windows-x64.zip.sha256)"
+          if [ -z "${version}" ] || [ -z "${commit}" ] || [ -z "${sha}" ]; then
+            echo "release-build.txt is missing version, commit, or checksum"
+            exit 1
+          fi
+          if [ "${RELEASE_TAG}" != "v${version}" ]; then
+            echo "Refusing to publish: tag ${RELEASE_TAG} != v${version}"
+            exit 1
+          fi
+          VERSION="${version}" COMMIT="${commit}" SHA256="${sha}" TAG="${RELEASE_TAG}" python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          commit = os.environ["COMMIT"]
+          sha = os.environ["SHA256"]
+          tag = os.environ["TAG"]
+          Path("DRAFT_RELEASE_NOTES.md").write_text(
+              f"""## Draft — not a public release
+
+          Built by the Windows release workflow. This draft is **not public**.
+          Publish it only after the mandatory Windows MOTW smoke test in
+          `packaging/README.md` passes. Leave it unpublished on failure.
+
+          | | |
+          | --- | --- |
+          | Version | {version} |
+          | Tag | {tag} |
+          | Commit | {commit} |
+          | Artifact | orga-drone-windows-x64.zip |
+          | SHA256 | {sha} |
+
+          ### Maintainer gate
+
+          1. In a browser, while signed in, download `orga-drone-windows-x64.zip` **from this draft** (not `gh release download`, curl, or the Actions artifact wrapper).
+          2. Confirm `Zone.Identifier` / `ZoneId=3`, extract with Windows Explorer into a path with parentheses, and run the functional checks (native window, Library folder picker, Studio soundtrack picker, Studio MP4 save dialog, 1080p export, project and playlist persisted after restart).
+          3. Record the tested ZIP SHA256, commit, test date, and outcome in these notes.
+          4. Publish only if every check passed.
+
+          ```
+          {sha}  orga-drone-windows-x64.zip
+          ```
+
+          ```powershell
+          Get-FileHash -Algorithm SHA256 .\\orga-drone-windows-x64.zip
+          ```
+          """,
+              encoding="utf-8",
+          )
+          PY
+          if gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft > /tmp/is_draft; then
+            is_draft="$(cat /tmp/is_draft)"
+            if [ "${is_draft}" != "true" ]; then
+              echo "Release ${RELEASE_TAG} is already published. Refusing to replace it."
+              exit 1
+            fi
+            echo "Draft already exists. Replaced the zip and checksum. Release notes were left unchanged."
+            gh release upload "${RELEASE_TAG}" \
+              orga-drone-windows-x64.zip \
+              orga-drone-windows-x64.zip.sha256 \
+              --clobber
+          else
+            gh release create "${RELEASE_TAG}" \
+              --draft \
+              --title "orga-drone ${RELEASE_TAG}" \
+              --notes-file DRAFT_RELEASE_NOTES.md \
+              orga-drone-windows-x64.zip \
+              orga-drone-windows-x64.zip.sha256
+          fi
+          gh release edit "${RELEASE_TAG}" --draft
+          is_draft="$(gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft)"
+          if [ "${is_draft}" != "true" ]; then
+            echo "Release ${RELEASE_TAG} is not a draft. Refusing to leave a public release."
+            exit 1
+          fi
+          gh release view "${RELEASE_TAG}" --json isDraft,url --jq '{isDraft: .isDraft, url: .url}'

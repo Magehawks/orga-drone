@@ -18,7 +18,7 @@ Do not invent layers, services, or plugins that are not present.
 | App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip |
 | Tests | pytest under `tests/` |
-| CI | GitHub Actions: Ruff, MyPy, pytest on pull requests |
+| CI | GitHub Actions: Ruff, MyPy, pytest on pull requests. Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `packaging/README.md`. |
 
 Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 `create_app()` in `src/orga_drone/app.py`.

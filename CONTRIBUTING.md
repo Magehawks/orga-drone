@@ -70,6 +70,11 @@ pytest
 
 Install the same tooling locally via `pip install -e ".[dev]"`. Configuration lives in `pyproject.toml`.
 
+Windows release candidates are a separate **Windows release** workflow
+(manual dispatch or a `vX.Y.Z` tag). It does not run on pull requests and it
+does not publish a public release. Procedure, checksum, draft approval, and
+rollback: [`packaging/README.md`](packaging/README.md).
+
 ## Pull requests
 
 1. Branch from `master` (default branch).

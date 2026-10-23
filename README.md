@@ -97,7 +97,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
-| CI-built multi-OS installers | Not available | Windows zip built/published manually today |
+| CI-built multi-OS installers | Not available | Windows onefolder zip is built in GitHub Actions (draft release; maintainer publishes after the MOTW smoke test). No MSIX, macOS, or Linux installer. |
 
 ## Installation and first start
 
@@ -272,7 +272,7 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)
 - Online geocoding providers (place auto-tags are offline today)
 - Plugin / extension hooks for parsers and exports
-- CI-built installers for Windows / macOS / Linux
+- Installers and multi-OS release builds (Windows MSIX, macOS, Linux). The Windows onefolder zip can be built in GitHub Actions; publishing stays manual after the MOTW smoke test.
 - Optional intelligent features only when they solve a concrete memory/library problem
 
 Full prioritization language: [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -299,7 +299,7 @@ Known limitations:
 - No Library albums UI, no plugin API, no content-hash duplicate
 detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
-- CI covers Ruff, MyPy, and unit tests on pull requests; release/installer automation is not included
+- CI covers Ruff, MyPy, and pytest on pull requests. A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
 - Telemetry **burn-in** into exported video is not included
 
 If video browsing feels heavy under Windows Defender, exclude the unzipped `orga-drone` folder (see [`packaging/README.md`](packaging/README.md)).
