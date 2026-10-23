@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 ACTIVE_STATES = frozenset({"pending", "running"})
-FINISHED_STATES = frozenset({"completed", "failed"})
+FINISHED_STATES = frozenset({"completed", "failed", "cancelled"})
 
 
 def estimate_eta_s(elapsed_s: float, percent: int) -> float | None:
@@ -96,6 +96,7 @@ class ExportJobStore:
     ) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, ExportJob] = {}
+        self._cancel_events: dict[str, threading.Event] = {}
         self._active_id: str | None = None
         self._last_success: ExportLastSuccess | None = None
         self.max_finished = max_finished
@@ -113,8 +114,25 @@ class ExportJobStore:
                 return None
             job = ExportJob(id=str(uuid.uuid4()))
             self._jobs[job.id] = job
+            self._cancel_events[job.id] = threading.Event()
             self._active_id = job.id
             return job
+
+    def cancel_event(self, job_id: str) -> threading.Event | None:
+        with self._lock:
+            return self._cancel_events.get(job_id)
+
+    def request_cancel(self, job_id: str) -> threading.Event | None:
+        """Ask a running export to stop. Returns the event when it was active."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            event = self._cancel_events.get(job_id)
+            if job is None or event is None or job.state not in ACTIVE_STATES:
+                return None
+            job.phase = "cancelling"
+            job.updated_at = time.time()
+            event.set()
+            return event
 
     def get_last_success(self) -> ExportLastSuccess | None:
         with self._lock:
@@ -139,11 +157,14 @@ class ExportJobStore:
     def mark_running(self, job_id: str, *, clip_total: int = 0) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
+            event = self._cancel_events.get(job_id)
             if job is None or job.state not in ACTIVE_STATES:
                 return
             now = time.time()
             job.state = "running"
-            job.phase = "preparing"
+            job.phase = (
+                "cancelling" if event is not None and event.is_set() else "preparing"
+            )
             job.clip_total = max(0, int(clip_total))
             job.clip_index = 0
             job.percent = 0
@@ -154,7 +175,12 @@ class ExportJobStore:
     def apply_progress(self, job_id: str, progress: dict[str, Any]) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
+            event = self._cancel_events.get(job_id)
             if job is None or job.state not in ACTIVE_STATES:
+                return
+            if event is not None and event.is_set():
+                job.phase = "cancelling"
+                job.updated_at = time.time()
                 return
             if job.state == "pending":
                 job.state = "running"
@@ -168,11 +194,31 @@ class ExportJobStore:
                 job.clip_total = int(progress["clip_total"])
             if "percent" in progress and progress["percent"] is not None:
                 # Never move percent backwards during a run (heartbeat / race).
-                job.percent = max(job.percent, max(0, min(100, int(progress["percent"]))))
+                job.percent = max(
+                    job.percent, max(0, min(100, int(progress["percent"])))
+                )
             if "current_label" in progress:
                 label = progress["current_label"]
                 job.current_label = None if label is None else str(label)[:200]
             job.updated_at = time.time()
+
+    def finish_cancelled(self, job_id: str) -> None:
+        """Record a user cancellation. Does not record a successful export."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.state not in ACTIVE_STATES:
+                return
+            now = time.time()
+            job.state = "cancelled"
+            job.phase = "cancelled"
+            job.error = "Export cancelled."
+            job.output_path = None
+            job.directory = None
+            job.updated_at = now
+            job.finished_at = now
+            if self._active_id == job_id:
+                self._active_id = None
+            self._cleanup_locked()
 
     def complete(
         self,
@@ -183,7 +229,7 @@ class ExportJobStore:
     ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
+            if job is None or job.state not in ACTIVE_STATES:
                 return
             now = time.time()
             job.state = "completed"
@@ -210,7 +256,21 @@ class ExportJobStore:
     def fail(self, job_id: str, error: str) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
+            event = self._cancel_events.get(job_id)
+            if job is None or job.state not in ACTIVE_STATES:
+                return
+            if event is not None and event.is_set():
+                now = time.time()
+                job.state = "cancelled"
+                job.phase = "cancelled"
+                job.error = "Export cancelled."
+                job.output_path = None
+                job.directory = None
+                job.updated_at = now
+                job.finished_at = now
+                if self._active_id == job_id:
+                    self._active_id = None
+                self._cleanup_locked()
                 return
             now = time.time()
             job.state = "failed"
@@ -232,6 +292,7 @@ class ExportJobStore:
         ]
         for jid in stale:
             del self._jobs[jid]
+            self._cancel_events.pop(jid, None)
 
         finished = sorted(
             (
@@ -245,6 +306,7 @@ class ExportJobStore:
         if overflow > 0:
             for job in finished[:overflow]:
                 del self._jobs[job.id]
+                self._cancel_events.pop(job.id, None)
 
         if self._active_id is not None and self._active_id not in self._jobs:
             self._active_id = None

@@ -6,10 +6,13 @@ codec-agnostic. The default adapter uses the existing ffmpeg binary discovery.
 
 from __future__ import annotations
 
+import contextvars
 import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
@@ -66,9 +69,7 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
     A neutral clip adds nothing, so the chain matches ``_segment_vf``.
     """
     base = _segment_vf(width, height)
-    grade = (
-        ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
-    )
+    grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
     vf = f"{grade},{base}" if grade else base
     fades: list[str] = []
     fade_in = max(0.0, float(clip.fade_in_s))
@@ -182,6 +183,58 @@ class StudioExportError(Exception):
         self.code = code
 
 
+class ExportCancelled(StudioExportError):
+    """The user stopped the export before a finished file was published."""
+
+    def __init__(self) -> None:
+        super().__init__("Export cancelled.", code="cancelled")
+
+
+_cancel_event: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
+    "studio_export_cancel",
+    default=None,
+)
+_export_procs: dict[int, subprocess.Popen[str]] = {}
+_export_procs_lock = threading.Lock()
+
+
+def cancel_export_process(cancel_event: threading.Event) -> None:
+    """Mark an export cancelled and stop its current ffmpeg process."""
+    cancel_event.set()
+    with _export_procs_lock:
+        proc = _export_procs.get(id(cancel_event))
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+
+
+def _raise_if_cancelled() -> None:
+    event = _cancel_event.get()
+    if event is not None and event.is_set():
+        raise ExportCancelled()
+
+
+def _bind_export_process(event: threading.Event, proc: subprocess.Popen[str]) -> None:
+    with _export_procs_lock:
+        _export_procs[id(event)] = proc
+        should_kill = event.is_set()
+    if should_kill and proc.poll() is None:
+        proc.kill()
+
+
+def _unbind_export_process(event: threading.Event, proc: subprocess.Popen[str]) -> None:
+    with _export_procs_lock:
+        if _export_procs.get(id(event)) is proc:
+            del _export_procs[id(event)]
+
+
+def _watch_export_cancel(event: threading.Event, proc: subprocess.Popen[str]) -> None:
+    while proc.poll() is None:
+        if event.wait(timeout=0.2):
+            if proc.poll() is None:
+                proc.kill()
+            return
+
+
 def _clip_progress_label(clip: StudioExportClip) -> str:
     if clip.label:
         return clip.label
@@ -196,11 +249,14 @@ class StudioVideoEncoder(Protocol):
         config: StudioExportConfig,
         *,
         on_progress: ProgressCallback | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> Path:
         """Render ``config`` to a finished file at ``config.output_path``.
 
         Implementations should write via a temporary file and only place the
         final destination after success. Must not modify source media.
+        When ``cancel_event`` is set, stop the work and leave the destination
+        untouched.
         """
 
 
@@ -298,6 +354,7 @@ class FfmpegStudioEncoder:
         config: StudioExportConfig,
         *,
         on_progress: ProgressCallback | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> Path:
         if not config.clips:
             raise StudioExportError("Studio project has no exportable clips.")
@@ -316,9 +373,12 @@ class FfmpegStudioEncoder:
         clip_total = len(config.clips)
         tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
         tmp_out = tmp_dir / "export_tmp.mp4"
+        partial = parent / f".{dest.name}.{uuid.uuid4().hex}.partial"
+        token = _cancel_event.set(cancel_event)
         try:
             segments: list[Path] = []
             for index, clip in enumerate(config.clips):
+                _raise_if_cancelled()
                 clip_index = index + 1
                 label = _clip_progress_label(clip)
                 _emit(
@@ -349,6 +409,7 @@ class FfmpegStudioEncoder:
                     current_label=label,
                 )
                 segments.append(seg)
+            _raise_if_cancelled()
             _emit(
                 on_progress,
                 phase="concat",
@@ -357,6 +418,7 @@ class FfmpegStudioEncoder:
                 current_label=None,
             )
             self._concat_or_stitch(ffmpeg, segments, tmp_out, config)
+            _raise_if_cancelled()
             if config.music_tracks:
                 _emit(
                     on_progress,
@@ -370,9 +432,10 @@ class FfmpegStudioEncoder:
                 tmp_out = mixed
             if not tmp_out.is_file() or tmp_out.stat().st_size <= 0:
                 raise StudioExportError("Export failed: empty output.")
-            if dest.exists():
-                dest.unlink()
-            shutil.move(str(tmp_out), str(dest))
+            _raise_if_cancelled()
+            shutil.move(str(tmp_out), partial)
+            _raise_if_cancelled()
+            partial.replace(dest)
             _emit(
                 on_progress,
                 phase="done",
@@ -386,7 +449,9 @@ class FfmpegStudioEncoder:
         except Exception as exc:  # noqa: BLE001
             raise StudioExportError(f"Export failed: {exc}") from exc
         finally:
+            partial.unlink(missing_ok=True)
             shutil.rmtree(tmp_dir, ignore_errors=True)
+            _cancel_event.reset(token)
 
     def _render_clip(
         self,
@@ -918,41 +983,43 @@ def _persist_ffmpeg_failure(cmd: list[str], stderr: str) -> None:
         return
 
 
+def _terminate_ffmpeg(proc: subprocess.Popen[str]) -> None:
+    if proc.poll() is not None:
+        return
+    proc.kill()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        return
+
+
 def _run_ffmpeg(
     cmd: list[str],
     *,
     on_time: Callable[[float], None] | None = None,
     duration_s: float | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
-    """Run ffmpeg; optionally stream ``-progress pipe:1`` for live time updates."""
-    if on_time is None:
-        try:
-            proc = subprocess.run(
-                cmd,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=3600,
-                **subprocess_no_window_kwargs(),
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise StudioExportError(f"Export failed: {exc}") from exc
-        if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout or "").strip()
-            _persist_ffmpeg_failure(cmd, err)
-            raise StudioExportError(f"Export failed: {_ffmpeg_error_message(err)}")
-        return
+    """Run ffmpeg; optionally stream ``-progress pipe:1`` for live time updates.
 
-    # Insert progress reporting just before the output path (last arg).
-    # Do NOT pipe stderr while reading stdout — ffmpeg fills the stderr buffer
-    # and deadlocks (especially on Windows). Capture stderr to a temp file.
+    A set cancel event kills the process. The destination file is not this
+    function's concern; callers publish it only after a successful return.
+    """
+    event = _cancel_event.get() if cancel_event is None else cancel_event
+    if event is not None and event.is_set():
+        raise ExportCancelled()
     if len(cmd) < 2:
         raise StudioExportError("Export failed: invalid ffmpeg command.")
-    progress_cmd = cmd[:-1] + ["-progress", "pipe:1", "-nostats", cmd[-1]]
+    progress_cmd = cmd
+    if on_time is not None:
+        # Insert progress reporting just before the output path (last arg).
+        progress_cmd = cmd[:-1] + ["-progress", "pipe:1", "-nostats", cmd[-1]]
     err_fd, err_name = tempfile.mkstemp(prefix="orga-ffmpeg-", suffix=".err")
     err_path = Path(err_name)
     last_emit = -1.0
     returncode = 1
+    popen: subprocess.Popen[str] | None = None
+    watcher: threading.Thread | None = None
     try:
         with open(err_fd, "w", encoding="utf-8", errors="replace") as err_file:
             try:
@@ -966,9 +1033,23 @@ def _run_ffmpeg(
                 )
             except OSError as exc:
                 raise StudioExportError(f"Export failed: {exc}") from exc
+            if event is not None:
+                _bind_export_process(event, popen)
+                watcher = threading.Thread(
+                    target=_watch_export_cancel,
+                    args=(event, popen),
+                    name="studio-export-cancel",
+                    daemon=True,
+                )
+                watcher.start()
             assert popen.stdout is not None
             try:
                 for line in popen.stdout:
+                    if event is not None and event.is_set():
+                        _terminate_ffmpeg(popen)
+                        raise ExportCancelled()
+                    if on_time is None:
+                        continue
                     media_s = parse_ffmpeg_out_time_seconds(line)
                     if media_s is None:
                         if "=" in line and line.strip().startswith(
@@ -989,9 +1070,15 @@ def _run_ffmpeg(
                         last_emit = media_s
                         on_time(media_s)
                 returncode = popen.wait(timeout=3600)
+            except ExportCancelled:
+                raise
             except (OSError, subprocess.SubprocessError) as exc:
-                popen.kill()
+                _terminate_ffmpeg(popen)
+                if event is not None and event.is_set():
+                    raise ExportCancelled() from exc
                 raise StudioExportError(f"Export failed: {exc}") from exc
+        if event is not None and event.is_set():
+            raise ExportCancelled()
         try:
             stderr = err_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -999,9 +1086,11 @@ def _run_ffmpeg(
         if returncode != 0:
             _persist_ffmpeg_failure(progress_cmd, stderr)
             raise StudioExportError(f"Export failed: {_ffmpeg_error_message(stderr)}")
-        if last_emit < 0 and duration_s is not None:
+        if on_time is not None and last_emit < 0 and duration_s is not None:
             on_time(duration_s)
     finally:
+        if popen is not None and event is not None:
+            _unbind_export_process(event, popen)
         err_path.unlink(missing_ok=True)
 
 

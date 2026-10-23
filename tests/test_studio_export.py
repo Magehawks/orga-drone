@@ -120,7 +120,7 @@ class _FakeEncoder:
         self.configs: list[StudioExportConfig] = []
         self.progress: list[dict] = []
 
-    def render(self, config: StudioExportConfig, *, on_progress=None) -> Path:  # type: ignore[no-untyped-def]
+    def render(self, config: StudioExportConfig, *, on_progress=None, cancel_event=None) -> Path:  # type: ignore[no-untyped-def]
         self.configs.append(config)
         total = len(config.clips)
         if on_progress is not None:

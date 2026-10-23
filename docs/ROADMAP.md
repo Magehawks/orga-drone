@@ -33,7 +33,7 @@ Highlights:
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
   source start/end; Projects switcher beside the open project title; Clear Studio
-  on the Story toolbar (clips only); synced Story preview playback; local MP4 export with
+  on the Story toolbar (clips only); synced Story preview playback; local MP4 export (Cancel stops a running encode) with
   configurable resolution, including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
