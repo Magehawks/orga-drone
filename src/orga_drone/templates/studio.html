@@ -68,6 +68,7 @@
          data-title-failed="{{ _('Could not save project title.')|e }}"
          data-export-failed="{{ _('Export failed.')|e }}"
          data-export-cancelled="{{ _('Export cancelled.')|e }}"
+         data-export-cancelling="{{ _('Cancelling export…')|e }}"
          data-export-no-resolution="{{ _('No exportable video resolution in this project.')|e }}"
          data-export-overwrite="{{ _('A file with this name already exists. Overwrite it?')|e }}"
          data-export-running="{{ _('Exporting…')|e }}"
@@ -722,7 +723,7 @@
     </div>
     <p class="hint" id="studio-export-hint"></p>
     <div class="studio-export-actions">
-      <button type="submit" class="button ghost" value="cancel" id="studio-export-cancel">{{ _('Cancel') }}</button>
+      <button type="button" class="button ghost" id="studio-export-cancel">{{ _('Cancel export') }}</button>
       <button type="button" class="button" id="studio-export-run">{{ _('Export MP4') }}</button>
     </div>
   </form>

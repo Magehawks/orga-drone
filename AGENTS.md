@@ -82,7 +82,7 @@ The application helps users:
   (Cut, Fade through black, Crossfade) in preview and MP4; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
   export); local MP4 export with configurable
-  resolution on desktop, including photo-only stories at 720/1080; after a successful export, Open video / Show in folder
+  resolution on desktop, including photo-only stories at 720/1080; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
   canvas; loop still repeats a single song to Story end). The open project is

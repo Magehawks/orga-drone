@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
@@ -14,6 +15,7 @@ from orga_drone.export.studio_config import (
 )
 from orga_drone.export.studio_encoder import (
     ProgressCallback,
+    ExportCancelled,
     StudioExportError,
     StudioVideoEncoder,
     get_default_encoder,
@@ -417,6 +419,7 @@ def run_studio_export(
     project_id: int | None = None,
     encoder: StudioVideoEncoder | None = None,
     on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
     config = prepare_studio_export(
         db,
@@ -436,7 +439,17 @@ def run_studio_export(
         )
     enc = encoder or get_default_encoder()
     try:
-        result = enc.render(config, on_progress=on_progress)
+        result = enc.render(
+            config,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+        )
+    except ExportCancelled:
+        append_export_log(
+            f"CANCEL title={config.project_title!r} height={config.height} "
+            f"clips={len(config.clips)} dest={config.output_path}"
+        )
+        raise
     except StudioExportError as exc:
         append_export_log(
             f"FAIL title={config.project_title!r} height={config.height} "

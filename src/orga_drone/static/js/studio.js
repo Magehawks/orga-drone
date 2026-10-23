@@ -206,6 +206,7 @@
   const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
   const msgDragReorder = root.dataset.dragReorder || "Drag to reorder";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
+  const msgExportCancelling = root.dataset.exportCancelling || "Cancelling export…";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
   const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
   const msgExportRunning = root.dataset.exportRunning || "Exporting…";
@@ -2764,6 +2765,8 @@
   let exportElapsedTimer = null;
   let exportStartedAtMs = 0;
   let exportLastJob = null;
+  let exportActiveJobId = null;
+  let exportCancelRequested = false;
 
   function setExportStatus(message, { error = false } = {}) {
     if (!exportStatus) return;
@@ -2855,7 +2858,7 @@
   function setExportRunningUi(running) {
     if (exportRunBtn) exportRunBtn.disabled = running;
     if (exportResolution) exportResolution.disabled = running;
-    if (exportCancelBtn) exportCancelBtn.disabled = running;
+    if (exportCancelBtn && !exportCancelRequested) exportCancelBtn.disabled = false;
   }
 
   function stopExportElapsedTimer() {
@@ -2975,8 +2978,26 @@
         setExportProgressVisible(true);
         const localElapsedS = (Date.now() - exportStartedAtMs) / 1000;
         updateExportProgress(data, { localElapsedS });
+        if (data.state === "cancelled") {
+          stopExportElapsedTimer();
+          exportActiveJobId = null;
+          exportCancelRequested = false;
+          if (exportProgress) exportProgress.classList.remove("is-working");
+          setExportProgressVisible(false);
+          setExportStatus(msgExportCancelled);
+          setExportRunningUi(false);
+          return;
+        }
+        if (data.phase === "cancelling") {
+          setExportStatus(msgExportCancelling);
+          if (exportCancelBtn) exportCancelBtn.disabled = true;
+          exportPollTimer = window.setTimeout(tick, 400);
+          return;
+        }
         if (data.state === "completed") {
           stopExportElapsedTimer();
+          exportActiveJobId = null;
+          exportCancelRequested = false;
           if (exportProgress) exportProgress.classList.remove("is-working");
           setExportRunningUi(false);
           if (exportDialog && typeof exportDialog.close === "function") {
@@ -2992,6 +3013,8 @@
         }
         if (data.state === "failed") {
           stopExportElapsedTimer();
+          exportActiveJobId = null;
+          exportCancelRequested = false;
           if (exportProgress) exportProgress.classList.remove("is-working");
           setExportStatus(data.error || msgExportFailed, { error: true });
           setExportRunningUi(false);
@@ -3011,6 +3034,8 @@
     hideExportSuccess();
     stopExportPoll();
     exportLastJob = null;
+    exportActiveJobId = null;
+    exportCancelRequested = false;
     setExportStatus("");
     setExportProgressVisible(false);
     if (exportProgressBar) exportProgressBar.style.width = "0%";
@@ -3151,6 +3176,8 @@
         eta_s: null,
       });
       setExportStatus(msgExportRunningHint);
+      exportActiveJobId = data.job_id;
+      exportCancelRequested = false;
       pollExportJob(data.job_id);
     } catch (_) {
       setExportStatus(msgExportFailed, { error: true });
@@ -3161,6 +3188,41 @@
   exportRunBtn?.addEventListener("click", (event) => {
     event.preventDefault();
     runStudioExport();
+  });
+
+  async function requestExportCancel() {
+    if (!exportActiveJobId || exportCancelRequested) return;
+    exportCancelRequested = true;
+    if (exportCancelBtn) exportCancelBtn.disabled = true;
+    setExportStatus(msgExportCancelling);
+    try {
+      const res = await fetch(
+        `/api/studio/export/jobs/${encodeURIComponent(exportActiveJobId)}/cancel`,
+        { method: "POST", headers: { Accept: "application/json" } }
+      );
+      if (!res.ok) {
+        exportCancelRequested = false;
+        if (exportCancelBtn) exportCancelBtn.disabled = false;
+      }
+    } catch (_) {
+      exportCancelRequested = false;
+      if (exportCancelBtn) exportCancelBtn.disabled = false;
+    }
+  }
+
+  exportCancelBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (exportActiveJobId) {
+      requestExportCancel();
+      return;
+    }
+    stopExportPoll();
+    if (exportDialog && typeof exportDialog.close === "function") exportDialog.close();
+  });
+  exportDialog?.addEventListener("cancel", (event) => {
+    if (!exportActiveJobId) return;
+    event.preventDefault();
+    requestExportCancel();
   });
 
   document.getElementById("studio-music-add")?.addEventListener("click", (event) => {

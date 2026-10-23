@@ -38,19 +38,26 @@ def test_run_ffmpeg_pass_creationflags_on_windows(
     monkeypatch.setattr(se.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
     captured: dict[str, Any] = {}
 
-    class _Result:
-        returncode = 0
-        stdout = ""
-        stderr = ""
+    class _FakePopen:
+        def __init__(self, cmd, **kwargs):  # type: ignore[no-untyped-def]
+            captured["kwargs"] = kwargs
+            self.stdout = iter(())
+            self.returncode = 0
 
-    def fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
-        captured["kwargs"] = kwargs
-        return _Result()
+        def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+            return 0
 
-    monkeypatch.setattr(se.subprocess, "run", fake_run)
+        def poll(self):  # type: ignore[no-untyped-def]
+            return 0
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(se.subprocess, "Popen", _FakePopen)
     se._run_ffmpeg(["ffmpeg", "-y", "-i", "in.mp4", "out.mp4"])
     assert captured["kwargs"].get("creationflags") == 0x08000000
     assert captured["kwargs"].get("shell") is not True
+    assert captured["kwargs"]["stderr"] is not se.subprocess.PIPE
 
 
 def test_run_ffmpeg_popen_pass_creationflags_on_windows(
@@ -98,15 +105,21 @@ def test_run_ffmpeg_no_creationflags_on_linux(
     monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", "linux")
     captured: dict[str, Any] = {}
 
-    class _Result:
-        returncode = 0
-        stdout = ""
-        stderr = ""
+    class _FakePopen:
+        def __init__(self, cmd, **kwargs):  # type: ignore[no-untyped-def]
+            captured["kwargs"] = kwargs
+            self.stdout = iter(())
+            self.returncode = 0
 
-    def fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
-        captured["kwargs"] = kwargs
-        return _Result()
+        def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+            return 0
 
-    monkeypatch.setattr(se.subprocess, "run", fake_run)
+        def poll(self):  # type: ignore[no-untyped-def]
+            return 0
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(se.subprocess, "Popen", _FakePopen)
     se._run_ffmpeg(["ffmpeg", "-y", "-i", "in.mp4", "out.mp4"])
     assert "creationflags" not in captured["kwargs"]

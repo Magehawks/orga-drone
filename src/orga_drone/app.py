@@ -1602,7 +1602,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/studio/export")
     async def api_studio_export(request: Request) -> JSONResponse:
-        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
         from orga_drone.studio_export import prepare_studio_export, run_studio_export
 
         try:
@@ -1648,6 +1648,8 @@ def create_app() -> FastAPI:
                 detail="An export is already running. Wait for it to finish.",
             )
 
+        cancel_event = store.cancel_event(job.id)
+
         def _worker() -> None:
             store.mark_running(job.id)
 
@@ -1662,16 +1664,25 @@ def create_app() -> FastAPI:
                     overwrite=True,  # preflight already confirmed overwrite
                     project_id=project_id,
                     on_progress=on_progress,
+                    cancel_event=cancel_event,
                 )
                 store.complete(
                     job.id,
                     output_path=str(result),
                     directory=str(result.parent),
                 )
+            except ExportCancelled:
+                store.finish_cancelled(job.id)
             except StudioExportError as exc:
-                store.fail(job.id, translate(str(exc)))
+                if cancel_event is not None and cancel_event.is_set():
+                    store.finish_cancelled(job.id)
+                else:
+                    store.fail(job.id, translate(str(exc)))
             except Exception as exc:  # noqa: BLE001
-                store.fail(job.id, f"Export failed: {exc}")
+                if cancel_event is not None and cancel_event.is_set():
+                    store.finish_cancelled(job.id)
+                else:
+                    store.fail(job.id, f"Export failed: {exc}")
 
         threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
         return JSONResponse({"ok": True, "job_id": job.id})
@@ -1750,6 +1761,20 @@ def create_app() -> FastAPI:
         return JSONResponse(
             {"ok": True, "action": action, "filename": last.filename}
         )
+
+    @app.post("/api/studio/export/jobs/{job_id}/cancel")
+    async def api_studio_export_cancel(job_id: str) -> JSONResponse:
+        from orga_drone.export.studio_encoder import cancel_export_process
+
+        store: ExportJobStore = app.state.export_jobs
+        event = store.request_cancel(job_id)
+        if event is None:
+            job = store.get(job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail="Export job not found")
+            return JSONResponse({"ok": True, "state": job.state})
+        await asyncio.to_thread(cancel_export_process, event)
+        return JSONResponse({"ok": True, "state": "cancelling"})
 
     @app.get("/api/studio/export/jobs/{job_id}")
     async def api_studio_export_job(job_id: str) -> JSONResponse:

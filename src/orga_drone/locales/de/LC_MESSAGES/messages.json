@@ -258,6 +258,8 @@
   "Preview plays Story media in order. Export writes a local MP4 and includes project music when set.": "Preview spielt Story-Medien der Reihe nach ab. Export schreibt eine lokale MP4 und mischt Projektmusik ein, wenn vorhanden.",
   "Export failed.": "Export fehlgeschlagen.",
   "Export cancelled.": "Export abgebrochen.",
+  "Cancel export": "Export abbrechen",
+  "Cancelling export…": "Export wird abgebrochen…",
   "No exportable video resolution in this project.": "In diesem Projekt gibt es keine exportierbare Videoauflösung.",
   "A file with this name already exists. Overwrite it?": "Eine Datei mit diesem Namen existiert bereits. Überschreiben?",
   "Exporting…": "Exportiere…",
