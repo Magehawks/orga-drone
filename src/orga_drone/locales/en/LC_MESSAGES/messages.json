@@ -439,5 +439,17 @@
   "Left": "Left",
   "Right": "Right",
   "Up": "Up",
-  "Down": "Down"
+  "Down": "Down",
+  "Privacy": "Privacy",
+  "Blur": "Blur",
+  "Pixelate": "Pixelate",
+  "Add blur mask": "Add blur mask",
+  "Add pixelate mask": "Add pixelate mask",
+  "Effect": "Effect",
+  "Strength": "Strength",
+  "Remove mask": "Remove mask",
+  "Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.": "Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.",
+  "Could not save privacy masks.": "Could not save privacy masks.",
+  "A clip can have up to 8 privacy masks.": "A clip can have up to 8 privacy masks.",
+  "A privacy mask could not be rendered. Make the region larger and export again.": "A privacy mask could not be rendered. Make the region larger and export again."
 }

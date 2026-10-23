@@ -138,6 +138,11 @@
          data-overlay-missing="{{ _('Overlay image is missing.')|e }}"
          data-overlay-clamped="{{ _('Overlay timing was shortened to fit this clip.')|e }}"
          data-overlay-limit="{{ _('This clip already has 8 overlays.')|e }}"
+         data-mask-failed="{{ _('Could not save privacy masks.')|e }}"
+         data-mask-limit="{{ _('A clip can have up to 8 privacy masks.')|e }}"
+         data-mask-blur="{{ _('Blur')|e }}"
+         data-mask-pixelate="{{ _('Pixelate')|e }}"
+         data-mask-model='{{ mask_model|tojson }}'
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -320,6 +325,9 @@
           <img id="studio-preview-image-b" class="studio-preview-media studio-preview-layer-b" alt="" hidden>
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
           <video id="studio-preview-video-b" class="studio-preview-media studio-preview-layer-b" playsinline preload="metadata" muted hidden></video>
+          <canvas id="studio-preview-masks-b" class="studio-preview-masks studio-preview-masks-b" hidden></canvas>
+          <canvas id="studio-preview-masks" class="studio-preview-masks" hidden></canvas>
+          <div id="studio-preview-mask-handles" class="studio-preview-mask-handles" hidden></div>
           <audio id="studio-music-audio" preload="metadata" hidden></audio>
           <audio id="studio-music-audio-next" preload="metadata" hidden></audio>
           <div id="studio-preview-titlecard" class="studio-preview-titlecard" hidden data-bg="dark">
@@ -487,6 +495,7 @@
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
+                  data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -678,6 +687,35 @@
             <button type="button" class="button ghost" id="overlay-remove">{{ _('Remove overlay') }}</button>
           </div>
           <p class="hint">{{ _('Overlays stay on this Story clip between their start and end. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+        </div>
+        <div id="inspector-masks" hidden>
+          <p class="studio-inspector-kind">{{ _('Privacy') }}</p>
+          <div class="studio-mask-actions">
+            <button type="button" class="button ghost" id="mask-add-blur"
+                    aria-label="{{ _('Add blur mask') }}">{{ _('Blur') }}</button>
+            <button type="button" class="button ghost" id="mask-add-pixelate"
+                    aria-label="{{ _('Add pixelate mask') }}">{{ _('Pixelate') }}</button>
+          </div>
+          <ul class="studio-mask-list" id="mask-list"></ul>
+          <div id="mask-editor" hidden>
+            <label class="studio-inspector-field">
+              <span>{{ _('Effect') }}</span>
+              <select id="mask-effect">
+                <option value="blur">{{ _('Blur') }}</option>
+                <option value="pixelate">{{ _('Pixelate') }}</option>
+              </select>
+            </label>
+            <label class="studio-inspector-field">
+              <span class="studio-image-adjust-label">
+                <span>{{ _('Strength') }}</span>
+                <span class="studio-image-adjust-value" id="mask-strength-value">50</span>
+              </span>
+              <input type="range" id="mask-strength" min="1" max="100" step="1" value="50"
+                     aria-label="{{ _('Strength') }}">
+            </label>
+            <button type="button" class="button ghost" id="mask-remove">{{ _('Remove mask') }}</button>
+          </div>
+          <p class="hint">{{ _('Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

@@ -1366,6 +1366,53 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-preview-layer-b {
   z-index: 1;
 }
+.studio-preview-masks {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+.studio-preview-masks-b {
+  z-index: 1;
+}
+.studio-preview-masks[hidden],
+.studio-preview-mask-handles[hidden] {
+  display: none !important;
+}
+.studio-preview-mask-handles {
+  position: absolute;
+  z-index: 4;
+}
+.studio-mask-box {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  cursor: move;
+  touch-action: none;
+  background: transparent;
+}
+.studio-mask-box.is-selected {
+  border-color: var(--accent, #3d8bfd);
+}
+.studio-mask-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #111;
+  background: #fff;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.studio-mask-actions,
+.studio-mask-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  list-style: none;
+}
 .studio-preview-fade-black {
   position: absolute;
   inset: 0;
