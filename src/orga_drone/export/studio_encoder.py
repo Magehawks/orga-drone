@@ -61,16 +61,14 @@ def _segment_vf(width: int, height: int) -> str:
     )
 
 
-def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str:
-    """Scale/pad chain, with an optional per-clip grade before fades.
-
-    Photo and video grades are applied on the decoded frame, then the existing
-    scale, timebase, and fade filters run. Title cards stay ungraded.
-    A neutral clip adds nothing, so the chain matches ``_segment_vf``.
-    """
+def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
+    """Grade plus scale/pad. Fades stay separate so overlays can sit before them."""
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
-    vf = f"{grade},{base}" if grade else base
+    return f"{grade},{base}" if grade else base
+
+
+def _fade_filters(clip: StudioExportClip) -> list[str]:
     fades: list[str] = []
     fade_in = max(0.0, float(clip.fade_in_s))
     fade_out = max(0.0, float(clip.fade_out_s))
@@ -79,9 +77,153 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
     if fade_out > 0:
         start = max(0.0, float(clip.duration_s) - fade_out)
         fades.append(f"fade=t=out:st={start:.4f}:d={fade_out:.4f}")
+    return fades
+
+
+def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str:
+    """Scale/pad chain, with an optional per-clip grade before fades.
+
+    Photo and video grades are applied on the decoded frame, then the existing
+    scale, timebase, and fade filters run. Title cards stay ungraded.
+    A neutral clip adds nothing, so the chain matches ``_segment_vf``.
+    Overlays are not part of this string; they use a filter graph only when
+    the clip has any, so neutral exports stay on the previous ``-vf`` path.
+    """
+    chain = _segment_chain(width, height, clip)
+    fades = _fade_filters(clip)
     if fades:
-        return f"{vf},{','.join(fades)}"
-    return vf
+        return f"{chain},{','.join(fades)}"
+    return chain
+
+
+def _source_frame_size(clip: StudioExportClip) -> tuple[int, int]:
+    path = clip.source_path
+    if path is None or not path.is_file():
+        return 0, 0
+    if clip.kind == "photo":
+        try:
+            from PIL import Image
+
+            with Image.open(path) as image:
+                return int(image.width), int(image.height)
+        except OSError:
+            return 0, 0
+    from orga_drone.studio_export import probe_video_dimensions
+
+    width, height = probe_video_dimensions(path)
+    return int(width or 0), int(height or 0)
+
+
+def _segment_filter_invocation(
+    clip: StudioExportClip,
+    width: int,
+    height: int,
+    work: Path,
+) -> tuple[list[str], list[str]]:
+    """Extra inputs and the filter flags for one segment.
+
+    No overlays: ``-vf`` only, identical to the pre-overlay command.
+    With overlays: PNG inputs plus ``-filter_complex`` mapped to ``[vout]``.
+    The caller still maps audio.
+    """
+    chain = _segment_chain(width, height, clip)
+    fades = _fade_filters(clip)
+    active = [
+        item
+        for item in clip.overlays
+        if float(item.end_s) - float(item.start_s) >= 0.1
+        and float(item.start_s) < float(clip.duration_s)
+    ]
+    if not active:
+        vf = f"{chain},{','.join(fades)}" if fades else chain
+        return [], ["-vf", vf]
+    from orga_drone.config import settings
+    from orga_drone.studio_overlay import (
+        MIN_SPAN_S,
+        OverlayAssetMissing,
+        OverlayFontMissing,
+        OverlayWindow,
+        content_rect,
+        ffmpeg_overlay_graph,
+        filter_time_origin,
+        overlay_box_pixels,
+        render_overlay_png,
+        resolve_overlay_asset,
+    )
+
+    origin = filter_time_origin(kind=clip.kind, source_start_s=clip.source_start_s)
+    source_w, source_h = _source_frame_size(clip)
+    fitted = content_rect(width, height, source_w, source_h)
+    extra: list[str] = []
+    windows: list[OverlayWindow] = []
+    for index, overlay in enumerate(active):
+        end = min(float(overlay.end_s), float(clip.duration_s))
+        if end - float(overlay.start_s) < MIN_SPAN_S:
+            continue
+        asset: Path | None = None
+        if overlay.kind == "image":
+            try:
+                asset = resolve_overlay_asset(settings.data_dir, overlay.asset_name)
+            except ValueError as exc:
+                raise StudioExportError(
+                    "An overlay image is missing. Remove it or choose the image again.",
+                    code="overlay_asset_missing",
+                ) from exc
+            if not asset.is_file():
+                raise StudioExportError(
+                    "An overlay image is missing. Remove it or choose the image again.",
+                    code="overlay_asset_missing",
+                )
+        png = work / f"overlay-{index}.png"
+        try:
+            render_overlay_png(
+                overlay,
+                frame_width=width,
+                frame_height=height,
+                source_width=source_w,
+                source_height=source_h,
+                asset_path=asset,
+                dest=png,
+            )
+        except OverlayAssetMissing as exc:
+            raise StudioExportError(
+                "An overlay image is missing. Remove it or choose the image again.",
+                code="overlay_asset_missing",
+            ) from exc
+        except OverlayFontMissing as exc:
+            raise StudioExportError(str(exc), code="overlay_font_missing") from exc
+        extra.extend(["-loop", "1", "-framerate", str(EXPORT_FPS), "-i", str(png)])
+        left, top, box_w, box_h = overlay_box_pixels(overlay, fitted)
+        origin_x, origin_y, content_w, content_h = fitted
+        windows.append(
+            OverlayWindow(
+                start_s=origin + float(overlay.start_s),
+                end_s=origin + end,
+                animation=overlay.animation,
+                animation_s=float(overlay.animation_s),
+                slide_from=overlay.slide_from,
+                frame_w=width,
+                frame_h=height,
+                px=left,
+                py=top,
+                pw=box_w,
+                ph=box_h,
+                ox=origin_x,
+                oy=origin_y,
+                cw=content_w,
+                ch=content_h,
+            )
+        )
+    if not windows:
+        vf = f"{chain},{','.join(fades)}" if fades else chain
+        return [], ["-vf", vf]
+    graph = ffmpeg_overlay_graph(
+        base_chain=chain,
+        fades=fades,
+        windows=windows,
+        first_input=1,
+    )
+    return extra, ["-filter_complex", graph, "-map", "[vout]"]
 
 
 def _has_crossfade(clips: tuple[StudioExportClip, ...]) -> bool:
@@ -480,13 +622,13 @@ class FfmpegStudioEncoder:
         if clip.source_path is None or not clip.source_path.is_file():
             name = clip.source_path.name if clip.source_path is not None else "clip"
             raise StudioExportError(f"Missing source file: {name}")
-        vf = _segment_vf_for_clip(width, height, clip)
         if clip.kind == "photo":
             self._render_photo(
                 ffmpeg,
                 clip,
                 out,
-                vf,
+                width,
+                height,
                 on_progress=on_progress,
                 clip_index=clip_index,
                 clip_total=clip_total,
@@ -496,7 +638,8 @@ class FfmpegStudioEncoder:
                 ffmpeg,
                 clip,
                 out,
-                vf,
+                width,
+                height,
                 on_progress=on_progress,
                 clip_index=clip_index,
                 clip_total=clip_total,
@@ -545,12 +688,12 @@ class FfmpegStudioEncoder:
             fade_in_s=clip.fade_in_s,
             fade_out_s=clip.fade_out_s,
         )
-        vf = _segment_vf_for_clip(width, height, photo_clip)
         self._render_photo(
             ffmpeg,
             photo_clip,
             out,
-            vf,
+            width,
+            height,
             on_progress=on_progress,
             clip_index=clip_index,
             clip_total=clip_total,
@@ -587,7 +730,8 @@ class FfmpegStudioEncoder:
         ffmpeg: str,
         clip: StudioExportClip,
         out: Path,
-        vf: str,
+        width: int,
+        height: int,
         *,
         on_progress: ProgressCallback | None,
         clip_index: int,
@@ -600,6 +744,9 @@ class FfmpegStudioEncoder:
             raise StudioExportError("Missing source file: clip")
         _materialize_photo_still(clip.source_path, still)
         dur = max(0.1, float(clip.duration_s))
+        extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
+        overlay_count = extra.count("-i")
+        audio_index = 1 + overlay_count
         cmd = [
             ffmpeg,
             "-y",
@@ -609,24 +756,30 @@ class FfmpegStudioEncoder:
             str(EXPORT_FPS),
             "-i",
             str(still),
+            *extra,
             "-f",
             "lavfi",
             "-i",
             "anullsrc=channel_layout=stereo:sample_rate=48000",
             "-t",
             f"{dur:.3f}",
-            "-vf",
-            vf,
-            *_x264_video_args(),
-            "-c:a",
-            "aac",
-            "-ac",
-            "2",
-            "-ar",
-            "48000",
-            "-shortest",
-            str(out),
+            *filters,
         ]
+        if overlay_count:
+            cmd.extend(["-map", f"{audio_index}:a:0"])
+        cmd.extend(
+            [
+                *_x264_video_args(),
+                "-c:a",
+                "aac",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "-shortest",
+                str(out),
+            ]
+        )
         _run_ffmpeg(
             cmd,
             on_time=self._progress_cb(
@@ -644,7 +797,8 @@ class FfmpegStudioEncoder:
         ffmpeg: str,
         clip: StudioExportClip,
         out: Path,
-        vf: str,
+        width: int,
+        height: int,
         *,
         on_progress: ProgressCallback | None,
         clip_index: int,
@@ -663,6 +817,8 @@ class FfmpegStudioEncoder:
             clip_total=clip_total,
             duration_s=dur,
         )
+        extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
+        overlay_count = extra.count("-i")
         # Prefer accurate cuts on HEVC/DJI: decode then seek (slower, correct).
         # Explicit maps: DJI files often carry an attached JPEG that must not win.
         cmd = [
@@ -670,12 +826,12 @@ class FfmpegStudioEncoder:
             "-y",
             "-i",
             str(clip.source_path),
+            *extra,
             "-ss",
             f"{start:.3f}",
             "-t",
             f"{dur:.3f}",
-            "-vf",
-            vf,
+            *filters,
             *_x264_video_args(),
             "-c:a",
             "aac",
@@ -683,33 +839,34 @@ class FfmpegStudioEncoder:
             "2",
             "-ar",
             "48000",
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a:0",
-            str(out),
         ]
+        if overlay_count == 0:
+            cmd.extend(["-map", "0:v:0", "-map", "0:a:0"])
+        else:
+            cmd.extend(["-map", "0:a:0"])
+        cmd.append(str(out))
         try:
             _run_ffmpeg(cmd, on_time=on_time, duration_s=dur)
         except StudioExportError:
             # Some clips have no audio track; add silence so concat stays uniform.
+            audio_index = 1 + overlay_count
             cmd_silent = [
                 ffmpeg,
                 "-y",
                 "-i",
                 str(clip.source_path),
+                *extra,
                 "-f",
                 "lavfi",
                 "-i",
                 "anullsrc=channel_layout=stereo:sample_rate=48000",
-                # Keep decode-then-seek semantics: after both inputs, -ss is an
+                # Keep decode-then-seek semantics: after the inputs, -ss is an
                 # output option and trims the video source rather than anullsrc.
                 "-ss",
                 f"{start:.3f}",
                 "-t",
                 f"{dur:.3f}",
-                "-vf",
-                vf,
+                *filters,
                 *_x264_video_args(),
                 "-c:a",
                 "aac",
@@ -718,12 +875,12 @@ class FfmpegStudioEncoder:
                 "-ar",
                 "48000",
                 "-shortest",
-                "-map",
-                "0:v:0",
-                "-map",
-                "1:a:0",
-                str(out),
             ]
+            if overlay_count == 0:
+                cmd_silent.extend(["-map", "0:v:0", "-map", "1:a:0"])
+            else:
+                cmd_silent.extend(["-map", f"{audio_index}:a:0"])
+            cmd_silent.append(str(out))
             _run_ffmpeg(cmd_silent, on_time=on_time, duration_s=dur)
 
     def _concat(self, ffmpeg: str, segments: list[Path], out: Path) -> None:

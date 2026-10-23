@@ -143,6 +143,7 @@ professional video-editing knowledge.
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
+| Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -239,7 +240,9 @@ See `README.md` for the detailed feature status table. In short:
   Crossfade) persist per outgoing clip
   and render in preview and MP4. Photo and video clips can store a basic image adjustment
   (brightness, contrast, saturation, warmth) on that Story clip; preview
-  approximates the exported picture and is not a color-managed grade. Media
+  approximates the exported picture and is not a color-managed grade. The same clips
+  can carry up to 8 timed text, shape, or image overlays, with Fade in, Fade out,
+  or Slide in. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
