@@ -39,7 +39,9 @@ class ExportResolutionOption:
 
 def height_to_width(height: int) -> int:
     """16:9 frame width for a given export height."""
-    return {720: 1280, 1080: 1920, 1440: 2560, 2160: 3840}.get(int(height), int(round(height * 16 / 9)))
+    return {720: 1280, 1080: 1920, 1440: 2560, 2160: 3840}.get(
+        int(height), int(round(height * 16 / 9))
+    )
 
 
 def classify_source_height(height: int | None) -> int | None:
@@ -130,8 +132,27 @@ def default_export_height(source_heights: list[int | None]) -> int | None:
 _UNSAFE_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 
 
-def suggested_export_filename(project_title: str) -> str:
-    """Safe ``.mp4`` basename derived from the Studio project title."""
+def export_resolution_filename_tag(height: int) -> str:
+    """Unambiguous filename tag for the selected output frame.
+
+    1080 and 2160 use the names people look for (``1080p``, ``4k``).
+    Every other height uses ``720p`` or the exact ``WIDTHxHEIGHT`` frame
+    so a 1440 export cannot be mistaken for 1080p or 4K.
+    """
+    h = int(height)
+    if h == 1080:
+        return "1080p"
+    if h == 2160:
+        return "4k"
+    if h == 720:
+        return "720p"
+    if h <= 0:
+        return ""
+    return f"{height_to_width(h)}x{h}"
+
+
+def suggested_export_filename(project_title: str, *, height: int | None = None) -> str:
+    """Safe ``.mp4`` basename from the project title and selected height."""
     raw = (project_title or "").strip() or "Your story"
     cleaned = _UNSAFE_FILENAME.sub(" ", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
@@ -149,6 +170,10 @@ def suggested_export_filename(project_title: str) -> str:
         cleaned = f"export-{cleaned}"
     if len(cleaned) > 120:
         cleaned = cleaned[:120].rstrip(" .")
+    if height is not None:
+        tag = export_resolution_filename_tag(height)
+        if tag:
+            cleaned = f"{cleaned}_{tag}"
     return f"{cleaned}.mp4"
 
 

@@ -12,13 +12,21 @@ from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig, StudioExportMusic
+from orga_drone.export.studio_config import (
+    StudioExportClip,
+    StudioExportConfig,
+    StudioExportMusic,
+)
 from orga_drone.export.studio_encoder import (
     FfmpegStudioEncoder,
     StudioExportError,
 )
 from orga_drone.ffmpeg_bin import find_ffmpeg
-from orga_drone.studio_export import prepare_studio_export, probe_video_dimensions, run_studio_export
+from orga_drone.studio_export import (
+    prepare_studio_export,
+    probe_video_dimensions,
+    run_studio_export,
+)
 
 
 _FFMPEG_I_STDERR = """
@@ -36,9 +44,7 @@ def test_probe_video_dimensions_ffmpeg_fallback_skips_attached_pic(
     media.write_bytes(b"fake")
 
     monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: None)
-    monkeypatch.setattr(
-        "orga_drone.ffmpeg_bin.find_ffmpeg", lambda: "ffmpeg-fake"
-    )
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffmpeg", lambda: "ffmpeg-fake")
 
     def fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
         assert cmd[0] == "ffmpeg-fake"
@@ -179,7 +185,9 @@ def test_http_export_options_and_fake_export(
     assert item is not None
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
@@ -192,9 +200,14 @@ def test_http_export_options_and_fake_export(
     assert opts.status_code == 200
     body = opts.json()
     assert body["ok"] is True
-    assert body["suggested_filename"] == "Alps Cut.mp4"
+    assert body["suggested_filename"] == "Alps Cut_1080p.mp4"
     assert body["default_height"] == 1080
     assert [o["height"] for o in body["options"]] == [720, 1080, 1440, 2160]
+    names = {o["height"]: o["suggested_filename"] for o in body["options"]}
+    assert names[720] == "Alps Cut_720p.mp4"
+    assert names[1080] == "Alps Cut_1080p.mp4"
+    assert names[1440] == "Alps Cut_2560x1440.mp4"
+    assert names[2160] == "Alps Cut_4k.mp4"
     assert any(o["recommended"] for o in body["options"] if o["height"] == 1080)
 
     out = tmp_path / "Videos" / "Alps Cut.mp4"
@@ -253,7 +266,9 @@ def test_run_studio_export_refuses_missing_overwrite(
     assert item is not None
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
@@ -363,9 +378,7 @@ def test_encoder_silent_video_fallback_preserves_source_start(
         text=True,
     )
     assert "Audio: aac" in probed.stderr
-    duration_match = re.search(
-        r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", probed.stderr
-    )
+    duration_match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", probed.stderr)
     assert duration_match is not None
     hours, minutes, seconds = duration_match.groups()
     duration_s = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
@@ -511,7 +524,9 @@ def test_export_options_photo_only_unlock_generated_resolutions(
     assert item is not None
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
@@ -688,7 +703,9 @@ def test_prepare_export_without_music_skips_mix(
     assert item is not None
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
@@ -712,7 +729,9 @@ def test_prepare_export_missing_music_fails(
     assert item is not None
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
@@ -744,7 +763,9 @@ def test_fake_encoder_receives_music_config(
     source_bytes = Path(item.path).read_bytes()
     db.add_studio_item(
         item.path,
-        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        identity_key=make_identity_key(
+            item.filename, item.size_bytes, item.recorded_at
+        ),
         filename=item.filename,
         recorded_at=item.recorded_at,
         kind=item.kind,
