@@ -2656,6 +2656,80 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_overlays(
+        self,
+        studio_item_id: int,
+        payload: object,
+    ) -> tuple[StudioClip, bool]:
+        """Replace per-clip overlays. Raises ``ValueError`` on bad input.
+
+        Photos and videos accept overlays. Times are clamped to the clip's
+        visible duration. The returned flag is true when a value was clamped.
+        """
+        from orga_drone.studio_estimate import effective_kind, effective_seconds
+        from orga_drone.studio_overlay import dump_overlays, parse_overlays
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings, s.photo_duration_s, s.source_start,
+                          s.source_end, s.card_duration_s,
+                          m.kind AS live_kind, m.id AS media_id, m.duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("overlays only apply to photos and videos")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind not in {"photo", "video"}:
+                raise ValueError("overlays only apply to photos and videos")
+            duration = effective_seconds(
+                kind=kind,
+                photo_duration_s=(
+                    float(row["photo_duration_s"])
+                    if row["photo_duration_s"] is not None
+                    else None
+                ),
+                duration_s=float(row["duration_s"]) if row["duration_s"] is not None else None,
+                available=available,
+                source_in_s=(
+                    float(row["source_start"]) if row["source_start"] is not None else None
+                ),
+                source_out_s=float(row["source_end"]) if row["source_end"] is not None else None,
+                card_duration_s=(
+                    float(row["card_duration_s"])
+                    if row["card_duration_s"] is not None
+                    else None
+                ),
+            )
+            if duration is None or duration <= 0:
+                raise ValueError("clip is too short for an overlay")
+            overlays, clamped = parse_overlays(payload, duration_s=float(duration))
+            blob = dump_overlays(str(row["effect_settings"] or ""), overlays)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id], clamped
+
     def set_studio_transition(
         self,
         studio_item_id: int,

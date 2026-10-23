@@ -1377,6 +1377,75 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-preview-fade-black[hidden] {
   display: none !important;
 }
+.studio-preview-annotations {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+.studio-preview-annotations.is-layer-b {
+  z-index: 2;
+}
+.studio-preview-annotations[hidden] {
+  display: none !important;
+}
+.studio-annotation {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  line-height: 1.15;
+  text-align: center;
+  user-select: none;
+  cursor: move;
+}
+.studio-annotation.is-selected {
+  outline: 2px solid #ff9f0a;
+  outline-offset: 1px;
+}
+.studio-annotation svg,
+.studio-annotation img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.studio-annotation img {
+  object-fit: contain;
+}
+.studio-annotation.is-missing {
+  border: 1px dashed #ff9f0a;
+  font-size: 0.75rem;
+  padding: 0.2rem;
+}
+.studio-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.studio-overlay-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.studio-overlay-list button {
+  width: 100%;
+  text-align: left;
+}
+video.studio-preview-media,
+img.studio-preview-media,
+.studio-preview-titlecard {
+  z-index: 3;
+}
 .studio-preview-titlecard[data-bg="dark"] {
   background: #0a0c0e;
   color: #f2f4f6;

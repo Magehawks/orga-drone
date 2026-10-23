@@ -180,6 +180,8 @@
   const previewTitlecardBTitle = document.getElementById("studio-preview-titlecard-b-title");
   const previewTitlecardBSubtitle = document.getElementById("studio-preview-titlecard-b-subtitle");
   const previewFadeBlack = document.getElementById("studio-preview-fade-black");
+  const previewAnnotations = document.getElementById("studio-preview-annotations");
+  const previewAnnotationsB = document.getElementById("studio-preview-annotations-b");
   const musicAudio = document.getElementById("studio-music-audio");
   const musicAudioNext = document.getElementById("studio-music-audio-next");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
@@ -254,6 +256,11 @@
   const labelInStory = root.dataset.inStory || "In story";
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
+  const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
+  const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
+  const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
+  const msgOverlayLimit = root.dataset.overlayLimit || "This clip already has 8 overlays.";
+  const overlayModel = readOverlayModel();
   const imageAdjustModel = readImageAdjustModel();
 
   const STORAGE_KEY = "orga-drone-studio-ui-v1";
@@ -275,6 +282,8 @@
     timelineMode: "fit",
     zoomIndex: 1,
   };
+  let selectedOverlayId = null;
+  let overlaySaveChain = Promise.resolve();
 
   let dragCard = null;
   let dragOrderBefore = null;
@@ -1092,6 +1101,7 @@
     clearVideoElement();
     hideTitlecard();
     hideOverlayLayers();
+    hideAnnotations();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
     applyPreviewGrades(null);
   }
@@ -1295,6 +1305,7 @@
       previewFadeBlack.style.opacity = "0";
     }
     applyPreviewGrades(hit);
+    syncAnnotations(hit);
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -2154,6 +2165,10 @@
       const imageWrap = document.getElementById("inspector-image-adjust");
       if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
       if (isPhoto || isVideo) fillImageAdjust(clip);
+      const overlayWrap = document.getElementById("inspector-overlays");
+      if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
+      if (isPhoto || isVideo) fillOverlayInspector(clip);
+      else selectedOverlayId = null;
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -3535,6 +3550,520 @@
     setSaveState(false);
     queueImageAdjustSave(clip);
   });
+
+  function readOverlayModel() {
+    try {
+      const parsed = JSON.parse(root.dataset.overlayModel || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function readOverlays(clip) {
+    if (!clip) return [];
+    try {
+      const parsed = JSON.parse(clip.dataset.overlays || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeOverlays(clip, overlays) {
+    clip.dataset.overlays = JSON.stringify(overlays);
+  }
+
+  function overlayActive(overlay, localS, duration) {
+    const start = Number(overlay.start_s);
+    const end = Math.min(Number(overlay.end_s), Number(duration) || 0);
+    return start <= localS && localS <= end && end - start >= 0.05;
+  }
+
+  function hideAnnotations() {
+    [previewAnnotations, previewAnnotationsB].forEach((layer) => {
+      if (!layer) return;
+      layer.hidden = true;
+      layer.replaceChildren();
+      layer.style.opacity = "";
+    });
+  }
+
+  function contentBoxFor(mediaEl) {
+    const frameW = previewFrame ? previewFrame.clientWidth : 0;
+    const frameH = previewFrame ? previewFrame.clientHeight : 0;
+    const sourceW = mediaEl ? mediaEl.videoWidth || mediaEl.naturalWidth || 0 : 0;
+    const sourceH = mediaEl ? mediaEl.videoHeight || mediaEl.naturalHeight || 0 : 0;
+    if (!frameW || !frameH || !sourceW || !sourceH) {
+      return { left: 0, top: 0, width: frameW, height: frameH };
+    }
+    const scale = Math.min(frameW / sourceW, frameH / sourceH);
+    const width = sourceW * scale;
+    const height = sourceH * scale;
+    return {
+      left: (frameW - width) / 2,
+      top: (frameH - height) / 2,
+      width,
+      height,
+    };
+  }
+
+  function mediaForAnnotation(clip, layerB) {
+    if (!clip) return null;
+    if (clip.dataset.kind === "photo") return layerB ? previewImageB : previewImage;
+    if (clip.dataset.kind === "video") return layerB ? previewVideoB : previewVideo;
+    return null;
+  }
+
+  function safeColor(value, fallback) {
+    const text = String(value || "");
+    return /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(text) ? text : fallback;
+  }
+
+  function annotationSvg(overlay) {
+    const stroke = safeColor(overlay.stroke, "#ffffff");
+    const fill = safeColor(overlay.fill, "none");
+    if (overlay.kind === "arrow") {
+      return (
+        '<svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">' +
+        '<line x1="2" y1="20" x2="72" y2="20" stroke="' + stroke + '" stroke-width="6" stroke-linecap="round"></line>' +
+        '<polygon points="68,6 98,20 68,34" fill="' + stroke + '"></polygon></svg>'
+      );
+    }
+    if (overlay.kind === "circle") {
+      return (
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        '<ellipse cx="50" cy="50" rx="46" ry="46" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4"></ellipse></svg>'
+      );
+    }
+    if (overlay.kind === "rectangle") {
+      return (
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        '<rect x="3" y="3" width="94" height="94" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4"></rect></svg>'
+      );
+    }
+    return "";
+  }
+
+  function animationSpan(overlay) {
+    const start = Number(overlay.start_s) || 0;
+    const end = Number(overlay.end_s) || 0;
+    const limit = Math.max(0.1, end - start);
+    const requested = Number(overlay.animation_s);
+    const duration = Number.isFinite(requested) ? requested : 0.4;
+    return Math.min(limit, Math.max(0.1, duration));
+  }
+
+  function animationOpacity(overlay, localS) {
+    const kind = overlay.animation || "none";
+    if (kind !== "fade_in" && kind !== "fade_out") return 1;
+    const start = Number(overlay.start_s) || 0;
+    const end = Number(overlay.end_s) || 0;
+    const duration = animationSpan(overlay);
+    if (kind === "fade_in") return Math.max(0, Math.min(1, (localS - start) / duration));
+    const outStart = end - duration;
+    if (localS <= outStart) return 1;
+    return Math.max(0, Math.min(1, 1 - (localS - outStart) / duration));
+  }
+
+  function animationTransform(overlay, localS, layer) {
+    const rotation = "rotate(" + Number(overlay.rotation || 0) + "deg)";
+    if ((overlay.animation || "none") !== "slide_in") return rotation;
+    const start = Number(overlay.start_s) || 0;
+    const duration = animationSpan(overlay);
+    const remain = 1 - Math.max(0, Math.min(1, (localS - start) / duration));
+    const from = overlay.slide_from || "left";
+    let shift = "";
+    if (from === "right") {
+      shift = "translateX(calc(" + remain + " * (100% + " + (1 - overlay.x - overlay.w) * 100 + "%)))";
+    } else if (from === "up") {
+      shift = "translateY(calc(" + -remain + " * (100% + " + overlay.y * 100 + "%)))";
+    } else if (from === "down") {
+      shift = "translateY(calc(" + remain + " * (100% + " + (1 - overlay.y - overlay.h) * 100 + "%)))";
+    } else {
+      shift = "translateX(calc(" + -remain + " * (100% + " + overlay.x * 100 + "%)))";
+    }
+    return shift + " " + rotation;
+  }
+
+  function buildAnnotation(overlay, layer, interactive, localS) {
+    const el = document.createElement("div");
+    el.className = "studio-annotation";
+    if (interactive && selectedOverlayId === overlay.id) el.classList.add("is-selected");
+    el.dataset.overlayId = overlay.id;
+    el.style.left = Number(overlay.x) * 100 + "%";
+    el.style.top = Number(overlay.y) * 100 + "%";
+    el.style.width = Number(overlay.w) * 100 + "%";
+    el.style.height = Number(overlay.h) * 100 + "%";
+    el.style.transform = animationTransform(overlay, localS, layer);
+    el.style.opacity = String(animationOpacity(overlay, localS));
+    if (overlay.kind === "text") {
+      el.textContent = overlay.text || "";
+      el.style.color = safeColor(overlay.color, "#ffffff").slice(0, 7);
+      const px = Math.max(8, Number(overlay.font_size || 0.06) * layer.clientHeight);
+      el.style.fontSize = px + "px";
+      if (overlay.fill && !String(overlay.fill).endsWith("00")) {
+        el.style.background = overlay.fill;
+      }
+    } else if (overlay.kind === "image") {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = "/studio/overlay-assets/" + encodeURIComponent(overlay.asset_name || "");
+      img.addEventListener("error", () => {
+        el.classList.add("is-missing");
+        el.textContent = msgOverlayMissing;
+      });
+      el.appendChild(img);
+    } else {
+      el.innerHTML = annotationSvg(overlay);
+    }
+    if (interactive) {
+      el.addEventListener("pointerdown", (event) => startAnnotationDrag(event, overlay.id));
+    }
+    return el;
+  }
+
+  function renderAnnotationLayer(layer, clip, localS, interactive) {
+    if (!layer) return;
+    layer.replaceChildren();
+    if (!clip || (clip.dataset.kind !== "photo" && clip.dataset.kind !== "video")) {
+      layer.hidden = true;
+      return;
+    }
+    const duration = clipDuration(clip);
+    const visible = readOverlays(clip).filter((overlay) => overlayActive(overlay, localS, duration));
+    if (!visible.length) {
+      layer.hidden = true;
+      return;
+    }
+    const media = mediaForAnnotation(clip, layer === previewAnnotationsB);
+    const box = contentBoxFor(media);
+    layer.hidden = false;
+    layer.style.left = box.left + "px";
+    layer.style.top = box.top + "px";
+    layer.style.width = Math.max(1, box.width) + "px";
+    layer.style.height = Math.max(1, box.height) + "px";
+    visible.forEach((overlay) => layer.appendChild(buildAnnotation(overlay, layer, interactive, localS)));
+  }
+
+  function syncAnnotations(hit) {
+    if (!hit || !hit.clip) {
+      hideAnnotations();
+      return;
+    }
+    const overlap = hit.overlapClip && hit.crossfadeProgress != null;
+    renderAnnotationLayer(previewAnnotations, hit.clip, hit.localS || 0, true);
+    if (previewAnnotations) {
+      previewAnnotations.style.opacity = overlap ? String(hit.crossfadeProgress) : "";
+    }
+    if (overlap) {
+      renderAnnotationLayer(previewAnnotationsB, hit.overlapClip, hit.overlapLocalS || 0, false);
+    } else if (previewAnnotationsB) {
+      previewAnnotationsB.hidden = true;
+      previewAnnotationsB.replaceChildren();
+    }
+  }
+
+  function selectedOverlayClip() {
+    if (!state.selected || state.selected.type !== "clip") return null;
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.selected.id));
+    if (!clip || (clip.dataset.kind !== "photo" && clip.dataset.kind !== "video")) return null;
+    return clip;
+  }
+
+  function overlayLabel(overlay) {
+    if (overlay.kind === "text" && overlay.text) return overlay.text;
+    const button = document.getElementById("overlay-add-" + overlay.kind);
+    if (button && button.textContent.trim()) return button.textContent.trim();
+    return overlay.kind;
+  }
+
+  function fillOverlayInspector(clip) {
+    const list = document.getElementById("inspector-overlay-list");
+    const editor = document.getElementById("inspector-overlay-editor");
+    if (!list || !editor) return;
+    const overlays = readOverlays(clip);
+    if (!overlays.some((overlay) => overlay.id === selectedOverlayId)) {
+      selectedOverlayId = overlays.length ? overlays[overlays.length - 1].id : null;
+    }
+    list.replaceChildren();
+    overlays.forEach((overlay) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button ghost";
+      button.textContent = overlayLabel(overlay);
+      if (overlay.id === selectedOverlayId) button.classList.add("is-selected");
+      button.addEventListener("click", () => {
+        selectedOverlayId = overlay.id;
+        fillOverlayInspector(clip);
+        syncAnnotations(resolveAt(state.projectTimeS));
+      });
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+    const current = overlays.find((overlay) => overlay.id === selectedOverlayId);
+    editor.hidden = !current;
+    if (!current) return;
+    const kind = current.kind;
+    editor.querySelectorAll("[data-overlay-field]").forEach((field) => {
+      const key = field.getAttribute("data-overlay-field");
+      const show =
+        (key === "text" && kind === "text") ||
+        (key === "font" && kind === "text") ||
+        (key === "color" && kind === "text") ||
+        (key === "stroke" && kind !== "text" && kind !== "image") ||
+        (key === "fill" && (kind === "circle" || kind === "rectangle")) ||
+        (key === "slide" && (current.animation || "none") === "slide_in");
+      field.hidden = !show;
+    });
+    setNumber("overlay-start", current.start_s);
+    setNumber("overlay-end", current.end_s);
+    setNumber("overlay-x", Math.round(current.x * 100));
+    setNumber("overlay-y", Math.round(current.y * 100));
+    setNumber("overlay-w", Math.round(current.w * 100));
+    setNumber("overlay-h", Math.round(current.h * 100));
+    setNumber("overlay-rotation", current.rotation || 0);
+    setNumber("overlay-font", Math.round(Number(current.font_size || 0.06) * 100));
+    const text = document.getElementById("overlay-text");
+    if (text && document.activeElement !== text) text.value = current.text || "";
+    setColor("overlay-color", current.color);
+    setColor("overlay-stroke", current.stroke);
+    setColor("overlay-fill", current.fill);
+    const animation = document.getElementById("overlay-animation");
+    if (animation && document.activeElement !== animation) animation.value = current.animation || "none";
+    setNumber("overlay-animation-s", current.animation_s == null ? 0.4 : current.animation_s);
+    const slide = document.getElementById("overlay-slide-from");
+    if (slide && document.activeElement !== slide) slide.value = current.slide_from || "left";
+  }
+
+  function setNumber(id, value) {
+    const input = document.getElementById(id);
+    if (!input || document.activeElement === input) return;
+    input.value = String(value);
+  }
+
+  function setColor(id, value) {
+    const input = document.getElementById(id);
+    if (!input || document.activeElement === input) return;
+    const hex = String(value || "#ffffff");
+    input.value = hex.slice(0, 7);
+  }
+
+  function editorOverlayPatch(overlay) {
+    const next = Object.assign({}, overlay);
+    const duration = clipDuration(selectedOverlayClip() || { dataset: {} });
+    next.start_s = numberOr(document.getElementById("overlay-start"), next.start_s);
+    next.end_s = numberOr(document.getElementById("overlay-end"), next.end_s);
+    next.x = numberOr(document.getElementById("overlay-x"), next.x * 100) / 100;
+    next.y = numberOr(document.getElementById("overlay-y"), next.y * 100) / 100;
+    next.w = numberOr(document.getElementById("overlay-w"), next.w * 100) / 100;
+    next.h = numberOr(document.getElementById("overlay-h"), next.h * 100) / 100;
+    next.rotation = numberOr(document.getElementById("overlay-rotation"), next.rotation || 0);
+    next.font_size = numberOr(document.getElementById("overlay-font"), (next.font_size || 0.06) * 100) / 100;
+    const text = document.getElementById("overlay-text");
+    if (text && next.kind === "text") next.text = text.value;
+    const color = document.getElementById("overlay-color");
+    if (color && next.kind === "text") next.color = color.value;
+    const stroke = document.getElementById("overlay-stroke");
+    if (stroke && next.kind !== "text" && next.kind !== "image") next.stroke = stroke.value;
+    const fill = document.getElementById("overlay-fill");
+    if (fill && (next.kind === "circle" || next.kind === "rectangle")) next.fill = fill.value + "66";
+    const animation = document.getElementById("overlay-animation");
+    if (animation) next.animation = animation.value || "none";
+    next.animation_s = numberOr(document.getElementById("overlay-animation-s"), next.animation_s || 0.4);
+    const slide = document.getElementById("overlay-slide-from");
+    if (slide) next.slide_from = slide.value || "left";
+    if (duration > 0 && next.end_s > duration) next.end_s = duration;
+    return next;
+  }
+
+  function numberOr(input, fallback) {
+    if (!input) return Number(fallback) || 0;
+    const value = Number(input.value);
+    return Number.isFinite(value) ? value : Number(fallback) || 0;
+  }
+
+  function replaceSelectedOverlay(mutator, { save = true } = {}) {
+    const clip = selectedOverlayClip();
+    if (!clip || !selectedOverlayId) return;
+    const overlays = readOverlays(clip).map((overlay) =>
+      overlay.id === selectedOverlayId ? mutator(overlay) : overlay
+    );
+    writeOverlays(clip, overlays);
+    if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+    syncAnnotations(resolveAt(state.projectTimeS));
+    if (save) queueOverlaySave(clip);
+  }
+
+  async function saveOverlays(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const res = await fetch("/api/studio/" + studioId + "/overlays", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ overlays: readOverlays(clip) }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgOverlayFailed);
+    }
+    writeOverlays(clip, body.overlays || []);
+    if (body.clamped) showRootFlash(msgOverlayClamped);
+    if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+    syncAnnotations(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
+  function queueOverlaySave(clip) {
+    const studioId = clip.dataset.studioId;
+    setSaveState(false);
+    overlaySaveChain = overlaySaveChain
+      .then(() => saveOverlays(studioId))
+      .catch((err) => {
+        showRootFlash((err && err.message) || msgOverlayFailed);
+      });
+  }
+
+  function addOverlay(kind, assetName) {
+    const clip = selectedOverlayClip();
+    if (!clip) return;
+    const maxCount = Number(overlayModel.max_overlays || 8);
+    const existing = readOverlays(clip);
+    if (existing.length >= maxCount) {
+      showRootFlash(msgOverlayLimit);
+      return;
+    }
+    const duration = Math.max(0.1, clipDuration(clip));
+    const shift = (existing.length % 4) * 0.06;
+    const overlay = {
+      id: "ov" + Math.random().toString(16).slice(2, 12),
+      kind,
+      start_s: 0,
+      end_s: Math.max(0.1, Math.min(duration, 3)),
+      x: Math.min(0.72, 0.08 + shift),
+      y: Math.min(0.72, 0.08 + shift),
+      w: kind === "text" ? 0.46 : kind === "arrow" ? 0.3 : 0.24,
+      h: kind === "text" ? 0.16 : kind === "arrow" ? 0.12 : 0.24,
+      rotation: 0,
+      text: kind === "text" ? "Text" : "",
+      font_size: 0.06,
+      color: "#ffffff",
+      fill: kind === "circle" || kind === "rectangle" ? "#00000066" : "#00000000",
+      stroke: "#ffffff",
+      stroke_width: 0.012,
+      asset_name: assetName || "",
+      animation: "none",
+      animation_s: 0.4,
+      slide_from: "left",
+    };
+    selectedOverlayId = overlay.id;
+    writeOverlays(clip, existing.concat([overlay]));
+    fillOverlayInspector(clip);
+    syncAnnotations(resolveAt(state.projectTimeS));
+    queueOverlaySave(clip);
+  }
+
+  function startAnnotationDrag(event, overlayId) {
+    if (event.button != null && event.button !== 0) return;
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.activeStudioId));
+    if (!clip) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectedOverlayId = overlayId;
+    if (!state.selected || String(state.selected.id) !== String(clip.dataset.studioId)) {
+      selectClip(clip.dataset.studioId, { movePlayhead: false });
+    } else {
+      fillOverlayInspector(clip);
+    }
+    const layer = previewAnnotations;
+    if (!layer) return;
+    const origin = readOverlays(clip).find((item) => item.id === overlayId);
+    if (!origin) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const width = layer.clientWidth || 1;
+    const height = layer.clientHeight || 1;
+    function move(ev) {
+      const dx = (ev.clientX - startX) / width;
+      const dy = (ev.clientY - startY) / height;
+      const maxX = Math.max(0, 1 - Number(origin.w));
+      const maxY = Math.max(0, 1 - Number(origin.h));
+      const next = Object.assign({}, origin, {
+        x: Math.min(maxX, Math.max(0, Number(origin.x) + dx)),
+        y: Math.min(maxY, Math.max(0, Number(origin.y) + dy)),
+      });
+      writeOverlays(
+        clip,
+        readOverlays(clip).map((item) => (item.id === overlayId ? next : item))
+      );
+      syncAnnotations(resolveAt(state.projectTimeS));
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      fillOverlayInspector(clip);
+      queueOverlaySave(clip);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  ["overlay-add-text", "overlay-add-arrow", "overlay-add-circle", "overlay-add-rectangle"].forEach(
+    (id) => {
+      const button = document.getElementById(id);
+      if (!button) return;
+      const kind = id.replace("overlay-add-", "");
+      button.addEventListener("click", () => addOverlay(kind, ""));
+    }
+  );
+  const overlayImageButton = document.getElementById("overlay-add-image");
+  const overlayImageFile = document.getElementById("overlay-image-file");
+  if (overlayImageButton && overlayImageFile) {
+    overlayImageButton.addEventListener("click", () => overlayImageFile.click());
+    overlayImageFile.addEventListener("change", async () => {
+      const file = overlayImageFile.files && overlayImageFile.files[0];
+      overlayImageFile.value = "";
+      if (!file) return;
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch("/api/studio/overlay-assets", { method: "POST", body });
+        const payload = await readJson(res);
+        if (!res.ok || !payload || !payload.asset_name) {
+          throw new Error((payload && payload.detail) || msgOverlayFailed);
+        }
+        addOverlay("image", payload.asset_name);
+      } catch (err) {
+        showRootFlash((err && err.message) || msgOverlayFailed);
+      }
+    });
+  }
+  ["overlay-text", "overlay-start", "overlay-end", "overlay-x", "overlay-y", "overlay-w", "overlay-h", "overlay-rotation", "overlay-font", "overlay-color", "overlay-stroke", "overlay-fill", "overlay-animation", "overlay-animation-s", "overlay-slide-from"].forEach(
+    (id) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.addEventListener("change", () => {
+        replaceSelectedOverlay((overlay) => editorOverlayPatch(overlay));
+      });
+    }
+  );
+  document.getElementById("overlay-remove")?.addEventListener("click", () => {
+    const clip = selectedOverlayClip();
+    if (!clip || !selectedOverlayId) return;
+    const overlays = readOverlays(clip).filter((overlay) => overlay.id !== selectedOverlayId);
+    selectedOverlayId = overlays.length ? overlays[overlays.length - 1].id : null;
+    writeOverlays(clip, overlays);
+    fillOverlayInspector(clip);
+    syncAnnotations(resolveAt(state.projectTimeS));
+    queueOverlaySave(clip);
+  });
+  if (previewImage) {
+    previewImage.addEventListener("load", () => syncAnnotations(resolveAt(state.projectTimeS)));
+  }
+  if (previewVideo) {
+    previewVideo.addEventListener("loadedmetadata", () => syncAnnotations(resolveAt(state.projectTimeS)));
+  }
 
   ["inspector-music-volume", "inspector-music-fade-in", "inspector-music-fade-out"].forEach(
     (id) => {

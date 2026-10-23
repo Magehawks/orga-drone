@@ -41,3 +41,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0013](0013-itch-windows-channel.md) | itch.io Windows channel via butler | Accepted |
 | [0014](0014-studio-export-cancel.md) | Studio export cancellation | Accepted |
 | [0015](0015-update-notice.md) | Optional published-release notice | Accepted |
+| [0016](0016-studio-overlays.md) | Studio timed overlays | Accepted |

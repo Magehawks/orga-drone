@@ -49,7 +49,8 @@ People fly drones for experiences, not for managing files. Footage piles up acro
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
   Crossfade between Story items; basic per-clip image adjustment for photos and videos
-  (brightness, contrast, saturation, warmth); local MP4 export with
+  (brightness, contrast, saturation, warmth); timed text, shape, and image overlays
+  with Fade in, Fade out, and Slide in; local MP4 export with
   configurable resolution (desktop), including photo-only stories at 720/1080; after a successful export, Open video /
   Show in folder on Windows; optional sequential soundtrack playlist (up to 8
   local songs) in preview and MP4 export
@@ -92,6 +93,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
 | Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
+| Studio overlays | Available | Up to 8 text, arrow, circle, rectangle, or PNG/JPG overlays per photo or video clip; clip-relative timing; Fade in, Fade out, or Slide in; preview approximates export |
 | Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
 | Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
