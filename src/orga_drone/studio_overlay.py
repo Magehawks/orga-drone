@@ -511,12 +511,15 @@ def ffmpeg_overlay_graph(
     fades: list[str],
     windows: Sequence[OverlayWindow | tuple[float, float]],
     first_input: int,
+    source_label: str | None = None,
 ) -> str:
     """Composite full-frame PNGs onto the scaled segment, then run fades.
 
     ``windows`` are filter-clock seconds. Fade in/out uses the overlay input's
     clock, which starts with the main input because ``-ss`` is an output option.
     Slide in moves the finished PNG. The graph contains only formatted numbers.
+    ``source_label`` continues a graph that already scaled the frame, such as
+    privacy masks. The default still starts from ``[0:v]``.
     """
     parsed = [_window(item) for item in windows]
     if not parsed:
@@ -526,8 +529,12 @@ def ffmpeg_overlay_graph(
         for item in parsed
     ):
         raise ValueError("overlay timing is invalid")
-    parts = [f"[0:v]{base_chain}[base]"]
-    prev = "base"
+    if source_label:
+        parts = []
+        prev = source_label
+    else:
+        parts = [f"[0:v]{base_chain}[base]"]
+        prev = "base"
     for index, window in enumerate(parsed):
         src = first_input + index
         prep = f"[{src}:v]format=rgba"

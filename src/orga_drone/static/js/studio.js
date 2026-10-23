@@ -182,6 +182,9 @@
   const previewFadeBlack = document.getElementById("studio-preview-fade-black");
   const previewAnnotations = document.getElementById("studio-preview-annotations");
   const previewAnnotationsB = document.getElementById("studio-preview-annotations-b");
+  const previewMasks = document.getElementById("studio-preview-masks");
+  const previewMasksB = document.getElementById("studio-preview-masks-b");
+  const previewMaskHandles = document.getElementById("studio-preview-mask-handles");
   const musicAudio = document.getElementById("studio-music-audio");
   const musicAudioNext = document.getElementById("studio-music-audio-next");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
@@ -261,7 +264,12 @@
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
   const msgOverlayLimit = root.dataset.overlayLimit || "This clip already has 8 overlays.";
   const overlayModel = readOverlayModel();
+  const msgMaskFailed = root.dataset.maskFailed || "Could not save privacy masks.";
+  const msgMaskLimit = root.dataset.maskLimit || "A clip can have up to 8 privacy masks.";
+  const labelMaskBlur = root.dataset.maskBlur || "Blur";
+  const labelMaskPixelate = root.dataset.maskPixelate || "Pixelate";
   const imageAdjustModel = readImageAdjustModel();
+  const maskModel = readMaskModel();
 
   const STORAGE_KEY = "orga-drone-studio-ui-v1";
 
@@ -1096,12 +1104,464 @@
     setSaveState(true);
   }
 
+  let selectedMaskId = null;
+  let maskDragging = false;
+  const maskScratch = document.createElement("canvas");
+
+  function readMaskModel() {
+    const fallback = {
+      maxMasks: 8,
+      minBox: 0.04,
+      strengthMin: 1,
+      strengthMax: 100,
+      defaultStrength: 50,
+      blurFraction: 0.05,
+      pixelFraction: 0.06,
+    };
+    try {
+      const parsed = JSON.parse(root.dataset.maskModel || "");
+      return Object.assign(fallback, parsed);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function clampMaskStrength(value) {
+    const number = Number(value);
+    const min = Number(maskModel.strengthMin) || 1;
+    const max = Number(maskModel.strengthMax) || 100;
+    if (!Number.isFinite(number)) return Number(maskModel.defaultStrength) || 50;
+    return Math.max(min, Math.min(max, Math.round(number)));
+  }
+
+  function clampMaskBox(mask) {
+    const minBox = Number(maskModel.minBox) || 0.04;
+    const width = Math.min(1, Math.max(minBox, Number(mask.w) || minBox));
+    const height = Math.min(1, Math.max(minBox, Number(mask.h) || minBox));
+    return {
+      id: String(mask.id || ""),
+      effect: mask.effect === "pixelate" ? "pixelate" : "blur",
+      strength: clampMaskStrength(mask.strength),
+      x: Math.min(1 - width, Math.max(0, Number(mask.x) || 0)),
+      y: Math.min(1 - height, Math.max(0, Number(mask.y) || 0)),
+      w: width,
+      h: height,
+    };
+  }
+
+  function readMasks(clip) {
+    if (!clip) return [];
+    try {
+      const parsed = JSON.parse(clip.dataset.masks || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((item) => clampMaskBox(item));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeMasks(clip, masks) {
+    clip.dataset.masks = JSON.stringify(masks.map((item) => clampMaskBox(item)));
+  }
+
+  function maskEffectLabel(effect) {
+    return effect === "pixelate" ? labelMaskPixelate : labelMaskBlur;
+  }
+
+  function newMaskId() {
+    const bytes = new Uint8Array(5);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+    else bytes.forEach((_, index) => { bytes[index] = Math.floor(Math.random() * 256); });
+    const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+    return `m${hex}`;
+  }
+
+  function mediaContentBox(media) {
+    if (!media || media.hidden) return null;
+    const frame = media.parentElement;
+    if (!frame) return null;
+    const frameRect = frame.getBoundingClientRect();
+    const mediaRect = media.getBoundingClientRect();
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    if (!srcW || !srcH || mediaRect.width < 2 || mediaRect.height < 2) return null;
+    const scale = Math.min(mediaRect.width / srcW, mediaRect.height / srcH);
+    const width = srcW * scale;
+    const height = srcH * scale;
+    return {
+      left: mediaRect.left - frameRect.left + (mediaRect.width - width) / 2,
+      top: mediaRect.top - frameRect.top + (mediaRect.height - height) / 2,
+      width,
+      height,
+    };
+  }
+
+  function effectAmount(strength, contentW, contentH, fraction) {
+    const span = Math.min(contentW, contentH);
+    const amount = (clampMaskStrength(strength) / 100) * span * Number(fraction || 0);
+    return Math.max(1, amount);
+  }
+
+  function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
+    const dx = mask.x * box.width;
+    const dy = mask.y * box.height;
+    const dw = Math.max(1, mask.w * box.width);
+    const dh = Math.max(1, mask.h * box.height);
+    const sx = mask.x * srcW;
+    const sy = mask.y * srcH;
+    const sw = Math.max(1, mask.w * srcW);
+    const sh = Math.max(1, mask.h * srcH);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(dx, dy, dw, dh);
+    ctx.clip();
+    try {
+      if (mask.effect === "pixelate") {
+        const block = Math.max(
+          2,
+          effectAmount(mask.strength, box.width, box.height, maskModel.pixelFraction)
+        );
+        const cols = Math.max(1, Math.round(dw / block));
+        const rows = Math.max(1, Math.round(dh / block));
+        maskScratch.width = cols;
+        maskScratch.height = rows;
+        const scratch = maskScratch.getContext("2d");
+        if (!scratch) {
+          ctx.restore();
+          return;
+        }
+        scratch.imageSmoothingEnabled = false;
+        scratch.clearRect(0, 0, cols, rows);
+        scratch.drawImage(media, sx, sy, sw, sh, 0, 0, cols, rows);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(maskScratch, 0, 0, cols, rows, dx, dy, dw, dh);
+      } else {
+        const radius = effectAmount(mask.strength, box.width, box.height, maskModel.blurFraction);
+        const padX = (radius / box.width) * srcW;
+        const padY = (radius / box.height) * srcH;
+        ctx.filter = `blur(${radius}px)`;
+        ctx.drawImage(
+          media,
+          sx - padX,
+          sy - padY,
+          sw + padX * 2,
+          sh + padY * 2,
+          dx - radius,
+          dy - radius,
+          dw + radius * 2,
+          dh + radius * 2
+        );
+        ctx.filter = "none";
+      }
+    } catch (_) {
+      /* Media may not be ready to draw yet. */
+    }
+    ctx.restore();
+  }
+
+  function drawMaskCanvas(canvas, media, masks, opacity) {
+    if (!canvas) return;
+    if (!media || media.hidden || !masks.length) {
+      canvas.hidden = true;
+      return;
+    }
+    const box = mediaContentBox(media);
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    if (!box || !srcW || !srcH) {
+      canvas.hidden = true;
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const pixelW = Math.max(1, Math.round(box.width * dpr));
+    const pixelH = Math.max(1, Math.round(box.height * dpr));
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
+    }
+    canvas.style.left = `${box.left}px`;
+    canvas.style.top = `${box.top}px`;
+    canvas.style.width = `${box.width}px`;
+    canvas.style.height = `${box.height}px`;
+    canvas.style.opacity = opacity == null || opacity === "" ? "1" : String(opacity);
+    canvas.hidden = false;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, box.width, box.height);
+    masks.forEach((mask) => paintPrivacyMask(ctx, media, mask, box, srcW, srcH));
+  }
+
+  function visiblePrimaryMedia() {
+    if (previewVideo && !previewVideo.hidden) return previewVideo;
+    if (previewImage && !previewImage.hidden) return previewImage;
+    return null;
+  }
+
+  function visibleSecondaryMedia() {
+    if (previewVideoB && !previewVideoB.hidden) return previewVideoB;
+    if (previewImageB && !previewImageB.hidden) return previewImageB;
+    return null;
+  }
+
+  function hidePrivacyMasks() {
+    if (previewMasks) previewMasks.hidden = true;
+    if (previewMasksB) previewMasksB.hidden = true;
+    if (previewMaskHandles) previewMaskHandles.hidden = true;
+  }
+
+  function renderMaskHandles(clip, box) {
+    const layer = previewMaskHandles;
+    if (!layer) return;
+    const selected =
+      clip &&
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId);
+    const masks = selected ? readMasks(clip) : [];
+    if (!selected || !box || !masks.length) {
+      layer.hidden = true;
+      if (!maskDragging) layer.replaceChildren();
+      return;
+    }
+    layer.hidden = false;
+    layer.style.left = `${box.left}px`;
+    layer.style.top = `${box.top}px`;
+    layer.style.width = `${box.width}px`;
+    layer.style.height = `${box.height}px`;
+    if (maskDragging) return;
+    layer.replaceChildren();
+    masks.forEach((mask) => {
+      const boxEl = document.createElement("div");
+      boxEl.className = "studio-mask-box";
+      if (mask.id === selectedMaskId) boxEl.classList.add("is-selected");
+      boxEl.dataset.maskId = mask.id;
+      boxEl.style.left = `${mask.x * 100}%`;
+      boxEl.style.top = `${mask.y * 100}%`;
+      boxEl.style.width = `${mask.w * 100}%`;
+      boxEl.style.height = `${mask.h * 100}%`;
+      boxEl.setAttribute("role", "button");
+      boxEl.tabIndex = 0;
+      boxEl.setAttribute("aria-label", maskEffectLabel(mask.effect));
+      const handle = document.createElement("span");
+      handle.className = "studio-mask-resize";
+      handle.dataset.resize = "1";
+      boxEl.appendChild(handle);
+      boxEl.addEventListener("pointerdown", (event) => onMaskPointerDown(event, clip, mask.id));
+      layer.appendChild(boxEl);
+    });
+  }
+
+  function onMaskPointerDown(event, clip, maskId) {
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const layer = previewMaskHandles;
+    if (!layer) return;
+    selectedMaskId = maskId;
+    fillMaskInspector(clip);
+    const masks = readMasks(clip);
+    const startMask = masks.find((item) => item.id === maskId);
+    if (!startMask) return;
+    const resizing = Boolean(event.target && event.target.dataset && event.target.dataset.resize);
+    const bounds = layer.getBoundingClientRect();
+    if (bounds.width < 2 || bounds.height < 2) return;
+    maskDragging = true;
+    const originX = event.clientX;
+    const originY = event.clientY;
+    const pointerId = event.pointerId;
+    if (event.currentTarget.setPointerCapture) {
+      try {
+        event.currentTarget.setPointerCapture(pointerId);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    const move = (ev) => {
+      const dx = (ev.clientX - originX) / bounds.width;
+      const dy = (ev.clientY - originY) / bounds.height;
+      const next = readMasks(clip).map((item) => {
+        if (item.id !== maskId) return item;
+        if (resizing) {
+          return clampMaskBox({ ...startMask, w: startMask.w + dx, h: startMask.h + dy });
+        }
+        return clampMaskBox({ ...startMask, x: startMask.x + dx, y: startMask.y + dy });
+      });
+      writeMasks(clip, next);
+      const current = next.find((item) => item.id === maskId);
+      const el = layer.querySelector(`[data-mask-id="${CSS.escape(maskId)}"]`);
+      if (el && current) {
+        el.style.left = `${current.x * 100}%`;
+        el.style.top = `${current.y * 100}%`;
+        el.style.width = `${current.w * 100}%`;
+        el.style.height = `${current.h * 100}%`;
+      }
+      drawPrivacyMasks();
+    };
+    const up = () => {
+      maskDragging = false;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      queueMaskSave(clip);
+      drawPrivacyMasks();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function drawPrivacyMasks() {
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || !hit.clip) {
+      hidePrivacyMasks();
+      return;
+    }
+    const primary = visiblePrimaryMedia();
+    const primaryOpacity = primary ? primary.style.opacity : "1";
+    drawMaskCanvas(previewMasks, primary, readMasks(hit.clip), primaryOpacity);
+    const overlap = hit.overlapClip && hit.crossfadeProgress != null;
+    const secondary = overlap ? visibleSecondaryMedia() : null;
+    drawMaskCanvas(
+      previewMasksB,
+      secondary,
+      overlap ? readMasks(hit.overlapClip) : [],
+      secondary ? secondary.style.opacity : "1"
+    );
+    renderMaskHandles(hit.clip, primary ? mediaContentBox(primary) : null);
+  }
+
+  function fillMaskInspector(clip) {
+    const wrap = document.getElementById("inspector-masks");
+    const list = document.getElementById("mask-list");
+    const editor = document.getElementById("mask-editor");
+    const effect = document.getElementById("mask-effect");
+    const strength = document.getElementById("mask-strength");
+    const strengthValue = document.getElementById("mask-strength-value");
+    if (!wrap || !list || !editor) return;
+    const show = clip && (clip.dataset.kind === "photo" || clip.dataset.kind === "video");
+    wrap.hidden = !show;
+    if (!show) return;
+    const masks = readMasks(clip);
+    if (!masks.some((item) => item.id === selectedMaskId)) {
+      selectedMaskId = masks.length ? masks[0].id : null;
+    }
+    list.replaceChildren();
+    masks.forEach((mask) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button ghost";
+      button.textContent = maskEffectLabel(mask.effect);
+      if (mask.id === selectedMaskId) button.setAttribute("aria-current", "true");
+      button.addEventListener("click", () => {
+        selectedMaskId = mask.id;
+        fillMaskInspector(clip);
+        drawPrivacyMasks();
+      });
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+    const current = masks.find((item) => item.id === selectedMaskId) || null;
+    editor.hidden = !current;
+    if (!current || !effect || !strength) return;
+    if (document.activeElement !== effect) effect.value = current.effect;
+    if (document.activeElement !== strength) strength.value = String(current.strength);
+    if (strengthValue) strengthValue.textContent = String(current.strength);
+  }
+
+  function replaceSelectedMask(patch) {
+    const clip = selectedAdjustableClip();
+    if (!clip || !selectedMaskId) return;
+    const masks = readMasks(clip).map((item) =>
+      item.id === selectedMaskId ? clampMaskBox({ ...item, ...patch }) : item
+    );
+    writeMasks(clip, masks);
+    fillMaskInspector(clip);
+    drawPrivacyMasks();
+    queueMaskSave(clip);
+  }
+
+  function addPrivacyMask(effectName) {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const masks = readMasks(clip);
+    if (masks.length >= Number(maskModel.maxMasks || 8)) {
+      showFlash(msgMaskLimit);
+      return;
+    }
+    const shift = (masks.length % 4) * 0.06;
+    const mask = clampMaskBox({
+      id: newMaskId(),
+      effect: effectName,
+      strength: maskModel.defaultStrength,
+      x: 0.2 + shift,
+      y: 0.2 + shift,
+      w: 0.28,
+      h: 0.22,
+    });
+    masks.push(mask);
+    selectedMaskId = mask.id;
+    writeMasks(clip, masks);
+    fillMaskInspector(clip);
+    drawPrivacyMasks();
+    queueMaskSave(clip);
+  }
+
+  function removeSelectedMask() {
+    const clip = selectedAdjustableClip();
+    if (!clip || !selectedMaskId) return;
+    const masks = readMasks(clip).filter((item) => item.id !== selectedMaskId);
+    selectedMaskId = masks.length ? masks[0].id : null;
+    writeMasks(clip, masks);
+    fillMaskInspector(clip);
+    drawPrivacyMasks();
+    queueMaskSave(clip);
+  }
+
+  let maskSaveChain = Promise.resolve();
+
+  function queueMaskSave(clip) {
+    const studioId = clip.dataset.studioId;
+    const snapshot = clip.dataset.masks || "[]";
+    maskSaveChain = maskSaveChain
+      .then(() => saveMasks(studioId, snapshot))
+      .catch((err) => {
+        showFlash((err && err.message) || msgMaskFailed);
+      });
+  }
+
+  async function saveMasks(studioId, snapshot) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const res = await fetch(`/api/studio/${studioId}/masks`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ masks: JSON.parse(snapshot || "[]") }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgMaskFailed);
+    }
+    if ((clip.dataset.masks || "[]") === snapshot) {
+      writeMasks(clip, body.masks || []);
+      if (
+        state.selected &&
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(studioId)
+      ) {
+        fillMaskInspector(clip);
+      }
+      drawPrivacyMasks();
+    }
+    setSaveState(true);
+  }
+
   function showPlaceholder() {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
     hideOverlayLayers();
     hideAnnotations();
+    hidePrivacyMasks();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
     applyPreviewGrades(null);
   }
@@ -1306,6 +1766,7 @@
     }
     applyPreviewGrades(hit);
     syncAnnotations(hit);
+    drawPrivacyMasks();
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -2169,6 +2630,7 @@
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
       if (isPhoto || isVideo) fillOverlayInspector(clip);
       else selectedOverlayId = null;
+      fillMaskInspector(clip);
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -3541,6 +4003,36 @@
       queueImageAdjustSave(clip);
     });
   });
+
+  document.getElementById("mask-add-blur")?.addEventListener("click", () => addPrivacyMask("blur"));
+  document.getElementById("mask-add-pixelate")?.addEventListener("click", () => {
+    addPrivacyMask("pixelate");
+  });
+  document.getElementById("mask-remove")?.addEventListener("click", () => removeSelectedMask());
+  document.getElementById("mask-effect")?.addEventListener("change", (event) => {
+    replaceSelectedMask({ effect: event.target.value });
+  });
+  document.getElementById("mask-strength")?.addEventListener("input", (event) => {
+    const clip = selectedAdjustableClip();
+    if (!clip || !selectedMaskId) return;
+    const strength = clampMaskStrength(event.target.value);
+    const valueEl = document.getElementById("mask-strength-value");
+    if (valueEl) valueEl.textContent = String(strength);
+    const masks = readMasks(clip).map((item) =>
+      item.id === selectedMaskId ? clampMaskBox({ ...item, strength }) : item
+    );
+    writeMasks(clip, masks);
+    drawPrivacyMasks();
+  });
+  document.getElementById("mask-strength")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    queueMaskSave(clip);
+  });
+  window.addEventListener("resize", () => drawPrivacyMasks());
+  previewImage?.addEventListener("load", () => drawPrivacyMasks());
+  previewVideo?.addEventListener("seeked", () => drawPrivacyMasks());
+  previewVideo?.addEventListener("loadeddata", () => drawPrivacyMasks());
   document.getElementById("inspector-image-reset")?.addEventListener("click", () => {
     const clip = selectedAdjustableClip();
     if (!clip) return;

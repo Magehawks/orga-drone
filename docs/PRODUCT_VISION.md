@@ -144,13 +144,14 @@ professional video-editing knowledge.
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
+| Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
-| Further light editing (curves, masks, keyframes), extra transition types | **Later** |
+| Further light editing (curves, freeform masks, keyframes, tracking), extra transition types | **Later** |
 | Music-lane time mapping | **Later** |
 
 ### 4. Share
@@ -242,7 +243,10 @@ See `README.md` for the detailed feature status table. In short:
   (brightness, contrast, saturation, warmth) on that Story clip; preview
   approximates the exported picture and is not a color-managed grade. The same clips
   can carry up to 8 timed text, shape, or image overlays, with Fade in, Fade out,
-  or Slide in. Media
+  or Slide in. Photo and
+  video clips can also store up to 8 rectangular privacy masks (blur or
+  pixelate) for the whole clip. Masks use the fitted picture, so letterboxing
+  does not move them. Preview approximates the export. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
@@ -267,7 +271,8 @@ See `README.md` for the detailed feature status table. In short:
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
   headings, read-only time-proportional soundtrack coverage on that canvas,
-  basic rendered visual transitions, and basic per-clip image adjustment
+  basic rendered visual transitions, basic per-clip image adjustment, and
+  rectangular blur/pixelate privacy masks (fixed for the clip; not tracking)
   (preview approximates export; not a professional grade or NLE). Albums for
   organizing the media library remain Later.
 
