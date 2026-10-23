@@ -219,14 +219,24 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
         default_h = generated_only_default_height()
     last_dir = get_last_export_directory()
     directory = resolve_export_directory(last_dir)
+    option_rows: list[dict[str, int | str | bool]] = []
+    for option in options:
+        row = option.as_dict()
+        row["suggested_filename"] = suggested_export_filename(
+            project.title, height=option.height
+        )
+        option_rows.append(row)
+    suggested = suggested_export_filename(
+        project.title, height=default_h if default_h is not None else None
+    )
     return {
         "project_id": project.id,
         "project_title": project.title,
-        "suggested_filename": suggested_export_filename(project.title),
+        "suggested_filename": suggested,
         "default_directory": str(directory),
         "last_export_directory": last_dir,
         "default_height": default_h,
-        "options": [o.as_dict() for o in options],
+        "options": option_rows,
         "has_video_resolution": bool(options),
     }
 

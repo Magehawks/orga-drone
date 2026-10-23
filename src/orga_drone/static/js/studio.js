@@ -2751,6 +2751,8 @@
   });
 
   const exportResolution = document.getElementById("studio-export-resolution");
+  const exportFilename = document.getElementById("studio-export-filename");
+  let exportFilenameAuto = "";
   const exportStatus = document.getElementById("studio-export-status");
   const exportHint = document.getElementById("studio-export-hint");
   const exportRunBtn = document.getElementById("studio-export-run");
@@ -2858,7 +2860,44 @@
   function setExportRunningUi(running) {
     if (exportRunBtn) exportRunBtn.disabled = running;
     if (exportResolution) exportResolution.disabled = running;
+    if (exportFilename) exportFilename.disabled = running;
     if (exportCancelBtn && !exportCancelRequested) exportCancelBtn.disabled = false;
+  }
+
+  function suggestionForHeight(height) {
+    const options =
+      exportOptionsCache && Array.isArray(exportOptionsCache.options)
+        ? exportOptionsCache.options
+        : [];
+    const match = options.find((opt) => Number(opt.height) === Number(height));
+    if (match && match.suggested_filename) return String(match.suggested_filename);
+    if (exportOptionsCache && exportOptionsCache.suggested_filename) {
+      return String(exportOptionsCache.suggested_filename);
+    }
+    return "export.mp4";
+  }
+
+  function refreshExportHint() {
+    if (!exportHint || !exportOptionsCache) return;
+    const name =
+      (exportFilename && exportFilename.value.trim()) ||
+      suggestionForHeight(exportResolution ? exportResolution.value : null);
+    exportHint.textContent = `${name} → ${exportOptionsCache.default_directory || ""}`;
+  }
+
+  function syncExportFilename(height, { reset = false } = {}) {
+    const next = suggestionForHeight(height);
+    const current = exportFilename ? exportFilename.value.trim() : "";
+    if (exportFilename && (reset || !current || current === exportFilenameAuto)) {
+      exportFilename.value = next;
+      exportFilenameAuto = next;
+    }
+    refreshExportHint();
+  }
+
+  function chosenExportFilename(height) {
+    const typed = exportFilename ? exportFilename.value.trim() : "";
+    return typed || suggestionForHeight(height);
   }
 
   function stopExportElapsedTimer() {
@@ -3045,6 +3084,8 @@
     setExportRunningUi(false);
     if (exportRunBtn) exportRunBtn.disabled = true;
     if (exportResolution) exportResolution.innerHTML = "";
+    exportFilenameAuto = "";
+    if (exportFilename) exportFilename.value = "";
     exportDialog.showModal();
     try {
       const qs = projectId ? `?project_id=${encodeURIComponent(String(projectId))}` : "";
@@ -3078,11 +3119,10 @@
           exportResolution.appendChild(option);
         });
       }
-      if (exportHint) {
-        exportHint.textContent = `${data.suggested_filename || "export.mp4"} → ${
-          data.default_directory || ""
-        }`;
-      }
+      syncExportFilename(
+        exportResolution ? exportResolution.value : data.default_height,
+        { reset: true }
+      );
       if (exportRunBtn) exportRunBtn.disabled = false;
     } catch (_) {
       setExportStatus(msgExportFailed, { error: true });
@@ -3106,7 +3146,7 @@
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           directory: exportOptionsCache.default_directory || "",
-          filename: exportOptionsCache.suggested_filename || "export.mp4",
+          filename: chosenExportFilename(height),
         }),
       });
       const pickData = await pickRes.json().catch(() => null);
@@ -3184,6 +3224,13 @@
       setExportRunningUi(false);
     }
   }
+
+  exportResolution?.addEventListener("change", () => {
+    syncExportFilename(exportResolution.value);
+  });
+  exportFilename?.addEventListener("input", () => {
+    refreshExportHint();
+  });
 
   exportRunBtn?.addEventListener("click", (event) => {
     event.preventDefault();
