@@ -9,7 +9,9 @@ multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution; after export, Open video / Show in folder on
 Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
 in preview and MP4 export; Title Cards as generated Story items; basic rendered
-visual transitions with labeled boundary overlays; Inspector headings that
+visual transitions with labeled boundary overlays; basic per-clip video image
+adjustment (brightness, contrast, saturation, warmth; preview approximates
+export); Inspector headings that
 distinguish selection from the playhead-active clip; time-based Story canvas
 with Fit to story / zoom; read-only soundtrack coverage on that canvas).
 
@@ -56,7 +58,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip video image adjustment (brightness, contrast, saturation, warmth) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -77,7 +79,9 @@ The application helps users:
   ruler/playhead mapping); labeled transition overlays and Inspector headings
   that distinguish selection from playhead-active clips; Title Cards as generated Story items (title, subtitle,
   duration, solid background; preview + MP4); basic visual transitions
-  (Cut, Fade through black, Crossfade) in preview and MP4; local MP4 export with configurable
+  (Cut, Fade through black, Crossfade) in preview and MP4; basic per-clip video
+  image adjustment (brightness, contrast, saturation, warmth; preview approximates
+  export); local MP4 export with configurable
   resolution on desktop, including photo-only stories at 720/1080; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
@@ -100,8 +104,9 @@ The application helps users:
   (up to 8 local songs; loop for a one-song playlist), a
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector
   headings that distinguish selection from playhead-active clips, read-only
-  time-proportional soundtrack coverage on that canvas, and basic rendered visual
-  transitions (not a professional effects editor or NLE).
+  time-proportional soundtrack coverage on that canvas, basic rendered visual
+  transitions, and basic per-clip video image adjustment (not a professional
+  effects editor, color grade, or NLE).
 
 ## Product principles
 

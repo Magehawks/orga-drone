@@ -385,5 +385,12 @@
   "Title card duration in seconds": "Title card duration in seconds",
   "Could not save title card.": "Could not save title card.",
   "Or add a Title Card to start with a heading.": "Or add a Title Card to start with a heading.",
-  "Title Card export needs a system sans font.": "Title Card export needs a system sans font."
+  "Title Card export needs a system sans font.": "Title Card export needs a system sans font.",
+  "Adjust image": "Adjust image",
+  "Brightness": "Brightness",
+  "Contrast": "Contrast",
+  "Saturation": "Saturation",
+  "Warmth": "Warmth",
+  "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.": "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.",
+  "Could not save image adjustments.": "Could not save image adjustments."
 }

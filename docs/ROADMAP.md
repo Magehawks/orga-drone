@@ -34,7 +34,8 @@ Highlights:
   configurable resolution, including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
-  as generated Story items; basic rendered visual transitions; time-based
+  as generated Story items; basic rendered visual transitions; basic per-clip
+  video image adjustment (brightness, contrast, saturation, warmth); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
   that canvas)
 

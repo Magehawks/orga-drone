@@ -1975,6 +1975,21 @@ video.studio-preview-media.studio-preview-layer-b {
   gap: 0.25rem;
   font-size: 0.85rem;
 }
+.studio-image-adjust-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.studio-image-adjust-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.studio-preview-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
 .studio-inspector-field input,
 .studio-inspector-field select,
 .studio-photo-duration {
