@@ -103,9 +103,11 @@ The application helps users:
   GitHub Actions; a maintainer publishes the GitHub Release only after the
   MOTW smoke test (`packaging/README.md`). A Windows itch.io butler process
   is documented for a Draft/Restricted test channel and is not a public paid
-  launch. ZIP installs do not receive itch.io app updates. It is not an
-  in-app updater, an MSIX installer, or a macOS/Linux build. Studio supports
-  multiple local
+  launch. ZIP installs do not receive itch.io app updates. About shows the
+  installed version. An optional startup check, off by default, reports a
+  newer published Windows release and links to it; it does not download,
+  install, or run when disabled. It is not an in-app updater, an
+  MSIX installer, or a macOS/Linux build. Studio supports multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector

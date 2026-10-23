@@ -171,7 +171,9 @@
       <h1 class="studio-project-heading">{{ _('Projects') }}</h1>
     </div>
     {% endif %}
-    <span class="app-version studio-app-version">v{{ version }}</span>
+    <button type="button" class="app-version-button" data-open-about>
+      <span class="app-version studio-app-version">v{{ version }}</span>
+    </button>
   </header>
 
   {% if flash_msg == 'studio_removed' %}

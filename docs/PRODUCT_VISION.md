@@ -254,7 +254,11 @@ See `README.md` for the detailed feature status table. In short:
 - There is **no** Library albums model, plugin API, or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
-  MOTW smoke test (`packaging/README.md`). It is not an in-app updater, an
+  MOTW smoke test (`packaging/README.md`). About shows the installed version.
+  An optional startup check, off by default, can report a newer published
+  Windows release and opens its release page. It does not download or install,
+  and it does not run while offline or when the setting is off. It is not an
+  in-app updater, an
   MSIX installer, or a macOS/Linux build. Studio supports multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
