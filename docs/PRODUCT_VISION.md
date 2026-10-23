@@ -164,6 +164,7 @@ Sharing is the final step of the journey.
 | Simple Studio MP4 export | **Available now** (local file; resolution choice; optional music) |
 | Open video / Show in folder after Studio export | **Available now** (Windows desktop) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
+| itch.io Windows convenience build | **Later** (butler process documented for a Draft/Restricted test; no public paid launch; no in-app updater; ZIP copies do not auto-update) |
 
 ---
 

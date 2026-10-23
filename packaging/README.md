@@ -318,3 +318,13 @@ Launch `orga-drone.exe` from the extracted folder and verify:
 
 Do **not** publish the release if any step fails. A failed candidate stays a
 draft, or is deleted; it is not made public.
+
+## itch.io test channel
+
+Publishing that zip to itch.io does **not** replace this smoke test. The
+repeatable butler process, Draft/Restricted guard, A/B version ids, and
+rollback notes are in [`packaging/itch/README.md`](itch/README.md). The helper
+`python packaging/itch_channel.py` prints a command and does not upload.
+
+There is no in-app updater. Copies installed from a ZIP do not receive
+itch.io desktop-app updates. User data stays in `%APPDATA%\orga-drone`.
