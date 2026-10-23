@@ -5,6 +5,7 @@
  * Music is a persisted per-project soundtrack mixed into MP4 export.
  * The soundtrack lane is a read-only coverage span on the Story time canvas.
  * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
+ * Photo and video image adjustments persist per clip and approximate the export grade.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
 (function () {
@@ -251,6 +252,8 @@
   const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
   const labelInStory = root.dataset.inStory || "In story";
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
+  const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
+  const imageAdjustModel = readImageAdjustModel();
 
   const STORAGE_KEY = "orga-drone-studio-ui-v1";
 
@@ -843,12 +846,253 @@
     if (previewTitlecard) previewTitlecard.hidden = true;
   }
 
+  function readImageAdjustModel() {
+    const fallback = {
+      exposureEvAtFull: 1,
+      contrastDeltaAtFull: 0.5,
+      saturationDeltaAtFull: 1,
+      warmthMiredAtFull: 60,
+      neutralKelvin: 6500,
+    };
+    try {
+      const parsed = JSON.parse(root.dataset.imageAdjustModel || "");
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return Object.assign(fallback, parsed);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function clampImageSlider(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-100, Math.min(100, Math.round(number)));
+  }
+
+  function neutralImageAdjust() {
+    return { exposure: 0, contrast: 0, saturation: 0, warmth: 0 };
+  }
+
+  function readImageAdjust(clip) {
+    const neutral = neutralImageAdjust();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.imageAdjust || "");
+      if (!parsed || typeof parsed !== "object") return neutral;
+      return {
+        exposure: clampImageSlider(parsed.exposure),
+        contrast: clampImageSlider(parsed.contrast),
+        saturation: clampImageSlider(parsed.saturation),
+        warmth: clampImageSlider(parsed.warmth),
+      };
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function writeImageAdjust(clip, adjust) {
+    if (!clip) return;
+    clip.dataset.imageAdjust = JSON.stringify({
+      exposure: clampImageSlider(adjust.exposure),
+      contrast: clampImageSlider(adjust.contrast),
+      saturation: clampImageSlider(adjust.saturation),
+      warmth: clampImageSlider(adjust.warmth),
+    });
+  }
+
+  function imageAdjustIsNeutral(adjust) {
+    return !adjust.exposure && !adjust.contrast && !adjust.saturation && !adjust.warmth;
+  }
+
+  // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
+  // studio_image.blackbody_channel_gains. ffmpeg 7.1 colortemperature on
+  // rgb(127, 95, 63) at 4800 K is (127, 83, 49).
+  function blackbodyGains(kelvin) {
+    const temp = kelvin / 100;
+    let red;
+    let green;
+    let blue;
+    if (temp <= 66) {
+      red = 255;
+      green = 99.4708025861 * Math.log(temp) - 161.1195681661;
+      blue = temp <= 19 ? 0 : 138.5177312231 * Math.log(temp - 10) - 305.0447927307;
+    } else {
+      red = 329.698727446 * (temp - 60) ** -0.1332047592;
+      green = 288.1221695283 * (temp - 60) ** -0.0755148492;
+      blue = 255;
+    }
+    const channels = [red, green, blue].map((channel) => Math.max(0, Math.min(255, channel)));
+    const peak = Math.max(...channels) || 1;
+    return channels.map((channel) => channel / peak);
+  }
+
+  function kelvinForWarmth(warmth) {
+    const model = imageAdjustModel;
+    const neutralMired = 1000000 / model.neutralKelvin;
+    const mired = neutralMired + (warmth / 100) * model.warmthMiredAtFull;
+    const kelvin = 1000000 / mired;
+    return Math.round(Math.min(40000, Math.max(1000, kelvin)));
+  }
+
+  function cssFilterFor(adjust) {
+    const model = imageAdjustModel;
+    const parts = [];
+    if (adjust.saturation) {
+      const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
+      parts.push(`saturate(${factor.toFixed(4)})`);
+    }
+    if (adjust.contrast) {
+      const factor = 1 + (adjust.contrast / 100) * model.contrastDeltaAtFull;
+      parts.push(`contrast(${factor.toFixed(4)})`);
+    }
+    if (adjust.exposure) {
+      const ev = (adjust.exposure / 100) * model.exposureEvAtFull;
+      parts.push(`brightness(${Math.pow(2, ev).toFixed(4)})`);
+    }
+    return parts.join(" ");
+  }
+
+  function setGradeMatrix(matrixId, kelvin) {
+    const matrix = document.getElementById(matrixId);
+    if (!matrix) return;
+    const [red, green, blue] = blackbodyGains(kelvin);
+    matrix.setAttribute(
+      "values",
+      `${red.toFixed(6)} 0 0 0 0 0 ${green.toFixed(6)} 0 0 0 0 0 ${blue.toFixed(6)} 0 0 0 0 0 1 0`
+    );
+  }
+
+  function gradePreviewElement(el, clip, filterId, matrixId) {
+    if (!el) return;
+    const kind = clip && clip.dataset.kind;
+    const active = clip && (kind === "video" || kind === "photo") && !el.hidden;
+    if (!active) {
+      el.style.filter = "";
+      return;
+    }
+    const adjust = readImageAdjust(clip);
+    if (imageAdjustIsNeutral(adjust)) {
+      el.style.filter = "";
+      return;
+    }
+    const css = cssFilterFor(adjust);
+    if (adjust.warmth) {
+      setGradeMatrix(matrixId, kelvinForWarmth(adjust.warmth));
+      el.style.filter = `${css} url(#${filterId})`.trim();
+      return;
+    }
+    el.style.filter = css;
+  }
+
+  function applyPreviewGrades(hit) {
+    const primary = hit && hit.clip ? hit.clip : null;
+    const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
+    gradePreviewElement(
+      previewVideo,
+      primary,
+      "studio-preview-grade",
+      "studio-preview-grade-matrix"
+    );
+    gradePreviewElement(
+      previewImage,
+      primary,
+      "studio-preview-grade",
+      "studio-preview-grade-matrix"
+    );
+    gradePreviewElement(
+      previewVideoB,
+      overlap,
+      "studio-preview-grade-b",
+      "studio-preview-grade-matrix-b"
+    );
+    gradePreviewElement(
+      previewImageB,
+      overlap,
+      "studio-preview-grade-b",
+      "studio-preview-grade-matrix-b"
+    );
+  }
+
+  const IMAGE_ADJUST_FIELDS = [
+    ["exposure", "inspector-image-exposure", "inspector-image-exposure-value"],
+    ["contrast", "inspector-image-contrast", "inspector-image-contrast-value"],
+    ["saturation", "inspector-image-saturation", "inspector-image-saturation-value"],
+    ["warmth", "inspector-image-warmth", "inspector-image-warmth-value"],
+  ];
+
+  function selectedAdjustableClip() {
+    if (!state.selected || state.selected.type !== "clip") return null;
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.selected.id));
+    if (!clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) return null;
+    return clip;
+  }
+
+  function fillImageAdjust(clip) {
+    const adjust = readImageAdjust(clip);
+    IMAGE_ADJUST_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      const shown = adjust[key];
+      if (input) input.value = String(shown);
+      if (valueEl) valueEl.textContent = String(shown);
+    });
+  }
+
+  function imageAdjustFromControls() {
+    const adjust = neutralImageAdjust();
+    IMAGE_ADJUST_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      const shown = clampImageSlider(input ? input.value : 0);
+      adjust[key] = shown;
+      if (valueEl) valueEl.textContent = String(shown);
+    });
+    return adjust;
+  }
+
+  let imageSaveChain = Promise.resolve();
+
+  function queueImageAdjustSave(clip) {
+    const studioId = clip.dataset.studioId;
+    imageSaveChain = imageSaveChain
+      .then(() => saveImageAdjust(studioId))
+      .catch((err) => {
+        showFlash((err && err.message) || msgImageFailed);
+      });
+  }
+
+  async function saveImageAdjust(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const adjust = readImageAdjust(clip);
+    const res = await fetch(`/api/studio/${studioId}/image`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(adjust),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgImageFailed);
+    }
+    writeImageAdjust(clip, body.image || adjust);
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillImageAdjust(clip);
+    }
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
   function showPlaceholder() {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
     hideOverlayLayers();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
+    applyPreviewGrades(null);
   }
 
   function showImage(src) {
@@ -1049,6 +1293,7 @@
       previewFadeBlack.hidden = true;
       previewFadeBlack.style.opacity = "0";
     }
+    applyPreviewGrades(hit);
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -1905,6 +2150,9 @@
           if (hintEl) hintEl.textContent = msgCutHint;
         }
       }
+      const imageWrap = document.getElementById("inspector-image-adjust");
+      if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
+      if (isPhoto || isVideo) fillImageAdjust(clip);
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -3151,6 +3399,33 @@
       showRootFlash(err.message || msgTransitionFailed);
     }
   }
+
+  IMAGE_ADJUST_FIELDS.forEach(([, inputId]) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      writeImageAdjust(clip, imageAdjustFromControls());
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      setSaveState(false);
+    });
+    input.addEventListener("change", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      writeImageAdjust(clip, imageAdjustFromControls());
+      queueImageAdjustSave(clip);
+    });
+  });
+  document.getElementById("inspector-image-reset")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    writeImageAdjust(clip, neutralImageAdjust());
+    fillImageAdjust(clip);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(false);
+    queueImageAdjustSave(clip);
+  });
 
   ["inspector-music-volume", "inspector-music-fade-in", "inspector-music-fade-out"].forEach(
     (id) => {

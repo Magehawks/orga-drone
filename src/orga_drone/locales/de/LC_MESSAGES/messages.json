@@ -385,5 +385,12 @@
   "Title card duration in seconds": "Titelseiten-Dauer in Sekunden",
   "Could not save title card.": "Titelseite konnte nicht gespeichert werden.",
   "Or add a Title Card to start with a heading.": "Oder füge eine Titelseite als Überschrift hinzu.",
-  "Title Card export needs a system sans font.": "Der Titelseiten-Export braucht eine System-Sans-Schrift."
+  "Title Card export needs a system sans font.": "Der Titelseiten-Export braucht eine System-Sans-Schrift.",
+  "Adjust image": "Bild optimieren",
+  "Brightness": "Helligkeit",
+  "Contrast": "Kontrast",
+  "Saturation": "Sättigung",
+  "Warmth": "Wärme",
+  "Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.": "Gilt nur für diesen Story-Clip. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
+  "Could not save image adjustments.": "Bildkorrekturen konnten nicht gespeichert werden."
 }

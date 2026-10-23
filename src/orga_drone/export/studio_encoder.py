@@ -16,6 +16,7 @@ from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_image import ffmpeg_grade_chain
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -58,7 +59,17 @@ def _segment_vf(width: int, height: int) -> str:
 
 
 def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str:
-    vf = _segment_vf(width, height)
+    """Scale/pad chain, with an optional per-clip grade before fades.
+
+    Photo and video grades are applied on the decoded frame, then the existing
+    scale, timebase, and fade filters run. Title cards stay ungraded.
+    A neutral clip adds nothing, so the chain matches ``_segment_vf``.
+    """
+    base = _segment_vf(width, height)
+    grade = (
+        ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    )
+    vf = f"{grade},{base}" if grade else base
     fades: list[str] = []
     fade_in = max(0.0, float(clip.fade_in_s))
     fade_out = max(0.0, float(clip.fade_out_s))

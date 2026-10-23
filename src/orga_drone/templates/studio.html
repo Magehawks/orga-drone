@@ -130,6 +130,8 @@
          data-source-out="{{ _('Source out')|e }}"
          data-in-story="{{ _('In story')|e }}"
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
+         data-image-failed="{{ _('Could not save image adjustments.')|e }}"
+         data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -296,6 +298,16 @@
       <div class="studio-preview" id="studio-preview">
         {% if items %}
         <div class="studio-preview-frame" id="studio-preview-frame">
+          <svg class="studio-preview-filters" aria-hidden="true" focusable="false" width="0" height="0">
+            <filter id="studio-preview-grade" color-interpolation-filters="sRGB">
+              <feColorMatrix id="studio-preview-grade-matrix" type="matrix"
+                             values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="studio-preview-grade-b" color-interpolation-filters="sRGB">
+              <feColorMatrix id="studio-preview-grade-matrix-b" type="matrix"
+                             values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+            </filter>
+          </svg>
           <img id="studio-preview-image" class="studio-preview-media" alt="" hidden>
           <img id="studio-preview-image-b" class="studio-preview-media studio-preview-layer-b" alt="" hidden>
           <video id="studio-preview-video" class="studio-preview-media" playsinline preload="metadata" hidden></video>
@@ -463,6 +475,7 @@
                   data-preview-url="{{ row.preview_url }}"
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
+                  data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -531,6 +544,43 @@
           <p class="meta-line" data-field="source-in"></p>
           <p class="meta-line" data-field="source-out"></p>
           <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
+        </div>
+        <div id="inspector-image-adjust" hidden>
+          <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Brightness') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-image-exposure-value">0</span>
+            </span>
+            <input type="range" id="inspector-image-exposure" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Brightness') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Contrast') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-image-contrast-value">0</span>
+            </span>
+            <input type="range" id="inspector-image-contrast" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Contrast') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Saturation') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-image-saturation-value">0</span>
+            </span>
+            <input type="range" id="inspector-image-saturation" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Saturation') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Warmth') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-image-warmth-value">0</span>
+            </span>
+            <input type="range" id="inspector-image-warmth" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Warmth') }}">
+          </label>
+          <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
+          <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

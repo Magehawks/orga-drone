@@ -29,6 +29,10 @@ from orga_drone.studio_estimate import (
     effective_seconds,
     summarize_studio_items,
 )
+from orga_drone.studio_image import (
+    image_adjust_from_effect_settings,
+    image_adjust_preview_model,
+)
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.studio_transition import (
     apply_for_items,
@@ -1022,6 +1026,9 @@ def create_app() -> FastAPI:
                         "can_play": can_play,
                         "display_title": display_title,
                         "display_subtitle": display_subtitle,
+                        "image_adjust": image_adjust_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
                         "applied_transition": applied_by_id.get(it.id),
@@ -1053,6 +1060,7 @@ def create_app() -> FastAPI:
             studio_mode=studio_mode,
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
+            image_adjust_model=image_adjust_preview_model(),
             favorite_media=favorite_media,
             music_payload=music_payload,
             flash_msg=msg,
@@ -1431,6 +1439,35 @@ def create_app() -> FastAPI:
                 "photo_duration_s": item.photo_duration_s,
                 "effective_duration_s": seconds,
                 "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/image")
+    async def api_studio_image(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include an image adjustment"
+            )
+        try:
+            item = db.set_studio_image_adjust(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        image = image_adjust_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "image": image.as_dict(),
             }
         )
 
