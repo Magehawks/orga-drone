@@ -42,7 +42,7 @@ Highlights:
   as generated Story items; basic rendered visual transitions; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth); timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
-  for the whole clip); time-based
+  for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
   that canvas)
 

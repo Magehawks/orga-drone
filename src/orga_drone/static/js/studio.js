@@ -268,6 +268,7 @@
   const msgMaskLimit = root.dataset.maskLimit || "A clip can have up to 8 privacy masks.";
   const labelMaskBlur = root.dataset.maskBlur || "Blur";
   const labelMaskPixelate = root.dataset.maskPixelate || "Pixelate";
+  const msgFrameFailed = root.dataset.frameFailed || "Could not save framing.";
   const imageAdjustModel = readImageAdjustModel();
   const maskModel = readMaskModel();
 
@@ -1101,6 +1102,7 @@
       fillImageAdjust(clip);
     }
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    applyFramePreview(resolveAt(state.projectTimeS));
     setSaveState(true);
   }
 
@@ -1555,6 +1557,301 @@
     setSaveState(true);
   }
 
+  function neutralFrame() {
+    return {
+      zoom_start: 1,
+      zoom_end: 1,
+      x_start: 0.5,
+      y_start: 0.5,
+      x_end: 0.5,
+      y_end: 0.5,
+    };
+  }
+
+  function clampZoom(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 1;
+    const stepped = Math.round(number * 20) / 20;
+    return Math.max(1, Math.min(3, stepped));
+  }
+
+  function clampFocal(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0.5;
+    return Math.max(0, Math.min(1, number));
+  }
+
+  function readFrame(clip) {
+    const neutral = neutralFrame();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.frame || "");
+      if (!parsed || typeof parsed !== "object") return neutral;
+      const zoomStart = clampZoom(parsed.zoom_start);
+      return {
+        zoom_start: zoomStart,
+        zoom_end: clampZoom(parsed.zoom_end == null ? zoomStart : parsed.zoom_end),
+        x_start: clampFocal(parsed.x_start),
+        y_start: clampFocal(parsed.y_start),
+        x_end: clampFocal(parsed.x_end == null ? parsed.x_start : parsed.x_end),
+        y_end: clampFocal(parsed.y_end == null ? parsed.y_start : parsed.y_end),
+      };
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function writeFrame(clip, frame) {
+    if (!clip) return;
+    clip.dataset.frame = JSON.stringify({
+      zoom_start: clampZoom(frame.zoom_start),
+      zoom_end: clampZoom(frame.zoom_end),
+      x_start: Number(clampFocal(frame.x_start).toFixed(4)),
+      y_start: Number(clampFocal(frame.y_start).toFixed(4)),
+      x_end: Number(clampFocal(frame.x_end).toFixed(4)),
+      y_end: Number(clampFocal(frame.y_end).toFixed(4)),
+    });
+  }
+
+  function frameMotionChecked() {
+    return Boolean(document.getElementById("inspector-frame-motion")?.checked);
+  }
+
+  function frameMotionOn(frame) {
+    return (
+      Math.abs(frame.zoom_start - frame.zoom_end) > 0.001 ||
+      Math.abs(frame.x_start - frame.x_end) > 0.001 ||
+      Math.abs(frame.y_start - frame.y_end) > 0.001
+    );
+  }
+
+  function formatZoom(value) {
+    return `${clampZoom(value).toFixed(2)}×`;
+  }
+
+  function contentRect(frameW, frameH, sourceW, sourceH) {
+    if (!(sourceW > 0) || !(sourceH > 0) || !(frameW > 0) || !(frameH > 0)) {
+      return { x: 0, y: 0, w: frameW, h: frameH };
+    }
+    const scale = Math.min(frameW / sourceW, frameH / sourceH);
+    const w = Math.max(1, Math.min(frameW, Math.round(sourceW * scale)));
+    const h = Math.max(1, Math.min(frameH, Math.round(sourceH * scale)));
+    return {
+      x: Math.floor((frameW - w) / 2),
+      y: Math.floor((frameH - h) / 2),
+      w,
+      h,
+    };
+  }
+
+  function windowFor(zoom, focalX, focalY, frameW, frameH, sourceW, sourceH) {
+    const content = contentRect(frameW, frameH, sourceW, sourceH);
+    const viewW = Math.max(1, Math.min(content.w, Math.round(content.w / clampZoom(zoom))));
+    const viewH = Math.max(1, Math.min(content.h, Math.round(content.h / clampZoom(zoom))));
+    const centerX = content.x + clampFocal(focalX) * content.w;
+    const centerY = content.y + clampFocal(focalY) * content.h;
+    let left = Math.round(centerX - viewW / 2);
+    let top = Math.round(centerY - viewH / 2);
+    left = Math.max(content.x, Math.min(content.x + content.w - viewW, left));
+    top = Math.max(content.y, Math.min(content.y + content.h - viewH, top));
+    return { x: left, y: top, w: viewW, h: viewH, content };
+  }
+
+  function sampleFrame(frame, progress) {
+    const span = Math.max(0, Math.min(1, Number(progress) || 0));
+    return {
+      zoom: frame.zoom_start + (frame.zoom_end - frame.zoom_start) * span,
+      x: frame.x_start + (frame.x_end - frame.x_start) * span,
+      y: frame.y_start + (frame.y_end - frame.y_start) * span,
+    };
+  }
+
+  function sourceSize(el) {
+    if (!el) return { w: 0, h: 0 };
+    if (el.tagName === "VIDEO") {
+      return { w: el.videoWidth || 0, h: el.videoHeight || 0 };
+    }
+    return { w: el.naturalWidth || 0, h: el.naturalHeight || 0 };
+  }
+
+  function clearFrameTransform(el) {
+    if (!el) return;
+    el.style.transform = "";
+    el.style.transformOrigin = "";
+  }
+
+  function framePreviewProgress(clip, localS) {
+    const selected = selectedAdjustableClip();
+    const editing =
+      !state.playing &&
+      frameMotionChecked() &&
+      selected &&
+      clip &&
+      String(selected.dataset.studioId) === String(clip.dataset.studioId);
+    if (editing) return frameEditTarget === "end" ? 1 : 0;
+    const duration = clipDuration(clip);
+    if (!(duration > 0)) return 0;
+    return Math.max(0, Math.min(1, localS / duration));
+  }
+
+  function applyFrameToElement(el, clip, localS) {
+    if (!el) return;
+    const kind = clip && clip.dataset.kind;
+    if (!clip || el.hidden || (kind !== "photo" && kind !== "video")) {
+      clearFrameTransform(el);
+      return;
+    }
+    const frame = readFrame(clip);
+    const sample = sampleFrame(frame, framePreviewProgress(clip, localS));
+    if (sample.zoom <= 1.001) {
+      clearFrameTransform(el);
+      return;
+    }
+    const bounds = el.getBoundingClientRect();
+    const source = sourceSize(el);
+    if (!(bounds.width > 0) || !(bounds.height > 0) || !(source.w > 0) || !(source.h > 0)) {
+      clearFrameTransform(el);
+      return;
+    }
+    const win = windowFor(
+      sample.zoom,
+      sample.x,
+      sample.y,
+      bounds.width,
+      bounds.height,
+      source.w,
+      source.h
+    );
+    const scale = win.content.w / win.w;
+    const tx = win.content.x - win.x * scale;
+    const ty = win.content.y - win.y * scale;
+    el.style.transformOrigin = "0 0";
+    el.style.transform = `translate(${tx.toFixed(3)}px, ${ty.toFixed(3)}px) scale(${scale.toFixed(6)})`;
+  }
+
+  function applyFramePreview(hit) {
+    const primary = hit && hit.clip ? hit.clip : null;
+    const localS = hit && Number.isFinite(hit.localS) ? hit.localS : 0;
+    applyFrameToElement(previewImage, primary, localS);
+    applyFrameToElement(previewVideo, primary, localS);
+    const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
+    const overlapLocal = hit && Number.isFinite(hit.overlapLocalS) ? hit.overlapLocalS : 0;
+    applyFrameToElement(previewImageB, overlap, overlapLocal);
+    applyFrameToElement(previewVideoB, overlap, overlapLocal);
+    const active = selectedAdjustableClip();
+    const framing = active ? readFrame(active) : null;
+    const zooming = Boolean(
+      framing && (framing.zoom_start > 1.001 || framing.zoom_end > 1.001)
+    );
+    if (previewFrame) previewFrame.classList.toggle("is-framing", zooming);
+  }
+
+  let frameEditTarget = "start";
+  let frameMotionArmed = false;
+
+  function fillFrame(clip) {
+    const frame = readFrame(clip);
+    const motion = document.getElementById("inspector-frame-motion");
+    const fields = document.getElementById("inspector-frame-motion-fields");
+    const zoom = document.getElementById("inspector-frame-zoom");
+    const zoomValue = document.getElementById("inspector-frame-zoom-value");
+    const zoomEnd = document.getElementById("inspector-frame-zoom-end");
+    const zoomEndValue = document.getElementById("inspector-frame-zoom-end-value");
+    const moving = frameMotionArmed || frameMotionOn(frame);
+    if (motion) motion.checked = moving;
+    if (fields) fields.hidden = !moving;
+    if (!moving) frameEditTarget = "start";
+    if (zoom) zoom.value = String(frame.zoom_start);
+    if (zoomValue) zoomValue.textContent = formatZoom(frame.zoom_start);
+    if (zoomEnd) zoomEnd.value = String(frame.zoom_end);
+    if (zoomEndValue) zoomEndValue.textContent = formatZoom(frame.zoom_end);
+    document
+      .getElementById("inspector-frame-target-start")
+      ?.classList.toggle("is-active", frameEditTarget !== "end");
+    document
+      .getElementById("inspector-frame-target-end")
+      ?.classList.toggle("is-active", frameEditTarget === "end");
+  }
+
+  function commitFrame(clip, frame) {
+    writeFrame(clip, frame);
+    fillFrame(clip);
+    applyFramePreview(resolveAt(state.projectTimeS));
+  }
+
+  let frameSaveChain = Promise.resolve();
+
+  function queueFrameSave(clip) {
+    const studioId = clip.dataset.studioId;
+    frameSaveChain = frameSaveChain
+      .then(() => saveFrame(studioId))
+      .catch((err) => {
+        showFlash((err && err.message) || msgFrameFailed);
+      });
+  }
+
+  async function saveFrame(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const frame = readFrame(clip);
+    const res = await fetch(`/api/studio/${studioId}/frame`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ frame }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgFrameFailed);
+    }
+    writeFrame(clip, body.frame || frame);
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillFrame(clip);
+    }
+    applyFramePreview(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
+  function panFrame(clip, dx, dy) {
+    const el = previewImage && !previewImage.hidden ? previewImage : previewVideo;
+    if (!el) return;
+    const bounds = el.getBoundingClientRect();
+    const source = sourceSize(el);
+    if (!(bounds.width > 0) || !(bounds.height > 0) || !(source.w > 0) || !(source.h > 0)) {
+      return;
+    }
+    const frame = readFrame(clip);
+    const moving = frameMotionChecked();
+    const editingEnd = moving && frameEditTarget === "end";
+    const zoom = editingEnd ? frame.zoom_end : frame.zoom_start;
+    const focalX = editingEnd ? frame.x_end : frame.x_start;
+    const focalY = editingEnd ? frame.y_end : frame.y_start;
+    if (zoom <= 1.001) return;
+    const win = windowFor(zoom, focalX, focalY, bounds.width, bounds.height, source.w, source.h);
+    const scale = win.content.w / win.w;
+    const left = win.x - dx / scale;
+    const top = win.y - dy / scale;
+    const nextX = clampFocal((left + win.w / 2 - win.content.x) / win.content.w);
+    const nextY = clampFocal((top + win.h / 2 - win.content.y) / win.content.h);
+    if (editingEnd) {
+      frame.x_end = nextX;
+      frame.y_end = nextY;
+    } else if (moving) {
+      frame.x_start = nextX;
+      frame.y_start = nextY;
+    } else {
+      frame.x_start = nextX;
+      frame.y_start = nextY;
+      frame.x_end = nextX;
+      frame.y_end = nextY;
+      frame.zoom_end = frame.zoom_start;
+    }
+    commitFrame(clip, frame);
+  }
+
   function showPlaceholder() {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
@@ -1564,6 +1861,11 @@
     hidePrivacyMasks();
     if (previewPlaceholder) previewPlaceholder.hidden = false;
     applyPreviewGrades(null);
+    clearFrameTransform(previewImage);
+    clearFrameTransform(previewVideo);
+    clearFrameTransform(previewImageB);
+    clearFrameTransform(previewVideoB);
+    if (previewFrame) previewFrame.classList.remove("is-framing", "is-panning");
   }
 
   function showImage(src) {
@@ -1767,6 +2069,7 @@
     applyPreviewGrades(hit);
     syncAnnotations(hit);
     drawPrivacyMasks();
+    applyFramePreview(hit);
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -2631,6 +2934,13 @@
       if (isPhoto || isVideo) fillOverlayInspector(clip);
       else selectedOverlayId = null;
       fillMaskInspector(clip);
+      const frameWrap = document.getElementById("inspector-frame");
+      if (frameWrap) frameWrap.hidden = !(isPhoto || isVideo);
+      if (isPhoto || isVideo) {
+        frameMotionArmed = frameMotionOn(readFrame(clip));
+        frameEditTarget = "start";
+        fillFrame(clip);
+      }
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -4556,6 +4866,116 @@
   if (previewVideo) {
     previewVideo.addEventListener("loadedmetadata", () => syncAnnotations(resolveAt(state.projectTimeS)));
   }
+  document.getElementById("inspector-frame-zoom")?.addEventListener("input", () => {
+    const clip = selectedAdjustableClip();
+    const input = document.getElementById("inspector-frame-zoom");
+    if (!clip || !input) return;
+    const frame = readFrame(clip);
+    frame.zoom_start = clampZoom(input.value);
+    if (!frameMotionChecked()) {
+      frame.zoom_end = frame.zoom_start;
+      frame.x_end = frame.x_start;
+      frame.y_end = frame.y_start;
+    }
+    commitFrame(clip, frame);
+    setSaveState(false);
+  });
+  document.getElementById("inspector-frame-zoom")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    queueFrameSave(clip);
+  });
+  document.getElementById("inspector-frame-zoom-end")?.addEventListener("input", () => {
+    const clip = selectedAdjustableClip();
+    const input = document.getElementById("inspector-frame-zoom-end");
+    if (!clip || !input) return;
+    const frame = readFrame(clip);
+    frame.zoom_end = clampZoom(input.value);
+    frameMotionArmed = true;
+    commitFrame(clip, frame);
+    setSaveState(false);
+  });
+  document.getElementById("inspector-frame-zoom-end")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    queueFrameSave(clip);
+  });
+  document.getElementById("inspector-frame-motion")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const frame = readFrame(clip);
+    frameMotionArmed = frameMotionChecked();
+    if (!frameMotionArmed) {
+      frame.zoom_end = frame.zoom_start;
+      frame.x_end = frame.x_start;
+      frame.y_end = frame.y_start;
+      frameEditTarget = "start";
+    }
+    commitFrame(clip, frame);
+    setSaveState(false);
+    queueFrameSave(clip);
+  });
+  document.getElementById("inspector-frame-target-start")?.addEventListener("click", () => {
+    frameEditTarget = "start";
+    const clip = selectedAdjustableClip();
+    if (clip) fillFrame(clip);
+    applyFramePreview(resolveAt(state.projectTimeS));
+  });
+  document.getElementById("inspector-frame-target-end")?.addEventListener("click", () => {
+    frameEditTarget = "end";
+    frameMotionArmed = true;
+    const clip = selectedAdjustableClip();
+    if (clip) fillFrame(clip);
+    applyFramePreview(resolveAt(state.projectTimeS));
+  });
+  document.getElementById("inspector-frame-reset")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    frameMotionArmed = false;
+    frameEditTarget = "start";
+    commitFrame(clip, neutralFrame());
+    setSaveState(false);
+    queueFrameSave(clip);
+  });
+  if (previewFrame) {
+    previewFrame.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      const frame = readFrame(clip);
+      const editingEnd = frameMotionChecked() && frameEditTarget === "end";
+      const zoom = editingEnd ? frame.zoom_end : frame.zoom_start;
+      if (zoom <= 1.001) return;
+      event.preventDefault();
+      previewFrame.classList.add("is-panning");
+      const pointerId = event.pointerId;
+      previewFrame.setPointerCapture?.(pointerId);
+      let lastX = event.clientX;
+      let lastY = event.clientY;
+      const move = (ev) => {
+        panFrame(clip, ev.clientX - lastX, ev.clientY - lastY);
+        lastX = ev.clientX;
+        lastY = ev.clientY;
+      };
+      const up = () => {
+        previewFrame.classList.remove("is-panning");
+        previewFrame.removeEventListener("pointermove", move);
+        previewFrame.removeEventListener("pointerup", up);
+        previewFrame.removeEventListener("pointercancel", up);
+        setSaveState(false);
+        queueFrameSave(clip);
+      };
+      previewFrame.addEventListener("pointermove", move);
+      previewFrame.addEventListener("pointerup", up);
+      previewFrame.addEventListener("pointercancel", up);
+    });
+  }
+  const reapplyFrame = () => applyFramePreview(resolveAt(state.projectTimeS));
+  previewImage?.addEventListener("load", reapplyFrame);
+  previewImageB?.addEventListener("load", reapplyFrame);
+  previewVideo?.addEventListener("loadedmetadata", reapplyFrame);
+  previewVideoB?.addEventListener("loadedmetadata", reapplyFrame);
+  window.addEventListener("resize", reapplyFrame);
 
   ["inspector-music-volume", "inspector-music-fade-in", "inspector-music-fade-out"].forEach(
     (id) => {

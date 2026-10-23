@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_image import ImageAdjust
 from orga_drone.studio_mask import Mask
 from orga_drone.studio_overlay import Overlay
@@ -29,6 +30,7 @@ class StudioExportClip:
     fade_in_s: float = 0.0
     fade_out_s: float = 0.0
     image: ImageAdjust = field(default_factory=ImageAdjust)
+    frame: FrameTransform = field(default_factory=FrameTransform)
     masks: tuple[Mask, ...] = ()
     overlays: tuple[Overlay, ...] = ()
 

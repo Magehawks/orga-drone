@@ -31,6 +31,10 @@ from orga_drone.studio_estimate import (
     effective_seconds,
     summarize_studio_items,
 )
+from orga_drone.studio_frame import (
+    frame_from_effect_settings,
+    frame_preview_model,
+)
 from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
@@ -1056,6 +1060,7 @@ def create_app() -> FastAPI:
                         ]
                         if it.kind in {"photo", "video"}
                         else [],
+                        "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
                         "applied_transition": applied_by_id.get(it.id),
@@ -1088,6 +1093,7 @@ def create_app() -> FastAPI:
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
+            frame_model=frame_preview_model(),
             mask_model=mask_preview_model(),
             overlay_model=overlay_preview_model(),
             favorite_media=favorite_media,
@@ -1588,6 +1594,35 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "masks": [mask.as_dict() for mask in masks],
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/frame")
+    async def api_studio_frame(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include frame"
+            )
+        try:
+            item = db.set_studio_frame(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        frame = frame_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "frame": frame.as_dict(),
             }
         )
 
