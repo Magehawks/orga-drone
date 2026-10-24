@@ -276,6 +276,8 @@ def test_http_masks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert removed_id in page.text
     assert "Datenschutz" in page.text
     assert "studio-inspector-resize" in page.text
+    assert "studio-browser-resize" in page.text
+    assert "studio-story-resize" in page.text
     assert "inspector-tab-effects" in page.text
     removed = client.patch(
         f"/api/studio/{clip_id}/masks",

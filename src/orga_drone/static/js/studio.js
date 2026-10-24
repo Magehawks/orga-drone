@@ -1747,20 +1747,25 @@
     );
   }
 
+  function readStoredSize(key, min, max) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw == null || raw === "") return null;
+      const value = Number(raw);
+      if (!Number.isFinite(value)) return null;
+      return Math.round(Math.max(min, Math.min(max, value)));
+    } catch (_) {
+      return null;
+    }
+  }
+
   function bindInspectorChrome() {
     const workspace = document.querySelector(".studio-workspace");
     const handle = document.getElementById("studio-inspector-resize");
     const inspector = document.getElementById("studio-inspector");
     if (workspace) {
-      try {
-        const saved = Number(localStorage.getItem("orga-drone.studio.inspectorWidth"));
-        if (Number.isFinite(saved)) {
-          const width = Math.round(Math.max(240, Math.min(520, saved)));
-          workspace.style.setProperty("--studio-inspector-width", `${width}px`);
-        }
-      } catch (_) {
-        /* ignore */
-      }
+      const saved = readStoredSize("orga-drone.studio.inspectorWidth", 240, 520);
+      if (saved != null) workspace.style.setProperty("--studio-inspector-width", `${saved}px`);
     }
     if (handle && workspace && inspector) {
       handle.addEventListener("pointerdown", (event) => {
@@ -1789,6 +1794,89 @@
           }
           drawPrivacyMasks();
           drawFlightMap(resolveAt(state.projectTimeS));
+          if (typeof layoutTimeline === "function") layoutTimeline();
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        move(event);
+      });
+    }
+    const browser = document.querySelector(".studio-browser");
+    const browserHandle = document.getElementById("studio-browser-resize");
+    const stage = document.querySelector(".studio-stage");
+    const story = document.querySelector(".studio-story-area");
+    const storyHandle = document.getElementById("studio-story-resize");
+    if (workspace) {
+      const savedBrowser = readStoredSize("orga-drone.studio.browserWidth", 200, 420);
+      if (savedBrowser != null) workspace.style.setProperty("--studio-browser-width", `${savedBrowser}px`);
+    }
+    if (stage) {
+      const savedStory = readStoredSize("orga-drone.studio.storyHeight", 128, 480);
+      if (savedStory != null) stage.style.setProperty("--studio-story-height", `${savedStory}px`);
+    }
+    if (browserHandle && workspace && browser) {
+      browserHandle.addEventListener("pointerdown", (event) => {
+        if (window.matchMedia("(max-width: 800px)").matches) return;
+        if (event.button != null && event.button !== 0) return;
+        event.preventDefault();
+        browserHandle.classList.add("is-dragging");
+        const originX = event.clientX;
+        const originW = browser.getBoundingClientRect().width;
+        const move = (ev) => {
+          const rect = workspace.getBoundingClientRect();
+          const max = Math.min(420, Math.max(240, rect.width * 0.36));
+          const width = Math.round(Math.min(max, Math.max(200, originW + (ev.clientX - originX))));
+          workspace.style.setProperty("--studio-browser-width", `${width}px`);
+        };
+        const up = () => {
+          browserHandle.classList.remove("is-dragging");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+          const width = Number.parseFloat(workspace.style.getPropertyValue("--studio-browser-width"));
+          if (Number.isFinite(width)) {
+            try {
+              localStorage.setItem("orga-drone.studio.browserWidth", String(Math.round(width)));
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          drawPrivacyMasks();
+          drawFlightMap(resolveAt(state.projectTimeS));
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        move(event);
+      });
+    }
+    if (storyHandle && stage && story) {
+      storyHandle.addEventListener("pointerdown", (event) => {
+        if (window.matchMedia("(max-width: 800px)").matches) return;
+        if (event.button != null && event.button !== 0) return;
+        event.preventDefault();
+        storyHandle.classList.add("is-dragging");
+        const originY = event.clientY;
+        const originH = story.getBoundingClientRect().height;
+        const move = (ev) => {
+          const rect = stage.getBoundingClientRect();
+          const max = Math.min(480, Math.max(180, rect.height * 0.55));
+          const height = Math.round(Math.min(max, Math.max(128, originH + (originY - ev.clientY))));
+          stage.style.setProperty("--studio-story-height", `${height}px`);
+        };
+        const up = () => {
+          storyHandle.classList.remove("is-dragging");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+          const height = Number.parseFloat(stage.style.getPropertyValue("--studio-story-height"));
+          if (Number.isFinite(height)) {
+            try {
+              localStorage.setItem("orga-drone.studio.storyHeight", String(Math.round(height)));
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          drawPrivacyMasks();
+          drawFlightMap(resolveAt(state.projectTimeS));
+          layoutTimeline();
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);

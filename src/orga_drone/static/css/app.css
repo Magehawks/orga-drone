@@ -1236,10 +1236,11 @@ body.studio-app { padding-bottom: 0; }
 }
 
 .studio-workspace {
+  --studio-browser-width: 16rem;
   --studio-inspector-width: 17rem;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr) var(--studio-inspector-width);
+  grid-template-columns: var(--studio-browser-width) minmax(0, 1fr) var(--studio-inspector-width);
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   gap: 0;
@@ -1252,6 +1253,36 @@ body.studio-app { padding-bottom: 0; }
   padding: 0.75rem;
   overflow: auto;
   min-height: 0;
+}
+.studio-browser {
+  position: relative;
+  min-width: 0;
+}
+.studio-browser-resize,
+.studio-story-resize {
+  position: absolute;
+  z-index: 6;
+  touch-action: none;
+}
+.studio-browser-resize {
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+}
+.studio-story-resize {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8px;
+  cursor: row-resize;
+}
+.studio-browser-resize:hover,
+.studio-browser-resize.is-dragging,
+.studio-story-resize:hover,
+.studio-story-resize.is-dragging {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .studio-inspector {
   position: relative;
@@ -1419,6 +1450,7 @@ body.studio-app { padding-bottom: 0; }
 .studio-add-media { width: 100%; text-align: center; }
 
 .studio-stage {
+  --studio-story-height: 15.5rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1905,10 +1937,13 @@ img.studio-preview-media,
 .studio-transport-volume input { width: 5.5rem; vertical-align: middle; }
 
 .studio-story-area {
-  flex: 0 0 auto;
-  padding: 0.5rem 0.75rem 0.85rem;
+  position: relative;
+  flex: 0 0 var(--studio-story-height);
+  height: var(--studio-story-height);
+  max-height: var(--studio-story-height);
+  box-sizing: border-box;
+  padding: 0.7rem 0.75rem 0.85rem;
   background: color-mix(in srgb, var(--panel) 70%, var(--surface-deep));
-  max-height: 15.5rem;
   overflow: auto;
 }
 .studio-timeline-toolbar {
@@ -2512,7 +2547,7 @@ img.studio-preview-media,
 
 @media (max-width: 1100px) {
   .studio-workspace {
-    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+    grid-template-columns: var(--studio-browser-width) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
   }
   .studio-inspector {
@@ -2539,6 +2574,13 @@ img.studio-preview-media,
     border-bottom: 1px solid var(--border);
     max-height: 12rem;
     overflow: auto;
+  }
+  .studio-browser-resize,
+  .studio-story-resize { display: none; }
+  .studio-story-area {
+    height: auto;
+    max-height: none;
+    flex-basis: auto;
   }
   .studio-browser-panel {
     flex: none;
