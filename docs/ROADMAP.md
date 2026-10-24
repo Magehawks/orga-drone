@@ -27,7 +27,9 @@ Highlights:
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
   `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
-  publishes it only after the MOTW smoke test in `packaging/README.md`
+  publishes it only after the MOTW smoke test in `packaging/README.md`.
+  About shows the installed version. An optional check, off by default, links
+  to a newer published Windows release and does not download or install it.
 - Library scan progress (live phase/counters during full rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +

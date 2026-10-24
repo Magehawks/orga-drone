@@ -43,6 +43,7 @@
         <button type="submit">{{ _('Apply') }}</button>
       </form>
       {% endif %}
+      <button type="button" class="about-open" data-open-about>{{ _('About') }}</button>
       <div class="seg-control lang" role="group" aria-label="{{ _('Language') }}">
         {% for code in langs %}
           <a href="/lang/{{ code }}" class="seg-item {% if code == lang %}active{% endif %}">{{ code }}</a>
@@ -50,6 +51,12 @@
       </div>
     </div>
   </header>
+
+  <div id="update-notice" class="update-notice" hidden role="status">
+    <p id="update-notice-text"></p>
+    <a id="update-notice-link" href="{{ download_url }}" target="_blank" rel="noopener noreferrer">{{ _('Download') }}</a>
+    <button type="button" id="update-notice-dismiss">{{ _('Dismiss') }}</button>
+  </div>
 
   {% block stats %}{% endblock %}
 
@@ -81,9 +88,31 @@
   </nav>
 
   <footer>
-    <p>{{ _('Local only — your videos never leave this computer.') }} · <span class="app-version">v{{ version }}</span></p>
+    <p>{{ _('Local only — your videos never leave this computer.') }} · <button type="button" class="app-version-button" data-open-about><span class="app-version">v{{ version }}</span></button></p>
   </footer>
+
+  <dialog id="about-dialog" class="about-dialog"
+          data-update-check="{{ '1' if check_updates else '0' }}"
+          data-msg-available="{{ _('Version {version} is available.')|e }}"
+          data-msg-current="{{ _("You're up to date.")|e }}"
+          data-msg-unavailable="{{ _('Could not check for updates.')|e }}"
+          data-msg-checking="{{ _('Checking for updates…')|e }}">
+    <h2>{{ _('About Orga Drone') }}</h2>
+    <p>{{ _('Installed version') }} <span class="app-version">v{{ version }}</span></p>
+    <p class="hint">{{ _('A check only asks for the latest published Windows release. Your library stays on this computer.') }}</p>
+    <label class="about-check" for="about-check-updates">
+      <input type="checkbox" id="about-check-updates" {% if check_updates %}checked{% endif %}>
+      <span>{{ _('Check for updates at startup') }}</span>
+    </label>
+    <p id="about-check-status" class="hint" role="status"></p>
+    <div class="about-actions">
+      <button type="button" class="button ghost" id="about-check-now">{{ _('Check for updates') }}</button>
+      <a class="button ghost" id="about-download" href="{{ download_url }}" target="_blank" rel="noopener noreferrer">{{ _('Download') }}</a>
+      <button type="button" class="button" id="about-close">{{ _('Close') }}</button>
+    </div>
+  </dialog>
   <script src="/static/js/ui.js"></script>
+  <script src="/static/js/updates.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

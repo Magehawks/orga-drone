@@ -16,7 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from orga_drone import __version__
+from orga_drone.app_prefs import get_check_updates, set_check_updates
 from orga_drone.config import settings
+from orga_drone.updates import OFFICIAL_DOWNLOAD_URL, UpdateChecker, installed_version
 from orga_drone.db import Database, make_identity_key, parse_tags, track_from_json
 from orga_drone.dupes import (
     DURATION_TOLERANCE_S,
@@ -228,6 +230,7 @@ def create_app() -> FastAPI:
     app.state.db = db
     app.state.scan_jobs = ScanJobStore()
     app.state.export_jobs = ExportJobStore()
+    app.state.update_checker = UpdateChecker()
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["filesize"] = format_bytes
@@ -451,7 +454,9 @@ def create_app() -> FastAPI:
             "lang": lang,
             "langs": SUPPORTED_LANGS,
             "_": _,
-            "version": __version__,
+            "version": installed_version(),
+            "check_updates": get_check_updates(),
+            "download_url": OFFICIAL_DOWNLOAD_URL,
             "stats": db.stats(),
             "theme": theme.mode,
             "theme_accent": theme.accent,
@@ -2267,8 +2272,67 @@ def create_app() -> FastAPI:
         apply_theme_cookies(response, prefs)
         return response
 
+    @app.get("/api/updates")
+    async def api_updates_preference() -> dict[str, Any]:
+        return {
+            "ok": True,
+            "enabled": get_check_updates(),
+            "version": installed_version(),
+            "download_url": OFFICIAL_DOWNLOAD_URL,
+        }
+
+    @app.post("/api/updates/preference")
+    async def api_updates_set_preference(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or not isinstance(payload.get("enabled"), bool):
+            raise HTTPException(status_code=400, detail="enabled must be a boolean")
+        set_check_updates(payload["enabled"])
+        return JSONResponse({"ok": True, "enabled": get_check_updates()})
+
+    @app.post("/api/updates/check")
+    async def api_updates_check(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        startup = isinstance(payload, dict) and payload.get("startup") is True
+        if startup and not get_check_updates():
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "checked": False,
+                    "state": "skipped",
+                    "current": installed_version(),
+                    "latest": None,
+                    "download_url": OFFICIAL_DOWNLOAD_URL,
+                }
+            )
+        checker: UpdateChecker = app.state.update_checker
+        report = await asyncio.to_thread(
+            checker.check, current=installed_version(), startup=startup
+        )
+        body = report.as_dict()
+        body["ok"] = True
+        body["checked"] = True
+        return JSONResponse(body)
+
+    @app.post("/api/updates/open-download")
+    async def api_updates_open_download() -> JSONResponse:
+        import webbrowser
+
+        try:
+            opened = await asyncio.to_thread(webbrowser.open, OFFICIAL_DOWNLOAD_URL)
+        except OSError:
+            opened = False
+        return JSONResponse(
+            {"ok": bool(opened), "url": OFFICIAL_DOWNLOAD_URL}
+        )
+
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok", "version": __version__}
+        return {"status": "ok", "version": installed_version()}
 
     return app
