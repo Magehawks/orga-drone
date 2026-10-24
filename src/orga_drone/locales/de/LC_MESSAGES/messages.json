@@ -65,6 +65,9 @@
   "Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.": "Der native Ordnerdialog ist nicht verfügbar. Bitte den Pfad manuell eingeben oder orga-drone als Desktop-App starten.",
   "Label (optional)": "Bezeichnung (optional)",
   "Scan": "Scannen",
+  "Offline": "Offline",
+  "Source offline. Catalog entries stay until this folder is connected again.": "Quelle offline. Katalogeinträge bleiben, bis dieser Ordner wieder verbunden ist.",
+  "Source offline. This catalog entry is kept. Connect the drive to open it again.": "Quelle offline. Dieser Katalogeintrag bleibt erhalten. Schließe das Laufwerk an, um die Datei wieder zu öffnen.",
   "Scan all": "Alle scannen",
   "Remove": "Entfernen",
   "Last scanned": "Zuletzt gescannt",
@@ -494,5 +497,11 @@
   "Already in this album.": "Schon in diesem Album.",
   "Removed from album.": "Aus dem Album entfernt.",
   "Not in any album yet.": "Noch in keinem Album.",
-  "That album is no longer available.": "Dieses Album gibt es nicht mehr."
+  "That album is no longer available.": "Dieses Album gibt es nicht mehr.",
+  "Color to black and white": "Farbe zu Schwarzweiß",
+  "Animate saturation": "Sättigung animieren",
+  "Start saturation": "Start-Sättigung",
+  "End saturation": "End-Sättigung",
+  "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.": "Hält die Start-Sättigung bis zum Startzeitpunkt und geht dann linear zur End-Sättigung. 100 % behält die aktuelle Korrektur. 0 % ist Schwarzweiß. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
+  "Could not save the color change.": "Die Farbänderung konnte nicht gespeichert werden."
 }

@@ -26,7 +26,8 @@ stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
 export; Title Cards; basic visual transitions; basic per-clip image
-adjustment for photos and videos (brightness, contrast, saturation, warmth); read-only soundtrack
+adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear
+saturation ramp on video clips from that grade toward black and white; read-only soundtrack
 coverage on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
@@ -99,7 +100,7 @@ orga-drone.
 
 | Responsibility | Status |
 |----------------|--------|
-| Import / scan | **Available now** (full rescan per root) |
+| Import / scan | **Available now** (listable roots rescan in place; unchanged files skip metadata extraction by size + mtime; an unlistable source keeps its catalog entries and is marked offline) |
 | Metadata (EXIF, DJI, SRT, …) | **Available now** |
 | GPS | **Available now** |
 | Sessions / flows | **Available now** (heuristic) |
@@ -144,6 +145,7 @@ professional video-editing knowledge.
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
+| Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
@@ -248,7 +250,9 @@ See `README.md` for the detailed feature status table. In short:
   Crossfade) persist per outgoing clip
   and render in preview and MP4. Photo and video clips can store a basic image adjustment
   (brightness, contrast, saturation, warmth) on that Story clip; preview
-  approximates the exported picture and is not a color-managed grade. The same clips
+  approximates the exported picture and is not a color-managed grade. A video clip
+  can also animate that saturation across a start and end time inside the clip,
+  from the current grade toward black and white. Photo and video clips
   can carry up to 8 timed text, shape, or image overlays, with Fade in, Fade out,
   or Slide in. Photo and
   video clips can also store up to 8 rectangular privacy masks (blur or
@@ -263,7 +267,13 @@ See `README.md` for the detailed feature status table. In short:
 
 ## Honest limitations
 
-- Library scan is a **full rescan** per root (not incremental).
+- A library rescan still walks each listable root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. A source that cannot be listed is not treated as a deleted
+  library: catalog entries stay and are marked offline until the folder is
+  connected and scanned again. Files removed from a folder that can still be
+  listed are dropped on the next scan. Scan never deletes files, favorites,
+  tags, notes, or Studio clips.
 - Flight sessions are **heuristic**.
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is thinner than DJI-oriented paths.
@@ -283,7 +293,8 @@ See `README.md` for the detailed feature status table. In short:
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
   headings, read-only time-proportional soundtrack coverage on that canvas,
-  basic rendered visual transitions, basic per-clip image adjustment, timed text,
+  basic rendered visual transitions, basic per-clip image adjustment, a linear
+  video saturation ramp (not a keyframe editor), timed text,
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;

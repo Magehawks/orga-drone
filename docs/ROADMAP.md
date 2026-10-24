@@ -30,7 +30,7 @@ Highlights:
   publishes it only after the MOTW smoke test in `packaging/README.md`.
   About shows the installed version. An optional check, off by default, links
   to a newer published Windows release and does not download or install it.
-- Library scan progress (live phase/counters during full rescan)
+- Library scan progress (live phase/counters during a library rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
@@ -40,7 +40,7 @@ Highlights:
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
-  image adjustment for photos and videos (brightness, contrast, saturation, warmth); timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
+  image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
   for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
@@ -52,7 +52,7 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
 1. Export cancel / abort during long renders
-2. **Incremental or cheaper rescans** (clearer scan progress is available)
+2. **Cheaper directory walks** (unchanged files already skip metadata extraction by size and mtime; scan progress is available)
 3. **Broader multi-brand parsers** beyond DJI-first depth
 4. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
    The Windows onefolder zip Actions workflow is available; it is not an
@@ -90,6 +90,11 @@ open/reveal of the finished file already exist on Windows desktop.
 - Competing with Premiere / DaVinci / CapCut as a pro NLE
 
 ## How work enters the repo
+
+User-need reports ([`docs/USER_NEEDS.md`](USER_NEEDS.md)) are evidence. Opening
+or accepting one does not change this roadmap. A maintainer may later turn an
+accepted need into a product issue. Shipped work links that user-need issue to
+the release notes. A roadmap edit is a separate maintainer decision.
 
 1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
 2. **Product-Spec-Reviewer** checks the spec against code and vision docs

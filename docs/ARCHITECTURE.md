@@ -18,7 +18,7 @@ Do not invent layers, services, or plugins that are not present.
 | App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip. itch.io butler process is documented in `packaging/itch/` and is not an in-app updater |
 | Tests | pytest under `tests/` |
-| CI | GitHub Actions: Ruff, MyPy, pytest on pull requests. Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `packaging/README.md`. |
+| CI | GitHub Actions on pull requests: Ruff, MyPy, pytest, plus a separate **App journey smoke** check (`tests/test_pr_journey_smoke.py`, synthetic JPEG, no private library). Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `docs/PR_E2E.md` and `packaging/README.md`. |
 
 Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 `create_app()` in `src/orga_drone/app.py`.
@@ -51,7 +51,7 @@ so they do not auto-update. See `packaging/itch/README.md`.
 | `config.py` | Settings, paths, env |
 | `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files; MOTW-safe copy of WebView2 DLLs (see `packaging/README.md`) |
 | `db/` | Schema, migrations, queries |
-| `scan/` | Full rescan of library roots |
+| `scan/` | Rescan of library roots; unchanged files skip metadata extraction |
 | `parse/` | Filenames, SRT, EXIF, generic media |
 | `group/` | Flows (FAT32 splits) + sessions |
 | `search/` | Rule-based Ask the library (DE/EN) |
@@ -79,7 +79,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `albums` | User-named library albums (independent of `studio_projects`) |
 | `album_items` | Non-destructive media references (`media_path` + `identity_key` + optional `source_media_id`); one file may appear in several albums; survives rescan; listed as offline when the file is not on disk |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
-| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`); survives rescan |
+| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; video saturation ramp under `saturation_ramp`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`); survives rescan |
 | `studio_audio_clips` | Optional sequential soundtrack playlist (up to 8 songs; `duration_s`; volume/fades; loop when N=1; read-only path outside library roots allowed; not library media) |
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
@@ -88,21 +88,28 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
-1. Recursively find media files under a root
-2. Clear indexed media for that root (**full rescan**; `media_meta`,
-   `album_items`, and `studio_clips` kept)
-3. Parse → upsert assets/media
-4. Relink user meta + album membership + Studio membership + apply auto-tags
-5. Rebuild flows, then sessions
-6. Mark root scanned
+1. If the root cannot be listed (missing drive, disconnected share, or an OS
+   error while walking it), keep the existing catalog and report the source
+   offline. Do not clear `media` or user metadata.
+2. Recursively find media files under a root
+3. Skip metadata extraction when the stored asset size and mtime match
+   (ADR 0020). Parse new or changed files before replacing any index rows.
+   If the source disappears during that read, keep the existing catalog.
+4. Drop index rows for this root whose paths were not found, and only if the
+   root is still listable (`media_meta`, `album_items`, and `studio_clips` stay).
+   An empty but listable folder is a confirmed deletion.
+5. Upsert new or changed files, then relink user meta, album membership,
+   Studio membership, and auto-tags for those parsed files. A size/mtime
+   match still refreshes SRT/LRF flags and Live Photo pairing from filenames.
+6. Rebuild flows, then sessions (this still runs when every file was unchanged)
+7. Mark root scanned
 
 HTTP triggers in `app.py`: add root, scan one root, scan all.
 
 Library scans run in a **background thread** with an in-memory job
 (`src/orga_drone/scan/jobs.py`). The browser polls `GET /api/scan-jobs/{id}`
-for phase/counters (discovering / indexing / grouping). Full-rescan semantics
-are unchanged; jobs are not persisted in SQLite. At most one library scan runs
-at a time.
+for phase/counters (discovering / indexing / grouping). Jobs are not persisted
+in SQLite. At most one library scan runs at a time.
 
 ## UI surfaces
 
@@ -136,7 +143,7 @@ scope.
 Typical user flow:
 
 ```text
-add folder → full scan/parse → SQLite index → browse / map / detail
+add folder → scan/parse (unchanged files skip extraction) → SQLite index → browse / map / detail
                                          → optional Studio curation
                                          → optional rename, merge, export, dupes
 ```
@@ -145,6 +152,7 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 
 - Location: `tests/`
 - Style: domain unit tests + FastAPI `TestClient` smoke tests
+- Pull-request journey: `tests/test_pr_journey_smoke.py` walks import → browse → Studio with a generated JPEG and a temporary data directory. CI reports it as **App journey smoke**. See `docs/PR_E2E.md`.
 - Prefer covering parsing, sessions, search, dupes, meta, and route behavior
   when those areas change
 
@@ -166,4 +174,5 @@ add folder → full scan/parse → SQLite index → browse / map / detail
 - Roadmap: `docs/ROADMAP.md`
 - Decisions: `docs/decisions/`
 - Packaging: `packaging/README.md`
+- Pull-request journey check: `docs/PR_E2E.md`
 - Agent summary: `AGENTS.md`

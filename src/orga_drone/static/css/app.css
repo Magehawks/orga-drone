@@ -1341,6 +1341,9 @@ video.studio-preview-media.studio-preview-layer-b {
   align-items: center;
   gap: 0.4rem;
 }
+#inspector-bw-enabled {
+  width: auto;
+}
 .studio-frame-target {
   display: flex;
   gap: 0.35rem;
@@ -2148,6 +2151,24 @@ img.studio-preview-media,
       transparent 16px
     ),
     var(--surface-deep);
+}
+.library-offline-note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dash-rail-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.wm-item-link .wm-thumb {
+  width: 3.5rem;
+  height: 2.65rem;
+  border-radius: 5px;
+  border: 1px solid var(--border);
 }
 .badge.unavailable {
   display: inline-block;

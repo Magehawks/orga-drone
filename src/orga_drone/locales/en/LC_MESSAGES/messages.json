@@ -65,6 +65,9 @@
   "Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.": "Native folder picker is not available. Enter the path manually or start orga-drone as a desktop app.",
   "Label (optional)": "Label (optional)",
   "Scan": "Scan",
+  "Offline": "Offline",
+  "Source offline. Catalog entries stay until this folder is connected again.": "Source offline. Catalog entries stay until this folder is connected again.",
+  "Source offline. This catalog entry is kept. Connect the drive to open it again.": "Source offline. This catalog entry is kept. Connect the drive to open it again.",
   "Scan all": "Scan all",
   "Remove": "Remove",
   "Last scanned": "Last scanned",
@@ -494,5 +497,11 @@
   "Already in this album.": "Already in this album.",
   "Removed from album.": "Removed from album.",
   "Not in any album yet.": "Not in any album yet.",
-  "That album is no longer available.": "That album is no longer available."
+  "That album is no longer available.": "That album is no longer available.",
+  "Color to black and white": "Color to black and white",
+  "Animate saturation": "Animate saturation",
+  "Start saturation": "Start saturation",
+  "End saturation": "End saturation",
+  "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.": "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.",
+  "Could not save the color change.": "Could not save the color change."
 }

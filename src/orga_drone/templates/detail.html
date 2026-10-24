@@ -25,7 +25,11 @@
 {% endif %}
 
 <section class="detail panel">
-  <h1>{{ item.filename }}</h1>
+  <h1>{{ item.filename }}
+    {% if item.root_id in offline_root_ids %}
+      <span class="badge unavailable">{{ _('Offline') }}</span>
+    {% endif %}
+  </h1>
 
   {% if flash_msg == 'renamed' %}
     <div class="flash ok" role="status">{{ _('File renamed. Matching LRF/SRT files were renamed too.') }}</div>
@@ -276,7 +280,9 @@
 
   <div class="detail-split {% if not show_map %}single{% endif %}">
     <div class="detail-media">
-      {% if can_play %}
+      {% if item.root_id in offline_root_ids %}
+        <p class="hint" role="status">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
+      {% elif can_play %}
         <h2>{% if active_tab == 'flight' %}{{ _('Flight preview') }}{% else %}{{ _('Preview') }}{% endif %}</h2>
         {% if item.kind == 'photo' %}
           <div class="photo-frame">
