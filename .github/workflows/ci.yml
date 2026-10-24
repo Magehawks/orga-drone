@@ -39,7 +39,7 @@ jobs:
         run: ruff check .
 
       - name: MyPy type check
-        run: mypy src
+        run: mypy src packaging/itch_channel.py
 
       - name: Unit tests
         # The journey file has its own check so a failure is visible as

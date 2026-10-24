@@ -34,7 +34,7 @@ Highlights:
   `studio_clips` with editable title, order, estimated runtime, video Cut via
   source start/end; Projects switcher beside the open project title; Clear Studio
   on the Story toolbar (clips only); synced Story preview playback; local MP4 export (Cancel stops a running encode) with
-  configurable resolution, including photo-only stories at 720/1080; after success, Open video / Show in folder on
+  configurable resolution (suggested filename includes that resolution), including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
@@ -56,6 +56,9 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
    The Windows onefolder zip Actions workflow is available; it is not an
    installer and it does not publish on merge.
 6. Online geocoding providers (place tags are offline today)
+7. **itch.io Windows channel** via butler for the existing onefolder build.
+   The process is documented for a Draft/Restricted test. A public paid
+   launch waits on the A→B app-update record. This is not an in-app updater.
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
 dedicated product slice. Local MP4 export, optional soundtrack playlist in

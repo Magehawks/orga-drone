@@ -6,7 +6,7 @@ Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
-with configurable resolution; after export, Open video / Show in folder on
+with configurable resolution (suggested filename includes that resolution; Cancel export stops the running encode); after export, Open video / Show in folder on
 Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
 in preview and MP4 export; Title Cards as generated Story items; basic rendered
 visual transitions with labeled boundary overlays; basic per-clip image
@@ -58,7 +58,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth) |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -82,7 +82,7 @@ The application helps users:
   (Cut, Fade through black, Crossfade) in preview and MP4; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
   export); local MP4 export with configurable
-  resolution on desktop, including photo-only stories at 720/1080; Cancel export stops the running encode; after a successful export, Open video / Show in folder
+  resolution on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
   canvas; loop still repeats a single song to Story end). The open project is
@@ -101,8 +101,11 @@ The application helps users:
 - There is **no** Library albums model, plugin API, or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
-  MOTW smoke test (`packaging/README.md`). It is not an in-app updater, an
-  MSIX installer, or a macOS/Linux build. Studio supports multiple local
+  MOTW smoke test (`packaging/README.md`). A Windows itch.io butler process
+  is documented for a Draft/Restricted test channel and is not a public paid
+  launch. ZIP installs do not receive itch.io app updates. It is not an
+  in-app updater, an MSIX installer, or a macOS/Linux build. Studio supports
+  multiple local
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector
@@ -137,6 +140,8 @@ The application helps users:
 - battery and equipment analytics
 - additional drone manufacturers via dedicated parsers
 - incremental scanning and multi-OS / MSIX installers
+- itch.io Windows convenience channel via butler (documented test process;
+  not a public launch; no custom in-app updater)
 
 These are future directions. Never describe them as already available.
 

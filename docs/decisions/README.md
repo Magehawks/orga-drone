@@ -38,4 +38,5 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0010](0010-studio-visual-transitions.md) | Studio visual transitions | Accepted |
 | [0011](0011-studio-image-adjust.md) | Studio per-clip image adjustment | Accepted |
 | [0012](0012-windows-release-workflow.md) | Windows release workflow with a draft publish gate | Accepted |
+| [0013](0013-itch-windows-channel.md) | itch.io Windows channel via butler | Accepted |
 | [0014](0014-studio-export-cancel.md) | Studio export cancellation | Accepted |

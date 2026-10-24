@@ -12,6 +12,7 @@ from orga_drone.studio_export_resolution import (
     classify_source_height,
     default_export_height,
     default_videos_directory,
+    export_resolution_filename_tag,
     max_project_export_height,
     resolve_export_directory,
     suggested_export_filename,
@@ -97,6 +98,40 @@ def test_suggested_export_filename(title: str, expected: str) -> None:
     assert suggested_export_filename(title) == expected
 
 
+@pytest.mark.parametrize(
+    ("height", "tag"),
+    [
+        (1080, "1080p"),
+        (2160, "4k"),
+        (720, "720p"),
+        (1440, "2560x1440"),
+        (480, "853x480"),
+    ],
+)
+def test_export_resolution_filename_tag(height: int, tag: str) -> None:
+    assert export_resolution_filename_tag(height) == tag
+
+
+@pytest.mark.parametrize(
+    ("title", "height", "expected"),
+    [
+        ("Summer Alps 2026", 1080, "Summer Alps 2026_1080p.mp4"),
+        ("Summer Alps 2026", 2160, "Summer Alps 2026_4k.mp4"),
+        ("Summer Alps 2026", 720, "Summer Alps 2026_720p.mp4"),
+        ("Summer Alps 2026", 1440, "Summer Alps 2026_2560x1440.mp4"),
+        ("a/b\\c:d*e?", 1080, "a b c d e_1080p.mp4"),
+        ("", 2160, "Your story_4k.mp4"),
+        ("   ", 720, "Your story_720p.mp4"),
+        ("CON", 1440, "export-CON_2560x1440.mp4"),
+        ("My.Story.", 1080, "My.Story_1080p.mp4"),
+    ],
+)
+def test_suggested_export_filename_includes_resolution(
+    title: str, height: int, expected: str
+) -> None:
+    assert suggested_export_filename(title, height=height) == expected
+
+
 def test_resolve_export_directory_prefers_last(tmp_path: Path) -> None:
     last = tmp_path / "exports"
     last.mkdir()
@@ -106,7 +141,9 @@ def test_resolve_export_directory_prefers_last(tmp_path: Path) -> None:
     assert missing == default_videos_directory()
 
 
-def test_last_export_directory_prefs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_last_export_directory_prefs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from orga_drone.config import Settings
     import orga_drone.app_prefs as prefs
 
