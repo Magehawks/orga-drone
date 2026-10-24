@@ -132,6 +132,7 @@
          data-in-story="{{ _('In story')|e }}"
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
+         data-bw-failed="{{ _('Could not save the color change.')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-overlay-model='{{ overlay_model|tojson }}'
          data-overlay-failed="{{ _('Could not save overlays.')|e }}"
@@ -496,6 +497,7 @@
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
+                  data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-frame='{{ row.frame|tojson }}'
@@ -604,6 +606,40 @@
           </label>
           <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+        </div>
+        <div id="inspector-saturation-ramp" hidden>
+          <p class="studio-inspector-kind">{{ _('Color to black and white') }}</p>
+          <label class="studio-inspector-field studio-frame-motion">
+            <input type="checkbox" id="inspector-bw-enabled">
+            <span>{{ _('Animate saturation') }}</span>
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('Start (s)') }}</span>
+            <input type="number" id="inspector-bw-start" min="-86400" max="86400" step="0.1" value="0"
+                   aria-label="{{ _('Start (s)') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('End (s)') }}</span>
+            <input type="number" id="inspector-bw-end" min="-86400" max="86400" step="0.1" value="0"
+                   aria-label="{{ _('End (s)') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Start saturation') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-bw-start-sat-value">100</span>
+            </span>
+            <input type="range" id="inspector-bw-start-sat" min="0" max="100" step="1" value="100"
+                   aria-label="{{ _('Start saturation') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('End saturation') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-bw-end-sat-value">0</span>
+            </span>
+            <input type="range" id="inspector-bw-end-sat" min="0" max="100" step="1" value="0"
+                   aria-label="{{ _('End saturation') }}">
+          </label>
+          <p class="hint">{{ _('Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
         <div id="inspector-overlays" hidden>
           <p class="studio-inspector-kind">{{ _('Overlays') }}</p>

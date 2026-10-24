@@ -1,0 +1,1173 @@
+{
+  "issue": 99,
+  "measured_at": "2026-10-24T19:41:27",
+  "git_head": "49b16120bf97e4a6c199a776687f8807aeead9f6",
+  "label": "Synthetic fixture measurements. Not a recruited 20k photo/video archive and not a NAS.",
+  "hardware": {
+    "platform": "win32",
+    "python": "3.12.3",
+    "cpu": {
+      "Name": "AMD Ryzen 7 5700X 8-Core Processor             ",
+      "NumberOfCores": 8,
+      "NumberOfLogicalProcessors": 16
+    },
+    "total_physical_memory_bytes": 34278871040,
+    "logical_disks": [
+      {
+        "DeviceID": "C:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 498492669952,
+        "FreeSpace": 142439002112
+      },
+      {
+        "DeviceID": "D:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 2000263573504,
+        "FreeSpace": 1336081481728
+      },
+      {
+        "DeviceID": "E:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 2000382062592,
+        "FreeSpace": 294283681792
+      },
+      {
+        "DeviceID": "F:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 1000187359232,
+        "FreeSpace": 79961096192
+      },
+      {
+        "DeviceID": "G:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 471855104,
+        "FreeSpace": 455708672
+      },
+      {
+        "DeviceID": "H:",
+        "DriveType": 3,
+        "FileSystem": "NTFS",
+        "Size": 1000186310656,
+        "FreeSpace": 150919954432
+      },
+      {
+        "DeviceID": "I:",
+        "DriveType": 5,
+        "FileSystem": null,
+        "Size": null,
+        "FreeSpace": null
+      }
+    ],
+    "physical_disks": [
+      {
+        "FriendlyName": "Samsung SSD 850 EVO 500GB",
+        "MediaType": "SSD",
+        "BusType": "SATA",
+        "Size": 500107862016,
+        "HealthStatus": "Healthy"
+      },
+      {
+        "FriendlyName": "Samsung SSD 990 EVO Plus 1TB",
+        "MediaType": "SSD",
+        "BusType": "NVMe",
+        "Size": 1000204886016,
+        "HealthStatus": "Healthy"
+      },
+      {
+        "FriendlyName": "Samsung SSD 990 EVO Plus 2TB",
+        "MediaType": "SSD",
+        "BusType": "NVMe",
+        "Size": 2000398934016,
+        "HealthStatus": "Healthy"
+      },
+      {
+        "FriendlyName": "Samsung SSD 860 EVO 1TB",
+        "MediaType": "SSD",
+        "BusType": "SATA",
+        "Size": 1000204886016,
+        "HealthStatus": "Healthy"
+      },
+      {
+        "FriendlyName": "WDC WD20EZRZ-00Z5HB0",
+        "MediaType": "HDD",
+        "BusType": "SATA",
+        "Size": 2000398934016,
+        "HealthStatus": "Healthy"
+      }
+    ],
+    "partition_media": [
+      {
+        "DriveLetter": "E",
+        "BusType": "NVMe",
+        "MediaType": "SSD",
+        "FriendlyName": "Samsung SSD 990 EVO Plus 2TB"
+      },
+      {
+        "DriveLetter": "F",
+        "BusType": "NVMe",
+        "MediaType": "SSD",
+        "FriendlyName": "Samsung SSD 990 EVO Plus 1TB"
+      },
+      {
+        "DriveLetter": "G",
+        "BusType": "SATA",
+        "MediaType": "SSD",
+        "FriendlyName": "Samsung SSD 850 EVO 500GB"
+      },
+      {
+        "DriveLetter": "C",
+        "BusType": "SATA",
+        "MediaType": "SSD",
+        "FriendlyName": "Samsung SSD 850 EVO 500GB"
+      },
+      {
+        "DriveLetter": "H",
+        "BusType": "SATA",
+        "MediaType": "SSD",
+        "FriendlyName": "Samsung SSD 860 EVO 1TB"
+      },
+      {
+        "DriveLetter": "D",
+        "BusType": "SATA",
+        "MediaType": "HDD",
+        "FriendlyName": "WDC WD20EZRZ-00Z5HB0"
+      }
+    ],
+    "process_memory_at_start": {
+      "working_set_bytes": 29167616,
+      "peak_working_set_bytes": 29167616
+    }
+  },
+  "installed_catalog_not_rescanned": {
+    "present": true,
+    "bytes": 10543104,
+    "media": 17485,
+    "photos": 16790,
+    "videos": 695,
+    "roots": 5,
+    "roots_existing": 5,
+    "roots_missing": 0,
+    "favorites": 0,
+    "studio_clips": 89,
+    "note": "Counted only. This harness did not rescan those roots."
+  },
+  "network_and_other_drives": {
+    "method": "Path.exists() in a child process. DriveType 2 is removable, 4 is network. No share was mounted and no drive was ejected.",
+    "probes": {
+      "missing_local": {
+        "seconds": 0.0,
+        "exists": false,
+        "error": null,
+        "timed_out": false,
+        "returncode": 0
+      },
+      "unc_test_net": {
+        "seconds": 20,
+        "exists": null,
+        "error": "timeout",
+        "timed_out": true,
+        "stdout": ""
+      },
+      "unc_localhost_missing_share": {
+        "seconds": 0.005,
+        "exists": false,
+        "error": null,
+        "timed_out": false,
+        "returncode": 0
+      },
+      "drive_i_type_5": {
+        "seconds": 0.012,
+        "exists": false,
+        "error": null,
+        "timed_out": false,
+        "returncode": 0
+      }
+    }
+  },
+  "removable_folder": {
+    "attempted": false,
+    "reason": "No removable drive with >100 MiB free."
+  },
+  "unavailable_root_cases": {
+    "method": "Local directories only. 'Missing' means the directory was removed. 'Emptied' means the same path still exists with no media files. This is not a NAS unplug.",
+    "first_scan_result_count": 4,
+    "sample_list_media_id": 120,
+    "before": {
+      "keep": {
+        "media": 30,
+        "assets": 30
+      },
+      "emptied": {
+        "media": 30,
+        "assets": 30
+      },
+      "direct": {
+        "media": 20,
+        "assets": 20
+      },
+      "favorites": 2,
+      "studio_clips": 2
+    },
+    "after_keep_removed_and_emptied_rescanned_via_scan_all_roots": {
+      "keep": {
+        "media": 30,
+        "assets": 30
+      },
+      "emptied": {
+        "media": 0,
+        "assets": 0
+      },
+      "direct": {
+        "media": 20,
+        "assets": 20
+      },
+      "favorites": 2,
+      "studio_clips": 2,
+      "studio_available_flags": [
+        true,
+        false
+      ],
+      "scan_all_errors": [
+        {
+          "root_id": 1,
+          "error": "missing"
+        }
+      ]
+    },
+    "after_emptied_files_restored": {
+      "emptied": {
+        "media": 30,
+        "assets": 30
+      },
+      "favorite_relinked": true,
+      "studio_available_flags": [
+        true,
+        true
+      ],
+      "restored_filename_present": true,
+      "scan_errors": [
+        "missing"
+      ]
+    },
+    "scan_root_after_directory_removed": {
+      "seconds": 0.074,
+      "counts": {
+        "assets": 0,
+        "videos": 0,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 0
+      },
+      "error": null,
+      "snapshot": {
+        "media": 0,
+        "assets": 0
+      }
+    },
+    "mid_scan_files_deleted_at_processed_10": {
+      "seconds": 3.513,
+      "counts": {
+        "assets": 40,
+        "videos": 0,
+        "photos": 40,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 0
+      },
+      "error": null,
+      "files_left_on_disk": 0,
+      "snapshot": {
+        "media": 40,
+        "assets": 40
+      }
+    }
+  },
+  "video_stubs": {
+    "ffmpeg": true,
+    "ffprobe": false,
+    "count": 80,
+    "composition": "160x90 black H.264 about 0.5s, copied N times. Not drone footage.",
+    "seed": {
+      "seconds": 0.033,
+      "returncode": 0,
+      "bytes": 1800,
+      "stderr": ""
+    },
+    "fixture_write_seconds": 0.066,
+    "scan": {
+      "seconds": 20.149,
+      "seconds_per_file": 0.2519,
+      "counts": {
+        "assets": 80,
+        "videos": 80,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 1
+      },
+      "phases": [
+        {
+          "phase": "discovering",
+          "root_id": 1,
+          "start_seconds": 0.001,
+          "duration_seconds": 0.061,
+          "discovered": 0,
+          "memory": {
+            "working_set_bytes": 37142528,
+            "peak_working_set_bytes": 38903808
+          }
+        },
+        {
+          "phase": "indexing",
+          "root_id": 1,
+          "start_seconds": 0.062,
+          "duration_seconds": 19.982,
+          "discovered": 80,
+          "memory": {
+            "working_set_bytes": 37240832,
+            "peak_working_set_bytes": 38903808
+          }
+        },
+        {
+          "phase": "grouping",
+          "root_id": 1,
+          "start_seconds": 20.044,
+          "duration_seconds": 0.105,
+          "discovered": 80,
+          "memory": {
+            "working_set_bytes": 37322752,
+            "peak_working_set_bytes": 39325696
+          }
+        },
+        {
+          "phase": "done",
+          "root_id": 1,
+          "start_seconds": 20.149,
+          "duration_seconds": 0.0,
+          "discovered": 80,
+          "memory": {
+            "working_set_bytes": 37621760,
+            "peak_working_set_bytes": 39325696
+          }
+        }
+      ],
+      "memory_before": {
+        "working_set_bytes": 37138432,
+        "peak_working_set_bytes": 38903808
+      },
+      "memory_after": {
+        "working_set_bytes": 37621760,
+        "peak_working_set_bytes": 39325696
+      },
+      "sqlite_bytes": 233472
+    },
+    "per_file_microbench": {
+      "sample_bytes": 1800,
+      "scan_video_header": {
+        "repeats": 5,
+        "seconds": 0.008,
+        "seconds_per_call": 0.0017
+      },
+      "probe_video_streams": {
+        "repeats": 5,
+        "seconds": 0.477,
+        "seconds_per_call": 0.0953
+      },
+      "probe_video_with_ffprobe": {
+        "repeats": 5,
+        "seconds": 0.159,
+        "seconds_per_call": 0.0318
+      },
+      "parse_media_file": {
+        "repeats": 5,
+        "seconds": 0.178,
+        "seconds_per_call": 0.0355
+      }
+    },
+    "projection_note": "Per-file times are measurements. They are not multiplied into a 20k video total."
+  },
+  "large_synthetic_jpegs": {
+    "composition": "Synthetic solid-color JPEGs, no EXIF GPS. Not drone photos.",
+    "files": [
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.007
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.007
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.008
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.008
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.007
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "bytes": 33269,
+        "pillow_save_seconds": 0.008
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "bytes": 130229,
+        "pillow_save_seconds": 0.031
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "bytes": 130229,
+        "pillow_save_seconds": 0.031
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "bytes": 130229,
+        "pillow_save_seconds": 0.034
+      }
+    ],
+    "parse_media_file_seconds": 0.109,
+    "parse_seconds_per_file": 0.0121,
+    "ensure_thumbnail_seconds": 0.362,
+    "thumbnail_seconds_per_file": 0.0402
+  },
+  "offline_geocode_one_coordinate": {
+    "coordinate": "47.3769, 8.5417 (public sample, not from a library file)",
+    "cold_seconds": 2.968,
+    "cached_seconds": 0.002,
+    "cold_resolved": true,
+    "cached_resolved": true,
+    "note": "The 20k photo fixture has no GPS, so scan did not call this. Cold time includes the first offline geocoder load in this process."
+  },
+  "installed_library_rescan": {
+    "attempted": true,
+    "method": "Read-only look at the installed catalog, then a full rescan of those roots into a new SQLite file. Source files were not modified. Paths and filenames are omitted.",
+    "roots": [
+      {
+        "index": 1,
+        "drive": "F:",
+        "exists": true,
+        "exists_seconds": 0.0,
+        "exists_timed_out": false,
+        "seconds": 325.792,
+        "counts": {
+          "assets": 679,
+          "videos": 4,
+          "photos": 480,
+          "live_sidecars": 190,
+          "non_video": 5,
+          "flows": 0,
+          "sessions": 1
+        },
+        "phases": [
+          {
+            "phase": "discovering",
+            "root_id": 1,
+            "start_seconds": 0.0,
+            "duration_seconds": 0.777,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 174600192,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "indexing",
+            "root_id": 1,
+            "start_seconds": 0.777,
+            "duration_seconds": 324.752,
+            "discovered": 679,
+            "memory": {
+              "working_set_bytes": 174600192,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "grouping",
+            "root_id": 1,
+            "start_seconds": 325.529,
+            "duration_seconds": 0.262,
+            "discovered": 679,
+            "memory": {
+              "working_set_bytes": 176738304,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "done",
+            "root_id": 1,
+            "start_seconds": 325.791,
+            "duration_seconds": 0.001,
+            "discovered": 679,
+            "memory": {
+              "working_set_bytes": 178012160,
+              "peak_working_set_bytes": 187633664
+            }
+          }
+        ],
+        "memory_after": {
+          "working_set_bytes": 178012160,
+          "peak_working_set_bytes": 187633664
+        }
+      },
+      {
+        "index": 2,
+        "drive": "C:",
+        "exists": true,
+        "exists_seconds": 0.0,
+        "exists_timed_out": false,
+        "seconds": 0.642,
+        "counts": {
+          "assets": 2,
+          "videos": 0,
+          "photos": 2,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "flows": 0,
+          "sessions": 0
+        },
+        "phases": [
+          {
+            "phase": "discovering",
+            "root_id": 2,
+            "start_seconds": 0.0,
+            "duration_seconds": 0.006,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 178012160,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "indexing",
+            "root_id": 2,
+            "start_seconds": 0.006,
+            "duration_seconds": 0.475,
+            "discovered": 2,
+            "memory": {
+              "working_set_bytes": 178012160,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "grouping",
+            "root_id": 2,
+            "start_seconds": 0.481,
+            "duration_seconds": 0.161,
+            "discovered": 2,
+            "memory": {
+              "working_set_bytes": 178069504,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "done",
+            "root_id": 2,
+            "start_seconds": 0.642,
+            "duration_seconds": 0.0,
+            "discovered": 2,
+            "memory": {
+              "working_set_bytes": 178069504,
+              "peak_working_set_bytes": 187633664
+            }
+          }
+        ],
+        "memory_after": {
+          "working_set_bytes": 178069504,
+          "peak_working_set_bytes": 187633664
+        }
+      },
+      {
+        "index": 3,
+        "drive": "D:",
+        "exists": true,
+        "exists_seconds": 0.0,
+        "exists_timed_out": false,
+        "seconds": 1784.122,
+        "counts": {
+          "assets": 16913,
+          "videos": 624,
+          "photos": 16289,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "flows": 0,
+          "sessions": 123
+        },
+        "phases": [
+          {
+            "phase": "discovering",
+            "root_id": 3,
+            "start_seconds": 0.001,
+            "duration_seconds": 16.135,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 178073600,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "indexing",
+            "root_id": 3,
+            "start_seconds": 16.136,
+            "duration_seconds": 1767.238,
+            "discovered": 16913,
+            "memory": {
+              "working_set_bytes": 186724352,
+              "peak_working_set_bytes": 187633664
+            }
+          },
+          {
+            "phase": "grouping",
+            "root_id": 3,
+            "start_seconds": 1783.374,
+            "duration_seconds": 0.725,
+            "discovered": 16913,
+            "memory": {
+              "working_set_bytes": 193548288,
+              "peak_working_set_bytes": 197533696
+            }
+          },
+          {
+            "phase": "done",
+            "root_id": 3,
+            "start_seconds": 1784.099,
+            "duration_seconds": 0.023,
+            "discovered": 16913,
+            "memory": {
+              "working_set_bytes": 251359232,
+              "peak_working_set_bytes": 251359232
+            }
+          }
+        ],
+        "memory_after": {
+          "working_set_bytes": 191479808,
+          "peak_working_set_bytes": 251359232
+        }
+      },
+      {
+        "index": 4,
+        "drive": "C:",
+        "exists": true,
+        "exists_seconds": 0.0,
+        "exists_timed_out": false,
+        "seconds": 0.057,
+        "counts": {
+          "assets": 0,
+          "videos": 0,
+          "photos": 0,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "flows": 0,
+          "sessions": 0
+        },
+        "phases": [
+          {
+            "phase": "discovering",
+            "root_id": 4,
+            "start_seconds": 0.0,
+            "duration_seconds": 0.001,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 191610880,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "indexing",
+            "root_id": 4,
+            "start_seconds": 0.001,
+            "duration_seconds": 0.014,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 191610880,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "grouping",
+            "root_id": 4,
+            "start_seconds": 0.015,
+            "duration_seconds": 0.041,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 191885312,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "done",
+            "root_id": 4,
+            "start_seconds": 0.056,
+            "duration_seconds": 0.001,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 191868928,
+              "peak_working_set_bytes": 251359232
+            }
+          }
+        ],
+        "memory_after": {
+          "working_set_bytes": 191868928,
+          "peak_working_set_bytes": 251359232
+        }
+      },
+      {
+        "index": 5,
+        "drive": "F:",
+        "exists": true,
+        "exists_seconds": 0.0,
+        "exists_timed_out": false,
+        "seconds": 78.181,
+        "counts": {
+          "assets": 157,
+          "videos": 61,
+          "photos": 20,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "flows": 8,
+          "sessions": 14
+        },
+        "phases": [
+          {
+            "phase": "discovering",
+            "root_id": 5,
+            "start_seconds": 0.0,
+            "duration_seconds": 0.153,
+            "discovered": 0,
+            "memory": {
+              "working_set_bytes": 191868928,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "indexing",
+            "root_id": 5,
+            "start_seconds": 0.153,
+            "duration_seconds": 77.913,
+            "discovered": 157,
+            "memory": {
+              "working_set_bytes": 189050880,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "grouping",
+            "root_id": 5,
+            "start_seconds": 78.066,
+            "duration_seconds": 0.114,
+            "discovered": 157,
+            "memory": {
+              "working_set_bytes": 190214144,
+              "peak_working_set_bytes": 251359232
+            }
+          },
+          {
+            "phase": "done",
+            "root_id": 5,
+            "start_seconds": 78.18,
+            "duration_seconds": 0.001,
+            "discovered": 157,
+            "memory": {
+              "working_set_bytes": 190926848,
+              "peak_working_set_bytes": 251359232
+            }
+          }
+        ],
+        "memory_after": {
+          "working_set_bytes": 189259776,
+          "peak_working_set_bytes": 251359232
+        }
+      }
+    ],
+    "media_rows": 17480,
+    "photo_rows": 16791,
+    "video_rows": 689,
+    "sqlite_bytes": 10620928,
+    "browse_queries": {
+      "count_media": {
+        "repeats": 3,
+        "min_seconds": 0.0095,
+        "max_seconds": 0.0103,
+        "last_result_len": 17077
+      },
+      "list_page_50": {
+        "repeats": 3,
+        "min_seconds": 0.0024,
+        "max_seconds": 0.0026,
+        "last_result_len": 50
+      },
+      "list_page_200": {
+        "repeats": 3,
+        "min_seconds": 0.0053,
+        "max_seconds": 0.0054,
+        "last_result_len": 200
+      },
+      "list_unbounded": {
+        "repeats": 1,
+        "min_seconds": 0.392,
+        "max_seconds": 0.392,
+        "last_result_len": 17077
+      }
+    },
+    "thumbnails": {
+      "photos": 10,
+      "videos": 3,
+      "ok": 13,
+      "failed": 0,
+      "seconds": 1.872,
+      "note": "First ensure_thumbnail call for this sample. Not the whole library."
+    },
+    "memory_after": {
+      "working_set_bytes": 192913408,
+      "peak_working_set_bytes": 292397056
+    }
+  },
+  "scale": {
+    "photo_count": 20000,
+    "composition": "20000 8x8 JPEG files, DJI-style names, 100 files per folder, no EXIF GPS, split across two library roots. Not a drone archive.",
+    "primary_drive": "C:",
+    "secondary_drive": "D:",
+    "same_volume": false,
+    "tiny_jpeg_bytes": 631,
+    "secondary_root_kept_until_cleanup": "D:\\orga-drone-issue-99-bench",
+    "fixture_write_seconds": {
+      "primary": 5.085,
+      "secondary": 4.84
+    },
+    "discover_only_seconds": 1.838,
+    "discover_only_files": 20000,
+    "first_scan": {
+      "seconds": 941.475,
+      "seconds_per_file": 0.0471,
+      "roots": [
+        {
+          "root_id": 1,
+          "error": null,
+          "assets": 10000,
+          "photos": 10000,
+          "videos": 0
+        },
+        {
+          "root_id": 2,
+          "error": null,
+          "assets": 10000,
+          "photos": 10000,
+          "videos": 0
+        }
+      ],
+      "phases": [
+        {
+          "phase": "discovering",
+          "root_id": 1,
+          "start_seconds": 0.002,
+          "duration_seconds": 5.761,
+          "discovered": 0,
+          "memory": {
+            "working_set_bytes": 199417856,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "indexing",
+          "root_id": 1,
+          "start_seconds": 5.763,
+          "duration_seconds": 461.475,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 214134784,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "grouping",
+          "root_id": 1,
+          "start_seconds": 467.238,
+          "duration_seconds": 0.281,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 218796032,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "done",
+          "root_id": 1,
+          "start_seconds": 467.519,
+          "duration_seconds": 0.013,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 254197760,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "discovering",
+          "root_id": 2,
+          "start_seconds": 467.532,
+          "duration_seconds": 6.332,
+          "discovered": 0,
+          "memory": {
+            "working_set_bytes": 211726336,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "indexing",
+          "root_id": 2,
+          "start_seconds": 473.864,
+          "duration_seconds": 467.3,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 212566016,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "grouping",
+          "root_id": 2,
+          "start_seconds": 941.164,
+          "duration_seconds": 0.302,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 214695936,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "done",
+          "root_id": 2,
+          "start_seconds": 941.466,
+          "duration_seconds": 0.009,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 249012224,
+            "peak_working_set_bytes": 292397056
+          }
+        }
+      ],
+      "memory_before": {
+        "working_set_bytes": 199417856,
+        "peak_working_set_bytes": 292397056
+      },
+      "memory_after": {
+        "working_set_bytes": 216752128,
+        "peak_working_set_bytes": 292397056
+      },
+      "sqlite_bytes": 14106624,
+      "media_rows": 20000
+    },
+    "second_full_rescan": {
+      "seconds": 1023.683,
+      "seconds_per_file": 0.0512,
+      "phases": [
+        {
+          "phase": "discovering",
+          "root_id": 1,
+          "start_seconds": 0.001,
+          "duration_seconds": 5.878,
+          "discovered": 0,
+          "memory": {
+            "working_set_bytes": 216879104,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "indexing",
+          "root_id": 1,
+          "start_seconds": 5.879,
+          "duration_seconds": 505.949,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 217948160,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "grouping",
+          "root_id": 1,
+          "start_seconds": 511.828,
+          "duration_seconds": 0.277,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 218763264,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "done",
+          "root_id": 1,
+          "start_seconds": 512.105,
+          "duration_seconds": 0.011,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 254836736,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "discovering",
+          "root_id": 2,
+          "start_seconds": 512.116,
+          "duration_seconds": 6.268,
+          "discovered": 0,
+          "memory": {
+            "working_set_bytes": 220430336,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "indexing",
+          "root_id": 2,
+          "start_seconds": 518.384,
+          "duration_seconds": 505.015,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 220762112,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "grouping",
+          "root_id": 2,
+          "start_seconds": 1023.399,
+          "duration_seconds": 0.276,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 220815360,
+            "peak_working_set_bytes": 292397056
+          }
+        },
+        {
+          "phase": "done",
+          "root_id": 2,
+          "start_seconds": 1023.675,
+          "duration_seconds": 0.008,
+          "discovered": 10000,
+          "memory": {
+            "working_set_bytes": 248766464,
+            "peak_working_set_bytes": 292397056
+          }
+        }
+      ],
+      "sqlite_bytes": 14200832,
+      "memory_after": {
+        "working_set_bytes": 224227328,
+        "peak_working_set_bytes": 292397056
+      }
+    },
+    "browse_queries": {
+      "count_media": {
+        "repeats": 3,
+        "min_seconds": 0.0096,
+        "max_seconds": 0.011,
+        "last_result_len": 20000
+      },
+      "list_page_50": {
+        "repeats": 3,
+        "min_seconds": 0.0014,
+        "max_seconds": 0.0016,
+        "last_result_len": 50
+      },
+      "list_page_100": {
+        "repeats": 3,
+        "min_seconds": 0.0023,
+        "max_seconds": 0.0023,
+        "last_result_len": 100
+      },
+      "list_page_200": {
+        "repeats": 3,
+        "min_seconds": 0.004,
+        "max_seconds": 0.004,
+        "last_result_len": 200
+      },
+      "list_deep_page_50": {
+        "repeats": 3,
+        "min_seconds": 0.0129,
+        "max_seconds": 0.0134,
+        "last_result_len": 50
+      },
+      "list_unbounded": {
+        "repeats": 1,
+        "min_seconds": 0.5112,
+        "max_seconds": 0.5112,
+        "last_result_len": 20000
+      },
+      "page_50_unique_ids": 50,
+      "page_50_row_count": 50
+    },
+    "thumbnails_first_50_tiny_jpegs": {
+      "cold_seconds": 0.098,
+      "cached_seconds": 0.021,
+      "cache_files": 72,
+      "cache_bytes": 1613259,
+      "note": "Scan does not build thumbnails. These calls are ensure_thumbnail."
+    },
+    "http": {
+      "pages": {
+        "/browse?page_size=50": {
+          "status": 200,
+          "seconds": 0.106,
+          "bytes": 90790
+        },
+        "/browse?page_size=200": {
+          "status": 200,
+          "seconds": 0.036,
+          "bytes": 334045
+        },
+        "/browse?page=40&page_size=200": {
+          "status": 200,
+          "seconds": 0.085,
+          "bytes": 338915
+        },
+        "/": {
+          "status": 200,
+          "seconds": 0.458,
+          "bytes": 7526
+        }
+      },
+      "thumb_gets": {
+        "count": 50,
+        "seconds": 0.414,
+        "statuses": {
+          "200": 50
+        }
+      },
+      "note": "In-process TestClient. No browser and no WebView2."
+    },
+    "root_ids": {
+      "primary": 1,
+      "secondary": 2
+    }
+  },
+  "memory_at_end": {
+    "working_set_bytes": 235999232,
+    "peak_working_set_bytes": 292397056
+  }
+}

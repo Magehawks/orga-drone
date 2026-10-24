@@ -259,6 +259,7 @@
   const labelInStory = root.dataset.inStory || "In story";
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
+  const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -953,9 +954,15 @@
     return Math.round(Math.min(40000, Math.max(1000, kelvin)));
   }
 
-  function cssFilterFor(adjust) {
+  function cssFilterFor(adjust, rampMultiplier) {
     const model = imageAdjustModel;
     const parts = [];
+    // Leftmost saturate is applied last and matches hue after the grade.
+    // Keep the 0..1 multiplier in lockstep with saturation_multiplier.
+    const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
+    if (mult < 0.9995) {
+      parts.push(`saturate(${Math.max(0, mult).toFixed(4)})`);
+    }
     if (adjust.saturation) {
       const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
       parts.push(`saturate(${factor.toFixed(4)})`);
@@ -981,7 +988,68 @@
     );
   }
 
-  function gradePreviewElement(el, clip, filterId, matrixId) {
+  function neutralSaturationRamp() {
+    return { enabled: false, start_s: 0, end_s: 0, start_saturation: 100, end_saturation: 0 };
+  }
+
+  function clampRampTime(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-86400, Math.min(86400, Math.round(number * 10000) / 10000));
+  }
+
+  function clampRampPercent(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(100, Math.round(number)));
+  }
+
+  function readSaturationRamp(clip) {
+    const neutral = neutralSaturationRamp();
+    if (!clip || clip.dataset.kind !== "video") return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.saturationRamp || "");
+      if (!parsed || typeof parsed !== "object") return neutral;
+      return {
+        enabled: parsed.enabled === true,
+        start_s: clampRampTime(parsed.start_s),
+        end_s: clampRampTime(parsed.end_s),
+        start_saturation: clampRampPercent(
+          parsed.start_saturation == null ? 100 : parsed.start_saturation
+        ),
+        end_saturation: clampRampPercent(parsed.end_saturation),
+      };
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function writeSaturationRamp(clip, ramp) {
+    if (!clip) return;
+    clip.dataset.saturationRamp = JSON.stringify({
+      enabled: ramp.enabled === true,
+      start_s: clampRampTime(ramp.start_s),
+      end_s: clampRampTime(ramp.end_s),
+      start_saturation: clampRampPercent(ramp.start_saturation),
+      end_saturation: clampRampPercent(ramp.end_saturation),
+    });
+  }
+
+  function saturationRampMultiplier(ramp, localS) {
+    if (!ramp || ramp.enabled !== true) return 1;
+    const span = ramp.end_s - ramp.start_s;
+    if (!(span > 0.001)) return 1;
+    const startM = ramp.start_saturation / 100;
+    const endM = ramp.end_saturation / 100;
+    if (ramp.start_saturation === ramp.end_saturation) return startM;
+    const local = Number(localS);
+    const t = Number.isFinite(local) ? local : 0;
+    if (t <= ramp.start_s) return startM;
+    if (t >= ramp.end_s) return endM;
+    return startM + (endM - startM) * ((t - ramp.start_s) / span);
+  }
+
+  function gradePreviewElement(el, clip, filterId, matrixId, localS) {
     if (!el) return;
     const kind = clip && clip.dataset.kind;
     const active = clip && (kind === "video" || kind === "photo") && !el.hidden;
@@ -990,11 +1058,12 @@
       return;
     }
     const adjust = readImageAdjust(clip);
-    if (imageAdjustIsNeutral(adjust)) {
+    const mult = saturationRampMultiplier(readSaturationRamp(clip), localS);
+    if (imageAdjustIsNeutral(adjust) && mult >= 0.9995) {
       el.style.filter = "";
       return;
     }
-    const css = cssFilterFor(adjust);
+    const css = cssFilterFor(adjust, mult);
     if (adjust.warmth) {
       setGradeMatrix(matrixId, kelvinForWarmth(adjust.warmth));
       el.style.filter = `${css} url(#${filterId})`.trim();
@@ -1006,29 +1075,35 @@
   function applyPreviewGrades(hit) {
     const primary = hit && hit.clip ? hit.clip : null;
     const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
+    const localS = hit && Number.isFinite(hit.localS) ? hit.localS : 0;
+    const overlapLocal = hit && Number.isFinite(hit.overlapLocalS) ? hit.overlapLocalS : 0;
     gradePreviewElement(
       previewVideo,
       primary,
       "studio-preview-grade",
-      "studio-preview-grade-matrix"
+      "studio-preview-grade-matrix",
+      localS
     );
     gradePreviewElement(
       previewImage,
       primary,
       "studio-preview-grade",
-      "studio-preview-grade-matrix"
+      "studio-preview-grade-matrix",
+      localS
     );
     gradePreviewElement(
       previewVideoB,
       overlap,
       "studio-preview-grade-b",
-      "studio-preview-grade-matrix-b"
+      "studio-preview-grade-matrix-b",
+      overlapLocal
     );
     gradePreviewElement(
       previewImageB,
       overlap,
       "studio-preview-grade-b",
-      "studio-preview-grade-matrix-b"
+      "studio-preview-grade-matrix-b",
+      overlapLocal
     );
   }
 
@@ -2929,6 +3004,9 @@
       const imageWrap = document.getElementById("inspector-image-adjust");
       if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
       if (isPhoto || isVideo) fillImageAdjust(clip);
+      const bwWrap = document.getElementById("inspector-saturation-ramp");
+      if (bwWrap) bwWrap.hidden = !isVideo;
+      if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
       if (isPhoto || isVideo) fillOverlayInspector(clip);
@@ -4351,6 +4429,140 @@
     applyPreviewGrades(resolveAt(state.projectTimeS));
     setSaveState(false);
     queueImageAdjustSave(clip);
+  });
+
+  const BW_TIME_FIELDS = [
+    ["start_s", "inspector-bw-start"],
+    ["end_s", "inspector-bw-end"],
+  ];
+  const BW_PERCENT_FIELDS = [
+    ["start_saturation", "inspector-bw-start-sat", "inspector-bw-start-sat-value"],
+    ["end_saturation", "inspector-bw-end-sat", "inspector-bw-end-sat-value"],
+  ];
+
+  function selectedVideoClip() {
+    const clip = selectedAdjustableClip();
+    if (!clip || clip.dataset.kind !== "video") return null;
+    return clip;
+  }
+
+  function fillSaturationRamp(clip) {
+    const ramp = readSaturationRamp(clip);
+    const enabled = document.getElementById("inspector-bw-enabled");
+    if (enabled) enabled.checked = ramp.enabled;
+    BW_TIME_FIELDS.forEach(([key, inputId]) => {
+      const input = document.getElementById(inputId);
+      if (input) input.value = String(ramp[key]);
+    });
+    BW_PERCENT_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      if (input) input.value = String(ramp[key]);
+      if (valueEl) valueEl.textContent = String(ramp[key]);
+    });
+  }
+
+  function saturationRampFromControls() {
+    const ramp = neutralSaturationRamp();
+    const enabled = document.getElementById("inspector-bw-enabled");
+    ramp.enabled = Boolean(enabled && enabled.checked);
+    BW_TIME_FIELDS.forEach(([key, inputId]) => {
+      const input = document.getElementById(inputId);
+      ramp[key] = clampRampTime(input ? input.value : 0);
+    });
+    BW_PERCENT_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      const shown = clampRampPercent(input ? input.value : 0);
+      ramp[key] = shown;
+      if (valueEl) valueEl.textContent = String(shown);
+    });
+    return ramp;
+  }
+
+  function queueSaturationRampSave(clip) {
+    const studioId = clip.dataset.studioId;
+    imageSaveChain = imageSaveChain
+      .then(() => saveSaturationRamp(studioId))
+      .catch((err) => {
+        showFlash((err && err.message) || msgBwFailed);
+      });
+  }
+
+  async function saveSaturationRamp(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const ramp = readSaturationRamp(clip);
+    const res = await fetch(`/api/studio/${studioId}/saturation-ramp`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ saturation_ramp: ramp }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgBwFailed);
+    }
+    writeSaturationRamp(clip, body.saturation_ramp || ramp);
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillSaturationRamp(clip);
+    }
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
+  function commitSaturationRamp(clip, ramp) {
+    writeSaturationRamp(clip, ramp);
+    fillSaturationRamp(clip);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(false);
+    queueSaturationRampSave(clip);
+  }
+
+  document.getElementById("inspector-bw-enabled")?.addEventListener("change", () => {
+    const clip = selectedVideoClip();
+    if (!clip) return;
+    const ramp = saturationRampFromControls();
+    if (ramp.enabled && !(ramp.end_s - ramp.start_s > 0.001)) {
+      ramp.start_s = 0;
+      ramp.end_s = Math.max(0.1, Math.round(clipDuration(clip) * 10000) / 10000);
+    }
+    commitSaturationRamp(clip, ramp);
+  });
+  BW_TIME_FIELDS.forEach(([, inputId]) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const clip = selectedVideoClip();
+      if (!clip) return;
+      writeSaturationRamp(clip, saturationRampFromControls());
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      setSaveState(false);
+    });
+    input.addEventListener("change", () => {
+      const clip = selectedVideoClip();
+      if (!clip) return;
+      commitSaturationRamp(clip, saturationRampFromControls());
+    });
+  });
+  BW_PERCENT_FIELDS.forEach(([, inputId]) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const clip = selectedVideoClip();
+      if (!clip) return;
+      writeSaturationRamp(clip, saturationRampFromControls());
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      setSaveState(false);
+    });
+    input.addEventListener("change", () => {
+      const clip = selectedVideoClip();
+      if (!clip) return;
+      commitSaturationRamp(clip, saturationRampFromControls());
+    });
   });
 
   function readOverlayModel() {

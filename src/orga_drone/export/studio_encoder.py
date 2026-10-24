@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
-from orga_drone.studio_image import ffmpeg_grade_chain
+from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -64,13 +64,19 @@ def _segment_vf(width: int, height: int) -> str:
 
 
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
-    """Grade, optional zoom/pan, then scale/pad.
+    """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
     Fades stay separate so privacy masks and overlays can sit on the framed
-    picture before them.
+    picture before them. The ramp follows the grade so a fade to black still
+    ends on black.
     """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    ramp = (
+        ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=clip.source_start_s)
+        if clip.kind == "video"
+        else ""
+    )
     prefix = ""
     suffix = ""
     if clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
@@ -93,7 +99,7 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_start_s=clip.source_start_s,
             duration_s=clip.duration_s,
         )
-    return ",".join(part for part in (grade, prefix, base, suffix) if part)
+    return ",".join(part for part in (grade, ramp, prefix, base, suffix) if part)
 
 
 def _fade_filters(clip: StudioExportClip) -> list[str]:

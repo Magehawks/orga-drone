@@ -148,7 +148,7 @@ mock implementation.
 
 - Read-only: no application, CSS, JS, template, or i18n edits.
 - Do not claim roadmap features already exist.
-- Do not invent plugins, albums, cloud share destinations, AI storytelling, or
+- Do not invent plugins, cloud share destinations, AI storytelling, or
   professional editor surfaces absent from the current product truth.
 - Do not treat visual polish as a usability problem unless it blocks a task.
 - Do not silently expand into a redesign of Library, Browse, Studio, or Share.

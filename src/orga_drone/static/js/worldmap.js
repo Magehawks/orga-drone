@@ -184,11 +184,20 @@
     a.href = mediaDetailUrl(item);
     a.className = "wm-item-link";
 
-    const thumb = document.createElement("img");
-    thumb.src = `/media/${item.id}/thumb`;
-    thumb.alt = "";
-    thumb.loading = "lazy";
-    thumb.decoding = "async";
+    if (item.source_offline) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "wm-thumb thumb-placeholder";
+      placeholder.setAttribute("role", "img");
+      placeholder.setAttribute("aria-label", t("i18nOffline", "Offline"));
+      a.appendChild(placeholder);
+    } else {
+      const thumb = document.createElement("img");
+      thumb.src = `/media/${item.id}/thumb`;
+      thumb.alt = "";
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      a.appendChild(thumb);
+    }
 
     const body = document.createElement("div");
     body.className = "wm-item-body";
@@ -199,8 +208,13 @@
     meta.textContent = formatMeta(item);
     body.appendChild(title);
     body.appendChild(meta);
+    if (item.source_offline) {
+      const badge = document.createElement("span");
+      badge.className = "badge unavailable";
+      badge.textContent = t("i18nOffline", "Offline");
+      body.appendChild(badge);
+    }
 
-    a.appendChild(thumb);
     a.appendChild(body);
     li.appendChild(a);
 
@@ -265,8 +279,11 @@
     for (const item of allPoints) {
       if (item.lat == null || item.lon == null) continue;
       const m = L.marker([item.lat, item.lon], { icon: markerIcon(), title: item.filename });
+      const offlineLabel = item.source_offline
+        ? `<br><span class="badge unavailable">${escapeHtml(t("i18nOffline", "Offline"))}</span>`
+        : "";
       m.bindPopup(
-        `<strong>${escapeHtml(item.filename)}</strong><br>` +
+        `<strong>${escapeHtml(item.filename)}</strong>${offlineLabel}<br>` +
           `<a href="${mediaDetailUrl(item)}">${escapeHtml(t("i18nOpen", "Open"))}</a>`
       );
       m.on("click", () => {

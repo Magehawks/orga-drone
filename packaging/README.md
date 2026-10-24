@@ -135,10 +135,11 @@ FFmpeg (imageio-ffmpeg), templates, static files, and locales are bundled the
 same way as a local build. Source media, `.env`, and the user SQLite database
 are not part of the app and the workflow fails if they appear in `dist/orga-drone`.
 
-Merging a pull request does **not** build or publish a release. The quality
-workflow (`.github/workflows/ci.yml`: Ruff, MyPy, pytest) still runs on pull
-requests. The release workflow calls that same quality workflow and **does not
-package** if it fails.
+Merging a pull request does **not** build or publish a release. Pull requests
+run `.github/workflows/ci.yml` (Ruff, MyPy, pytest, and the App journey smoke
+in `docs/PR_E2E.md`). The release workflow calls that same workflow and **does
+not package** if it fails. The journey smoke is a synthetic library path. It
+does not replace the Mark-of-the-Web checklist below.
 
 ### When it runs
 
