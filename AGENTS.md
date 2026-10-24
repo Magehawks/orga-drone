@@ -58,7 +58,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); optional flight map (route and synced marker from GPS already stored for the clip, on a plain background; no map tiles; drag and resize; empty state without GPS) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -83,7 +83,7 @@ The application helps users:
   image adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
   export); timed text, shape, and image overlays with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy masks on photo and video clips
   (up to 8; fixed for the whole clip; preview approximates export); per-clip zoom and pan (1×–3×, optional start/end motion; preview matches
-  the exported frame); local MP4 export with configurable
+  the exported frame); optional flight map on photo and video clips (stored GPS route and a marker synced to the clip clock, plain background, no third-party map tiles, drag and resize inside the picture, empty state when GPS is missing; preview and MP4); local MP4 export with configurable
   resolution on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
@@ -117,8 +117,8 @@ The application helps users:
   time-proportional soundtrack coverage on that canvas, basic rendered visual
   transitions, basic per-clip image adjustment, timed text, shape, and
   image overlays, rectangular blur/pixelate privacy masks (not tracking or a
-  legal anonymization guarantee), and per-clip zoom and pan (not tracking or a
-  keyframe editor; not a professional effects editor, color grade, or NLE).
+  legal anonymization guarantee), per-clip zoom and pan (not tracking or a
+  keyframe editor; not a professional effects editor, color grade, or NLE), and an optional flight map that draws the stored GPS route on a plain background (no downloaded or bundled map tiles; not live tracking).
 
 ## Product principles
 

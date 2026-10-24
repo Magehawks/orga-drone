@@ -459,5 +459,10 @@
   "Start": "Start",
   "End": "Ende",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Ziehen Sie die Vorschau, um den Ausschnitt zu verschieben. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau entspricht dem exportierten Bild.",
-  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden."
+  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden.",
+  "Flight map": "Flugkarte",
+  "Show flight map": "Flugkarte anzeigen",
+  "No GPS for this clip.": "Für diesen Clip ist kein GPS vorhanden.",
+  "Could not save the flight map.": "Die Flugkarte konnte nicht gespeichert werden.",
+  "Drag the map inside the picture and resize it from the corner. The route uses GPS already stored for this clip. No online map is downloaded.": "Ziehen Sie die Karte im Bild und ändern Sie die Größe an der Ecke. Die Route nutzt das bereits gespeicherte GPS dieses Clips. Es wird keine Online-Karte heruntergeladen."
 }

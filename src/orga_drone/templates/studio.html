@@ -145,6 +145,10 @@
          data-mask-model='{{ mask_model|tojson }}'
          data-frame-failed="{{ _('Could not save framing.')|e }}"
          data-frame-model='{{ frame_model|tojson }}'
+         data-map-failed="{{ _('Could not save the flight map.')|e }}"
+         data-map-empty="{{ _('No GPS for this clip.')|e }}"
+         data-map-label="{{ _('Flight map')|e }}"
+         data-map-model='{{ map_model|tojson }}'
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -341,6 +345,15 @@
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
           </div>
           <div id="studio-preview-fade-black" class="studio-preview-fade-black" hidden aria-hidden="true"></div>
+          <div id="studio-preview-map-b" class="studio-preview-map is-layer-b" hidden>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <p class="studio-preview-map-empty" hidden></p>
+          </div>
+          <div id="studio-preview-map" class="studio-preview-map" hidden>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <p class="studio-preview-map-empty" hidden></p>
+            <span class="studio-map-resize" data-resize="1" hidden></span>
+          </div>
           <div id="studio-preview-annotations-b" class="studio-preview-annotations is-layer-b" hidden></div>
           <div id="studio-preview-annotations" class="studio-preview-annotations" hidden></div>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
@@ -499,6 +512,8 @@
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-frame='{{ row.frame|tojson }}'
+                  data-map='{{ row.map|tojson }}'
+                  data-gps='{{ row.gps|tojson|replace("'", "\\u0027") }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -750,6 +765,33 @@
           </div>
           <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
+        </div>
+        <div id="inspector-map" hidden>
+          <p class="studio-inspector-kind">{{ _('Flight map') }}</p>
+          <label class="studio-inspector-field studio-frame-motion">
+            <input type="checkbox" id="inspector-map-enabled">
+            <span>{{ _('Show flight map') }}</span>
+          </label>
+          <p class="hint" id="inspector-map-empty" hidden>{{ _('No GPS for this clip.') }}</p>
+          <div id="inspector-map-fields" hidden>
+            <label class="studio-inspector-field">
+              <span>{{ _('X') }}</span>
+              <input type="number" id="map-x" min="0" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Y') }}</span>
+              <input type="number" id="map-y" min="0" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Width') }}</span>
+              <input type="number" id="map-w" min="12" max="72" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Height') }}</span>
+              <input type="number" id="map-h" min="12" max="72" step="1">
+            </label>
+          </div>
+          <p class="hint">{{ _('Drag the map inside the picture and resize it from the corner. The route uses GPS already stored for this clip. No online map is downloaded.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

@@ -146,6 +146,7 @@ professional video-editing knowledge.
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
+| Flight map overlay | **Available now** (optional per photo or video clip; route and moving marker from GPS already stored; plain background; no third-party map tiles; drag and resize inside the picture; empty state without GPS; preview and MP4) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -251,7 +252,12 @@ See `README.md` for the detailed feature status table. In short:
   clips can store a zoom and focal point (1×–3×), including a start and an end
   so the frame moves across the clip. At 1× the existing fit is unchanged.
   Preview uses the same window as MP4 export. This is not tracking or a
-  keyframe editor. Media
+  keyframe editor. The same clips can show an optional flight map: the GPS
+  route already stored for that clip, and a marker that follows the clip
+  clock, on a plain background. The box uses the fitted picture, can be
+  dragged and resized inside the frame, and is saved with the Story clip.
+  No map tiles are downloaded or bundled. A clip with no GPS shows an empty
+  panel. This is not live tracking. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
@@ -280,7 +286,9 @@ See `README.md` for the detailed feature status table. In short:
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;
-  not a professional grade or NLE). Albums for
+  not a professional grade or NLE), and an optional flight map (stored GPS
+  route and synced marker on a plain background; no third-party map tiles;
+  not live tracking). Albums for
   organizing the media library remain Later.
 
 ## Studio MVP (local Create → Share)
