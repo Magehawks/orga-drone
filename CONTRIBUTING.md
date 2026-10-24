@@ -8,6 +8,17 @@ Thanks for helping improve this local drone media library. Contributions of code
 - For larger changes, open an issue first so we can align on scope.
 - Keep changes focused — small PRs are easier to review.
 
+## User needs
+
+To describe a concrete problem — your own, or one you observed elsewhere — use the **User need** issue template.
+
+- **Direct feedback** is about your use of Orga Drone.
+- **External research** is evidence about someone else's pain point. It is not a feature request from that person.
+
+Do not attach photos, videos, flight logs, or screenshots that show people, homes, or precise locations. Opening a user-need issue does not add a public roadmap item.
+
+Labels, the monthly triage, and how accepted work is linked to release notes: [`docs/USER_NEEDS.md`](docs/USER_NEEDS.md).
+
 ## Development setup
 
 Requirements: **Python 3.11+**
@@ -60,13 +71,16 @@ bounded DOM size via pagination.
 
 ## Quality checks (local and CI)
 
-Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with:
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with two checks:
 
 ```bash
 ruff check .
 mypy src
-pytest
+pytest --ignore=tests/test_pr_journey_smoke.py
+pytest tests/test_pr_journey_smoke.py
 ```
+
+The second command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
 Install the same tooling locally via `pip install -e ".[dev]"`. Configuration lives in `pyproject.toml`.
 

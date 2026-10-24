@@ -26,7 +26,8 @@ stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
 export; Title Cards; basic visual transitions; basic per-clip image
-adjustment for photos and videos (brightness, contrast, saturation, warmth); read-only soundtrack
+adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear
+saturation ramp on video clips from that grade toward black and white; read-only soundtrack
 coverage on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
@@ -99,12 +100,13 @@ orga-drone.
 
 | Responsibility | Status |
 |----------------|--------|
-| Import / scan | **Available now** (full rescan per root) |
+| Import / scan | **Available now** (listable roots rescan in place; unchanged files skip metadata extraction by size + mtime; an unlistable source keeps its catalog entries and is marked offline) |
 | Metadata (EXIF, DJI, SRT, …) | **Available now** |
 | GPS | **Available now** |
 | Sessions / flows | **Available now** (heuristic) |
 | Duplicate detection | **Available now** (heuristics; no auto-delete) |
 | File management (rename, merge under roots) | **Available now** |
+| User-managed albums | **Available now** (local named references across flights and folders; one file can be in several albums; separate from Studio; no shared, cloud, or automatic albums) |
 | AI indexing | **Later** — only if justified; do not label rule-based Ask/auto-tags as AI |
 
 ### 2. Browse
@@ -119,7 +121,7 @@ orga-drone.
 | Map | **Available now** |
 | Sessions / flows in UI | **Available now** |
 | Rule-based “Ask the library” | **Available now** (not an LLM) |
-| Timeline product UI | **Later** (today: date filters and sessions, not a timeline editor) |
+| Timeline product UI | **Available now** (Browse year/month/day groups by recording date; existing filters; missing or non-calendar dates called out; page size 50/100/200). This is not the Studio editor timeline. |
 
 ### 3. Studio
 
@@ -142,11 +144,15 @@ professional video-editing knowledge.
 | Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
+| Video section repeat (in/out range, 1×–8×) | **Available now** (video clips; story duration grows with each play; preview and MP4 include the repeats at the same speed; not slow motion, a seamless loop, or reverse playback) |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
+| Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
 | Flight map overlay | **Available now** (optional per photo or video clip; route and moving marker from GPS already stored; plain background; no third-party map tiles; drag and resize inside the picture; empty state without GPS; preview and MP4) |
+| Optional telemetry HUD | **Available now** (one preset on a video clip when a sibling DJI SRT has timed cues; elapsed source time and relative altitude; speed and home distance stay unavailable; preview and MP4; not a goggles display or tracking) |
+| Slow motion on a selected video section (0.5×, 0.25×, or 1× to reset) | **Available now** (that section only; neighboring sections keep their speed; Story length updates; preview and MP4 match; source audio on a slowed section is muted; not optical-flow interpolation or fast-forward) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -219,6 +225,15 @@ See `README.md` for the detailed feature status table. In short:
 - Import and organize drone (and related) photos and videos from local folders
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
+- Browse Timeline: chronological year/month/day groups of indexed photos and
+  videos (local recording dates only; Date unknown when a date is missing or
+  not a calendar day; same filters and page size as the grid). Not the Studio
+  story timeline.
+- **Library albums:** local named collections (`albums` / `album_items`). Create,
+  rename, and delete an album; add or remove media; the same file can sit in
+  more than one album. Membership survives a rescan and stays listed when
+  the file is offline. Albums do not modify files and are not Studio projects.
+  No shared albums, cloud sync, or automatic albums.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
@@ -231,7 +246,9 @@ See `README.md` for the detailed feature status table. In short:
   UI state, not project data). Selected Story objects are distinct from the
   playhead-active clip; transition chips show Cut / Fade / Crossfade and name
   neighbors in the Inspector. Persisted today: editable project title;
-  order; estimated runtime; optional video source start/end after Cut. Story
+  order; estimated runtime; optional video source start/end after Cut. A video
+  clip can play that in/out range again, up to 8 times, at the same speed;
+  the Story length, preview, and MP4 include each play. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop), including photo-only stories at
   720/1080. Title Cards persist as generated
@@ -243,7 +260,9 @@ See `README.md` for the detailed feature status table. In short:
   Crossfade) persist per outgoing clip
   and render in preview and MP4. Photo and video clips can store a basic image adjustment
   (brightness, contrast, saturation, warmth) on that Story clip; preview
-  approximates the exported picture and is not a color-managed grade. The same clips
+  approximates the exported picture and is not a color-managed grade. A video clip
+  can also animate that saturation across a start and end time inside the clip,
+  from the current grade toward black and white. Photo and video clips
   can carry up to 8 timed text, shape, or image overlays, with Fade in, Fade out,
   or Slide in. Photo and
   video clips can also store up to 8 rectangular privacy masks (blur or
@@ -257,19 +276,38 @@ See `README.md` for the detailed feature status table. In short:
   clock, on a plain background. The box uses the fitted picture, can be
   dragged and resized inside the frame, and is saved with the Story clip.
   No map tiles are downloaded or bundled. A clip with no GPS shows an empty
-  panel. This is not live tracking. Media
+  panel. This is not live tracking. A video clip can also turn on one telemetry HUD when a
+  sibling DJI SRT has timed cues. It shows elapsed source time and relative
+  altitude where the parser has `rel_alt`. Speed and home distance are marked
+  unavailable because that parser does not record them. Gaps stay blank.
+  Preview and MP4 use the same windows. This is not a goggles display or
+  tracking. A selected section of a video clip can play at 0.5× or 0.25×
+  (1× restores that section). The rest of the clip keeps its speed, and the Story
+  gets longer by the same amount in preview and in the MP4. Source audio on a
+  slowed section is muted. The effect holds the source frames; it does not invent
+  frames between them, and it is not fast-forward or reverse. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
 ## Honest limitations
 
-- Library scan is a **full rescan** per root (not incremental).
+- A library rescan still walks each listable root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. A source that cannot be listed is not treated as a deleted
+  library: catalog entries stay and are marked offline until the folder is
+  connected and scanned again. Files removed from a folder that can still be
+  listed are dropped on the next scan. Scan never deletes files, favorites,
+  tags, notes, or Studio clips.
 - Flight sessions are **heuristic**.
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, or multi-OS installer
+- Browse Timeline groups indexed media by recording date. It does not edit
+  video, recognize faces, or search by meaning. Missing dates stay in
+  Date unknown.
+- Library albums are local named references only (no shared albums, cloud
+  sync, or automatic albums). There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
   MOTW smoke test (`packaging/README.md`). About shows the installed version.
@@ -282,14 +320,19 @@ See `README.md` for the detailed feature status table. In short:
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
   headings, read-only time-proportional soundtrack coverage on that canvas,
-  basic rendered visual transitions, basic per-clip image adjustment, timed text,
+  basic rendered visual transitions, basic per-clip image adjustment, a linear
+  video saturation ramp (not a keyframe editor), timed text,
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
-  the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
-  motion; preview matches the exported frame; not tracking or a keyframe editor;
-  not a professional grade or NLE), and an optional flight map (stored GPS
-  route and synced marker on a plain background; no third-party map tiles;
-  not live tracking). Albums for
-  organizing the media library remain Later.
+  the clip; not tracking), per-clip zoom and pan (1×–3×, optional start/end
+  motion; preview matches the exported frame; not tracking or a keyframe editor),
+  an optional flight map (stored GPS route and synced marker on a plain background;
+  no third-party map tiles; not live tracking), and an optional telemetry HUD on a
+  video clip with a sibling DJI SRT (elapsed time and relative altitude only; not a
+  goggles display or tracking; not a professional grade or NLE). A selected section
+  of a video clip can use slow motion at 0.5× or 0.25× (1× resets that section;
+  source audio on the slowed section is muted; not optical-flow interpolation,
+  fast-forward, or reverse). A video section repeat plays an in/out range up to 8
+  times at the same speed (not a seamless or reverse loop).
 
 ## Studio MVP (local Create → Share)
 

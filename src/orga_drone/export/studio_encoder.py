@@ -20,8 +20,15 @@ from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
-from orga_drone.studio_image import ffmpeg_grade_chain
+from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
+from orga_drone.studio_speed import (
+    coerce_playback_speed,
+    ffmpeg_slow_prefix,
+    ffmpeg_slow_stretch,
+    source_span_s,
+)
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -63,16 +70,54 @@ def _segment_vf(width: int, height: int) -> str:
     )
 
 
+def _slow_timing(clip: StudioExportClip) -> tuple[str, str, float, float] | None:
+    """Trim/stretch filters plus the pre-stretch framing clock, or ``None`` at 1×.
+
+    Framing sees source time after the trim resets timestamps. Stretch runs
+    after ``fps``, so fades and overlays that follow the chain see Story time.
+    """
+    if clip.kind != "video":
+        return None
+    speed = coerce_playback_speed(clip.playback_speed)
+    if speed >= 1.0:
+        return None
+    start, end, _output = source_span_s(
+        source_start_s=clip.source_start_s,
+        source_end_s=clip.source_end_s,
+        output_duration_s=clip.duration_s,
+        speed=speed,
+    )
+    return (
+        ffmpeg_slow_prefix(start, end),
+        ffmpeg_slow_stretch(speed),
+        0.0,
+        max(0.001, end - start),
+    )
+
+
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
-    """Grade, optional zoom/pan, then scale/pad.
+    """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
     Fades stay separate so privacy masks and overlays can sit on the framed
-    picture before them.
+    picture before them. Slow motion trims first and stretches after ``fps``.
+    The saturation ramp follows the grade so a fade to black still ends on black.
     """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    ramp = (
+        ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=clip.source_start_s)
+        if clip.kind == "video"
+        else ""
+    )
     prefix = ""
     suffix = ""
+    slow = _slow_timing(clip)
+    trim = ""
+    stretch = ""
+    frame_origin = clip.source_start_s
+    frame_duration = clip.duration_s
+    if slow is not None:
+        trim, stretch, frame_origin, frame_duration = slow
     if clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
         source_w, source_h = _source_frame_size(clip)
         prefix = ffmpeg_frame_prefix(
@@ -80,8 +125,8 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_width=source_w,
             source_height=source_h,
             kind=clip.kind,
-            source_start_s=clip.source_start_s,
-            duration_s=clip.duration_s,
+            source_start_s=frame_origin,
+            duration_s=frame_duration,
         )
         suffix = ffmpeg_frame_suffix(
             clip.frame,
@@ -90,10 +135,68 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_width=source_w,
             source_height=source_h,
             kind=clip.kind,
-            source_start_s=clip.source_start_s,
-            duration_s=clip.duration_s,
+            source_start_s=frame_origin,
+            duration_s=frame_duration,
         )
-    return ",".join(part for part in (grade, prefix, base, suffix) if part)
+    return ",".join(
+        part for part in (trim, grade, ramp, prefix, base, suffix, stretch) if part
+    )
+
+
+def _hud_filter_text(clip: StudioExportClip, height: int) -> str:
+    """Elapsed time and altitude for a video whose HUD preset is on.
+
+    An empty string leaves the existing grade, mask, and overlay chain alone.
+    """
+    if clip.kind != "video" or not clip.hud_enabled:
+        return ""
+    from orga_drone.studio_hud import ffmpeg_hud_chain
+    from orga_drone.studio_title_card import TitleCardFontError, resolve_title_card_font
+
+    try:
+        font = resolve_title_card_font()
+    except TitleCardFontError as exc:
+        raise StudioExportError(
+            "Telemetry HUD could not be rendered because no font was found.",
+            code="hud_font_missing",
+        ) from exc
+    return ffmpeg_hud_chain(
+        fontfile=font,
+        height=height,
+        intervals=clip.hud_intervals,
+    )
+
+
+def _filter_args(body: str, work: Path, *, complex_graph: bool) -> list[str]:
+    from orga_drone.studio_hud import video_filter_args
+
+    return video_filter_args(
+        body,
+        script_path=work / f"filters-{uuid.uuid4().hex}.txt",
+        complex_graph=complex_graph,
+    )
+
+
+def _chain_with_hud(chain: str, hud: str, fades: list[str]) -> str:
+    parts = [chain]
+    if hud:
+        parts.append(hud)
+    parts.extend(fades)
+    return ",".join(part for part in parts if part)
+
+
+def _graph_with_hud(graph: str, hud: str) -> str:
+    if not hud:
+        return graph
+    from orga_drone.studio_hud import HudGraphError, insert_hud_chain
+
+    try:
+        return insert_hud_chain(graph, hud)
+    except HudGraphError as exc:
+        raise StudioExportError(
+            "Telemetry HUD could not be rendered.",
+            code="hud_render_failed",
+        ) from exc
 
 
 def _fade_filters(clip: StudioExportClip) -> list[str]:
@@ -253,6 +356,7 @@ def _segment_filter_invocation(
     chain = _segment_chain(width, height, clip)
     fades = _fade_filters(clip)
     masks = tuple(clip.masks) if clip.kind in {"photo", "video"} else ()
+    hud = _hud_filter_text(clip, height)
 
     def privacy_graph(*, include_tail: bool) -> tuple[str, int]:
         source_w, source_h = _source_frame_size(clip)
@@ -286,10 +390,17 @@ def _segment_filter_invocation(
 
     def plain_or_masks() -> tuple[list[str], list[str]]:
         if not masks:
-            vf = f"{chain},{','.join(fades)}" if fades else chain
-            return [], ["-vf", vf]
+            return [], _filter_args(
+                _chain_with_hud(chain, hud, fades),
+                work,
+                complex_graph=False,
+            )
         graph, _count = privacy_graph(include_tail=True)
-        return [], ["-filter_complex", graph, "-map", "[vout]"]
+        return [], _filter_args(
+            _graph_with_hud(graph, hud),
+            work,
+            complex_graph=True,
+        )
 
     active = [
         item
@@ -313,7 +424,11 @@ def _segment_filter_invocation(
         resolve_overlay_asset,
     )
 
-    origin = filter_time_origin(kind=clip.kind, source_start_s=clip.source_start_s)
+    origin = (
+        0.0
+        if _slow_timing(clip) is not None
+        else filter_time_origin(kind=clip.kind, source_start_s=clip.source_start_s)
+    )
     source_w, source_h = _source_frame_size(clip)
     fitted = content_rect(width, height, source_w, source_h)
     extra: list[str] = []
@@ -393,7 +508,7 @@ def _segment_filter_invocation(
     )
     if prefix:
         graph = f"{prefix};{graph}"
-    return _attach_flight_map(
+    extra_out, filters = _attach_flight_map(
         clip,
         width,
         height,
@@ -401,6 +516,10 @@ def _segment_filter_invocation(
         extra,
         ["-filter_complex", graph, "-map", "[vout]"],
     )
+    if filters and filters[0] == "-filter_complex":
+        body = _graph_with_hud(filters[1], hud)
+        return extra_out, _filter_args(body, work, complex_graph=True)
+    return extra_out, filters
 
 
 def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:
@@ -590,6 +709,39 @@ def _watch_export_cancel(event: threading.Event, proc: subprocess.Popen[str]) ->
             if proc.poll() is None:
                 proc.kill()
             return
+
+
+def section_repeat_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...]:
+    """Expand a video into one encode per play of its in/out range.
+
+    One repeat returns the clip unchanged, so ordinary exports stay on the
+    existing path. Each extra play is the same source span at the same speed.
+    Fades stay on the first and last play. Joins between plays are cuts.
+    """
+    repeats = int(clip.section_repeats or 1)
+    if clip.kind != "video" or repeats <= 1:
+        return (clip,)
+    repeats = max(1, min(MAX_SECTION_REPEATS, repeats))
+    start = max(0.0, float(clip.source_start_s))
+    if clip.source_end_s is not None:
+        cycle = max(0.0, float(clip.source_end_s) - start)
+    else:
+        cycle = max(0.0, float(clip.duration_s) / repeats)
+    if cycle <= 0:
+        return (clip,)
+    slices: list[StudioExportClip] = []
+    for index in range(repeats):
+        slices.append(
+            replace(
+                clip,
+                duration_s=cycle,
+                section_repeats=1,
+                exact_span=True,
+                fade_in_s=clip.fade_in_s if index == 0 else 0.0,
+                fade_out_s=clip.fade_out_s if index == repeats - 1 else 0.0,
+            )
+        )
+    return tuple(slices)
 
 
 def _clip_progress_label(clip: StudioExportClip) -> str:
@@ -1009,6 +1161,72 @@ class FfmpegStudioEncoder:
             duration_s=dur,
         )
 
+    def _render_slow_video(
+        self,
+        ffmpeg: str,
+        clip: StudioExportClip,
+        out: Path,
+        width: int,
+        height: int,
+        *,
+        on_progress: ProgressCallback | None,
+        clip_index: int,
+        clip_total: int,
+    ) -> None:
+        """Encode one slowed section with muted source audio.
+
+        ``trim`` selects the source range. ``setpts`` holds those frames.
+        Silence replaces the source track so concat stays stereo AAC without
+        time-stretching the original sound.
+        """
+        speed = coerce_playback_speed(clip.playback_speed)
+        _start, _end, output_dur = source_span_s(
+            source_start_s=clip.source_start_s,
+            source_end_s=clip.source_end_s,
+            output_duration_s=clip.duration_s,
+            speed=speed,
+        )
+        dur = max(0.1, output_dur)
+        on_time = self._progress_cb(
+            on_progress,
+            clip=clip,
+            clip_index=clip_index,
+            clip_total=clip_total,
+            duration_s=dur,
+        )
+        extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
+        overlay_count = extra.count("-i")
+        audio_index = 1 + overlay_count
+        uses_graph = bool(filters) and filters[0] == "-filter_complex"
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(clip.source_path),
+            *extra,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t",
+            f"{dur:.3f}",
+            *filters,
+            *_x264_video_args(),
+            "-c:a",
+            "aac",
+            "-ac",
+            "2",
+            "-ar",
+            "48000",
+            "-shortest",
+        ]
+        if uses_graph:
+            cmd.extend(["-map", f"{audio_index}:a:0"])
+        else:
+            cmd.extend(["-map", "0:v:0", "-map", f"{audio_index}:a:0"])
+        cmd.append(str(out))
+        _run_ffmpeg(cmd, on_time=on_time, duration_s=dur)
+
     def _render_video(
         self,
         ffmpeg: str,
@@ -1021,12 +1239,46 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
     ) -> None:
+        slices = section_repeat_slices(clip)
+        if len(slices) > 1:
+            parts: list[Path] = []
+            for index, slice_clip in enumerate(slices):
+                _raise_if_cancelled()
+                part = out.parent / f"{out.stem}-loop-{index:02d}{out.suffix}"
+                self._render_video(
+                    ffmpeg,
+                    slice_clip,
+                    part,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                parts.append(part)
+            self._concat(ffmpeg, parts, out)
+            return
+        if _slow_timing(clip) is not None:
+            self._render_slow_video(
+                ffmpeg,
+                clip,
+                out,
+                width,
+                height,
+                on_progress=on_progress,
+                clip_index=clip_index,
+                clip_total=clip_total,
+            )
+            return
         start = max(0.0, float(clip.source_start_s))
         if clip.source_end_s is not None:
             end = float(clip.source_end_s)
-            dur = max(0.1, end - start)
+            span = end - start
+            dur = span if clip.exact_span else max(0.1, span)
         else:
-            dur = max(0.1, float(clip.duration_s))
+            dur = float(clip.duration_s) if clip.exact_span else max(0.1, float(clip.duration_s))
+        if clip.exact_span:
+            dur = max(0.05, dur)
         on_time = self._progress_cb(
             on_progress,
             clip=clip,

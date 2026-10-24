@@ -44,4 +44,8 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0016](0016-studio-overlays.md) | Studio timed overlays | Accepted |
 | [0017](0017-studio-privacy-masks.md) | Studio privacy masks | Accepted |
 | [0018](0018-studio-framing.md) | Studio per-clip zoom and pan | Accepted |
-| [0019](0019-studio-flight-map.md) | Studio flight map without third-party tiles | Accepted |
+| [0019](0019-studio-saturation-ramp.md) | Studio video saturation ramp | Accepted |
+| [0020](0020-incremental-rescan-fingerprint.md) | Skip unchanged media on rescan | Accepted |
+| [0021](0021-studio-section-repeat.md) | Studio video section repeat | Accepted |
+| [0022](0022-studio-telemetry-hud.md) | Studio telemetry HUD | Accepted |
+| [0023](0023-studio-flight-map.md) | Studio flight map without third-party tiles | Accepted |

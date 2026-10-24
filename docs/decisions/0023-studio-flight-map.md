@@ -1,4 +1,4 @@
-# ADR 0019: Studio flight map without third-party tiles
+# ADR 0023: Studio flight map without third-party tiles
 
 - **Status:** Accepted
 - **Date:** 2026-10-24

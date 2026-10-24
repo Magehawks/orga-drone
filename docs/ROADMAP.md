@@ -20,29 +20,29 @@ See `README.md` → “Current feature status” and `docs/PRODUCT_VISION.md`.
 
 Highlights:
 
-- Local folder library + SQLite index + browse
+- Local folder library + SQLite index + browse, including a chronological Timeline (recording-date groups; not the Studio story timeline)
 - DJI-oriented parsing (strongest path) + thinner generic media support
 - Flows, heuristic sessions, maps, rule-based Ask the library
-- User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
+- User meta (stars/favorites/tags/notes), library albums, rename/merge, spot GeoJSON
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
   `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
   publishes it only after the MOTW smoke test in `packaging/README.md`.
   About shows the installed version. An optional check, off by default, links
   to a newer published Windows release and does not download or install it.
-- Library scan progress (live phase/counters during full rescan)
+- Library scan progress (live phase/counters during a library rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
-  source start/end; Projects switcher beside the open project title; Clear Studio
+  source start/end; video section repeat (in/out range, 1×–8×, same speed); Projects switcher beside the open project title; Clear Studio
   on the Story toolbar (clips only); synced Story preview playback; local MP4 export (Cancel stops a running encode) with
   configurable resolution (suggested filename includes that resolution), including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
-  image adjustment for photos and videos (brightness, contrast, saturation, warmth); timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
+  image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
-  for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); optional flight map (stored GPS route and synced marker on a plain background; no map tiles); time-based
+  for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); optional flight map (stored GPS route and synced marker on a plain background; no map tiles); optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed time and relative altitude); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
   that canvas)
 
@@ -52,15 +52,13 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
 1. Export cancel / abort during long renders
-2. **Incremental or cheaper rescans** (clearer scan progress is available)
+2. **Cheaper directory walks** (unchanged files already skip metadata extraction by size and mtime; scan progress is available)
 3. **Broader multi-brand parsers** beyond DJI-first depth
-4. **Library albums** for organizing media sets (Studio already has multiple
-   local edit projects; albums are a separate library concern)
-5. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
+4. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
    The Windows onefolder zip Actions workflow is available; it is not an
    installer and it does not publish on merge.
-6. Online geocoding providers (place tags are offline today)
-7. **itch.io Windows channel** via butler for the existing onefolder build.
+5. Online geocoding providers (place tags are offline today)
+6. **itch.io Windows channel** via butler for the existing onefolder build.
    The process is documented for a Draft/Restricted test. A public paid
    launch waits on the A→B app-update record. This is not an in-app updater.
 
@@ -92,6 +90,11 @@ open/reveal of the finished file already exist on Windows desktop.
 - Competing with Premiere / DaVinci / CapCut as a pro NLE
 
 ## How work enters the repo
+
+User-need reports ([`docs/USER_NEEDS.md`](USER_NEEDS.md)) are evidence. Opening
+or accepting one does not change this roadmap. A maintainer may later turn an
+accepted need into a product issue. Shipped work links that user-need issue to
+the release notes. A roadmap edit is a separate maintainer decision.
 
 1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
 2. **Product-Spec-Reviewer** checks the spec against code and vision docs

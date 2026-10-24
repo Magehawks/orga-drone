@@ -1,4 +1,4 @@
-"""SQLite persistence for library roots, assets, media, flows, and sessions."""
+"""SQLite persistence for library roots, assets, media, flows, sessions, and albums."""
 
 from __future__ import annotations
 
@@ -10,6 +10,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
+
+from orga_drone.browse_timeline import (
+    recorded_span_clause,
+    timeline_day_key_sql,
+    timeline_order_sql,
+)
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -197,6 +203,31 @@ CREATE TABLE IF NOT EXISTS studio_audio_clips (
 );
 CREATE INDEX IF NOT EXISTS idx_studio_audio_clips_project
     ON studio_audio_clips(project_id, lane, position);
+
+-- Library albums (non-destructive references; independent of Studio projects).
+CREATE TABLE IF NOT EXISTS albums (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS album_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+    media_path TEXT NOT NULL,
+    identity_key TEXT NOT NULL,
+    source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+    filename_snapshot TEXT NOT NULL,
+    kind_snapshot TEXT NOT NULL,
+    recorded_at_snapshot TEXT,
+    added_at TEXT NOT NULL,
+    UNIQUE (album_id, media_path)
+);
+CREATE INDEX IF NOT EXISTS idx_album_items_album ON album_items(album_id);
+CREATE INDEX IF NOT EXISTS idx_album_items_path ON album_items(media_path);
+CREATE INDEX IF NOT EXISTS idx_album_items_identity ON album_items(identity_key);
+CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id);
 
 CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
@@ -390,6 +421,58 @@ class StudioClip:
 # Backward-compatible name used by older tests/call sites.
 StudioItem = StudioClip
 
+ALBUM_TITLE_MAX = 80
+
+
+def clean_album_title(title: str | None) -> str | None:
+    """Collapse whitespace and cap length. None when nothing remains."""
+    collapsed = " ".join((title or "").split())
+    if not collapsed:
+        return None
+    if len(collapsed) > ALBUM_TITLE_MAX:
+        collapsed = collapsed[:ALBUM_TITLE_MAX].rstrip()
+    return collapsed or None
+
+
+def album_media_state(media_path: str) -> str:
+    """``available`` when the referenced file is on disk, otherwise ``offline``.
+
+    Album membership is kept either way. Offline covers a missing file or an
+    unplugged drive; the original file is never changed here.
+    """
+    try:
+        on_disk = Path(media_path).is_file()
+    except OSError:
+        on_disk = False
+    return "available" if on_disk else "offline"
+
+
+@dataclass
+class Album:
+    """A user-named library album. Does not own or copy media files."""
+
+    id: int
+    title: str
+    created_at: str
+    updated_at: str
+    item_count: int = 0
+
+
+@dataclass
+class AlbumItem:
+    """One media reference inside an album (path + identity, not a file copy)."""
+
+    id: int
+    album_id: int
+    media_path: str
+    identity_key: str
+    filename: str
+    kind: str
+    recorded_at: str | None
+    added_at: str
+    state: str
+    media_id: int | None
+
 
 class Database:
     def __init__(self, path: Path) -> None:
@@ -540,6 +623,7 @@ class Database:
         Database._migrate_studio_clips_title_cards(conn)
         Database._migrate_studio_clips_transition_duration(conn)
         Database._migrate_studio_audio_clips(conn)
+        Database._migrate_albums(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
@@ -871,6 +955,44 @@ class Database:
         if "duration_s" not in cols:
             conn.execute("ALTER TABLE studio_audio_clips ADD COLUMN duration_s REAL")
 
+    @staticmethod
+    def _migrate_albums(conn: sqlite3.Connection) -> None:
+        """User-managed library albums. Membership survives media-row rebuilds."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS albums (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS album_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+                media_path TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                filename_snapshot TEXT NOT NULL,
+                kind_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                added_at TEXT NOT NULL,
+                UNIQUE (album_id, media_path)
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_album ON album_items(album_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_path ON album_items(media_path)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_identity ON album_items(identity_key)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id)"
+        )
+
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
             return list(conn.execute("SELECT * FROM library_roots ORDER BY id"))
@@ -907,7 +1029,9 @@ class Database:
     def clear_root_media(self, root_id: int) -> None:
         """Drop indexed media for a root.
 
-        Does NOT touch media_meta or studio_clips / studio_projects (user curation).
+        Does NOT touch media_meta, album_items, or studio_clips / studio_projects
+        (user curation). Deleting media rows sets album_items.source_media_id
+        to NULL; the album reference itself stays.
         """
         with self.connect() as conn:
             # flows / sessions that only belong to this root
@@ -923,6 +1047,97 @@ class Database:
             conn.execute("DELETE FROM flows WHERE root_id = ?", (root_id,))
             conn.execute("DELETE FROM media WHERE root_id = ?", (root_id,))
             conn.execute("DELETE FROM assets WHERE root_id = ?", (root_id,))
+
+    def indexed_assets_for_root(self, root_id: int) -> dict[str, dict[str, Any]]:
+        """Asset rows for one root, with the media id when this path is library media.
+
+        Used to skip metadata extraction when size and mtime are unchanged.
+        """
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id AS asset_id, a.path, a.kind, a.size_bytes, a.mtime,
+                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf
+                   FROM assets a
+                   LEFT JOIN media m
+                     ON m.path = a.path AND m.root_id = a.root_id
+                   WHERE a.root_id = ?""",
+                (root_id,),
+            ).fetchall()
+        found: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            media_id = None if row["media_id"] is None else int(row["media_id"])
+            found[str(row["path"])] = {
+                "asset_id": int(row["asset_id"]),
+                "kind": str(row["kind"]),
+                "size_bytes": int(row["size_bytes"]),
+                "mtime": None if row["mtime"] is None else float(row["mtime"]),
+                "stem_base": row["stem_base"],
+                "media_id": media_id,
+                "has_srt": int(row["has_srt"] or 0) if media_id is not None else 0,
+                "has_lrf": int(row["has_lrf"] or 0) if media_id is not None else 0,
+            }
+        return found
+
+    def remove_root_index_except(self, root_id: int, keep_paths: set[str]) -> int:
+        """Drop asset and media rows for this root that were not rediscovered.
+
+        Does not delete files on disk, ``media_meta``, or Studio clips. Call
+        this only after a completed walk of a root that is still readable.
+        Returns how many asset rows were removed.
+        """
+        with self.connect() as conn:
+            conn.execute(
+                "CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths(path TEXT PRIMARY KEY)"
+            )
+            conn.execute("DELETE FROM scan_keep_paths")
+            conn.executemany(
+                "INSERT OR IGNORE INTO scan_keep_paths(path) VALUES (?)",
+                [(path,) for path in keep_paths],
+            )
+            conn.execute(
+                """DELETE FROM media
+                   WHERE root_id = ?
+                     AND path NOT IN (SELECT path FROM scan_keep_paths)""",
+                (root_id,),
+            )
+            cur = conn.execute(
+                """DELETE FROM assets
+                   WHERE root_id = ?
+                     AND path NOT IN (SELECT path FROM scan_keep_paths)""",
+                (root_id,),
+            )
+            removed = cur.rowcount
+        return int(removed) if removed is not None and removed > 0 else 0
+
+    def set_asset_kind(self, asset_id: int, kind: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE assets SET kind = ? WHERE id = ?",
+                (kind, asset_id),
+            )
+
+    def delete_media_row(self, media_id: int) -> None:
+        """Drop one indexed media row.
+
+        Does not delete the file, ``media_meta``, or Studio clips. A Studio
+        ``source_media_id`` for this row becomes NULL.
+        """
+        with self.connect() as conn:
+            conn.execute("DELETE FROM media WHERE id = ?", (media_id,))
+
+    def set_media_sidecar_flags(
+        self,
+        media_id: int,
+        *,
+        has_srt: bool,
+        has_lrf: bool,
+    ) -> None:
+        """Update SRT/LRF flags without rewriting extracted metadata."""
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE media SET has_srt = ?, has_lrf = ? WHERE id = ?",
+                (1 if has_srt else 0, 1 if has_lrf else 0, media_id),
+            )
 
     def upsert_asset(
         self,
@@ -1217,6 +1432,7 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
     ) -> tuple[list[str], list[Any], str]:
         """Return (where_clauses, params, collapse_sql) for browse list/count."""
         where = ["m.kind IN ('video', 'photo')"]
@@ -1234,7 +1450,9 @@ class Database:
         if has_gps is True:
             where.append("m.latitude IS NOT NULL AND m.longitude IS NOT NULL")
         if has_gps is False:
-            where.append("m.latitude IS NULL OR m.longitude IS NULL")
+            # Parentheses required: AND binds tighter than OR, so an ungrouped
+            # predicate lets rows skip kind, drone, and session collapse.
+            where.append("(m.latitude IS NULL OR m.longitude IS NULL)")
         if flows_only is True:
             where.append("f.clip_count > 1")
         if flows_only is False:
@@ -1255,6 +1473,10 @@ class Database:
         if date_to:
             where.append("m.recorded_at IS NOT NULL AND date(m.recorded_at) <= date(?)")
             params.append(date_to)
+        span_sql, span_params = recorded_span_clause(recorded_span)
+        if span_sql:
+            where.append(span_sql)
+            params.extend(span_params)
         # Multi-token AND: each whitespace-separated term must match somewhere.
         tokens = [t for t in (q or "").split() if t]
         for token in tokens:
@@ -1303,6 +1525,7 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
     ) -> int:
         """Count browse rows after the same filters/collapse as ``list_media``."""
         where, params, collapse = self._media_list_filters(
@@ -1316,6 +1539,7 @@ class Database:
             q=q,
             date_from=date_from,
             date_to=date_to,
+            recorded_span=recorded_span,
         )
         sql = f"""
             SELECT COUNT(*)
@@ -1332,6 +1556,56 @@ class Database:
             row = conn.execute(sql, params).fetchone()
         return int(row[0]) if row else 0
 
+    def timeline_day_counts(
+        self,
+        *,
+        drone: str | None = None,
+        kind: str | None = None,
+        source: str | None = None,
+        has_gps: bool | None = None,
+        flows_only: bool | None = None,
+        sessions_only: bool | None = None,
+        favorite: bool | None = None,
+        q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[tuple[str | None, int]]:
+        """Calendar-day counts for the Browse timeline navigator.
+
+        Uses the same filters and row collapse as ``list_media``. A NULL day
+        means the recording date is missing or not a calendar day. The timeline
+        focus itself is not applied, so year/month/day links stay visible.
+        """
+        where, params, collapse = self._media_list_filters(
+            drone=drone,
+            kind=kind,
+            source=source,
+            has_gps=has_gps,
+            flows_only=flows_only,
+            sessions_only=sessions_only,
+            favorite=favorite,
+            q=q,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        day_key = timeline_day_key_sql()
+        sql = f"""
+            SELECT {day_key} AS day_key,
+                   COUNT(*) AS n
+            FROM media m
+            LEFT JOIN flows f ON f.id = m.flow_id
+            LEFT JOIN flow_items fi ON fi.media_id = m.id
+            LEFT JOIN sessions s ON s.id = m.session_id
+            LEFT JOIN session_items si ON si.media_id = m.id
+            LEFT JOIN media_meta mm ON mm.media_path = m.path
+            WHERE {' AND '.join(where)}
+              AND {collapse}
+            GROUP BY day_key
+        """
+        with self.connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [(None if row[0] is None else str(row[0]), int(row[1])) for row in rows]
+
     def list_media(
         self,
         *,
@@ -1347,6 +1621,8 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
+        date_order: str | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> list[MediaRow]:
@@ -1373,7 +1649,13 @@ class Database:
             q=q,
             date_from=date_from,
             date_to=date_to,
+            recorded_span=recorded_span,
         )
+        if date_order in {"asc", "desc"}:
+            direction = "ASC" if date_order == "asc" else "DESC"
+            order_clause = timeline_order_sql(direction)
+        else:
+            order_clause = f"{sort_sql} {order_sql}, m.id DESC"
 
         sql = f"""
             SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
@@ -1392,7 +1674,7 @@ class Database:
             LEFT JOIN media_meta mm ON mm.media_path = m.path
             WHERE {' AND '.join(where)}
               AND {collapse}
-            ORDER BY {sort_sql} {order_sql}, m.id DESC
+            ORDER BY {order_clause}
         """
         if limit is not None and limit > 0:
             sql += " LIMIT ?"
@@ -2656,6 +2938,63 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_saturation_ramp(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Store a video clip's saturation ramp. Raises ``ValueError`` on bad input.
+
+        The ramp is clip instance data in ``effect_settings`` and does not
+        change the source file. Photos and Title Cards are rejected.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_image import (
+            dump_saturation_ramp,
+            parse_saturation_ramp_payload,
+        )
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("saturation ramp only applies to video")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("saturation ramp only applies to video")
+            ramp = parse_saturation_ramp_payload(payload)
+            blob = dump_saturation_ramp(str(row["effect_settings"] or ""), ramp)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_overlays(
         self,
         studio_item_id: int,
@@ -2674,7 +3013,7 @@ class Database:
             row = conn.execute(
                 """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
                           s.effect_settings, s.photo_duration_s, s.source_start,
-                          s.source_end, s.card_duration_s,
+                          s.source_end, s.card_duration_s, s.playback_speed,
                           m.kind AS live_kind, m.id AS media_id, m.duration_s
                    FROM studio_clips s
                    LEFT JOIN media m ON m.path = s.media_path
@@ -2711,6 +3050,11 @@ class Database:
                 card_duration_s=(
                     float(row["card_duration_s"])
                     if row["card_duration_s"] is not None
+                    else None
+                ),
+                playback_speed=(
+                    float(row["playback_speed"])
+                    if row["playback_speed"] is not None
                     else None
                 ),
             )
@@ -2891,6 +3235,68 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_hud(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Turn the telemetry HUD on or off for one video clip.
+
+        The preset lives in ``effect_settings`` and does not change the file.
+        Enabling requires a sibling SRT the existing parser can time.
+        """
+        from pathlib import Path
+
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_hud import cues_from_srt, dump_hud, parse_hud_enabled, sibling_srt
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id, m.path AS media_path
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("telemetry HUD only applies to videos")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("telemetry HUD only applies to videos")
+            enabled = parse_hud_enabled(payload)
+            if enabled:
+                media_path = Path(str(row["media_path"])) if row["media_path"] else None
+                srt = sibling_srt(media_path) if media_path is not None else None
+                cues = cues_from_srt(srt) if srt is not None else ()
+                if not cues:
+                    raise ValueError("This clip has no telemetry to show.")
+            blob = dump_hud(str(row["effect_settings"] or ""), enabled)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_transition(
         self,
         studio_item_id: int,
@@ -2942,6 +3348,272 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_playback_speed(
+        self,
+        studio_item_id: int,
+        speed: float,
+        range_in_s: float | None = None,
+        range_out_s: float | None = None,
+    ) -> tuple[list[StudioClip], int]:
+        """Apply 1×, 0.5×, or 0.25× to a source range inside one video clip.
+
+        A partial range splits the clip. Sections outside the range keep their
+        speed. Source files are never modified. Returns the resulting clips in
+        order and the id of the clip that received ``speed``.
+        """
+        from orga_drone.studio_cut import resolve_source_range
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_speed import coerce_playback_speed, plan_speed_segments
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.media_path, s.identity_key, s.position,
+                          s.filename_snapshot, s.recorded_at_snapshot,
+                          s.kind_snapshot, s.photo_duration_s,
+                          s.source_start, s.source_end, s.added_at,
+                          s.source_media_id, s.playback_speed, s.volume,
+                          s.transition, s.transition_duration_s, s.effect_settings,
+                          m.id AS media_id, m.kind AS live_kind,
+                          m.duration_s AS live_duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("only video clips can change speed")
+            if not available:
+                raise ValueError("unavailable clips cannot change speed")
+            media_duration = (
+                float(row["live_duration_s"])
+                if row["live_duration_s"] is not None
+                else None
+            )
+            rang = resolve_source_range(
+                source_in_s=(
+                    float(row["source_start"])
+                    if row["source_start"] is not None
+                    else None
+                ),
+                source_out_s=(
+                    float(row["source_end"])
+                    if row["source_end"] is not None
+                    else None
+                ),
+                media_duration_s=media_duration,
+            )
+            if rang is None:
+                raise ValueError("video duration unknown")
+            current = coerce_playback_speed(
+                float(row["playback_speed"])
+                if row["playback_speed"] is not None
+                else 1.0
+            )
+            try:
+                segments, selected_index = plan_speed_segments(
+                    rang,
+                    current_speed=current,
+                    range_in_s=range_in_s,
+                    range_out_s=range_out_s,
+                    speed=speed,
+                )
+            except ValueError as exc:
+                raise ValueError(str(exc)) from exc
+
+            project_id = int(row["project_id"])
+            position = int(row["position"])
+            ids: list[int] = [studio_item_id]
+            now = datetime.now().isoformat(timespec="seconds")
+            if len(segments) == 1:
+                conn.execute(
+                    "UPDATE studio_clips SET playback_speed = ? WHERE id = ?",
+                    (segments[0].speed, studio_item_id),
+                )
+            else:
+                extra = len(segments) - 1
+                conn.execute(
+                    """UPDATE studio_clips
+                       SET position = position + ?
+                       WHERE project_id = ? AND position > ?""",
+                    (extra, project_id, position),
+                )
+                conn.execute(
+                    """UPDATE studio_clips
+                       SET source_start = ?, source_end = ?, playback_speed = ?,
+                           transition = 'cut'
+                       WHERE id = ?""",
+                    (
+                        segments[0].source_in_s,
+                        segments[0].source_out_s,
+                        segments[0].speed,
+                        studio_item_id,
+                    ),
+                )
+                source_media_id = (
+                    int(row["media_id"])
+                    if row["media_id"] is not None
+                    else (
+                        int(row["source_media_id"])
+                        if row["source_media_id"] is not None
+                        else None
+                    )
+                )
+                volume = float(row["volume"] if row["volume"] is not None else 1.0)
+                remembered = (
+                    float(row["transition_duration_s"])
+                    if row["transition_duration_s"] is not None
+                    else None
+                )
+                for offset, seg in enumerate(segments[1:], start=1):
+                    is_last = offset == len(segments) - 1
+                    cur = conn.execute(
+                        """INSERT INTO studio_clips(
+                             project_id, media_path, identity_key, source_media_id,
+                             position, filename_snapshot, recorded_at_snapshot,
+                             kind_snapshot, photo_duration_s, source_start, source_end,
+                             playback_speed, volume, transition, transition_duration_s,
+                             effect_settings, added_at
+                           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            project_id,
+                            str(row["media_path"]),
+                            str(row["identity_key"]),
+                            source_media_id,
+                            position + offset,
+                            str(row["filename_snapshot"]),
+                            row["recorded_at_snapshot"],
+                            str(row["kind_snapshot"] or "video"),
+                            seg.source_in_s,
+                            seg.source_out_s,
+                            seg.speed,
+                            volume,
+                            row["transition"] if is_last else "cut",
+                            remembered,
+                            str(row["effect_settings"] or "{}"),
+                            now,
+                        ),
+                    )
+                    new_id = cur.lastrowid
+                    assert new_id is not None
+                    ids.append(int(new_id))
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+
+        by_id = {item.id: item for item in self.list_studio_items(project_id)}
+        ordered = [by_id[item_id] for item_id in ids if item_id in by_id]
+        if len(ordered) != len(ids):
+            raise RuntimeError("speed change succeeded but clips are missing")
+        return ordered, ids[selected_index]
+
+
+    def set_studio_section(
+        self,
+        studio_item_id: int,
+        *,
+        source_in_s: float,
+        source_out_s: float,
+        repeats: object,
+    ) -> StudioClip:
+        """Set a video in/out range and how many times that range plays.
+
+        Source files are not modified. A full-media range is stored as NULL,
+        matching Cut. Repeat count 1 omits the effect key. Raises ``ValueError``
+        on bad input.
+        """
+        from orga_drone.studio_cut import (
+            MIN_SEGMENT_S,
+            dump_section_repeats,
+            parse_section_repeats,
+            resolve_source_range,
+        )
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        count = parse_section_repeats(repeats)
+        if isinstance(source_in_s, bool) or not isinstance(source_in_s, (int, float)):
+            raise ValueError("source in must be a number")
+        if isinstance(source_out_s, bool) or not isinstance(source_out_s, (int, float)):
+            raise ValueError("source out must be a number")
+        start = float(source_in_s)
+        end = float(source_out_s)
+        if start < 0 or end <= start:
+            raise ValueError("source out must be after source in")
+        if end - start < MIN_SEGMENT_S:
+            raise ValueError("section is too short")
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id, m.duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("section repeat only applies to videos")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("section repeat only applies to videos")
+            media_duration = (
+                float(row["duration_s"]) if row["duration_s"] is not None else None
+            )
+            rang = resolve_source_range(
+                source_in_s=start,
+                source_out_s=end,
+                media_duration_s=media_duration,
+            )
+            if rang is None or rang.duration_s < MIN_SEGMENT_S:
+                raise ValueError("section is outside the video")
+            start_s = rang.source_in_s
+            end_s = rang.source_out_s
+            store_start: float | None = start_s
+            store_end: float | None = end_s
+            if (
+                media_duration is not None
+                and start_s <= 1e-4
+                and end_s >= media_duration - 1e-3
+            ):
+                store_start = None
+                store_end = None
+            blob = dump_section_repeats(str(row["effect_settings"] or ""), count)
+            conn.execute(
+                """UPDATE studio_clips
+                   SET source_start = ?, source_end = ?, effect_settings = ?
+                   WHERE id = ?""",
+                (store_start, store_end, blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def cut_studio_video_item(
         self,
         studio_item_id: int,
@@ -2954,6 +3626,7 @@ class Database:
         """
         from orga_drone.studio_cut import resolve_source_range, split_source_range
         from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_image import shift_saturation_ramp_settings
 
         with self.connect() as conn:
             row = conn.execute(
@@ -3034,6 +3707,10 @@ class Database:
                     else None
                 )
             )
+            right_settings = shift_saturation_ramp_settings(
+                str(row["effect_settings"] or "{}"),
+                float(local_cut_s),
+            )
             cur = conn.execute(
                 """INSERT INTO studio_clips(
                      project_id, media_path, identity_key, source_media_id, position,
@@ -3061,7 +3738,7 @@ class Database:
                         if row["transition_duration_s"] is not None
                         else None
                     ),
-                    str(row["effect_settings"] or "{}"),
+                    right_settings,
                     now,
                 ),
             )
@@ -3168,6 +3845,360 @@ class Database:
                 ),
             )
 
+    def list_albums(self) -> list[Album]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at,
+                          COUNT(i.id) AS item_count
+                   FROM albums a
+                   LEFT JOIN album_items i ON i.album_id = a.id
+                   GROUP BY a.id
+                   ORDER BY a.title COLLATE NOCASE, a.id"""
+            ).fetchall()
+        return [
+            Album(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                created_at=str(r["created_at"]),
+                updated_at=str(r["updated_at"]),
+                item_count=int(r["item_count"]),
+            )
+            for r in rows
+        ]
+
+    def get_album(self, album_id: int) -> Album | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at,
+                          COUNT(i.id) AS item_count
+                   FROM albums a
+                   LEFT JOIN album_items i ON i.album_id = a.id
+                   WHERE a.id = ?
+                   GROUP BY a.id""",
+                (album_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Album(
+            id=int(row["id"]),
+            title=str(row["title"]),
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
+            item_count=int(row["item_count"]),
+        )
+
+    def create_album(self, title: str) -> Album:
+        """Create an empty album. Raises ValueError when the title is blank."""
+        clean = clean_album_title(title)
+        if clean is None:
+            raise ValueError("empty album title")
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """INSERT INTO albums(title, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                (clean, now, now),
+            )
+            album_id = cur.lastrowid
+        assert album_id is not None
+        created = self.get_album(int(album_id))
+        assert created is not None
+        return created
+
+    def rename_album(self, album_id: int, title: str) -> Album | None:
+        """Rename an album. None when it does not exist.
+
+        Raises ValueError when the title is blank.
+        """
+        clean = clean_album_title(title)
+        if clean is None:
+            raise ValueError("empty album title")
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM albums WHERE id = ?",
+                (album_id,),
+            ).fetchone()
+            if existing is None:
+                return None
+            conn.execute(
+                "UPDATE albums SET title = ?, updated_at = ? WHERE id = ?",
+                (clean, now, album_id),
+            )
+        return self.get_album(album_id)
+
+    def delete_album(self, album_id: int) -> bool:
+        """Delete the album and its references. Media files and rows stay."""
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+            return cur.rowcount > 0
+
+    def albums_for_path(self, media_path: str) -> list[Album]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at
+                   FROM albums a
+                   JOIN album_items i ON i.album_id = a.id
+                   WHERE i.media_path = ?
+                   ORDER BY a.title COLLATE NOCASE, a.id""",
+                (media_path,),
+            ).fetchall()
+        return [
+            Album(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                created_at=str(r["created_at"]),
+                updated_at=str(r["updated_at"]),
+            )
+            for r in rows
+        ]
+
+    def add_media_to_album(self, album_id: int, media_id: int) -> str:
+        """Reference a library item from an album.
+
+        Returns ``added``, ``exists``, ``missing_album``, or ``missing_media``.
+        Does not copy or modify the file.
+        """
+        media = self.get_media(media_id)
+        if media is None:
+            return "missing_media"
+        identity = make_identity_key(
+            media.filename, media.size_bytes, media.recorded_at
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            album = conn.execute(
+                "SELECT id FROM albums WHERE id = ?",
+                (album_id,),
+            ).fetchone()
+            if album is None:
+                return "missing_album"
+            existing = conn.execute(
+                """SELECT id FROM album_items
+                   WHERE album_id = ? AND media_path = ?""",
+                (album_id, media.path),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE album_items
+                       SET identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, kind_snapshot = ?,
+                           recorded_at_snapshot = ?
+                       WHERE id = ?""",
+                    (
+                        identity,
+                        media.id,
+                        media.filename,
+                        media.kind,
+                        media.recorded_at,
+                        existing["id"],
+                    ),
+                )
+                return "exists"
+            conn.execute(
+                """INSERT INTO album_items(
+                     album_id, media_path, identity_key, source_media_id,
+                     filename_snapshot, kind_snapshot, recorded_at_snapshot, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    album_id,
+                    media.path,
+                    identity,
+                    media.id,
+                    media.filename,
+                    media.kind,
+                    media.recorded_at,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return "added"
+
+    def remove_album_item(self, album_id: int, item_id: int) -> bool:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM album_items WHERE id = ? AND album_id = ?",
+                (item_id, album_id),
+            )
+            if cur.rowcount == 0:
+                return False
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return True
+
+    def remove_media_from_album(self, album_id: int, media_path: str) -> bool:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM album_items WHERE album_id = ? AND media_path = ?",
+                (album_id, media_path),
+            )
+            if cur.rowcount == 0:
+                return False
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return True
+
+    def list_album_items(self, album_id: int) -> list[AlbumItem]:
+        """Album contents, including references whose files are offline."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT i.id, i.album_id, i.media_path, i.identity_key,
+                          i.filename_snapshot, i.kind_snapshot,
+                          i.recorded_at_snapshot, i.added_at,
+                          m.id AS media_id, m.filename AS live_filename,
+                          m.recorded_at AS live_recorded_at, m.kind AS live_kind
+                   FROM album_items i
+                   LEFT JOIN media m ON m.path = i.media_path
+                   WHERE i.album_id = ?
+                   ORDER BY COALESCE(m.recorded_at, i.recorded_at_snapshot) DESC,
+                            i.id ASC""",
+                (album_id,),
+            ).fetchall()
+        items: list[AlbumItem] = []
+        for row in rows:
+            path = str(row["media_path"])
+            state = album_media_state(path)
+            live_id = int(row["media_id"]) if row["media_id"] is not None else None
+            filename = (
+                str(row["live_filename"])
+                if row["live_filename"]
+                else str(row["filename_snapshot"])
+            )
+            kind = (
+                str(row["live_kind"])
+                if row["live_kind"]
+                else str(row["kind_snapshot"])
+            )
+            recorded = (
+                row["live_recorded_at"]
+                if row["media_id"] is not None
+                else row["recorded_at_snapshot"]
+            )
+            items.append(
+                AlbumItem(
+                    id=int(row["id"]),
+                    album_id=int(row["album_id"]),
+                    media_path=path,
+                    identity_key=str(row["identity_key"]),
+                    filename=filename,
+                    kind=kind,
+                    recorded_at=str(recorded) if recorded else None,
+                    added_at=str(row["added_at"]),
+                    state=state,
+                    media_id=live_id if state == "available" else None,
+                )
+            )
+        return items
+
+    def repath_album_items(self, old_path: str, new_path: str) -> None:
+        """Follow a library rename. Drops a duplicate reference in the same album."""
+        if old_path == new_path:
+            return
+        new_name = Path(new_path).name
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, album_id FROM album_items WHERE media_path = ?",
+                (old_path,),
+            ).fetchall()
+            for row in rows:
+                conflict = conn.execute(
+                    """SELECT id FROM album_items
+                       WHERE album_id = ? AND media_path = ? AND id != ?""",
+                    (row["album_id"], new_path, row["id"]),
+                ).fetchone()
+                if conflict:
+                    conn.execute(
+                        "DELETE FROM album_items WHERE id = ?",
+                        (row["id"],),
+                    )
+                else:
+                    conn.execute(
+                        """UPDATE album_items
+                           SET media_path = ?, filename_snapshot = ?
+                           WHERE id = ?""",
+                        (new_path, new_name, row["id"]),
+                    )
+
+    def link_album_items_for_path(
+        self,
+        media_path: str,
+        *,
+        filename: str,
+        size_bytes: int,
+        recorded_at: str | None,
+    ) -> None:
+        """After rescan/rename: refresh identity and relink an unambiguous orphan.
+
+        Same rules as Studio clip relink: exact path wins; otherwise one orphan
+        path group with the same identity may move onto this path.
+        """
+        identity = make_identity_key(filename, size_bytes, recorded_at)
+        with self.connect() as conn:
+            media_row = conn.execute(
+                "SELECT id FROM media WHERE path = ?",
+                (media_path,),
+            ).fetchone()
+            live_id = int(media_row["id"]) if media_row is not None else None
+            by_path = conn.execute(
+                "SELECT id FROM album_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchall()
+            if by_path:
+                conn.execute(
+                    """UPDATE album_items
+                       SET identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, recorded_at_snapshot = ?
+                       WHERE media_path = ?""",
+                    (identity, live_id, filename, recorded_at, media_path),
+                )
+                return
+            orphans = conn.execute(
+                """SELECT id, album_id, media_path FROM album_items
+                   WHERE identity_key = ?
+                     AND media_path NOT IN (SELECT path FROM media)""",
+                (identity,),
+            ).fetchall()
+            if not orphans:
+                return
+            orphan_paths = {str(r["media_path"]) for r in orphans}
+            if len(orphan_paths) != 1:
+                return
+            for orphan in orphans:
+                conflict = conn.execute(
+                    """SELECT id FROM album_items
+                       WHERE album_id = ? AND media_path = ?""",
+                    (orphan["album_id"], media_path),
+                ).fetchone()
+                if conflict:
+                    conn.execute(
+                        "DELETE FROM album_items WHERE id = ?",
+                        (orphan["id"],),
+                    )
+                    continue
+                conn.execute(
+                    """UPDATE album_items
+                       SET media_path = ?, identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, recorded_at_snapshot = ?
+                       WHERE id = ?""",
+                    (
+                        media_path,
+                        identity,
+                        live_id,
+                        filename,
+                        recorded_at,
+                        orphan["id"],
+                    ),
+                )
+
     def distinct_drones(self) -> list[str]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -3248,7 +4279,7 @@ class Database:
             params.append(int(limit))
 
         sql = f"""
-            SELECT m.id, m.kind, m.filename, m.recorded_at, m.duration_s,
+            SELECT m.id, m.root_id, m.kind, m.filename, m.recorded_at, m.duration_s,
                    m.size_bytes, m.drone_model, m.latitude, m.longitude,
                    COALESCE(mm.stars, 0) AS stars,
                    COALESCE(mm.favorite, 0) AS favorite
@@ -3265,6 +4296,7 @@ class Database:
             out.append(
                 {
                     "id": int(r["id"]),
+                    "root_id": int(r["root_id"]),
                     "kind": r["kind"],
                     "filename": r["filename"],
                     "recorded_at": r["recorded_at"],
@@ -3327,6 +4359,7 @@ class Database:
                 )
         self.repath_media_meta(old_path, new_path)
         self.repath_studio_item(old_path, new_path)
+        self.repath_album_items(old_path, new_path)
 
     def update_media_identity(
         self,
@@ -3349,6 +4382,7 @@ class Database:
         if old and old["path"] != path:
             self.repath_media_meta(old["path"], path)
             self.repath_studio_item(old["path"], path)
+            self.repath_album_items(old["path"], path)
         if old:
             self.link_media_meta_for_path(
                 path,
@@ -3357,6 +4391,12 @@ class Database:
                 recorded_at=old["recorded_at"],
             )
             self.link_studio_item_for_path(
+                path,
+                filename=filename,
+                size_bytes=int(old["size_bytes"] or 0),
+                recorded_at=old["recorded_at"],
+            )
+            self.link_album_items_for_path(
                 path,
                 filename=filename,
                 size_bytes=int(old["size_bytes"] or 0),
