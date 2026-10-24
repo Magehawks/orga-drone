@@ -7,6 +7,8 @@ body:
     attributes:
       value: |
         orga-drone is local-first. Feature ideas move through PM → UX (when UI/interaction) → PM concept selection → CTO → Development → Independent Review → Human Test before merge. UX discovery does not create implementation issues.
+
+        A pain point without a proposed change belongs on the **User need** form. External research is evidence, not a request from the person you observed. Filing either form does not add a public roadmap item; that requires a separate maintainer decision (`docs/USER_NEEDS.md`).
   - type: textarea
     id: problem
     attributes:

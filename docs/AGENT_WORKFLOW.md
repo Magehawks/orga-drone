@@ -77,6 +77,16 @@ Classification labels may be added independently, for example:
 
 Exactly one `status:*` label should describe the current workflow state.
 
+## User-needs intake
+
+Public pain points use the User need issue form and the labels in
+[`USER_NEEDS.md`](USER_NEEDS.md). A `user-need` issue is not `ready-for-dev`.
+
+An accepted need becomes an ordinary product issue and still passes the PM,
+UX (when required), and CTO gates. When that work ships, the user-need issue
+links the release notes and is labeled `feedback:shipped`. Accepting a need
+does not change [`ROADMAP.md`](ROADMAP.md).
+
 ## Issue contract
 
 An issue is `ready-for-dev` only when PM and CTO gates are complete.

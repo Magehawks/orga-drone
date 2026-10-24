@@ -1,0 +1,147 @@
+name: User need
+description: Report a concrete user problem. External research is evidence, not a feature request.
+title: "[User need]: "
+labels: ["user-need", "feedback:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for describing a real problem. This form records evidence for maintainers. It does not schedule work, and it does not change the public roadmap.
+
+        Choose **Direct feedback** when the problem is yours. Choose **External research** when you are reporting someone else's pain point (a conversation, a forum post, or something you observed). External research is not a feature request from that person, and it is not a commitment to build anything.
+
+        Do not attach photos, videos, SRT files, flight logs, or screenshots that show people, homes, or precise locations. Describe the situation in text. There is no upload step on this form.
+  - type: dropdown
+    id: origin_kind
+    attributes:
+      label: Where this comes from
+      description: This separates a report about your own use from notes about someone else. External research stays evidence until a maintainer accepts it.
+      options:
+        - Direct feedback — I use Orga Drone, or I tried to
+        - External research — someone else's pain point (not a request from that person)
+    validations:
+      required: true
+  - type: textarea
+    id: user_goal
+    attributes:
+      label: User goal
+      description: What is the person trying to do, and what gets in the way?
+      placeholder: I want to find last weekend's clips without opening every folder…
+    validations:
+      required: true
+  - type: textarea
+    id: target_user
+    attributes:
+      label: Target user
+      description: Who has this problem (hobby pilot, creator, professional operator, contributor, or similar)?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source (optional)
+      description: Where you heard this, if it was not your own session. A public link or a short note is enough. Do not paste private messages, names, or personal media.
+      placeholder: Forum thread, conversation summary, or "my own use"
+    validations:
+      required: false
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround
+      description: What do people do today instead? Write "None" if there is no workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Public links or a short description of what you observed. Link existing issues when you know them. Do not upload personal media.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Affected platform
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Not sure
+        - Not applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      options:
+        - Happens every time
+        - Happens sometimes
+        - Happened once
+        - Not a bug — a goal or an observed pain point
+    validations:
+      required: true
+  - type: textarea
+    id: repro_notes
+    attributes:
+      label: What you tried
+      description: Versions, steps, and what happened. Redact home paths, account names, and coordinates.
+      placeholder: |
+        Version: 1.9.0
+        1. …
+        2. …
+    validations:
+      required: false
+  - type: checkboxes
+    id: samples
+    attributes:
+      label: Sample files
+      description: Do not attach personal media. If a maintainer later asks for a sample, use a synthetic or fully redacted file and say so in a comment.
+      options:
+        - label: I am not attaching photos, videos, SRT files, flight logs, or screenshots of people, homes, or precise locations.
+          required: true
+  - type: dropdown
+    id: attribution
+    attributes:
+      label: Consent for attribution
+      description: Maintainers may mention accepted needs in release notes only within this choice.
+      options:
+        - You may quote this report anonymously
+        - You may attribute a short quote to my GitHub username
+        - Do not quote this report in release notes or public docs
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        **Maintainers — leave this section blank when you report a need.** Notes here are triage records. They do not add a roadmap item unless a maintainer updates `docs/ROADMAP.md` in a separate, explicit decision. See `docs/USER_NEEDS.md`.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Maintainer field, filled during monthly triage before the need is accepted.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Maintainer field. Fill this only after the need is accepted, on this issue or on the linked product issue.
+    validations:
+      required: false
+  - type: input
+    id: product_issue
+    attributes:
+      label: Linked product issue
+      description: Maintainer field. Issue or pull request that carries the accepted work through the normal gates.
+      placeholder: "#123"
+    validations:
+      required: false
+  - type: input
+    id: release_notes
+    attributes:
+      label: Release notes link
+      description: Maintainer field. When the accepted work ships, link the GitHub Release or `releases/<version>/RELEASE_NOTES.md`.
+      placeholder: "https://github.com/Magehawks/orga-drone/releases/tag/vX.Y.Z"
+    validations:
+      required: false

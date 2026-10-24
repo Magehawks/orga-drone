@@ -301,7 +301,7 @@ Full prioritization language: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributing
 
-Bug reports, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
+Bug reports, user needs, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). A user-need issue records a concrete problem; it is not a roadmap promise ([`docs/USER_NEEDS.md`](docs/USER_NEEDS.md)). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
 
 ```bash
 pip install -e ".[dev]"
