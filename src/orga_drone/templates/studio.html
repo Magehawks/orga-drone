@@ -132,6 +132,7 @@
          data-section-failed="{{ _('Could not save the section.')|e }}"
          data-in-story="{{ _('In story')|e }}"
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
+         data-speed-failed="{{ _('Could not change speed.')|e }}"
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
          data-bw-failed="{{ _('Could not save the color change.')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
@@ -480,6 +481,7 @@
                   data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
                   data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
+                  data-playback-speed="{{ item.playback_speed }}"
                   data-section-repeats="{{ row.section_repeats }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
                   data-transition-type="{{ row.stored_transition }}"
@@ -523,7 +525,7 @@
                     <strong>{% if item.kind == 'title_card' %}{{ row.display_title }}{% else %}{{ item.filename }}{% endif %}</strong>
                     <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% elif item.kind == 'title_card' %}{{ _('Title card') }}{% else %}{{ _('Memory') }}{% endif %}</span>
                     <span class="studio-clip-duration" data-clip-duration>
-                      {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% else %}—{% endif %}
+                      {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% if item.kind == 'video' and item.playback_speed < 0.999 %} · {{ '%g'|format(item.playback_speed) }}×{% endif %}{% else %}—{% endif %}
                     </span>
                     <span class="visually-hidden studio-clip-playing-label" hidden>{{ _('Now playing') }}</span>
                   </span>
@@ -585,6 +587,25 @@
           </label>
           <p class="hint">{{ _('Repeat plays this in/out range again, up to 8 times, at the same speed.') }}</p>
           <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
+        </div>
+        <div id="inspector-speed" hidden>
+          <p class="studio-inspector-kind">{{ _('Speed') }}</p>
+          <div class="studio-speed-choices" role="group" aria-label="{{ _('Speed') }}">
+            <button type="button" class="button ghost" data-speed="1">1×</button>
+            <button type="button" class="button ghost" data-speed="0.5">0.5×</button>
+            <button type="button" class="button ghost" data-speed="0.25">0.25×</button>
+          </div>
+          <label class="studio-inspector-field">
+            <span>{{ _('From (s)') }}</span>
+            <input type="number" id="inspector-speed-in" class="studio-photo-duration"
+                   min="0" step="0.1" inputmode="decimal" aria-label="{{ _('From (s)') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('To (s)') }}</span>
+            <input type="number" id="inspector-speed-out" class="studio-photo-duration"
+                   min="0" step="0.1" inputmode="decimal" aria-label="{{ _('To (s)') }}">
+          </label>
+          <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
         <div id="inspector-image-adjust" hidden>
           <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>

@@ -258,6 +258,7 @@
   const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
   const labelInStory = root.dataset.inStory || "In story";
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
+  const msgSpeedFailed = root.dataset.speedFailed || "Could not change speed.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
@@ -447,6 +448,12 @@
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 
+  function playbackSpeed(clip) {
+    const n = Number(clip && clip.dataset.playbackSpeed);
+    if (n === 0.5 || n === 0.25) return n;
+    return 1;
+  }
+
   function sourceOutS(clip) {
     const raw = clip.dataset.sourceOut;
     if (raw !== "" && raw != null) {
@@ -456,9 +463,29 @@
     const media = Number(clip.dataset.mediaDuration);
     if (Number.isFinite(media) && media > 0) return media;
     const reps = sectionRepeats(clip);
+    const speed = playbackSpeed(clip);
     const dur = clipDuration(clip);
-    const cycle = reps > 1 && dur > 0 ? dur / reps : dur;
-    return sourceInS(clip) + cycle;
+    const cycle = reps > 0 && dur > 0 ? dur / reps : dur;
+    return sourceInS(clip) + cycle * speed;
+  }
+
+  function sourceDurationS(clip) {
+    return Math.max(0, sourceOutS(clip) - sourceInS(clip));
+  }
+
+  function applyClipPlayback(video, clip) {
+    if (!video) return;
+    const speed = clip ? playbackSpeed(clip) : 1;
+    try {
+      if (video.playbackRate !== speed) video.playbackRate = speed;
+    } catch (_) {
+      /* ignore unsupported rates */
+    }
+    if (video === previewVideo) {
+      const slow = speed < 0.999;
+      video.muted = slow;
+      if (!slow) video.volume = state.volume;
+    }
   }
 
   function sectionRepeats(clip) {
@@ -471,8 +498,10 @@
   }
 
   function sectionCycleS(clip) {
-    const cycle = sourceOutS(clip) - sourceInS(clip);
-    if (cycle > 0.001) return cycle;
+    const source = sourceOutS(clip) - sourceInS(clip);
+    const speed = playbackSpeed(clip);
+    const story = speed > 0 ? source / speed : source;
+    if (story > 0.001) return story;
     const reps = sectionRepeats(clip);
     const dur = clipDuration(clip);
     return reps > 0 ? dur / reps : dur;
@@ -2012,9 +2041,11 @@
       ? sectionPoint(clip, localS)
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
     videoLoopIndex = point.index;
-    const target = Math.max(inS, inS + Math.max(0, point.offset));
+    const speed = clip ? playbackSpeed(clip) : 1;
+    const target = Math.max(inS, inS + Math.max(0, point.offset) * speed);
     const apply = () => {
       try {
+        applyClipPlayback(previewVideo, clip);
         let max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
         if (outS != null && Number.isFinite(outS)) {
           max = Math.min(max > 0 ? max : outS, outS);
@@ -2037,6 +2068,7 @@
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
+    applyClipPlayback(previewVideo, clip);
     const needLoad = !src || loadedVideoSrc !== src;
     if (needLoad) {
       loadedVideoSrc = src || "";
@@ -2132,9 +2164,10 @@
           previewVideoB.load();
         }
         const inS = sourceInS(clip);
-        const target = inS + Math.max(0, sectionSampleS(clip, localS));
+        const target = inS + Math.max(0, sectionSampleS(clip, localS)) * playbackSpeed(clip);
         const apply = () => {
           try {
+            applyClipPlayback(previewVideoB, clip);
             previewVideoB.currentTime = target;
           } catch (_) {
             /* ignore */
@@ -2398,10 +2431,12 @@
     }
     const inS = sourceInS(playing);
     const outS = sourceOutS(playing);
+    const speed = playbackSpeed(playing);
     const reps = sectionRepeats(playing);
     const cycle = sectionCycleS(playing);
     const mediaTime = previewVideo.currentTime || 0;
-    const within = Math.max(0, mediaTime - inS);
+    applyClipPlayback(previewVideo, playing);
+    const within = Math.max(0, (mediaTime - inS) / speed);
     const local = reps > 1 ? videoLoopIndex * cycle + within : within;
     const next = clipStartTime(playing) + local;
     if (Math.abs(next - state.projectTimeS) >= 0.01) {
@@ -3103,6 +3138,7 @@
           if (hintEl) hintEl.textContent = msgCutHint;
         }
       }
+      fillSpeedInspector(clip, isVideo);
       const imageWrap = document.getElementById("inspector-image-adjust");
       if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
       if (isPhoto || isVideo) fillImageAdjust(clip);
@@ -3140,6 +3176,82 @@
     }
   }
 
+  function fillSpeedInspector(clip, isVideo) {
+    const wrap = document.getElementById("inspector-speed");
+    if (wrap) wrap.hidden = !isVideo;
+    if (!isVideo || !clip) return;
+    const speed = playbackSpeed(clip);
+    wrap.querySelectorAll("[data-speed]").forEach((btn) => {
+      btn.classList.toggle("is-active", Number(btn.dataset.speed) === speed);
+      btn.disabled = clip.dataset.available !== "1";
+    });
+    const inEl = document.getElementById("inspector-speed-in");
+    const outEl = document.getElementById("inspector-speed-out");
+    const sourceDur = sourceDurationS(clip);
+    const shownOut = Math.floor(sourceDur * 1000) / 1000;
+    if (inEl) {
+      inEl.value = "0";
+      inEl.disabled = clip.dataset.available !== "1";
+    }
+    if (outEl) {
+      outEl.value = String(shownOut);
+      outEl.disabled = clip.dataset.available !== "1";
+    }
+  }
+
+  let speedApplyPending = false;
+
+  async function applyClipSpeed(speed) {
+    if (speedApplyPending) return;
+    const selected = clips().find(
+      (c) => state.selected && String(c.dataset.studioId) === String(state.selected.id)
+    );
+    if (!selected || selected.dataset.kind !== "video") return;
+    if (speed === playbackSpeed(selected)) return;
+    const inEl = document.getElementById("inspector-speed-in");
+    const outEl = document.getElementById("inspector-speed-out");
+    const rangeIn = inEl ? Number(inEl.value) : 0;
+    const rangeOut = outEl ? Number(outEl.value) : sourceDurationS(selected);
+    if (!Number.isFinite(rangeIn) || !Number.isFinite(rangeOut)) {
+      showFlash(msgSpeedFailed);
+      return;
+    }
+    speedApplyPending = true;
+    if (state.playing) pausePlayback();
+    try {
+      const res = await fetch(`/api/studio/${selected.dataset.studioId}/speed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          speed,
+          range_in_s: rangeIn,
+          range_out_s: rangeOut,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash((data && data.detail) || msgSpeedFailed);
+        speedApplyPending = false;
+        return;
+      }
+      try {
+        sessionStorage.setItem(
+          CUT_RESTORE_KEY,
+          JSON.stringify({
+            selectId: String(data.selected_id),
+            atClipStart: true,
+          })
+        );
+      } catch (_) {
+        /* ignore */
+      }
+      window.location.reload();
+    } catch (_) {
+      showFlash(msgSpeedFailed);
+      speedApplyPending = false;
+    }
+  }
+
   function canCutAtHit(hit) {
     if (!hit || hit.atEnd) return false;
     if (!state.selected || state.selected.type !== "clip") return false;
@@ -3148,9 +3260,9 @@
     if (sectionRepeats(hit.clip) > 1) return false;
     if (hit.clip.dataset.canPlay !== "1") return false;
     if (hit.clip.dataset.available !== "1") return false;
-    const local = hit.localS;
-    const dur = hit.duration;
-    return local > MIN_CUT_SEGMENT_S && local < dur - MIN_CUT_SEGMENT_S;
+    const sourceLocal = hit.localS * playbackSpeed(hit.clip);
+    const sourceDur = sourceDurationS(hit.clip);
+    return sourceLocal > MIN_CUT_SEGMENT_S && sourceLocal < sourceDur - MIN_CUT_SEGMENT_S;
   }
 
   function updateCutEnabled() {
@@ -3164,7 +3276,7 @@
     const hit = resolveAt(state.projectTimeS);
     if (!canCutAtHit(hit)) return;
     const studioId = hit.clip.dataset.studioId;
-    const localS = hit.localS;
+    const localS = hit.localS * playbackSpeed(hit.clip);
     const playhead = state.projectTimeS;
     if (state.playing) pausePlayback();
     cutBtn.disabled = true;
@@ -5265,6 +5377,13 @@
   if (previewVideo) {
     previewVideo.addEventListener("loadedmetadata", () => syncAnnotations(resolveAt(state.projectTimeS)));
   }
+  document.querySelectorAll("#inspector-speed [data-speed]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const speed = Number(btn.dataset.speed);
+      if (speed === 1 || speed === 0.5 || speed === 0.25) applyClipSpeed(speed);
+    });
+  });
+
   document.getElementById("inspector-frame-zoom")?.addEventListener("input", () => {
     const clip = selectedAdjustableClip();
     const input = document.getElementById("inspector-frame-zoom");
@@ -5585,8 +5704,12 @@
     cutRestore.selectId &&
     clips().some((c) => String(c.dataset.studioId) === String(cutRestore.selectId))
   ) {
-    selectClip(cutRestore.selectId, { movePlayhead: false });
-    setProjectTime(Number(cutRestore.projectTimeS) || 0);
+    if (cutRestore.atClipStart) {
+      selectClip(cutRestore.selectId);
+    } else {
+      selectClip(cutRestore.selectId, { movePlayhead: false });
+      setProjectTime(Number(cutRestore.projectTimeS) || 0);
+    }
   } else if (root.dataset.selectId && clips().some((c) => String(c.dataset.studioId) === String(root.dataset.selectId))) {
     selectClip(root.dataset.selectId);
     if (root.dataset.focusField === "title") {

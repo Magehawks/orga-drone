@@ -151,6 +151,17 @@ msgstr "Oder füge eine Titelseite als Überschrift hinzu."
 msgid "Title Card export needs a system sans font."
 msgstr "Der Titelseiten-Export braucht eine System-Sans-Schrift."
 
+msgid "Could not change speed."
+msgstr "Geschwindigkeit konnte nicht geändert werden."
+
+msgid "From (s)"
+msgstr "Von (s)"
+
+msgid "To (s)"
+msgstr "Bis (s)"
+
+msgid "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate."
+msgstr "Zeitlupe gilt für diesen Abschnitt und verlängert die Story. Die Zeiten zählen ab dem Anfang dieses Clips. Der Rest des Clips behält seine Geschwindigkeit. Der Originalton eines verlangsamten Abschnitts ist stumm. Vorschau und Export nutzen dieselbe Geschwindigkeit. Die Glätte hängt von der Bildrate der Quelle ab."
 msgid "Repeat"
 msgstr "Wiederholen"
 

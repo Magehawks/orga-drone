@@ -150,6 +150,7 @@ professional video-editing knowledge.
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
+| Slow motion on a selected video section (0.5×, 0.25×, or 1× to reset) | **Available now** (that section only; neighboring sections keep their speed; Story length updates; preview and MP4 match; source audio on a slowed section is muted; not optical-flow interpolation or fast-forward) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -268,7 +269,11 @@ See `README.md` for the detailed feature status table. In short:
   clips can store a zoom and focal point (1×–3×), including a start and an end
   so the frame moves across the clip. At 1× the existing fit is unchanged.
   Preview uses the same window as MP4 export. This is not tracking or a
-  keyframe editor. Media
+  keyframe editor. A selected section of a video clip can play at 0.5× or 0.25×
+  (1× restores that section). The rest of the clip keeps its speed, and the Story
+  gets longer by the same amount in preview and in the MP4. Source audio on a
+  slowed section is muted. The effect holds the source frames; it does not invent
+  frames between them, and it is not fast-forward or reverse. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
@@ -308,9 +313,11 @@ See `README.md` for the detailed feature status table. In short:
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;
-  not a professional grade or NLE). A video section repeat plays an in/out
-  range up to 8 times at the same speed (not slow motion, not a seamless or
-  reverse loop).
+  not a professional grade or NLE). A selected section of a video clip can use
+  slow motion at 0.5× or 0.25× (1× resets that section; source audio on the slowed
+  section is muted; not optical-flow interpolation, fast-forward, or reverse).
+  A video section repeat plays an in/out range up to 8 times at the same speed
+  (not a seamless or reverse loop).
 
 ## Studio MVP (local Create → Share)
 

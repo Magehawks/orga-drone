@@ -4,7 +4,7 @@
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(manual order + estimated runtime + simple video Cut + persisted project title;
+(manual order + estimated runtime + simple video Cut + slow motion on a selected video section + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution (suggested filename includes that resolution; Cancel export stops the running encode); after export, Open video / Show in folder on
 Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
@@ -59,7 +59,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime; offline roots keep catalog entries), metadata, GPS, sessions/flows, dupes, user-managed albums |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio; chronological Timeline (year/month/day by recording date; missing dates called out; not the Studio editor timeline) |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); video section repeat (in/out range, 1×–8×, same speed) |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); slow motion at 0.5× or 0.25× for a selected section of a video clip (1× resets that section; source audio on a slowed section is muted); video section repeat (in/out range, 1×–8×, same speed) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -90,7 +90,10 @@ The application helps users:
   export); a linear saturation ramp on video clips (start and end time, from the current grade toward black and white; preview approximates
   export); timed text, shape, and image overlays with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy masks on photo and video clips
   (up to 8; fixed for the whole clip; preview approximates export); per-clip zoom and pan (1×–3×, optional start/end motion; preview matches
-  the exported frame); local MP4 export with configurable
+  the exported frame); slow motion at 0.5× or 0.25× on a selected section of a video clip
+  (1× resets that section; neighboring sections keep their speed; source audio on a slowed
+  section is muted; preview and MP4 share the speed and the longer duration; not optical-flow
+  interpolation or fast-forward); local MP4 export with configurable
   resolution on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
@@ -136,10 +139,12 @@ The application helps users:
   time-proportional soundtrack coverage on that canvas, basic rendered visual
   transitions, basic per-clip image adjustment, a linear video saturation ramp (not a keyframe editor), timed text, shape, and
   image overlays, rectangular blur/pixelate privacy masks (not tracking or a
-  legal anonymization guarantee), and per-clip zoom and pan (not tracking or a
-  keyframe editor; not a professional effects editor, color grade, or NLE).
+  legal anonymization guarantee), per-clip zoom and pan (not tracking or a
+  keyframe editor; not a professional effects editor, color grade, or NLE), and slow motion
+  at 0.5× or 0.25× for a selected video section (source audio on that section is muted;
+  not optical-flow interpolation, fast-forward, reverse, or a speed curve).
   A video clip can repeat its in/out range up to 8 times at the same speed
-  (not slow motion, not a seamless or reverse loop).
+  (not a seamless or reverse loop).
 
 ## Product principles
 

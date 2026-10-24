@@ -23,6 +23,12 @@ from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
 from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
+from orga_drone.studio_speed import (
+    coerce_playback_speed,
+    ffmpeg_slow_prefix,
+    ffmpeg_slow_stretch,
+    source_span_s,
+)
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -64,12 +70,37 @@ def _segment_vf(width: int, height: int) -> str:
     )
 
 
+def _slow_timing(clip: StudioExportClip) -> tuple[str, str, float, float] | None:
+    """Trim/stretch filters plus the pre-stretch framing clock, or ``None`` at 1×.
+
+    Framing sees source time after the trim resets timestamps. Stretch runs
+    after ``fps``, so fades and overlays that follow the chain see Story time.
+    """
+    if clip.kind != "video":
+        return None
+    speed = coerce_playback_speed(clip.playback_speed)
+    if speed >= 1.0:
+        return None
+    start, end, _output = source_span_s(
+        source_start_s=clip.source_start_s,
+        source_end_s=clip.source_end_s,
+        output_duration_s=clip.duration_s,
+        speed=speed,
+    )
+    return (
+        ffmpeg_slow_prefix(start, end),
+        ffmpeg_slow_stretch(speed),
+        0.0,
+        max(0.001, end - start),
+    )
+
+
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
     Fades stay separate so privacy masks and overlays can sit on the framed
-    picture before them. The ramp follows the grade so a fade to black still
-    ends on black.
+    picture before them. Slow motion trims first and stretches after ``fps``.
+    The saturation ramp follows the grade so a fade to black still ends on black.
     """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
@@ -80,6 +111,13 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     )
     prefix = ""
     suffix = ""
+    slow = _slow_timing(clip)
+    trim = ""
+    stretch = ""
+    frame_origin = clip.source_start_s
+    frame_duration = clip.duration_s
+    if slow is not None:
+        trim, stretch, frame_origin, frame_duration = slow
     if clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
         source_w, source_h = _source_frame_size(clip)
         prefix = ffmpeg_frame_prefix(
@@ -87,8 +125,8 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_width=source_w,
             source_height=source_h,
             kind=clip.kind,
-            source_start_s=clip.source_start_s,
-            duration_s=clip.duration_s,
+            source_start_s=frame_origin,
+            duration_s=frame_duration,
         )
         suffix = ffmpeg_frame_suffix(
             clip.frame,
@@ -97,10 +135,12 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_width=source_w,
             source_height=source_h,
             kind=clip.kind,
-            source_start_s=clip.source_start_s,
-            duration_s=clip.duration_s,
+            source_start_s=frame_origin,
+            duration_s=frame_duration,
         )
-    return ",".join(part for part in (grade, ramp, prefix, base, suffix) if part)
+    return ",".join(
+        part for part in (trim, grade, ramp, prefix, base, suffix, stretch) if part
+    )
 
 
 def _fade_filters(clip: StudioExportClip) -> list[str]:
@@ -228,7 +268,11 @@ def _segment_filter_invocation(
         resolve_overlay_asset,
     )
 
-    origin = filter_time_origin(kind=clip.kind, source_start_s=clip.source_start_s)
+    origin = (
+        0.0
+        if _slow_timing(clip) is not None
+        else filter_time_origin(kind=clip.kind, source_start_s=clip.source_start_s)
+    )
     source_w, source_h = _source_frame_size(clip)
     fitted = content_rect(width, height, source_w, source_h)
     extra: list[str] = []
@@ -950,6 +994,72 @@ class FfmpegStudioEncoder:
             duration_s=dur,
         )
 
+    def _render_slow_video(
+        self,
+        ffmpeg: str,
+        clip: StudioExportClip,
+        out: Path,
+        width: int,
+        height: int,
+        *,
+        on_progress: ProgressCallback | None,
+        clip_index: int,
+        clip_total: int,
+    ) -> None:
+        """Encode one slowed section with muted source audio.
+
+        ``trim`` selects the source range. ``setpts`` holds those frames.
+        Silence replaces the source track so concat stays stereo AAC without
+        time-stretching the original sound.
+        """
+        speed = coerce_playback_speed(clip.playback_speed)
+        _start, _end, output_dur = source_span_s(
+            source_start_s=clip.source_start_s,
+            source_end_s=clip.source_end_s,
+            output_duration_s=clip.duration_s,
+            speed=speed,
+        )
+        dur = max(0.1, output_dur)
+        on_time = self._progress_cb(
+            on_progress,
+            clip=clip,
+            clip_index=clip_index,
+            clip_total=clip_total,
+            duration_s=dur,
+        )
+        extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
+        overlay_count = extra.count("-i")
+        audio_index = 1 + overlay_count
+        uses_graph = bool(filters) and filters[0] == "-filter_complex"
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(clip.source_path),
+            *extra,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t",
+            f"{dur:.3f}",
+            *filters,
+            *_x264_video_args(),
+            "-c:a",
+            "aac",
+            "-ac",
+            "2",
+            "-ar",
+            "48000",
+            "-shortest",
+        ]
+        if uses_graph:
+            cmd.extend(["-map", f"{audio_index}:a:0"])
+        else:
+            cmd.extend(["-map", "0:v:0", "-map", f"{audio_index}:a:0"])
+        cmd.append(str(out))
+        _run_ffmpeg(cmd, on_time=on_time, duration_s=dur)
+
     def _render_video(
         self,
         ffmpeg: str,
@@ -980,6 +1090,18 @@ class FfmpegStudioEncoder:
                 )
                 parts.append(part)
             self._concat(ffmpeg, parts, out)
+            return
+        if _slow_timing(clip) is not None:
+            self._render_slow_video(
+                ffmpeg,
+                clip,
+                out,
+                width,
+                height,
+                on_progress=on_progress,
+                clip_index=clip_index,
+                clip_total=clip_total,
+            )
             return
         start = max(0.0, float(clip.source_start_s))
         if clip.source_end_s is not None:
