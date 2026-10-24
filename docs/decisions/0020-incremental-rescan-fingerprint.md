@@ -1,4 +1,4 @@
-# ADR 0019: Skip unchanged media on rescan
+# ADR 0020: Skip unchanged media on rescan
 
 - **Status:** Accepted
 - **Date:** 2026-10-24
@@ -14,8 +14,8 @@ Large folders, including NAS archives, pay that cost on every scan.
 Issue #96 asks for a documented safe fingerprint and for added, changed, and
 deleted files to reconcile, while user tags, favorites, and Studio references
 survive. It does not name the fingerprint. Hashing every large video is an
-explicit non-goal. The offline catalog for disconnected roots is issue #95
-and is out of scope here.
+explicit non-goal. An unlistable root keeps its catalog and is marked offline
+(issue #95). The fingerprint skip applies only after that root can be listed.
 
 ## Decision
 

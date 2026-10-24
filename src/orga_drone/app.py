@@ -38,6 +38,7 @@ from orga_drone.studio_frame import (
 from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
+    saturation_ramp_from_effect_settings,
 )
 from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
 from orga_drone.studio_overlay import (
@@ -64,7 +65,7 @@ from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
-from orga_drone.scan import scan_all_roots, scan_root
+from orga_drone.scan import offline_root_ids, scan_all_roots, scan_root
 from orga_drone.scan.jobs import ScanJobStore
 from orga_drone.scan.progress import ProgressCallback
 from orga_drone.export.jobs import ExportJobStore
@@ -476,6 +477,7 @@ def create_app() -> FastAPI:
             "theme_style": custom_css_vars(theme) if theme.mode == "custom" else "",
             "nav_active": "",
             "browse_return_url": None,
+            "offline_root_ids": offline_root_ids(db),
             **extra,
         }
 
@@ -797,6 +799,11 @@ def create_app() -> FastAPI:
         if include_noloc:
             without = db.list_geo_media(with_gps=False, limit=200)
         stats = db.stats()
+        offline = offline_root_ids(db)
+        for row in points:
+            row["source_offline"] = int(row["root_id"]) in offline
+        for row in without:
+            row["source_offline"] = int(row["root_id"]) in offline
         return {
             "items": points,
             "without_location": without,
@@ -1043,6 +1050,9 @@ def create_app() -> FastAPI:
                         "display_title": display_title,
                         "display_subtitle": display_subtitle,
                         "image_adjust": image_adjust_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
+                        "saturation_ramp": saturation_ramp_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
                         "overlays": [
@@ -1503,6 +1513,35 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "image": image.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/saturation-ramp")
+    async def api_studio_saturation_ramp(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include a saturation ramp"
+            )
+        try:
+            item = db.set_studio_saturation_ramp(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        ramp = saturation_ramp_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "saturation_ramp": ramp.as_dict(),
             }
         )
 

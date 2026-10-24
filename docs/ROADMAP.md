@@ -40,7 +40,7 @@ Highlights:
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
-  image adjustment for photos and videos (brightness, contrast, saturation, warmth); timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
+  image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
   for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
@@ -92,6 +92,11 @@ open/reveal of the finished file already exist on Windows desktop.
 - Competing with Premiere / DaVinci / CapCut as a pro NLE
 
 ## How work enters the repo
+
+User-need reports ([`docs/USER_NEEDS.md`](USER_NEEDS.md)) are evidence. Opening
+or accepting one does not change this roadmap. A maintainer may later turn an
+accepted need into a product issue. Shipped work links that user-need issue to
+the release notes. A roadmap edit is a separate maintainer decision.
 
 1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
 2. **Product-Spec-Reviewer** checks the spec against code and vision docs

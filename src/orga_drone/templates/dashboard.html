@@ -45,8 +45,15 @@
     <div class="dash-rail">
       {% for item in favorites %}
       <a class="dash-rail-item" href="/media/{{ item.id }}">
-        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        {% if item.root_id in offline_root_ids %}
+          <span class="dash-rail-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') }}"></span>
+        {% else %}
+          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        {% endif %}
         <span class="dash-rail-title">{{ item.filename }}</span>
+        {% if item.root_id in offline_root_ids %}
+          <span class="badge unavailable">{{ _('Offline') }}</span>
+        {% endif %}
       </a>
       {% endfor %}
     </div>
@@ -62,8 +69,15 @@
     <div class="dash-rail">
       {% for item in recent %}
       <a class="dash-rail-item" href="/media/{{ item.id }}">
-        <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        {% if item.root_id in offline_root_ids %}
+          <span class="dash-rail-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') }}"></span>
+        {% else %}
+          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+        {% endif %}
         <span class="dash-rail-title">{{ item.filename }}</span>
+        {% if item.root_id in offline_root_ids %}
+          <span class="badge unavailable">{{ _('Offline') }}</span>
+        {% endif %}
       </a>
       {% endfor %}
     </div>

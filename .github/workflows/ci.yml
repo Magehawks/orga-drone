@@ -5,7 +5,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# The Windows release workflow calls this job and packages only after it passes.
+# Pull requests run quality (Ruff, MyPy, unit tests) and App journey smoke.
+# The Windows release workflow calls this workflow and packages only after both pass.
+# The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
   contents: read
 
@@ -40,4 +42,49 @@ jobs:
         run: mypy src packaging/itch_channel.py
 
       - name: Unit tests
-        run: pytest
+        # The journey file has its own check so a failure is visible as
+        # "App journey smoke". Local `pytest` still runs it.
+        run: pytest --ignore=tests/test_pr_journey_smoke.py
+
+  journey:
+    name: App journey smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Synthetic library journey
+        id: smoke
+        run: pytest tests/test_pr_journey_smoke.py -q --tb=short
+
+      - name: Explain the check
+        if: always()
+        run: |
+          {
+            echo "### App journey smoke"
+            echo ""
+            echo "Command: \`pytest tests/test_pr_journey_smoke.py\`"
+            echo ""
+            echo "Temporary data directory and one generated JPEG. No private library, no network, no desktop window."
+            echo ""
+            echo "Path: health, English UI, add folder, scan, Browse, Ask, search, detail, Studio create/add/clear, Dashboard, Map, Duplicates. The photo stays on disk."
+            echo ""
+            echo "**Result:** ${{ steps.smoke.outcome }}"
+            echo ""
+            echo "A person still checks the WebView2 window, native dialogs, real drone media, playback, and the Mark-of-the-Web zip in \`packaging/README.md\`."
+            echo ""
+            echo "Details: \`docs/PR_E2E.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"

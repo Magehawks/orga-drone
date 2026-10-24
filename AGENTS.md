@@ -11,7 +11,8 @@ Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
 in preview and MP4 export; Title Cards as generated Story items; basic rendered
 visual transitions with labeled boundary overlays; basic per-clip image
 adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
-export); Inspector headings that
+export); a linear saturation ramp on video clips (start and end time, from the current grade
+toward black and white); Inspector headings that
 distinguish selection from the playhead-active clip; time-based Story canvas
 with Fit to story / zoom; read-only soundtrack coverage on that canvas).
 
@@ -56,9 +57,9 @@ Before implementing a feature, verify it improves this journey (see
 
 | Area | Question | Today (honest) |
 |------|----------|----------------|
-| Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime), metadata, GPS, sessions/flows, dupes |
+| Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime; offline roots keep catalog entries), metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -66,7 +67,8 @@ Before implementing a feature, verify it improves this journey (see
 The application helps users:
 
 - import and organize drone (and related) photos and videos from local folders
-  (a rescan skips metadata extraction when file size and mtime are unchanged)
+  (a rescan skips metadata extraction when file size and mtime are unchanged;
+  when a source folder cannot be listed, its catalog entries stay and the UI marks that source offline)
 - extract DJI and standard media metadata (EXIF, filenames, SRT where present)
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
@@ -82,6 +84,7 @@ The application helps users:
   duration, solid background; preview + MP4); basic visual transitions
   (Cut, Fade through black, Crossfade) in preview and MP4; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
+  export); a linear saturation ramp on video clips (start and end time, from the current grade toward black and white; preview approximates
   export); timed text, shape, and image overlays with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy masks on photo and video clips
   (up to 8; fixed for the whole clip; preview approximates export); per-clip zoom and pan (1×–3×, optional start/end motion; preview matches
   the exported frame); local MP4 export with configurable
@@ -95,10 +98,14 @@ The application helps users:
 
 ## Limitations (honest)
 
-- A library rescan still walks each root and rebuilds flows and sessions.
+- A library rescan still walks each listable root and rebuilds flows and sessions.
   Unchanged files (same size and mtime) skip metadata extraction. This is not
-  a content hash. An unavailable root is left indexed as-is. Scan never deletes
-  files, favorites, tags, notes, or Studio clips.
+  a content hash. If a source drive or folder cannot be listed, that scan keeps
+  the root's catalog entries and user metadata, and the UI marks them offline.
+  Scanning again after the folder is connected updates those entries without
+  adding duplicate rows. Files removed from a folder that can still be listed
+  are dropped on the next scan. Scan never deletes files, favorites, tags,
+  notes, or Studio clips.
 - Flight sessions are **heuristic** (time gaps + optional SRT altitude/GPS).
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
@@ -119,7 +126,7 @@ The application helps users:
   time-based Story canvas with Fit/zoom, labeled transition overlays, Inspector
   headings that distinguish selection from playhead-active clips, read-only
   time-proportional soundtrack coverage on that canvas, basic rendered visual
-  transitions, basic per-clip image adjustment, timed text, shape, and
+  transitions, basic per-clip image adjustment, a linear video saturation ramp (not a keyframe editor), timed text, shape, and
   image overlays, rectangular blur/pixelate privacy masks (not tracking or a
   legal anonymization guarantee), and per-clip zoom and pan (not tracking or a
   keyframe editor; not a professional effects editor, color grade, or NLE).
@@ -255,7 +262,7 @@ GitHub issues and pull requests are the handoff boundary between roles. The cano
    - must return `CTO_APPROVED` before `ready-for-dev`
 4. **Developer** — main Cursor implementation agent
    - implements only the approved issue
-   - runs Ruff, MyPy and pytest and updates docs/i18n when required
+   - runs Ruff, MyPy and pytest (including the PR journey smoke; CI reports it as its own check — `docs/PR_E2E.md`) and updates docs/i18n when required
 5. **Independent Review Gate** — `implementation-reviewer`
    - reviews issue + diff + tests independently
    - read-only; never fixes its own findings

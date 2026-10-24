@@ -1,7 +1,7 @@
 """Rescan skips metadata extraction when size and mtime are unchanged.
 
 Issue #96 does not name a content fingerprint. The skip signal is file size
-plus filesystem mtime (see ADR 0019). These tests are the benchmark: a second
+plus filesystem mtime (see ADR 0020). These tests are the benchmark: a second
 scan must not call ``parse_media_file`` for unchanged media.
 """
 
