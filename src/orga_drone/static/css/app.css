@@ -1341,12 +1341,17 @@ video.studio-preview-media.studio-preview-layer-b {
   align-items: center;
   gap: 0.4rem;
 }
-.studio-frame-target {
+.studio-frame-target,
+.studio-speed-choices {
   display: flex;
   gap: 0.35rem;
 }
-.studio-frame-target .button.is-active {
+.studio-frame-target .button.is-active,
+.studio-speed-choices .button.is-active {
   border-color: var(--accent, currentColor);
+}
+.studio-speed-choices {
+  margin-bottom: 0.65rem;
 }
 .studio-preview-placeholder {
   position: absolute;

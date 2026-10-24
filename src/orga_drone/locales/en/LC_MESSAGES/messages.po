@@ -151,3 +151,15 @@ msgstr "Or add a Title Card to start with a heading."
 msgid "Title Card export needs a system sans font."
 msgstr "Title Card export needs a system sans font."
 
+msgid "Could not change speed."
+msgstr "Could not change speed."
+
+msgid "From (s)"
+msgstr "From (s)"
+
+msgid "To (s)"
+msgstr "To (s)"
+
+msgid "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate."
+msgstr "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate."
+

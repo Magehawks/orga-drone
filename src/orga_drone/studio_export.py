@@ -277,6 +277,9 @@ def _clip_to_export_clip(
     if path is None:
         return None
     kind = clip.kind if clip.kind in {"photo", "video"} else media.kind
+    from orga_drone.studio_speed import coerce_playback_speed
+
+    speed = coerce_playback_speed(clip.playback_speed) if kind == "video" else 1.0
     seconds = effective_seconds(
         kind=kind or "unknown",
         photo_duration_s=clip.photo_duration_s,
@@ -284,6 +287,7 @@ def _clip_to_export_clip(
         available=True,
         source_in_s=clip.source_start,
         source_out_s=clip.source_end,
+        playback_speed=speed,
     )
     if seconds is None or seconds <= 0:
         if kind == "photo":
@@ -322,6 +326,7 @@ def _clip_to_export_clip(
         duration_s=float(seconds),
         source_start_s=start,
         source_end_s=end,
+        playback_speed=speed,
         image=image,
         frame=frame,
         masks=masks,

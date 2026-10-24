@@ -2674,7 +2674,7 @@ class Database:
             row = conn.execute(
                 """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
                           s.effect_settings, s.photo_duration_s, s.source_start,
-                          s.source_end, s.card_duration_s,
+                          s.source_end, s.card_duration_s, s.playback_speed,
                           m.kind AS live_kind, m.id AS media_id, m.duration_s
                    FROM studio_clips s
                    LEFT JOIN media m ON m.path = s.media_path
@@ -2711,6 +2711,11 @@ class Database:
                 card_duration_s=(
                     float(row["card_duration_s"])
                     if row["card_duration_s"] is not None
+                    else None
+                ),
+                playback_speed=(
+                    float(row["playback_speed"])
+                    if row["playback_speed"] is not None
                     else None
                 ),
             )
@@ -2887,6 +2892,176 @@ class Database:
             )
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
+
+    def set_studio_playback_speed(
+        self,
+        studio_item_id: int,
+        speed: float,
+        range_in_s: float | None = None,
+        range_out_s: float | None = None,
+    ) -> tuple[list[StudioClip], int]:
+        """Apply 1×, 0.5×, or 0.25× to a source range inside one video clip.
+
+        A partial range splits the clip. Sections outside the range keep their
+        speed. Source files are never modified. Returns the resulting clips in
+        order and the id of the clip that received ``speed``.
+        """
+        from orga_drone.studio_cut import resolve_source_range
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_speed import coerce_playback_speed, plan_speed_segments
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.media_path, s.identity_key, s.position,
+                          s.filename_snapshot, s.recorded_at_snapshot,
+                          s.kind_snapshot, s.photo_duration_s,
+                          s.source_start, s.source_end, s.added_at,
+                          s.source_media_id, s.playback_speed, s.volume,
+                          s.transition, s.transition_duration_s, s.effect_settings,
+                          m.id AS media_id, m.kind AS live_kind,
+                          m.duration_s AS live_duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("only video clips can change speed")
+            if not available:
+                raise ValueError("unavailable clips cannot change speed")
+            media_duration = (
+                float(row["live_duration_s"])
+                if row["live_duration_s"] is not None
+                else None
+            )
+            rang = resolve_source_range(
+                source_in_s=(
+                    float(row["source_start"])
+                    if row["source_start"] is not None
+                    else None
+                ),
+                source_out_s=(
+                    float(row["source_end"])
+                    if row["source_end"] is not None
+                    else None
+                ),
+                media_duration_s=media_duration,
+            )
+            if rang is None:
+                raise ValueError("video duration unknown")
+            current = coerce_playback_speed(
+                float(row["playback_speed"])
+                if row["playback_speed"] is not None
+                else 1.0
+            )
+            try:
+                segments, selected_index = plan_speed_segments(
+                    rang,
+                    current_speed=current,
+                    range_in_s=range_in_s,
+                    range_out_s=range_out_s,
+                    speed=speed,
+                )
+            except ValueError as exc:
+                raise ValueError(str(exc)) from exc
+
+            project_id = int(row["project_id"])
+            position = int(row["position"])
+            ids: list[int] = [studio_item_id]
+            now = datetime.now().isoformat(timespec="seconds")
+            if len(segments) == 1:
+                conn.execute(
+                    "UPDATE studio_clips SET playback_speed = ? WHERE id = ?",
+                    (segments[0].speed, studio_item_id),
+                )
+            else:
+                extra = len(segments) - 1
+                conn.execute(
+                    """UPDATE studio_clips
+                       SET position = position + ?
+                       WHERE project_id = ? AND position > ?""",
+                    (extra, project_id, position),
+                )
+                conn.execute(
+                    """UPDATE studio_clips
+                       SET source_start = ?, source_end = ?, playback_speed = ?,
+                           transition = 'cut'
+                       WHERE id = ?""",
+                    (
+                        segments[0].source_in_s,
+                        segments[0].source_out_s,
+                        segments[0].speed,
+                        studio_item_id,
+                    ),
+                )
+                source_media_id = (
+                    int(row["media_id"])
+                    if row["media_id"] is not None
+                    else (
+                        int(row["source_media_id"])
+                        if row["source_media_id"] is not None
+                        else None
+                    )
+                )
+                volume = float(row["volume"] if row["volume"] is not None else 1.0)
+                remembered = (
+                    float(row["transition_duration_s"])
+                    if row["transition_duration_s"] is not None
+                    else None
+                )
+                for offset, seg in enumerate(segments[1:], start=1):
+                    is_last = offset == len(segments) - 1
+                    cur = conn.execute(
+                        """INSERT INTO studio_clips(
+                             project_id, media_path, identity_key, source_media_id,
+                             position, filename_snapshot, recorded_at_snapshot,
+                             kind_snapshot, photo_duration_s, source_start, source_end,
+                             playback_speed, volume, transition, transition_duration_s,
+                             effect_settings, added_at
+                           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            project_id,
+                            str(row["media_path"]),
+                            str(row["identity_key"]),
+                            source_media_id,
+                            position + offset,
+                            str(row["filename_snapshot"]),
+                            row["recorded_at_snapshot"],
+                            str(row["kind_snapshot"] or "video"),
+                            seg.source_in_s,
+                            seg.source_out_s,
+                            seg.speed,
+                            volume,
+                            row["transition"] if is_last else "cut",
+                            remembered,
+                            str(row["effect_settings"] or "{}"),
+                            now,
+                        ),
+                    )
+                    new_id = cur.lastrowid
+                    assert new_id is not None
+                    ids.append(int(new_id))
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+
+        by_id = {item.id: item for item in self.list_studio_items(project_id)}
+        ordered = [by_id[item_id] for item_id in ids if item_id in by_id]
+        if len(ordered) != len(ids):
+            raise RuntimeError("speed change succeeded but clips are missing")
+        return ordered, ids[selected_index]
 
     def cut_studio_video_item(
         self,

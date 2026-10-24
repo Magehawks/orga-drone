@@ -383,6 +383,7 @@ def item_effective_seconds(item: object) -> float | None:
         source_in_s=getattr(item, "source_in_s", None),
         source_out_s=getattr(item, "source_out_s", None),
         card_duration_s=getattr(item, "card_duration_s", None),
+        playback_speed=getattr(item, "playback_speed", None),
     )
 
 

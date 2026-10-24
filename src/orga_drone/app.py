@@ -982,6 +982,7 @@ def create_app() -> FastAPI:
                     source_in_s=it.source_start,
                     source_out_s=it.source_end,
                     card_duration_s=it.card_duration_s,
+                    playback_speed=it.playback_speed,
                 )
                 stream_url = ""
                 proxy_url = ""
@@ -1466,6 +1467,7 @@ def create_app() -> FastAPI:
             available=item.available,
             source_in_s=item.source_in_s,
             source_out_s=item.source_out_s,
+            playback_speed=item.playback_speed,
         )
         return JSONResponse(
             {
@@ -1532,6 +1534,7 @@ def create_app() -> FastAPI:
             source_in_s=item.source_start,
             source_out_s=item.source_end,
             card_duration_s=item.card_duration_s,
+            playback_speed=item.playback_speed,
         )
         overlays = overlays_from_effect_settings(
             item.effect_settings,
@@ -1683,6 +1686,78 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.post("/api/studio/{studio_item_id}/speed")
+    async def api_studio_speed(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "speed" not in payload:
+            raise HTTPException(status_code=400, detail="JSON body must include speed")
+        raw_speed = payload.get("speed")
+        if isinstance(raw_speed, bool) or not isinstance(raw_speed, (int, float)):
+            raise HTTPException(status_code=400, detail="speed must be 1, 0.5, or 0.25")
+        has_in = "range_in_s" in payload and payload.get("range_in_s") is not None
+        has_out = "range_out_s" in payload and payload.get("range_out_s") is not None
+        if has_in != has_out:
+            raise HTTPException(
+                status_code=400, detail="speed range needs both start and end"
+            )
+        range_in: float | None = None
+        range_out: float | None = None
+        if has_in and has_out:
+            raw_in = payload.get("range_in_s")
+            raw_out = payload.get("range_out_s")
+            if isinstance(raw_in, bool) or not isinstance(raw_in, (int, float)):
+                raise HTTPException(status_code=400, detail="range_in_s must be a number")
+            if isinstance(raw_out, bool) or not isinstance(raw_out, (int, float)):
+                raise HTTPException(status_code=400, detail="range_out_s must be a number")
+            range_in = float(raw_in)
+            range_out = float(raw_out)
+        try:
+            changed, selected_id = db.set_studio_playback_speed(
+                studio_item_id,
+                float(raw_speed),
+                range_in_s=range_in,
+                range_out_s=range_out,
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(changed[0].project_id)
+        summary = summarize_studio_items(items)
+
+        def _speed_row(clip: Any) -> dict[str, Any]:
+            return {
+                "id": clip.id,
+                "source_in_s": clip.source_in_s,
+                "source_out_s": clip.source_out_s,
+                "playback_speed": clip.playback_speed,
+                "effective_duration_s": effective_seconds(
+                    kind=clip.kind or "unknown",
+                    photo_duration_s=clip.photo_duration_s,
+                    duration_s=clip.duration_s,
+                    available=clip.available,
+                    source_in_s=clip.source_in_s,
+                    source_out_s=clip.source_out_s,
+                    playback_speed=clip.playback_speed,
+                ),
+            }
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "selected_id": selected_id,
+                "clips": [_speed_row(clip) for clip in changed],
+                "summary": summary.as_dict(),
+            }
+        )
+
     @app.post("/api/studio/{studio_item_id}/cut")
     async def api_studio_cut(
         studio_item_id: int,
@@ -1724,6 +1799,7 @@ def create_app() -> FastAPI:
                         available=left.available,
                         source_in_s=left.source_in_s,
                         source_out_s=left.source_out_s,
+                        playback_speed=left.playback_speed,
                     ),
                 },
                 "right": {
@@ -1737,6 +1813,7 @@ def create_app() -> FastAPI:
                         available=right.available,
                         source_in_s=right.source_in_s,
                         source_out_s=right.source_out_s,
+                        playback_speed=right.playback_speed,
                     ),
                 },
                 "summary": summary.as_dict(),

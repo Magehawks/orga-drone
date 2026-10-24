@@ -459,5 +459,9 @@
   "Start": "Start",
   "End": "End",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.",
-  "Could not save framing.": "Could not save framing."
+  "Could not save framing.": "Could not save framing.",
+  "Could not change speed.": "Could not change speed.",
+  "From (s)": "From (s)",
+  "To (s)": "To (s)",
+  "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.": "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate."
 }

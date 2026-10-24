@@ -20,6 +20,7 @@ class StudioExportClip:
     duration_s: float
     source_start_s: float = 0.0
     source_end_s: float | None = None
+    playback_speed: float = 1.0
     title_text: str = ""
     subtitle_text: str = ""
     background: str = "dark"

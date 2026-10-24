@@ -459,5 +459,9 @@
   "Start": "Start",
   "End": "Ende",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Ziehen Sie die Vorschau, um den Ausschnitt zu verschieben. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau entspricht dem exportierten Bild.",
-  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden."
+  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden.",
+  "Could not change speed.": "Geschwindigkeit konnte nicht geändert werden.",
+  "From (s)": "Von (s)",
+  "To (s)": "Bis (s)",
+  "Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.": "Zeitlupe gilt für diesen Abschnitt und verlängert die Story. Die Zeiten zählen ab dem Anfang dieses Clips. Der Rest des Clips behält seine Geschwindigkeit. Der Originalton eines verlangsamten Abschnitts ist stumm. Vorschau und Export nutzen dieselbe Geschwindigkeit. Die Glätte hängt von der Bildrate der Quelle ab."
 }
