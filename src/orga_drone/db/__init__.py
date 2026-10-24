@@ -1,4 +1,4 @@
-"""SQLite persistence for library roots, assets, media, flows, and sessions."""
+"""SQLite persistence for library roots, assets, media, flows, sessions, and albums."""
 
 from __future__ import annotations
 
@@ -198,6 +198,31 @@ CREATE TABLE IF NOT EXISTS studio_audio_clips (
 CREATE INDEX IF NOT EXISTS idx_studio_audio_clips_project
     ON studio_audio_clips(project_id, lane, position);
 
+-- Library albums (non-destructive references; independent of Studio projects).
+CREATE TABLE IF NOT EXISTS albums (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS album_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+    media_path TEXT NOT NULL,
+    identity_key TEXT NOT NULL,
+    source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+    filename_snapshot TEXT NOT NULL,
+    kind_snapshot TEXT NOT NULL,
+    recorded_at_snapshot TEXT,
+    added_at TEXT NOT NULL,
+    UNIQUE (album_id, media_path)
+);
+CREATE INDEX IF NOT EXISTS idx_album_items_album ON album_items(album_id);
+CREATE INDEX IF NOT EXISTS idx_album_items_path ON album_items(media_path);
+CREATE INDEX IF NOT EXISTS idx_album_items_identity ON album_items(identity_key);
+CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id);
+
 CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -390,6 +415,58 @@ class StudioClip:
 # Backward-compatible name used by older tests/call sites.
 StudioItem = StudioClip
 
+ALBUM_TITLE_MAX = 80
+
+
+def clean_album_title(title: str | None) -> str | None:
+    """Collapse whitespace and cap length. None when nothing remains."""
+    collapsed = " ".join((title or "").split())
+    if not collapsed:
+        return None
+    if len(collapsed) > ALBUM_TITLE_MAX:
+        collapsed = collapsed[:ALBUM_TITLE_MAX].rstrip()
+    return collapsed or None
+
+
+def album_media_state(media_path: str) -> str:
+    """``available`` when the referenced file is on disk, otherwise ``offline``.
+
+    Album membership is kept either way. Offline covers a missing file or an
+    unplugged drive; the original file is never changed here.
+    """
+    try:
+        on_disk = Path(media_path).is_file()
+    except OSError:
+        on_disk = False
+    return "available" if on_disk else "offline"
+
+
+@dataclass
+class Album:
+    """A user-named library album. Does not own or copy media files."""
+
+    id: int
+    title: str
+    created_at: str
+    updated_at: str
+    item_count: int = 0
+
+
+@dataclass
+class AlbumItem:
+    """One media reference inside an album (path + identity, not a file copy)."""
+
+    id: int
+    album_id: int
+    media_path: str
+    identity_key: str
+    filename: str
+    kind: str
+    recorded_at: str | None
+    added_at: str
+    state: str
+    media_id: int | None
+
 
 class Database:
     def __init__(self, path: Path) -> None:
@@ -540,6 +617,7 @@ class Database:
         Database._migrate_studio_clips_title_cards(conn)
         Database._migrate_studio_clips_transition_duration(conn)
         Database._migrate_studio_audio_clips(conn)
+        Database._migrate_albums(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
@@ -871,6 +949,44 @@ class Database:
         if "duration_s" not in cols:
             conn.execute("ALTER TABLE studio_audio_clips ADD COLUMN duration_s REAL")
 
+    @staticmethod
+    def _migrate_albums(conn: sqlite3.Connection) -> None:
+        """User-managed library albums. Membership survives media-row rebuilds."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS albums (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS album_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+                media_path TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                filename_snapshot TEXT NOT NULL,
+                kind_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                added_at TEXT NOT NULL,
+                UNIQUE (album_id, media_path)
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_album ON album_items(album_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_path ON album_items(media_path)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_identity ON album_items(identity_key)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id)"
+        )
+
     def list_roots(self) -> list[sqlite3.Row]:
         with self.connect() as conn:
             return list(conn.execute("SELECT * FROM library_roots ORDER BY id"))
@@ -907,7 +1023,9 @@ class Database:
     def clear_root_media(self, root_id: int) -> None:
         """Drop indexed media for a root.
 
-        Does NOT touch media_meta or studio_clips / studio_projects (user curation).
+        Does NOT touch media_meta, album_items, or studio_clips / studio_projects
+        (user curation). Deleting media rows sets album_items.source_media_id
+        to NULL; the album reference itself stays.
         """
         with self.connect() as conn:
             # flows / sessions that only belong to this root
@@ -3114,6 +3232,360 @@ class Database:
                 ),
             )
 
+    def list_albums(self) -> list[Album]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at,
+                          COUNT(i.id) AS item_count
+                   FROM albums a
+                   LEFT JOIN album_items i ON i.album_id = a.id
+                   GROUP BY a.id
+                   ORDER BY a.title COLLATE NOCASE, a.id"""
+            ).fetchall()
+        return [
+            Album(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                created_at=str(r["created_at"]),
+                updated_at=str(r["updated_at"]),
+                item_count=int(r["item_count"]),
+            )
+            for r in rows
+        ]
+
+    def get_album(self, album_id: int) -> Album | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at,
+                          COUNT(i.id) AS item_count
+                   FROM albums a
+                   LEFT JOIN album_items i ON i.album_id = a.id
+                   WHERE a.id = ?
+                   GROUP BY a.id""",
+                (album_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return Album(
+            id=int(row["id"]),
+            title=str(row["title"]),
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
+            item_count=int(row["item_count"]),
+        )
+
+    def create_album(self, title: str) -> Album:
+        """Create an empty album. Raises ValueError when the title is blank."""
+        clean = clean_album_title(title)
+        if clean is None:
+            raise ValueError("empty album title")
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """INSERT INTO albums(title, created_at, updated_at)
+                   VALUES (?, ?, ?)""",
+                (clean, now, now),
+            )
+            album_id = cur.lastrowid
+        assert album_id is not None
+        created = self.get_album(int(album_id))
+        assert created is not None
+        return created
+
+    def rename_album(self, album_id: int, title: str) -> Album | None:
+        """Rename an album. None when it does not exist.
+
+        Raises ValueError when the title is blank.
+        """
+        clean = clean_album_title(title)
+        if clean is None:
+            raise ValueError("empty album title")
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM albums WHERE id = ?",
+                (album_id,),
+            ).fetchone()
+            if existing is None:
+                return None
+            conn.execute(
+                "UPDATE albums SET title = ?, updated_at = ? WHERE id = ?",
+                (clean, now, album_id),
+            )
+        return self.get_album(album_id)
+
+    def delete_album(self, album_id: int) -> bool:
+        """Delete the album and its references. Media files and rows stay."""
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+            return cur.rowcount > 0
+
+    def albums_for_path(self, media_path: str) -> list[Album]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id, a.title, a.created_at, a.updated_at
+                   FROM albums a
+                   JOIN album_items i ON i.album_id = a.id
+                   WHERE i.media_path = ?
+                   ORDER BY a.title COLLATE NOCASE, a.id""",
+                (media_path,),
+            ).fetchall()
+        return [
+            Album(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                created_at=str(r["created_at"]),
+                updated_at=str(r["updated_at"]),
+            )
+            for r in rows
+        ]
+
+    def add_media_to_album(self, album_id: int, media_id: int) -> str:
+        """Reference a library item from an album.
+
+        Returns ``added``, ``exists``, ``missing_album``, or ``missing_media``.
+        Does not copy or modify the file.
+        """
+        media = self.get_media(media_id)
+        if media is None:
+            return "missing_media"
+        identity = make_identity_key(
+            media.filename, media.size_bytes, media.recorded_at
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            album = conn.execute(
+                "SELECT id FROM albums WHERE id = ?",
+                (album_id,),
+            ).fetchone()
+            if album is None:
+                return "missing_album"
+            existing = conn.execute(
+                """SELECT id FROM album_items
+                   WHERE album_id = ? AND media_path = ?""",
+                (album_id, media.path),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE album_items
+                       SET identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, kind_snapshot = ?,
+                           recorded_at_snapshot = ?
+                       WHERE id = ?""",
+                    (
+                        identity,
+                        media.id,
+                        media.filename,
+                        media.kind,
+                        media.recorded_at,
+                        existing["id"],
+                    ),
+                )
+                return "exists"
+            conn.execute(
+                """INSERT INTO album_items(
+                     album_id, media_path, identity_key, source_media_id,
+                     filename_snapshot, kind_snapshot, recorded_at_snapshot, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    album_id,
+                    media.path,
+                    identity,
+                    media.id,
+                    media.filename,
+                    media.kind,
+                    media.recorded_at,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return "added"
+
+    def remove_album_item(self, album_id: int, item_id: int) -> bool:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM album_items WHERE id = ? AND album_id = ?",
+                (item_id, album_id),
+            )
+            if cur.rowcount == 0:
+                return False
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return True
+
+    def remove_media_from_album(self, album_id: int, media_path: str) -> bool:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM album_items WHERE album_id = ? AND media_path = ?",
+                (album_id, media_path),
+            )
+            if cur.rowcount == 0:
+                return False
+            conn.execute(
+                "UPDATE albums SET updated_at = ? WHERE id = ?",
+                (now, album_id),
+            )
+        return True
+
+    def list_album_items(self, album_id: int) -> list[AlbumItem]:
+        """Album contents, including references whose files are offline."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT i.id, i.album_id, i.media_path, i.identity_key,
+                          i.filename_snapshot, i.kind_snapshot,
+                          i.recorded_at_snapshot, i.added_at,
+                          m.id AS media_id, m.filename AS live_filename,
+                          m.recorded_at AS live_recorded_at, m.kind AS live_kind
+                   FROM album_items i
+                   LEFT JOIN media m ON m.path = i.media_path
+                   WHERE i.album_id = ?
+                   ORDER BY COALESCE(m.recorded_at, i.recorded_at_snapshot) DESC,
+                            i.id ASC""",
+                (album_id,),
+            ).fetchall()
+        items: list[AlbumItem] = []
+        for row in rows:
+            path = str(row["media_path"])
+            state = album_media_state(path)
+            live_id = int(row["media_id"]) if row["media_id"] is not None else None
+            filename = (
+                str(row["live_filename"])
+                if row["live_filename"]
+                else str(row["filename_snapshot"])
+            )
+            kind = (
+                str(row["live_kind"])
+                if row["live_kind"]
+                else str(row["kind_snapshot"])
+            )
+            recorded = (
+                row["live_recorded_at"]
+                if row["media_id"] is not None
+                else row["recorded_at_snapshot"]
+            )
+            items.append(
+                AlbumItem(
+                    id=int(row["id"]),
+                    album_id=int(row["album_id"]),
+                    media_path=path,
+                    identity_key=str(row["identity_key"]),
+                    filename=filename,
+                    kind=kind,
+                    recorded_at=str(recorded) if recorded else None,
+                    added_at=str(row["added_at"]),
+                    state=state,
+                    media_id=live_id if state == "available" else None,
+                )
+            )
+        return items
+
+    def repath_album_items(self, old_path: str, new_path: str) -> None:
+        """Follow a library rename. Drops a duplicate reference in the same album."""
+        if old_path == new_path:
+            return
+        new_name = Path(new_path).name
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, album_id FROM album_items WHERE media_path = ?",
+                (old_path,),
+            ).fetchall()
+            for row in rows:
+                conflict = conn.execute(
+                    """SELECT id FROM album_items
+                       WHERE album_id = ? AND media_path = ? AND id != ?""",
+                    (row["album_id"], new_path, row["id"]),
+                ).fetchone()
+                if conflict:
+                    conn.execute(
+                        "DELETE FROM album_items WHERE id = ?",
+                        (row["id"],),
+                    )
+                else:
+                    conn.execute(
+                        """UPDATE album_items
+                           SET media_path = ?, filename_snapshot = ?
+                           WHERE id = ?""",
+                        (new_path, new_name, row["id"]),
+                    )
+
+    def link_album_items_for_path(
+        self,
+        media_path: str,
+        *,
+        filename: str,
+        size_bytes: int,
+        recorded_at: str | None,
+    ) -> None:
+        """After rescan/rename: refresh identity and relink an unambiguous orphan.
+
+        Same rules as Studio clip relink: exact path wins; otherwise one orphan
+        path group with the same identity may move onto this path.
+        """
+        identity = make_identity_key(filename, size_bytes, recorded_at)
+        with self.connect() as conn:
+            media_row = conn.execute(
+                "SELECT id FROM media WHERE path = ?",
+                (media_path,),
+            ).fetchone()
+            live_id = int(media_row["id"]) if media_row is not None else None
+            by_path = conn.execute(
+                "SELECT id FROM album_items WHERE media_path = ?",
+                (media_path,),
+            ).fetchall()
+            if by_path:
+                conn.execute(
+                    """UPDATE album_items
+                       SET identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, recorded_at_snapshot = ?
+                       WHERE media_path = ?""",
+                    (identity, live_id, filename, recorded_at, media_path),
+                )
+                return
+            orphans = conn.execute(
+                """SELECT id, album_id, media_path FROM album_items
+                   WHERE identity_key = ?
+                     AND media_path NOT IN (SELECT path FROM media)""",
+                (identity,),
+            ).fetchall()
+            if not orphans:
+                return
+            orphan_paths = {str(r["media_path"]) for r in orphans}
+            if len(orphan_paths) != 1:
+                return
+            for orphan in orphans:
+                conflict = conn.execute(
+                    """SELECT id FROM album_items
+                       WHERE album_id = ? AND media_path = ?""",
+                    (orphan["album_id"], media_path),
+                ).fetchone()
+                if conflict:
+                    conn.execute(
+                        "DELETE FROM album_items WHERE id = ?",
+                        (orphan["id"],),
+                    )
+                    continue
+                conn.execute(
+                    """UPDATE album_items
+                       SET media_path = ?, identity_key = ?, source_media_id = ?,
+                           filename_snapshot = ?, recorded_at_snapshot = ?
+                       WHERE id = ?""",
+                    (
+                        media_path,
+                        identity,
+                        live_id,
+                        filename,
+                        recorded_at,
+                        orphan["id"],
+                    ),
+                )
+
     def distinct_drones(self) -> list[str]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -3273,6 +3745,7 @@ class Database:
                 )
         self.repath_media_meta(old_path, new_path)
         self.repath_studio_item(old_path, new_path)
+        self.repath_album_items(old_path, new_path)
 
     def update_media_identity(
         self,
@@ -3295,6 +3768,7 @@ class Database:
         if old and old["path"] != path:
             self.repath_media_meta(old["path"], path)
             self.repath_studio_item(old["path"], path)
+            self.repath_album_items(old["path"], path)
         if old:
             self.link_media_meta_for_path(
                 path,
@@ -3303,6 +3777,12 @@ class Database:
                 recorded_at=old["recorded_at"],
             )
             self.link_studio_item_for_path(
+                path,
+                filename=filename,
+                size_bytes=int(old["size_bytes"] or 0),
+                recorded_at=old["recorded_at"],
+            )
+            self.link_album_items_for_path(
                 path,
                 filename=filename,
                 size_bytes=int(old["size_bytes"] or 0),

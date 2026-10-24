@@ -905,6 +905,11 @@ def create_app() -> FastAPI:
             if open_detail is not None
             else False
         )
+        media_albums = db.albums_for_path(item.path)
+        member_ids = {album.id for album in media_albums}
+        albums_available = [
+            album for album in db.list_albums() if album.id not in member_ids
+        ]
         return render(
             request,
             "detail.html",
@@ -941,6 +946,8 @@ def create_app() -> FastAPI:
             browse_from_qs=browse_from_qs,
             return_qs=return_qs,
             in_studio=in_studio,
+            media_albums=media_albums,
+            albums_available=albums_available,
         )
 
     @app.get("/studio", response_class=HTMLResponse)
@@ -2249,6 +2256,128 @@ def create_app() -> FastAPI:
 
         threading.Thread(target=runner, name=f"scan-job-{job.id[:8]}", daemon=True).start()
         return RedirectResponse(url=f"/library?scan_job={job.id}", status_code=303)
+
+    @app.get("/albums", response_class=HTMLResponse)
+    async def albums_page(request: Request, msg: str | None = None) -> HTMLResponse:
+        return render(
+            request,
+            "albums.html",
+            albums=db.list_albums(),
+            flash_msg=msg,
+            nav_active="albums",
+        )
+
+    @app.post("/albums")
+    async def albums_create(title: str = Form("")) -> RedirectResponse:
+        try:
+            album = db.create_album(title)
+        except ValueError:
+            return RedirectResponse(url="/albums?msg=album_invalid", status_code=303)
+        return RedirectResponse(url=f"/albums/{album.id}?msg=album_created", status_code=303)
+
+    @app.get("/albums/{album_id}", response_class=HTMLResponse)
+    async def album_detail(
+        request: Request,
+        album_id: int,
+        msg: str | None = None,
+    ) -> HTMLResponse:
+        album = db.get_album(album_id)
+        if album is None:
+            return render(request, "error.html", status_code=404, message="Not found")
+        return render(
+            request,
+            "album.html",
+            album=album,
+            items=db.list_album_items(album_id),
+            flash_msg=msg,
+            nav_active="albums",
+        )
+
+    @app.post("/albums/{album_id}/rename")
+    async def album_rename(album_id: int, title: str = Form("")) -> RedirectResponse:
+        if db.get_album(album_id) is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        try:
+            renamed = db.rename_album(album_id, title)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/albums/{album_id}?msg=album_invalid",
+                status_code=303,
+            )
+        if renamed is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        return RedirectResponse(
+            url=f"/albums/{album_id}?msg=album_renamed",
+            status_code=303,
+        )
+
+    @app.post("/albums/{album_id}/delete")
+    async def album_delete(album_id: int) -> RedirectResponse:
+        if not db.delete_album(album_id):
+            raise HTTPException(status_code=404, detail="Not found")
+        return RedirectResponse(url="/albums?msg=album_deleted", status_code=303)
+
+    @app.post("/albums/{album_id}/items/{item_id}/remove")
+    async def album_item_remove(album_id: int, item_id: int) -> RedirectResponse:
+        if db.get_album(album_id) is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        db.remove_album_item(album_id, item_id)
+        return RedirectResponse(
+            url=f"/albums/{album_id}?msg=album_removed",
+            status_code=303,
+        )
+
+    @app.post("/media/{media_id}/albums/add")
+    async def media_album_add(
+        media_id: int,
+        album_id: str = Form(""),
+        title: str = Form(""),
+    ) -> RedirectResponse:
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        raw_id = (album_id or "").strip()
+        target_id: int | None = None
+        if raw_id:
+            try:
+                target_id = int(raw_id)
+            except ValueError:
+                target_id = None
+            if target_id is None or db.get_album(target_id) is None:
+                return RedirectResponse(
+                    url=f"/media/{media_id}?msg=album_missing",
+                    status_code=303,
+                )
+        else:
+            try:
+                target_id = db.create_album(title).id
+            except ValueError:
+                return RedirectResponse(
+                    url=f"/media/{media_id}?msg=album_invalid",
+                    status_code=303,
+                )
+        assert target_id is not None
+        result = db.add_media_to_album(target_id, media_id)
+        if result == "added":
+            msg = "album_added"
+        elif result == "exists":
+            msg = "album_already"
+        else:
+            msg = "album_missing"
+        return RedirectResponse(url=f"/media/{media_id}?msg={msg}", status_code=303)
+
+    @app.post("/media/{media_id}/albums/{album_id}/remove")
+    async def media_album_remove(media_id: int, album_id: int) -> RedirectResponse:
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        if db.get_album(album_id) is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        db.remove_media_from_album(album_id, item.path)
+        return RedirectResponse(
+            url=f"/media/{media_id}?msg=album_removed",
+            status_code=303,
+        )
 
     @app.get("/library", response_class=HTMLResponse)
     async def library_page(request: Request) -> HTMLResponse:

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ album.title }} · {{ _('Albums') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/">{{ _('Dashboard') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <a href="/albums">{{ _('Albums') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span class="breadcrumb-current">{{ album.title }}</span>
+</nav>
+
+<section class="panel">
+  <h1>{{ album.title }}</h1>
+  <p class="hint">{{ _('References only. Removing an item or deleting this album does not change the file on disk.') }}</p>
+
+  {% if flash_msg == 'album_created' %}
+    <div class="flash ok" role="status">{{ _('Album created.') }}</div>
+  {% elif flash_msg == 'album_renamed' %}
+    <div class="flash ok" role="status">{{ _('Album renamed.') }}</div>
+  {% elif flash_msg == 'album_removed' %}
+    <div class="flash ok" role="status">{{ _('Removed from album.') }}</div>
+  {% elif flash_msg == 'album_invalid' %}
+    <div class="flash err" role="alert">{{ _('Enter an album name.') }}</div>
+  {% endif %}
+
+  <form method="post" action="/albums/{{ album.id }}/rename" class="add-form">
+    <label>
+      {{ _('Album name') }}
+      <input type="text" name="title" value="{{ album.title }}" maxlength="80" required>
+    </label>
+    <button type="submit">{{ _('Rename album') }}</button>
+  </form>
+  <form method="post" action="/albums/{{ album.id }}/delete" class="inline"
+        onsubmit="return confirm('{{ _('Delete this album? Media files stay on disk.')|e }}');">
+    <button type="submit" class="danger">{{ _('Delete album') }}</button>
+  </form>
+</section>
+
+<section class="panel">
+  {% if not items %}
+    <div class="empty">
+      <h1>{{ _('This album is empty') }}</h1>
+      <p>{{ _('Open a photo or video and add it to this album.') }}</p>
+      <a class="button" href="/browse">{{ _('Browse') }}</a>
+    </div>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>{{ _('Filename') }}</th>
+          <th>{{ _('Kind') }}</th>
+          <th>{{ _('Date') }}</th>
+          <th>{{ _('State') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in items %}
+        <tr>
+          <td>
+            {% if entry.media_id %}
+              <a href="/media/{{ entry.media_id }}">{{ entry.filename }}</a>
+            {% else %}
+              {{ entry.filename }}
+            {% endif %}
+          </td>
+          <td>
+            {% if entry.kind == 'video' %}{{ _('Video') }}{% elif entry.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ entry.kind }}{% endif %}
+          </td>
+          <td>{{ entry.recorded_at or '—' }}</td>
+          <td>
+            {% if entry.state == 'offline' %}
+              <span class="album-state offline">{{ _('Offline') }}</span>
+              <p class="hint">{{ _('File is not on this computer right now. The album still keeps the reference.') }}</p>
+            {% else %}
+              <span class="album-state">{{ _('Available') }}</span>
+            {% endif %}
+          </td>
+          <td class="row-actions">
+            {% if entry.media_id %}
+              <a class="button ghost" href="/media/{{ entry.media_id }}">{{ _('Open media') }}</a>
+            {% endif %}
+            <form method="post" action="/albums/{{ album.id }}/items/{{ entry.id }}/remove">
+              <button type="submit" class="ghost">{{ _('Remove from album') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

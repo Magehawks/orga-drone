@@ -23,7 +23,7 @@ Highlights:
 - Local folder library + SQLite index + browse
 - DJI-oriented parsing (strongest path) + thinner generic media support
 - Flows, heuristic sessions, maps, rule-based Ask the library
-- User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
+- User meta (stars/favorites/tags/notes), library albums, rename/merge, spot GeoJSON
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
   `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
@@ -54,13 +54,11 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 1. Export cancel / abort during long renders
 2. **Incremental or cheaper rescans** (clearer scan progress is available)
 3. **Broader multi-brand parsers** beyond DJI-first depth
-4. **Library albums** for organizing media sets (Studio already has multiple
-   local edit projects; albums are a separate library concern)
-5. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
+4. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
    The Windows onefolder zip Actions workflow is available; it is not an
    installer and it does not publish on merge.
-6. Online geocoding providers (place tags are offline today)
-7. **itch.io Windows channel** via butler for the existing onefolder build.
+5. Online geocoding providers (place tags are offline today)
+6. **itch.io Windows channel** via butler for the existing onefolder build.
    The process is documented for a Draft/Restricted test. A public paid
    launch waits on the A→B app-update record. This is not an in-app updater.
 

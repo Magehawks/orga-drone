@@ -56,7 +56,7 @@ Before implementing a feature, verify it improves this journey (see
 
 | Area | Question | Today (honest) |
 |------|----------|----------------|
-| Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
+| Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes, user-managed albums |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
@@ -70,6 +70,7 @@ The application helps users:
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
 - filter, browse (page size 50/100/200; bulk add of the current page to Studio), and detect likely duplicate files (heuristics; no auto-delete)
+- collect media in **library albums** (`albums` / `album_items`): create, rename, and delete named albums; add or remove media; one file can belong to several albums; references survive a full rescan and stay listed when the file is offline; albums are separate from Studio projects and do not modify files on disk
 - collect selected media in a **Studio** workspace (non-destructive
   `studio_projects` / `studio_clips`; multiple local edit projects with
   browser/switcher; editable persisted title; manual order and
@@ -100,7 +101,9 @@ The application helps users:
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, or multi-OS installer
+- Library albums are local named references only. There are no shared albums,
+  cloud sync, or automatic albums.
+- There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
   MOTW smoke test (`packaging/README.md`). A Windows itch.io butler process
@@ -136,7 +139,6 @@ The application helps users:
 
 ## Possible future capabilities (roadmap / vision)
 
-- albums for organizing media sets (Studio edit projects are Available now)
 - plugin architecture and community integrations
 - semantic search or other optional intelligent features (only if justified)
 - automatic highlight / quality suggestions
