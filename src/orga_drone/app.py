@@ -38,6 +38,7 @@ from orga_drone.studio_frame import (
 from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
+    saturation_ramp_from_effect_settings,
 )
 from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
 from orga_drone.studio_overlay import (
@@ -1045,6 +1046,9 @@ def create_app() -> FastAPI:
                         "image_adjust": image_adjust_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "saturation_ramp": saturation_ramp_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "overlays": [
                             item.as_dict()
                             for item in overlays_from_effect_settings(
@@ -1503,6 +1507,35 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "image": image.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/saturation-ramp")
+    async def api_studio_saturation_ramp(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include a saturation ramp"
+            )
+        try:
+            item = db.set_studio_saturation_ramp(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        ramp = saturation_ramp_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "saturation_ramp": ramp.as_dict(),
             }
         )
 

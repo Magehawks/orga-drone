@@ -44,3 +44,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0016](0016-studio-overlays.md) | Studio timed overlays | Accepted |
 | [0017](0017-studio-privacy-masks.md) | Studio privacy masks | Accepted |
 | [0018](0018-studio-framing.md) | Studio per-clip zoom and pan | Accepted |
+| [0019](0019-studio-saturation-ramp.md) | Studio video saturation ramp | Accepted |

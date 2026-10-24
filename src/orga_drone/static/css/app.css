@@ -1341,6 +1341,9 @@ video.studio-preview-media.studio-preview-layer-b {
   align-items: center;
   gap: 0.4rem;
 }
+#inspector-bw-enabled {
+  width: auto;
+}
 .studio-frame-target {
   display: flex;
   gap: 0.35rem;

@@ -2656,6 +2656,63 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_saturation_ramp(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Store a video clip's saturation ramp. Raises ``ValueError`` on bad input.
+
+        The ramp is clip instance data in ``effect_settings`` and does not
+        change the source file. Photos and Title Cards are rejected.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_image import (
+            dump_saturation_ramp,
+            parse_saturation_ramp_payload,
+        )
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("saturation ramp only applies to video")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("saturation ramp only applies to video")
+            ramp = parse_saturation_ramp_payload(payload)
+            blob = dump_saturation_ramp(str(row["effect_settings"] or ""), ramp)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_overlays(
         self,
         studio_item_id: int,
@@ -2900,6 +2957,7 @@ class Database:
         """
         from orga_drone.studio_cut import resolve_source_range, split_source_range
         from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_image import shift_saturation_ramp_settings
 
         with self.connect() as conn:
             row = conn.execute(
@@ -2980,6 +3038,10 @@ class Database:
                     else None
                 )
             )
+            right_settings = shift_saturation_ramp_settings(
+                str(row["effect_settings"] or "{}"),
+                float(local_cut_s),
+            )
             cur = conn.execute(
                 """INSERT INTO studio_clips(
                      project_id, media_path, identity_key, source_media_id, position,
@@ -3007,7 +3069,7 @@ class Database:
                         if row["transition_duration_s"] is not None
                         else None
                     ),
-                    str(row["effect_settings"] or "{}"),
+                    right_settings,
                     now,
                 ),
             )
