@@ -265,3 +265,202 @@ def preview_matrix_values(image: ImageAdjust) -> str:
         f"0 0 {blue:.6f} 0 0 "
         "0 0 0 1 0"
     )
+
+
+# Issue #109. One linear saturation ramp per video clip, stored beside the
+# grade. 100% keeps that grade's saturation; 0% is black and white. Times are
+# seconds into the trimmed clip. Missing JSON leaves the grade unchanged.
+PERCENT_MIN = 0
+PERCENT_MAX = 100
+TIME_MIN_S = -86_400.0
+TIME_MAX_S = 86_400.0
+MIN_RAMP_SPAN_S = 0.001
+RAMP_KEY = "saturation_ramp"
+
+
+@dataclass(frozen=True)
+class SaturationRamp:
+    """Clip-relative saturation multiplier. Disabled leaves the grade alone."""
+
+    enabled: bool = False
+    start_s: float = 0.0
+    end_s: float = 0.0
+    start_saturation: int = 100
+    end_saturation: int = 0
+
+    @property
+    def is_active(self) -> bool:
+        """True when export and preview should move saturation over time."""
+        return self.enabled and (self.end_s - self.start_s) > MIN_RAMP_SPAN_S
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "start_s": self.start_s,
+            "end_s": self.end_s,
+            "start_saturation": self.start_saturation,
+            "end_saturation": self.end_saturation,
+        }
+
+
+def _parse_percent(value: object, key: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be a number from 0 to 100")
+    number = float(value)
+    if not math.isfinite(number) or number < PERCENT_MIN or number > PERCENT_MAX:
+        raise ValueError(f"{key} must be a number from 0 to 100")
+    return _round_half_away_from_zero(number)
+
+
+def _parse_ramp_time(value: object, key: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be a time in seconds")
+    number = float(value)
+    if not math.isfinite(number) or number < TIME_MIN_S or number > TIME_MAX_S:
+        raise ValueError(f"{key} must be a time in seconds")
+    return round(number, 4)
+
+
+def _read_percent(value: object, default: int) -> int:
+    try:
+        return _parse_percent(value, "saturation")
+    except ValueError:
+        return default
+
+
+def _read_ramp_time(value: object) -> float:
+    try:
+        return _parse_ramp_time(value, "time")
+    except ValueError:
+        return 0.0
+
+
+def saturation_ramp_from_effect_settings(raw: str | None) -> SaturationRamp:
+    """Missing or invalid JSON is an off ramp. The grade stays as stored."""
+    if raw is None or not str(raw).strip():
+        return SaturationRamp()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return SaturationRamp()
+    if not isinstance(data, dict):
+        return SaturationRamp()
+    ramp = data.get(RAMP_KEY, {})
+    if not isinstance(ramp, dict):
+        return SaturationRamp()
+    enabled = ramp.get("enabled", False)
+    return SaturationRamp(
+        enabled=enabled if isinstance(enabled, bool) else False,
+        start_s=_read_ramp_time(ramp.get("start_s", 0)),
+        end_s=_read_ramp_time(ramp.get("end_s", 0)),
+        start_saturation=_read_percent(ramp.get("start_saturation", 100), 100),
+        end_saturation=_read_percent(ramp.get("end_saturation", 0), 0),
+    )
+
+
+def parse_saturation_ramp_payload(payload: Mapping[str, object]) -> SaturationRamp:
+    """Replace the clip ramp. Bad numbers raise. A zero-length range cannot be on."""
+    body = payload.get(RAMP_KEY, payload)
+    if not isinstance(body, dict) or "enabled" not in body:
+        raise ValueError("JSON body must include a saturation ramp")
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be true or false")
+    ramp = SaturationRamp(
+        enabled=enabled,
+        start_s=_parse_ramp_time(body.get("start_s", 0), "start_s"),
+        end_s=_parse_ramp_time(body.get("end_s", 0), "end_s"),
+        start_saturation=_parse_percent(
+            body.get("start_saturation", 100), "start_saturation"
+        ),
+        end_saturation=_parse_percent(body.get("end_saturation", 0), "end_saturation"),
+    )
+    if ramp.enabled and not ramp.is_active:
+        raise ValueError("color change needs a longer range")
+    return ramp
+
+
+def dump_saturation_ramp(existing: str | None, ramp: SaturationRamp) -> str:
+    """Write the ramp and keep unrelated effect_settings keys, including image."""
+    try:
+        parsed = json.loads(existing) if existing else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    data = parsed if isinstance(parsed, dict) else {}
+    data[RAMP_KEY] = ramp.as_dict()
+    return json.dumps(data, separators=(",", ":"), sort_keys=True)
+
+
+def shift_saturation_ramp_settings(raw: str | None, delta_s: float) -> str:
+    """Move ramp times by ``-delta_s``. JSON without a ramp is returned unchanged.
+
+    A split keeps the left clip's times. The right clip's local 0 is the cut,
+    so its stored times shift by the cut offset and the picture stays continuous.
+    """
+    text = raw if raw else "{}"
+    try:
+        parsed = json.loads(text) if text.strip() else {}
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(parsed, dict) or RAMP_KEY not in parsed:
+        return text
+    ramp = saturation_ramp_from_effect_settings(text)
+    shifted = replace(
+        ramp,
+        start_s=round(ramp.start_s - float(delta_s), 4),
+        end_s=round(ramp.end_s - float(delta_s), 4),
+    )
+    return dump_saturation_ramp(text, shifted)
+
+
+def saturation_multiplier(ramp: SaturationRamp, local_s: float) -> float:
+    """1 keeps the graded saturation. 0 is black and white.
+
+    Before the start time the clip holds the start level. After the end time
+    it holds the end level. A disabled or zero-length ramp returns 1.
+    """
+    if not ramp.is_active:
+        return 1.0
+    start_m = ramp.start_saturation / 100.0
+    end_m = ramp.end_saturation / 100.0
+    if ramp.start_saturation == ramp.end_saturation:
+        return start_m
+    local = float(local_s)
+    if local <= ramp.start_s:
+        return start_m
+    if local >= ramp.end_s:
+        return end_m
+    span = ramp.end_s - ramp.start_s
+    progress = (local - ramp.start_s) / span
+    return start_m + (end_m - start_m) * progress
+
+
+def ffmpeg_saturation_ramp(ramp: SaturationRamp, *, origin_s: float) -> str:
+    """``hue`` saturation fragment, or empty when the clip stays on its grade.
+
+    The multiplier runs after the grade, so brightness, contrast, warmth, and
+    the static saturation slider still apply and then fade toward the target.
+    Only formatted numbers are interpolated. Video filter ``t`` is the source
+    timestamp because ``-ss`` stays an output option, so clip-relative time is
+    ``t`` minus the trim in-point.
+    """
+    if not ramp.is_active:
+        return ""
+    if ramp.start_saturation == 100 and ramp.end_saturation == 100:
+        return ""
+    start_m = ramp.start_saturation / 100.0
+    end_m = ramp.end_saturation / 100.0
+    if ramp.start_saturation == ramp.end_saturation:
+        return f"hue=s={_fmt(start_m)}"
+    origin = max(0.0, float(origin_s))
+    local = f"(t-{_fmt(origin)})"
+    start_s = _fmt(ramp.start_s)
+    end_s = _fmt(ramp.end_s)
+    span = _fmt(ramp.end_s - ramp.start_s)
+    delta = _fmt(end_m - start_m)
+    expr = (
+        f"if(lte({local}\\,{start_s})\\,{_fmt(start_m)}\\,"
+        f"if(gte({local}\\,{end_s})\\,{_fmt(end_m)}\\,"
+        f"{_fmt(start_m)}+({delta})*({local}-{start_s})/{span}))"
+    )
+    return f"hue=s='{expr}'"

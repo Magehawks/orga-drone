@@ -24,7 +24,11 @@ from orga_drone.export.studio_encoder import (
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
 from orga_drone.studio_frame import FrameTransform, frame_from_effect_settings
-from orga_drone.studio_image import ImageAdjust, image_adjust_from_effect_settings
+from orga_drone.studio_image import (
+    ImageAdjust,
+    image_adjust_from_effect_settings,
+    saturation_ramp_from_effect_settings,
+)
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
 from orga_drone.studio_export_resolution import (
@@ -278,8 +282,24 @@ def _clip_to_export_clip(
         return None
     kind = clip.kind if clip.kind in {"photo", "video"} else media.kind
     from orga_drone.studio_speed import coerce_playback_speed
+    from orga_drone.studio_cut import section_repeats_from_effect_settings
 
     speed = coerce_playback_speed(clip.playback_speed) if kind == "video" else 1.0
+    repeats = (
+        section_repeats_from_effect_settings(clip.effect_settings)
+        if kind == "video"
+        else 1
+    )
+    one_play = effective_seconds(
+        kind=kind or "unknown",
+        photo_duration_s=clip.photo_duration_s,
+        duration_s=clip.duration_s,
+        available=True,
+        source_in_s=clip.source_start,
+        source_out_s=clip.source_end,
+        playback_speed=speed,
+        section_repeats=1,
+    )
     seconds = effective_seconds(
         kind=kind or "unknown",
         photo_duration_s=clip.photo_duration_s,
@@ -288,6 +308,7 @@ def _clip_to_export_clip(
         source_in_s=clip.source_start,
         source_out_s=clip.source_end,
         playback_speed=speed,
+        section_repeats=repeats,
     )
     if seconds is None or seconds <= 0:
         if kind == "photo":
@@ -305,9 +326,17 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else ImageAdjust()
     )
+    overlay_span = one_play if kind == "video" and one_play else seconds
+    saturation_ramp = (
+        saturation_ramp_from_effect_settings(clip.effect_settings)
+        if kind == "video"
+        else saturation_ramp_from_effect_settings(None)
+    )
     overlays = (
-        overlays_from_effect_settings(clip.effect_settings, duration_s=float(seconds))
-        if kind in {"photo", "video"}
+        overlays_from_effect_settings(
+            clip.effect_settings, duration_s=float(overlay_span)
+        )
+        if kind in {"photo", "video"} and overlay_span
         else ()
     )
     masks = (
@@ -327,7 +356,9 @@ def _clip_to_export_clip(
         source_start_s=start,
         source_end_s=end,
         playback_speed=speed,
+        section_repeats=repeats if kind == "video" else 1,
         image=image,
+        saturation_ramp=saturation_ramp,
         frame=frame,
         masks=masks,
         overlays=overlays,

@@ -37,7 +37,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 ## What Orga Drone currently provides
 
 - Index one or more local folders into a single library (SQLite index; media files stay on disk)
-- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio)
+- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio; Timeline groups the same index by recording date)
 - Index DJI media plus everyday vacation/hobby photos and videos (phones, cameras, action cams — no `DJI_` filename required)
 - Extract GPS and related metadata from DJI `.SRT` telemetry, photo EXIF, and best-effort video container tags
 - Group FAT32 **split clips** into a **flow**, and heuristically group a logical **flight session** (takeoff → landing)
@@ -45,11 +45,13 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
+- **Library albums:** named collections across flights, cameras, and folders (add/remove media; one file can be in several albums; references survive a rescan and stay listed when the file is offline; files are not modified; separate from Studio)
 - **Studio:** collect media, arrange order, estimate runtime; editable project
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
   Crossfade between Story items; basic per-clip image adjustment for photos and videos
-  (brightness, contrast, saturation, warmth); timed text, shape, and image overlays
+  (brightness, contrast, saturation, warmth); a linear saturation ramp on video clips
+  from that grade toward black and white; timed text, shape, and image overlays
   with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy
   masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan
   (1×–3×, optional start/end motion); local MP4 export with
@@ -77,7 +79,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio |
+| Folder library + browse/list | Available | Rescan per root; unchanged files skip metadata extraction (size + mtime, not a content hash); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio; Timeline groups photos and videos by recording date |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
 | iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
@@ -95,12 +97,13 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
 | Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
+| Studio saturation ramp | Available | Per video clip: linear saturation from the current grade toward black and white between a start and end time; preview approximates export; source files stay unchanged |
 | Studio overlays | Available | Up to 8 text, arrow, circle, rectangle, or PNG/JPG overlays per photo or video clip; clip-relative timing; Fade in, Fade out, or Slide in; preview approximates export |
 | Studio privacy masks | Available | Up to 8 rectangular blur or pixelate masks per photo or video clip; fixed for the whole clip; preview approximates export; source files stay unchanged |
 | Studio framing | Available | Per photo or video clip: zoom 1×–3× and pan; optional start/end motion across the clip; preview matches the exported frame; source files stay unchanged |
 | Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
-| Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
+| Library albums | Available | Local named albums (`albums` / `album_items`); create, rename, delete; add/remove media; one file in several albums; membership survives rescan and stays listed when the file is offline; separate from Studio; no shared, cloud, or automatic albums |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
@@ -204,7 +207,7 @@ python -m orga_drone
 
 ### Browse, Ask the library, and search API
 
-On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date.
+On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date. **Timeline** (next to Grid and List) groups the same filtered photos and videos by recording year, month, and day. Dates that are missing or not a calendar day appear under **Date unknown**. It does not edit a story; Studio keeps its own story timeline.
 
 **Ask the library** accepts short German or English phrases. The server parses them with **fixed rules** (kind, month/year, place keywords, favorites, and similar) and combines the result with explicit filters. It is **not** an LLM and does not perform semantic embedding search.
 
@@ -287,8 +290,6 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 
 **Possible next steps** (not available now):
 
-- Library albums for organizing media sets (Studio already has multiple local
-  edit projects)
 - Incremental or cheaper library rescans
 - Broader multi-brand parsers beyond the current DJI-first depth
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)
@@ -301,7 +302,7 @@ Full prioritization language: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributing
 
-Bug reports, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
+Bug reports, user needs, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). A user-need issue records a concrete problem; it is not a roadmap promise ([`docs/USER_NEEDS.md`](docs/USER_NEEDS.md)). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
 
 ```bash
 pip install -e ".[dev]"
@@ -318,10 +319,10 @@ Known limitations:
 
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
-- No Library albums UI, no plugin API, no content-hash duplicate
+- Library albums are local references only (no shared albums, cloud sync, or automatic albums). No plugin API, no content-hash duplicate
 detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
-- CI covers Ruff, MyPy, and pytest on pull requests. A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
+- CI on pull requests covers Ruff, MyPy, pytest, and an **App journey smoke** check (synthetic photo through the local HTTP app; `docs/PR_E2E.md`). A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
 - No in-app updater. itch.io desktop-app updates apply only to copies that
   app installed; ZIP installs stay as they are until you replace them
   (`packaging/itch/README.md`)

@@ -21,6 +21,8 @@ def _seed(
     recorded_at: str,
     tags: list[str] | None = None,
     notes: str = "",
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> int:
     root_path.mkdir(parents=True, exist_ok=True)
     roots = db.list_roots()
@@ -45,8 +47,8 @@ def _seed(
             "mode": None,
             "drone_model": "Avata 2",
             "camera_model": None,
-            "latitude": None,
-            "longitude": None,
+            "latitude": latitude,
+            "longitude": longitude,
             "abs_alt": None,
             "has_srt": 0,
             "has_lrf": 0,
@@ -143,3 +145,59 @@ def test_browse_ask_and_api_search(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
     assert ranged.json()["count"] == 1
     assert ranged.json()["items"][0]["filename"] == "nov.JPG"
+
+
+def test_browse_without_gps_respects_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without GPS must not bypass the kind filter (AND/OR precedence)."""
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    lib = tmp_path / "lib"
+    _seed(
+        db,
+        lib,
+        filename="full.MP4",
+        kind="video",
+        recorded_at="2024-06-01T12:00:00",
+        latitude=35.9,
+        longitude=14.4,
+    )
+    _seed(
+        db,
+        lib,
+        filename="none.MP4",
+        kind="video",
+        recorded_at="2024-06-01T12:00:00",
+    )
+    _seed(
+        db,
+        lib,
+        filename="partial.JPG",
+        kind="photo",
+        recorded_at="2024-06-01T12:00:00",
+        latitude=35.9,
+        longitude=None,
+    )
+
+    missing = {item.filename for item in db.list_media(kind="video", has_gps=False)}
+    assert missing == {"none.MP4"}
+    assert db.count_media(kind="video", has_gps=False) == 1
+    assert {item.filename for item in db.list_media(has_gps=False)} == {
+        "none.MP4",
+        "partial.JPG",
+    }
+    assert [item.filename for item in db.list_media(has_gps=True)] == ["full.MP4"]
+
+    client = TestClient(app)
+    page = client.get("/browse", params={"kind": "video", "gps": "no"})
+    assert page.status_code == 200
+    assert "none.MP4" in page.text
+    assert "partial.JPG" not in page.text
+    assert "full.MP4" not in page.text

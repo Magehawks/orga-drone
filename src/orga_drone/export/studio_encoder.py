@@ -20,8 +20,9 @@ from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
-from orga_drone.studio_image import ffmpeg_grade_chain
+from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
 from orga_drone.studio_speed import (
     coerce_playback_speed,
     ffmpeg_slow_prefix,
@@ -95,13 +96,19 @@ def _slow_timing(clip: StudioExportClip) -> tuple[str, str, float, float] | None
 
 
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
-    """Grade, optional zoom/pan, then scale/pad.
+    """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
     Fades stay separate so privacy masks and overlays can sit on the framed
     picture before them. Slow motion trims first and stretches after ``fps``.
+    The saturation ramp follows the grade so a fade to black still ends on black.
     """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    ramp = (
+        ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=clip.source_start_s)
+        if clip.kind == "video"
+        else ""
+    )
     prefix = ""
     suffix = ""
     slow = _slow_timing(clip)
@@ -131,7 +138,9 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_start_s=frame_origin,
             duration_s=frame_duration,
         )
-    return ",".join(part for part in (trim, grade, prefix, base, suffix, stretch) if part)
+    return ",".join(
+        part for part in (trim, grade, ramp, prefix, base, suffix, stretch) if part
+    )
 
 
 def _fade_filters(clip: StudioExportClip) -> list[str]:
@@ -533,6 +542,39 @@ def _watch_export_cancel(event: threading.Event, proc: subprocess.Popen[str]) ->
             if proc.poll() is None:
                 proc.kill()
             return
+
+
+def section_repeat_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...]:
+    """Expand a video into one encode per play of its in/out range.
+
+    One repeat returns the clip unchanged, so ordinary exports stay on the
+    existing path. Each extra play is the same source span at the same speed.
+    Fades stay on the first and last play. Joins between plays are cuts.
+    """
+    repeats = int(clip.section_repeats or 1)
+    if clip.kind != "video" or repeats <= 1:
+        return (clip,)
+    repeats = max(1, min(MAX_SECTION_REPEATS, repeats))
+    start = max(0.0, float(clip.source_start_s))
+    if clip.source_end_s is not None:
+        cycle = max(0.0, float(clip.source_end_s) - start)
+    else:
+        cycle = max(0.0, float(clip.duration_s) / repeats)
+    if cycle <= 0:
+        return (clip,)
+    slices: list[StudioExportClip] = []
+    for index in range(repeats):
+        slices.append(
+            replace(
+                clip,
+                duration_s=cycle,
+                section_repeats=1,
+                exact_span=True,
+                fade_in_s=clip.fade_in_s if index == 0 else 0.0,
+                fade_out_s=clip.fade_out_s if index == repeats - 1 else 0.0,
+            )
+        )
+    return tuple(slices)
 
 
 def _clip_progress_label(clip: StudioExportClip) -> str:
@@ -1030,6 +1072,25 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
     ) -> None:
+        slices = section_repeat_slices(clip)
+        if len(slices) > 1:
+            parts: list[Path] = []
+            for index, slice_clip in enumerate(slices):
+                _raise_if_cancelled()
+                part = out.parent / f"{out.stem}-loop-{index:02d}{out.suffix}"
+                self._render_video(
+                    ffmpeg,
+                    slice_clip,
+                    part,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                parts.append(part)
+            self._concat(ffmpeg, parts, out)
+            return
         if _slow_timing(clip) is not None:
             self._render_slow_video(
                 ffmpeg,
@@ -1045,9 +1106,12 @@ class FfmpegStudioEncoder:
         start = max(0.0, float(clip.source_start_s))
         if clip.source_end_s is not None:
             end = float(clip.source_end_s)
-            dur = max(0.1, end - start)
+            span = end - start
+            dur = span if clip.exact_span else max(0.1, span)
         else:
-            dur = max(0.1, float(clip.duration_s))
+            dur = float(clip.duration_s) if clip.exact_span else max(0.1, float(clip.duration_s))
+        if clip.exact_span:
+            dur = max(0.05, dur)
         on_time = self._progress_cb(
             on_progress,
             clip=clip,
