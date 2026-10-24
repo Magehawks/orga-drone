@@ -459,5 +459,16 @@
   "Start": "Start",
   "End": "End",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.",
-  "Could not save framing.": "Could not save framing."
+  "Could not save framing.": "Could not save framing.",
+  "Telemetry HUD": "Telemetry HUD",
+  "Show HUD": "Show HUD",
+  "Elapsed time": "Elapsed time",
+  "Home distance": "Home distance",
+  "Available": "Available",
+  "Unavailable": "Unavailable",
+  "Telemetry is available for this clip.": "Telemetry is available for this clip.",
+  "No telemetry for this clip.": "No telemetry for this clip.",
+  "Could not save the telemetry HUD.": "Could not save the telemetry HUD.",
+  "This clip has no telemetry to show.": "This clip has no telemetry to show.",
+  "Shows elapsed time and altitude from the sibling SRT when those values exist. Speed and home distance are not in that file, so they stay off. Gaps stay blank. The file on disk stays unchanged. This is not a goggles display.": "Shows elapsed time and altitude from the sibling SRT when those values exist. Speed and home distance are not in that file, so they stay off. Gaps stay blank. The file on disk stays unchanged. This is not a goggles display."
 }

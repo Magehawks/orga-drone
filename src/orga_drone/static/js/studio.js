@@ -180,6 +180,8 @@
   const previewTitlecardBTitle = document.getElementById("studio-preview-titlecard-b-title");
   const previewTitlecardBSubtitle = document.getElementById("studio-preview-titlecard-b-subtitle");
   const previewFadeBlack = document.getElementById("studio-preview-fade-black");
+  const previewHud = document.getElementById("studio-preview-hud");
+  const previewHudB = document.getElementById("studio-preview-hud-b");
   const previewAnnotations = document.getElementById("studio-preview-annotations");
   const previewAnnotationsB = document.getElementById("studio-preview-annotations-b");
   const previewMasks = document.getElementById("studio-preview-masks");
@@ -269,6 +271,11 @@
   const labelMaskBlur = root.dataset.maskBlur || "Blur";
   const labelMaskPixelate = root.dataset.maskPixelate || "Pixelate";
   const msgFrameFailed = root.dataset.frameFailed || "Could not save framing.";
+  const msgHudFailed = root.dataset.hudFailed || "Could not save the telemetry HUD.";
+  const msgHudReady = root.dataset.hudReady || "Telemetry is available for this clip.";
+  const msgHudMissing = root.dataset.hudMissing || "No telemetry for this clip.";
+  const labelHudAvailable = root.dataset.hudAvailable || "Available";
+  const labelHudUnavailable = root.dataset.hudUnavailable || "Unavailable";
   const imageAdjustModel = readImageAdjustModel();
   const maskModel = readMaskModel();
 
@@ -1859,6 +1866,8 @@
     hideOverlayLayers();
     hideAnnotations();
     hidePrivacyMasks();
+    paintHud(previewHud, null, 0, null);
+    paintHud(previewHudB, null, 0, null);
     if (previewPlaceholder) previewPlaceholder.hidden = false;
     applyPreviewGrades(null);
     clearFrameTransform(previewImage);
@@ -2070,6 +2079,7 @@
     syncAnnotations(hit);
     drawPrivacyMasks();
     applyFramePreview(hit);
+    syncHud(hit);
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -2941,6 +2951,9 @@
         frameEditTarget = "start";
         fillFrame(clip);
       }
+      const hudWrap = document.getElementById("inspector-hud");
+      if (hudWrap) hudWrap.hidden = !isVideo;
+      if (isVideo) fillHud(clip);
       setClipRemoveAction(removeForm, clip.dataset.studioId);
     }
 
@@ -4927,6 +4940,148 @@
     const clip = selectedAdjustableClip();
     if (clip) fillFrame(clip);
     applyFramePreview(resolveAt(state.projectTimeS));
+  });
+  function readHud(clip) {
+    if (!clip) return {};
+    try {
+      const parsed = JSON.parse(clip.dataset.hud || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function writeHud(clip, hud) {
+    clip.dataset.hud = JSON.stringify(hud);
+  }
+
+  function formatHudElapsed(sourceS) {
+    const total = Math.max(0, Math.floor(Number(sourceS) + 1e-6));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const pad = (value) => String(value).padStart(2, "0");
+    return pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
+  }
+
+  function hudAltitudeText(hud, sourceS) {
+    const rows = Array.isArray(hud.intervals) ? hud.intervals : [];
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      const start = Number(row.start);
+      const end = Number(row.end);
+      const last = index === rows.length - 1;
+      const beforeEnd = sourceS < end - 1e-9 || (last && sourceS <= end + 1e-3);
+      if (sourceS >= start - 1e-9 && beforeEnd && row.alt != null && Number.isFinite(Number(row.alt))) {
+        return Number(row.alt).toFixed(1) + " m";
+      }
+    }
+    return "";
+  }
+
+  function paintHud(el, clip, localS, opacity) {
+    if (!el) return;
+    const hud = clip ? readHud(clip) : null;
+    if (!clip || clip.dataset.kind !== "video" || !hud || !hud.enabled || !hud.available) {
+      el.hidden = true;
+      el.textContent = "";
+      el.style.opacity = "";
+      return;
+    }
+    const sourceS = sourceInS(clip) + Math.max(0, Number(localS) || 0);
+    const lines = [formatHudElapsed(sourceS)];
+    const altitude = hudAltitudeText(hud, sourceS);
+    if (altitude) lines.push(altitude);
+    el.hidden = false;
+    el.textContent = lines.join("\n");
+    el.style.opacity = opacity == null ? "" : String(opacity);
+  }
+
+  function syncHud(hit) {
+    if (!hit || !hit.clip) {
+      paintHud(previewHud, null, 0, null);
+      paintHud(previewHudB, null, 0, null);
+      return;
+    }
+    const overlap = Boolean(hit.overlapClip && hit.crossfadeProgress != null);
+    paintHud(
+      previewHud,
+      hit.clip,
+      hit.localS || 0,
+      overlap ? hit.crossfadeProgress : null
+    );
+    if (overlap) paintHud(previewHudB, hit.overlapClip, hit.overlapLocalS || 0, 1);
+    else paintHud(previewHudB, null, 0, null);
+  }
+
+  function selectedVideoClip() {
+    const clip = selectedAdjustableClip();
+    if (!clip || clip.dataset.kind !== "video") return null;
+    return clip;
+  }
+
+  function fillHud(clip) {
+    const hud = readHud(clip);
+    const status = document.getElementById("inspector-hud-status");
+    const box = document.getElementById("inspector-hud-enabled");
+    if (status) status.textContent = hud.available ? msgHudReady : msgHudMissing;
+    ["elapsed", "altitude", "speed", "home_distance"].forEach((field) => {
+      const node = document.querySelector('[data-hud-field="' + field + '"]');
+      if (!node) return;
+      const ready = hud[field] === "available";
+      node.textContent = ready ? labelHudAvailable : labelHudUnavailable;
+      node.classList.toggle("is-unavailable", !ready);
+    });
+    if (box) {
+      box.disabled = !hud.available;
+      box.checked = Boolean(hud.available && hud.enabled);
+    }
+  }
+
+  async function saveHud(studioId, enabled) {
+    const res = await fetch(`/api/studio/${studioId}/hud`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ enabled: Boolean(enabled) }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgHudFailed);
+    }
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (clip) {
+      const hud = readHud(clip);
+      hud.enabled = Boolean(body.enabled);
+      writeHud(clip, hud);
+      if (
+        state.selected &&
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(studioId)
+      ) {
+        fillHud(clip);
+      }
+      syncHud(resolveAt(state.projectTimeS));
+    }
+    setSaveState(true);
+  }
+
+  document.getElementById("inspector-hud-enabled")?.addEventListener("change", () => {
+    const clip = selectedVideoClip();
+    const box = document.getElementById("inspector-hud-enabled");
+    if (!clip || !box || box.disabled) return;
+    const enabled = Boolean(box.checked);
+    const hud = readHud(clip);
+    hud.enabled = enabled;
+    writeHud(clip, hud);
+    syncHud(resolveAt(state.projectTimeS));
+    setSaveState(false);
+    saveHud(clip.dataset.studioId, enabled).catch((err) => {
+      hud.enabled = !enabled;
+      writeHud(clip, hud);
+      box.checked = !enabled;
+      syncHud(resolveAt(state.projectTimeS));
+      showFlash((err && err.message) || msgHudFailed);
+    });
   });
   document.getElementById("inspector-frame-reset")?.addEventListener("click", () => {
     const clip = selectedAdjustableClip();

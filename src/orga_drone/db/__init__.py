@@ -2837,6 +2837,68 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_hud(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Turn the telemetry HUD on or off for one video clip.
+
+        The preset lives in ``effect_settings`` and does not change the file.
+        Enabling requires a sibling SRT the existing parser can time.
+        """
+        from pathlib import Path
+
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_hud import cues_from_srt, dump_hud, parse_hud_enabled, sibling_srt
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id, m.path AS media_path
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("telemetry HUD only applies to videos")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("telemetry HUD only applies to videos")
+            enabled = parse_hud_enabled(payload)
+            if enabled:
+                media_path = Path(str(row["media_path"])) if row["media_path"] else None
+                srt = sibling_srt(media_path) if media_path is not None else None
+                cues = cues_from_srt(srt) if srt is not None else ()
+                if not cues:
+                    raise ValueError("This clip has no telemetry to show.")
+            blob = dump_hud(str(row["effect_settings"] or ""), enabled)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_transition(
         self,
         studio_item_id: int,

@@ -35,6 +35,7 @@ from orga_drone.studio_frame import (
     frame_from_effect_settings,
     frame_preview_model,
 )
+from orga_drone.studio_hud import empty_hud_state, hud_client_state
 from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
@@ -990,6 +991,7 @@ def create_app() -> FastAPI:
                 can_play = False
                 display_title = ""
                 display_subtitle = ""
+                hud_state = empty_hud_state()
                 if it.kind == TITLE_CARD_KIND:
                     display_title, display_subtitle = display_lines(
                         it.title_text, it.subtitle_text, lang
@@ -1011,6 +1013,15 @@ def create_app() -> FastAPI:
                                 has_proxy = proxy_path is not None
                                 if has_proxy:
                                     proxy_url = f"/media/{it.media_id}/proxy"
+                            if kind == "video" and media_path is not None:
+                                hud_state = hud_client_state(
+                                    media_path,
+                                    effect_settings=it.effect_settings,
+                                    source_start_s=it.source_start,
+                                    source_end_s=it.source_end,
+                                    media_duration_s=None,
+                                    fallback_duration_s=seconds,
+                                )
                             elif kind == "photo":
                                 if browser_can_display_photo(media_path):
                                     preview_url = stream_url
@@ -1061,6 +1072,7 @@ def create_app() -> FastAPI:
                         if it.kind in {"photo", "video"}
                         else [],
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
+                        "hud": hud_state,
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
                         "applied_transition": applied_by_id.get(it.id),
@@ -1623,6 +1635,36 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "frame": frame.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/hud")
+    async def api_studio_hud(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        from orga_drone.studio_hud import hud_enabled_from_effect_settings
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include enabled"
+            )
+        try:
+            item = db.set_studio_hud(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "enabled": hud_enabled_from_effect_settings(item.effect_settings),
             }
         )
 

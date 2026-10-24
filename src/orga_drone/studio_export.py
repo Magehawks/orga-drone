@@ -24,6 +24,7 @@ from orga_drone.export.studio_encoder import (
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
 from orga_drone.studio_frame import FrameTransform, frame_from_effect_settings
+from orga_drone.studio_hud import HudInterval, hud_client_state
 from orga_drone.studio_image import ImageAdjust, image_adjust_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
@@ -316,6 +317,30 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else FrameTransform()
     )
+    hud_enabled = False
+    hud_intervals: tuple[HudInterval, ...] = ()
+    if kind == "video":
+        hud_state = hud_client_state(
+            path,
+            effect_settings=clip.effect_settings,
+            source_start_s=start,
+            source_end_s=end,
+            media_duration_s=None,
+            fallback_duration_s=float(seconds),
+        )
+        if hud_state["enabled"] is True and hud_state["available"] is True:
+            hud_enabled = True
+            raw_intervals = hud_state["intervals"]
+            if isinstance(raw_intervals, list):
+                hud_intervals = tuple(
+                    HudInterval(
+                        start_s=float(row["start"]),
+                        end_s=float(row["end"]),
+                        altitude_m=float(row["alt"]),
+                    )
+                    for row in raw_intervals
+                    if isinstance(row, dict)
+                )
     return StudioExportClip(
         source_path=path,
         kind=kind or "video",
@@ -326,6 +351,8 @@ def _clip_to_export_clip(
         frame=frame,
         masks=masks,
         overlays=overlays,
+        hud_enabled=hud_enabled,
+        hud_intervals=hud_intervals,
     )
 
 

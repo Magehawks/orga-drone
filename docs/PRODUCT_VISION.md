@@ -146,6 +146,7 @@ professional video-editing knowledge.
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
+| Optional telemetry HUD | **Available now** (one preset on a video clip when a sibling DJI SRT has timed cues; elapsed source time and relative altitude; speed and home distance stay unavailable; preview and MP4; not a goggles display or tracking) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -251,7 +252,12 @@ See `README.md` for the detailed feature status table. In short:
   clips can store a zoom and focal point (1×–3×), including a start and an end
   so the frame moves across the clip. At 1× the existing fit is unchanged.
   Preview uses the same window as MP4 export. This is not tracking or a
-  keyframe editor. Media
+  keyframe editor. A video clip can also turn on one telemetry HUD when a
+  sibling DJI SRT has timed cues. It shows elapsed source time and relative
+  altitude where the parser has `rel_alt`. Speed and home distance are marked
+  unavailable because that parser does not record them. Gaps stay blank.
+  Preview and MP4 use the same windows. This is not a goggles display or
+  tracking. Media
   files are referenced, never copied or modified.
 - Local SQLite index; media files stay on disk
 
@@ -278,8 +284,10 @@ See `README.md` for the detailed feature status table. In short:
   headings, read-only time-proportional soundtrack coverage on that canvas,
   basic rendered visual transitions, basic per-clip image adjustment, timed text,
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
-  the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
-  motion; preview matches the exported frame; not tracking or a keyframe editor;
+  the clip; not tracking), per-clip zoom and pan (1×–3×, optional start/end
+  motion; preview matches the exported frame; not tracking or a keyframe editor),
+  and an optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed
+  time and relative altitude only; not a goggles display or tracking;
   not a professional grade or NLE). Albums for
   organizing the media library remain Later.
 
