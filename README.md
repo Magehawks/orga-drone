@@ -314,7 +314,7 @@ Known limitations:
 - No Library albums UI, no plugin API, no content-hash duplicate
 detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
-- CI covers Ruff, MyPy, and pytest on pull requests. A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
+- CI on pull requests covers Ruff, MyPy, pytest, and an **App journey smoke** check (synthetic photo through the local HTTP app; `docs/PR_E2E.md`). A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
 - No in-app updater. itch.io desktop-app updates apply only to copies that
   app installed; ZIP installs stay as they are until you replace them
   (`packaging/itch/README.md`)

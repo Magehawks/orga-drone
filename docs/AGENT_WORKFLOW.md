@@ -126,7 +126,7 @@ The main implementation agent must:
 5. Avoid unrelated refactors and speculative architecture.
 6. Add/update tests and DE/EN strings where needed.
 7. Update product/architecture docs only when product truth actually changes.
-8. Run Ruff, MyPy and pytest (or explain any test that cannot run).
+8. Run Ruff, MyPy and pytest (or explain any test that cannot run). Pytest includes the PR journey smoke; CI also reports that file as **App journey smoke** (`docs/PR_E2E.md`).
 9. Open/update a PR that links the issue and reports test evidence.
 10. Hand the PR to the independent reviewer.
 

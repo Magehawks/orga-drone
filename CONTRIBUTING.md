@@ -60,13 +60,16 @@ bounded DOM size via pagination.
 
 ## Quality checks (local and CI)
 
-Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with:
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with two checks:
 
 ```bash
 ruff check .
 mypy src
-pytest
+pytest --ignore=tests/test_pr_journey_smoke.py
+pytest tests/test_pr_journey_smoke.py
 ```
+
+The second command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
 Install the same tooling locally via `pip install -e ".[dev]"`. Configuration lives in `pyproject.toml`.
 
