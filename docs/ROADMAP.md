@@ -93,6 +93,11 @@ open/reveal of the finished file already exist on Windows desktop.
 
 ## How work enters the repo
 
+User-need reports ([`docs/USER_NEEDS.md`](USER_NEEDS.md)) are evidence. Opening
+or accepting one does not change this roadmap. A maintainer may later turn an
+accepted need into a product issue. Shipped work links that user-need issue to
+the release notes. A roadmap edit is a separate maintainer decision.
+
 1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
 2. **Product-Spec-Reviewer** checks the spec against code and vision docs
    (`docs/PRODUCT_VISION.md` journey filter).
