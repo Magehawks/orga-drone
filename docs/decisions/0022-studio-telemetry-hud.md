@@ -1,4 +1,4 @@
-# ADR 0019: Studio telemetry HUD
+# ADR 0022: Studio telemetry HUD
 
 - **Status:** Accepted
 - **Date:** 2026-10-24
