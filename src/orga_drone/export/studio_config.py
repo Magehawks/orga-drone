@@ -20,6 +20,10 @@ class StudioExportClip:
     duration_s: float
     source_start_s: float = 0.0
     source_end_s: float | None = None
+    # Video only. 1 plays the in/out range once. The encoder repeats that range.
+    section_repeats: int = 1
+    # Internal: a repeat slice uses its real in/out length, including spans under 0.1s.
+    exact_span: bool = False
     title_text: str = ""
     subtitle_text: str = ""
     background: str = "dark"

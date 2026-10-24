@@ -26,6 +26,7 @@ from orga_drone.dupes import (
     find_duplicate_groups,
     media_row_to_fingerprint,
 )
+from orga_drone.studio_cut import section_repeats_from_effect_settings
 from orga_drone.studio_estimate import (
     DEFAULT_PHOTO_DURATION_S,
     effective_seconds,
@@ -974,6 +975,21 @@ def create_app() -> FastAPI:
                 if seq_i < len(applied_list):
                     applied_by_id[items[item_idx].id] = applied_list[seq_i]
             for it in items:
+                repeats = (
+                    section_repeats_from_effect_settings(it.effect_settings)
+                    if (it.kind or "") == "video"
+                    else 1
+                )
+                one_play = effective_seconds(
+                    kind=it.kind or "unknown",
+                    photo_duration_s=it.photo_duration_s,
+                    duration_s=it.duration_s,
+                    available=it.available,
+                    source_in_s=it.source_start,
+                    source_out_s=it.source_end,
+                    card_duration_s=it.card_duration_s,
+                    section_repeats=1,
+                )
                 seconds = effective_seconds(
                     kind=it.kind or "unknown",
                     photo_duration_s=it.photo_duration_s,
@@ -982,6 +998,7 @@ def create_app() -> FastAPI:
                     source_in_s=it.source_start,
                     source_out_s=it.source_end,
                     card_duration_s=it.card_duration_s,
+                    section_repeats=repeats,
                 )
                 stream_url = ""
                 proxy_url = ""
@@ -1021,6 +1038,7 @@ def create_app() -> FastAPI:
                 item_display.append(
                     {
                         "item": it,
+                        "section_repeats": repeats,
                         "effective_duration_s": seconds,
                         "display_duration_s": (
                             it.card_duration_s
@@ -1049,7 +1067,12 @@ def create_app() -> FastAPI:
                             item.as_dict()
                             for item in overlays_from_effect_settings(
                                 it.effect_settings,
-                                duration_s=float(seconds or it.photo_duration_s or DEFAULT_PHOTO_DURATION_S),
+                                duration_s=float(
+                                    (one_play if it.kind == "video" and one_play else None)
+                                    or seconds
+                                    or it.photo_duration_s
+                                    or DEFAULT_PHOTO_DURATION_S
+                                ),
                             )
                         ]
                         if it.kind in {"photo", "video"}
@@ -1626,6 +1649,70 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.patch("/api/studio/{studio_item_id}/section")
+    async def api_studio_section(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or not all(
+            key in payload for key in ("source_in_s", "source_out_s", "repeats")
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="JSON body must include source_in_s, source_out_s, and repeats",
+            )
+        raw_in = payload.get("source_in_s")
+        raw_out = payload.get("source_out_s")
+        raw_repeats = payload.get("repeats")
+        if isinstance(raw_in, bool) or not isinstance(raw_in, (int, float)):
+            raise HTTPException(status_code=400, detail="source in must be a number")
+        if isinstance(raw_out, bool) or not isinstance(raw_out, (int, float)):
+            raise HTTPException(status_code=400, detail="source out must be a number")
+        if isinstance(raw_repeats, bool) or not isinstance(raw_repeats, (int, float)):
+            raise HTTPException(
+                status_code=400, detail="repeat count must be a whole number from 1 to 8"
+            )
+        try:
+            item = db.set_studio_section(
+                studio_item_id,
+                source_in_s=float(raw_in),
+                source_out_s=float(raw_out),
+                repeats=raw_repeats,
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(item.project_id)
+        summary = summarize_studio_items(items)
+        repeats = section_repeats_from_effect_settings(item.effect_settings)
+        seconds = effective_seconds(
+            kind=item.kind or "unknown",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+            source_in_s=item.source_in_s,
+            source_out_s=item.source_out_s,
+            card_duration_s=item.card_duration_s,
+            section_repeats=repeats if (item.kind or "") == "video" else 1,
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "source_in_s": item.source_in_s,
+                "source_out_s": item.source_out_s,
+                "section_repeats": repeats,
+                "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
+        )
+
     @app.patch("/api/studio/{studio_item_id}/transition")
     async def api_studio_transition(
         studio_item_id: int,
@@ -1724,6 +1811,9 @@ def create_app() -> FastAPI:
                         available=left.available,
                         source_in_s=left.source_in_s,
                         source_out_s=left.source_out_s,
+                        section_repeats=section_repeats_from_effect_settings(
+                            left.effect_settings
+                        ),
                     ),
                 },
                 "right": {
@@ -1737,6 +1827,9 @@ def create_app() -> FastAPI:
                         available=right.available,
                         source_in_s=right.source_in_s,
                         source_out_s=right.source_out_s,
+                        section_repeats=section_repeats_from_effect_settings(
+                            right.effect_settings
+                        ),
                     ),
                 },
                 "summary": summary.as_dict(),

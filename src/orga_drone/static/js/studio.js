@@ -252,8 +252,8 @@
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgStorySummary = root.dataset.storySummary || "{count} items · {duration}";
-  const msgSourceIn = root.dataset.sourceIn || "Source in";
-  const msgSourceOut = root.dataset.sourceOut || "Source out";
+  const msgSectionFailed = root.dataset.sectionFailed || "Could not save the section.";
+  const MAX_SECTION_REPEATS = 8;
   const labelInspectorStory = root.dataset.inspectorStory || "Story";
   const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
   const labelInStory = root.dataset.inStory || "In story";
@@ -303,6 +303,8 @@
   let wallClockRaf = 0;
   let wallClockLastMs = 0;
   let suppressVideoClock = false;
+  let videoLoopIndex = 0;
+  let loopSeeking = false;
   let loadedVideoSrc = "";
   let loadedImageSrc = "";
   let syncToken = 0;
@@ -452,7 +454,47 @@
     }
     const media = Number(clip.dataset.mediaDuration);
     if (Number.isFinite(media) && media > 0) return media;
-    return sourceInS(clip) + clipDuration(clip);
+    const reps = sectionRepeats(clip);
+    const dur = clipDuration(clip);
+    const cycle = reps > 1 && dur > 0 ? dur / reps : dur;
+    return sourceInS(clip) + cycle;
+  }
+
+  function sectionRepeats(clip) {
+    if (!clip) return 1;
+    const n = Number(clip.dataset.sectionRepeats);
+    if (!Number.isFinite(n)) return 1;
+    const rounded = Math.round(n);
+    if (rounded < 1) return 1;
+    return Math.min(MAX_SECTION_REPEATS, rounded);
+  }
+
+  function sectionCycleS(clip) {
+    const cycle = sourceOutS(clip) - sourceInS(clip);
+    if (cycle > 0.001) return cycle;
+    const reps = sectionRepeats(clip);
+    const dur = clipDuration(clip);
+    return reps > 0 ? dur / reps : dur;
+  }
+
+  // Same mapping as section_playback_point in studio_cut.py.
+  function sectionPoint(clip, localS) {
+    const reps = sectionRepeats(clip);
+    const cycle = sectionCycleS(clip);
+    const local = Math.max(0, Number(localS) || 0);
+    if (reps <= 1 || !(cycle > 0)) {
+      return { index: 0, offset: local, atEnd: false };
+    }
+    const span = cycle * reps;
+    if (local >= span - 0.001) {
+      return { index: reps - 1, offset: cycle, atEnd: true };
+    }
+    const index = Math.min(reps - 1, Math.floor(local / cycle));
+    return { index, offset: local - index * cycle, atEnd: false };
+  }
+
+  function sectionSampleS(clip, localS) {
+    return sectionPoint(clip, localS).offset;
   }
 
   function totalDuration() {
@@ -1689,9 +1731,11 @@
       clip &&
       String(selected.dataset.studioId) === String(clip.dataset.studioId);
     if (editing) return frameEditTarget === "end" ? 1 : 0;
-    const duration = clipDuration(clip);
+    const repeated = sectionRepeats(clip) > 1;
+    const duration = repeated ? sectionCycleS(clip) : clipDuration(clip);
+    const sample = repeated ? sectionSampleS(clip, localS) : localS;
     if (!(duration > 0)) return 0;
-    return Math.max(0, Math.min(1, localS / duration));
+    return Math.max(0, Math.min(1, sample / duration));
   }
 
   function applyFrameToElement(el, clip, localS) {
@@ -1889,7 +1933,11 @@
     if (!previewVideo) return;
     const inS = clip ? sourceInS(clip) : 0;
     const outS = clip ? sourceOutS(clip) : null;
-    const target = Math.max(inS, inS + Math.max(0, localS));
+    const point = clip
+      ? sectionPoint(clip, localS)
+      : { index: 0, offset: Math.max(0, localS), atEnd: false };
+    videoLoopIndex = point.index;
+    const target = Math.max(inS, inS + Math.max(0, point.offset));
     const apply = () => {
       try {
         let max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
@@ -2009,7 +2057,7 @@
           previewVideoB.load();
         }
         const inS = sourceInS(clip);
-        const target = inS + Math.max(0, localS);
+        const target = inS + Math.max(0, sectionSampleS(clip, localS));
         const apply = () => {
           try {
             previewVideoB.currentTime = target;
@@ -2275,8 +2323,11 @@
     }
     const inS = sourceInS(playing);
     const outS = sourceOutS(playing);
+    const reps = sectionRepeats(playing);
+    const cycle = sectionCycleS(playing);
     const mediaTime = previewVideo.currentTime || 0;
-    const local = Math.max(0, mediaTime - inS);
+    const within = Math.max(0, mediaTime - inS);
+    const local = reps > 1 ? videoLoopIndex * cycle + within : within;
     const next = clipStartTime(playing) + local;
     if (Math.abs(next - state.projectTimeS) >= 0.01) {
       state.projectTimeS = next;
@@ -2293,6 +2344,35 @@
     if (after.clip !== playing) {
       syncPreviewMedia({ seek: true });
       beginClockForActiveClip();
+      return;
+    }
+    if (reps > 1 && outS != null && mediaTime >= outS - 0.01 && videoLoopIndex + 1 < reps) {
+      if (loopSeeking) return;
+      loopSeeking = true;
+      videoLoopIndex += 1;
+      suppressVideoClock = true;
+      state.projectTimeS = clipStartTime(playing) + videoLoopIndex * cycle;
+      updatePlayheadChrome();
+      applyTransitionPreview(resolveAt(state.projectTimeS));
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        loopSeeking = false;
+        suppressVideoClock = false;
+      };
+      previewVideo.addEventListener("seeked", settle, { once: true });
+      window.setTimeout(settle, 200);
+      try {
+        previewVideo.currentTime = inS;
+      } catch (_) {
+        settle();
+      }
+      if (state.playing) {
+        previewVideo.play().catch(() => {
+          pausePlayback();
+        });
+      }
       return;
     }
     if (outS != null && mediaTime >= outS - 0.05) {
@@ -2315,6 +2395,24 @@
     if (hit.clip.dataset.kind !== "video") {
       syncPreviewMedia({ seek: true });
       beginClockForActiveClip();
+      return;
+    }
+    const reps = sectionRepeats(hit.clip);
+    if (reps > 1 && videoLoopIndex + 1 < reps) {
+      videoLoopIndex += 1;
+      const inS = sourceInS(hit.clip);
+      state.projectTimeS = clipStartTime(hit.clip) + videoLoopIndex * sectionCycleS(hit.clip);
+      updatePlayheadChrome();
+      try {
+        previewVideo.currentTime = inS;
+      } catch (_) {
+        /* ignore */
+      }
+      if (state.playing) {
+        previewVideo.play().catch(() => {
+          pausePlayback();
+        });
+      }
       return;
     }
     advanceToNextOrStop(hit);
@@ -2918,11 +3016,15 @@
       if (videoTiming) {
         videoTiming.hidden = !isVideo;
         if (isVideo) {
-          const inEl = panel.querySelector('[data-field="source-in"]');
-          const outEl = panel.querySelector('[data-field="source-out"]');
+          const inEl = document.getElementById("inspector-source-in");
+          const outEl = document.getElementById("inspector-source-out");
+          const repeatEl = document.getElementById("inspector-section-repeats");
           const hintEl = panel.querySelector('[data-field="cut-hint"]');
-          if (inEl) inEl.textContent = `${msgSourceIn}: ${sourceInS(clip).toFixed(1)} s`;
-          if (outEl) outEl.textContent = `${msgSourceOut}: ${sourceOutS(clip).toFixed(1)} s`;
+          if (inEl && document.activeElement !== inEl) inEl.value = sourceInS(clip).toFixed(2);
+          if (outEl && document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
+          if (repeatEl && document.activeElement !== repeatEl) {
+            repeatEl.value = String(sectionRepeats(clip));
+          }
           if (hintEl) hintEl.textContent = msgCutHint;
         }
       }
@@ -2965,6 +3067,7 @@
     if (!state.selected || state.selected.type !== "clip") return false;
     if (String(state.selected.id) !== String(hit.clip.dataset.studioId)) return false;
     if (hit.clip.dataset.kind !== "video") return false;
+    if (sectionRepeats(hit.clip) > 1) return false;
     if (hit.clip.dataset.canPlay !== "1") return false;
     if (hit.clip.dataset.available !== "1") return false;
     const local = hit.localS;
@@ -3408,6 +3511,81 @@
     } catch (_) {
       clip.dataset.photoDuration = prev;
       showFlash(msgDurationFailed);
+    }
+  }
+
+  async function persistSection(clip) {
+    const inEl = document.getElementById("inspector-source-in");
+    const outEl = document.getElementById("inspector-source-out");
+    const repeatEl = document.getElementById("inspector-section-repeats");
+    if (!inEl || !outEl || !repeatEl) return;
+    const sourceIn = Number(inEl.value);
+    const sourceOut = Number(outEl.value);
+    let repeats = Math.round(Number(repeatEl.value));
+    if (!Number.isFinite(repeats)) repeats = 1;
+    repeats = Math.max(1, Math.min(MAX_SECTION_REPEATS, repeats));
+    repeatEl.value = String(repeats);
+    if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut <= sourceIn) {
+      showFlash(msgSectionFailed);
+      return;
+    }
+    const prevIn = clip.dataset.sourceIn;
+    const prevOut = clip.dataset.sourceOut;
+    const prevRepeats = clip.dataset.sectionRepeats;
+    const prevDuration = clip.dataset.effectiveDuration;
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/${clip.dataset.studioId}/section`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          source_in_s: sourceIn,
+          source_out_s: sourceOut,
+          repeats,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        throw new Error((data && data.detail) || msgSectionFailed);
+      }
+      clip.dataset.sourceIn = data.source_in_s == null ? "" : String(data.source_in_s);
+      clip.dataset.sourceOut = data.source_out_s == null ? "" : String(data.source_out_s);
+      clip.dataset.sectionRepeats = String(data.section_repeats || 1);
+      clip.dataset.effectiveDuration =
+        data.effective_duration_s == null ? "" : String(data.effective_duration_s);
+      const flex = Number(data.effective_duration_s);
+      if (Number.isFinite(flex)) {
+        clip.style.setProperty("--clip-flex", flex.toFixed(4));
+      }
+      const label = clip.querySelector("[data-clip-duration]");
+      if (label) {
+        label.textContent = Number.isFinite(flex) ? `${flex.toFixed(1)}s` : "—";
+      }
+      if (data.summary && data.summary.estimated_total_s != null) {
+        root.dataset.totalS = String(data.summary.estimated_total_s);
+        root.dataset.totalLabel =
+          data.summary.estimated_total_label || formatTime(data.summary.estimated_total_s);
+      }
+      if (document.activeElement !== inEl) inEl.value = sourceInS(clip).toFixed(2);
+      if (document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
+      if (document.activeElement !== repeatEl) repeatEl.value = String(sectionRepeats(clip));
+      const durationLine = document.querySelector(
+        "#inspector-clip [data-field='duration-line']"
+      );
+      const dur = clipDuration(clip);
+      if (durationLine) {
+        durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
+      }
+      layoutTimeline();
+      setProjectTime(state.projectTimeS);
+      setSaveState(true);
+      showFlash("");
+    } catch (err) {
+      clip.dataset.sourceIn = prevIn;
+      clip.dataset.sourceOut = prevOut;
+      clip.dataset.sectionRepeats = prevRepeats;
+      clip.dataset.effectiveDuration = prevDuration;
+      showFlash((err && err.message) || msgSectionFailed);
     }
   }
 
@@ -4532,8 +4710,10 @@
       layer.hidden = true;
       return;
     }
-    const duration = clipDuration(clip);
-    const visible = readOverlays(clip).filter((overlay) => overlayActive(overlay, localS, duration));
+    const repeated = sectionRepeats(clip) > 1;
+    const duration = repeated ? sectionCycleS(clip) : clipDuration(clip);
+    const sample = repeated ? sectionSampleS(clip, localS) : localS;
+    const visible = readOverlays(clip).filter((overlay) => overlayActive(overlay, sample, duration));
     if (!visible.length) {
       layer.hidden = true;
       return;
@@ -4545,7 +4725,7 @@
     layer.style.top = box.top + "px";
     layer.style.width = Math.max(1, box.width) + "px";
     layer.style.height = Math.max(1, box.height) + "px";
-    visible.forEach((overlay) => layer.appendChild(buildAnnotation(overlay, layer, interactive, localS)));
+    visible.forEach((overlay) => layer.appendChild(buildAnnotation(overlay, layer, interactive, sample)));
   }
 
   function syncAnnotations(hit) {
@@ -4654,7 +4834,11 @@
 
   function editorOverlayPatch(overlay) {
     const next = Object.assign({}, overlay);
-    const duration = clipDuration(selectedOverlayClip() || { dataset: {} });
+    const overlayClip = selectedOverlayClip();
+    const duration =
+      overlayClip && sectionRepeats(overlayClip) > 1
+        ? sectionCycleS(overlayClip)
+        : clipDuration(overlayClip || { dataset: {} });
     next.start_s = numberOr(document.getElementById("overlay-start"), next.start_s);
     next.end_s = numberOr(document.getElementById("overlay-end"), next.end_s);
     next.x = numberOr(document.getElementById("overlay-x"), next.x * 100) / 100;
@@ -4736,7 +4920,10 @@
       showRootFlash(msgOverlayLimit);
       return;
     }
-    const duration = Math.max(0.1, clipDuration(clip));
+    const duration = Math.max(
+      0.1,
+      sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip)
+    );
     const shift = (existing.length % 4) * 0.06;
     const overlay = {
       id: "ov" + Math.random().toString(16).slice(2, 12),
@@ -5003,6 +5190,15 @@
     syncMusicAudio();
     layoutTimeline();
     patchMusicSettings();
+  });
+
+  ["inspector-source-in", "inspector-source-out", "inspector-section-repeats"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      if (state.selected.type !== "clip") return;
+      const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
+      if (!clip || clip.dataset.kind !== "video") return;
+      persistSection(clip);
+    });
   });
 
   document.getElementById("inspector-photo-duration")?.addEventListener("change", (event) => {

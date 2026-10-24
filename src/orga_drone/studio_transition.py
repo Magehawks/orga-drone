@@ -375,6 +375,14 @@ def item_effective_seconds(item: object) -> float | None:
     from orga_drone.studio_estimate import effective_seconds
 
     kind = getattr(item, "kind", None) or "unknown"
+    repeats = 1
+    if kind == "video":
+        from orga_drone.studio_cut import section_repeats_from_effect_settings
+
+        raw_effects = getattr(item, "effect_settings", None)
+        repeats = section_repeats_from_effect_settings(
+            raw_effects if isinstance(raw_effects, str) else None
+        )
     return effective_seconds(
         kind=kind,
         photo_duration_s=getattr(item, "photo_duration_s", None),
@@ -383,6 +391,7 @@ def item_effective_seconds(item: object) -> float | None:
         source_in_s=getattr(item, "source_in_s", None),
         source_out_s=getattr(item, "source_out_s", None),
         card_duration_s=getattr(item, "card_duration_s", None),
+        section_repeats=repeats,
     )
 
 
