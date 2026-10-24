@@ -178,10 +178,12 @@
                aria-label="{{ _('Select for Studio') }}">
       </label>
       <a class="card-main" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
-        <div class="thumb">
+        <div class="thumb{% if item.root_id in offline_root_ids %} thumb-placeholder{% endif %}">
           {# JPEG thumbs only — never preload LRF/proxy as <video> in the grid
              (dozens of concurrent Range requests spike CPU/IO under Defender). #}
+          {% if item.root_id not in offline_root_ids %}
           <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
+          {% endif %}
           {% if item.kind == 'video' %}
           <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
           {% endif %}
@@ -200,6 +202,9 @@
         </div>
         <div class="card-body">
           <strong class="title">{{ item.filename }}</strong>
+          {% if item.root_id in offline_root_ids %}
+            <span class="badge unavailable">{{ _('Offline') }}</span>
+          {% endif %}
           <div class="meta-line">
             <span>{{ item.recorded_at or '—' }}</span>
             <span>
@@ -311,15 +316,22 @@
             </label>
           </td>
           <td class="thumb-cell">
+            {% if item.root_id in offline_root_ids %}
+              <div class="list-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') }}"></div>
+            {% else %}
             <a href="/media/{{ item.id }}?{{ browse_detail_qs }}">
               <img class="list-thumb" src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
             </a>
+            {% endif %}
           </td>
           <td>{{ item.recorded_at or '—' }}</td>
           <td>
             <span class="kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ item.kind }}{% endif %}</span>
             {% if item.favorite %}<span class="fav-mark" title="{{ _('Favorite') }}">♥</span>{% endif %}
             {{ item.filename }}
+            {% if item.root_id in offline_root_ids %}
+              <span class="badge unavailable">{{ _('Offline') }}</span>
+            {% endif %}
             {% if item.tags %}
               <div class="tag-line compact">
                 {% for tag in item.tags[:3] %}

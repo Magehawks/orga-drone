@@ -151,3 +151,12 @@ msgstr "Or add a Title Card to start with a heading."
 msgid "Title Card export needs a system sans font."
 msgstr "Title Card export needs a system sans font."
 
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Source offline. Catalog entries stay until this folder is connected again."
+msgstr "Source offline. Catalog entries stay until this folder is connected again."
+
+msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
+msgstr "Source offline. This catalog entry is kept. Connect the drive to open it again."
+

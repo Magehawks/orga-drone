@@ -56,7 +56,7 @@ Before implementing a feature, verify it improves this journey (see
 
 | Area | Question | Today (honest) |
 |------|----------|----------------|
-| Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
+| Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes; offline roots keep catalog entries |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
@@ -65,7 +65,7 @@ Before implementing a feature, verify it improves this journey (see
 
 The application helps users:
 
-- import and organize drone (and related) photos and videos from local folders
+- import and organize drone (and related) photos and videos from local folders; when a source folder cannot be listed, its catalog entries stay and the UI marks that source offline
 - extract DJI and standard media metadata (EXIF, filenames, SRT where present)
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
@@ -94,7 +94,7 @@ The application helps users:
 
 ## Limitations (honest)
 
-- Library scan is a **full rescan** per root (not incremental).
+- Library scan is a **full rescan** per root (not incremental). If a source drive or folder cannot be listed, that scan keeps the root's catalog entries and user metadata, and the UI marks them offline. Scanning again after the folder is connected updates those entries without adding duplicate rows. Files removed from a folder that can still be listed are dropped on the next scan.
 - Flight sessions are **heuristic** (time gaps + optional SRT altitude/GPS).
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.

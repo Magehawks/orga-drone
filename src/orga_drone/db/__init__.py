@@ -3196,7 +3196,7 @@ class Database:
             params.append(int(limit))
 
         sql = f"""
-            SELECT m.id, m.kind, m.filename, m.recorded_at, m.duration_s,
+            SELECT m.id, m.root_id, m.kind, m.filename, m.recorded_at, m.duration_s,
                    m.size_bytes, m.drone_model, m.latitude, m.longitude,
                    COALESCE(mm.stars, 0) AS stars,
                    COALESCE(mm.favorite, 0) AS favorite
@@ -3213,6 +3213,7 @@ class Database:
             out.append(
                 {
                     "id": int(r["id"]),
+                    "root_id": int(r["root_id"]),
                     "kind": r["kind"],
                     "filename": r["filename"],
                     "recorded_at": r["recorded_at"],

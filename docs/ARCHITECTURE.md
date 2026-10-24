@@ -86,13 +86,17 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
-1. Recursively find media files under a root
-2. Clear indexed media for that root (**full rescan**; `media_meta` and
-   `studio_clips` kept)
-3. Parse → upsert assets/media
-4. Relink user meta + Studio membership + apply auto-tags
-5. Rebuild flows, then sessions
-6. Mark root scanned
+1. If the root cannot be listed (missing drive, disconnected share, or an OS
+   error while walking it), keep the existing catalog and report the source
+   offline. Do not clear `media` or user metadata.
+2. Recursively find media files under a root and read metadata
+3. Clear indexed media for that root only after that read, and only if the
+   root is still listable (**full rescan**; `media_meta` and `studio_clips`
+   kept). An empty but listable folder is a confirmed deletion.
+4. Upsert assets/media from the read
+5. Relink user meta + Studio membership + apply auto-tags
+6. Rebuild flows, then sessions
+7. Mark root scanned
 
 HTTP triggers in `app.py`: add root, scan one root, scan all.
 
