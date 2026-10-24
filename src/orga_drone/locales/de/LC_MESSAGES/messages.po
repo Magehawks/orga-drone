@@ -151,3 +151,12 @@ msgstr "Oder füge eine Titelseite als Überschrift hinzu."
 msgid "Title Card export needs a system sans font."
 msgstr "Der Titelseiten-Export braucht eine System-Sans-Schrift."
 
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Source offline. Catalog entries stay until this folder is connected again."
+msgstr "Quelle offline. Katalogeinträge bleiben, bis dieser Ordner wieder verbunden ist."
+
+msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
+msgstr "Quelle offline. Dieser Katalogeintrag bleibt erhalten. Schließe das Laufwerk an, um die Datei wieder zu öffnen."
+

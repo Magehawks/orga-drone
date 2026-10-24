@@ -64,7 +64,7 @@ from orga_drone.i18n import SUPPORTED_LANGS, get_translator, normalize_lang
 from orga_drone.media_files import resolve_media_file, resolve_proxy_file
 from orga_drone.ops.merge import MergeError, default_merge_name, merge_flow
 from orga_drone.ops.rename import RenameError, rename_media
-from orga_drone.scan import scan_all_roots, scan_root
+from orga_drone.scan import offline_root_ids, scan_all_roots, scan_root
 from orga_drone.scan.jobs import ScanJobStore
 from orga_drone.scan.progress import ProgressCallback
 from orga_drone.export.jobs import ExportJobStore
@@ -476,6 +476,7 @@ def create_app() -> FastAPI:
             "theme_style": custom_css_vars(theme) if theme.mode == "custom" else "",
             "nav_active": "",
             "browse_return_url": None,
+            "offline_root_ids": offline_root_ids(db),
             **extra,
         }
 
@@ -797,6 +798,11 @@ def create_app() -> FastAPI:
         if include_noloc:
             without = db.list_geo_media(with_gps=False, limit=200)
         stats = db.stats()
+        offline = offline_root_ids(db)
+        for row in points:
+            row["source_offline"] = int(row["root_id"]) in offline
+        for row in without:
+            row["source_offline"] = int(row["root_id"]) in offline
         return {
             "items": points,
             "without_location": without,

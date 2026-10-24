@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from orga_drone.parse import (
     PHOTO_EXTS,
     PROXY_EXTS,
     SUBTITLE_EXTS,
+    ParsedMedia,
     live_photo_video_sidecars,
     parse_media_file,
     should_index_as_library_video,
@@ -122,15 +124,89 @@ def _emit(
     )
 
 
+def root_source_available(path: Path) -> bool:
+    """True when ``path`` is a directory that can be listed.
+
+    A missing drive, disconnected share, or other OS error is unavailable.
+    An empty directory that lists successfully is available, so a later scan
+    can treat files that are gone as confirmed deletions.
+    """
+    try:
+        with os.scandir(path) as entries:
+            next(entries, None)
+        return True
+    except OSError:
+        return False
+
+
+def offline_root_ids(db: Database) -> set[int]:
+    """Ids of library roots whose folder cannot be listed right now."""
+    offline: set[int] = set()
+    for root in db.list_roots():
+        if not root_source_available(Path(str(root["path"]))):
+            offline.add(int(root["id"]))
+    return offline
+
+
+def _offline_preserved() -> dict[str, int]:
+    """Scan result that leaves the existing catalog rows in place."""
+    return {
+        "assets": 0,
+        "videos": 0,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 0,
+        "offline": 1,
+        "preserved": 1,
+    }
+
+
+def _finish_offline(
+    on_progress: ProgressCallback | None,
+    root_id: int,
+) -> dict[str, int]:
+    _emit(
+        on_progress,
+        phase="done",
+        discovered=0,
+        processed=0,
+        current_path=None,
+        root_id=root_id,
+    )
+    return _offline_preserved()
+
+
 def scan_root(
     db: Database,
     root_id: int,
     root_path: Path,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, int]:
-    root_path = root_path.resolve()
+    """Index one library root.
+
+    A full rescan still replaces the index when the folder can be listed.
+    If the source is missing or disappears before that replace, existing
+    catalog rows stay. An empty but listable folder is a confirmed deletion.
+    """
+    try:
+        root_path = root_path.resolve()
+    except OSError:
+        return _finish_offline(on_progress, root_id)
+    if not root_source_available(root_path):
+        return _finish_offline(on_progress, root_id)
+
     _emit(on_progress, phase="discovering", discovered=0, processed=0, root_id=root_id)
-    files = iter_media_files(root_path, on_progress, root_id=root_id)
+    try:
+        files = iter_media_files(root_path, on_progress, root_id=root_id)
+    except OSError:
+        if root_source_available(root_path):
+            raise
+        return _finish_offline(on_progress, root_id)
+    if not root_source_available(root_path):
+        return _finish_offline(on_progress, root_id)
+
     discovered = len(files)
     _emit(
         on_progress,
@@ -146,6 +222,32 @@ def scan_root(
 
     live_sidecars = live_photo_video_sidecars(files)
 
+    # Read metadata before replacing the index. A drive that drops out during
+    # this read must not wipe catalog rows from the last successful scan.
+    prepared: list[tuple[Path, ParsedMedia, float | None]] = []
+    try:
+        for index, path in enumerate(files, start=1):
+            parsed = parse_media_file(path)
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                mtime = None
+            prepared.append((path, parsed, mtime))
+            _emit(
+                on_progress,
+                phase="indexing",
+                discovered=discovered,
+                processed=index,
+                current_path=display_scan_path(path, root_path),
+                root_id=root_id,
+            )
+    except OSError:
+        if root_source_available(root_path):
+            raise
+        return _finish_offline(on_progress, root_id)
+    if not root_source_available(root_path):
+        return _finish_offline(on_progress, root_id)
+
     # Clear previous index for this root (simple full rescan for MVP)
     db.clear_root_media(root_id)
 
@@ -157,8 +259,7 @@ def scan_root(
         "non_video": 0,
     }
 
-    for index, path in enumerate(files, start=1):
-        parsed = parse_media_file(path)
+    for index, (path, parsed, mtime) in enumerate(prepared, start=1):
         try:
             resolved = path.resolve()
         except OSError:
@@ -173,10 +274,6 @@ def scan_root(
             # "Main Still Picture" poster MOVs). Keep as asset, skip media.
             asset_kind = "other"
 
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            mtime = None
         asset_id = db.upsert_asset(
             root_id=root_id,
             path=path,
@@ -236,6 +333,7 @@ def scan_root(
             if parsed.recorded_at
             else None
         )
+        stored_path = str(parsed.path)
 
         media_id = db.upsert_media(
             {
@@ -243,7 +341,7 @@ def scan_root(
                 "primary_asset_id": asset_id,
                 "kind": parsed.kind,
                 "filename": path.name,
-                "path": str(path.resolve()),
+                "path": stored_path,
                 "size_bytes": parsed.size_bytes,
                 "duration_s": parsed.duration_s,
                 "recorded_at": recorded,
@@ -262,13 +360,13 @@ def scan_root(
         )
         # Re-attach user metadata that survived clear_root_media (path / identity).
         db.link_media_meta_for_path(
-            str(path.resolve()),
+            stored_path,
             filename=path.name,
             size_bytes=parsed.size_bytes,
             recorded_at=recorded,
         )
         db.link_studio_item_for_path(
-            str(path.resolve()),
+            stored_path,
             filename=path.name,
             size_bytes=parsed.size_bytes,
             recorded_at=recorded,
@@ -360,9 +458,15 @@ def scan_all_roots(
     results = []
     for root in db.list_roots():
         path = Path(root["path"])
-        if not path.exists():
+        if not root_source_available(path):
             results.append(
-                {"root_id": root["id"], "path": root["path"], "error": "missing"}
+                {
+                    "root_id": root["id"],
+                    "path": root["path"],
+                    "error": "missing",
+                    "offline": 1,
+                    "preserved": 1,
+                }
             )
             continue
         counts = scan_root(db, int(root["id"]), path, on_progress=on_progress)
