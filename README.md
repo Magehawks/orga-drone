@@ -45,6 +45,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 - Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
 - Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
 - Manual favorites, stars, tags, and notes that survive a library rescan
+- **Library albums:** named collections across flights, cameras, and folders (add/remove media; one file can be in several albums; references survive a rescan and stay listed when the file is offline; files are not modified; separate from Studio)
 - **Studio:** collect media, arrange order, estimate runtime; editable project
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
@@ -102,7 +103,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio framing | Available | Per photo or video clip: zoom 1×–3× and pan; optional start/end motion across the clip; preview matches the exported frame; source files stay unchanged |
 | Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
-| Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
+| Library albums | Available | Local named albums (`albums` / `album_items`); create, rename, delete; add/remove media; one file in several albums; membership survives rescan and stays listed when the file is offline; separate from Studio; no shared, cloud, or automatic albums |
 | Plugin API | Not available | Possible future work |
 | Semantic / LLM search | Not available | Not planned as product identity |
 | Social share integrations | Not available | Later; local file / future MP4 first |
@@ -289,8 +290,6 @@ Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/
 
 **Possible next steps** (not available now):
 
-- Library albums for organizing media sets (Studio already has multiple local
-  edit projects)
 - Incremental or cheaper library rescans
 - Broader multi-brand parsers beyond the current DJI-first depth
 - Optional opt-in community sharing of flight spots (builds on local GeoJSON)
@@ -320,7 +319,7 @@ Known limitations:
 
 - Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
 - Session and duplicate results are best-effort heuristics
-- No Library albums UI, no plugin API, no content-hash duplicate
+- Library albums are local references only (no shared albums, cloud sync, or automatic albums). No plugin API, no content-hash duplicate
 detection (Studio supports multiple local edit projects)
 - Ask the library is rule-based phrase parsing, not generative AI
 - CI on pull requests covers Ruff, MyPy, pytest, and an **App journey smoke** check (synthetic photo through the local HTTP app; `docs/PR_E2E.md`). A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.

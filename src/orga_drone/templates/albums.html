@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Albums') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/">{{ _('Dashboard') }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span class="breadcrumb-current">{{ _('Albums') }}</span>
+</nav>
+
+<section class="panel">
+  <h1>{{ _('Albums') }}</h1>
+  <p class="hint">{{ _('Albums collect media across flights, dates, and folders. They do not change your files and stay separate from Studio projects.') }}</p>
+
+  {% if flash_msg == 'album_deleted' %}
+    <div class="flash ok" role="status">{{ _('Album deleted. Media files were kept.') }}</div>
+  {% elif flash_msg == 'album_invalid' %}
+    <div class="flash err" role="alert">{{ _('Enter an album name.') }}</div>
+  {% endif %}
+
+  <form method="post" action="/albums" class="add-form">
+    <label>
+      {{ _('Album name') }}
+      <input type="text" name="title" maxlength="80" required autofocus placeholder="{{ _('e.g. Malta vacation') }}">
+    </label>
+    <button type="submit" class="cta">{{ _('Create album') }}</button>
+  </form>
+</section>
+
+<section class="panel">
+  {% if not albums %}
+    <div class="empty">
+      <h1>{{ _('No albums yet') }}</h1>
+      <p>{{ _('Create an album, then add photos and videos from their detail pages.') }}</p>
+    </div>
+  {% else %}
+    <ul class="album-list">
+      {% for album in albums %}
+      <li class="album-row">
+        <div class="album-meta">
+          <a href="/albums/{{ album.id }}"><strong>{{ album.title }}</strong></a>
+          {% if album.item_count == 1 %}
+            <span class="muted">{{ _('1 item') }}</span>
+          {% else %}
+            <span class="muted">{{ _('%(count)s items')|format(count=album.item_count) }}</span>
+          {% endif %}
+        </div>
+        <form method="post" action="/albums/{{ album.id }}/rename" class="album-rename">
+          <label class="sr-only" for="album-rename-{{ album.id }}">{{ _('Album name') }}</label>
+          <input id="album-rename-{{ album.id }}" type="text" name="title" value="{{ album.title }}" maxlength="80" required>
+          <button type="submit">{{ _('Rename') }}</button>
+        </form>
+        <form method="post" action="/albums/{{ album.id }}/delete"
+              onsubmit="return confirm('{{ _('Delete this album? Media files stay on disk.')|e }}');">
+          <button type="submit" class="danger">{{ _('Delete album') }}</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

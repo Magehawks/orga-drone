@@ -106,6 +106,7 @@ orga-drone.
 | Sessions / flows | **Available now** (heuristic) |
 | Duplicate detection | **Available now** (heuristics; no auto-delete) |
 | File management (rename, merge under roots) | **Available now** |
+| User-managed albums | **Available now** (local named references across flights and folders; one file can be in several albums; separate from Studio; no shared, cloud, or automatic albums) |
 | AI indexing | **Later** — only if justified; do not label rule-based Ask/auto-tags as AI |
 
 ### 2. Browse
@@ -220,6 +221,11 @@ See `README.md` for the detailed feature status table. In short:
 - Import and organize drone (and related) photos and videos from local folders
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
+- **Library albums:** local named collections (`albums` / `album_items`). Create,
+  rename, and delete an album; add or remove media; the same file can sit in
+  more than one album. Membership survives a full rescan and stays listed when
+  the file is offline. Albums do not modify files and are not Studio projects.
+  No shared albums, cloud sync, or automatic albums.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
@@ -273,7 +279,8 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, or multi-OS installer
+- Library albums are local named references only (no shared albums, cloud
+  sync, or automatic albums). There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
   MOTW smoke test (`packaging/README.md`). About shows the installed version.
@@ -291,8 +298,7 @@ See `README.md` for the detailed feature status table. In short:
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;
-  not a professional grade or NLE). Albums for
-  organizing the media library remain Later.
+  not a professional grade or NLE).
 
 ## Studio MVP (local Create → Share)
 

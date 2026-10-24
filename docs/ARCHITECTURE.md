@@ -76,6 +76,8 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `flows` / `flow_items` | Split-clip groups |
 | `sessions` / `session_items` | Heuristic flight sessions |
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
+| `albums` | User-named library albums (independent of `studio_projects`) |
+| `album_items` | Non-destructive media references (`media_path` + `identity_key` + optional `source_media_id`); one file may appear in several albums; survives rescan; listed as offline when the file is not on disk |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
 | `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; video saturation ramp under `saturation_ramp`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`); survives rescan |
 | `studio_audio_clips` | Optional sequential soundtrack playlist (up to 8 songs; `duration_s`; volume/fades; loop when N=1; read-only path outside library roots allowed; not library media) |
@@ -94,11 +96,11 @@ Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
    (ADR 0020). Parse new or changed files before replacing any index rows.
    If the source disappears during that read, keep the existing catalog.
 4. Drop index rows for this root whose paths were not found, and only if the
-   root is still listable (`media_meta` and `studio_clips` stay). An empty
-   but listable folder is a confirmed deletion.
-5. Upsert new or changed files, then relink user meta, Studio membership,
-   and auto-tags for those parsed files. A size/mtime match still refreshes
-   SRT/LRF flags and Live Photo pairing from filenames.
+   root is still listable (`media_meta`, `album_items`, and `studio_clips` stay).
+   An empty but listable folder is a confirmed deletion.
+5. Upsert new or changed files, then relink user meta, album membership,
+   Studio membership, and auto-tags for those parsed files. A size/mtime
+   match still refreshes SRT/LRF flags and Live Photo pairing from filenames.
 6. Rebuild flows, then sessions (this still runs when every file was unchanged)
 7. Mark root scanned
 
@@ -157,9 +159,9 @@ add folder → scan/parse (unchanged files skip extraction) → SQLite index →
 ## Design constraints for new work
 
 1. Stay local-first; do not require cloud accounts.
-2. Do not claim plugins, albums, or incremental scan until implemented.
+2. Do not claim plugins or incremental scan until implemented.
 3. Prefer small modules in existing package areas over new top-level frameworks.
-4. Preserve `media_meta` and `studio_clips` across rescans.
+4. Preserve `media_meta`, `album_items`, and `studio_clips` across rescans.
 5. Path operations for library media must stay confined under library roots.
    Studio music is a documented exception: read-only soundtrack paths (up to 8
    sequential songs per project), including files outside library folders

@@ -3304,6 +3304,42 @@ footer {
   .tagline { display: none; }
 }
 
+.album-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.album-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.9rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.album-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.album-meta { display: flex; gap: 0.6rem; align-items: baseline; min-width: 10rem; }
+.album-rename { display: flex; gap: 0.4rem; align-items: center; flex: 1; }
+.album-rename input { min-width: 8rem; }
+.album-membership { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.album-membership li { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; }
+.album-membership form { margin: 0; }
+.album-state {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+}
+.album-state.offline {
+  background: color-mix(in srgb, #c45c26 22%, var(--panel));
+  color: color-mix(in srgb, #c45c26 70%, var(--text));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

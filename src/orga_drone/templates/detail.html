@@ -41,6 +41,16 @@
     <div class="flash ok" role="status">{{ _('Added to Studio.') }}</div>
   {% elif flash_msg == 'studio_already' %}
     <div class="flash ok" role="status">{{ _('Already in Studio.') }}</div>
+  {% elif flash_msg == 'album_added' %}
+    <div class="flash ok" role="status">{{ _('Added to album.') }}</div>
+  {% elif flash_msg == 'album_already' %}
+    <div class="flash ok" role="status">{{ _('Already in this album.') }}</div>
+  {% elif flash_msg == 'album_removed' %}
+    <div class="flash ok" role="status">{{ _('Removed from album.') }}</div>
+  {% elif flash_msg == 'album_invalid' %}
+    <div class="flash err" role="alert">{{ _('Enter an album name.') }}</div>
+  {% elif flash_msg == 'album_missing' %}
+    <div class="flash err" role="alert">{{ _('That album is no longer available.') }}</div>
   {% endif %}
   {% if flash_error %}
     <div class="flash err" role="alert">{{ flash_error }}</div>
@@ -146,6 +156,45 @@
       </label>
       <button type="submit">{{ _('Save') }}</button>
     </form>
+
+    <div class="action-form album-form">
+      <h2>{{ _('Albums') }}</h2>
+      <p class="hint">{{ _('Albums collect media across flights, dates, and folders. They do not change your files and stay separate from Studio projects.') }}</p>
+      {% if media_albums %}
+        <ul class="album-membership">
+          {% for album in media_albums %}
+          <li>
+            <a href="/albums/{{ album.id }}">{{ album.title }}</a>
+            <form method="post" action="/media/{{ item.id }}/albums/{{ album.id }}/remove">
+              <button type="submit" class="ghost">{{ _('Remove from album') }}</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="hint">{{ _('Not in any album yet.') }}</p>
+      {% endif %}
+      {% if albums_available %}
+      <form method="post" action="/media/{{ item.id }}/albums/add">
+        <label>
+          {{ _('Album') }}
+          <select name="album_id" required>
+            {% for album in albums_available %}
+            <option value="{{ album.id }}">{{ album.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">{{ _('Add to album') }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/media/{{ item.id }}/albums/add">
+        <label>
+          {{ _('New album') }}
+          <input type="text" name="title" maxlength="80" required placeholder="{{ _('e.g. Malta vacation') }}">
+        </label>
+        <button type="submit">{{ _('Create album and add') }}</button>
+      </form>
+    </div>
 
     <div class="action-form studio-form">
       <h2>{{ _('Studio') }}</h2>
