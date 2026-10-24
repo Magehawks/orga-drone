@@ -92,7 +92,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
 | Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
-| Studio MP4 export | Available | Configurable resolution up to source max; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
+| Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
 | Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
 | Library albums | Not available | Later; Studio edit projects are not a media-library albums model |
 | Plugin API | Not available | Possible future work |

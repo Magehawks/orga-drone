@@ -710,6 +710,11 @@
       <span>{{ _('Resolution') }}</span>
       <select id="studio-export-resolution" aria-label="{{ _('Export resolution') }}"></select>
     </label>
+    <label class="studio-inspector-field" for="studio-export-filename">
+      <span>{{ _('Filename') }}</span>
+      <input id="studio-export-filename" type="text" autocomplete="off" spellcheck="false"
+             aria-label="{{ _('Filename') }}">
+    </label>
     <p class="meta-line" id="studio-export-status" hidden></p>
     <div class="studio-export-progress" id="studio-export-progress" hidden>
       <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"

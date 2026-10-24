@@ -147,7 +147,7 @@ professional video-editing knowledge.
 | Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
-| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
+| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Further light editing (curves, masks, keyframes), extra transition types | **Later** |
 | Music-lane time mapping | **Later** |
