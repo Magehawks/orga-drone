@@ -160,3 +160,12 @@ msgstr "Repeat plays this in/out range again, up to 8 times, at the same speed."
 msgid "Could not save the section."
 msgstr "Could not save the section."
 
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Source offline. Catalog entries stay until this folder is connected again."
+msgstr "Source offline. Catalog entries stay until this folder is connected again."
+
+msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
+msgstr "Source offline. This catalog entry is kept. Connect the drive to open it again."
+

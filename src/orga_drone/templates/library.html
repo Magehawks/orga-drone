@@ -74,8 +74,16 @@
       <tbody>
         {% for root in roots %}
         <tr>
-          <td>{{ root['label'] or '—' }}</td>
-          <td class="mono">{{ root['path'] }}</td>
+          <td>{{ root['label'] or '—' }}
+            {% if root['id'] in offline_root_ids %}
+              <span class="badge unavailable">{{ _('Offline') }}</span>
+            {% endif %}
+          </td>
+          <td class="mono">{{ root['path'] }}
+            {% if root['id'] in offline_root_ids %}
+              <div class="library-offline-note">{{ _('Source offline. Catalog entries stay until this folder is connected again.') }}</div>
+            {% endif %}
+          </td>
           <td>{{ root['last_scanned_at'] or _('Never') }}</td>
           <td class="row-actions">
             <form method="post" action="/library/{{ root['id'] }}/scan">

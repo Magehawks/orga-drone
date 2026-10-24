@@ -17,7 +17,7 @@ Closes #
 
 - [ ] `ruff check .` passes locally
 - [ ] `mypy src` passes locally
-- [ ] `pytest` passes locally
+- [ ] `pytest` passes locally (includes `tests/test_pr_journey_smoke.py`)
 - [ ] Feature-specific regression tests added/updated
 
 Details:
@@ -50,4 +50,4 @@ Reviewer verdict:
 
 <!-- Performance improvements, future profiles, cleanup, etc. Keep them out of the current diff unless required for correctness. -->
 
-<!-- CI on PRs runs Ruff lint, MyPy type check, pytest. See docs/AGENT_WORKFLOW.md. -->
+<!-- CI on PRs runs Ruff, MyPy, unit tests, and App journey smoke. See docs/PR_E2E.md. -->

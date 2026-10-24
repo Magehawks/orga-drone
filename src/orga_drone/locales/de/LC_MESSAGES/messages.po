@@ -160,3 +160,12 @@ msgstr "Wiederholen spielt diesen In/Out-Bereich erneut ab, höchstens 8-mal, mi
 msgid "Could not save the section."
 msgstr "Der Abschnitt konnte nicht gespeichert werden."
 
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Source offline. Catalog entries stay until this folder is connected again."
+msgstr "Quelle offline. Katalogeinträge bleiben, bis dieser Ordner wieder verbunden ist."
+
+msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
+msgstr "Quelle offline. Dieser Katalogeintrag bleibt erhalten. Schließe das Laufwerk an, um die Datei wieder zu öffnen."
+

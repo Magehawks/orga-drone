@@ -26,7 +26,8 @@ stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
 export; Title Cards; basic visual transitions; basic per-clip image
-adjustment for photos and videos (brightness, contrast, saturation, warmth); read-only soundtrack
+adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear
+saturation ramp on video clips from that grade toward black and white; read-only soundtrack
 coverage on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
@@ -99,12 +100,13 @@ orga-drone.
 
 | Responsibility | Status |
 |----------------|--------|
-| Import / scan | **Available now** (full rescan per root) |
+| Import / scan | **Available now** (listable roots rescan in place; unchanged files skip metadata extraction by size + mtime; an unlistable source keeps its catalog entries and is marked offline) |
 | Metadata (EXIF, DJI, SRT, …) | **Available now** |
 | GPS | **Available now** |
 | Sessions / flows | **Available now** (heuristic) |
 | Duplicate detection | **Available now** (heuristics; no auto-delete) |
 | File management (rename, merge under roots) | **Available now** |
+| User-managed albums | **Available now** (local named references across flights and folders; one file can be in several albums; separate from Studio; no shared, cloud, or automatic albums) |
 | AI indexing | **Later** — only if justified; do not label rule-based Ask/auto-tags as AI |
 
 ### 2. Browse
@@ -119,7 +121,7 @@ orga-drone.
 | Map | **Available now** |
 | Sessions / flows in UI | **Available now** |
 | Rule-based “Ask the library” | **Available now** (not an LLM) |
-| Timeline product UI | **Later** (today: date filters and sessions, not a timeline editor) |
+| Timeline product UI | **Available now** (Browse year/month/day groups by recording date; existing filters; missing or non-calendar dates called out; page size 50/100/200). This is not the Studio editor timeline. |
 
 ### 3. Studio
 
@@ -144,6 +146,7 @@ professional video-editing knowledge.
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Video section repeat (in/out range, 1×–8×) | **Available now** (video clips; story duration grows with each play; preview and MP4 include the repeats at the same speed; not slow motion, a seamless loop, or reverse playback) |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
+| Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
@@ -219,6 +222,15 @@ See `README.md` for the detailed feature status table. In short:
 - Import and organize drone (and related) photos and videos from local folders
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
+- Browse Timeline: chronological year/month/day groups of indexed photos and
+  videos (local recording dates only; Date unknown when a date is missing or
+  not a calendar day; same filters and page size as the grid). Not the Studio
+  story timeline.
+- **Library albums:** local named collections (`albums` / `album_items`). Create,
+  rename, and delete an album; add or remove media; the same file can sit in
+  more than one album. Membership survives a rescan and stays listed when
+  the file is offline. Albums do not modify files and are not Studio projects.
+  No shared albums, cloud sync, or automatic albums.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
@@ -245,7 +257,9 @@ See `README.md` for the detailed feature status table. In short:
   Crossfade) persist per outgoing clip
   and render in preview and MP4. Photo and video clips can store a basic image adjustment
   (brightness, contrast, saturation, warmth) on that Story clip; preview
-  approximates the exported picture and is not a color-managed grade. The same clips
+  approximates the exported picture and is not a color-managed grade. A video clip
+  can also animate that saturation across a start and end time inside the clip,
+  from the current grade toward black and white. Photo and video clips
   can carry up to 8 timed text, shape, or image overlays, with Fade in, Fade out,
   or Slide in. Photo and
   video clips can also store up to 8 rectangular privacy masks (blur or
@@ -260,13 +274,23 @@ See `README.md` for the detailed feature status table. In short:
 
 ## Honest limitations
 
-- Library scan is a **full rescan** per root (not incremental).
+- A library rescan still walks each listable root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. A source that cannot be listed is not treated as a deleted
+  library: catalog entries stay and are marked offline until the folder is
+  connected and scanned again. Files removed from a folder that can still be
+  listed are dropped on the next scan. Scan never deletes files, favorites,
+  tags, notes, or Studio clips.
 - Flight sessions are **heuristic**.
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
-- There is **no** Library albums model, plugin API, or multi-OS installer
+- Browse Timeline groups indexed media by recording date. It does not edit
+  video, recognize faces, or search by meaning. Missing dates stay in
+  Date unknown.
+- Library albums are local named references only (no shared albums, cloud
+  sync, or automatic albums). There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the
   MOTW smoke test (`packaging/README.md`). About shows the installed version.
@@ -279,14 +303,14 @@ See `README.md` for the detailed feature status table. In short:
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
   headings, read-only time-proportional soundtrack coverage on that canvas,
-  basic rendered visual transitions, basic per-clip image adjustment, timed text,
+  basic rendered visual transitions, basic per-clip image adjustment, a linear
+  video saturation ramp (not a keyframe editor), timed text,
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;
   not a professional grade or NLE). A video section repeat plays an in/out
   range up to 8 times at the same speed (not slow motion, not a seamless or
-  reverse loop). Albums for
-  organizing the media library remain Later.
+  reverse loop).
 
 ## Studio MVP (local Create → Share)
 

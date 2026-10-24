@@ -1,4 +1,4 @@
-# ADR 0019: Studio video section repeat
+# ADR 0021: Studio video section repeat
 
 - **Status:** Accepted
 - **Date:** 2026-10-24
