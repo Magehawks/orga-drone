@@ -30,7 +30,7 @@ Highlights:
   publishes it only after the MOTW smoke test in `packaging/README.md`.
   About shows the installed version. An optional check, off by default, links
   to a newer published Windows release and does not download or install it.
-- Library scan progress (live phase/counters during full rescan)
+- Library scan progress (live phase/counters during a library rescan)
 - Studio workspace (Creator Studio UI: browser, preview, transport, Story track,
   soundtrack playlist, inspector, export dialog; persisted: `studio_projects` +
   `studio_clips` with editable title, order, estimated runtime, video Cut via
@@ -52,7 +52,7 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
 1. Export cancel / abort during long renders
-2. **Incremental or cheaper rescans** (clearer scan progress is available)
+2. **Cheaper directory walks** (unchanged files already skip metadata extraction by size and mtime; scan progress is available)
 3. **Broader multi-brand parsers** beyond DJI-first depth
 4. **Library albums** for organizing media sets (Studio already has multiple
    local edit projects; albums are a separate library concern)

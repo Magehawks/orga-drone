@@ -100,7 +100,7 @@ orga-drone.
 
 | Responsibility | Status |
 |----------------|--------|
-| Import / scan | **Available now** (full rescan per root; an unlistable source keeps its catalog entries and is marked offline) |
+| Import / scan | **Available now** (listable roots rescan in place; unchanged files skip metadata extraction by size + mtime; an unlistable source keeps its catalog entries and is marked offline) |
 | Metadata (EXIF, DJI, SRT, …) | **Available now** |
 | GPS | **Available now** |
 | Sessions / flows | **Available now** (heuristic) |
@@ -261,7 +261,13 @@ See `README.md` for the detailed feature status table. In short:
 
 ## Honest limitations
 
-- Library scan is a **full rescan** per root (not incremental). A source that cannot be listed is not treated as a deleted library: catalog entries stay and are marked offline until the folder is connected and scanned again. Files removed from a folder that can still be listed are dropped on the next scan.
+- A library rescan still walks each listable root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. A source that cannot be listed is not treated as a deleted
+  library: catalog entries stay and are marked offline until the folder is
+  connected and scanned again. Files removed from a folder that can still be
+  listed are dropped on the next scan. Scan never deletes files, favorites,
+  tags, notes, or Studio clips.
 - Flight sessions are **heuristic**.
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is thinner than DJI-oriented paths.

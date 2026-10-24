@@ -51,7 +51,7 @@ so they do not auto-update. See `packaging/itch/README.md`.
 | `config.py` | Settings, paths, env |
 | `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files; MOTW-safe copy of WebView2 DLLs (see `packaging/README.md`) |
 | `db/` | Schema, migrations, queries |
-| `scan/` | Full rescan of library roots |
+| `scan/` | Rescan of library roots; unchanged files skip metadata extraction |
 | `parse/` | Filenames, SRT, EXIF, generic media |
 | `group/` | Flows (FAT32 splits) + sessions |
 | `search/` | Rule-based Ask the library (DE/EN) |
@@ -89,22 +89,25 @@ Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 1. If the root cannot be listed (missing drive, disconnected share, or an OS
    error while walking it), keep the existing catalog and report the source
    offline. Do not clear `media` or user metadata.
-2. Recursively find media files under a root and read metadata
-3. Clear indexed media for that root only after that read, and only if the
-   root is still listable (**full rescan**; `media_meta` and `studio_clips`
-   kept). An empty but listable folder is a confirmed deletion.
-4. Upsert assets/media from the read
-5. Relink user meta + Studio membership + apply auto-tags
-6. Rebuild flows, then sessions
+2. Recursively find media files under a root
+3. Skip metadata extraction when the stored asset size and mtime match
+   (ADR 0020). Parse new or changed files before replacing any index rows.
+   If the source disappears during that read, keep the existing catalog.
+4. Drop index rows for this root whose paths were not found, and only if the
+   root is still listable (`media_meta` and `studio_clips` stay). An empty
+   but listable folder is a confirmed deletion.
+5. Upsert new or changed files, then relink user meta, Studio membership,
+   and auto-tags for those parsed files. A size/mtime match still refreshes
+   SRT/LRF flags and Live Photo pairing from filenames.
+6. Rebuild flows, then sessions (this still runs when every file was unchanged)
 7. Mark root scanned
 
 HTTP triggers in `app.py`: add root, scan one root, scan all.
 
 Library scans run in a **background thread** with an in-memory job
 (`src/orga_drone/scan/jobs.py`). The browser polls `GET /api/scan-jobs/{id}`
-for phase/counters (discovering / indexing / grouping). Full-rescan semantics
-are unchanged; jobs are not persisted in SQLite. At most one library scan runs
-at a time.
+for phase/counters (discovering / indexing / grouping). Jobs are not persisted
+in SQLite. At most one library scan runs at a time.
 
 ## UI surfaces
 
@@ -138,7 +141,7 @@ scope.
 Typical user flow:
 
 ```text
-add folder → full scan/parse → SQLite index → browse / map / detail
+add folder → scan/parse (unchanged files skip extraction) → SQLite index → browse / map / detail
                                          → optional Studio curation
                                          → optional rename, merge, export, dupes
 ```

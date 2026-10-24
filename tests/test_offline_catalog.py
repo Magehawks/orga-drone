@@ -101,6 +101,9 @@ def test_interrupted_read_after_listing_preserves_catalog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db, root_id, lib = _index(tmp_path)
+    # A size/mtime match skips parsing. Bump mtime so this rescan still reads
+    # the file, which is where a disappearing source must not clear the catalog.
+    (lib / "coast.jpg").touch()
     import orga_drone.scan as scan_mod
 
     real_parse = scan_mod.parse_media_file

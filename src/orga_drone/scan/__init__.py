@@ -1,10 +1,19 @@
-"""Scan library roots and index media into SQLite."""
+"""Scan library roots and index media into SQLite.
+
+A rescan still walks a listable root and rebuilds flows and sessions.
+Metadata extraction is skipped when an indexed file has the same size and
+mtime. Issue #96 does not define a content fingerprint; those filesystem
+signals are the skip check. If a root cannot be listed, or disappears
+before the index is replaced, catalog entries stay and the source is
+offline. Files, user metadata, and Studio clips are never deleted.
+"""
 
 from __future__ import annotations
 
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from orga_drone.auto_tags import apply_auto_tags_to_media
 from orga_drone.db import Database, track_from_json, track_to_json
@@ -124,6 +133,23 @@ def _emit(
     )
 
 
+def _empty_scan_counts() -> dict[str, int]:
+    return {
+        "assets": 0,
+        "videos": 0,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 0,
+        "unchanged": 0,
+        "removed": 0,
+        "unavailable": 0,
+        "offline": 0,
+        "preserved": 0,
+    }
+
+
 def root_source_available(path: Path) -> bool:
     """True when ``path`` is a directory that can be listed.
 
@@ -150,17 +176,11 @@ def offline_root_ids(db: Database) -> set[int]:
 
 def _offline_preserved() -> dict[str, int]:
     """Scan result that leaves the existing catalog rows in place."""
-    return {
-        "assets": 0,
-        "videos": 0,
-        "photos": 0,
-        "live_sidecars": 0,
-        "non_video": 0,
-        "flows": 0,
-        "sessions": 0,
-        "offline": 1,
-        "preserved": 1,
-    }
+    counts = _empty_scan_counts()
+    counts["unavailable"] = 1
+    counts["offline"] = 1
+    counts["preserved"] = 1
+    return counts
 
 
 def _finish_offline(
@@ -178,6 +198,107 @@ def _finish_offline(
     return _offline_preserved()
 
 
+def _resolved_path(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def _file_fingerprint(path: Path) -> tuple[int, float] | None:
+    """Return ``(size_bytes, st_mtime)``.
+
+    Issue #96 asks for a safe fingerprint but does not name one. Size plus
+    mtime avoids hashing large videos. It is not a content hash: a same-size
+    edit that also preserves mtime is not detected.
+    """
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (int(st.st_size), float(st.st_mtime))
+
+
+def _fingerprint_matches(
+    indexed: dict[str, Any],
+    fingerprint: tuple[int, float] | None,
+) -> bool:
+    if fingerprint is None or indexed.get("mtime") is None:
+        return False
+    size, mtime = fingerprint
+    return int(indexed["size_bytes"]) == size and float(indexed["mtime"]) == mtime
+
+
+def _reuse_unchanged_file(
+    db: Database,
+    *,
+    indexed: dict[str, Any],
+    path: Path,
+    resolved: Path,
+    by_stem: dict[str, list[Path]],
+    live_sidecars: set[Path],
+    counts: dict[str, int],
+) -> bool:
+    """Keep an indexed file when size and mtime match.
+
+    Returns False when the row must be parsed again (missing media row, or a
+    Live Photo companion that is no longer paired and needs classification).
+    """
+    kind = str(indexed["kind"])
+    in_live = resolved in live_sidecars
+    if kind == "video" and in_live:
+        db.set_asset_kind(int(indexed["asset_id"]), "live_sidecar")
+        media_id = indexed.get("media_id")
+        if media_id is not None:
+            db.delete_media_row(int(media_id))
+        counts["assets"] += 1
+        counts["live_sidecars"] += 1
+        return True
+    if kind == "live_sidecar" and not in_live:
+        return False
+    if kind in {"video", "photo"} and indexed.get("media_id") is None:
+        return False
+
+    counts["assets"] += 1
+    counts["unchanged"] += 1
+    if kind == "live_sidecar":
+        counts["live_sidecars"] += 1
+        return True
+    if kind == "other":
+        counts["non_video"] += 1
+        return True
+    if kind not in {"video", "photo"}:
+        return True
+
+    stem = indexed.get("stem_base") or path.stem
+    sibs = _siblings(str(stem), by_stem)
+    has_srt = ".srt" in sibs
+    has_lrf = ".lrf" in sibs
+    media_id = int(indexed["media_id"])
+    if has_srt != bool(indexed.get("has_srt")) or has_lrf != bool(indexed.get("has_lrf")):
+        db.set_media_sidecar_flags(media_id, has_srt=has_srt, has_lrf=has_lrf)
+    if kind == "video":
+        counts["videos"] += 1
+    else:
+        counts["photos"] += 1
+    return True
+
+
+def _must_reparse(
+    indexed: dict[str, Any],
+    resolved: Path,
+    live_sidecars: set[Path],
+) -> bool:
+    """True when a size/mtime match still needs ``parse_media_file``."""
+    kind = str(indexed["kind"])
+    in_live = resolved in live_sidecars
+    if kind == "live_sidecar" and not in_live:
+        return True
+    if kind in {"video", "photo"} and indexed.get("media_id") is None:
+        return True
+    return False
+
+
 def scan_root(
     db: Database,
     root_id: int,
@@ -186,9 +307,9 @@ def scan_root(
 ) -> dict[str, int]:
     """Index one library root.
 
-    A full rescan still replaces the index when the folder can be listed.
-    If the source is missing or disappears before that replace, existing
-    catalog rows stay. An empty but listable folder is a confirmed deletion.
+    Unchanged files skip metadata extraction. If the source is missing or
+    disappears before index rows are replaced, the existing catalog stays.
+    An empty but listable folder is a confirmed deletion.
     """
     try:
         root_path = root_path.resolve()
@@ -215,24 +336,36 @@ def scan_root(
         processed=0,
         root_id=root_id,
     )
-
     by_stem: dict[str, list[Path]] = {}
     for f in files:
         by_stem.setdefault(f.stem, []).append(f)
 
     live_sidecars = live_photo_video_sidecars(files)
+    seen_paths = {str(_resolved_path(path)) for path in files}
+    existing = db.indexed_assets_for_root(root_id)
 
-    # Read metadata before replacing the index. A drive that drops out during
-    # this read must not wipe catalog rows from the last successful scan.
+    # Parse changed files before deleting index rows. A drive that drops
+    # during this read must not wipe catalog rows from the last successful scan.
+    # Unchanged files (size + mtime) are not parsed.
     prepared: list[tuple[Path, ParsedMedia, float | None]] = []
+    reuse_paths: list[Path] = []
     try:
         for index, path in enumerate(files, start=1):
-            parsed = parse_media_file(path)
-            try:
-                mtime = path.stat().st_mtime
-            except OSError:
-                mtime = None
-            prepared.append((path, parsed, mtime))
+            resolved_key = _resolved_path(path)
+            indexed = existing.get(str(resolved_key))
+            if (
+                indexed is not None
+                and _fingerprint_matches(indexed, _file_fingerprint(path))
+                and not _must_reparse(indexed, resolved_key, live_sidecars)
+            ):
+                reuse_paths.append(path)
+            else:
+                parsed = parse_media_file(path)
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    mtime = None
+                prepared.append((path, parsed, mtime))
             _emit(
                 on_progress,
                 phase="indexing",
@@ -248,16 +381,24 @@ def scan_root(
     if not root_source_available(root_path):
         return _finish_offline(on_progress, root_id)
 
-    # Clear previous index for this root (simple full rescan for MVP)
-    db.clear_root_media(root_id)
+    removed = db.remove_root_index_except(root_id, seen_paths)
+    counts = _empty_scan_counts()
+    counts["removed"] = removed
 
-    counts = {
-        "assets": 0,
-        "videos": 0,
-        "photos": 0,
-        "live_sidecars": 0,
-        "non_video": 0,
-    }
+    for index, path in enumerate(reuse_paths, start=1):
+        resolved_key = _resolved_path(path)
+        indexed = existing.get(str(resolved_key))
+        if indexed is None:
+            continue
+        _reuse_unchanged_file(
+            db,
+            indexed=indexed,
+            path=path,
+            resolved=resolved_key,
+            by_stem=by_stem,
+            live_sidecars=live_sidecars,
+            counts=counts,
+        )
 
     for index, (path, parsed, mtime) in enumerate(prepared, start=1):
         try:
@@ -333,7 +474,7 @@ def scan_root(
             if parsed.recorded_at
             else None
         )
-        stored_path = str(parsed.path)
+        stored_path = str(resolved)
 
         media_id = db.upsert_media(
             {
@@ -358,7 +499,7 @@ def scan_root(
                 "track_json": track_to_json(parsed.track),
             }
         )
-        # Re-attach user metadata that survived clear_root_media (path / identity).
+        # Relink user metadata and Studio clips for parsed paths (new, changed, or repaired).
         db.link_media_meta_for_path(
             stored_path,
             filename=path.name,
@@ -470,5 +611,15 @@ def scan_all_roots(
             )
             continue
         counts = scan_root(db, int(root["id"]), path, on_progress=on_progress)
+        if counts.get("unavailable"):
+            results.append(
+                {
+                    "root_id": root["id"],
+                    "path": root["path"],
+                    "error": "missing",
+                    **counts,
+                }
+            )
+            continue
         results.append({"root_id": root["id"], "path": root["path"], **counts})
     return results
