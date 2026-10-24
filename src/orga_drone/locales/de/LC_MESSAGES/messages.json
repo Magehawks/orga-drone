@@ -543,5 +543,9 @@
   "Start saturation": "Start-Sättigung",
   "End saturation": "End-Sättigung",
   "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.": "Hält die Start-Sättigung bis zum Startzeitpunkt und geht dann linear zur End-Sättigung. 100 % behält die aktuelle Korrektur. 0 % ist Schwarzweiß. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
-  "Could not save the color change.": "Die Farbänderung konnte nicht gespeichert werden."
+  "Could not save the color change.": "Die Farbänderung konnte nicht gespeichert werden.",
+  "Clip": "Clip",
+  "Effects": "Effekte",
+  "Resize inspector": "Inspektorbreite ändern",
+  "Delete privacy mask": "Datenschutzmaske löschen"
 }

@@ -267,11 +267,31 @@ def test_http_masks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert saved.status_code == 200
     body = saved.json()
     assert len(body["masks"]) == 2
+    kept_id = body["masks"][0]["id"]
+    removed_id = body["masks"][1]["id"]
     page = client.get("/studio")
     assert page.status_code == 200
     assert "data-masks='" in page.text
-    assert "mphoto00001" in page.text
+    assert kept_id in page.text
+    assert removed_id in page.text
     assert "Datenschutz" in page.text
+    assert "studio-inspector-resize" in page.text
+    assert "inspector-tab-effects" in page.text
+    removed = client.patch(
+        f"/api/studio/{clip_id}/masks",
+        json={"masks": [body["masks"][0]]},
+    )
+    assert removed.status_code == 200
+    assert [row["id"] for row in removed.json()["masks"]] == [kept_id]
+    again = client.get("/studio")
+    assert kept_id in again.text
+    assert removed_id not in again.text
+    project = db.get_open_studio_project()
+    assert project is not None
+    items = db.list_studio_items(project.id)
+    export_clip = _clip_to_export_clip(db, items[0])
+    assert export_clip is not None
+    assert [mask.id for mask in export_clip.masks] == [kept_id]
     missing = client.patch("/api/studio/99999/masks", json={"masks": []})
     assert missing.status_code == 404
 
