@@ -239,7 +239,7 @@ GitHub issues and pull requests are the handoff boundary between roles. The cano
    - must return `CTO_APPROVED` before `ready-for-dev`
 4. **Developer** — main Cursor implementation agent
    - implements only the approved issue
-   - runs Ruff, MyPy and pytest and updates docs/i18n when required
+   - runs Ruff, MyPy and pytest (including the PR journey smoke; CI reports it as its own check — `docs/PR_E2E.md`) and updates docs/i18n when required
 5. **Independent Review Gate** — `implementation-reviewer`
    - reviews issue + diff + tests independently
    - read-only; never fixes its own findings
