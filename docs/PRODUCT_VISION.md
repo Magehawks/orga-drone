@@ -148,13 +148,13 @@ professional video-editing knowledge.
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
-| Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; preview approximates export) |
+| Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; select one in the preview or inspector and remove it without touching the file; preview approximates export) |
 | Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
 | Flight map overlay | **Available now** (optional per photo or video clip; route and moving marker from GPS already stored; plain background; no third-party map tiles; drag and resize inside the picture; empty state without GPS; preview and MP4) |
 | Optional telemetry HUD | **Available now** (one preset on a video clip when a sibling DJI SRT has timed cues; elapsed source time and relative altitude; speed and home distance stay unavailable; preview and MP4; not a goggles display or tracking) |
 | Slow motion on a selected video section (0.5×, 0.25×, or 1× to reset) | **Available now** (that section only; neighboring sections keep their speed; Story length updates; preview and MP4 match; source audio on a slowed section is muted; not optical-flow interpolation or fast-forward) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
-| Inspector object heading, selection vs playhead-active | **Available now** (not a professional NLE) |
+| Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the width is dragged and kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |

@@ -543,5 +543,9 @@
   "Start saturation": "Start saturation",
   "End saturation": "End saturation",
   "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.": "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.",
-  "Could not save the color change.": "Could not save the color change."
+  "Could not save the color change.": "Could not save the color change.",
+  "Clip": "Clip",
+  "Effects": "Effects",
+  "Resize inspector": "Resize inspector",
+  "Delete privacy mask": "Delete privacy mask"
 }

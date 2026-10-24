@@ -145,6 +145,7 @@
          data-mask-limit="{{ _('A clip can have up to 8 privacy masks.')|e }}"
          data-mask-blur="{{ _('Blur')|e }}"
          data-mask-pixelate="{{ _('Pixelate')|e }}"
+         data-mask-remove="{{ _('Delete privacy mask')|e }}"
          data-mask-model='{{ mask_model|tojson }}'
          data-frame-failed="{{ _('Could not save framing.')|e }}"
          data-frame-model='{{ frame_model|tojson }}'
@@ -577,6 +578,8 @@
     </div>
 
     <aside class="studio-inspector" id="studio-inspector" aria-label="{{ _('Inspector') }}">
+      <div class="studio-inspector-resize" id="studio-inspector-resize" role="separator"
+           aria-orientation="vertical" aria-label="{{ _('Resize inspector') }}"></div>
       {% set initial_remove_id = select_id if select_id else (items[0].id if items else none) %}
       <h2 class="studio-inspector-title" id="studio-inspector-heading">{{ _('Story') }}</h2>
       <div class="studio-inspector-empty" id="inspector-empty">
@@ -587,12 +590,26 @@
         <p class="hint">{{ _('Select a clip, transition, or soundtrack to edit its properties.') }}</p>
       </div>
 
-      <div class="studio-inspector-panel" id="inspector-clip" hidden>
-        <p class="studio-inspector-kind"><span data-field="kind"></span></p>
-        <p><strong data-field="filename"></strong></p>
-        <p class="meta-line" data-field="recorded"></p>
-        <p class="meta-line" data-field="duration-line"></p>
-        <div id="inspector-video-timing" hidden>
+      <div class="studio-inspector-panel" id="inspector-clip" data-tab="clip" hidden>
+        <div class="studio-inspector-tabs" role="tablist" aria-label="{{ _('Inspector') }}">
+          <button type="button" class="studio-inspector-tab is-active" role="tab"
+                  id="inspector-tab-clip" data-inspector-tab-button="clip"
+                  aria-selected="true">{{ _('Clip') }}</button>
+          <button type="button" class="studio-inspector-tab" role="tab"
+                  id="inspector-tab-image" data-inspector-tab-button="image"
+                  aria-selected="false">{{ _('Image') }}</button>
+          <button type="button" class="studio-inspector-tab" role="tab"
+                  id="inspector-tab-effects" data-inspector-tab-button="effects"
+                  aria-selected="false">{{ _('Effects') }}</button>
+          <button type="button" class="studio-inspector-tab" role="tab"
+                  id="inspector-tab-overlays" data-inspector-tab-button="overlays"
+                  aria-selected="false">{{ _('Overlays') }}</button>
+        </div>
+        <p class="studio-inspector-kind" data-inspector-tab="clip"><span data-field="kind"></span></p>
+        <p data-inspector-tab="clip"><strong data-field="filename"></strong></p>
+        <p class="meta-line" data-field="recorded" data-inspector-tab="clip"></p>
+        <p class="meta-line" data-field="duration-line" data-inspector-tab="clip"></p>
+        <div id="inspector-video-timing" data-inspector-tab="clip" hidden>
           <label class="studio-inspector-field" for="inspector-source-in">
             {{ _('Source in') }}
             <input type="number" id="inspector-source-in" min="0" step="0.1" inputmode="decimal"
@@ -611,7 +628,7 @@
           <p class="hint">{{ _('Repeat plays this in/out range again, up to 8 times, at the same speed.') }}</p>
           <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
         </div>
-        <div id="inspector-speed" hidden>
+        <div id="inspector-speed" data-inspector-tab="clip" hidden>
           <p class="studio-inspector-kind">{{ _('Speed') }}</p>
           <div class="studio-speed-choices" role="group" aria-label="{{ _('Speed') }}">
             <button type="button" class="button ghost" data-speed="1">1×</button>
@@ -630,7 +647,7 @@
           </label>
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
-        <div id="inspector-image-adjust" hidden>
+        <div id="inspector-image-adjust" data-inspector-tab="image" hidden>
           <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
           <label class="studio-inspector-field">
             <span class="studio-image-adjust-label">
@@ -667,7 +684,7 @@
           <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
-        <div id="inspector-saturation-ramp" hidden>
+        <div id="inspector-saturation-ramp" data-inspector-tab="image" hidden>
           <p class="studio-inspector-kind">{{ _('Color to black and white') }}</p>
           <label class="studio-inspector-field studio-frame-motion">
             <input type="checkbox" id="inspector-bw-enabled">
@@ -701,7 +718,7 @@
           </label>
           <p class="hint">{{ _('Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
-        <div id="inspector-overlays" hidden>
+        <div id="inspector-overlays" data-inspector-tab="overlays" hidden>
           <p class="studio-inspector-kind">{{ _('Overlays') }}</p>
           <div class="studio-overlay-actions">
             <button type="button" class="button ghost" id="overlay-add-text">{{ _('Text') }}</button>
@@ -787,7 +804,7 @@
           </div>
           <p class="hint">{{ _('Overlays stay on this Story clip between their start and end. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
-        <div id="inspector-masks" hidden>
+        <div id="inspector-masks" data-inspector-tab="effects" hidden>
           <p class="studio-inspector-kind">{{ _('Privacy') }}</p>
           <div class="studio-mask-actions">
             <button type="button" class="button ghost" id="mask-add-blur"
@@ -816,7 +833,7 @@
           </div>
           <p class="hint">{{ _('Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
-        <div id="inspector-frame" hidden>
+        <div id="inspector-frame" data-inspector-tab="image" hidden>
           <p class="studio-inspector-kind">{{ _('Framing') }}</p>
           <label class="studio-inspector-field">
             <span class="studio-image-adjust-label">
@@ -847,7 +864,7 @@
           <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
         </div>
-        <div id="inspector-map" hidden>
+        <div id="inspector-map" data-inspector-tab="overlays" hidden>
           <p class="studio-inspector-kind">{{ _('Flight map') }}</p>
           <label class="studio-inspector-field studio-frame-motion">
             <input type="checkbox" id="inspector-map-enabled">
@@ -874,7 +891,7 @@
           </div>
           <p class="hint">{{ _('Drag the map inside the picture and resize it from the corner. The route uses GPS already stored for this clip. No online map is downloaded.') }}</p>
         </div>
-        <div id="inspector-hud" hidden>
+        <div id="inspector-hud" data-inspector-tab="effects" hidden>
           <p class="studio-inspector-kind">{{ _('Telemetry HUD') }}</p>
           <p id="inspector-hud-status" class="hint"></p>
           <ul class="studio-hud-fields" id="inspector-hud-fields">
@@ -889,14 +906,14 @@
           </label>
           <p class="hint">{{ _('Shows elapsed time and altitude from the sibling SRT when those values exist. Speed and home distance are not in that file, so they stay off. Gaps stay blank. The file on disk stays unchanged. This is not a goggles display.') }}</p>
         </div>
-        <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
+        <label class="studio-inspector-field" id="inspector-photo-duration-wrap" data-inspector-tab="clip" hidden>
           <span>{{ _('Duration (s)') }}</span>
           <input type="number" id="inspector-photo-duration" class="studio-photo-duration"
                  min="0.5" max="60" step="0.1" inputmode="decimal"
                  aria-label="{{ _('Photo duration in seconds') }}">
         </label>
-        <button type="button" class="button ghost" id="inspector-photo-reset" hidden>{{ _('Reset') }}</button>
-        <form method="post" id="inspector-remove-form" class="studio-inspector-remove"
+        <button type="button" class="button ghost" id="inspector-photo-reset" data-inspector-tab="clip" hidden>{{ _('Reset') }}</button>
+        <form method="post" id="inspector-remove-form" class="studio-inspector-remove" data-inspector-tab="clip"
               {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
           <button type="submit" class="button ghost studio-icon-button"
                   {% if initial_remove_id %}formaction="/studio/{{ initial_remove_id }}/remove"{% endif %}

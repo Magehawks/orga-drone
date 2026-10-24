@@ -277,6 +277,7 @@
   const msgMaskLimit = root.dataset.maskLimit || "A clip can have up to 8 privacy masks.";
   const labelMaskBlur = root.dataset.maskBlur || "Blur";
   const labelMaskPixelate = root.dataset.maskPixelate || "Pixelate";
+  const msgMaskRemove = root.dataset.maskRemove || "Delete privacy mask";
   const msgFrameFailed = root.dataset.frameFailed || "Could not save framing.";
   const msgHudFailed = root.dataset.hudFailed || "Could not save the telemetry HUD.";
   const msgHudReady = root.dataset.hudReady || "Telemetry is available for this clip.";
@@ -1509,6 +1510,25 @@
       handle.className = "studio-mask-resize";
       handle.dataset.resize = "1";
       boxEl.appendChild(handle);
+      if (mask.id === selectedMaskId) {
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "studio-mask-remove";
+        close.dataset.maskRemove = "1";
+        close.textContent = "×";
+        close.setAttribute("aria-label", msgMaskRemove);
+        close.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        close.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          selectedMaskId = mask.id;
+          removeSelectedMask();
+        });
+        boxEl.appendChild(close);
+      }
       boxEl.addEventListener("pointerdown", (event) => onMaskPointerDown(event, clip, mask.id));
       layer.appendChild(boxEl);
     });
@@ -1516,12 +1536,14 @@
 
   function onMaskPointerDown(event, clip, maskId) {
     if (event.button != null && event.button !== 0) return;
+    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
     event.preventDefault();
     event.stopPropagation();
     const layer = previewMaskHandles;
     if (!layer) return;
     selectedMaskId = maskId;
     fillMaskInspector(clip);
+    if (event.currentTarget && event.currentTarget.focus) event.currentTarget.focus();
     const masks = readMasks(clip);
     const startMask = masks.find((item) => item.id === maskId);
     if (!startMask) return;
@@ -1607,23 +1629,34 @@
       selectedMaskId = masks.length ? masks[0].id : null;
     }
     list.replaceChildren();
-    masks.forEach((mask) => {
+    masks.forEach((mask, index) => {
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
       button.className = "button ghost";
-      button.textContent = maskEffectLabel(mask.effect);
+      button.textContent = `${maskEffectLabel(mask.effect)} ${index + 1}`;
       if (mask.id === selectedMaskId) button.setAttribute("aria-current", "true");
       button.addEventListener("click", () => {
         selectedMaskId = mask.id;
         fillMaskInspector(clip);
         drawPrivacyMasks();
       });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button ghost studio-mask-list-remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", msgMaskRemove);
+      remove.addEventListener("click", () => {
+        selectedMaskId = mask.id;
+        removeSelectedMask();
+      });
       item.appendChild(button);
+      item.appendChild(remove);
       list.appendChild(item);
     });
     const current = masks.find((item) => item.id === selectedMaskId) || null;
     editor.hidden = !current;
+    refreshInspectorTabMarks(clip);
     if (!current || !effect || !strength) return;
     if (document.activeElement !== effect) effect.value = current.effect;
     if (document.activeElement !== strength) strength.value = String(current.strength);
@@ -1666,6 +1699,132 @@
     fillMaskInspector(clip);
     drawPrivacyMasks();
     queueMaskSave(clip);
+  }
+
+  const inspectorTabs = ["clip", "image", "effects", "overlays"];
+
+  function setInspectorTab(name) {
+    const tab = inspectorTabs.includes(name) ? name : "clip";
+    const panel = document.getElementById("inspector-clip");
+    if (panel) panel.dataset.tab = tab;
+    document.querySelectorAll("[data-inspector-tab-button]").forEach((button) => {
+      const on = button.dataset.inspectorTabButton === tab;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    try {
+      sessionStorage.setItem("orga-drone.studio.inspectorTab", tab);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function refreshInspectorTabMarks(clip) {
+    const image = document.getElementById("inspector-tab-image");
+    const effects = document.getElementById("inspector-tab-effects");
+    const overlays = document.getElementById("inspector-tab-overlays");
+    if (!clip || !image || !effects || !overlays) return;
+    const adjust = readImageAdjust(clip);
+    const ramp = readSaturationRamp(clip);
+    const frame = readFrame(clip);
+    const frameActive =
+      frame.zoom_start > 1.001 ||
+      frame.zoom_end > 1.001 ||
+      Math.abs(frame.x_start - 0.5) > 0.001 ||
+      Math.abs(frame.y_start - 0.5) > 0.001 ||
+      Math.abs(frame.x_end - 0.5) > 0.001 ||
+      Math.abs(frame.y_end - 0.5) > 0.001;
+    image.classList.toggle(
+      "has-settings",
+      !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive
+    );
+    const hud = readHud(clip);
+    effects.classList.toggle("has-settings", readMasks(clip).length > 0 || hud.enabled === true);
+    const map = readMap(clip);
+    overlays.classList.toggle(
+      "has-settings",
+      readOverlays(clip).length > 0 || map.enabled === true
+    );
+  }
+
+  function bindInspectorChrome() {
+    const workspace = document.querySelector(".studio-workspace");
+    const handle = document.getElementById("studio-inspector-resize");
+    const inspector = document.getElementById("studio-inspector");
+    if (workspace) {
+      try {
+        const saved = Number(localStorage.getItem("orga-drone.studio.inspectorWidth"));
+        if (Number.isFinite(saved)) {
+          const width = Math.round(Math.max(240, Math.min(520, saved)));
+          workspace.style.setProperty("--studio-inspector-width", `${width}px`);
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (handle && workspace && inspector) {
+      handle.addEventListener("pointerdown", (event) => {
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        if (event.button != null && event.button !== 0) return;
+        event.preventDefault();
+        handle.classList.add("is-dragging");
+        const move = (ev) => {
+          const rect = workspace.getBoundingClientRect();
+          const max = Math.min(520, Math.max(280, rect.width * 0.46));
+          const width = Math.round(Math.min(max, Math.max(240, rect.right - ev.clientX)));
+          workspace.style.setProperty("--studio-inspector-width", `${width}px`);
+        };
+        const up = () => {
+          handle.classList.remove("is-dragging");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+          const raw = workspace.style.getPropertyValue("--studio-inspector-width");
+          const width = Number.parseFloat(raw);
+          if (Number.isFinite(width)) {
+            try {
+              localStorage.setItem("orga-drone.studio.inspectorWidth", String(Math.round(width)));
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          drawPrivacyMasks();
+          drawFlightMap(resolveAt(state.projectTimeS));
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        move(event);
+      });
+    }
+    document.querySelectorAll("[data-inspector-tab-button]").forEach((button) => {
+      button.addEventListener("click", () => setInspectorTab(button.dataset.inspectorTabButton));
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      const active = document.activeElement;
+      const tag = active && active.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (active && active.isContentEditable)
+      ) {
+        return;
+      }
+      const clipPanel = document.getElementById("inspector-clip");
+      const masksPanel = document.getElementById("inspector-masks");
+      if (!clipPanel || clipPanel.hidden || !masksPanel || masksPanel.hidden || !selectedMaskId) {
+        return;
+      }
+      const inMaskUi =
+        active &&
+        active.closest &&
+        (active.closest("#studio-preview-mask-handles") ||
+          active.closest("#inspector-masks") ||
+          active.closest("#mask-list"));
+      if (clipPanel.dataset.tab !== "effects" && !inMaskUi) return;
+      event.preventDefault();
+      removeSelectedMask();
+    });
   }
 
   function removeSelectedMask() {
@@ -3182,6 +3341,14 @@
       if (hudWrap) hudWrap.hidden = !isVideo;
       if (isVideo) fillHud(clip);
       setClipRemoveAction(removeForm, clip.dataset.studioId);
+      let storedTab = "clip";
+      try {
+        storedTab = sessionStorage.getItem("orga-drone.studio.inspectorTab") || "clip";
+      } catch (_) {
+        storedTab = "clip";
+      }
+      setInspectorTab(storedTab);
+      refreshInspectorTabMarks(clip);
     }
 
     if (movePlayhead && !playheadTouchesClip(clip)) {
@@ -4711,6 +4878,7 @@
     addPrivacyMask("pixelate");
   });
   document.getElementById("mask-remove")?.addEventListener("click", () => removeSelectedMask());
+  bindInspectorChrome();
   document.getElementById("mask-effect")?.addEventListener("change", (event) => {
     replaceSelectedMask({ effect: event.target.value });
   });
