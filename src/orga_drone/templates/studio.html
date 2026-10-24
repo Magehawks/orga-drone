@@ -226,6 +226,8 @@
   {% if studio_mode == 'editor' and project %}
   <div class="studio-workspace">
     <aside class="studio-browser" aria-label="{{ _('Media browser') }}">
+      <div class="studio-browser-resize" id="studio-browser-resize" role="separator"
+           aria-orientation="vertical" aria-label="{{ _('Resize media browser') }}"></div>
       <div class="studio-browser-tabs" role="tablist">
         <button type="button" class="studio-browser-tab is-active" role="tab"
                 data-browser-tab="story" aria-selected="true">{{ _('Story') }}</button>
@@ -418,6 +420,8 @@
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">
+        <div class="studio-story-resize" id="studio-story-resize" role="separator"
+             aria-orientation="horizontal" aria-label="{{ _('Resize tracks') }}"></div>
         <div class="studio-timeline-toolbar" role="toolbar" aria-label="{{ _('Timeline') }}">
           <button type="button" class="studio-transport-btn" id="studio-timeline-fit"
                   data-timeline-zoom="fit"
