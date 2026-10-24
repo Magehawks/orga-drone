@@ -1234,7 +1234,9 @@ class Database:
         if has_gps is True:
             where.append("m.latitude IS NOT NULL AND m.longitude IS NOT NULL")
         if has_gps is False:
-            where.append("m.latitude IS NULL OR m.longitude IS NULL")
+            # Parentheses required: AND binds tighter than OR, so an ungrouped
+            # predicate lets rows skip kind, drone, and session collapse.
+            where.append("(m.latitude IS NULL OR m.longitude IS NULL)")
         if flows_only is True:
             where.append("f.clip_count > 1")
         if flows_only is False:
