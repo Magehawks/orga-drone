@@ -74,6 +74,7 @@ def effective_seconds(
     source_in_s: float | None = None,
     source_out_s: float | None = None,
     card_duration_s: float | None = None,
+    section_repeats: int = 1,
 ) -> float | None:
     if kind == "title_card":
         from orga_drone.studio_title_card import DEFAULT_DURATION_S, clamp_card_duration
@@ -97,7 +98,9 @@ def effective_seconds(
         )
         if rang is None:
             return None
-        return rang.duration_s
+        from orga_drone.studio_cut import repeated_duration_s
+
+        return repeated_duration_s(rang.duration_s, section_repeats)
     return None
 
 

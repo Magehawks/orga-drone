@@ -151,6 +151,15 @@ msgstr "Or add a Title Card to start with a heading."
 msgid "Title Card export needs a system sans font."
 msgstr "Title Card export needs a system sans font."
 
+msgid "Repeat"
+msgstr "Repeat"
+
+msgid "Repeat plays this in/out range again, up to 8 times, at the same speed."
+msgstr "Repeat plays this in/out range again, up to 8 times, at the same speed."
+
+msgid "Could not save the section."
+msgstr "Could not save the section."
+
 msgid "Offline"
 msgstr "Offline"
 

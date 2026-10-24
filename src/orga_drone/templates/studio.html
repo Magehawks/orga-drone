@@ -129,6 +129,7 @@
          data-story-summary="{{ _('{count} items · {duration}')|e }}"
          data-source-in="{{ _('Source in')|e }}"
          data-source-out="{{ _('Source out')|e }}"
+         data-section-failed="{{ _('Could not save the section.')|e }}"
          data-in-story="{{ _('In story')|e }}"
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
@@ -479,6 +480,7 @@
                   data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
                   data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
+                  data-section-repeats="{{ row.section_repeats }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
                   data-transition-type="{{ row.stored_transition }}"
                   data-transition-duration="{{ row.stored_transition_duration_s if row.stored_transition_duration_s is not none else '' }}"
@@ -566,8 +568,22 @@
         <p class="meta-line" data-field="recorded"></p>
         <p class="meta-line" data-field="duration-line"></p>
         <div id="inspector-video-timing" hidden>
-          <p class="meta-line" data-field="source-in"></p>
-          <p class="meta-line" data-field="source-out"></p>
+          <label class="studio-inspector-field" for="inspector-source-in">
+            {{ _('Source in') }}
+            <input type="number" id="inspector-source-in" min="0" step="0.1" inputmode="decimal"
+                   aria-label="{{ _('Source in') }}">
+          </label>
+          <label class="studio-inspector-field" for="inspector-source-out">
+            {{ _('Source out') }}
+            <input type="number" id="inspector-source-out" min="0" step="0.1" inputmode="decimal"
+                   aria-label="{{ _('Source out') }}">
+          </label>
+          <label class="studio-inspector-field" for="inspector-section-repeats">
+            {{ _('Repeat') }}
+            <input type="number" id="inspector-section-repeats" min="1" max="8" step="1" value="1"
+                   inputmode="numeric" aria-label="{{ _('Repeat') }}">
+          </label>
+          <p class="hint">{{ _('Repeat plays this in/out range again, up to 8 times, at the same speed.') }}</p>
           <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
         </div>
         <div id="inspector-image-adjust" hidden>

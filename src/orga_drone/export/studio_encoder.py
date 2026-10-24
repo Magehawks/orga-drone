@@ -20,6 +20,7 @@ from typing import Any, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
 from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
 
@@ -499,6 +500,39 @@ def _watch_export_cancel(event: threading.Event, proc: subprocess.Popen[str]) ->
             return
 
 
+def section_repeat_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...]:
+    """Expand a video into one encode per play of its in/out range.
+
+    One repeat returns the clip unchanged, so ordinary exports stay on the
+    existing path. Each extra play is the same source span at the same speed.
+    Fades stay on the first and last play. Joins between plays are cuts.
+    """
+    repeats = int(clip.section_repeats or 1)
+    if clip.kind != "video" or repeats <= 1:
+        return (clip,)
+    repeats = max(1, min(MAX_SECTION_REPEATS, repeats))
+    start = max(0.0, float(clip.source_start_s))
+    if clip.source_end_s is not None:
+        cycle = max(0.0, float(clip.source_end_s) - start)
+    else:
+        cycle = max(0.0, float(clip.duration_s) / repeats)
+    if cycle <= 0:
+        return (clip,)
+    slices: list[StudioExportClip] = []
+    for index in range(repeats):
+        slices.append(
+            replace(
+                clip,
+                duration_s=cycle,
+                section_repeats=1,
+                exact_span=True,
+                fade_in_s=clip.fade_in_s if index == 0 else 0.0,
+                fade_out_s=clip.fade_out_s if index == repeats - 1 else 0.0,
+            )
+        )
+    return tuple(slices)
+
+
 def _clip_progress_label(clip: StudioExportClip) -> str:
     if clip.label:
         return clip.label
@@ -928,12 +962,34 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
     ) -> None:
+        slices = section_repeat_slices(clip)
+        if len(slices) > 1:
+            parts: list[Path] = []
+            for index, slice_clip in enumerate(slices):
+                _raise_if_cancelled()
+                part = out.parent / f"{out.stem}-loop-{index:02d}{out.suffix}"
+                self._render_video(
+                    ffmpeg,
+                    slice_clip,
+                    part,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                parts.append(part)
+            self._concat(ffmpeg, parts, out)
+            return
         start = max(0.0, float(clip.source_start_s))
         if clip.source_end_s is not None:
             end = float(clip.source_end_s)
-            dur = max(0.1, end - start)
+            span = end - start
+            dur = span if clip.exact_span else max(0.1, span)
         else:
-            dur = max(0.1, float(clip.duration_s))
+            dur = float(clip.duration_s) if clip.exact_span else max(0.1, float(clip.duration_s))
+        if clip.exact_span:
+            dur = max(0.05, dur)
         on_time = self._progress_cb(
             on_progress,
             clip=clip,

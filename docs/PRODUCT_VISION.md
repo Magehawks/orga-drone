@@ -144,6 +144,7 @@ professional video-editing knowledge.
 | Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
+| Video section repeat (in/out range, 1×–8×) | **Available now** (video clips; story duration grows with each play; preview and MP4 include the repeats at the same speed; not slow motion, a seamless loop, or reverse playback) |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
@@ -242,7 +243,9 @@ See `README.md` for the detailed feature status table. In short:
   UI state, not project data). Selected Story objects are distinct from the
   playhead-active clip; transition chips show Cut / Fade / Crossfade and name
   neighbors in the Inspector. Persisted today: editable project title;
-  order; estimated runtime; optional video source start/end after Cut. Story
+  order; estimated runtime; optional video source start/end after Cut. A video
+  clip can play that in/out range again, up to 8 times, at the same speed;
+  the Story length, preview, and MP4 include each play. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
   export with configurable resolution (desktop), including photo-only stories at
   720/1080. Title Cards persist as generated
@@ -305,7 +308,9 @@ See `README.md` for the detailed feature status table. In short:
   shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
   the clip; not tracking), and per-clip zoom and pan (1×–3×, optional start/end
   motion; preview matches the exported frame; not tracking or a keyframe editor;
-  not a professional grade or NLE).
+  not a professional grade or NLE). A video section repeat plays an in/out
+  range up to 8 times at the same speed (not slow motion, not a seamless or
+  reverse loop).
 
 ## Studio MVP (local Create → Share)
 

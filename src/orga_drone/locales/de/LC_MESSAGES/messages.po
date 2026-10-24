@@ -151,6 +151,15 @@ msgstr "Oder füge eine Titelseite als Überschrift hinzu."
 msgid "Title Card export needs a system sans font."
 msgstr "Der Titelseiten-Export braucht eine System-Sans-Schrift."
 
+msgid "Repeat"
+msgstr "Wiederholen"
+
+msgid "Repeat plays this in/out range again, up to 8 times, at the same speed."
+msgstr "Wiederholen spielt diesen In/Out-Bereich erneut ab, höchstens 8-mal, mit gleicher Geschwindigkeit."
+
+msgid "Could not save the section."
+msgstr "Der Abschnitt konnte nicht gespeichert werden."
+
 msgid "Offline"
 msgstr "Offline"
 

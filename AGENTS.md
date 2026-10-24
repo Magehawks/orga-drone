@@ -59,7 +59,7 @@ Before implementing a feature, verify it improves this journey (see
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime; offline roots keep catalog entries), metadata, GPS, sessions/flows, dupes, user-managed albums |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio; chronological Timeline (year/month/day by recording date; missing dates called out; not the Studio editor timeline) |
-| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
+| Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); video section repeat (in/out range, 1×–8×, same speed) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
 ## Available now (implemented)
@@ -77,7 +77,9 @@ The application helps users:
 - collect selected media in a **Studio** workspace (non-destructive
   `studio_projects` / `studio_clips`; multiple local edit projects with
   browser/switcher; editable persisted title; manual order and
-  estimated runtime; simple video Cut via source start/end; Creator Studio UI
+  estimated runtime; simple video Cut via source start/end; video section repeat
+  (in/out range played 1×–8× at the same speed; story duration, preview, and MP4
+  include each play); Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
   with the playhead; time-based Story canvas (Fit to story / zoom; shared
   ruler/playhead mapping); labeled transition overlays and Inspector headings
@@ -136,6 +138,8 @@ The application helps users:
   image overlays, rectangular blur/pixelate privacy masks (not tracking or a
   legal anonymization guarantee), and per-clip zoom and pan (not tracking or a
   keyframe editor; not a professional effects editor, color grade, or NLE).
+  A video clip can repeat its in/out range up to 8 times at the same speed
+  (not slow motion, not a seamless or reverse loop).
 
 ## Product principles
 

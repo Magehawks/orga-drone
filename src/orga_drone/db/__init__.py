@@ -3227,6 +3227,101 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_section(
+        self,
+        studio_item_id: int,
+        *,
+        source_in_s: float,
+        source_out_s: float,
+        repeats: object,
+    ) -> StudioClip:
+        """Set a video in/out range and how many times that range plays.
+
+        Source files are not modified. A full-media range is stored as NULL,
+        matching Cut. Repeat count 1 omits the effect key. Raises ``ValueError``
+        on bad input.
+        """
+        from orga_drone.studio_cut import (
+            MIN_SEGMENT_S,
+            dump_section_repeats,
+            parse_section_repeats,
+            resolve_source_range,
+        )
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        count = parse_section_repeats(repeats)
+        if isinstance(source_in_s, bool) or not isinstance(source_in_s, (int, float)):
+            raise ValueError("source in must be a number")
+        if isinstance(source_out_s, bool) or not isinstance(source_out_s, (int, float)):
+            raise ValueError("source out must be a number")
+        start = float(source_in_s)
+        end = float(source_out_s)
+        if start < 0 or end <= start:
+            raise ValueError("source out must be after source in")
+        if end - start < MIN_SEGMENT_S:
+            raise ValueError("section is too short")
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id, m.duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("section repeat only applies to videos")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("section repeat only applies to videos")
+            media_duration = (
+                float(row["duration_s"]) if row["duration_s"] is not None else None
+            )
+            rang = resolve_source_range(
+                source_in_s=start,
+                source_out_s=end,
+                media_duration_s=media_duration,
+            )
+            if rang is None or rang.duration_s < MIN_SEGMENT_S:
+                raise ValueError("section is outside the video")
+            start_s = rang.source_in_s
+            end_s = rang.source_out_s
+            store_start: float | None = start_s
+            store_end: float | None = end_s
+            if (
+                media_duration is not None
+                and start_s <= 1e-4
+                and end_s >= media_duration - 1e-3
+            ):
+                store_start = None
+                store_end = None
+            blob = dump_section_repeats(str(row["effect_settings"] or ""), count)
+            conn.execute(
+                """UPDATE studio_clips
+                   SET source_start = ?, source_end = ?, effect_settings = ?
+                   WHERE id = ?""",
+                (store_start, store_end, blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def cut_studio_video_item(
         self,
         studio_item_id: int,

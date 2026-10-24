@@ -46,3 +46,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0018](0018-studio-framing.md) | Studio per-clip zoom and pan | Accepted |
 | [0019](0019-studio-saturation-ramp.md) | Studio video saturation ramp | Accepted |
 | [0020](0020-incremental-rescan-fingerprint.md) | Skip unchanged media on rescan | Accepted |
+| [0021](0021-studio-section-repeat.md) | Studio video section repeat | Accepted |
