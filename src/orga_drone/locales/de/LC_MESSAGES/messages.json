@@ -462,5 +462,11 @@
   "Start": "Start",
   "End": "Ende",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Ziehen Sie die Vorschau, um den Ausschnitt zu verschieben. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau entspricht dem exportierten Bild.",
-  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden."
+  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden.",
+  "Color to black and white": "Farbe zu Schwarzweiß",
+  "Animate saturation": "Sättigung animieren",
+  "Start saturation": "Start-Sättigung",
+  "End saturation": "End-Sättigung",
+  "Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.": "Hält die Start-Sättigung bis zum Startzeitpunkt und geht dann linear zur End-Sättigung. 100 % behält die aktuelle Korrektur. 0 % ist Schwarzweiß. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
+  "Could not save the color change.": "Die Farbänderung konnte nicht gespeichert werden."
 }

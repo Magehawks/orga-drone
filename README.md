@@ -49,7 +49,8 @@ People fly drones for experiences, not for managing files. Footage piles up acro
   title; simple video Cut (source start/end); Creator Studio UI with synced
   Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
   Crossfade between Story items; basic per-clip image adjustment for photos and videos
-  (brightness, contrast, saturation, warmth); timed text, shape, and image overlays
+  (brightness, contrast, saturation, warmth); a linear saturation ramp on video clips
+  from that grade toward black and white; timed text, shape, and image overlays
   with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy
   masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan
   (1×–3×, optional start/end motion); local MP4 export with
@@ -95,6 +96,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 | Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
 | Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
 | Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
+| Studio saturation ramp | Available | Per video clip: linear saturation from the current grade toward black and white between a start and end time; preview approximates export; source files stay unchanged |
 | Studio overlays | Available | Up to 8 text, arrow, circle, rectangle, or PNG/JPG overlays per photo or video clip; clip-relative timing; Fade in, Fade out, or Slide in; preview approximates export |
 | Studio privacy masks | Available | Up to 8 rectangular blur or pixelate masks per photo or video clip; fixed for the whole clip; preview approximates export; source files stay unchanged |
 | Studio framing | Available | Per photo or video clip: zoom 1×–3× and pan; optional start/end motion across the clip; preview matches the exported frame; source files stay unchanged |
