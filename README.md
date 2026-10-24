@@ -37,7 +37,7 @@ People fly drones for experiences, not for managing files. Footage piles up acro
 ## What Orga Drone currently provides
 
 - Index one or more local folders into a single library (SQLite index; media files stay on disk)
-- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio)
+- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio; Timeline groups the same index by recording date)
 - Index DJI media plus everyday vacation/hobby photos and videos (phones, cameras, action cams — no `DJI_` filename required)
 - Extract GPS and related metadata from DJI `.SRT` telemetry, photo EXIF, and best-effort video container tags
 - Group FAT32 **split clips** into a **flow**, and heuristically group a logical **flight session** (takeoff → landing)
@@ -77,7 +77,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio |
+| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio; Timeline groups photos and videos by recording date |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
 | iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
@@ -204,7 +204,7 @@ python -m orga_drone
 
 ### Browse, Ask the library, and search API
 
-On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date.
+On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date. **Timeline** (next to Grid and List) groups the same filtered photos and videos by recording year, month, and day. Dates that are missing or not a calendar day appear under **Date unknown**. It does not edit a story; Studio keeps its own story timeline.
 
 **Ask the library** accepts short German or English phrases. The server parses them with **fixed rules** (kind, month/year, place keywords, favorites, and similar) and combines the result with explicit filters. It is **not** an LLM and does not perform semantic embedding search.
 

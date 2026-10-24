@@ -459,5 +459,22 @@
   "Start": "Start",
   "End": "Ende",
   "Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.": "Ziehen Sie die Vorschau, um den Ausschnitt zu verschieben. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau entspricht dem exportierten Bild.",
-  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden."
+  "Could not save framing.": "Bildausschnitt konnte nicht gespeichert werden.",
+  "Recording dates": "Aufnahmedaten",
+  "All dates": "Alle Daten",
+  "Date unknown": "Datum unbekannt",
+  "Timeline follows the recording date.": "Die Zeitleiste folgt dem Aufnahmedatum.",
+  "This recording date is missing or not a calendar day.": "Das Aufnahmedatum fehlt oder ist kein Kalendertag.",
+  "January": "Januar",
+  "February": "Februar",
+  "March": "März",
+  "April": "April",
+  "May": "Mai",
+  "June": "Juni",
+  "July": "Juli",
+  "August": "August",
+  "September": "September",
+  "October": "Oktober",
+  "November": "November",
+  "December": "Dezember"
 }

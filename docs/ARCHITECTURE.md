@@ -106,6 +106,9 @@ at a time.
 
 Templates under `src/orga_drone/templates/` (dashboard/browse, library,
 detail, map, duplicates, studio, …). Static assets under `src/orga_drone/static/`.
+Browse Timeline (`browse_timeline.py`, `view=timeline`) groups the same indexed
+photos and videos by recording date. It reuses Browse filters and pagination
+and does not call the Studio story timeline.
 Studio page: Jinja layout + `static/js/studio.js` (project browser/switcher,
 project title, reorder/duration/cut APIs; `GET /studio` restores the last-opened
 project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4

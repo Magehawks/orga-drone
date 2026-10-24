@@ -57,7 +57,7 @@ Before implementing a feature, verify it improves this journey (see
 | Area | Question | Today (honest) |
 |------|----------|----------------|
 | Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
-| Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
+| Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio; chronological Timeline (year/month/day by recording date; missing dates called out; not the Studio editor timeline) |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
 
@@ -69,7 +69,7 @@ The application helps users:
 - extract DJI and standard media metadata (EXIF, filenames, SRT where present)
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
-- filter, browse (page size 50/100/200; bulk add of the current page to Studio), and detect likely duplicate files (heuristics; no auto-delete)
+- filter, browse (page size 50/100/200; bulk add of the current page to Studio; chronological Timeline grouped by recording date), and detect likely duplicate files (heuristics; no auto-delete)
 - collect selected media in a **Studio** workspace (non-destructive
   `studio_projects` / `studio_clips`; multiple local edit projects with
   browser/switcher; editable persisted title; manual order and
@@ -100,6 +100,9 @@ The application helps users:
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN),
   not an LLM or semantic search system.
+- Browse Timeline groups the local index by recording date (year, month, day).
+  Missing or non-calendar dates stay in a Date unknown group. It is not the
+  Studio story timeline, and it does not recognize faces or search by meaning.
 - There is **no** Library albums model, plugin API, or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
   GitHub Actions; a maintainer publishes the GitHub Release only after the

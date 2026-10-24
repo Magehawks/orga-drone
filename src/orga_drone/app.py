@@ -19,6 +19,11 @@ from orga_drone import __version__
 from orga_drone.app_prefs import get_check_updates, set_check_updates
 from orga_drone.config import settings
 from orga_drone.updates import OFFICIAL_DOWNLOAD_URL, UpdateChecker, installed_version
+from orga_drone.browse_timeline import (
+    build_timeline_nav,
+    group_timeline_page,
+    parse_timeline_focus,
+)
 from orga_drone.db import Database, make_identity_key, parse_tags, track_from_json
 from orga_drone.dupes import (
     DURATION_TOLERANCE_S,
@@ -257,7 +262,7 @@ def create_app() -> FastAPI:
 
     def view_from_request(request: Request, override: str | None = None) -> str:
         raw = (override or request.cookies.get("view") or "grid").lower()
-        return raw if raw in {"grid", "list"} else "grid"
+        return raw if raw in {"grid", "list", "timeline"} else "grid"
 
     def theme_from_request(request: Request) -> ThemePrefs:
         stored = load_theme_file(settings.theme_path)
@@ -386,6 +391,7 @@ def create_app() -> FastAPI:
         "view",
         "page",
         "page_size",
+        "tl",
     )
 
     def browse_detail_qs_from_request(request: Request) -> str:
@@ -604,6 +610,7 @@ def create_app() -> FastAPI:
         view: str | None = None,
         page: int = Query(1, ge=1),
         page_size: str | None = None,
+        tl: str | None = None,
         msg: str | None = None,
         added: int | None = None,
         skipped: int | None = None,
@@ -628,6 +635,9 @@ def create_app() -> FastAPI:
             else None
         )
         current_view = view_from_request(request, view)
+        focus = parse_timeline_focus(tl) if current_view == "timeline" else None
+        recorded_span = focus.token if focus is not None else None
+        timeline_order = "asc" if order.lower() == "asc" else "desc"
         resolved_kind = search.kind
         resolved_q = search.effective_q()
         resolved_from = search.date_from
@@ -645,6 +655,8 @@ def create_app() -> FastAPI:
             "q": resolved_q,
             "date_from": resolved_from,
             "date_to": resolved_to,
+            "recorded_span": recorded_span,
+            "date_order": timeline_order if current_view == "timeline" else None,
         }
         total = db.count_media(
             drone=list_kwargs["drone"],
@@ -657,6 +669,7 @@ def create_app() -> FastAPI:
             q=list_kwargs["q"],
             date_from=list_kwargs["date_from"],
             date_to=list_kwargs["date_to"],
+            recorded_span=list_kwargs["recorded_span"],
         )
         size = browse_resolve_page_size(page_size)
         pagination = browse_pagination(total=total, page=page, page_size=size)
@@ -692,7 +705,37 @@ def create_app() -> FastAPI:
             "ask": ask_text,
             "view": current_view,
             "page_size": str(pagination["page_size"]),
+            "tl": recorded_span or "",
         }
+
+        def timeline_href(token: str | None) -> str:
+            payload = dict(filters)
+            payload["view"] = "timeline"
+            payload["tl"] = token or ""
+            return "/browse?" + browse_filter_query(payload)
+
+        timeline_nav = None
+        timeline_groups: list[Any] = []
+        if current_view == "timeline":
+            day_counts = db.timeline_day_counts(
+                drone=list_kwargs["drone"],
+                kind=list_kwargs["kind"],
+                source=list_kwargs["source"],
+                has_gps=list_kwargs["has_gps"],
+                flows_only=list_kwargs["flows_only"],
+                sessions_only=list_kwargs["sessions_only"],
+                favorite=list_kwargs["favorite"],
+                q=list_kwargs["q"],
+                date_from=list_kwargs["date_from"],
+                date_to=list_kwargs["date_to"],
+            )
+            timeline_nav = build_timeline_nav(
+                day_counts,
+                active=focus,
+                order=timeline_order,
+                href_for=timeline_href,
+            )
+            timeline_groups = group_timeline_page(items, href_for=timeline_href)
         response = render(
             request,
             "index.html",
@@ -716,8 +759,10 @@ def create_app() -> FastAPI:
             flash_msg=msg,
             flash_added=added,
             flash_skipped=skipped,
+            timeline_nav=timeline_nav,
+            timeline_groups=timeline_groups,
         )
-        if view in {"grid", "list"}:
+        if view in {"grid", "list", "timeline"}:
             response.set_cookie("view", view, max_age=365 * 24 * 3600)
         return response
 

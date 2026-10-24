@@ -20,7 +20,7 @@ See `README.md` → “Current feature status” and `docs/PRODUCT_VISION.md`.
 
 Highlights:
 
-- Local folder library + SQLite index + browse
+- Local folder library + SQLite index + browse, including a chronological Timeline (recording-date groups; not the Studio story timeline)
 - DJI-oriented parsing (strongest path) + thinner generic media support
 - Flows, heuristic sessions, maps, rule-based Ask the library
 - User meta (stars/favorites/tags/notes), rename/merge, spot GeoJSON
