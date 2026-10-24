@@ -148,6 +148,11 @@
          data-mask-model='{{ mask_model|tojson }}'
          data-frame-failed="{{ _('Could not save framing.')|e }}"
          data-frame-model='{{ frame_model|tojson }}'
+         data-hud-failed="{{ _('Could not save the telemetry HUD.')|e }}"
+         data-hud-ready="{{ _('Telemetry is available for this clip.')|e }}"
+         data-hud-missing="{{ _('No telemetry for this clip.')|e }}"
+         data-hud-available="{{ _('Available')|e }}"
+         data-hud-unavailable="{{ _('Unavailable')|e }}"
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -343,6 +348,8 @@
             <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-b-title"></p>
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
           </div>
+          <div id="studio-preview-hud-b" class="studio-preview-hud is-layer-b" hidden></div>
+          <div id="studio-preview-hud" class="studio-preview-hud" hidden></div>
           <div id="studio-preview-fade-black" class="studio-preview-fade-black" hidden aria-hidden="true"></div>
           <div id="studio-preview-annotations-b" class="studio-preview-annotations is-layer-b" hidden></div>
           <div id="studio-preview-annotations" class="studio-preview-annotations" hidden></div>
@@ -505,6 +512,7 @@
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-frame='{{ row.frame|tojson }}'
+                  data-hud='{{ row.hud|tojson|replace("'", "\\u0027") }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -823,6 +831,21 @@
           </div>
           <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
+        </div>
+        <div id="inspector-hud" hidden>
+          <p class="studio-inspector-kind">{{ _('Telemetry HUD') }}</p>
+          <p id="inspector-hud-status" class="hint"></p>
+          <ul class="studio-hud-fields" id="inspector-hud-fields">
+            <li><span>{{ _('Elapsed time') }}</span> <span data-hud-field="elapsed"></span></li>
+            <li><span>{{ _('Altitude') }}</span> <span data-hud-field="altitude"></span></li>
+            <li><span>{{ _('Speed') }}</span> <span data-hud-field="speed"></span></li>
+            <li><span>{{ _('Home distance') }}</span> <span data-hud-field="home_distance"></span></li>
+          </ul>
+          <label class="studio-inspector-field studio-frame-motion">
+            <input type="checkbox" id="inspector-hud-enabled">
+            <span>{{ _('Show HUD') }}</span>
+          </label>
+          <p class="hint">{{ _('Shows elapsed time and altitude from the sibling SRT when those values exist. Speed and home distance are not in that file, so they stay off. Gaps stay blank. The file on disk stays unchanged. This is not a goggles display.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

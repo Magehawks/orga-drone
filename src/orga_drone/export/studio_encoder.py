@@ -143,6 +143,62 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     )
 
 
+def _hud_filter_text(clip: StudioExportClip, height: int) -> str:
+    """Elapsed time and altitude for a video whose HUD preset is on.
+
+    An empty string leaves the existing grade, mask, and overlay chain alone.
+    """
+    if clip.kind != "video" or not clip.hud_enabled:
+        return ""
+    from orga_drone.studio_hud import ffmpeg_hud_chain
+    from orga_drone.studio_title_card import TitleCardFontError, resolve_title_card_font
+
+    try:
+        font = resolve_title_card_font()
+    except TitleCardFontError as exc:
+        raise StudioExportError(
+            "Telemetry HUD could not be rendered because no font was found.",
+            code="hud_font_missing",
+        ) from exc
+    return ffmpeg_hud_chain(
+        fontfile=font,
+        height=height,
+        intervals=clip.hud_intervals,
+    )
+
+
+def _filter_args(body: str, work: Path, *, complex_graph: bool) -> list[str]:
+    from orga_drone.studio_hud import video_filter_args
+
+    return video_filter_args(
+        body,
+        script_path=work / f"filters-{uuid.uuid4().hex}.txt",
+        complex_graph=complex_graph,
+    )
+
+
+def _chain_with_hud(chain: str, hud: str, fades: list[str]) -> str:
+    parts = [chain]
+    if hud:
+        parts.append(hud)
+    parts.extend(fades)
+    return ",".join(part for part in parts if part)
+
+
+def _graph_with_hud(graph: str, hud: str) -> str:
+    if not hud:
+        return graph
+    from orga_drone.studio_hud import HudGraphError, insert_hud_chain
+
+    try:
+        return insert_hud_chain(graph, hud)
+    except HudGraphError as exc:
+        raise StudioExportError(
+            "Telemetry HUD could not be rendered.",
+            code="hud_render_failed",
+        ) from exc
+
+
 def _fade_filters(clip: StudioExportClip) -> list[str]:
     fades: list[str] = []
     fade_in = max(0.0, float(clip.fade_in_s))
@@ -208,6 +264,7 @@ def _segment_filter_invocation(
     chain = _segment_chain(width, height, clip)
     fades = _fade_filters(clip)
     masks = tuple(clip.masks) if clip.kind in {"photo", "video"} else ()
+    hud = _hud_filter_text(clip, height)
 
     def privacy_graph(*, include_tail: bool) -> tuple[str, int]:
         source_w, source_h = _source_frame_size(clip)
@@ -241,10 +298,17 @@ def _segment_filter_invocation(
 
     def plain_or_masks() -> tuple[list[str], list[str]]:
         if not masks:
-            vf = f"{chain},{','.join(fades)}" if fades else chain
-            return [], ["-vf", vf]
+            return [], _filter_args(
+                _chain_with_hud(chain, hud, fades),
+                work,
+                complex_graph=False,
+            )
         graph, _count = privacy_graph(include_tail=True)
-        return [], ["-filter_complex", graph, "-map", "[vout]"]
+        return [], _filter_args(
+            _graph_with_hud(graph, hud),
+            work,
+            complex_graph=True,
+        )
 
     active = [
         item
@@ -352,7 +416,11 @@ def _segment_filter_invocation(
     )
     if prefix:
         graph = f"{prefix};{graph}"
-    return extra, ["-filter_complex", graph, "-map", "[vout]"]
+    return extra, _filter_args(
+        _graph_with_hud(graph, hud),
+        work,
+        complex_graph=True,
+    )
 
 
 def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:
