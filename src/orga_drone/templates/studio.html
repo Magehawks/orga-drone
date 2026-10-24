@@ -143,6 +143,8 @@
          data-mask-blur="{{ _('Blur')|e }}"
          data-mask-pixelate="{{ _('Pixelate')|e }}"
          data-mask-model='{{ mask_model|tojson }}'
+         data-frame-failed="{{ _('Could not save framing.')|e }}"
+         data-frame-model='{{ frame_model|tojson }}'
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -496,6 +498,7 @@
                   data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
+                  data-frame='{{ row.frame|tojson }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -716,6 +719,37 @@
             <button type="button" class="button ghost" id="mask-remove">{{ _('Remove mask') }}</button>
           </div>
           <p class="hint">{{ _('Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+        </div>
+        <div id="inspector-frame" hidden>
+          <p class="studio-inspector-kind">{{ _('Framing') }}</p>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Zoom') }}</span>
+              <span class="studio-image-adjust-value" id="inspector-frame-zoom-value">1.00×</span>
+            </span>
+            <input type="range" id="inspector-frame-zoom" min="1" max="3" step="0.05" value="1"
+                   aria-label="{{ _('Zoom') }}">
+          </label>
+          <label class="studio-inspector-field studio-frame-motion">
+            <input type="checkbox" id="inspector-frame-motion">
+            <span>{{ _('Motion') }}</span>
+          </label>
+          <div id="inspector-frame-motion-fields" hidden>
+            <label class="studio-inspector-field">
+              <span class="studio-image-adjust-label">
+                <span>{{ _('End zoom') }}</span>
+                <span class="studio-image-adjust-value" id="inspector-frame-zoom-end-value">1.00×</span>
+              </span>
+              <input type="range" id="inspector-frame-zoom-end" min="1" max="3" step="0.05" value="1"
+                     aria-label="{{ _('End zoom') }}">
+            </label>
+            <div class="studio-frame-target" role="group" aria-label="{{ _('Framing') }}">
+              <button type="button" class="button ghost is-active" id="inspector-frame-target-start">{{ _('Start') }}</button>
+              <button type="button" class="button ghost" id="inspector-frame-target-end">{{ _('End') }}</button>
+            </div>
+          </div>
+          <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
+          <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

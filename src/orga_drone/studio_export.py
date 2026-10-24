@@ -23,6 +23,7 @@ from orga_drone.export.studio_encoder import (
 )
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
+from orga_drone.studio_frame import FrameTransform, frame_from_effect_settings
 from orga_drone.studio_image import ImageAdjust, image_adjust_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
@@ -310,6 +311,11 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else ()
     )
+    frame = (
+        frame_from_effect_settings(clip.effect_settings)
+        if kind in {"photo", "video"}
+        else FrameTransform()
+    )
     return StudioExportClip(
         source_path=path,
         kind=kind or "video",
@@ -317,6 +323,7 @@ def _clip_to_export_clip(
         source_start_s=start,
         source_end_s=end,
         image=image,
+        frame=frame,
         masks=masks,
         overlays=overlays,
     )
