@@ -11,6 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+from orga_drone.browse_timeline import (
+    recorded_span_clause,
+    timeline_day_key_sql,
+    timeline_order_sql,
+)
+
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
@@ -1426,6 +1432,7 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
     ) -> tuple[list[str], list[Any], str]:
         """Return (where_clauses, params, collapse_sql) for browse list/count."""
         where = ["m.kind IN ('video', 'photo')"]
@@ -1466,6 +1473,10 @@ class Database:
         if date_to:
             where.append("m.recorded_at IS NOT NULL AND date(m.recorded_at) <= date(?)")
             params.append(date_to)
+        span_sql, span_params = recorded_span_clause(recorded_span)
+        if span_sql:
+            where.append(span_sql)
+            params.extend(span_params)
         # Multi-token AND: each whitespace-separated term must match somewhere.
         tokens = [t for t in (q or "").split() if t]
         for token in tokens:
@@ -1514,6 +1525,7 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
     ) -> int:
         """Count browse rows after the same filters/collapse as ``list_media``."""
         where, params, collapse = self._media_list_filters(
@@ -1527,6 +1539,7 @@ class Database:
             q=q,
             date_from=date_from,
             date_to=date_to,
+            recorded_span=recorded_span,
         )
         sql = f"""
             SELECT COUNT(*)
@@ -1543,6 +1556,56 @@ class Database:
             row = conn.execute(sql, params).fetchone()
         return int(row[0]) if row else 0
 
+    def timeline_day_counts(
+        self,
+        *,
+        drone: str | None = None,
+        kind: str | None = None,
+        source: str | None = None,
+        has_gps: bool | None = None,
+        flows_only: bool | None = None,
+        sessions_only: bool | None = None,
+        favorite: bool | None = None,
+        q: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[tuple[str | None, int]]:
+        """Calendar-day counts for the Browse timeline navigator.
+
+        Uses the same filters and row collapse as ``list_media``. A NULL day
+        means the recording date is missing or not a calendar day. The timeline
+        focus itself is not applied, so year/month/day links stay visible.
+        """
+        where, params, collapse = self._media_list_filters(
+            drone=drone,
+            kind=kind,
+            source=source,
+            has_gps=has_gps,
+            flows_only=flows_only,
+            sessions_only=sessions_only,
+            favorite=favorite,
+            q=q,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        day_key = timeline_day_key_sql()
+        sql = f"""
+            SELECT {day_key} AS day_key,
+                   COUNT(*) AS n
+            FROM media m
+            LEFT JOIN flows f ON f.id = m.flow_id
+            LEFT JOIN flow_items fi ON fi.media_id = m.id
+            LEFT JOIN sessions s ON s.id = m.session_id
+            LEFT JOIN session_items si ON si.media_id = m.id
+            LEFT JOIN media_meta mm ON mm.media_path = m.path
+            WHERE {' AND '.join(where)}
+              AND {collapse}
+            GROUP BY day_key
+        """
+        with self.connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [(None if row[0] is None else str(row[0]), int(row[1])) for row in rows]
+
     def list_media(
         self,
         *,
@@ -1558,6 +1621,8 @@ class Database:
         q: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        recorded_span: str | None = None,
+        date_order: str | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> list[MediaRow]:
@@ -1584,7 +1649,13 @@ class Database:
             q=q,
             date_from=date_from,
             date_to=date_to,
+            recorded_span=recorded_span,
         )
+        if date_order in {"asc", "desc"}:
+            direction = "ASC" if date_order == "asc" else "DESC"
+            order_clause = timeline_order_sql(direction)
+        else:
+            order_clause = f"{sort_sql} {order_sql}, m.id DESC"
 
         sql = f"""
             SELECT m.*, f.clip_count, f.total_size_bytes AS flow_total_size,
@@ -1603,7 +1674,7 @@ class Database:
             LEFT JOIN media_meta mm ON mm.media_path = m.path
             WHERE {' AND '.join(where)}
               AND {collapse}
-            ORDER BY {sort_sql} {order_sql}, m.id DESC
+            ORDER BY {order_clause}
         """
         if limit is not None and limit > 0:
             sql += " LIMIT ?"

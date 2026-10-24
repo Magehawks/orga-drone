@@ -121,7 +121,7 @@ orga-drone.
 | Map | **Available now** |
 | Sessions / flows in UI | **Available now** |
 | Rule-based “Ask the library” | **Available now** (not an LLM) |
-| Timeline product UI | **Later** (today: date filters and sessions, not a timeline editor) |
+| Timeline product UI | **Available now** (Browse year/month/day groups by recording date; existing filters; missing or non-calendar dates called out; page size 50/100/200). This is not the Studio editor timeline. |
 
 ### 3. Studio
 
@@ -221,9 +221,13 @@ See `README.md` for the detailed feature status table. In short:
 - Import and organize drone (and related) photos and videos from local folders
 - Extract DJI and standard media metadata; flows and heuristic flight sessions
 - Maps, filters, favorites, rule-based Ask the library, heuristic duplicates
+- Browse Timeline: chronological year/month/day groups of indexed photos and
+  videos (local recording dates only; Date unknown when a date is missing or
+  not a calendar day; same filters and page size as the grid). Not the Studio
+  story timeline.
 - **Library albums:** local named collections (`albums` / `album_items`). Create,
   rename, and delete an album; add or remove media; the same file can sit in
-  more than one album. Membership survives a full rescan and stays listed when
+  more than one album. Membership survives a rescan and stays listed when
   the file is offline. Albums do not modify files and are not Studio projects.
   No shared albums, cloud sync, or automatic albums.
 - **Studio:** local project browser and switcher over `studio_projects` /
@@ -279,6 +283,9 @@ See `README.md` for the detailed feature status table. In short:
 - Non-DJI support is thinner than DJI-oriented paths.
 - “Ask the library” is a **deterministic rule-based** phrase parser (DE/EN), not
   an LLM or semantic search system.
+- Browse Timeline groups indexed media by recording date. It does not edit
+  video, recognize faces, or search by meaning. Missing dates stay in
+  Date unknown.
 - Library albums are local named references only (no shared albums, cloud
   sync, or automatic albums). There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in

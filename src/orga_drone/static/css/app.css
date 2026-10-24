@@ -818,6 +818,78 @@ button.cta, .button.cta {
   gap: 0.5rem;
   align-items: center;
 }
+.timeline-note {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.timeline-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.timeline-nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.timeline-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.timeline-nav-link.active {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+.timeline-nav-count {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.media-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.timeline-year,
+.timeline-month,
+.timeline-day {
+  margin: 0.85rem 0 0.45rem;
+}
+.timeline-year {
+  font-size: 1.35rem;
+}
+.timeline-month {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+.timeline-day {
+  font-size: 0.95rem;
+}
+.timeline-year a,
+.timeline-month a,
+.timeline-day a {
+  color: inherit;
+  text-decoration: none;
+}
+.timeline-unknown {
+  margin-top: 0.5rem;
+}
 .button.ghost.is-disabled,
 .button.ghost[aria-disabled="true"] {
   opacity: 0.45;
