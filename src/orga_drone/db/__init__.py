@@ -924,6 +924,97 @@ class Database:
             conn.execute("DELETE FROM media WHERE root_id = ?", (root_id,))
             conn.execute("DELETE FROM assets WHERE root_id = ?", (root_id,))
 
+    def indexed_assets_for_root(self, root_id: int) -> dict[str, dict[str, Any]]:
+        """Asset rows for one root, with the media id when this path is library media.
+
+        Used to skip metadata extraction when size and mtime are unchanged.
+        """
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id AS asset_id, a.path, a.kind, a.size_bytes, a.mtime,
+                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf
+                   FROM assets a
+                   LEFT JOIN media m
+                     ON m.path = a.path AND m.root_id = a.root_id
+                   WHERE a.root_id = ?""",
+                (root_id,),
+            ).fetchall()
+        found: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            media_id = None if row["media_id"] is None else int(row["media_id"])
+            found[str(row["path"])] = {
+                "asset_id": int(row["asset_id"]),
+                "kind": str(row["kind"]),
+                "size_bytes": int(row["size_bytes"]),
+                "mtime": None if row["mtime"] is None else float(row["mtime"]),
+                "stem_base": row["stem_base"],
+                "media_id": media_id,
+                "has_srt": int(row["has_srt"] or 0) if media_id is not None else 0,
+                "has_lrf": int(row["has_lrf"] or 0) if media_id is not None else 0,
+            }
+        return found
+
+    def remove_root_index_except(self, root_id: int, keep_paths: set[str]) -> int:
+        """Drop asset and media rows for this root that were not rediscovered.
+
+        Does not delete files on disk, ``media_meta``, or Studio clips. Call
+        this only after a completed walk of a root that is still readable.
+        Returns how many asset rows were removed.
+        """
+        with self.connect() as conn:
+            conn.execute(
+                "CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths(path TEXT PRIMARY KEY)"
+            )
+            conn.execute("DELETE FROM scan_keep_paths")
+            conn.executemany(
+                "INSERT OR IGNORE INTO scan_keep_paths(path) VALUES (?)",
+                [(path,) for path in keep_paths],
+            )
+            conn.execute(
+                """DELETE FROM media
+                   WHERE root_id = ?
+                     AND path NOT IN (SELECT path FROM scan_keep_paths)""",
+                (root_id,),
+            )
+            cur = conn.execute(
+                """DELETE FROM assets
+                   WHERE root_id = ?
+                     AND path NOT IN (SELECT path FROM scan_keep_paths)""",
+                (root_id,),
+            )
+            removed = cur.rowcount
+        return int(removed) if removed is not None and removed > 0 else 0
+
+    def set_asset_kind(self, asset_id: int, kind: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE assets SET kind = ? WHERE id = ?",
+                (kind, asset_id),
+            )
+
+    def delete_media_row(self, media_id: int) -> None:
+        """Drop one indexed media row.
+
+        Does not delete the file, ``media_meta``, or Studio clips. A Studio
+        ``source_media_id`` for this row becomes NULL.
+        """
+        with self.connect() as conn:
+            conn.execute("DELETE FROM media WHERE id = ?", (media_id,))
+
+    def set_media_sidecar_flags(
+        self,
+        media_id: int,
+        *,
+        has_srt: bool,
+        has_lrf: bool,
+    ) -> None:
+        """Update SRT/LRF flags without rewriting extracted metadata."""
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE media SET has_srt = ?, has_lrf = ? WHERE id = ?",
+                (1 if has_srt else 0, 1 if has_lrf else 0, media_id),
+            )
+
     def upsert_asset(
         self,
         *,

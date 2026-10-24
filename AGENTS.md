@@ -56,7 +56,7 @@ Before implementing a feature, verify it improves this journey (see
 
 | Area | Question | Today (honest) |
 |------|----------|----------------|
-| Library | Where are my memories? | Import/scan, metadata, GPS, sessions/flows, dupes |
+| Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime), metadata, GPS, sessions/flows, dupes |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion) |
 | Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
@@ -66,6 +66,7 @@ Before implementing a feature, verify it improves this journey (see
 The application helps users:
 
 - import and organize drone (and related) photos and videos from local folders
+  (a rescan skips metadata extraction when file size and mtime are unchanged)
 - extract DJI and standard media metadata (EXIF, filenames, SRT where present)
 - group media into **flows** (FAT32 split parts) and heuristic **flight sessions**
 - visualize GPS points and tracks on OpenStreetMap-based maps
@@ -94,7 +95,10 @@ The application helps users:
 
 ## Limitations (honest)
 
-- Library scan is a **full rescan** per root (not incremental).
+- A library rescan still walks each root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. An unavailable root is left indexed as-is. Scan never deletes
+  files, favorites, tags, notes, or Studio clips.
 - Flight sessions are **heuristic** (time gaps + optional SRT altitude/GPS).
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is useful but thinner than DJI/Avata 2–oriented paths.
@@ -145,7 +149,8 @@ The application helps users:
 - deeper creator/post-production workflows when justified by real users
 - battery and equipment analytics
 - additional drone manufacturers via dedicated parsers
-- incremental scanning and multi-OS / MSIX installers
+- cheaper directory walks than a full root walk, content-hash change detection,
+  and multi-OS / MSIX installers
 - itch.io Windows convenience channel via butler (documented test process;
   not a public launch; no custom in-app updater)
 

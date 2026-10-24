@@ -99,7 +99,7 @@ orga-drone.
 
 | Responsibility | Status |
 |----------------|--------|
-| Import / scan | **Available now** (full rescan per root) |
+| Import / scan | **Available now** (rescan per root; unchanged files skip metadata extraction by size + mtime) |
 | Metadata (EXIF, DJI, SRT, …) | **Available now** |
 | GPS | **Available now** |
 | Sessions / flows | **Available now** (heuristic) |
@@ -257,7 +257,10 @@ See `README.md` for the detailed feature status table. In short:
 
 ## Honest limitations
 
-- Library scan is a **full rescan** per root (not incremental).
+- A library rescan still walks each root and rebuilds flows and sessions.
+  Unchanged files (same size and mtime) skip metadata extraction. This is not
+  a content hash. An unavailable root is left indexed as-is. Scan never deletes
+  files, favorites, tags, notes, or Studio clips.
 - Flight sessions are **heuristic**.
 - Duplicate detection uses **metadata heuristics**, not content hashing.
 - Non-DJI support is thinner than DJI-oriented paths.

@@ -51,7 +51,7 @@ so they do not auto-update. See `packaging/itch/README.md`.
 | `config.py` | Settings, paths, env |
 | `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files; MOTW-safe copy of WebView2 DLLs (see `packaging/README.md`) |
 | `db/` | Schema, migrations, queries |
-| `scan/` | Full rescan of library roots |
+| `scan/` | Rescan of library roots; unchanged files skip metadata extraction |
 | `parse/` | Filenames, SRT, EXIF, generic media |
 | `group/` | Flows (FAT32 splits) + sessions |
 | `search/` | Rule-based Ask the library (DE/EN) |
@@ -87,20 +87,23 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
 1. Recursively find media files under a root
-2. Clear indexed media for that root (**full rescan**; `media_meta` and
-   `studio_clips` kept)
-3. Parse → upsert assets/media
-4. Relink user meta + Studio membership + apply auto-tags
-5. Rebuild flows, then sessions
+2. If the root is missing or unreadable, stop. Indexed rows, user metadata,
+   and Studio clips stay. Files on disk are never deleted by a scan.
+3. Drop index rows for this root whose paths were not found (`media_meta`
+   and `studio_clips` stay)
+4. Skip metadata extraction when the stored asset size and mtime match
+   (ADR 0019). Parse and upsert new or changed files, then relink user meta,
+   Studio membership, and auto-tags for those parsed files. A size/mtime
+   match still refreshes SRT/LRF flags and Live Photo pairing from filenames.
+5. Rebuild flows, then sessions (this still runs when every file was unchanged)
 6. Mark root scanned
 
 HTTP triggers in `app.py`: add root, scan one root, scan all.
 
 Library scans run in a **background thread** with an in-memory job
 (`src/orga_drone/scan/jobs.py`). The browser polls `GET /api/scan-jobs/{id}`
-for phase/counters (discovering / indexing / grouping). Full-rescan semantics
-are unchanged; jobs are not persisted in SQLite. At most one library scan runs
-at a time.
+for phase/counters (discovering / indexing / grouping). Jobs are not persisted
+in SQLite. At most one library scan runs at a time.
 
 ## UI surfaces
 
@@ -134,7 +137,7 @@ scope.
 Typical user flow:
 
 ```text
-add folder → full scan/parse → SQLite index → browse / map / detail
+add folder → scan/parse (unchanged files skip extraction) → SQLite index → browse / map / detail
                                          → optional Studio curation
                                          → optional rename, merge, export, dupes
 ```

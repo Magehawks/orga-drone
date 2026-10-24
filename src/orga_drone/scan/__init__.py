@@ -1,9 +1,17 @@
-"""Scan library roots and index media into SQLite."""
+"""Scan library roots and index media into SQLite.
+
+A rescan still walks the root and rebuilds flows and sessions. Metadata
+extraction is skipped when an indexed file has the same size and mtime.
+Issue #96 does not define a content fingerprint; those filesystem signals
+are the skip check. Files, user metadata, and Studio clips are never deleted.
+An unreadable root is left unchanged.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from orga_drone.auto_tags import apply_auto_tags_to_media
 from orga_drone.db import Database, track_from_json, track_to_json
@@ -122,15 +130,143 @@ def _emit(
     )
 
 
+def _empty_scan_counts(*, unavailable: int = 0) -> dict[str, int]:
+    return {
+        "assets": 0,
+        "videos": 0,
+        "photos": 0,
+        "live_sidecars": 0,
+        "non_video": 0,
+        "flows": 0,
+        "sessions": 0,
+        "unchanged": 0,
+        "removed": 0,
+        "unavailable": unavailable,
+    }
+
+
+def _root_is_readable_dir(root: Path) -> bool:
+    """True when ``root`` is a directory we can list.
+
+    A missing or disconnected folder must not be treated as an empty library.
+    """
+    try:
+        if not root.is_dir():
+            return False
+        next(root.iterdir(), None)
+    except OSError:
+        return False
+    return True
+
+
+def _resolved_path(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def _file_fingerprint(path: Path) -> tuple[int, float] | None:
+    """Return ``(size_bytes, st_mtime)``.
+
+    Issue #96 asks for a safe fingerprint but does not name one. Size plus
+    mtime avoids hashing large videos. It is not a content hash: a same-size
+    edit that also preserves mtime is not detected.
+    """
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (int(st.st_size), float(st.st_mtime))
+
+
+def _fingerprint_matches(
+    indexed: dict[str, Any],
+    fingerprint: tuple[int, float] | None,
+) -> bool:
+    if fingerprint is None or indexed.get("mtime") is None:
+        return False
+    size, mtime = fingerprint
+    return int(indexed["size_bytes"]) == size and float(indexed["mtime"]) == mtime
+
+
+def _reuse_unchanged_file(
+    db: Database,
+    *,
+    indexed: dict[str, Any],
+    path: Path,
+    resolved: Path,
+    by_stem: dict[str, list[Path]],
+    live_sidecars: set[Path],
+    counts: dict[str, int],
+) -> bool:
+    """Keep an indexed file when size and mtime match.
+
+    Returns False when the row must be parsed again (missing media row, or a
+    Live Photo companion that is no longer paired and needs classification).
+    """
+    kind = str(indexed["kind"])
+    in_live = resolved in live_sidecars
+    if kind == "video" and in_live:
+        db.set_asset_kind(int(indexed["asset_id"]), "live_sidecar")
+        media_id = indexed.get("media_id")
+        if media_id is not None:
+            db.delete_media_row(int(media_id))
+        counts["assets"] += 1
+        counts["live_sidecars"] += 1
+        return True
+    if kind == "live_sidecar" and not in_live:
+        return False
+    if kind in {"video", "photo"} and indexed.get("media_id") is None:
+        return False
+
+    counts["assets"] += 1
+    counts["unchanged"] += 1
+    if kind == "live_sidecar":
+        counts["live_sidecars"] += 1
+        return True
+    if kind == "other":
+        counts["non_video"] += 1
+        return True
+    if kind not in {"video", "photo"}:
+        return True
+
+    stem = indexed.get("stem_base") or path.stem
+    sibs = _siblings(str(stem), by_stem)
+    has_srt = ".srt" in sibs
+    has_lrf = ".lrf" in sibs
+    media_id = int(indexed["media_id"])
+    if has_srt != bool(indexed.get("has_srt")) or has_lrf != bool(indexed.get("has_lrf")):
+        db.set_media_sidecar_flags(media_id, has_srt=has_srt, has_lrf=has_lrf)
+    if kind == "video":
+        counts["videos"] += 1
+    else:
+        counts["photos"] += 1
+    return True
+
+
 def scan_root(
     db: Database,
     root_id: int,
     root_path: Path,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, int]:
-    root_path = root_path.resolve()
+    try:
+        root_path = root_path.resolve()
+    except OSError:
+        root_path = Path(root_path)
+    if not _root_is_readable_dir(root_path):
+        counts = _empty_scan_counts(unavailable=1)
+        _emit(on_progress, phase="done", root_id=root_id)
+        return counts
+
     _emit(on_progress, phase="discovering", discovered=0, processed=0, root_id=root_id)
-    files = iter_media_files(root_path, on_progress, root_id=root_id)
+    try:
+        files = iter_media_files(root_path, on_progress, root_id=root_id)
+    except OSError:
+        counts = _empty_scan_counts(unavailable=1)
+        _emit(on_progress, phase="done", root_id=root_id)
+        return counts
     discovered = len(files)
     _emit(
         on_progress,
@@ -139,25 +275,56 @@ def scan_root(
         processed=0,
         root_id=root_id,
     )
+    # A share can disappear during the walk. Do not treat a partial listing
+    # as "every other file was deleted".
+    if not _root_is_readable_dir(root_path):
+        counts = _empty_scan_counts(unavailable=1)
+        _emit(
+            on_progress,
+            phase="done",
+            discovered=discovered,
+            processed=0,
+            root_id=root_id,
+        )
+        return counts
 
     by_stem: dict[str, list[Path]] = {}
     for f in files:
         by_stem.setdefault(f.stem, []).append(f)
 
     live_sidecars = live_photo_video_sidecars(files)
+    seen_paths = {str(_resolved_path(path)) for path in files}
+    removed = db.remove_root_index_except(root_id, seen_paths)
+    existing = db.indexed_assets_for_root(root_id)
 
-    # Clear previous index for this root (simple full rescan for MVP)
-    db.clear_root_media(root_id)
-
-    counts = {
-        "assets": 0,
-        "videos": 0,
-        "photos": 0,
-        "live_sidecars": 0,
-        "non_video": 0,
-    }
+    counts = _empty_scan_counts()
+    counts["removed"] = removed
 
     for index, path in enumerate(files, start=1):
+        resolved_key = _resolved_path(path)
+        indexed = existing.get(str(resolved_key))
+        if indexed is not None and _fingerprint_matches(
+            indexed, _file_fingerprint(path)
+        ):
+            if _reuse_unchanged_file(
+                db,
+                indexed=indexed,
+                path=path,
+                resolved=resolved_key,
+                by_stem=by_stem,
+                live_sidecars=live_sidecars,
+                counts=counts,
+            ):
+                _emit(
+                    on_progress,
+                    phase="indexing",
+                    discovered=discovered,
+                    processed=index,
+                    current_path=display_scan_path(path, root_path),
+                    root_id=root_id,
+                )
+                continue
+
         parsed = parse_media_file(path)
         try:
             resolved = path.resolve()
@@ -260,7 +427,7 @@ def scan_root(
                 "track_json": track_to_json(parsed.track),
             }
         )
-        # Re-attach user metadata that survived clear_root_media (path / identity).
+        # Relink user metadata and Studio clips for parsed paths (new, changed, or repaired).
         db.link_media_meta_for_path(
             str(path.resolve()),
             filename=path.name,
@@ -360,11 +527,25 @@ def scan_all_roots(
     results = []
     for root in db.list_roots():
         path = Path(root["path"])
-        if not path.exists():
+        try:
+            available = path.exists()
+        except OSError:
+            available = False
+        if not available:
             results.append(
                 {"root_id": root["id"], "path": root["path"], "error": "missing"}
             )
             continue
         counts = scan_root(db, int(root["id"]), path, on_progress=on_progress)
+        if counts.get("unavailable"):
+            results.append(
+                {
+                    "root_id": root["id"],
+                    "path": root["path"],
+                    "error": "missing",
+                    **counts,
+                }
+            )
+            continue
         results.append({"root_id": root["id"], "path": root["path"], **counts})
     return results

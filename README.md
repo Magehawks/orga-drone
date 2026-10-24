@@ -77,7 +77,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Folder library + browse/list | Available | Full **rescan** per root (not incremental); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio |
+| Folder library + browse/list | Available | Rescan per root; unchanged files skip metadata extraction (size + mtime, not a content hash); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
 | iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
