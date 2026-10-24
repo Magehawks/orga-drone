@@ -248,6 +248,98 @@ def _source_frame_size(clip: StudioExportClip) -> tuple[int, int]:
     return int(width or 0), int(height or 0)
 
 
+def _picture_before_format(graph: str) -> tuple[str, str]:
+    """Split a finished segment graph into a picture label and the graph that defines it.
+
+    The tail ``format=yuv420p`` and any fades after the picture are dropped so a
+    flight map can sit on the fitted frame and still fade with the clip.
+    """
+    marker = "format=yuv420p["
+    pos = graph.rfind(marker)
+    if pos < 0:
+        raise StudioExportError(
+            "The flight map could not be placed on this clip.",
+            code="map_render_failed",
+        )
+    seg_start = graph.rfind(";", 0, pos) + 1
+    segment = graph[seg_start:pos]
+    end = segment.find("]")
+    if not segment.startswith("[") or end < 2:
+        raise StudioExportError(
+            "The flight map could not be placed on this clip.",
+            code="map_render_failed",
+        )
+    label = segment[1:end]
+    prefix = graph[:seg_start].rstrip(";")
+    if not prefix or not label:
+        raise StudioExportError(
+            "The flight map could not be placed on this clip.",
+            code="map_render_failed",
+        )
+    return label, prefix
+
+
+def _attach_flight_map(
+    clip: StudioExportClip,
+    width: int,
+    height: int,
+    work: Path,
+    extra: list[str],
+    filters: list[str],
+) -> tuple[list[str], list[str]]:
+    """Composite the local GPS panel before fades. A disabled map leaves the graph unchanged."""
+    placement = clip.map_placement
+    if not placement.enabled or clip.kind not in {"photo", "video"}:
+        return extra, filters
+    from orga_drone.studio_map import MapRenderError, flight_map_overlay
+
+    fades = _fade_filters(clip)
+    source_w, source_h = _source_frame_size(clip)
+    first_input = 1 + extra.count("-i")
+    if filters and filters[0] == "-vf":
+        body = filters[1]
+        for fade in reversed(fades):
+            token = "," + fade
+            if body.endswith(token):
+                body = body[: -len(token)]
+        picture = "pic"
+        prefix = f"[0:v]{body}[{picture}]"
+    elif filters and filters[0] == "-filter_complex":
+        picture, prefix = _picture_before_format(filters[1])
+    else:
+        raise StudioExportError(
+            "The flight map could not be placed on this clip.",
+            code="map_render_failed",
+        )
+    try:
+        map_args, fragment, label = flight_map_overlay(
+            placement=placement,
+            track=clip.gps_track,
+            media_duration_s=clip.media_duration_s,
+            frame_width=width,
+            frame_height=height,
+            source_width=source_w,
+            source_height=source_h,
+            dest_dir=work,
+            first_input=first_input,
+            picture_label=picture,
+            fps=EXPORT_FPS,
+        )
+    except MapRenderError as exc:
+        raise StudioExportError(
+            "The flight map could not be drawn for this clip.",
+            code="map_render_failed",
+        ) from exc
+    tail = ",".join([*fades, "format=yuv420p"])
+    graph = f"{prefix};{fragment};[{label}]{tail}[vout]"
+    if "http://" in graph or "https://" in graph:
+        raise StudioExportError(
+            "The flight map could not be drawn for this clip.",
+            code="map_render_failed",
+        )
+    return [*extra, *map_args], ["-filter_complex", graph, "-map", "[vout]"]
+
+
 def _segment_filter_invocation(
     clip: StudioExportClip,
     width: int,
@@ -317,7 +409,7 @@ def _segment_filter_invocation(
         and float(item.start_s) < float(clip.duration_s)
     ]
     if not active:
-        return plain_or_masks()
+        return _attach_flight_map(clip, width, height, work, *plain_or_masks())
     from orga_drone.config import settings
     from orga_drone.studio_overlay import (
         MIN_SPAN_S,
@@ -400,7 +492,7 @@ def _segment_filter_invocation(
             )
         )
     if not windows:
-        return plain_or_masks()
+        return _attach_flight_map(clip, width, height, work, *plain_or_masks())
     source_label = None
     if masks:
         prefix, count = privacy_graph(include_tail=False)
@@ -416,11 +508,18 @@ def _segment_filter_invocation(
     )
     if prefix:
         graph = f"{prefix};{graph}"
-    return extra, _filter_args(
-        _graph_with_hud(graph, hud),
+    extra_out, filters = _attach_flight_map(
+        clip,
+        width,
+        height,
         work,
-        complex_graph=True,
+        extra,
+        ["-filter_complex", graph, "-map", "[vout]"],
     )
+    if filters and filters[0] == "-filter_complex":
+        body = _graph_with_hud(filters[1], hud)
+        return extra_out, _filter_args(body, work, complex_graph=True)
+    return extra_out, filters
 
 
 def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:

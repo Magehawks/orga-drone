@@ -8,6 +8,7 @@ from pathlib import Path
 from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_hud import HudInterval
 from orga_drone.studio_image import ImageAdjust, SaturationRamp
+from orga_drone.studio_map import GpsSample, MapPlacement
 from orga_drone.studio_mask import Mask
 from orga_drone.studio_overlay import Overlay
 
@@ -40,6 +41,9 @@ class StudioExportClip:
     frame: FrameTransform = field(default_factory=FrameTransform)
     masks: tuple[Mask, ...] = ()
     overlays: tuple[Overlay, ...] = ()
+    map_placement: MapPlacement = field(default_factory=MapPlacement)
+    gps_track: tuple[GpsSample, ...] = ()
+    media_duration_s: float | None = None
     hud_enabled: bool = False
     hud_intervals: tuple[HudInterval, ...] = ()
 

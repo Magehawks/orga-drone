@@ -187,6 +187,8 @@
   const previewMasks = document.getElementById("studio-preview-masks");
   const previewMasksB = document.getElementById("studio-preview-masks-b");
   const previewMaskHandles = document.getElementById("studio-preview-mask-handles");
+  const previewMap = document.getElementById("studio-preview-map");
+  const previewMapB = document.getElementById("studio-preview-map-b");
   const musicAudio = document.getElementById("studio-music-audio");
   const musicAudioNext = document.getElementById("studio-music-audio-next");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
@@ -267,6 +269,9 @@
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
   const msgOverlayLimit = root.dataset.overlayLimit || "This clip already has 8 overlays.";
+  const msgMapFailed = root.dataset.mapFailed || "Could not save the flight map.";
+  const msgMapEmpty = root.dataset.mapEmpty || "No GPS for this clip.";
+  const msgMapLabel = root.dataset.mapLabel || "Flight map";
   const overlayModel = readOverlayModel();
   const msgMaskFailed = root.dataset.maskFailed || "Could not save privacy masks.";
   const msgMaskLimit = root.dataset.maskLimit || "A clip can have up to 8 privacy masks.";
@@ -280,6 +285,8 @@
   const labelHudUnavailable = root.dataset.hudUnavailable || "Unavailable";
   const imageAdjustModel = readImageAdjustModel();
   const maskModel = readMaskModel();
+  const mapModel = readMapModel();
+  let mapSaveChain = Promise.resolve();
 
   const STORAGE_KEY = "orga-drone-studio-ui-v1";
 
@@ -2234,6 +2241,7 @@
     applyPreviewGrades(hit);
     syncAnnotations(hit);
     drawPrivacyMasks();
+    drawFlightMap(hit);
     applyFramePreview(hit);
     syncHud(hit);
   }
@@ -3167,6 +3175,9 @@
         frameEditTarget = "start";
         fillFrame(clip);
       }
+      const mapWrap = document.getElementById("inspector-map");
+      if (mapWrap) mapWrap.hidden = !(isPhoto || isVideo);
+      if (isPhoto || isVideo) fillMapInspector(clip);
       const hudWrap = document.getElementById("inspector-hud");
       if (hudWrap) hudWrap.hidden = !isVideo;
       if (isVideo) fillHud(clip);
@@ -4720,7 +4731,10 @@
     if (!clip) return;
     queueMaskSave(clip);
   });
-  window.addEventListener("resize", () => drawPrivacyMasks());
+  window.addEventListener("resize", () => {
+    drawPrivacyMasks();
+    drawFlightMap(resolveAt(state.projectTimeS));
+  });
   previewImage?.addEventListener("load", () => drawPrivacyMasks());
   previewVideo?.addEventListener("seeked", () => drawPrivacyMasks());
   previewVideo?.addEventListener("loadeddata", () => drawPrivacyMasks());
@@ -5385,10 +5399,18 @@
     queueOverlaySave(clip);
   });
   if (previewImage) {
-    previewImage.addEventListener("load", () => syncAnnotations(resolveAt(state.projectTimeS)));
+    previewImage.addEventListener("load", () => {
+      const hit = resolveAt(state.projectTimeS);
+      syncAnnotations(hit);
+      drawFlightMap(hit);
+    });
   }
   if (previewVideo) {
-    previewVideo.addEventListener("loadedmetadata", () => syncAnnotations(resolveAt(state.projectTimeS)));
+    previewVideo.addEventListener("loadedmetadata", () => {
+      const hit = resolveAt(state.projectTimeS);
+      syncAnnotations(hit);
+      drawFlightMap(hit);
+    });
   }
   document.querySelectorAll("#inspector-speed [data-speed]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -5830,6 +5852,329 @@
       if (state.timelineMode === "fit") layoutTimeline();
     });
   }
+
+  function readMapModel() {
+    const fallback = {
+      minBox: 0.12,
+      maxBox: 0.72,
+      gapS: 2,
+      pad: 0.08,
+      defaultX: 0.68,
+      defaultY: 0.68,
+      defaultW: 0.28,
+      defaultH: 0.28,
+      bg: "#14181d",
+      route: "#7eb6ff",
+      marker: "#ff9f0a",
+      border: "#c5d0dc",
+    };
+    try {
+      const parsed = JSON.parse(root.dataset.mapModel || "");
+      return Object.assign(fallback, parsed && typeof parsed === "object" ? parsed : {});
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function defaultMap() {
+    return {
+      enabled: false,
+      x: Number(mapModel.defaultX) || 0.68,
+      y: Number(mapModel.defaultY) || 0.68,
+      w: Number(mapModel.defaultW) || 0.28,
+      h: Number(mapModel.defaultH) || 0.28,
+    };
+  }
+
+  function clampMapBox(map) {
+    const minBox = Number(mapModel.minBox) || 0.12;
+    const maxBox = Number(mapModel.maxBox) || 0.72;
+    const width = Math.min(maxBox, Math.max(minBox, Number(map.w) || minBox));
+    const height = Math.min(maxBox, Math.max(minBox, Number(map.h) || minBox));
+    return {
+      enabled: map.enabled === true,
+      w: width,
+      h: height,
+      x: Math.min(1 - width, Math.max(0, Number(map.x) || 0)),
+      y: Math.min(1 - height, Math.max(0, Number(map.y) || 0)),
+    };
+  }
+
+  function readMap(clip) {
+    if (!clip) return defaultMap();
+    try {
+      const parsed = JSON.parse(clip.dataset.map || "");
+      if (!parsed || typeof parsed !== "object") return defaultMap();
+      return clampMapBox(parsed);
+    } catch (_) {
+      return defaultMap();
+    }
+  }
+
+  function writeMap(clip, map) {
+    clip.dataset.map = JSON.stringify(clampMapBox(map));
+  }
+
+  function readGps(clip) {
+    const empty = { line: [], marker: [] };
+    if (!clip) return empty;
+    try {
+      const parsed = JSON.parse(clip.dataset.gps || "");
+      if (!parsed || typeof parsed !== "object") return empty;
+      const line = Array.isArray(parsed.line) ? parsed.line : [];
+      const marker = Array.isArray(parsed.marker) ? parsed.marker : line;
+      return { line, marker };
+    } catch (_) {
+      return empty;
+    }
+  }
+
+  function mapClock(clip, localS) {
+    const local = Number(localS) || 0;
+    if (clip && clip.dataset.kind === "video") return sourceInS(clip) + local;
+    return local;
+  }
+
+  function markerAt(points, timeS) {
+    if (!points.length) return null;
+    const gap = Number(mapModel.gapS) || 2;
+    const first = points[0];
+    if (points.length === 1 || timeS <= Number(first.t)) return first;
+    const last = points[points.length - 1];
+    if (timeS >= Number(last.t)) return last;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const left = points[index];
+      const right = points[index + 1];
+      if (timeS >= Number(right.t)) continue;
+      const span = Number(right.t) - Number(left.t);
+      if (span <= 0 || span > gap) return left;
+      const mix = (timeS - Number(left.t)) / span;
+      return {
+        x: Number(left.x) + (Number(right.x) - Number(left.x)) * mix,
+        y: Number(left.y) + (Number(right.y) - Number(left.y)) * mix,
+        t: timeS,
+      };
+    }
+    return last;
+  }
+
+  function finitePoint(point) {
+    const x = Number(point && point.x);
+    const y = Number(point && point.y);
+    const t = Number(point && point.t);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(t)) return null;
+    return { x, y, t };
+  }
+
+  function paintMapSvg(svg, gps, timeS) {
+    if (!svg) return false;
+    const pad = (Number(mapModel.pad) || 0.08) * 100;
+    const span = 100 - pad * 2;
+    const sx = (value) => pad + value * span;
+    const sy = (value) => pad + value * span;
+    const bg = safeColor(mapModel.bg, "#14181d");
+    const route = safeColor(mapModel.route, "#7eb6ff");
+    const marker = safeColor(mapModel.marker, "#ff9f0a");
+    const border = safeColor(mapModel.border, "#c5d0dc");
+    const line = (gps.line || []).map(finitePoint).filter(Boolean);
+    const samples = (gps.marker || []).map(finitePoint).filter(Boolean);
+    const parts = [
+      '<rect x="0" y="0" width="100" height="100" fill="' +
+        bg +
+        '" stroke="' +
+        border +
+        '" stroke-width="1"></rect>',
+    ];
+    if (line.length >= 2) {
+      const d = line
+        .map((point, index) => (index ? "L" : "M") + sx(point.x).toFixed(2) + " " + sy(point.y).toFixed(2))
+        .join(" ");
+      parts.push(
+        '<path d="' +
+          d +
+          '" fill="none" stroke="' +
+          route +
+          '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>'
+      );
+    }
+    const dot = markerAt(samples, timeS);
+    if (dot) {
+      parts.push(
+        '<circle cx="' +
+          sx(Number(dot.x)).toFixed(2) +
+          '" cy="' +
+          sy(Number(dot.y)).toFixed(2) +
+          '" r="3.2" fill="' +
+          marker +
+          '" stroke="#1a1206" stroke-width="0.6"></circle>'
+      );
+    }
+    svg.innerHTML = parts.join("");
+    return line.length > 0 || Boolean(dot);
+  }
+
+  function placeMapElement(el, clip, localS, interactive) {
+    if (!el) return;
+    const placement = readMap(clip);
+    const show = placement.enabled && clip && (clip.dataset.kind === "photo" || clip.dataset.kind === "video");
+    if (!show) {
+      el.hidden = true;
+      return;
+    }
+    const media = mediaForAnnotation(clip, el === previewMapB);
+    const content = contentBoxFor(media);
+    el.hidden = false;
+    el.style.left = content.left + placement.x * content.width + "px";
+    el.style.top = content.top + placement.y * content.height + "px";
+    el.style.width = Math.max(1, placement.w * content.width) + "px";
+    el.style.height = Math.max(1, placement.h * content.height) + "px";
+    el.setAttribute("aria-label", msgMapLabel);
+    const selected =
+      interactive &&
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId);
+    el.classList.toggle("is-locked", !selected);
+    const handle = el.querySelector("[data-resize]");
+    if (handle) handle.hidden = !selected;
+    const gps = readGps(clip);
+    const hasRoute = paintMapSvg(el.querySelector("svg"), gps, mapClock(clip, localS));
+    const empty = el.querySelector(".studio-preview-map-empty");
+    if (empty) {
+      empty.textContent = msgMapEmpty;
+      empty.hidden = hasRoute;
+    }
+  }
+
+  function drawFlightMap(hit) {
+    if (!hit || !hit.clip) {
+      if (previewMap) previewMap.hidden = true;
+      if (previewMapB) previewMapB.hidden = true;
+      return;
+    }
+    const overlap = hit.overlapClip && hit.crossfadeProgress != null;
+    placeMapElement(previewMap, hit.clip, hit.localS || 0, true);
+    if (previewMap) previewMap.style.opacity = overlap ? String(hit.crossfadeProgress) : "";
+    if (overlap) {
+      placeMapElement(previewMapB, hit.overlapClip, hit.overlapLocalS || 0, false);
+    } else if (previewMapB) {
+      previewMapB.hidden = true;
+    }
+  }
+
+  function fillMapInspector(clip) {
+    const wrap = document.getElementById("inspector-map");
+    const enabled = document.getElementById("inspector-map-enabled");
+    const fields = document.getElementById("inspector-map-fields");
+    const empty = document.getElementById("inspector-map-empty");
+    if (!wrap || !enabled || !fields) return;
+    const placement = readMap(clip);
+    if (document.activeElement !== enabled) enabled.checked = placement.enabled;
+    fields.hidden = !placement.enabled;
+    const gps = readGps(clip);
+    if (empty) empty.hidden = !(placement.enabled && !(gps.line && gps.line.length));
+    setNumber("map-x", Math.round(placement.x * 100));
+    setNumber("map-y", Math.round(placement.y * 100));
+    setNumber("map-w", Math.round(placement.w * 100));
+    setNumber("map-h", Math.round(placement.h * 100));
+  }
+
+  function editorMapPatch(map) {
+    const next = Object.assign({}, map);
+    next.x = numberOr(document.getElementById("map-x"), next.x * 100) / 100;
+    next.y = numberOr(document.getElementById("map-y"), next.y * 100) / 100;
+    next.w = numberOr(document.getElementById("map-w"), next.w * 100) / 100;
+    next.h = numberOr(document.getElementById("map-h"), next.h * 100) / 100;
+    const enabled = document.getElementById("inspector-map-enabled");
+    if (enabled) next.enabled = enabled.checked === true;
+    return clampMapBox(next);
+  }
+
+  async function saveMap(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const res = await fetch("/api/studio/" + studioId + "/map", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(readMap(clip)),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgMapFailed);
+    }
+    writeMap(clip, body.map || readMap(clip));
+    if (selectedAdjustableClip() === clip) fillMapInspector(clip);
+    drawFlightMap(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
+  function queueMapSave(clip) {
+    const studioId = clip.dataset.studioId;
+    setSaveState(false);
+    mapSaveChain = mapSaveChain
+      .then(() => saveMap(studioId))
+      .catch((err) => {
+        showRootFlash((err && err.message) || msgMapFailed);
+      });
+  }
+
+  function onMapPointerDown(event) {
+    if (event.button != null && event.button !== 0) return;
+    const hit = resolveAt(state.projectTimeS);
+    const clip = hit && hit.clip;
+    if (!clip || !previewMap || previewMap.classList.contains("is-locked")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const resizing = Boolean(event.target && event.target.dataset && event.target.dataset.resize);
+    const start = readMap(clip);
+    const content = contentBoxFor(mediaForAnnotation(clip, false));
+    if (!content.width || !content.height) return;
+    const originX = event.clientX;
+    const originY = event.clientY;
+    const move = (ev) => {
+      const dx = (ev.clientX - originX) / content.width;
+      const dy = (ev.clientY - originY) / content.height;
+      const next = resizing
+        ? clampMapBox(Object.assign({}, start, { w: start.w + dx, h: start.h + dy }))
+        : clampMapBox(Object.assign({}, start, { x: start.x + dx, y: start.y + dy }));
+      writeMap(clip, next);
+      placeMapElement(previewMap, clip, hit.localS || 0, true);
+      fillMapInspector(clip);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      queueMapSave(clip);
+      drawFlightMap(resolveAt(state.projectTimeS));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  previewMap?.addEventListener("pointerdown", onMapPointerDown);
+  document.getElementById("inspector-map-enabled")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const next = readMap(clip);
+    const enabled = document.getElementById("inspector-map-enabled");
+    next.enabled = Boolean(enabled && enabled.checked);
+    writeMap(clip, next);
+    fillMapInspector(clip);
+    drawFlightMap(resolveAt(state.projectTimeS));
+    queueMapSave(clip);
+  });
+  ["map-x", "map-y", "map-w", "map-h"].forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      writeMap(clip, editorMapPatch(readMap(clip)));
+      fillMapInspector(clip);
+      drawFlightMap(resolveAt(state.projectTimeS));
+      queueMapSave(clip);
+    });
+  });
 
   // Init
   loadUiState();

@@ -47,6 +47,12 @@ from orga_drone.studio_image import (
     image_adjust_preview_model,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_map import (
+    gps_from_stored,
+    map_from_effect_settings,
+    map_preview_model,
+    route_preview,
+)
 from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
 from orga_drone.studio_overlay import (
     overlay_preview_model,
@@ -1068,6 +1074,7 @@ def create_app() -> FastAPI:
                 can_play = False
                 display_title = ""
                 display_subtitle = ""
+                media_row = None
                 hud_state = empty_hud_state()
                 if it.kind == TITLE_CARD_KIND:
                     display_title, display_subtitle = display_lines(
@@ -1158,6 +1165,19 @@ def create_app() -> FastAPI:
                         if it.kind in {"photo", "video"}
                         else [],
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
+                        "map": map_from_effect_settings(it.effect_settings).as_dict(),
+                        "gps": (
+                            route_preview(
+                                gps_from_stored(
+                                    track_from_json(media_row.track_json),
+                                    latitude=media_row.latitude,
+                                    longitude=media_row.longitude,
+                                ),
+                                media_duration_s=media_row.duration_s,
+                            )
+                            if media_row is not None and it.kind in {"photo", "video"}
+                            else {"line": [], "marker": []}
+                        ),
                         "hud": hud_state,
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
@@ -1194,6 +1214,7 @@ def create_app() -> FastAPI:
             frame_model=frame_preview_model(),
             mask_model=mask_preview_model(),
             overlay_model=overlay_preview_model(),
+            map_model=map_preview_model(),
             favorite_media=favorite_media,
             music_payload=music_payload,
             flash_msg=msg,
@@ -1752,6 +1773,33 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "frame": frame.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/map")
+    async def api_studio_map(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include map")
+        try:
+            item = db.set_studio_map(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        placement = map_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "map": placement.as_dict(),
             }
         )
 

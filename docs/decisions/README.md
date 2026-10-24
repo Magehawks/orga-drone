@@ -48,3 +48,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0020](0020-incremental-rescan-fingerprint.md) | Skip unchanged media on rescan | Accepted |
 | [0021](0021-studio-section-repeat.md) | Studio video section repeat | Accepted |
 | [0022](0022-studio-telemetry-hud.md) | Studio telemetry HUD | Accepted |
+| [0023](0023-studio-flight-map.md) | Studio flight map without third-party tiles | Accepted |

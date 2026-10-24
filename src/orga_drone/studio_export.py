@@ -7,7 +7,7 @@ from pathlib import Path
 
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
 from orga_drone.config import settings
-from orga_drone.db import Database, StudioClip, StudioProject
+from orga_drone.db import Database, StudioClip, StudioProject, track_from_json
 from orga_drone.export.studio_config import (
     StudioExportClip,
     StudioExportConfig,
@@ -30,6 +30,7 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
 from orga_drone.studio_export_resolution import (
@@ -350,6 +351,20 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else FrameTransform()
     )
+    placement = (
+        map_from_effect_settings(clip.effect_settings)
+        if kind in {"photo", "video"}
+        else map_from_effect_settings(None)
+    )
+    gps_track = (
+        gps_from_stored(
+            track_from_json(media.track_json),
+            latitude=media.latitude,
+            longitude=media.longitude,
+        )
+        if kind in {"photo", "video"}
+        else ()
+    )
     hud_enabled = False
     hud_intervals: tuple[HudInterval, ...] = ()
     if kind == "video":
@@ -387,6 +402,9 @@ def _clip_to_export_clip(
         frame=frame,
         masks=masks,
         overlays=overlays,
+        map_placement=placement,
+        gps_track=gps_track,
+        media_duration_s=media.duration_s,
         hud_enabled=hud_enabled,
         hud_intervals=hud_intervals,
     )
