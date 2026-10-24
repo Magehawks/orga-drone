@@ -14,6 +14,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -86,9 +87,10 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
     Photo and video grades are applied on the decoded frame, then the existing
     scale, timebase, and fade filters run. Title cards stay ungraded.
     A neutral clip adds nothing, so the chain matches ``_segment_vf``.
-    Overlays are not part of this string; they use a filter graph only when
-    the clip has any, so neutral exports stay on the previous ``-vf`` path.
+    Overlays and privacy masks are not part of this string.
     """
+    if clip.masks:
+        raise RuntimeError("masked clips use _segment_video_args")
     chain = _segment_chain(width, height, clip)
     fades = _fade_filters(clip)
     if fades:
@@ -97,6 +99,7 @@ def _segment_vf_for_clip(width: int, height: int, clip: StudioExportClip) -> str
 
 
 def _source_frame_size(clip: StudioExportClip) -> tuple[int, int]:
+    """Pixel size of the media ffmpeg will scale. Zero means unknown."""
     path = clip.source_path
     if path is None or not path.is_file():
         return 0, 0
@@ -122,12 +125,52 @@ def _segment_filter_invocation(
 ) -> tuple[list[str], list[str]]:
     """Extra inputs and the filter flags for one segment.
 
-    No overlays: ``-vf`` only, identical to the pre-overlay command.
-    With overlays: PNG inputs plus ``-filter_complex`` mapped to ``[vout]``.
+    No overlays or masks: ``-vf`` only, identical to the pre-overlay command.
+    Masks run after grade and scale. Overlays sit on that picture, then fades.
+    With either effect: ``-filter_complex`` mapped to ``[vout]``.
     The caller still maps audio.
     """
     chain = _segment_chain(width, height, clip)
     fades = _fade_filters(clip)
+    masks = tuple(clip.masks) if clip.kind in {"photo", "video"} else ()
+
+    def privacy_graph(*, include_tail: bool) -> tuple[str, int]:
+        source_w, source_h = _source_frame_size(clip)
+        if source_w <= 0 or source_h <= 0:
+            raise StudioExportError(
+                "A privacy mask could not be rendered. Make the region larger and export again.",
+                code="mask_render_failed",
+            )
+        from orga_drone.studio_mask import MaskRenderError, ffmpeg_mask_graph, mask_windows
+
+        try:
+            placed = mask_windows(
+                masks,
+                frame_width=width,
+                frame_height=height,
+                source_width=source_w,
+                source_height=source_h,
+            )
+            graph = ffmpeg_mask_graph(
+                base_chain=chain,
+                fades=fades if include_tail else (),
+                windows=placed,
+                include_tail=include_tail,
+            )
+        except MaskRenderError as exc:
+            raise StudioExportError(
+                "A privacy mask could not be rendered. Make the region larger and export again.",
+                code="mask_render_failed",
+            ) from exc
+        return graph, len(placed)
+
+    def plain_or_masks() -> tuple[list[str], list[str]]:
+        if not masks:
+            vf = f"{chain},{','.join(fades)}" if fades else chain
+            return [], ["-vf", vf]
+        graph, _count = privacy_graph(include_tail=True)
+        return [], ["-filter_complex", graph, "-map", "[vout]"]
+
     active = [
         item
         for item in clip.overlays
@@ -135,8 +178,7 @@ def _segment_filter_invocation(
         and float(item.start_s) < float(clip.duration_s)
     ]
     if not active:
-        vf = f"{chain},{','.join(fades)}" if fades else chain
-        return [], ["-vf", vf]
+        return plain_or_masks()
     from orga_drone.config import settings
     from orga_drone.studio_overlay import (
         MIN_SPAN_S,
@@ -215,15 +257,62 @@ def _segment_filter_invocation(
             )
         )
     if not windows:
-        vf = f"{chain},{','.join(fades)}" if fades else chain
-        return [], ["-vf", vf]
+        return plain_or_masks()
+    source_label = None
+    if masks:
+        prefix, count = privacy_graph(include_tail=False)
+        source_label = f"mbase{count}"
+    else:
+        prefix = ""
     graph = ffmpeg_overlay_graph(
         base_chain=chain,
         fades=fades,
         windows=windows,
         first_input=1,
+        source_label=source_label,
     )
+    if prefix:
+        graph = f"{prefix};{graph}"
     return extra, ["-filter_complex", graph, "-map", "[vout]"]
+
+
+def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:
+    """``-vf`` for an unmasked clip, or ``-filter_complex`` when masks exist.
+
+    Masks are applied after grade and scale and before fades. A failure raises
+    ``StudioExportError`` instead of falling back to an unmasked chain.
+    """
+    base = _segment_vf(width, height)
+    grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    chain = f"{grade},{base}" if grade else base
+    fades = _fade_filters(clip)
+    masks = clip.masks if clip.kind in {"photo", "video"} else ()
+    if not masks:
+        vf = f"{chain},{','.join(fades)}" if fades else chain
+        return ["-vf", vf]
+    source_w, source_h = _source_frame_size(clip)
+    if source_w <= 0 or source_h <= 0:
+        raise StudioExportError(
+            "A privacy mask could not be rendered. Make the region larger and export again.",
+            code="mask_render_failed",
+        )
+    from orga_drone.studio_mask import MaskRenderError, ffmpeg_mask_graph, mask_windows
+
+    try:
+        windows = mask_windows(
+            masks,
+            frame_width=width,
+            frame_height=height,
+            source_width=source_w,
+            source_height=source_h,
+        )
+        graph = ffmpeg_mask_graph(base_chain=chain, fades=fades, windows=windows)
+    except MaskRenderError as exc:
+        raise StudioExportError(
+            "A privacy mask could not be rendered. Make the region larger and export again.",
+            code="mask_render_failed",
+        ) from exc
+    return ["-filter_complex", graph]
 
 
 def _has_crossfade(clips: tuple[StudioExportClip, ...]) -> bool:
@@ -743,10 +832,12 @@ class FfmpegStudioEncoder:
         if clip.source_path is None:
             raise StudioExportError("Missing source file: clip")
         _materialize_photo_still(clip.source_path, still)
+        sized = replace(clip, source_path=still, kind="photo")
         dur = max(0.1, float(clip.duration_s))
-        extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
+        extra, filters = _segment_filter_invocation(sized, width, height, out.parent)
         overlay_count = extra.count("-i")
         audio_index = 1 + overlay_count
+        uses_graph = bool(filters) and filters[0] == "-filter_complex"
         cmd = [
             ffmpeg,
             "-y",
@@ -765,7 +856,7 @@ class FfmpegStudioEncoder:
             f"{dur:.3f}",
             *filters,
         ]
-        if overlay_count:
+        if uses_graph:
             cmd.extend(["-map", f"{audio_index}:a:0"])
         cmd.extend(
             [
@@ -819,6 +910,7 @@ class FfmpegStudioEncoder:
         )
         extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
         overlay_count = extra.count("-i")
+        uses_graph = bool(filters) and filters[0] == "-filter_complex"
         # Prefer accurate cuts on HEVC/DJI: decode then seek (slower, correct).
         # Explicit maps: DJI files often carry an attached JPEG that must not win.
         cmd = [
@@ -840,15 +932,16 @@ class FfmpegStudioEncoder:
             "-ar",
             "48000",
         ]
-        if overlay_count == 0:
-            cmd.extend(["-map", "0:v:0", "-map", "0:a:0"])
-        else:
+        if uses_graph:
             cmd.extend(["-map", "0:a:0"])
+        else:
+            cmd.extend(["-map", "0:v:0", "-map", "0:a:0"])
         cmd.append(str(out))
         try:
             _run_ffmpeg(cmd, on_time=on_time, duration_s=dur)
         except StudioExportError:
             # Some clips have no audio track; add silence so concat stays uniform.
+            # The same video graph is kept, including masks and overlays.
             audio_index = 1 + overlay_count
             cmd_silent = [
                 ffmpeg,
@@ -876,10 +969,10 @@ class FfmpegStudioEncoder:
                 "48000",
                 "-shortest",
             ]
-            if overlay_count == 0:
-                cmd_silent.extend(["-map", "0:v:0", "-map", "1:a:0"])
-            else:
+            if uses_graph:
                 cmd_silent.extend(["-map", f"{audio_index}:a:0"])
+            else:
+                cmd_silent.extend(["-map", "0:v:0", "-map", "1:a:0"])
             cmd_silent.append(str(out))
             _run_ffmpeg(cmd_silent, on_time=on_time, duration_s=dur)
 

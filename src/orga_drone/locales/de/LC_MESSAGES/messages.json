@@ -439,5 +439,17 @@
   "Left": "Links",
   "Right": "Rechts",
   "Up": "Oben",
-  "Down": "Unten"
+  "Down": "Unten",
+  "Privacy": "Datenschutz",
+  "Blur": "Weichzeichnen",
+  "Pixelate": "Verpixeln",
+  "Add blur mask": "Weichzeichner hinzufügen",
+  "Add pixelate mask": "Verpixelung hinzufügen",
+  "Effect": "Effekt",
+  "Strength": "Stärke",
+  "Remove mask": "Maske entfernen",
+  "Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.": "Deckt diesen Story-Clip für die gesamte Dauer ab. Die Datei auf der Festplatte bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
+  "Could not save privacy masks.": "Datenschutzmasken konnten nicht gespeichert werden.",
+  "A clip can have up to 8 privacy masks.": "Ein Clip kann höchstens 8 Datenschutzmasken haben.",
+  "A privacy mask could not be rendered. Make the region larger and export again.": "Eine Datenschutzmaske konnte nicht gerendert werden. Vergrößere den Bereich und exportiere erneut."
 }

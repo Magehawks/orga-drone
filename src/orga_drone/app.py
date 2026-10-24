@@ -35,11 +35,12 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
 )
+from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
 from orga_drone.studio_overlay import (
     overlay_preview_model,
     overlays_from_effect_settings,
-    store_overlay_asset,
     resolve_overlay_asset,
+    store_overlay_asset,
 )
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.studio_transition import (
@@ -1049,6 +1050,12 @@ def create_app() -> FastAPI:
                         ]
                         if it.kind in {"photo", "video"}
                         else [],
+                        "masks": [
+                            mask.as_dict()
+                            for mask in masks_from_effect_settings(it.effect_settings)
+                        ]
+                        if it.kind in {"photo", "video"}
+                        else [],
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
                         "applied_transition": applied_by_id.get(it.id),
@@ -1081,6 +1088,7 @@ def create_app() -> FastAPI:
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
+            mask_model=mask_preview_model(),
             overlay_model=overlay_preview_model(),
             favorite_media=favorite_media,
             music_payload=music_payload,
@@ -1555,6 +1563,33 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Overlay image is missing.")
         media_type = "image/png" if path.suffix == ".png" else "image/jpeg"
         return FileResponse(path, media_type=media_type)
+
+    @app.patch("/api/studio/{studio_item_id}/masks")
+    async def api_studio_masks(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include masks")
+        try:
+            item = db.set_studio_masks(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        masks = masks_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "masks": [mask.as_dict() for mask in masks],
+            }
+        )
 
     @app.patch("/api/studio/{studio_item_id}/transition")
     async def api_studio_transition(
