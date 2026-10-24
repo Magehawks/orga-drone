@@ -133,6 +133,11 @@
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
+         data-overlay-model='{{ overlay_model|tojson }}'
+         data-overlay-failed="{{ _('Could not save overlays.')|e }}"
+         data-overlay-missing="{{ _('Overlay image is missing.')|e }}"
+         data-overlay-clamped="{{ _('Overlay timing was shortened to fit this clip.')|e }}"
+         data-overlay-limit="{{ _('This clip already has 8 overlays.')|e }}"
          data-now-playing="{{ _('Now playing')|e }}"
          data-title-card-failed="{{ _('Could not save title card.')|e }}"
          data-select-id="{{ select_id if select_id else '' }}"
@@ -326,6 +331,8 @@
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
           </div>
           <div id="studio-preview-fade-black" class="studio-preview-fade-black" hidden aria-hidden="true"></div>
+          <div id="studio-preview-annotations-b" class="studio-preview-annotations is-layer-b" hidden></div>
+          <div id="studio-preview-annotations" class="studio-preview-annotations" hidden></div>
           <div id="studio-preview-placeholder" class="studio-preview-placeholder">
             <p>{{ _('Select a clip in the Story track.') }}</p>
             <p class="hint">{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.') }}</p>
@@ -479,6 +486,7 @@
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
+                  data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-occupancy-s="{{ '%.4f'|format(row.clip_flex_s) }}"
                   style="--clip-flex: {{ '%.4f'|format(row.clip_flex_s) }};">
                 <button type="button" class="studio-drag-handle" draggable="true"
@@ -584,6 +592,92 @@
           </label>
           <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
           <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+        </div>
+        <div id="inspector-overlays" hidden>
+          <p class="studio-inspector-kind">{{ _('Overlays') }}</p>
+          <div class="studio-overlay-actions">
+            <button type="button" class="button ghost" id="overlay-add-text">{{ _('Text') }}</button>
+            <button type="button" class="button ghost" id="overlay-add-arrow">{{ _('Arrow') }}</button>
+            <button type="button" class="button ghost" id="overlay-add-circle">{{ _('Circle') }}</button>
+            <button type="button" class="button ghost" id="overlay-add-rectangle">{{ _('Rectangle') }}</button>
+            <button type="button" class="button ghost" id="overlay-add-image">{{ _('Image') }}</button>
+            <input type="file" id="overlay-image-file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden>
+          </div>
+          <ul class="studio-overlay-list" id="inspector-overlay-list"></ul>
+          <div id="inspector-overlay-editor" hidden>
+            <label class="studio-inspector-field" data-overlay-field="text">
+              <span>{{ _('Text') }}</span>
+              <input type="text" id="overlay-text" maxlength="80">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Start (s)') }}</span>
+              <input type="number" id="overlay-start" min="0" step="0.1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('End (s)') }}</span>
+              <input type="number" id="overlay-end" min="0.1" step="0.1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('X') }}</span>
+              <input type="number" id="overlay-x" min="0" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Y') }}</span>
+              <input type="number" id="overlay-y" min="0" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Width') }}</span>
+              <input type="number" id="overlay-w" min="4" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Height') }}</span>
+              <input type="number" id="overlay-h" min="4" max="100" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Rotation') }}</span>
+              <input type="number" id="overlay-rotation" min="-180" max="180" step="1">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Animation') }}</span>
+              <select id="overlay-animation">
+                <option value="none">{{ _('None') }}</option>
+                <option value="fade_in">{{ _('Fade in') }}</option>
+                <option value="fade_out">{{ _('Fade out') }}</option>
+                <option value="slide_in">{{ _('Slide in') }}</option>
+              </select>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Animation (s)') }}</span>
+              <input type="number" id="overlay-animation-s" min="0.1" max="2" step="0.1" value="0.4">
+            </label>
+            <label class="studio-inspector-field" data-overlay-field="slide">
+              <span>{{ _('From') }}</span>
+              <select id="overlay-slide-from">
+                <option value="left">{{ _('Left') }}</option>
+                <option value="right">{{ _('Right') }}</option>
+                <option value="up">{{ _('Up') }}</option>
+                <option value="down">{{ _('Down') }}</option>
+              </select>
+            </label>
+            <label class="studio-inspector-field" data-overlay-field="font">
+              <span>{{ _('Font size') }}</span>
+              <input type="number" id="overlay-font" min="3" max="20" step="1">
+            </label>
+            <label class="studio-inspector-field" data-overlay-field="color">
+              <span>{{ _('Color') }}</span>
+              <input type="color" id="overlay-color" value="#ffffff">
+            </label>
+            <label class="studio-inspector-field" data-overlay-field="stroke">
+              <span>{{ _('Stroke') }}</span>
+              <input type="color" id="overlay-stroke" value="#ffffff">
+            </label>
+            <label class="studio-inspector-field" data-overlay-field="fill">
+              <span>{{ _('Fill') }}</span>
+              <input type="color" id="overlay-fill" value="#000000">
+            </label>
+            <button type="button" class="button ghost" id="overlay-remove">{{ _('Remove overlay') }}</button>
+          </div>
+          <p class="hint">{{ _('Overlays stay on this Story clip between their start and end. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
         <label class="studio-inspector-field" id="inspector-photo-duration-wrap" hidden>
           <span>{{ _('Duration (s)') }}</span>

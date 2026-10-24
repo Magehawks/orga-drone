@@ -35,6 +35,12 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     image_adjust_preview_model,
 )
+from orga_drone.studio_overlay import (
+    overlay_preview_model,
+    overlays_from_effect_settings,
+    store_overlay_asset,
+    resolve_overlay_asset,
+)
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.studio_transition import (
     apply_for_items,
@@ -1034,6 +1040,15 @@ def create_app() -> FastAPI:
                         "image_adjust": image_adjust_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "overlays": [
+                            item.as_dict()
+                            for item in overlays_from_effect_settings(
+                                it.effect_settings,
+                                duration_s=float(seconds or it.photo_duration_s or DEFAULT_PHOTO_DURATION_S),
+                            )
+                        ]
+                        if it.kind in {"photo", "video"}
+                        else [],
                         "stored_transition": normalize_type(it.transition),
                         "stored_transition_duration_s": it.transition_duration_s,
                         "applied_transition": applied_by_id.get(it.id),
@@ -1066,6 +1081,7 @@ def create_app() -> FastAPI:
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
+            overlay_model=overlay_preview_model(),
             favorite_media=favorite_media,
             music_payload=music_payload,
             flash_msg=msg,
@@ -1475,6 +1491,70 @@ def create_app() -> FastAPI:
                 "image": image.as_dict(),
             }
         )
+
+    @app.patch("/api/studio/{studio_item_id}/overlays")
+    async def api_studio_overlays(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include overlays")
+        try:
+            item, clamped = db.set_studio_overlays(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        seconds = effective_seconds(
+            kind=item.kind or "photo",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+            source_in_s=item.source_start,
+            source_out_s=item.source_end,
+            card_duration_s=item.card_duration_s,
+        )
+        overlays = overlays_from_effect_settings(
+            item.effect_settings,
+            duration_s=float(seconds or DEFAULT_PHOTO_DURATION_S),
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "clamped": clamped,
+                "overlays": [entry.as_dict() for entry in overlays],
+            }
+        )
+
+    @app.post("/api/studio/overlay-assets")
+    async def api_studio_overlay_asset(request: Request) -> JSONResponse:
+        form = await request.form()
+        upload = form.get("file")
+        if upload is None or not hasattr(upload, "read"):
+            raise HTTPException(status_code=400, detail="overlay image must be a PNG or JPEG")
+        data = await upload.read()
+        try:
+            asset_name = store_overlay_asset(settings.data_dir, data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse({"ok": True, "asset_name": asset_name})
+
+    @app.get("/studio/overlay-assets/{asset_name}")
+    def studio_overlay_asset(asset_name: str) -> FileResponse:
+        try:
+            path = resolve_overlay_asset(settings.data_dir, asset_name)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Overlay image is missing.") from exc
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Overlay image is missing.")
+        media_type = "image/png" if path.suffix == ".png" else "image/jpeg"
+        return FileResponse(path, media_type=media_type)
 
     @app.patch("/api/studio/{studio_item_id}/transition")
     async def api_studio_transition(

@@ -40,7 +40,7 @@ Highlights:
   Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
   when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
-  image adjustment for photos and videos (brightness, contrast, saturation, warmth); time-based
+  image adjustment for photos and videos (brightness, contrast, saturation, warmth); timed text, shape, and image overlays with Fade in, Fade out, and Slide in; time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
   that canvas)
 
