@@ -13,6 +13,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import threading
 import uuid
@@ -21,7 +22,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_config import (
+    HeldExportFile,
+    StudioExportClip,
+    StudioExportConfig,
+)
+from orga_drone.media_mutation import hold_media_mutation
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
@@ -727,20 +733,56 @@ class ExportDestinationApproval(NamedTuple):
 
     identity: tuple[int, int] | None
     protected_identities: tuple[tuple[int, int], ...]
+    file: HeldExportFile | None
+
+
+# Test seam. Called immediately before a protected path is identified.
+before_protected_identity: Callable[[Path], None] | None = None
+
+EXPORT_IDENTITY_UNRELIABLE = (
+    "Export cannot overwrite this file because its identity is not reliable."
+)
 
 
 def _protected_identities(
     protected: Iterable[Path | str],
 ) -> tuple[tuple[int, int], ...]:
-    """File identities of protected originals, read before the destination."""
+    """File identities of protected originals, read before the destination.
+
+    An existing regular file without a reliable identity aborts approval.
+    Otherwise an overwrite could not tell that file from the destination.
+    """
     found: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
     for raw in protected:
-        identity = _file_identity(Path(raw))
-        if identity is None or identity in seen:
+        path = Path(raw)
+        hook = before_protected_identity
+        if hook is not None:
+            hook(path)
+        try:
+            is_file = path.is_file()
+        except OSError:
+            continue
+        if not is_file:
+            continue
+        identity = _file_identity(path)
+        if identity is None:
+            raise StudioExportError(EXPORT_IDENTITY_UNRELIABLE)
+        if identity in seen:
             continue
         seen.add(identity)
         found.append(identity)
+    return tuple(found)
+
+
+def _merge_identities(
+    *groups: Iterable[tuple[int, int]],
+) -> tuple[tuple[int, int], ...]:
+    found: list[tuple[int, int]] = []
+    for group in groups:
+        for identity in group:
+            if identity not in found:
+                found.append(identity)
     return tuple(found)
 
 
@@ -760,10 +802,11 @@ def approve_export_destination(
 ) -> ExportDestinationApproval:
     """Decide the only file a later publish may replace.
 
-    Protected originals are recorded by file identity before ``dest`` is read.
-    A path check after that cannot see an original renamed onto ``dest``,
-    because the catalog still names the old path. ``identity`` is ``None`` when
-    the name was free. A file that appears afterwards is not approved.
+    The caller holds the in-app mutation lock. Protected originals are recorded
+    by file identity before ``dest`` is opened. ``file`` is set only for a
+    confirmed overwrite, and that handle stays open until publish. A free name
+    has no handle and must be created exclusively later. A file that appears
+    afterwards is not approved.
     """
     protected_identities = _protected_identities(protected)
     reject_protected_export_destination(dest, protected)
@@ -771,39 +814,128 @@ def approve_export_destination(
     _reject_if_protected_identity(identity, protected_identities)
     if destination_matches_protected(dest, protected):
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
-    if identity is None:
-        return ExportDestinationApproval(None, protected_identities)
+    try:
+        dest_is_file = dest.is_file()
+    except OSError:
+        dest_is_file = False
+    if not dest_is_file:
+        return ExportDestinationApproval(None, protected_identities, None)
     if not overwrite:
         raise StudioExportError("File already exists. Confirm overwrite to continue.")
-    return ExportDestinationApproval(identity, protected_identities)
+    if identity is None:
+        raise StudioExportError(EXPORT_IDENTITY_UNRELIABLE)
+    fd = _open_export_target(dest)
+    try:
+        current = _file_identity_fd(fd)
+        if current is None or current != identity:
+            raise StudioExportError(EXPORT_IDENTITY_UNRELIABLE)
+        _reject_if_protected_identity(current, protected_identities)
+        if _file_identity(dest) != current:
+            raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+        held = HeldExportFile(fd, current)
+    except Exception:
+        os.close(fd)
+        raise
+    return ExportDestinationApproval(current, protected_identities, held)
 
 
 def _file_identity(path: Path) -> tuple[int, int] | None:
-    """Device and file id, or None when ``path`` is not an existing file."""
+    """Device and file id, or None when the id is missing or not reliable."""
     try:
         st = os.stat(path)
     except OSError:
         return None
+    return _identity_from_stat(st)
+
+
+def _file_identity_fd(fd: int) -> tuple[int, int] | None:
+    try:
+        st = os.fstat(fd)
+    except OSError:
+        return None
+    return _identity_from_stat(st)
+
+
+def _identity_from_stat(st: os.stat_result) -> tuple[int, int] | None:
     if not stat.S_ISREG(st.st_mode):
         return None
-    return (int(st.st_dev), int(st.st_ino))
+    ino = int(st.st_ino)
+    if ino <= 0:
+        return None
+    return (int(st.st_dev), ino)
+
+
+def _open_export_target(path: Path) -> int:
+    """Open ``path`` for overwrite without truncating it.
+
+    On Windows the share mode excludes delete, so the open handle blocks
+    renaming or deleting this name until it is closed.
+    """
+    if sys.platform == "win32":
+        return _open_windows_export_target(path)
+    flags = os.O_RDWR
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    return os.open(path, flags)
+
+
+def _open_windows_export_target(path: Path) -> int:
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    generic_read_write = 0x80000000 | 0x40000000
+    share_read_write = 0x00000001 | 0x00000002
+    invalid = wintypes.HANDLE(-1).value
+    handle = kernel32.CreateFileW(
+        str(path),
+        generic_read_write,
+        share_read_write,
+        None,
+        3,
+        0x80,
+        None,
+    )
+    if handle is None or handle == invalid:
+        err = ctypes.get_last_error()
+        raise OSError(None, os.strerror(err) or "CreateFileW failed", str(path), err)
+    return msvcrt.open_osfhandle(int(handle), os.O_BINARY)
 
 
 def _publish_export_file(
     partial: Path,
     dest: Path,
     *,
-    approved_identity: tuple[int, int] | None,
+    approved_file: HeldExportFile | None,
     protected: Iterable[Path | str],
     protected_identities: Iterable[tuple[int, int]] = (),
 ) -> None:
-    """Publish ``partial`` at ``dest`` without replacing a different file.
+    """Publish ``partial`` at ``dest`` without adopting a different file.
 
-    A free name is claimed with ``os.link`` (or ``O_EXCL`` when linking is not
-    available). Both fail if the name appeared during the encode, so a library
-    file renamed onto ``dest`` is left untouched. Overwrite is allowed only by
-    writing through a handle of the same file that was approved before encoding.
+    A confirmed overwrite writes only through the handle opened at approval.
+    That write can leave the ordinary export file incomplete if it stops
+    midway. A free name is claimed with ``os.link`` or ``O_EXCL`` and is never
+    turned into an overwrite when a file appears later.
     """
+    if approved_file is not None:
+        _write_held_export(
+            approved_file,
+            partial,
+            dest,
+            protected_identities=protected_identities,
+        )
+        return
     if destination_matches_protected(dest, protected):
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
     _reject_if_protected_identity(_file_identity(dest), protected_identities)
@@ -811,24 +943,10 @@ def _publish_export_file(
         os.link(partial, dest)
         return
     except FileExistsError:
-        _overwrite_approved_export(
-            partial,
-            dest,
-            approved_identity=approved_identity,
-            protected=protected,
-            protected_identities=protected_identities,
-        )
-        return
+        _refuse_occupied_destination(dest, protected, protected_identities)
     except OSError as exc:
         if _already_exists(exc) or _file_identity(dest) is not None:
-            _overwrite_approved_export(
-                partial,
-                dest,
-                approved_identity=approved_identity,
-                protected=protected,
-                protected_identities=protected_identities,
-            )
-            return
+            _refuse_occupied_destination(dest, protected, protected_identities)
         _create_export_exclusive(
             partial, dest, protected, protected_identities=protected_identities
         )
@@ -843,47 +961,50 @@ def _already_exists(exc: OSError) -> bool:
     return winerror == 183
 
 
-def _overwrite_approved_export(
+def _write_held_export(
+    approved_file: HeldExportFile,
     partial: Path,
     dest: Path,
     *,
-    approved_identity: tuple[int, int] | None,
-    protected: Iterable[Path | str],
-    protected_identities: Iterable[tuple[int, int]] = (),
+    protected_identities: Iterable[tuple[int, int]],
 ) -> None:
-    """Replace the bytes of the export file approved before encoding.
+    """Write ``partial`` through the handle approved before encoding.
 
-    The handle blocks a rename onto this name on Windows. A different file
-    identity is never written, including one that landed after the check.
+    The handle is not reopened by path. A failure while copying or truncating
+    can leave this ordinary export file incomplete. The handle still refers to
+    the approved file, so a different file that now occupies ``dest`` is not
+    written.
     """
-    if destination_matches_protected(dest, protected):
+    fd = approved_file.fd
+    current = _file_identity_fd(fd)
+    if current is None:
+        raise StudioExportError(EXPORT_IDENTITY_UNRELIABLE)
+    _reject_if_protected_identity(current, protected_identities)
+    if current != approved_file.identity:
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
-    _reject_if_protected_identity(approved_identity, protected_identities)
-    if approved_identity is None:
-        raise StudioExportError(
-            "File already exists. Confirm overwrite to continue."
-        )
-    flags = os.O_RDWR
-    if hasattr(os, "O_BINARY"):
-        flags |= os.O_BINARY
     try:
-        fd = os.open(dest, flags)
-    except OSError as exc:
-        raise StudioExportError(f"Export failed: {exc}") from exc
-    try:
-        current = (int(os.fstat(fd).st_dev), int(os.fstat(fd).st_ino))
-        _reject_if_protected_identity(current, protected_identities)
-        if current != approved_identity or _file_identity(dest) != current:
-            raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+        os.lseek(fd, 0, os.SEEK_SET)
         written = _copy_file_into_fd(fd, partial)
         if written <= 0:
             raise StudioExportError("Export failed: empty output.")
         os.ftruncate(fd, written)
         os.fsync(fd)
-        if _file_identity(dest) != current:
-            raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
-    finally:
-        os.close(fd)
+    except OSError as exc:
+        raise StudioExportError(f"Export failed: {exc}") from exc
+    if _file_identity(dest) != current:
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+
+
+def _refuse_occupied_destination(
+    dest: Path,
+    protected: Iterable[Path | str],
+    protected_identities: Iterable[tuple[int, int]],
+) -> None:
+    """A free name is no longer free. Do not write the file that appeared."""
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    _reject_if_protected_identity(_file_identity(dest), protected_identities)
+    raise StudioExportError("File already exists. Confirm overwrite to continue.")
 
 
 def _create_export_exclusive(
@@ -1152,13 +1273,28 @@ class FfmpegStudioEncoder:
         if not os_access_writable(parent):
             raise StudioExportError("Export folder is not writable.")
         protected = _config_protected_paths(config)
-        reject_protected_export_destination(dest, protected)
-        # The destination check already chose the only replaceable file.
-        # Statting here would treat a file that landed in the meantime as approved.
-        approved_identity = config.approved_identity
-        current = _file_identity(dest)
+        occupied = False
+        protected_identities = config.protected_identities
+        try:
+            with hold_media_mutation():
+                source_identities = _protected_identities(protected)
+                protected_identities = _merge_identities(
+                    config.protected_identities, source_identities
+                )
+                reject_protected_export_destination(dest, protected)
+                occupied = False
+                if config.approved_file is None:
+                    current = _file_identity(dest)
+                    _reject_if_protected_identity(current, protected_identities)
+                    occupied = current is not None
+        except Exception:
+            if config.approved_file is not None:
+                config.approved_file.close()
+            raise
         ffmpeg = find_ffmpeg()
         if not ffmpeg:
+            if config.approved_file is not None:
+                config.approved_file.close()
             raise StudioExportError(
                 "ffmpeg is not available. Install ffmpeg or use a build that includes it."
             )
@@ -1170,13 +1306,7 @@ class FfmpegStudioEncoder:
         token = _cancel_event.set(cancel_event)
         try:
             _raise_if_cancelled()
-            _reject_if_protected_identity(current, config.protected_identities)
-            if current is not None and current != approved_identity:
-                if (
-                    destination_matches_protected(dest, protected)
-                    or approved_identity is not None
-                ):
-                    raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+            if occupied:
                 raise StudioExportError(
                     "File already exists. Confirm overwrite to continue."
                 )
@@ -1242,9 +1372,9 @@ class FfmpegStudioEncoder:
             _publish_export_file(
                 partial,
                 dest,
-                approved_identity=approved_identity,
+                approved_file=config.approved_file,
                 protected=protected,
-                protected_identities=config.protected_identities,
+                protected_identities=protected_identities,
             )
             _emit(
                 on_progress,
@@ -1259,6 +1389,8 @@ class FfmpegStudioEncoder:
         except Exception as exc:  # noqa: BLE001
             raise StudioExportError(f"Export failed: {exc}") from exc
         finally:
+            if config.approved_file is not None:
+                config.approved_file.close()
             partial.unlink(missing_ok=True)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             _cancel_event.reset(token)
@@ -2068,7 +2200,11 @@ def _run_ffmpeg(
     finally:
         if popen is not None and event is not None:
             _unbind_export_process(event, popen)
-        err_path.unlink(missing_ok=True)
+        # A killed ffmpeg can still hold this temp file for a moment on Windows.
+        try:
+            err_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def get_default_encoder() -> StudioVideoEncoder:

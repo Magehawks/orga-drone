@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 import threading
 from collections.abc import Iterable
 from io import BytesIO
@@ -536,6 +537,129 @@ def test_rename_during_approval_is_not_an_overwrite_target(
     assert not other.exists()
 
 
+def test_rename_during_identity_capture_keeps_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An in-app rename started while identities are captured cannot replace the original.
+
+    The capture pauses before the second indexed file is identified. rename_media
+    then targets the export name. Either the rename or the export is rejected.
+    """
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    other_id = _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = root / "Story.MP4"
+    from orga_drone import media_mutation
+    from orga_drone.export import studio_encoder
+    from orga_drone.ops.rename import rename_media
+
+    paused = threading.Event()
+    release = threading.Event()
+    rename_waiting = threading.Event()
+    gate = {"used": False, "export_ident": 0}
+    outcome: dict[str, BaseException | None] = {"export": None, "rename": None}
+
+    def before_identity(path: Path) -> None:
+        if gate["used"]:
+            return
+        try:
+            matches = path.resolve() == other.resolve()
+        except OSError:
+            matches = False
+        if not matches:
+            return
+        gate["used"] = True
+        gate["export_ident"] = threading.get_ident()
+
+        def about_to_lock() -> None:
+            if threading.get_ident() != gate["export_ident"]:
+                rename_waiting.set()
+
+        media_mutation.before_media_mutation_lock = about_to_lock
+        paused.set()
+        assert release.wait(30)
+
+    def run_export() -> None:
+        try:
+            run_studio_export(
+                db,
+                height=720,
+                output_path=dest,
+                overwrite=False,
+            )
+        except Exception as exc:  # noqa: BLE001
+            outcome["export"] = exc
+
+    def run_rename() -> None:
+        try:
+            item = db.get_media(other_id)
+            assert item is not None
+            rename_media(db, item, "Story")
+        except Exception as exc:  # noqa: BLE001
+            outcome["rename"] = exc
+
+    studio_encoder.before_protected_identity = before_identity
+    export_thread = threading.Thread(target=run_export)
+    rename_thread = threading.Thread(target=run_rename)
+    try:
+        export_thread.start()
+        assert paused.wait(30)
+        rename_thread.start()
+        assert rename_waiting.wait(30)
+        release.set()
+        export_thread.join(60)
+        rename_thread.join(30)
+    finally:
+        release.set()
+        studio_encoder.before_protected_identity = None
+        media_mutation.before_media_mutation_lock = None
+        export_thread.join(5)
+        rename_thread.join(5)
+    assert gate["used"] is True
+    assert not export_thread.is_alive()
+    assert not rename_thread.is_alive()
+    assert outcome["export"] is not None or outcome["rename"] is not None
+    assert _sha256(source) == source_hash
+    preserved = False
+    if other.exists():
+        assert other.read_bytes() == other_bytes
+        assert _sha256(other) == other_hash
+        preserved = True
+    if dest.exists() and dest.read_bytes() == other_bytes:
+        preserved = True
+        assert outcome["export"] is not None
+    assert preserved
+
+
+def test_windows_export_handle_blocks_rename(tmp_path: Path) -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows share mode excludes delete")
+    from orga_drone.export.studio_encoder import _open_export_target
+
+    dest = tmp_path / "story.mp4"
+    dest.write_bytes(b"ordinary-export")
+    other = tmp_path / "other.mp4"
+    other.write_bytes(b"original-bytes")
+    fd = _open_export_target(dest)
+    try:
+        with pytest.raises(OSError):
+            os.replace(other, dest)
+        assert other.read_bytes() == b"original-bytes"
+        assert dest.read_bytes() == b"ordinary-export"
+    finally:
+        os.close(fd)
+
+
 def test_rename_onto_approved_overwrite_keeps_indexed_original(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -555,15 +679,20 @@ def test_rename_onto_approved_overwrite_keeps_indexed_original(
     other_hash = hashlib.sha256(other_bytes).hexdigest()
     dest = root / "Story.mp4"
     dest.write_bytes(b"ordinary-export")
-    moved = {"done": False}
+    moved = {"done": False, "replaced": False}
 
     def on_progress(payload: dict[str, object]) -> None:
         if moved["done"] or payload.get("phase") != "rendering":
             return
-        os.replace(other, dest)
         moved["done"] = True
+        try:
+            os.replace(other, dest)
+        except OSError:
+            return
+        moved["replaced"] = True
 
-    with pytest.raises(StudioExportError, match=_PROTECTED):
+    export_error: StudioExportError | None = None
+    try:
         run_studio_export(
             db,
             height=720,
@@ -571,10 +700,16 @@ def test_rename_onto_approved_overwrite_keeps_indexed_original(
             overwrite=True,
             on_progress=on_progress,
         )
+    except StudioExportError as exc:
+        export_error = exc
     assert moved["done"] is True
     assert _sha256(source) == source_hash
-    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
-    assert dest.read_bytes() == other_bytes
+    if moved["replaced"]:
+        assert export_error is not None
+        assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    else:
+        assert hashlib.sha256(other.read_bytes()).hexdigest() == other_hash
+        assert other.read_bytes() == other_bytes
 
 
 def test_real_encoder_success_overwrite_and_cancel(

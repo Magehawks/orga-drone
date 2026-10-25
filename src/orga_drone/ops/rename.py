@@ -8,6 +8,7 @@ from pathlib import Path
 
 from orga_drone.db import Database, MediaRow
 from orga_drone.media_files import is_under_root, resolve_media_file
+from orga_drone.media_mutation import hold_media_mutation
 
 SAFE_STEM_RE = re.compile(r"^[\w.\- ()\[\]]+$", re.UNICODE)
 
@@ -71,20 +72,31 @@ def rename_media(db: Database, item: MediaRow, new_stem: str) -> RenameResult:
         return RenameResult(media_id=item.id, renamed=[], new_filename=item.filename)
 
     renamed: list[tuple[str, str]] = []
-    for old, new_path in planned:
-        old.rename(new_path)
-        renamed.append((old.name, new_path.name))
-        db.repath_file(str(old.resolve()), str(new_path.resolve()), new_stem=new_path.stem)
+    with hold_media_mutation():
+        for old, new_path in planned:
+            if new_path.exists() and new_path.resolve() != old.resolve():
+                raise RenameError(f"target exists: {new_path.name}")
+            old.rename(new_path)
+            renamed.append((old.name, new_path.name))
+            db.repath_file(
+                str(old.resolve()), str(new_path.resolve()), new_stem=new_path.stem
+            )
 
-    media_path = source.parent / (stem + source.suffix)
-    has_lrf = media_path.with_suffix(".LRF").exists() or media_path.with_suffix(".lrf").exists()
-    has_srt = media_path.with_suffix(".SRT").exists() or media_path.with_suffix(".srt").exists()
-    db.update_media_identity(
-        item.id,
-        filename=media_path.name,
-        path=str(media_path.resolve()),
-        has_lrf=1 if has_lrf else 0,
-        has_srt=1 if has_srt else 0,
-    )
+        media_path = source.parent / (stem + source.suffix)
+        has_lrf = (
+            media_path.with_suffix(".LRF").exists()
+            or media_path.with_suffix(".lrf").exists()
+        )
+        has_srt = (
+            media_path.with_suffix(".SRT").exists()
+            or media_path.with_suffix(".srt").exists()
+        )
+        db.update_media_identity(
+            item.id,
+            filename=media_path.name,
+            path=str(media_path.resolve()),
+            has_lrf=1 if has_lrf else 0,
+            has_srt=1 if has_srt else 0,
+        )
 
     return RenameResult(media_id=item.id, renamed=renamed, new_filename=media_path.name)

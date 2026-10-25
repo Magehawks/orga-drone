@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -60,6 +61,34 @@ class StudioExportMusic:
     duration_s: float = 0.0
 
 
+@dataclass
+class HeldExportFile:
+    """Handle of the one ordinary file a confirmed overwrite may replace.
+
+    The handle stays open until publish. On Windows it is opened without
+    sharing delete, so another program cannot rename or delete that name while
+    the export runs. Bytes are written only through this handle. A write that
+    stops midway can leave this ordinary export file incomplete. No other file
+    is written.
+    """
+
+    fd: int
+    identity: tuple[int, int]
+    _closed: bool = field(default=False, repr=False)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        os.close(self.fd)
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except OSError:
+            pass
+
+
 @dataclass(frozen=True)
 class StudioExportConfig:
     """User-facing export intent without encoder/codec details."""
@@ -76,6 +105,8 @@ class StudioExportConfig:
     approved_identity: tuple[int, int] | None = None
     # Identities of protected originals, captured before the destination is read.
     protected_identities: tuple[tuple[int, int], ...] = ()
+    # Open handle for a confirmed overwrite. None when the name was free.
+    approved_file: HeldExportFile | None = None
 
     def __post_init__(self) -> None:
         if self.music is not None and not self.music_tracks:

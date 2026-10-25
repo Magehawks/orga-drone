@@ -22,6 +22,7 @@ from orga_drone.export.studio_encoder import (
     get_default_encoder,
     os_access_writable,
 )
+from orga_drone.media_mutation import hold_media_mutation
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
 from orga_drone.studio_frame import FrameTransform, frame_from_effect_settings
@@ -453,12 +454,14 @@ def prepare_studio_export(
         raise StudioExportError("Export folder is not writable.")
     # Overwrite may replace a previous export. It must not replace library
     # media, sidecars, soundtrack files, or other project assets. The identity
-    # is fixed here and is the only file the encoder may replace.
-    approval = approve_export_destination(
-        dest,
-        overwrite=overwrite,
-        protected=_protected_export_paths(db),
-    )
+    # and, for a confirmed overwrite, the open handle are fixed here. The lock
+    # is not held while clips are built or while ffmpeg runs.
+    with hold_media_mutation():
+        approval = approve_export_destination(
+            dest,
+            overwrite=overwrite,
+            protected=_protected_export_paths(db),
+        )
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
@@ -468,6 +471,8 @@ def prepare_studio_export(
             export_clips.append(built)
             source_items.append(clip)
     if not export_clips:
+        if approval.file is not None:
+            approval.file.close()
         raise StudioExportError("No available media to export.")
 
     from dataclasses import replace
@@ -516,16 +521,22 @@ def prepare_studio_export(
             )
         )
 
-    return StudioExportConfig(
-        output_path=dest,
-        width=width,
-        height=int(height),
-        clips=tuple(export_clips),
-        project_title=project.title,
-        music_tracks=tuple(music_tracks),
-        approved_identity=approval.identity,
-        protected_identities=approval.protected_identities,
-    )
+    try:
+        return StudioExportConfig(
+            output_path=dest,
+            width=width,
+            height=int(height),
+            clips=tuple(export_clips),
+            project_title=project.title,
+            music_tracks=tuple(music_tracks),
+            approved_identity=approval.identity,
+            protected_identities=approval.protected_identities,
+            approved_file=approval.file,
+        )
+    except Exception:
+        if approval.file is not None:
+            approval.file.close()
+        raise
 
 
 def append_export_log(message: str) -> None:
