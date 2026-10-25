@@ -400,6 +400,7 @@ def _segment_filter_invocation(
                 frame_height=height,
                 source_width=source_w,
                 source_height=source_h,
+                frame=clip.frame,
             )
             graph = ffmpeg_mask_graph(
                 base_chain=chain,
@@ -576,6 +577,7 @@ def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list
             frame_height=height,
             source_width=source_w,
             source_height=source_h,
+            frame=clip.frame,
         )
         graph = ffmpeg_mask_graph(base_chain=chain, fades=fades, windows=windows)
     except MaskRenderError as exc:

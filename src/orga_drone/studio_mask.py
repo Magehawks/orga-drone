@@ -5,8 +5,10 @@ pixelate effect. The region is fractions of the fitted picture so a later slice
 can add a time range without a new coordinate system. This slice covers the
 whole clip. Source files are never modified.
 
-Values live in ``studio_clips.effect_settings`` under ``masks``. Filter text
-contains only formatted numbers. Preview approximates the export.
+Values live in ``studio_clips.effect_settings`` under ``masks``. The box is a
+fraction of the visible picture after zoom and pan, so preview and export
+cover the same pixels. Filter text contains only formatted numbers. Preview
+approximates the export.
 """
 
 from __future__ import annotations
@@ -16,6 +18,8 @@ import math
 import re
 from dataclasses import dataclass
 from typing import Mapping, Sequence
+
+from orga_drone.studio_frame import FrameTransform, sample_frame, source_window
 
 MAX_MASKS = 8
 MIN_BOX = 0.04
@@ -297,6 +301,52 @@ def mask_box_pixels(
     return left, top, width, height
 
 
+def visible_picture_rect(
+    *,
+    frame_width: int,
+    frame_height: int,
+    source_width: int,
+    source_height: int,
+    frame: FrameTransform | None = None,
+) -> tuple[int, int, int, int]:
+    """Picture the mask sits on in the export frame.
+
+    Zoom and pan already crop that picture before the mask runs. The overlay
+    therefore uses the full frame, the same space the preview window shows.
+    """
+    if frame is not None and not frame.is_neutral:
+        return 0, 0, int(frame_width), int(frame_height)
+    return content_rect(frame_width, frame_height, source_width, source_height)
+
+
+def preview_source_rect(
+    mask: Mask,
+    *,
+    source_width: int,
+    source_height: int,
+    frame: FrameTransform | None = None,
+    progress: float = 0.0,
+) -> tuple[float, float, float, float]:
+    """Source crop that the preview must sample for one mask.
+
+    Without zoom this is the mask on the full picture. With zoom it is the
+    same region of the visible window that export shows after the crop.
+    """
+    src_w = max(1.0, float(source_width))
+    src_h = max(1.0, float(source_height))
+    if frame is None or frame.is_neutral:
+        return mask.x * src_w, mask.y * src_h, mask.w * src_w, mask.h * src_h
+    zoom, focal_x, focal_y = sample_frame(frame, progress)
+    left, top, view_w, view_h = source_window(
+        zoom,
+        focal_x,
+        focal_y,
+        source_width=int(source_width),
+        source_height=int(source_height),
+    )
+    return left + mask.x * view_w, top + mask.y * view_h, mask.w * view_w, mask.h * view_h
+
+
 def mask_windows(
     masks: Sequence[Mask],
     *,
@@ -304,11 +354,18 @@ def mask_windows(
     frame_height: int,
     source_width: int,
     source_height: int,
+    frame: FrameTransform | None = None,
 ) -> tuple[MaskWindow, ...]:
     """Place every mask. One failure aborts so export cannot drop a mask."""
     if not masks:
         raise MaskRenderError("no privacy masks")
-    fitted = content_rect(frame_width, frame_height, source_width, source_height)
+    fitted = visible_picture_rect(
+        frame_width=frame_width,
+        frame_height=frame_height,
+        source_width=source_width,
+        source_height=source_height,
+        frame=frame,
+    )
     _origin_x, _origin_y, content_w, content_h = fitted
     windows: list[MaskWindow] = []
     for mask in masks:

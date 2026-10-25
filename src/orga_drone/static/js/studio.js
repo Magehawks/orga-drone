@@ -1364,15 +1364,53 @@
     return Math.max(1, amount);
   }
 
+  function sourceWindowForMask(media, srcW, srcH) {
+    const frameRect = media.getBoundingClientRect();
+    const clip = clipForPreviewMedia(media);
+    const frame = clip ? readFrame(clip) : { zoom_start: 1, zoom_end: 1, x_start: 0.5, y_start: 0.5, x_end: 0.5, y_end: 0.5 };
+    const hit = resolveAt(state.projectTimeS);
+    const localS =
+      clip && hit && hit.overlapClip === clip
+        ? hit.overlapLocalS
+        : hit && hit.clip === clip
+          ? hit.localS
+          : 0;
+    const sample = sampleFrame(frame, clip ? framePreviewProgress(clip, localS) : 0);
+    if (sample.zoom <= 1.001) {
+      return { x: 0, y: 0, w: srcW, h: srcH };
+    }
+    const win = windowFor(sample.zoom, sample.x, sample.y, frameRect.width, frameRect.height, srcW, srcH);
+    const scale = srcW / win.content.w;
+    return {
+      x: (win.x - win.content.x) * scale,
+      y: (win.y - win.content.y) * scale,
+      w: win.w * scale,
+      h: win.h * scale,
+    };
+  }
+
+  function clipForPreviewMedia(media) {
+    if (media === previewVideo || media === previewImage) {
+      const hit = resolveAt(state.projectTimeS);
+      return hit && hit.clip ? hit.clip : null;
+    }
+    if (media === previewVideoB || media === previewImageB) {
+      const hit = resolveAt(state.projectTimeS);
+      return hit && hit.overlapClip ? hit.overlapClip : null;
+    }
+    return null;
+  }
+
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
     const dx = mask.x * box.width;
     const dy = mask.y * box.height;
     const dw = Math.max(1, mask.w * box.width);
     const dh = Math.max(1, mask.h * box.height);
-    const sx = mask.x * srcW;
-    const sy = mask.y * srcH;
-    const sw = Math.max(1, mask.w * srcW);
-    const sh = Math.max(1, mask.h * srcH);
+    const view = sourceWindowForMask(media, srcW, srcH);
+    const sx = view.x + mask.x * view.w;
+    const sy = view.y + mask.y * view.h;
+    const sw = Math.max(1, mask.w * view.w);
+    const sh = Math.max(1, mask.h * view.h);
     ctx.save();
     ctx.beginPath();
     ctx.rect(dx, dy, dw, dh);
@@ -1399,8 +1437,8 @@
         ctx.drawImage(maskScratch, 0, 0, cols, rows, dx, dy, dw, dh);
       } else {
         const radius = effectAmount(mask.strength, box.width, box.height, maskModel.blurFraction);
-        const padX = (radius / box.width) * srcW;
-        const padY = (radius / box.height) * srcH;
+        const padX = (radius / box.width) * view.w;
+        const padY = (radius / box.height) * view.h;
         ctx.filter = `blur(${radius}px)`;
         ctx.drawImage(
           media,
