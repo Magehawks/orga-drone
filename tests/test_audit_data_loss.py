@@ -6,6 +6,7 @@ import hashlib
 import os
 import subprocess
 import threading
+from collections.abc import Iterable
 from io import BytesIO
 from pathlib import Path
 
@@ -463,13 +464,69 @@ def test_rename_before_encoder_start_is_not_approved(
         os.replace(other, dest)
         moved["done"] = True
 
-    with pytest.raises(StudioExportError, match="File already exists"):
+    with pytest.raises(StudioExportError, match=_PROTECTED):
         run_studio_export(
             db,
             height=720,
             output_path=dest,
             overwrite=False,
             on_progress=on_progress,
+        )
+    assert moved["done"] is True
+    assert _sha256(source) == source_hash
+    assert dest.is_file()
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    assert dest.read_bytes() == other_bytes
+    assert not other.exists()
+
+
+def test_rename_during_approval_is_not_an_overwrite_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An original renamed onto dest inside the approval is not approved.
+
+    The rename runs after the path check and before the destination identity
+    is read. The catalog still has the old path, so only the captured file
+    identity can recognize the original.
+    """
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = root / "Story.mp4"
+    dest.write_bytes(b"ordinary-export")
+    moved = {"done": False}
+    from orga_drone.export import studio_encoder
+
+    real_reject = studio_encoder.reject_protected_export_destination
+
+    def reject_then_rename(path: Path, protected: Iterable[Path | str]) -> None:
+        real_reject(path, protected)
+        if moved["done"] or path.name != dest.name:
+            return
+        os.replace(other, path)
+        moved["done"] = True
+
+    monkeypatch.setattr(
+        studio_encoder,
+        "reject_protected_export_destination",
+        reject_then_rename,
+    )
+    with pytest.raises(StudioExportError, match=_PROTECTED):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
         )
     assert moved["done"] is True
     assert _sha256(source) == source_hash

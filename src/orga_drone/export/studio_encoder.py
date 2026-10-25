@@ -19,7 +19,7 @@ import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
@@ -722,27 +722,60 @@ def reject_protected_export_destination(
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
 
 
+class ExportDestinationApproval(NamedTuple):
+    """The only replaceable file, and originals that must not be written."""
+
+    identity: tuple[int, int] | None
+    protected_identities: tuple[tuple[int, int], ...]
+
+
+def _protected_identities(
+    protected: Iterable[Path | str],
+) -> tuple[tuple[int, int], ...]:
+    """File identities of protected originals, read before the destination."""
+    found: list[tuple[int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for raw in protected:
+        identity = _file_identity(Path(raw))
+        if identity is None or identity in seen:
+            continue
+        seen.add(identity)
+        found.append(identity)
+    return tuple(found)
+
+
+def _reject_if_protected_identity(
+    identity: tuple[int, int] | None,
+    protected_identities: Iterable[tuple[int, int]],
+) -> None:
+    if identity is not None and identity in set(protected_identities):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+
+
 def approve_export_destination(
     dest: Path,
     *,
     overwrite: bool,
     protected: Iterable[Path | str],
-) -> tuple[int, int] | None:
+) -> ExportDestinationApproval:
     """Decide the only file a later publish may replace.
 
-    Called at the destination check. ``None`` means the name was free, so
-    publish may only create it. A file that appears afterwards is not approved,
-    including when ``overwrite`` is false.
+    Protected originals are recorded by file identity before ``dest`` is read.
+    A path check after that cannot see an original renamed onto ``dest``,
+    because the catalog still names the old path. ``identity`` is ``None`` when
+    the name was free. A file that appears afterwards is not approved.
     """
+    protected_identities = _protected_identities(protected)
     reject_protected_export_destination(dest, protected)
     identity = _file_identity(dest)
-    if identity is None:
-        return None
+    _reject_if_protected_identity(identity, protected_identities)
     if destination_matches_protected(dest, protected):
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    if identity is None:
+        return ExportDestinationApproval(None, protected_identities)
     if not overwrite:
         raise StudioExportError("File already exists. Confirm overwrite to continue.")
-    return identity
+    return ExportDestinationApproval(identity, protected_identities)
 
 
 def _file_identity(path: Path) -> tuple[int, int] | None:
@@ -762,6 +795,7 @@ def _publish_export_file(
     *,
     approved_identity: tuple[int, int] | None,
     protected: Iterable[Path | str],
+    protected_identities: Iterable[tuple[int, int]] = (),
 ) -> None:
     """Publish ``partial`` at ``dest`` without replacing a different file.
 
@@ -772,12 +806,17 @@ def _publish_export_file(
     """
     if destination_matches_protected(dest, protected):
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    _reject_if_protected_identity(_file_identity(dest), protected_identities)
     try:
         os.link(partial, dest)
         return
     except FileExistsError:
         _overwrite_approved_export(
-            partial, dest, approved_identity=approved_identity, protected=protected
+            partial,
+            dest,
+            approved_identity=approved_identity,
+            protected=protected,
+            protected_identities=protected_identities,
         )
         return
     except OSError as exc:
@@ -787,9 +826,12 @@ def _publish_export_file(
                 dest,
                 approved_identity=approved_identity,
                 protected=protected,
+                protected_identities=protected_identities,
             )
             return
-        _create_export_exclusive(partial, dest, protected)
+        _create_export_exclusive(
+            partial, dest, protected, protected_identities=protected_identities
+        )
 
 
 def _already_exists(exc: OSError) -> bool:
@@ -807,6 +849,7 @@ def _overwrite_approved_export(
     *,
     approved_identity: tuple[int, int] | None,
     protected: Iterable[Path | str],
+    protected_identities: Iterable[tuple[int, int]] = (),
 ) -> None:
     """Replace the bytes of the export file approved before encoding.
 
@@ -815,6 +858,7 @@ def _overwrite_approved_export(
     """
     if destination_matches_protected(dest, protected):
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    _reject_if_protected_identity(approved_identity, protected_identities)
     if approved_identity is None:
         raise StudioExportError(
             "File already exists. Confirm overwrite to continue."
@@ -828,6 +872,7 @@ def _overwrite_approved_export(
         raise StudioExportError(f"Export failed: {exc}") from exc
     try:
         current = (int(os.fstat(fd).st_dev), int(os.fstat(fd).st_ino))
+        _reject_if_protected_identity(current, protected_identities)
         if current != approved_identity or _file_identity(dest) != current:
             raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
         written = _copy_file_into_fd(fd, partial)
@@ -842,7 +887,11 @@ def _overwrite_approved_export(
 
 
 def _create_export_exclusive(
-    partial: Path, dest: Path, protected: Iterable[Path | str]
+    partial: Path,
+    dest: Path,
+    protected: Iterable[Path | str],
+    *,
+    protected_identities: Iterable[tuple[int, int]] = (),
 ) -> None:
     """Create ``dest`` only if the name is still free."""
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
@@ -853,6 +902,7 @@ def _create_export_exclusive(
     except FileExistsError:
         if destination_matches_protected(dest, protected):
             raise StudioExportError(EXPORT_DESTINATION_PROTECTED) from None
+        _reject_if_protected_identity(_file_identity(dest), protected_identities)
         raise StudioExportError(
             "File already exists. Confirm overwrite to continue."
         ) from None
@@ -860,6 +910,7 @@ def _create_export_exclusive(
         if _already_exists(exc) or _file_identity(dest) is not None:
             if destination_matches_protected(dest, protected):
                 raise StudioExportError(EXPORT_DESTINATION_PROTECTED) from exc
+            _reject_if_protected_identity(_file_identity(dest), protected_identities)
             raise StudioExportError(
                 "File already exists. Confirm overwrite to continue."
             ) from exc
@@ -1119,6 +1170,7 @@ class FfmpegStudioEncoder:
         token = _cancel_event.set(cancel_event)
         try:
             _raise_if_cancelled()
+            _reject_if_protected_identity(current, config.protected_identities)
             if current is not None and current != approved_identity:
                 if (
                     destination_matches_protected(dest, protected)
@@ -1192,6 +1244,7 @@ class FfmpegStudioEncoder:
                 dest,
                 approved_identity=approved_identity,
                 protected=protected,
+                protected_identities=config.protected_identities,
             )
             _emit(
                 on_progress,

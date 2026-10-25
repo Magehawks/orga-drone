@@ -74,6 +74,8 @@ class StudioExportConfig:
     # Identity approved when the destination was checked. None means the name
     # was free: publish may create it and must not replace a file that appears later.
     approved_identity: tuple[int, int] | None = None
+    # Identities of protected originals, captured before the destination is read.
+    protected_identities: tuple[tuple[int, int], ...] = ()
 
     def __post_init__(self) -> None:
         if self.music is not None and not self.music_tracks:

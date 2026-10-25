@@ -454,7 +454,7 @@ def prepare_studio_export(
     # Overwrite may replace a previous export. It must not replace library
     # media, sidecars, soundtrack files, or other project assets. The identity
     # is fixed here and is the only file the encoder may replace.
-    approved_identity = approve_export_destination(
+    approval = approve_export_destination(
         dest,
         overwrite=overwrite,
         protected=_protected_export_paths(db),
@@ -523,7 +523,8 @@ def prepare_studio_export(
         clips=tuple(export_clips),
         project_title=project.title,
         music_tracks=tuple(music_tracks),
-        approved_identity=approved_identity,
+        approved_identity=approval.identity,
+        protected_identities=approval.protected_identities,
     )
 
 
