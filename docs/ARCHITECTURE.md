@@ -79,7 +79,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `albums` | User-named library albums (independent of `studio_projects`) |
 | `album_items` | Non-destructive media references (`media_path` + `identity_key` + optional `source_media_id`); one file may appear in several albums; survives rescan; listed as offline when the file is not on disk |
 | `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
-| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; video saturation ramp under `saturation_ramp`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`; optional flight-map box under `map`, drawn from stored GPS with no map tiles; optional video telemetry HUD under `hud`); survives rescan |
+| `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; video saturation ramp under `saturation_ramp`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`; optional flight-map box under `map`, drawn from stored GPS over cached OpenStreetMap tiles when a tile can be fetched, otherwise a plain panel; optional video telemetry HUD under `hud`); survives rescan |
 | `studio_audio_clips` | Optional sequential soundtrack playlist (up to 8 songs; `duration_s`; volume/fades; loop when N=1; read-only path outside library roots allowed; not library media) |
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
@@ -88,15 +88,18 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
 
-1. If the root cannot be listed (missing drive, disconnected share, or an OS
-   error while walking it), keep the existing catalog and report the source
-   offline. Do not clear `media` or user metadata.
+1. If the root cannot be listed (missing drive or disconnected share), keep
+   the existing catalog and report the source offline. Do not clear `media`
+   or user metadata. A child folder that cannot be listed keeps the catalog
+   entries already stored under that folder; the rest of the root is scanned.
 2. Recursively find media files under a root
 3. Skip metadata extraction when the stored asset size and mtime match
-   (ADR 0020). Parse new or changed files before replacing any index rows.
+   (ADR 0020). A sibling SRT is included by its own size and mtime. Parse new
+   or changed files before replacing any index rows.
    If the source disappears during that read, keep the existing catalog.
 4. Drop index rows for this root whose paths were not found, and only if the
-   root is still listable (`media_meta`, `album_items`, and `studio_clips` stay).
+   root is still listable. Paths under a child folder that could not be listed
+   stay. `media_meta`, `album_items`, and `studio_clips` stay.
    An empty but listable folder is a confirmed deletion.
 5. Upsert new or changed files, then relink user meta, album membership,
    Studio membership, and auto-tags for those parsed files. A size/mtime

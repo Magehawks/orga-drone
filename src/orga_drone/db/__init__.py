@@ -556,6 +556,8 @@ class Database:
             conn.execute("ALTER TABLE media ADD COLUMN width INTEGER")
         if "height" not in media_cols:
             conn.execute("ALTER TABLE media ADD COLUMN height INTEGER")
+        if "srt_token" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN srt_token TEXT")
         conn.execute(
             """CREATE TABLE IF NOT EXISTS geocode_cache (
                 lat_key REAL NOT NULL,
@@ -1056,7 +1058,7 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT a.id AS asset_id, a.path, a.kind, a.size_bytes, a.mtime,
-                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf
+                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf, m.srt_token
                    FROM assets a
                    LEFT JOIN media m
                      ON m.path = a.path AND m.root_id = a.root_id
@@ -1075,6 +1077,7 @@ class Database:
                 "media_id": media_id,
                 "has_srt": int(row["has_srt"] or 0) if media_id is not None else 0,
                 "has_lrf": int(row["has_lrf"] or 0) if media_id is not None else 0,
+                "srt_token": None if row["srt_token"] is None else str(row["srt_token"]),
             }
         return found
 
@@ -1124,6 +1127,14 @@ class Database:
         """
         with self.connect() as conn:
             conn.execute("DELETE FROM media WHERE id = ?", (media_id,))
+
+    def set_media_srt_token(self, media_id: int, token: str) -> None:
+        """Remember the sibling SRT size and mtime used for this media row."""
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE media SET srt_token = ? WHERE id = ?",
+                (token, media_id),
+            )
 
     def set_media_sidecar_flags(
         self,

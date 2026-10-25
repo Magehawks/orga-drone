@@ -48,6 +48,7 @@ from orga_drone.studio_image import (
     saturation_ramp_from_effect_settings,
 )
 from orga_drone.studio_map import (
+    cached_osm_tile,
     gps_from_stored,
     map_from_effect_settings,
     map_preview_model,
@@ -1176,7 +1177,7 @@ def create_app() -> FastAPI:
                                 media_duration_s=media_row.duration_s,
                             )
                             if media_row is not None and it.kind in {"photo", "video"}
-                            else {"line": [], "marker": []}
+                            else {"line": [], "marker": [], "tiles": []}
                         ),
                         "hud": hud_state,
                         "stored_transition": normalize_type(it.transition),
@@ -1775,6 +1776,14 @@ def create_app() -> FastAPI:
                 "frame": frame.as_dict(),
             }
         )
+
+    @app.get("/map-tiles/{z}/{x}/{y}.png")
+    async def map_tile(z: int, x: int, y: int) -> FileResponse:
+        """One cached OpenStreetMap tile for the Studio flight-map panel."""
+        path = cached_osm_tile(z, x, y)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Map tile is not available")
+        return FileResponse(path, media_type="image/png")
 
     @app.patch("/api/studio/{studio_item_id}/map")
     async def api_studio_map(

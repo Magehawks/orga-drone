@@ -13,6 +13,7 @@ from PIL import Image
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
 from orga_drone.export.studio_config import StudioExportClip
+from orga_drone.studio_mask import Mask
 from orga_drone.export.studio_encoder import _segment_filter_invocation
 from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_image import image_adjust_from_effect_settings
@@ -25,6 +26,8 @@ from orga_drone.studio_map import (
     gps_from_stored,
     map_from_effect_settings,
     marker_xy,
+    osm_basemap,
+    osm_tile_layout,
     parse_map_payload,
     project_route,
     render_route_image,
@@ -172,19 +175,79 @@ def _colors(image: Image.Image) -> set[tuple[int, ...]]:
     return set(pixels)
 
 
-def test_route_png_uses_stored_points_not_tiles() -> None:
+def test_route_png_keeps_the_plain_panel_without_tiles() -> None:
     image = render_route_image(project_route(_track(), media_duration_s=4), width=160, height=100)
     assert _ROUTE in _colors(image)
     empty = render_route_image((), width=80, height=60)
     assert _ROUTE not in _colors(empty)
     assert (20, 24, 29, 255) in _colors(empty)
-    source = Path("src/orga_drone/studio_map.py").read_text(encoding="utf-8")
-    assert "openstreetmap" not in source.lower()
-    assert "http://" not in source
-    assert "https://" not in source
 
 
-def test_export_graph_draws_the_marker_before_fades(tmp_path: Path) -> None:
+def test_openstreetmap_tiles_share_the_route_square(tmp_path: Path) -> None:
+    samples = _track()
+    preview = route_preview(samples, media_duration_s=4)
+    tiles = preview["tiles"]
+    assert isinstance(tiles, list) and tiles
+    assert route_preview((), media_duration_s=3)["tiles"] == []
+    still = gps_from_stored([], latitude=47.2, longitude=8.3)
+    assert project_route(still, media_duration_s=None)[0].x == 0.5
+    assert osm_tile_layout(still)
+
+    def fail(_z: int, _x: int, _y: int) -> Path | None:
+        return None
+
+    assert osm_basemap(samples, width=80, height=60, fetch=fail) is None
+    tile = tmp_path / "tile.png"
+    Image.new("RGBA", (8, 8), (20, 180, 40, 255)).save(tile)
+
+    def serve(_z: int, _x: int, _y: int) -> Path:
+        return tile
+
+    painted = osm_basemap(samples, width=160, height=100, fetch=serve)
+    assert painted is not None
+    image = render_route_image(
+        project_route(samples, media_duration_s=4),
+        width=160,
+        height=100,
+        background=painted,
+    )
+    assert (20, 180, 40, 255) in _colors(image)
+    assert _ROUTE in _colors(image)
+    assert "© OpenStreetMap" in Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+
+
+def test_long_filter_script_still_draws_the_flight_map(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("orga_drone.studio_hud.FILTER_INLINE_LIMIT", 0)
+    monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
+    still = tmp_path / "still.jpg"
+    Image.new("RGB", (320, 180), (30, 40, 50)).save(still, "JPEG")
+    clip = StudioExportClip(
+        source_path=still,
+        kind="photo",
+        duration_s=2.0,
+        map_placement=MapPlacement(enabled=True, x=0.6, y=0.56, w=0.28, h=0.28),
+        gps_track=_track(),
+        media_duration_s=4.0,
+        masks=(
+            Mask(id="mabc1234567", effect="blur", strength=80, x=0.2, y=0.2, w=0.3, h=0.3),
+        ),
+    )
+    extra, filters = _segment_filter_invocation(clip, 320, 180, tmp_path)
+    assert filters[0] == "-filter_complex_script"
+    assert filters[-2:] == ["-map", "[vout]"]
+    body = Path(filters[1]).read_text(encoding="utf-8")
+    assert "flight-map-route.png" in " ".join(extra)
+    assert "[vout]" in body
+    from orga_drone.export.studio_encoder import _uses_filter_graph
+
+    assert _uses_filter_graph(filters)
+    assert not _uses_filter_graph(["-vf", "scale=320:180"])
+
+
+def test_export_graph_draws_the_marker_before_fades(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
     still = tmp_path / "still.jpg"
     Image.new("RGB", (320, 180), (30, 40, 50)).save(still, "JPEG")
     clip = StudioExportClip(

@@ -174,6 +174,25 @@ def _hud_filter_text(clip: StudioExportClip, height: int) -> str:
     )
 
 
+_COMPLEX_FILTER_FLAGS = frozenset({"-filter_complex", "-filter_complex_script"})
+
+
+def _uses_filter_graph(filters: list[str]) -> bool:
+    """True when ffmpeg already maps the filtered ``[vout]`` stream.
+
+    A long HUD chain is written to ``-filter_complex_script``. That flag is
+    the same graph as ``-filter_complex`` and must not be followed by a map
+    of the raw input picture.
+    """
+    return bool(filters) and filters[0] in _COMPLEX_FILTER_FLAGS
+
+
+def _complex_graph_body(filters: list[str]) -> str:
+    if filters[0] == "-filter_complex_script":
+        return Path(filters[1]).read_text(encoding="utf-8")
+    return filters[1]
+
+
 def _filter_args(body: str, work: Path, *, complex_graph: bool) -> list[str]:
     from orga_drone.studio_hud import video_filter_args
 
@@ -311,8 +330,8 @@ def _attach_flight_map(
                 body = body[: -len(token)]
         picture = "pic"
         prefix = f"[0:v]{body}[{picture}]"
-    elif filters and filters[0] == "-filter_complex":
-        picture, prefix = _picture_before_format(filters[1])
+    elif _uses_filter_graph(filters):
+        picture, prefix = _picture_before_format(_complex_graph_body(filters))
     else:
         raise StudioExportError(
             "The flight map could not be placed on this clip.",
@@ -344,7 +363,7 @@ def _attach_flight_map(
             "The flight map could not be drawn for this clip.",
             code="map_render_failed",
         )
-    return [*extra, *map_args], ["-filter_complex", graph, "-map", "[vout]"]
+    return [*extra, *map_args], _filter_args(graph, work, complex_graph=True)
 
 
 def _segment_filter_invocation(
@@ -523,8 +542,8 @@ def _segment_filter_invocation(
         extra,
         ["-filter_complex", graph, "-map", "[vout]"],
     )
-    if filters and filters[0] == "-filter_complex":
-        body = _graph_with_hud(filters[1], hud)
+    if _uses_filter_graph(filters):
+        body = _graph_with_hud(_complex_graph_body(filters), hud)
         return extra_out, _filter_args(body, work, complex_graph=True)
     return extra_out, filters
 
@@ -1381,7 +1400,7 @@ class FfmpegStudioEncoder:
         extra, filters = _segment_filter_invocation(sized, width, height, out.parent)
         overlay_count = extra.count("-i")
         audio_index = 1 + overlay_count
-        uses_graph = bool(filters) and filters[0] == "-filter_complex"
+        uses_graph = _uses_filter_graph(filters)
         cmd = [
             ffmpeg,
             "-y",
@@ -1463,7 +1482,7 @@ class FfmpegStudioEncoder:
         extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
         overlay_count = extra.count("-i")
         audio_index = 1 + overlay_count
-        uses_graph = bool(filters) and filters[0] == "-filter_complex"
+        uses_graph = _uses_filter_graph(filters)
         cmd = [
             ffmpeg,
             "-y",
@@ -1554,7 +1573,7 @@ class FfmpegStudioEncoder:
         )
         extra, filters = _segment_filter_invocation(clip, width, height, out.parent)
         overlay_count = extra.count("-i")
-        uses_graph = bool(filters) and filters[0] == "-filter_complex"
+        uses_graph = _uses_filter_graph(filters)
         # Prefer accurate cuts on HEVC/DJI: decode then seek (slower, correct).
         # Explicit maps: DJI files often carry an attached JPEG that must not win.
         cmd = [
