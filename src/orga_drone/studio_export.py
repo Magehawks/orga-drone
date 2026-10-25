@@ -583,29 +583,33 @@ def run_studio_export(
         )
     enc = encoder or get_default_encoder()
     try:
-        result = enc.render(
-            config,
-            on_progress=on_progress,
-            cancel_event=cancel_event,
-        )
-    except ExportCancelled:
-        append_export_log(
-            f"CANCEL title={config.project_title!r} height={config.height} "
-            f"clips={len(config.clips)} dest={config.output_path}"
-        )
-        raise
-    except StudioExportError as exc:
-        append_export_log(
-            f"FAIL title={config.project_title!r} height={config.height} "
-            f"clips={len(config.clips)} dest={config.output_path} error={exc}"
-        )
-        raise
-    except Exception as exc:
-        append_export_log(
-            f"FAIL title={config.project_title!r} height={config.height} "
-            f"clips={len(config.clips)} dest={config.output_path} error={exc}"
-        )
-        raise
+        try:
+            result = enc.render(
+                config,
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
+        except ExportCancelled:
+            append_export_log(
+                f"CANCEL title={config.project_title!r} height={config.height} "
+                f"clips={len(config.clips)} dest={config.output_path}"
+            )
+            raise
+        except StudioExportError as exc:
+            append_export_log(
+                f"FAIL title={config.project_title!r} height={config.height} "
+                f"clips={len(config.clips)} dest={config.output_path} error={exc}"
+            )
+            raise
+        except Exception as exc:
+            append_export_log(
+                f"FAIL title={config.project_title!r} height={config.height} "
+                f"clips={len(config.clips)} dest={config.output_path} error={exc}"
+            )
+            raise
+    finally:
+        if config.approved_file is not None:
+            config.approved_file.close()
     set_last_export_directory(result.parent)
     append_export_log(
         f"OK title={config.project_title!r} height={config.height} "

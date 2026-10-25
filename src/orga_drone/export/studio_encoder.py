@@ -742,15 +742,27 @@ before_protected_identity: Callable[[Path], None] | None = None
 EXPORT_IDENTITY_UNRELIABLE = (
     "Export cannot overwrite this file because its identity is not reliable."
 )
+EXPORT_SOURCE_IDENTITY_UNAVAILABLE = (
+    "Export cannot overwrite this file because a library source is missing "
+    "or its identity cannot be read."
+)
 
 
 def _protected_identities(
     protected: Iterable[Path | str],
+    *,
+    overwrite: bool = False,
+    dest: Path | None = None,
 ) -> tuple[tuple[int, int], ...]:
     """File identities of protected originals, read before the destination.
 
     An existing regular file without a reliable identity aborts approval.
     Otherwise an overwrite could not tell that file from the destination.
+    When ``overwrite`` is set and ``dest`` is already a file, a missing or
+    unreadable protected path aborts too. Skipping it would allow the
+    destination handle to open on an original that was moved onto ``dest``
+    before this read. That handle does not prove the file was never a library
+    original. A free destination still allows a missing path.
     """
     found: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
@@ -762,17 +774,30 @@ def _protected_identities(
         try:
             is_file = path.is_file()
         except OSError:
-            continue
+            is_file = False
         if not is_file:
+            if overwrite and _destination_is_file(dest):
+                raise StudioExportError(EXPORT_SOURCE_IDENTITY_UNAVAILABLE)
             continue
         identity = _file_identity(path)
         if identity is None:
+            if overwrite and _destination_is_file(dest):
+                raise StudioExportError(EXPORT_SOURCE_IDENTITY_UNAVAILABLE)
             raise StudioExportError(EXPORT_IDENTITY_UNRELIABLE)
         if identity in seen:
             continue
         seen.add(identity)
         found.append(identity)
     return tuple(found)
+
+
+def _destination_is_file(dest: Path | None) -> bool:
+    if dest is None:
+        return False
+    try:
+        return dest.is_file()
+    except OSError:
+        return False
 
 
 def _merge_identities(
@@ -804,11 +829,18 @@ def approve_export_destination(
 
     The caller holds the in-app mutation lock. Protected originals are recorded
     by file identity before ``dest`` is opened. ``file`` is set only for a
-    confirmed overwrite, and that handle stays open until publish. A free name
-    has no handle and must be created exclusively later. A file that appears
-    afterwards is not approved.
+    confirmed overwrite of an existing file whose protected sources can all be
+    identified, and that handle stays open until publish. The handle does not
+    prove the file was never a library original. A missing or unreadable
+    protected path refuses the overwrite instead of opening it. A free name
+    has no handle and must be created exclusively later, including when a
+    protected path is offline. A file that appears afterwards is not approved.
     """
-    protected_identities = _protected_identities(protected)
+    protected_identities = _protected_identities(
+        protected,
+        overwrite=overwrite,
+        dest=dest,
+    )
     reject_protected_export_destination(dest, protected)
     identity = _file_identity(dest)
     _reject_if_protected_identity(identity, protected_identities)
@@ -869,7 +901,8 @@ def _open_export_target(path: Path) -> int:
     """Open ``path`` for overwrite without truncating it.
 
     On Windows the share mode excludes delete, so the open handle blocks
-    renaming or deleting this name until it is closed.
+    renaming or deleting this name until it is closed. The handle does not
+    prove the file was never a library original.
     """
     if sys.platform == "win32":
         return _open_windows_export_target(path)
@@ -879,38 +912,45 @@ def _open_export_target(path: Path) -> int:
     return os.open(path, flags)
 
 
-def _open_windows_export_target(path: Path) -> int:
-    import ctypes
-    import msvcrt
-    from ctypes import wintypes
+if sys.platform == "win32":
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.CreateFileW.argtypes = [
-        wintypes.LPCWSTR,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        wintypes.LPVOID,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        wintypes.HANDLE,
-    ]
-    kernel32.CreateFileW.restype = wintypes.HANDLE
-    generic_read_write = 0x80000000 | 0x40000000
-    share_read_write = 0x00000001 | 0x00000002
-    invalid = wintypes.HANDLE(-1).value
-    handle = kernel32.CreateFileW(
-        str(path),
-        generic_read_write,
-        share_read_write,
-        None,
-        3,
-        0x80,
-        None,
-    )
-    if handle is None or handle == invalid:
-        err = ctypes.get_last_error()
-        raise OSError(None, os.strerror(err) or "CreateFileW failed", str(path), err)
-    return msvcrt.open_osfhandle(int(handle), os.O_BINARY)
+    def _open_windows_export_target(path: Path) -> int:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        generic_read_write = 0x80000000 | 0x40000000
+        share_read_write = 0x00000001 | 0x00000002
+        invalid = wintypes.HANDLE(-1).value
+        handle = kernel32.CreateFileW(
+            str(path),
+            generic_read_write,
+            share_read_write,
+            None,
+            3,
+            0x80,
+            None,
+        )
+        if handle is None or handle == invalid:
+            err = ctypes.get_last_error()
+            raise OSError(None, os.strerror(err) or "CreateFileW failed", str(path), err)
+        return msvcrt.open_osfhandle(int(handle), os.O_BINARY)
+
+else:
+
+    def _open_windows_export_target(path: Path) -> int:
+        raise OSError("Windows export handles are only available on Windows")
 
 
 def _publish_export_file(

@@ -757,6 +757,148 @@ def test_real_encoder_success_overwrite_and_cancel(
         )
     assert dest.read_bytes() == kept
     assert _sha256(source) == source_hash
+    released = dest.with_name("released-after-cancel.bin")
+    released.write_bytes(b"released-after-cancel")
+    os.replace(released, dest)
+    assert dest.read_bytes() == b"released-after-cancel"
+
+
+def test_external_replace_before_identity_refuses_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An external rename before identity capture must not become an overwrite.
+
+    The second original is moved onto the existing export name immediately
+    before that path is identified. Real FFmpeg is the encoder. The export is
+    refused and the original bytes stay intact.
+    """
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    other_id = _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    assert other_id != source_id
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = tmp_path / "exports" / "story.mp4"
+    dest.parent.mkdir()
+    dest.write_bytes(b"ordinary-export")
+    from orga_drone.export import studio_encoder
+
+    def before_identity(path: Path) -> None:
+        try:
+            matches = path.resolve() == other.resolve()
+        except OSError:
+            matches = False
+        if matches and other.is_file():
+            os.replace(other, dest)
+
+    studio_encoder.before_protected_identity = before_identity
+    try:
+        with pytest.raises(StudioExportError, match="library source is missing"):
+            run_studio_export(
+                db,
+                height=720,
+                output_path=dest,
+                overwrite=True,
+            )
+    finally:
+        studio_encoder.before_protected_identity = None
+    assert _sha256(source) == source_hash
+    assert not other.exists()
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    assert dest.read_bytes() == other_bytes
+    released = dest.with_name("released-after-refusal.bin")
+    released.write_bytes(b"released-after-refusal")
+    os.replace(released, dest)
+    assert dest.read_bytes() == b"released-after-refusal"
+
+
+def test_offline_source_refuses_overwrite_and_allows_free_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "green")
+    other_id = _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    assert other_id != source_id
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other.unlink()
+    dest = tmp_path / "exports" / "story.mp4"
+    dest.parent.mkdir()
+    ordinary = b"ordinary-export"
+    dest.write_bytes(ordinary)
+
+    with pytest.raises(StudioExportError, match="library source is missing"):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+        )
+    assert dest.read_bytes() == ordinary
+    assert _sha256(source) == source_hash
+    assert not other.exists()
+
+    free = dest.with_name("story-free.mp4")
+    run_studio_export(
+        db,
+        height=720,
+        output_path=free,
+        overwrite=False,
+    )
+    assert _sha256(source) == source_hash
+    assert dest.read_bytes() == ordinary
+    assert not other.exists()
+    _mp4_signature(free)
+
+
+def test_export_error_releases_destination_handle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    source_id = _seed_media(db, root, height=720, width=1280, content=b"source-bytes")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    source_hash = _sha256(source)
+    dest = tmp_path / "exports" / "story.mp4"
+    dest.parent.mkdir()
+    ordinary = b"ordinary-export"
+    dest.write_bytes(ordinary)
+
+    class _Encoder:
+        def render(self, config: StudioExportConfig, **_kwargs: object) -> Path:
+            assert config.approved_file is not None
+            raise StudioExportError("encode failed")
+
+    with pytest.raises(StudioExportError, match="encode failed"):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+            encoder=_Encoder(),
+        )
+    assert dest.read_bytes() == ordinary
+    assert _sha256(source) == source_hash
+    released = dest.with_name("released-after-error.bin")
+    released.write_bytes(b"released-after-error")
+    os.replace(released, dest)
+    assert dest.read_bytes() == b"released-after-error"
 
 
 def test_encoder_keeps_overlay_png_even_as_destination(

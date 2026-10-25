@@ -67,7 +67,8 @@ class HeldExportFile:
 
     The handle stays open until publish. On Windows it is opened without
     sharing delete, so another program cannot rename or delete that name while
-    the export runs. Bytes are written only through this handle. A write that
+    the export runs. Bytes are written only through this handle. The handle
+    does not prove this file was never a library original. A write that
     stops midway can leave this ordinary export file incomplete. No other file
     is written.
     """

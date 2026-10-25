@@ -125,7 +125,10 @@ export via async job
 `POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
 determinate progress in the export dialog (elapsed time, ETA, current clip
 label; within-clip ffmpeg progress). A confirmed overwrite is written through a handle opened when the destination
-was approved. If that write stops midway, the ordinary export file can be left
+was approved. That handle does not prove the file was never a library original.
+If an indexed source path is missing or its identity cannot be read, overwrite
+is refused and the handle is not opened; export to a free name is still allowed.
+When an approved overwrite stops midway, that ordinary export file can be left
 incomplete; a different file is not written. A destination name that was free is
 created exclusively and is not replaced when another file appears later. On success the dialog closes and Studio
 shows a dismissible banner with Open video / Show in folder
