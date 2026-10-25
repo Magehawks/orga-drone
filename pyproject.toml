@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 authors = [{ name = "orga-drone contributors" }]
 keywords = ["drone", "dji", "video", "library", "openstreetmap"]
 dependencies = [
-  "fastapi>=0.115.0",
+  "fastapi>=0.162.0",
   "uvicorn[standard]>=0.32.0",
   "jinja2>=3.1.4",
   "python-multipart>=0.0.12",
