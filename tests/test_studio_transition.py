@@ -394,3 +394,20 @@ def test_stitch_filters_normalize_timebase_before_second_xfade() -> None:
     assert "[xv1][3:v]xfade" not in joined
     assert "[xv1]fps=30,format=yuv420p,settb=1/30[vl2]" in joined
     assert "[vl2][vr2]xfade=transition=fade:duration=0.5000:offset=7.3000[xv2]" in joined
+
+
+def test_preview_refreshes_transition_overlap_after_duration_changes() -> None:
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    persist_section = script.split("async function persistSection")[1].split("async function")[0]
+    persist_order = script.split("async function persistOrder")[1].split("async function")[0]
+    persist_photo = script.split("async function patchPhotoDuration")[1].split("async function")[0]
+    persist_title = script.split("async function persistTitlecard")[1].split("async function")[0]
+    refresh = script.split("function refreshAppliedTransitions()")[1].split("function ")[0]
+    assert "refreshAppliedTransitions();" in persist_section
+    assert "refreshAppliedTransitions();" in persist_order
+    assert "refreshAppliedTransitions();" in persist_photo
+    assert "refreshAppliedTransitions();" in persist_title
+    assert "Math.min(clipDuration(prev), clipDuration(next))" in refresh
+    shortened = apply_boundaries([0.15, 2.0], [TYPE_CROSSFADE, TYPE_CUT], [0.5, None])
+    assert shortened[0].type == TYPE_CUT
+    assert shortened[0].duration_s == 0.0

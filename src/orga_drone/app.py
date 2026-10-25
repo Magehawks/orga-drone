@@ -1900,6 +1900,7 @@ def create_app() -> FastAPI:
             source_in_s=item.source_in_s,
             source_out_s=item.source_out_s,
             card_duration_s=item.card_duration_s,
+            playback_speed=item.playback_speed,
             section_repeats=repeats if (item.kind or "") == "video" else 1,
         )
         return JSONResponse(

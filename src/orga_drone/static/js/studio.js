@@ -3258,6 +3258,31 @@
     });
   }
 
+  function refreshAppliedTransitions() {
+    const list = clips().filter((c) => clipDuration(c) > 0);
+    for (let i = 0; i < list.length - 1; i += 1) {
+      const prev = list[i];
+      const next = list[i + 1];
+      const stored = prev.dataset.transitionType || "cut";
+      let applied = stored;
+      let duration = Number(prev.dataset.transitionDuration) || 0.5;
+      const maxD = Math.min(clipDuration(prev), clipDuration(next)) - 0.1;
+      if (stored !== "cut" && maxD < 0.1) {
+        applied = "cut";
+        duration = 0;
+      } else if (stored !== "cut") {
+        duration = Math.max(0.1, Math.min(2, duration));
+        if (duration > maxD) duration = Math.max(0.1, Math.floor(maxD * 10) / 10);
+      } else {
+        duration = 0;
+      }
+      prev.dataset.appliedType = applied;
+      prev.dataset.appliedDuration = String(applied === "cut" ? 0 : duration);
+    }
+    rebuildTransitions();
+    applyTransitionsToDom();
+  }
+
   function rebuildTransitions() {
     const list = clips();
     grid.querySelectorAll(".studio-transition").forEach((el) => el.remove());
@@ -3917,8 +3942,7 @@
       });
       if (!res.ok) throw new Error("reorder failed");
       await res.json();
-      rebuildTransitions();
-      applyTransitionsToDom();
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -3937,7 +3961,7 @@
       const el = byId.get(id);
       if (el) grid.appendChild(el);
     });
-    rebuildTransitions();
+    refreshAppliedTransitions();
     layoutTimeline();
   }
 
@@ -3975,6 +3999,7 @@
           data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
         input.value = Number(shown).toFixed(1);
       }
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -4047,6 +4072,7 @@
       if (durationLine) {
         durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
       }
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -4851,6 +4877,7 @@
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
       syncPreviewMedia();
+      refreshAppliedTransitions();
       layoutTimeline();
       setSaveState(true);
     } catch (err) {
@@ -5774,7 +5801,7 @@
       el.style.opacity = "";
       return;
     }
-    const sourceS = sourceInS(clip) + Math.max(0, Number(localS) || 0);
+    const sourceS = sourceClock(clip, localS);
     const lines = [formatHudElapsed(sourceS)];
     const altitude = hudAltitudeText(hud, sourceS);
     if (altitude) lines.push(altitude);
@@ -6176,10 +6203,14 @@
     }
   }
 
+  function sourceClock(clip, localS) {
+    const sample = sectionSampleS(clip, Math.max(0, Number(localS) || 0));
+    return sourceInS(clip) + sample * playbackSpeed(clip);
+  }
+
   function mapClock(clip, localS) {
-    const local = Number(localS) || 0;
-    if (clip && clip.dataset.kind === "video") return sourceInS(clip) + local;
-    return local;
+    if (clip && clip.dataset.kind === "video") return sourceClock(clip, localS);
+    return Number(localS) || 0;
   }
 
   function markerAt(points, timeS) {

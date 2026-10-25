@@ -22,6 +22,7 @@ from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_export import _clip_to_export_clip
 from orga_drone.studio_hud import (
     FILTER_INLINE_LIMIT,
+    HudInterval,
     altitude_at,
     cues_from_srt,
     dump_hud,
@@ -198,6 +199,18 @@ def test_settings_roundtrip_and_filter_text_cannot_be_stored() -> None:
     assert hud_enabled_from_effect_settings('{"hud":{"enabled":1}}') is False
 
 
+def test_ffmpeg_hud_shifts_windows_to_the_kept_in_point(tmp_path: Path) -> None:
+    chain = ffmpeg_hud_chain(
+        fontfile=tmp_path / "font.ttf",
+        height=180,
+        intervals=(HudInterval(start_s=4.0, end_s=6.0, altitude_m=12.5),),
+        origin_s=4.0,
+    )
+    assert "floor((t+4.0000)/3600)" in chain
+    assert "between(t\\,0.0000\\,2.0000)" in chain
+    assert "between(t\\,4.0000\\,6.0000)" not in chain
+
+
 def test_export_chain_uses_source_clock_and_hides_the_gap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -229,12 +242,9 @@ def test_export_chain_uses_source_clock_and_hides_the_gap(
     assert filters[0] == "-vf"
     body = filters[1]
     assert body.index("drawtext=") < body.index("fade=t=in")
-    assert "floor(t/3600)" in body
+    assert "floor((t+4.0000)/3600)" in body
     assert "t-4" not in body
-    assert "between(t\\,4.0000\\," in body or any(
-        f"between(t\\,{window.start_s:.4f}\\," in body for window in windows
-    )
-    assert "between(t\\,0.0000\\," not in body
+    assert "between(t\\,0.0000\\," in body
     assert "3.5" not in body
     assert "speed" not in body.lower()
     assert "home" not in body.lower()
@@ -341,6 +351,13 @@ def test_http_hud_inspector_and_rejection(
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "hudWrap.hidden = !isVideo" in script
     assert "formatHudElapsed" in script
+    clock = script.split("function sourceClock(clip, localS)")[1].split("function ")[0]
+    paint = script.split("function paintHud(")[1].split("function ")[0]
+    mapped = script.split("function mapClock(clip, localS)")[1].split("function ")[0]
+    assert "sectionSampleS" in clock
+    assert "playbackSpeed(clip)" in clock
+    assert "sourceClock(clip, localS)" in paint
+    assert "sourceClock(clip, localS)" in mapped
     rejected = client.patch(f"/api/studio/{video_id}/hud", json={"enabled": "yes"})
     assert rejected.status_code == 400
     missing = client.patch(f"/api/studio/{plain_id}/hud", json={"enabled": True})

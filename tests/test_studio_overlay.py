@@ -33,6 +33,7 @@ from orga_drone.studio_overlay import (
     overlays_from_effect_settings,
     parse_overlays,
     render_overlay_png,
+    split_overlay_settings,
     store_overlay_asset,
 )
 
@@ -155,9 +156,35 @@ def test_two_overlays_and_letterbox_box() -> None:
     assert overlay_is_active(overlays[0], 3.2, duration_s=8) is False
 
 
-def test_video_filter_clock_shifts_by_trim() -> None:
+def test_split_overlay_settings_offsets_the_right_clip() -> None:
+    blob = dump_overlays(
+        "{}",
+        (
+            Overlay(
+                id="ovtext0001",
+                kind="text",
+                start_s=4.0,
+                end_s=8.0,
+                x=0.1,
+                y=0.2,
+                w=0.4,
+                h=0.16,
+                text="Tower",
+            ),
+        ),
+    )
+    left_blob, right_blob = split_overlay_settings(blob, 5.0, left_s=5.0, right_s=3.0)
+    left = overlays_from_effect_settings(left_blob, duration_s=5)
+    right = overlays_from_effect_settings(right_blob, duration_s=3)
+    assert left[0].start_s == pytest.approx(4.0)
+    assert left[0].end_s == pytest.approx(5.0)
+    assert right[0].start_s == pytest.approx(0.0)
+    assert right[0].end_s == pytest.approx(3.0)
+
+
+def test_video_filter_clock_starts_at_kept_in_point() -> None:
     assert filter_time_origin(kind="photo", source_start_s=2) == 0
-    assert filter_time_origin(kind="video", source_start_s=4) == 4
+    assert filter_time_origin(kind="video", source_start_s=4) == 0
     graph = ffmpeg_overlay_graph(
         base_chain="scale=320:180",
         fades=["fade=t=in:st=0:d=0.2000"],
@@ -289,14 +316,38 @@ def test_settings_persist_per_clip_and_survive_cut(tmp_path: Path) -> None:
     assert exported.overlays[0].text == "Tower"
     assert exported.image.exposure == 12
     left, right = reopened.cut_studio_video_item(first, 5.0)
-    assert overlays_from_effect_settings(left.effect_settings, duration_s=5)[0].text == "Tower"
-    assert overlays_from_effect_settings(right.effect_settings, duration_s=3)[0].text == "Tower"
+    left_ov = overlays_from_effect_settings(left.effect_settings, duration_s=5)
+    right_ov = overlays_from_effect_settings(right.effect_settings, duration_s=3)
+    assert left_ov[0].text == "Tower"
+    assert left_ov[0].end_s == pytest.approx(5.0)
+    assert right_ov[0].text == "Tower"
+    assert right_ov[0].start_s == pytest.approx(0.0)
+    assert right_ov[0].end_s == pytest.approx(3.0)
     card = reopened.add_studio_title_card(reopened.list_studio_projects()[0].id, title_text="Hi")
     with pytest.raises(ValueError, match="photos and videos"):
         reopened.set_studio_overlays(card.id, {"overlays": [_text()]})
     blob = dump_overlays(kept.effect_settings, ())
     assert "exposure" in blob
     assert json.loads(blob)["overlays"] == []
+
+
+def test_cut_offsets_overlays_on_a_slowed_clip(tmp_path: Path) -> None:
+    path = tmp_path / "studio.sqlite3"
+    db = Database(path)
+    media_id = _seed_media(db, tmp_path / "lib", filename="slow.MP4", kind="video", duration_s=8.0)
+    clip_id = _add(db, media_id)
+    db.set_studio_playback_speed(clip_id, 0.5)
+    db.set_studio_overlays(
+        clip_id,
+        {"overlays": [_text(start_s=4, end_s=8, text="Tower")]},
+    )
+    left, right = db.cut_studio_video_item(clip_id, 3.0)
+    left_ov = overlays_from_effect_settings(left.effect_settings, duration_s=6)
+    right_ov = overlays_from_effect_settings(right.effect_settings, duration_s=10)
+    assert left_ov[0].start_s == pytest.approx(4.0)
+    assert left_ov[0].end_s == pytest.approx(6.0)
+    assert right_ov[0].start_s == pytest.approx(0.0)
+    assert right_ov[0].end_s == pytest.approx(2.0)
 
 
 def test_segment_invocation_uses_vf_without_overlays(tmp_path: Path) -> None:

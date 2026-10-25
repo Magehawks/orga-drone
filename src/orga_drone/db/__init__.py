@@ -3694,6 +3694,24 @@ class Database:
             except ValueError as exc:
                 raise ValueError(str(exc)) from exc
 
+            from orga_drone.studio_overlay import split_overlay_settings
+            from orga_drone.studio_speed import coerce_playback_speed, timeline_offset_s
+
+            original_settings = str(row["effect_settings"] or "{}")
+            speed = coerce_playback_speed(row["playback_speed"])
+            left_len = float(left.source_out_s) - float(left.source_in_s)
+            right_len = float(right.source_out_s) - float(right.source_in_s)
+            # Overlay times are clip-local; ``local_cut_s`` is the source offset.
+            left_settings, right_base = split_overlay_settings(
+                original_settings,
+                timeline_offset_s(float(local_cut_s), speed),
+                left_s=timeline_offset_s(left_len, speed),
+                right_s=timeline_offset_s(right_len, speed),
+            )
+            right_settings = shift_saturation_ramp_settings(
+                right_base,
+                float(local_cut_s),
+            )
             position = int(row["position"])
             project_id = int(row["project_id"])
             conn.execute(
@@ -3704,9 +3722,10 @@ class Database:
             )
             conn.execute(
                 """UPDATE studio_clips
-                   SET source_start = ?, source_end = ?, transition = 'cut'
+                   SET source_start = ?, source_end = ?, transition = 'cut',
+                       effect_settings = ?
                    WHERE id = ?""",
-                (left.source_in_s, left.source_out_s, studio_item_id),
+                (left.source_in_s, left.source_out_s, left_settings, studio_item_id),
             )
             now = datetime.now().isoformat(timespec="seconds")
             source_media_id = (
@@ -3717,10 +3736,6 @@ class Database:
                     if row["source_media_id"] is not None
                     else None
                 )
-            )
-            right_settings = shift_saturation_ramp_settings(
-                str(row["effect_settings"] or "{}"),
-                float(local_cut_s),
             )
             cur = conn.execute(
                 """INSERT INTO studio_clips(
