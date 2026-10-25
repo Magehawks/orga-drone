@@ -957,6 +957,12 @@ def create_app() -> FastAPI:
             play_can = bool(start_entry["can_play"])
 
         stem = Path(item.filename).stem
+        source_offline = item.root_id in offline_root_ids(db)
+        item_exportable = (
+            item.kind in {"photo", "video"}
+            and media_path is not None
+            and not source_offline
+        )
         map_return_url, map_from_qs = map_return_from_request(request, item.id)
         browse_return_url, browse_from_qs = browse_return_from_request(request)
         return_qs = map_from_qs or browse_from_qs
@@ -1007,6 +1013,7 @@ def create_app() -> FastAPI:
             browse_from_qs=browse_from_qs,
             return_qs=return_qs,
             in_studio=in_studio,
+            item_exportable=item_exportable,
             media_albums=media_albums,
             albums_available=albums_available,
         )
@@ -2118,7 +2125,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/studio/export")
     async def api_studio_export(request: Request) -> JSONResponse:
-        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+        from orga_drone.export.studio_encoder import StudioExportError
         from orga_drone.studio_export import prepare_studio_export, run_studio_export
 
         try:
@@ -2140,7 +2147,6 @@ def create_app() -> FastAPI:
         ):
             raise HTTPException(status_code=400, detail="project_id must be an integer")
 
-        store: ExportJobStore = app.state.export_jobs
         translate = get_translator(lang_from_request(request))
         # Pre-flight validation before creating a job. ``overwrite`` is ignored.
         try:
@@ -2157,13 +2163,35 @@ def create_app() -> FastAPI:
             status = 409 if "already exists" in str(exc).lower() else 400
             raise HTTPException(status_code=status, detail=msg) from exc
 
+        def _work(
+            on_progress: Callable[..., None],
+            cancel_event: threading.Event | None,
+        ) -> Path:
+            return run_studio_export(
+                db,
+                height=height,
+                output_path=Path(output_path),
+                overwrite=overwrite,
+                project_id=project_id,
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
+
+        return _begin_export_job(_work, translate)
+
+    def _begin_export_job(
+        work: Callable[..., Path],
+        translate: Callable[[str], str],
+    ) -> JSONResponse:
+        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+
+        store: ExportJobStore = app.state.export_jobs
         job = store.try_create()
         if job is None:
             raise HTTPException(
                 status_code=409,
                 detail="An export is already running. Wait for it to finish.",
             )
-
         cancel_event = store.cancel_event(job.id)
 
         def _worker() -> None:
@@ -2173,15 +2201,7 @@ def create_app() -> FastAPI:
                 store.apply_progress(job.id, progress)
 
             try:
-                result = run_studio_export(
-                    db,
-                    height=height,
-                    output_path=Path(output_path),
-                    overwrite=overwrite,
-                    project_id=project_id,
-                    on_progress=on_progress,
-                    cancel_event=cancel_event,
-                )
+                result = work(on_progress, cancel_event)
                 store.complete(
                     job.id,
                     output_path=str(result),
@@ -2202,6 +2222,75 @@ def create_app() -> FastAPI:
 
         threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
         return JSONResponse({"ok": True, "job_id": job.id})
+
+    def _media_export_error(exc: BaseException, translate: Callable[[str], str]) -> HTTPException:
+        from orga_drone.export.studio_encoder import StudioExportError
+
+        if not isinstance(exc, StudioExportError):
+            return HTTPException(status_code=400, detail=translate(str(exc)))
+        status = 404 if str(exc) == "Media not found." else 400
+        return HTTPException(status_code=status, detail=translate(str(exc)))
+
+    @app.get("/api/media/{media_id}/export/options")
+    async def api_media_export_options(request: Request, media_id: int) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_export import build_media_export_options_payload
+
+        translate = get_translator(lang_from_request(request))
+        try:
+            payload = await asyncio.to_thread(
+                build_media_export_options_payload, db, media_id
+            )
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+        return JSONResponse({"ok": True, **payload})
+
+    @app.post("/api/media/{media_id}/export")
+    async def api_media_export(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_export import prepare_media_export, run_media_export
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        preset = payload.get("preset")
+        output_path = payload.get("output_path")
+        overwrite = bool(payload.get("overwrite"))
+        if not isinstance(preset, str) or not preset.strip():
+            raise HTTPException(status_code=400, detail="preset is required")
+        if not isinstance(output_path, str) or not output_path.strip():
+            raise HTTPException(status_code=400, detail="output_path is required")
+        translate = get_translator(lang_from_request(request))
+        try:
+            await asyncio.to_thread(
+                prepare_media_export,
+                db,
+                media_id,
+                preset=preset,
+                output_path=Path(output_path),
+                overwrite=overwrite,
+            )
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+
+        def _work(
+            on_progress: Callable[..., None],
+            cancel_event: threading.Event | None,
+        ) -> Path:
+            return run_media_export(
+                db,
+                media_id,
+                preset=preset,
+                output_path=Path(output_path),
+                overwrite=overwrite,
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
+
+        return _begin_export_job(_work, translate)
 
     def _export_action_flags() -> dict[str, bool]:
         from orga_drone.desktop import can_open_local_file, can_reveal_local_file
@@ -2242,9 +2331,23 @@ def create_app() -> FastAPI:
                 status_code=404,
             )
         path = Path(last.output_path)
+        open_suffixes = {
+            ".mp4",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".gif",
+            ".heic",
+            ".heif",
+            ".tif",
+            ".tiff",
+            ".bmp",
+            ".dng",
+        }
         if (
             not path.is_absolute()
-            or path.suffix.lower() != ".mp4"
+            or path.suffix.lower() not in open_suffixes
             or not path.is_file()
         ):
             return JSONResponse(

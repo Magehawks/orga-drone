@@ -151,8 +151,17 @@ def export_resolution_filename_tag(height: int) -> str:
     return f"{height_to_width(h)}x{h}"
 
 
-def suggested_export_filename(project_title: str, *, height: int | None = None) -> str:
-    """Safe ``.mp4`` basename from the project title and selected height."""
+def suggested_export_filename(
+    project_title: str,
+    *,
+    height: int | None = None,
+    suffix: str = ".mp4",
+    label: str | None = None,
+) -> str:
+    """Safe basename from a title, an optional label, and an optional height tag.
+
+    Callers that omit ``suffix`` and ``label`` still get a ``.mp4`` name.
+    """
     raw = (project_title or "").strip() or "Your story"
     cleaned = _UNSAFE_FILENAME.sub(" ", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
@@ -170,11 +179,17 @@ def suggested_export_filename(project_title: str, *, height: int | None = None) 
         cleaned = f"export-{cleaned}"
     if len(cleaned) > 120:
         cleaned = cleaned[:120].rstrip(" .")
+    if label:
+        extra = _UNSAFE_FILENAME.sub("", label).strip(" ._")
+        if extra:
+            cleaned = f"{cleaned}_{extra}"
     if height is not None:
         tag = export_resolution_filename_tag(height)
         if tag:
             cleaned = f"{cleaned}_{tag}"
-    return f"{cleaned}.mp4"
+    if not suffix.startswith("."):
+        suffix = f".{suffix}"
+    return f"{cleaned}{suffix}"
 
 
 def default_videos_directory() -> Path:

@@ -135,7 +135,13 @@ taken before the claim, the next free name is used. The success banner shows the
 name that was written. On success the dialog closes and Studio
 shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
-successful output only). Desktop save dialog. Optional project soundtrack
+successful output only). The media detail page exports that one photo or
+video through the same job, cancel, and open/reveal routes
+(`POST /api/media/{id}/export`). A photo is a local still (best quality copies
+a readable image; WhatsApp, Instagram, and TikTok are JPEG presets, not
+uploads). A video is one clip on the Studio encoder (best quality uses the
+highest existing resolution; those three presets are a 1080×1920 frame with
+the picture fitted inside it). Desktop save dialog. Optional project soundtrack
 playlist (`studio_audio_clips`, up to 8 songs) is previewed and mixed into the
 MP4; Title Cards are
 generated `studio_clips` (HTML preview + ephemeral Pillow still on export);

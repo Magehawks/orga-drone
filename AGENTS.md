@@ -18,7 +18,10 @@ with Fit to story / zoom; read-only soundtrack coverage on that canvas).
 
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
-locations on a map. It is **not** primarily a flight-log tool, mission planner,
+locations on a map. A photo or video detail page can export that one file
+locally: best quality, or a WhatsApp, Instagram, or TikTok preset saved on
+disk (nothing is posted). A photo stays an image; a video stays an MP4 from
+the Studio encoder. It is **not** primarily a flight-log tool, mission planner,
 video editor, or generic drone administration suite.
 
 Canonical narrative and journey: `docs/PRODUCT_VISION.md`.
@@ -60,7 +63,7 @@ Before implementing a feature, verify it improves this journey (see
 | Library | Where are my memories? | Import/scan (unchanged files skip metadata extraction by size + mtime; offline roots keep catalog entries), metadata, GPS, sessions/flows, dupes, user-managed albums |
 | Browse | What do I want to tell? | Filters, map, favorites, rule-based Ask; page size 50/100/200; bulk add of the current page to Studio; chronological Timeline (year/month/day by recording date; missing dates called out; not the Studio editor timeline) |
 | Studio | How do I want to tell this story? | Select, order, estimate, Cut, persisted title; multiple local projects (Projects switcher; Clear Studio is Story-scoped); synced preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selection; local MP4 export (resolution in the suggested filename; existing files are never replaced; a taken name is saved as the next free numbered file and shown after export; Cancel stops a running encode, including photo-only stories at 720/1080); optional sequential soundtrack playlist (up to 8 songs; loop when there is one song) with time-proportional coverage on the Story canvas; Title Cards; Cut / Fade through black / Crossfade; basic per-clip image adjustment (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays (up to 8 per photo or video clip; Fade in, Fade out, Slide in); rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed for the whole clip; selectable and removable in the preview and inspector); per-clip zoom and pan (1×–3×, optional start/end motion); slow motion at 0.5× or 0.25× for a selected section of a video clip (1× resets that section; source audio on a slowed section is muted); video section repeat (in/out range, 1×–8×, same speed); optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed time and relative altitude; speed and home distance stay unavailable); optional flight map (route and synced marker from GPS already stored for the clip, on a plain background; no map tiles; drag and resize; empty state without GPS) |
-| Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows) |
+| Share | How do I share? | Local files on disk; Studio MP4 export with optional soundtrack playlist; Open video / Show in folder after export (Windows); one photo or video from its detail page (best quality, or a local WhatsApp / Instagram / TikTok file — nothing is uploaded or posted; a photo is a still, a video is an MP4 at the highest existing resolution or 1080×1920 with the picture fitted inside the frame) |
 
 ## Available now (implemented)
 

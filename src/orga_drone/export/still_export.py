@@ -1,0 +1,228 @@
+"""Local still-image export for one library photo.
+
+Best quality copies a readable still (JPEG, PNG, and similar). Share presets
+write a new JPEG. Nothing is uploaded.
+"""
+
+from __future__ import annotations
+
+import shutil
+import tempfile
+import threading
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+from orga_drone.export.studio_encoder import (
+    ExportCancelled,
+    StudioExportError,
+    _publish_export_file,
+)
+
+PRESET_BEST = "best"
+PRESET_WHATSAPP = "whatsapp"
+PRESET_INSTAGRAM = "instagram"
+PRESET_TIKTOK = "tiktok"
+SHARE_PRESETS: tuple[str, ...] = (
+    PRESET_BEST,
+    PRESET_WHATSAPP,
+    PRESET_INSTAGRAM,
+    PRESET_TIKTOK,
+)
+
+WHATSAPP_LONGEST = 1600
+WHATSAPP_QUALITY = 85
+INSTAGRAM_SIZE = (1080, 1350)
+TIKTOK_SIZE = (1080, 1920)
+SOCIAL_JPEG_QUALITY = 90
+BEST_JPEG_QUALITY = 95
+
+# The Studio encoder scales and pads to an explicit frame. These presets use
+# that frame. The picture is fitted inside it, not cropped.
+SOCIAL_VIDEO_WIDTH = 1080
+SOCIAL_VIDEO_HEIGHT = 1920
+
+
+@dataclass(frozen=True)
+class PhotoPresetSpec:
+    """What a photo preset will write. ``copied`` means the original bytes."""
+
+    suffix: str
+    width: int | None
+    height: int | None
+    copied: bool
+
+
+def normalize_share_preset(preset: str) -> str:
+    key = str(preset or "").strip().lower()
+    if key not in SHARE_PRESETS:
+        raise StudioExportError("Choose a share preset.")
+    return key
+
+
+def inspect_photo_preset(source: Path, preset: str) -> PhotoPresetSpec:
+    """Pixel size and suffix for one photo preset. Does not write a file."""
+    key = normalize_share_preset(preset)
+    img = _load_still(source)
+    try:
+        if key == PRESET_BEST:
+            suffix = _copy_suffix(source, img.format or "")
+            if suffix is not None:
+                return PhotoPresetSpec(suffix=suffix, width=None, height=None, copied=True)
+            rgb = _oriented_rgb(img)
+            width, height = rgb.size
+            return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+        if key == PRESET_WHATSAPP:
+            fitted = _fit_longest(_oriented_rgb(img), WHATSAPP_LONGEST)
+            width, height = fitted.size
+            return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+        if key == PRESET_INSTAGRAM:
+            width, height = INSTAGRAM_SIZE
+        else:
+            width, height = TIKTOK_SIZE
+        return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+    finally:
+        img.close()
+
+
+def export_photo_file(
+    source: Path,
+    dest: Path,
+    preset: str,
+    *,
+    protected: Iterable[Path | str] = (),
+    protected_identities: Iterable[tuple[int, int]] = (),
+    cancel_event: threading.Event | None = None,
+) -> Path:
+    """Write one photo preset and publish it without replacing an existing file."""
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportCancelled()
+    key = normalize_share_preset(preset)
+    if not source.is_file():
+        raise StudioExportError("The source file is not available.")
+    tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
+    partial = tmp_dir / "still.bin"
+    try:
+        _write_preset(source, partial, key)
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportCancelled()
+        if not partial.is_file() or partial.stat().st_size <= 0:
+            raise StudioExportError("Could not read this photo.")
+        return _publish_export_file(
+            partial,
+            dest,
+            protected=protected,
+            protected_identities=protected_identities,
+        )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _write_preset(source: Path, dest: Path, preset: str) -> None:
+    img = _load_still(source)
+    try:
+        if preset == PRESET_BEST and _copy_suffix(source, img.format or "") is not None:
+            shutil.copyfile(source, dest)
+            return
+        if preset == PRESET_BEST:
+            image = _oriented_rgb(img)
+            _save_jpeg(image, dest, BEST_JPEG_QUALITY)
+            return
+        if preset == PRESET_WHATSAPP:
+            image = _fit_longest(_oriented_rgb(img), WHATSAPP_LONGEST)
+            _save_jpeg(image, dest, WHATSAPP_QUALITY)
+            return
+        target = INSTAGRAM_SIZE if preset == PRESET_INSTAGRAM else TIKTOK_SIZE
+        image = _cover_crop(_oriented_rgb(img), target[0], target[1])
+        _save_jpeg(image, dest, SOCIAL_JPEG_QUALITY)
+    finally:
+        img.close()
+
+
+def _copy_suffix(source: Path, image_format: str) -> str | None:
+    """Suffix for a byte copy, or None when the still must be re-encoded."""
+    fmt = (image_format or "").upper()
+    if fmt == "JPEG":
+        return ".jpg"
+    if fmt == "PNG":
+        return ".png"
+    if fmt == "WEBP":
+        return ".webp"
+    if fmt == "GIF":
+        return ".gif"
+    if fmt == "TIFF":
+        return ".tif"
+    if fmt == "BMP":
+        return ".bmp"
+    if fmt == "HEIF":
+        ext = source.suffix.lower()
+        return ext if ext in {".heic", ".heif"} else ".heic"
+    return None
+
+
+def _load_still(source: Path):
+    from PIL import Image
+
+    from orga_drone.parse import ensure_heif_support
+
+    if not source.is_file():
+        raise StudioExportError("The source file is not available.")
+    ensure_heif_support()
+    try:
+        img = Image.open(source)
+        img.load()
+    except OSError as exc:
+        raise StudioExportError("Could not read this photo.") from exc
+    return img
+
+
+def _oriented_rgb(img):
+    from PIL import ImageOps
+
+    oriented = ImageOps.exif_transpose(img) or img
+    if oriented.mode == "RGB":
+        return oriented
+    return oriented.convert("RGB")
+
+
+def _fit_longest(img, longest: int):
+    """Shrink so the longest side is at most ``longest``. Never stretches or upscales."""
+    width, height = img.size
+    if width < 1 or height < 1:
+        raise StudioExportError("Could not read this photo.")
+    if max(width, height) <= longest:
+        return img
+    if width >= height:
+        new_w = longest
+        new_h = max(1, int(round(height * longest / width)))
+    else:
+        new_h = longest
+        new_w = max(1, int(round(width * longest / height)))
+    return img.resize((new_w, new_h), _lanczos())
+
+
+def _cover_crop(img, target_w: int, target_h: int):
+    """Scale until the frame is covered, then crop the center. No stretching."""
+    width, height = img.size
+    if width < 1 or height < 1:
+        raise StudioExportError("Could not read this photo.")
+    scale = max(target_w / width, target_h / height)
+    new_w = max(target_w, int(round(width * scale)))
+    new_h = max(target_h, int(round(height * scale)))
+    resized = img.resize((new_w, new_h), _lanczos())
+    left = max(0, (new_w - target_w) // 2)
+    top = max(0, (new_h - target_h) // 2)
+    return resized.crop((left, top, left + target_w, top + target_h))
+
+
+def _lanczos():
+    from PIL import Image
+
+    return Image.Resampling.LANCZOS
+
+
+def _save_jpeg(img, dest: Path, quality: int) -> None:
+    try:
+        img.save(dest, format="JPEG", quality=int(quality), optimize=True)
+    except OSError as exc:
+        raise StudioExportError("Could not read this photo.") from exc

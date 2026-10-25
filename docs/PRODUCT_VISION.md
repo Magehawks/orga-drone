@@ -172,7 +172,8 @@ Sharing is the final step of the journey.
 |---------|--------|
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
 | Simple Studio MP4 export | **Available now** (local file; resolution choice; optional music) |
-| Open video / Show in folder after Studio export | **Available now** (Windows desktop) |
+| One photo or video from its detail page | **Available now** (local file only: best quality, or a WhatsApp, Instagram, or TikTok preset; nothing is uploaded or posted; a photo stays an image and a video stays an MP4) |
+| Open video / Show in folder after Studio export | **Available now** (Windows desktop; also after a detail-page export) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 | itch.io Windows convenience build | **Later** (butler process documented for a Draft/Restricted test; no public paid launch; no in-app updater; ZIP copies do not auto-update) |
 
@@ -234,6 +235,9 @@ See `README.md` for the detailed feature status table. In short:
   more than one album. Membership survives a rescan and stays listed when
   the file is offline. Albums do not modify files and are not Studio projects.
   No shared albums, cloud sync, or automatic albums.
+- **Detail-page export:** one photo or one video as a local file (best quality, or a
+  WhatsApp, Instagram, or TikTok preset). Nothing is uploaded or posted. A photo
+  stays an image. A video stays an MP4 from the Studio encoder.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,

@@ -55,6 +55,21 @@
   {% if flash_error %}
     <div class="flash err" role="alert">{{ flash_error }}</div>
   {% endif %}
+  {% if item_exportable %}
+  <div id="detail-export-success" class="studio-export-success" hidden role="status">
+    <div class="studio-export-success-copy">
+      <p id="detail-export-success-title"></p>
+      <p class="meta-line" id="detail-export-success-path" hidden></p>
+      <p class="meta-line" id="detail-export-success-error" hidden></p>
+    </div>
+    <div class="studio-export-success-actions">
+      <button type="button" class="button" id="detail-export-open-file">{{ _('Open video') }}</button>
+      <button type="button" class="button ghost" id="detail-export-reveal-file">{{ _('Show in folder') }}</button>
+      <button type="button" class="studio-export-success-dismiss" id="detail-export-success-dismiss"
+              aria-label="{{ _('Dismiss') }}">×</button>
+    </div>
+  </div>
+  {% endif %}
 
   {% if show_view_tabs %}
   <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
@@ -209,6 +224,57 @@
         </form>
       {% endif %}
     </div>
+
+    {% if item.kind == 'photo' or item.kind == 'video' %}
+    <div class="action-form" id="detail-export"
+         data-media-id="{{ item.id }}"
+         data-kind="{{ item.kind }}"
+         {% if item_exportable %}
+         data-export-failed="{{ _('Export failed.')|e }}"
+         data-export-cancelled="{{ _('Export cancelled.')|e }}"
+         data-export-cancelling="{{ _('Cancelling export…')|e }}"
+         data-export-running="{{ _('Exporting…')|e }}"
+         data-export-done="{{ _('Export finished.')|e }}"
+         data-export-preparing="{{ _('Preparing export…')|e }}"
+         data-export-clip="{{ _('Clip {current} of {total}')|e }}"
+         data-export-running-hint="{{ _('Export is running…')|e }}"
+         data-export-elapsed="{{ _('Elapsed {time}')|e }}"
+         data-export-eta="{{ _('About {time} left')|e }}"
+         data-export-estimating="{{ _('Estimating…')|e }}"
+         data-export-done-in="{{ _('Done in {time}')|e }}"
+         data-export-success="{{ _('Exported {filename}.')|e }}"
+         data-export-file-missing="{{ _('The exported file is no longer available.')|e }}"
+         data-export-open-unavailable="{{ _('Opening the exported video is not available on this device.')|e }}"
+         data-export-reveal-unavailable="{{ _('Showing the file in its folder is not available on this device.')|e }}"
+         data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
+         data-open-video="{{ _('Open video')|e }}"
+         data-open-image="{{ _('Open image')|e }}"
+         data-preset-best="{{ _('Best quality')|e }}"
+         data-preset-whatsapp="{{ _('WhatsApp')|e }}"
+         data-preset-instagram="{{ _('Instagram')|e }}"
+         data-preset-tiktok="{{ _('TikTok')|e }}"
+         data-photo-best="{{ _('Copies this still unchanged.')|e }}"
+         data-photo-best-jpeg="{{ _('JPEG at the original pixel size.')|e }}"
+         data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching.')|e }}"
+         data-photo-instagram="{{ _('JPEG 1080×1350, cropped from the center.')|e }}"
+         data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
+         data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
+         data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
+         data-no-preset="{{ _('No exportable resolution for this file.')|e }}"
+         {% endif %}>
+      <h2>{{ _('Export file') }}</h2>
+      {% if item_exportable %}
+        <p class="hint">{{ _('Saves a local file for this photo or video. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
+        <button type="button" class="button" id="detail-export-open">{{ _('Export file') }}</button>
+      {% elif item.root_id in offline_root_ids %}
+        <p class="hint">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
+        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
+      {% else %}
+        <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
+        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
+      {% endif %}
+    </div>
+    {% endif %}
 
     <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
       <h2>{{ _('Rename') }}</h2>
@@ -406,9 +472,46 @@
     </ol>
   </div>
   {% endif %}
+  {% if item_exportable %}
+  <dialog class="studio-export-dialog" id="detail-export-dialog">
+    <form method="dialog" class="studio-export-form" id="detail-export-form">
+      <h2>{{ _('Export this file') }}</h2>
+      <p class="meta-line mono">{{ item.filename }}</p>
+      <p class="hint">{{ _('Best quality, WhatsApp, Instagram, and TikTok save a file on this computer. Nothing is uploaded or posted.') }}</p>
+      <label class="studio-inspector-field" for="detail-export-preset">
+        <span>{{ _('Output') }}</span>
+        <select id="detail-export-preset" aria-label="{{ _('Output') }}"></select>
+      </label>
+      <label class="studio-inspector-field" for="detail-export-filename">
+        <span>{{ _('Filename') }}</span>
+        <input id="detail-export-filename" type="text" autocomplete="off" spellcheck="false"
+               aria-label="{{ _('Filename') }}">
+      </label>
+      <p class="meta-line" id="detail-export-status" hidden></p>
+      <div class="studio-export-progress" id="detail-export-progress" hidden>
+        <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"
+             id="detail-export-progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+             aria-label="{{ _('Export progress') }}">
+          <div class="busy-progress-bar" id="detail-export-progress-bar" style="width: 0%"></div>
+        </div>
+        <p class="studio-export-progress-primary" id="detail-export-progress-label"></p>
+        <p class="hint studio-export-progress-meta" id="detail-export-progress-meta"></p>
+        <p class="hint">{{ _('Keep this dialog open while exporting.') }}</p>
+      </div>
+      <p class="hint" id="detail-export-hint"></p>
+      <div class="studio-export-actions">
+        <button type="button" class="button ghost" id="detail-export-cancel">{{ _('Cancel export') }}</button>
+        <button type="button" class="button" id="detail-export-run">{{ _('Export file') }}</button>
+      </div>
+    </form>
+  </dialog>
+  {% endif %}
 </section>
 {% endblock %}
 {% block scripts %}
+  {% if item_exportable %}
+  <script src="/static/js/detail-export.js"></script>
+  {% endif %}
   <script src="/static/js/thumbs.js"></script>
   <script src="/static/js/player.js"></script>
   {% if active_tab == 'flight' and flight_playlist %}

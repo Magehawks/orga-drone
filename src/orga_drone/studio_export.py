@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 
 from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
 from orga_drone.config import settings
-from orga_drone.db import Database, StudioClip, StudioProject, track_from_json
+from orga_drone.db import Database, MediaRow, StudioClip, StudioProject, track_from_json
 from orga_drone.export.studio_config import (
     StudioExportClip,
     StudioExportConfig,
@@ -36,6 +37,7 @@ from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
 from orga_drone.studio_export_resolution import (
+    ExportResolutionOption,
     available_export_resolutions,
     default_export_height,
     generated_only_default_height,
@@ -43,6 +45,13 @@ from orga_drone.studio_export_resolution import (
     height_to_width,
     resolve_export_directory,
     suggested_export_filename,
+)
+from orga_drone.export.still_export import (
+    SOCIAL_VIDEO_HEIGHT,
+    SOCIAL_VIDEO_WIDTH,
+    export_photo_file,
+    inspect_photo_preset,
+    normalize_share_preset,
 )
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 
@@ -173,6 +182,20 @@ def _resolve_export_project(db: Database, project_id: int | None) -> StudioProje
     return project
 
 
+def media_frame_height(db: Database, media: MediaRow) -> int | None:
+    """Stored frame height, or a one-time probe stored back on the media row."""
+    stored = media.height
+    if stored is not None and int(stored) > 0:
+        return int(stored)
+    path = resolve_media_file(db, media)
+    if path is None:
+        return None
+    width, probed_h = probe_video_dimensions(path)
+    if probed_h is not None:
+        db.update_media_dimensions(media.id, width=width, height=probed_h)
+    return probed_h
+
+
 def collect_project_video_heights(
     db: Database, project_id: int | None = None
 ) -> list[int | None]:
@@ -185,18 +208,7 @@ def collect_project_video_heights(
         if media is None:
             heights.append(None)
             continue
-        h = getattr(media, "height", None)
-        if h is not None and int(h) > 0:
-            heights.append(int(h))
-            continue
-        path = resolve_media_file(db, media)
-        if path is None:
-            heights.append(None)
-            continue
-        _w, probed_h = probe_video_dimensions(path)
-        if probed_h is not None:
-            db.update_media_dimensions(media.id, width=_w, height=probed_h)
-        heights.append(probed_h)
+        heights.append(media_frame_height(db, media))
     return heights
 
 
@@ -424,6 +436,33 @@ def _protected_export_paths(db: Database) -> list[Path]:
     return paths
 
 
+def _snapshot_export_destination(
+    db: Database,
+    output_path: Path,
+    *,
+    overwrite: bool,
+    suffix: str,
+) -> tuple[Path, tuple[tuple[int, int], ...], tuple[str, ...]]:
+    """Resolve a destination. ``overwrite`` is ignored.
+
+    An existing file is never replaced. The protected snapshot is fixed here.
+    The lock is not held while clips are built or while encoding runs.
+    """
+    _ = overwrite
+    dest = Path(output_path).expanduser()
+    if dest.suffix.lower() != suffix.lower():
+        dest = dest.with_suffix(suffix)
+    dest = dest.resolve()
+    if not dest.parent.is_dir():
+        raise StudioExportError("Export folder does not exist.")
+    if not os_access_writable(dest.parent):
+        raise StudioExportError("Export folder is not writable.")
+    protected_paths = _protected_export_paths(db)
+    with hold_media_mutation():
+        protected_identities = _protected_identities(protected_paths)
+    return dest, protected_identities, tuple(str(path) for path in protected_paths)
+
+
 def prepare_studio_export(
     db: Database,
     *,
@@ -444,21 +483,12 @@ def prepare_studio_export(
             "Selected export resolution is not available for this project."
         )
     width = height_to_width(int(height))
-    dest = Path(output_path).expanduser()
-    if dest.suffix.lower() != ".mp4":
-        dest = dest.with_suffix(".mp4")
-    dest = dest.resolve()
-    if not dest.parent.is_dir():
-        raise StudioExportError("Export folder does not exist.")
-    if not os_access_writable(dest.parent):
-        raise StudioExportError("Export folder is not writable.")
-    # ``overwrite`` is accepted for older clients and ignored. An existing file
-    # is never replaced. The protected snapshot is fixed here. The lock is not
-    # held while clips are built or while ffmpeg runs.
-    _ = overwrite
-    protected_paths = _protected_export_paths(db)
-    with hold_media_mutation():
-        protected_identities = _protected_identities(protected_paths)
+    dest, protected_identities, protected_path_strs = _snapshot_export_destination(
+        db,
+        output_path,
+        overwrite=overwrite,
+        suffix=".mp4",
+    )
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
@@ -524,7 +554,7 @@ def prepare_studio_export(
         project_title=project.title,
         music_tracks=tuple(music_tracks),
         protected_identities=protected_identities,
-        protected_paths=tuple(str(path) for path in protected_paths),
+        protected_paths=protected_path_strs,
     )
 
 
@@ -561,6 +591,21 @@ def run_studio_export(
         overwrite=overwrite,
         project_id=project_id,
     )
+    return _execute_export_config(
+        config,
+        encoder=encoder,
+        on_progress=on_progress,
+        cancel_event=cancel_event,
+    )
+
+
+def _execute_export_config(
+    config: StudioExportConfig,
+    *,
+    encoder: StudioVideoEncoder | None = None,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+) -> Path:
     if on_progress is not None:
         on_progress(
             {
@@ -601,3 +646,279 @@ def run_studio_export(
         f"clips={len(config.clips)} dest={result}"
     )
     return result
+
+
+@dataclass(frozen=True)
+class MediaExportPlan:
+    """Validated one-file export. A photo has no encoder config."""
+
+    kind: str
+    preset: str
+    output_path: Path
+    config: StudioExportConfig | None = None
+    protected_identities: tuple[tuple[int, int], ...] = ()
+    protected_paths: tuple[str, ...] = ()
+
+
+def _require_export_media(db: Database, media_id: int) -> tuple[MediaRow, Path]:
+    media = db.get_media(int(media_id))
+    if media is None:
+        raise StudioExportError("Media not found.")
+    if media.kind not in {"photo", "video"}:
+        raise StudioExportError("This item cannot be exported.")
+    from orga_drone.scan import offline_root_ids
+
+    if int(media.root_id) in offline_root_ids(db):
+        raise StudioExportError("The source file is not available.")
+    path = resolve_media_file(db, media)
+    if path is None:
+        raise StudioExportError("The source file is not available.")
+    return media, path
+
+
+def _export_stem(media: MediaRow) -> str:
+    stem = Path(media.filename).stem.strip()
+    return stem or "export"
+
+
+def _best_video_option(heights: list[int | None]) -> ExportResolutionOption:
+    options = available_export_resolutions(heights)
+    if not options:
+        raise StudioExportError("No exportable resolution for this file.")
+    return max(options, key=lambda option: option.height)
+
+
+def _preset_filename(stem: str, preset: str, *, suffix: str, height: int | None = None, size_tag: str | None = None) -> str:
+    label = preset if not size_tag else f"{preset}_{size_tag}"
+    return suggested_export_filename(stem, height=height, suffix=suffix, label=label)
+
+
+def build_media_export_options_payload(db: Database, media_id: int) -> dict:
+    """Resolution or still presets for one library photo or video."""
+    media, path = _require_export_media(db, media_id)
+    stem = _export_stem(media)
+    last_dir = get_last_export_directory()
+    directory = resolve_export_directory(last_dir)
+    presets: list[dict[str, object]] = []
+    if media.kind == "photo":
+        for preset in ("best", "whatsapp", "instagram", "tiktok"):
+            spec = inspect_photo_preset(path, preset)
+            size_tag = None
+            if preset == "instagram":
+                size_tag = "1080x1350"
+            elif preset == "tiktok":
+                size_tag = "1080x1920"
+            presets.append(
+                {
+                    "id": preset,
+                    "suggested_filename": _preset_filename(
+                        stem, preset, suffix=spec.suffix, size_tag=size_tag
+                    ),
+                    "width": spec.width,
+                    "height": spec.height,
+                    "copied": spec.copied,
+                }
+            )
+        default_preset = "best"
+    else:
+        heights = [media_frame_height(db, media)]
+        try:
+            best = _best_video_option(heights)
+        except StudioExportError:
+            best = None
+        if best is not None:
+            presets.append(
+                {
+                    "id": "best",
+                    "suggested_filename": _preset_filename(
+                        stem, "best", suffix=".mp4", height=best.height
+                    ),
+                    "width": best.width,
+                    "height": best.height,
+                    "copied": False,
+                }
+            )
+        size_tag = f"{SOCIAL_VIDEO_WIDTH}x{SOCIAL_VIDEO_HEIGHT}"
+        for preset in ("whatsapp", "instagram", "tiktok"):
+            presets.append(
+                {
+                    "id": preset,
+                    "suggested_filename": _preset_filename(
+                        stem, preset, suffix=".mp4", size_tag=size_tag
+                    ),
+                    "width": SOCIAL_VIDEO_WIDTH,
+                    "height": SOCIAL_VIDEO_HEIGHT,
+                    "copied": False,
+                }
+            )
+        default_preset = "best" if best is not None else "whatsapp"
+    if not presets:
+        raise StudioExportError("No exportable resolution for this file.")
+    return {
+        "media_id": media.id,
+        "filename": media.filename,
+        "kind": media.kind,
+        "default_directory": str(directory),
+        "last_export_directory": last_dir,
+        "default_preset": default_preset,
+        "presets": presets,
+    }
+
+
+def _video_export_config(
+    db: Database,
+    media: MediaRow,
+    path: Path,
+    *,
+    preset: str,
+    output_path: Path,
+    overwrite: bool,
+) -> StudioExportConfig:
+    if preset == "best":
+        option = _best_video_option([media_frame_height(db, media)])
+        width, height = option.width, option.height
+    else:
+        width, height = SOCIAL_VIDEO_WIDTH, SOCIAL_VIDEO_HEIGHT
+    seconds = effective_seconds(
+        kind="video",
+        photo_duration_s=None,
+        duration_s=media.duration_s,
+        available=True,
+    )
+    if seconds is None or seconds <= 0:
+        raise StudioExportError("This file has no exportable duration.")
+    dest, protected_identities, protected_paths = _snapshot_export_destination(
+        db,
+        output_path,
+        overwrite=overwrite,
+        suffix=".mp4",
+    )
+    clip = StudioExportClip(
+        source_path=path,
+        kind="video",
+        duration_s=float(seconds),
+        source_start_s=0.0,
+        source_end_s=None,
+        playback_speed=1.0,
+        section_repeats=1,
+        media_duration_s=media.duration_s,
+    )
+    return StudioExportConfig(
+        output_path=dest,
+        width=width,
+        height=height,
+        clips=(clip,),
+        project_title=_export_stem(media),
+        music_tracks=(),
+        protected_identities=protected_identities,
+        protected_paths=protected_paths,
+    )
+
+
+def prepare_media_export(
+    db: Database,
+    media_id: int,
+    *,
+    preset: str,
+    output_path: Path,
+    overwrite: bool = False,
+) -> MediaExportPlan:
+    """Validate one photo or video export. Does not render."""
+    key = normalize_share_preset(preset)
+    media, path = _require_export_media(db, media_id)
+    if media.kind == "photo":
+        spec = inspect_photo_preset(path, key)
+        dest, identities, protected = _snapshot_export_destination(
+            db,
+            output_path,
+            overwrite=overwrite,
+            suffix=spec.suffix,
+        )
+        return MediaExportPlan(
+            kind="photo",
+            preset=key,
+            output_path=dest,
+            protected_identities=identities,
+            protected_paths=protected,
+        )
+    config = _video_export_config(
+        db,
+        media,
+        path,
+        preset=key,
+        output_path=output_path,
+        overwrite=overwrite,
+    )
+    return MediaExportPlan(
+        kind="video",
+        preset=key,
+        output_path=config.output_path,
+        config=config,
+        protected_identities=config.protected_identities,
+        protected_paths=config.protected_paths,
+    )
+
+
+def run_media_export(
+    db: Database,
+    media_id: int,
+    *,
+    preset: str,
+    output_path: Path,
+    overwrite: bool = False,
+    encoder: StudioVideoEncoder | None = None,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+) -> Path:
+    """Export one library photo as a still, or one video through the Studio encoder."""
+    plan = prepare_media_export(
+        db,
+        media_id,
+        preset=preset,
+        output_path=output_path,
+        overwrite=overwrite,
+    )
+    if plan.kind == "photo":
+        if on_progress is not None:
+            on_progress(
+                {
+                    "phase": "preparing",
+                    "clip_index": 1,
+                    "clip_total": 1,
+                    "percent": 0,
+                }
+            )
+        media, path = _require_export_media(db, media_id)
+        try:
+            result = export_photo_file(
+                path,
+                plan.output_path,
+                plan.preset,
+                protected=plan.protected_paths,
+                protected_identities=plan.protected_identities,
+                cancel_event=cancel_event,
+            )
+        except ExportCancelled:
+            append_export_log(
+                f"CANCEL title={_export_stem(media)!r} preset={plan.preset} dest={plan.output_path}"
+            )
+            raise
+        except StudioExportError as exc:
+            append_export_log(
+                f"FAIL title={_export_stem(media)!r} preset={plan.preset} "
+                f"dest={plan.output_path} error={exc}"
+            )
+            raise
+        set_last_export_directory(result.parent)
+        append_export_log(
+            f"OK title={_export_stem(media)!r} preset={plan.preset} dest={result}"
+        )
+        return result
+    if plan.config is None:
+        raise StudioExportError("This item cannot be exported.")
+    return _execute_export_config(
+        plan.config,
+        encoder=encoder,
+        on_progress=on_progress,
+        cancel_event=cancel_event,
+    )
