@@ -184,7 +184,7 @@ def test_export_chain_ramps_after_the_grade_and_respects_trim() -> None:
     assert "exposure=exposure=-0.2000" in vf
     assert "eq=contrast=1.1000:saturation=1.3000" in vf
     assert "hue=s='" in vf
-    assert "t-2.5000" in vf
+    assert "t-0.0000" in vf
     assert vf.index("colortemperature=") < vf.index("eq=") < vf.index("hue=s=")
     assert vf.index("hue=s=") < vf.index("scale=")
     plain = _segment_vf_for_clip(

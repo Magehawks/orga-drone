@@ -440,9 +440,8 @@ def ffmpeg_saturation_ramp(ramp: SaturationRamp, *, origin_s: float) -> str:
 
     The multiplier runs after the grade, so brightness, contrast, warmth, and
     the static saturation slider still apply and then fade toward the target.
-    Only formatted numbers are interpolated. Video filter ``t`` is the source
-    timestamp because ``-ss`` stays an output option, so clip-relative time is
-    ``t`` minus the trim in-point.
+    Only formatted numbers are interpolated. Video segments seek with input
+    ``-ss``, so clip-relative time is filter ``t`` (origin 0 at the kept in-point).
     """
     if not ramp.is_active:
         return ""
