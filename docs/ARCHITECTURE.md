@@ -48,7 +48,7 @@ so they do not auto-update. See `packaging/itch/README.md`.
 | Area | Responsibility |
 |------|----------------|
 | `app.py` | FastAPI routes (HTML + APIs) |
-| `local_http.py` | Loopback Host and Origin checks; foreign Hosts and cross-site writes are refused |
+| `local_http.py` | Loopback Host plus Origin scheme/host/port checks; writes need a matching Origin (or same-origin Sec-Fetch-Site and Referer) |
 | `config.py` | Settings, paths, env |
 | `desktop.py` | Desktop window / port discovery / native folder + save + open pickers; Windows open/reveal of local files; MOTW-safe copy of WebView2 DLLs (see `packaging/README.md`) |
 | `db/` | Schema, migrations, queries |
