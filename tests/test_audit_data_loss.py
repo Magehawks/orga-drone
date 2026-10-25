@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import os
+import subprocess
+import threading
+from io import BytesIO
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
@@ -16,6 +20,8 @@ from orga_drone.export.studio_encoder import (
     FfmpegStudioEncoder,
     StudioExportError,
 )
+from orga_drone.ffmpeg_bin import find_ffmpeg
+from orga_drone.studio_overlay import Overlay, resolve_overlay_asset, store_overlay_asset
 from orga_drone.studio_cut import section_repeats_from_effect_settings
 from orga_drone.studio_export import prepare_studio_export, run_studio_export
 from orga_drone.studio_mask import masks_from_effect_settings
@@ -310,3 +316,281 @@ def test_repath_preserves_cross_project_clip_edits(tmp_path: Path) -> None:
     assert [mask.id for mask in masks_b] == ["mask-b"]
     assert (root / "OLD.MP4").read_bytes() == b"old-bytes"
     assert new_file.read_bytes() == b"new-bytes"
+
+
+def _require_ffmpeg() -> str:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    return ffmpeg
+
+
+def _color_mp4(ffmpeg: str, path: Path, color: str) -> None:
+    generated = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c={color}:s=320x180:r=30:d=0.4",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert generated.returncode == 0, generated.stderr.decode("utf-8", errors="replace")
+
+
+def _index_video(db: Database, root: Path, filename: str, ffmpeg: str, color: str) -> int:
+    path = root / filename
+    _color_mp4(ffmpeg, path, color)
+    payload = path.read_bytes()
+    if db.list_roots():
+        root_id = int(db.list_roots()[0]["id"])
+    else:
+        root_id = db.add_root(root, label="lib")
+    return db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "video",
+            "filename": filename,
+            "path": str(path.resolve()),
+            "size_bytes": len(payload),
+            "duration_s": 0.4,
+            "width": 1280,
+            "height": 720,
+            "recorded_at": "2024-01-02T10:00:00",
+            "sequence": 1,
+            "mode": None,
+            "drone_model": "Avata 2",
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+
+
+def _mp4_signature(path: Path) -> None:
+    header = path.read_bytes()[:64]
+    assert b"ftyp" in header
+    assert path.stat().st_size > 0
+
+
+def test_rename_during_export_does_not_overwrite_indexed_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    other_id = _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    assert other_id != source_id
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = root / "Story.mp4"
+    moved = {"done": False}
+
+    def on_progress(payload: dict[str, object]) -> None:
+        if moved["done"] or payload.get("phase") != "rendering":
+            return
+        os.replace(other, dest)
+        moved["done"] = True
+
+    with pytest.raises(StudioExportError):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+            on_progress=on_progress,
+        )
+    assert moved["done"] is True
+    assert _sha256(source) == source_hash
+    assert dest.is_file()
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    assert dest.read_bytes() == other_bytes
+    assert not other.exists()
+
+
+def test_rename_onto_approved_overwrite_keeps_indexed_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Overwrite was confirmed for an ordinary export, then a library file took that name."""
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = root / "Story.mp4"
+    dest.write_bytes(b"ordinary-export")
+    moved = {"done": False}
+
+    def on_progress(payload: dict[str, object]) -> None:
+        if moved["done"] or payload.get("phase") != "rendering":
+            return
+        os.replace(other, dest)
+        moved["done"] = True
+
+    with pytest.raises(StudioExportError, match=_PROTECTED):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+            on_progress=on_progress,
+        )
+    assert moved["done"] is True
+    assert _sha256(source) == source_hash
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    assert dest.read_bytes() == other_bytes
+
+
+def test_real_encoder_success_overwrite_and_cancel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "green")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    source_hash = _sha256(source)
+    dest = tmp_path / "exports" / "story.mp4"
+    dest.parent.mkdir()
+    dest.write_bytes(b"ordinary-export")
+
+    run_studio_export(
+        db,
+        height=720,
+        output_path=dest,
+        overwrite=True,
+    )
+    assert _sha256(source) == source_hash
+    assert dest.read_bytes() != b"ordinary-export"
+    _mp4_signature(dest)
+
+    kept = b"ordinary-export-cancel"
+    dest.write_bytes(kept)
+    event = threading.Event()
+
+    def on_progress(payload: dict[str, object]) -> None:
+        if payload.get("phase") == "rendering":
+            event.set()
+
+    with pytest.raises(ExportCancelled):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+            on_progress=on_progress,
+            cancel_event=event,
+        )
+    assert dest.read_bytes() == kept
+    assert _sha256(source) == source_hash
+
+
+def test_encoder_keeps_overlay_png_even_as_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ffmpeg = _require_ffmpeg()
+    data = tmp_path / "data"
+    monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=data))
+    source = tmp_path / "clip.mp4"
+    _color_mp4(ffmpeg, source, "red")
+    buffer = BytesIO()
+    Image.new("RGB", (32, 32), (220, 20, 20)).save(buffer, "PNG")
+    asset_name = store_overlay_asset(data, buffer.getvalue())
+    asset = resolve_overlay_asset(data, asset_name)
+    overlay_hash = _sha256(asset)
+    source_hash = _sha256(source)
+    clip = StudioExportClip(
+        source_path=source,
+        kind="video",
+        duration_s=0.4,
+        overlays=(
+            Overlay(
+                id="ovimage001",
+                kind="image",
+                start_s=0.0,
+                end_s=0.4,
+                x=0.1,
+                y=0.1,
+                w=0.4,
+                h=0.4,
+                asset_name=asset_name,
+            ),
+        ),
+    )
+    exported = tmp_path / "story.mp4"
+    FfmpegStudioEncoder().render(
+        StudioExportConfig(
+            output_path=exported,
+            width=320,
+            height=180,
+            clips=(clip,),
+        )
+    )
+    _mp4_signature(exported)
+    assert _sha256(asset) == overlay_hash
+    assert _sha256(source) == source_hash
+
+    with pytest.raises(StudioExportError, match=_PROTECTED):
+        FfmpegStudioEncoder().render(
+            StudioExportConfig(
+                output_path=asset,
+                width=320,
+                height=180,
+                clips=(clip,),
+            )
+        )
+    assert _sha256(asset) == overlay_hash
+
+    alias = tmp_path / "overlay-alias.png"
+    try:
+        os.link(asset, alias)
+    except OSError:
+        alias = None
+    if alias is not None:
+        with pytest.raises(StudioExportError, match=_PROTECTED):
+            FfmpegStudioEncoder().render(
+                StudioExportConfig(
+                    output_path=alias,
+                    width=320,
+                    height=180,
+                    clips=(clip,),
+                )
+            )
+        assert _sha256(asset) == overlay_hash
+        assert _sha256(alias) == overlay_hash

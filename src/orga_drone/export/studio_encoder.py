@@ -7,9 +7,11 @@ codec-agnostic. The default adapter uses the existing ffmpeg binary discovery.
 from __future__ import annotations
 
 import contextvars
+import errno
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import threading
@@ -720,6 +722,152 @@ def reject_protected_export_destination(
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
 
 
+def _file_identity(path: Path) -> tuple[int, int] | None:
+    """Device and file id, or None when ``path`` is not an existing file."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    if not stat.S_ISREG(st.st_mode):
+        return None
+    return (int(st.st_dev), int(st.st_ino))
+
+
+def _publish_export_file(
+    partial: Path,
+    dest: Path,
+    *,
+    approved_identity: tuple[int, int] | None,
+    protected: Iterable[Path | str],
+) -> None:
+    """Publish ``partial`` at ``dest`` without replacing a different file.
+
+    A free name is claimed with ``os.link`` (or ``O_EXCL`` when linking is not
+    available). Both fail if the name appeared during the encode, so a library
+    file renamed onto ``dest`` is left untouched. Overwrite is allowed only by
+    writing through a handle of the same file that was approved before encoding.
+    """
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    try:
+        os.link(partial, dest)
+        return
+    except FileExistsError:
+        _overwrite_approved_export(
+            partial, dest, approved_identity=approved_identity, protected=protected
+        )
+        return
+    except OSError as exc:
+        if _already_exists(exc) or _file_identity(dest) is not None:
+            _overwrite_approved_export(
+                partial,
+                dest,
+                approved_identity=approved_identity,
+                protected=protected,
+            )
+            return
+        _create_export_exclusive(partial, dest, protected)
+
+
+def _already_exists(exc: OSError) -> bool:
+    if isinstance(exc, FileExistsError):
+        return True
+    if exc.errno == errno.EEXIST:
+        return True
+    winerror = getattr(exc, "winerror", None)
+    return winerror == 183
+
+
+def _overwrite_approved_export(
+    partial: Path,
+    dest: Path,
+    *,
+    approved_identity: tuple[int, int] | None,
+    protected: Iterable[Path | str],
+) -> None:
+    """Replace the bytes of the export file approved before encoding.
+
+    The handle blocks a rename onto this name on Windows. A different file
+    identity is never written, including one that landed after the check.
+    """
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    if approved_identity is None:
+        raise StudioExportError(
+            "File already exists. Confirm overwrite to continue."
+        )
+    flags = os.O_RDWR
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    try:
+        fd = os.open(dest, flags)
+    except OSError as exc:
+        raise StudioExportError(f"Export failed: {exc}") from exc
+    try:
+        current = (int(os.fstat(fd).st_dev), int(os.fstat(fd).st_ino))
+        if current != approved_identity or _file_identity(dest) != current:
+            raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+        written = _copy_file_into_fd(fd, partial)
+        if written <= 0:
+            raise StudioExportError("Export failed: empty output.")
+        os.ftruncate(fd, written)
+        os.fsync(fd)
+        if _file_identity(dest) != current:
+            raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    finally:
+        os.close(fd)
+
+
+def _create_export_exclusive(
+    partial: Path, dest: Path, protected: Iterable[Path | str]
+) -> None:
+    """Create ``dest`` only if the name is still free."""
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    try:
+        fd = os.open(dest, flags)
+    except FileExistsError:
+        if destination_matches_protected(dest, protected):
+            raise StudioExportError(EXPORT_DESTINATION_PROTECTED) from None
+        raise StudioExportError(
+            "File already exists. Confirm overwrite to continue."
+        ) from None
+    except OSError as exc:
+        if _already_exists(exc) or _file_identity(dest) is not None:
+            if destination_matches_protected(dest, protected):
+                raise StudioExportError(EXPORT_DESTINATION_PROTECTED) from exc
+            raise StudioExportError(
+                "File already exists. Confirm overwrite to continue."
+            ) from exc
+        raise StudioExportError(f"Export failed: {exc}") from exc
+    try:
+        written = _copy_file_into_fd(fd, partial)
+        if written <= 0:
+            raise StudioExportError("Export failed: empty output.")
+        os.ftruncate(fd, written)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _copy_file_into_fd(fd: int, source: Path) -> int:
+    written = 0
+    with source.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            view = memoryview(chunk)
+            while view:
+                count = os.write(fd, view)
+                if count <= 0:
+                    raise StudioExportError("Export failed: could not write output.")
+                view = view[count:]
+                written += count
+    return written
+
+
 _cancel_event: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
     "studio_export_cancel",
     default=None,
@@ -816,8 +964,9 @@ class StudioVideoEncoder(Protocol):
     ) -> Path:
         """Render ``config`` to a finished file at ``config.output_path``.
 
-        Implementations should write via a temporary file and only place the
-        final destination after success. Must not modify source media.
+        Implementations should write via a temporary file and publish it
+        without replacing a different file than the one approved at start.
+        Must not modify source media, overlay images, or soundtrack files.
         When ``cancel_event`` is set, stop the work and leave the destination
         untouched.
         """
@@ -927,7 +1076,12 @@ class FfmpegStudioEncoder:
             raise StudioExportError("Export folder does not exist.")
         if not os_access_writable(parent):
             raise StudioExportError("Export folder is not writable.")
-        reject_protected_export_destination(dest, _config_protected_paths(config))
+        protected = _config_protected_paths(config)
+        reject_protected_export_destination(dest, protected)
+        # Identity of an ordinary file the user may replace. A file that
+        # appears or changes during the encode is a different file and is
+        # not published over.
+        approved_identity = _file_identity(dest)
         ffmpeg = find_ffmpeg()
         if not ffmpeg:
             raise StudioExportError(
@@ -999,8 +1153,12 @@ class FfmpegStudioEncoder:
             _raise_if_cancelled()
             shutil.move(str(tmp_out), partial)
             _raise_if_cancelled()
-            reject_protected_export_destination(dest, _config_protected_paths(config))
-            partial.replace(dest)
+            _publish_export_file(
+                partial,
+                dest,
+                approved_identity=approved_identity,
+                protected=protected,
+            )
             _emit(
                 on_progress,
                 phase="done",
@@ -1618,14 +1776,51 @@ def _materialize_photo_still(source: Path, dest: Path) -> Path:
 
 
 def _config_protected_paths(config: StudioExportConfig) -> list[Path]:
-    """Source media and soundtrack files this encode must not replace."""
+    """Files this encode reads and must not replace.
+
+    Clip media, soundtrack files, image overlays, and a font the encode will
+    open. Comparison includes canonical paths and hard-link aliases.
+    """
     protected: list[Path] = []
+    needs_font = False
     for clip in config.clips:
         if clip.source_path is not None:
             protected.append(clip.source_path)
+        if clip.kind == "title_card":
+            needs_font = True
+        for overlay in clip.overlays:
+            if overlay.kind == "image" and overlay.asset_name:
+                asset = _overlay_asset_path(overlay.asset_name)
+                if asset is not None:
+                    protected.append(asset)
+            elif overlay.kind == "text" and overlay.text.strip():
+                needs_font = True
     for track in config.music_tracks:
         protected.append(track.source_path)
+    if needs_font:
+        font = _export_font_path()
+        if font is not None:
+            protected.append(font)
     return protected
+
+
+def _overlay_asset_path(asset_name: str) -> Path | None:
+    from orga_drone.config import settings
+    from orga_drone.studio_overlay import resolve_overlay_asset
+
+    try:
+        return resolve_overlay_asset(settings.data_dir, asset_name)
+    except (ValueError, OSError):
+        return None
+
+
+def _export_font_path() -> Path | None:
+    from orga_drone.studio_title_card import TitleCardFontError, resolve_title_card_font
+
+    try:
+        return resolve_title_card_font()
+    except (TitleCardFontError, OSError):
+        return None
 
 
 def os_access_writable(directory: Path) -> bool:
