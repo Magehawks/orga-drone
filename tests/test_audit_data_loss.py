@@ -433,6 +433,52 @@ def test_rename_during_export_does_not_overwrite_indexed_original(
     assert not other.exists()
 
 
+def test_rename_before_encoder_start_is_not_approved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A library file renamed onto the destination after the check is not a target.
+
+    The move happens after prepare_studio_export and before the encoder starts.
+    overwrite is false, so the encoder must not adopt the new file.
+    """
+    ffmpeg = _require_ffmpeg()
+    _prefs(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    root = tmp_path / "lib"
+    root.mkdir()
+    source_id = _index_video(db, root, "CLIP.MP4", ffmpeg, "red")
+    _index_video(db, root, "OTHER.MP4", ffmpeg, "blue")
+    _add_clip(db, source_id)
+    source = root / "CLIP.MP4"
+    other = root / "OTHER.MP4"
+    source_hash = _sha256(source)
+    other_bytes = other.read_bytes()
+    other_hash = hashlib.sha256(other_bytes).hexdigest()
+    dest = root / "Story.mp4"
+    moved = {"done": False}
+
+    def on_progress(payload: dict[str, object]) -> None:
+        if moved["done"] or payload.get("phase") != "preparing":
+            return
+        os.replace(other, dest)
+        moved["done"] = True
+
+    with pytest.raises(StudioExportError, match="File already exists"):
+        run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=False,
+            on_progress=on_progress,
+        )
+    assert moved["done"] is True
+    assert _sha256(source) == source_hash
+    assert dest.is_file()
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+    assert dest.read_bytes() == other_bytes
+    assert not other.exists()
+
+
 def test_rename_onto_approved_overwrite_keeps_indexed_original(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

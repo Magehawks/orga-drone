@@ -71,6 +71,9 @@ class StudioExportConfig:
     project_title: str = "Your story"
     music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
     music: StudioExportMusic | None = None
+    # Identity approved when the destination was checked. None means the name
+    # was free: publish may create it and must not replace a file that appears later.
+    approved_identity: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         if self.music is not None and not self.music_tracks:

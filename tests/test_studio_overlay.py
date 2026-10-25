@@ -320,7 +320,7 @@ def test_http_overlays_and_asset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-overlays" hidden' in page.text
+    assert 'id="inspector-overlays" data-inspector-tab="overlays" hidden' in page.text
     assert "Einblendungen" in page.text or "Overlays" in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "overlayWrap.hidden = !(isPhoto || isVideo)" in script

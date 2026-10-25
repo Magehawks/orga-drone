@@ -18,9 +18,9 @@ from orga_drone.export.studio_encoder import (
     ExportCancelled,
     StudioExportError,
     StudioVideoEncoder,
+    approve_export_destination,
     get_default_encoder,
     os_access_writable,
-    reject_protected_export_destination,
 )
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
@@ -452,10 +452,13 @@ def prepare_studio_export(
     if not os_access_writable(dest.parent):
         raise StudioExportError("Export folder is not writable.")
     # Overwrite may replace a previous export. It must not replace library
-    # media, sidecars, soundtrack files, or other project assets.
-    reject_protected_export_destination(dest, _protected_export_paths(db))
-    if dest.exists() and not overwrite:
-        raise StudioExportError("File already exists. Confirm overwrite to continue.")
+    # media, sidecars, soundtrack files, or other project assets. The identity
+    # is fixed here and is the only file the encoder may replace.
+    approved_identity = approve_export_destination(
+        dest,
+        overwrite=overwrite,
+        protected=_protected_export_paths(db),
+    )
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
@@ -520,6 +523,7 @@ def prepare_studio_export(
         clips=tuple(export_clips),
         project_title=project.title,
         music_tracks=tuple(music_tracks),
+        approved_identity=approved_identity,
     )
 
 

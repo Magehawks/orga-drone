@@ -722,6 +722,29 @@ def reject_protected_export_destination(
         raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
 
 
+def approve_export_destination(
+    dest: Path,
+    *,
+    overwrite: bool,
+    protected: Iterable[Path | str],
+) -> tuple[int, int] | None:
+    """Decide the only file a later publish may replace.
+
+    Called at the destination check. ``None`` means the name was free, so
+    publish may only create it. A file that appears afterwards is not approved,
+    including when ``overwrite`` is false.
+    """
+    reject_protected_export_destination(dest, protected)
+    identity = _file_identity(dest)
+    if identity is None:
+        return None
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+    if not overwrite:
+        raise StudioExportError("File already exists. Confirm overwrite to continue.")
+    return identity
+
+
 def _file_identity(path: Path) -> tuple[int, int] | None:
     """Device and file id, or None when ``path`` is not an existing file."""
     try:
@@ -965,7 +988,8 @@ class StudioVideoEncoder(Protocol):
         """Render ``config`` to a finished file at ``config.output_path``.
 
         Implementations should write via a temporary file and publish it
-        without replacing a different file than the one approved at start.
+        without replacing a different file than ``config.approved_identity``.
+        ``None`` means the name was free at the destination check.
         Must not modify source media, overlay images, or soundtrack files.
         When ``cancel_event`` is set, stop the work and leave the destination
         untouched.
@@ -1078,10 +1102,10 @@ class FfmpegStudioEncoder:
             raise StudioExportError("Export folder is not writable.")
         protected = _config_protected_paths(config)
         reject_protected_export_destination(dest, protected)
-        # Identity of an ordinary file the user may replace. A file that
-        # appears or changes during the encode is a different file and is
-        # not published over.
-        approved_identity = _file_identity(dest)
+        # The destination check already chose the only replaceable file.
+        # Statting here would treat a file that landed in the meantime as approved.
+        approved_identity = config.approved_identity
+        current = _file_identity(dest)
         ffmpeg = find_ffmpeg()
         if not ffmpeg:
             raise StudioExportError(
@@ -1094,6 +1118,16 @@ class FfmpegStudioEncoder:
         partial = parent / f".{dest.name}.{uuid.uuid4().hex}.partial"
         token = _cancel_event.set(cancel_event)
         try:
+            _raise_if_cancelled()
+            if current is not None and current != approved_identity:
+                if (
+                    destination_matches_protected(dest, protected)
+                    or approved_identity is not None
+                ):
+                    raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+                raise StudioExportError(
+                    "File already exists. Confirm overwrite to continue."
+                )
             segments: list[Path] = []
             for index, clip in enumerate(config.clips):
                 _raise_if_cancelled()
