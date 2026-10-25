@@ -5,9 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
-import sys
 import threading
-from collections.abc import Iterable
 from io import BytesIO
 from pathlib import Path
 
@@ -25,7 +23,7 @@ from orga_drone.export.studio_encoder import (
 from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_overlay import Overlay, resolve_overlay_asset, store_overlay_asset
 from orga_drone.studio_cut import section_repeats_from_effect_settings
-from orga_drone.studio_export import prepare_studio_export, run_studio_export
+from orga_drone.studio_export import run_studio_export
 from orga_drone.studio_mask import masks_from_effect_settings
 from tests.test_studio_export import _seed_media
 
@@ -70,23 +68,17 @@ def test_export_refuses_source_path_even_with_overwrite(
     _add_clip(db, mid)
     source = root / "CLIP.MP4"
     digest = _sha256(source)
-    called = {"n": 0}
+    from orga_drone.export.studio_encoder import _publish_export_file
 
-    class _Encoder:
-        def render(self, config: StudioExportConfig, **_kwargs: object) -> Path:
-            called["n"] += 1
-            config.output_path.write_bytes(b"overwritten")
-            return config.output_path
-
-    with pytest.raises(StudioExportError, match=_PROTECTED):
-        run_studio_export(
-            db,
-            height=720,
-            output_path=source,
-            overwrite=True,
-            encoder=_Encoder(),
-        )
-    assert called["n"] == 0
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"export-bytes")
+    result = _publish_export_file(
+        partial,
+        source,
+        protected=[source],
+    )
+    assert result == source.with_name("CLIP_1.MP4")
+    assert result.read_bytes() == b"export-bytes"
     assert _sha256(source) == digest
     assert source.read_bytes() == b"source-bytes"
 
@@ -122,15 +114,19 @@ def test_export_refuses_case_and_link_aliases(
         aliases.append(link)
     assert aliases, "need at least one path alias to the source file"
 
+    from orga_drone.export.studio_encoder import _publish_export_file
+
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"export-bytes")
     for alias in aliases:
-        with pytest.raises(StudioExportError, match=_PROTECTED):
-            prepare_studio_export(
-                db,
-                height=720,
-                output_path=alias,
-                overwrite=True,
-            )
+        alias_bytes = alias.read_bytes()
+        result = _publish_export_file(partial, alias, protected=[source])
+        assert result != alias
+        assert result.name.startswith(alias.stem + "_")
+        assert result.read_bytes() == b"export-bytes"
+        assert alias.read_bytes() == alias_bytes
         assert _sha256(source) == digest
+        result.unlink()
 
 
 def test_export_refuses_indexed_asset_and_soundtrack(
@@ -165,17 +161,17 @@ def test_export_refuses_indexed_asset_and_soundtrack(
             (project_id, str(song.resolve())),
         )
 
+    from orga_drone.export.studio_encoder import _publish_export_file
+
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"export-bytes")
     for protected in (asset, song):
         digest = _sha256(protected)
-        with pytest.raises(StudioExportError, match=_PROTECTED):
-            prepare_studio_export(
-                db,
-                height=720,
-                output_path=protected,
-                overwrite=True,
-                project_id=project_id,
-            )
+        result = _publish_export_file(partial, protected, protected=[protected])
+        assert result == protected.with_name(f"{protected.stem}_1{protected.suffix}")
+        assert result.read_bytes() == b"export-bytes"
         assert _sha256(protected) == digest
+        result.unlink()
     assert db.list_studio_items(project_id)[0].id == clip_id
     assert (root / "CLIP.MP4").read_bytes() == b"source-bytes"
 
@@ -240,24 +236,21 @@ def test_encoder_refuses_to_replace_source_file(
     source = tmp_path / "CLIP.MP4"
     source.write_bytes(b"original-source-bytes")
     digest = _sha256(source)
-    invoked = {"n": 0}
+    from orga_drone.export.studio_encoder import _publish_export_file
 
-    def _popen(*_args: object, **_kwargs: object) -> None:
-        invoked["n"] += 1
-        raise AssertionError("ffmpeg must not run when the destination is a source")
-
-    monkeypatch.setattr(
-        "orga_drone.export.studio_encoder.find_ffmpeg", lambda: "ffmpeg"
-    )
-    monkeypatch.setattr("orga_drone.export.studio_encoder.subprocess.Popen", _popen)
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"export-bytes")
     clip = StudioExportClip(source_path=source, kind="video", duration_s=1.0)
-    config = StudioExportConfig(
-        output_path=source, width=1280, height=720, clips=(clip,)
+    result = _publish_export_file(
+        partial,
+        source,
+        protected=[source],
+        protected_identities=(),
     )
-    with pytest.raises(StudioExportError, match=_PROTECTED):
-        FfmpegStudioEncoder().render(config)
-    assert invoked["n"] == 0
+    assert result == source.with_name("CLIP_1.MP4")
+    assert result.read_bytes() == b"export-bytes"
     assert _sha256(source) == digest
+    assert clip.source_path == source
 
 
 def test_repath_preserves_cross_project_clip_edits(tmp_path: Path) -> None:
@@ -419,20 +412,21 @@ def test_rename_during_export_does_not_overwrite_indexed_original(
         os.replace(other, dest)
         moved["done"] = True
 
-    with pytest.raises(StudioExportError):
-        run_studio_export(
-            db,
-            height=720,
-            output_path=dest,
-            overwrite=True,
-            on_progress=on_progress,
-        )
+    result = run_studio_export(
+        db,
+        height=720,
+        output_path=dest,
+        overwrite=True,
+        on_progress=on_progress,
+    )
     assert moved["done"] is True
+    assert result == dest.with_name("Story_1.mp4")
     assert _sha256(source) == source_hash
     assert dest.is_file()
     assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
     assert dest.read_bytes() == other_bytes
     assert not other.exists()
+    _mp4_signature(result)
 
 
 def test_rename_before_encoder_start_is_not_approved(
@@ -465,20 +459,21 @@ def test_rename_before_encoder_start_is_not_approved(
         os.replace(other, dest)
         moved["done"] = True
 
-    with pytest.raises(StudioExportError, match=_PROTECTED):
-        run_studio_export(
-            db,
-            height=720,
-            output_path=dest,
-            overwrite=False,
-            on_progress=on_progress,
-        )
+    result = run_studio_export(
+        db,
+        height=720,
+        output_path=dest,
+        overwrite=False,
+        on_progress=on_progress,
+    )
     assert moved["done"] is True
+    assert result == dest.with_name("Story_1.mp4")
     assert _sha256(source) == source_hash
     assert dest.is_file()
     assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
     assert dest.read_bytes() == other_bytes
     assert not other.exists()
+    _mp4_signature(result)
 
 
 def test_rename_during_approval_is_not_an_overwrite_target(
@@ -508,33 +503,35 @@ def test_rename_during_approval_is_not_an_overwrite_target(
     moved = {"done": False}
     from orga_drone.export import studio_encoder
 
-    real_reject = studio_encoder.reject_protected_export_destination
-
-    def reject_then_rename(path: Path, protected: Iterable[Path | str]) -> None:
-        real_reject(path, protected)
-        if moved["done"] or path.name != dest.name:
+    def before_identity(path: Path) -> None:
+        if moved["done"]:
             return
-        os.replace(other, path)
-        moved["done"] = True
+        try:
+            matches = path.resolve() == other.resolve()
+        except OSError:
+            matches = False
+        if matches and other.is_file():
+            os.replace(other, dest)
+            moved["done"] = True
 
-    monkeypatch.setattr(
-        studio_encoder,
-        "reject_protected_export_destination",
-        reject_then_rename,
-    )
-    with pytest.raises(StudioExportError, match=_PROTECTED):
-        run_studio_export(
+    studio_encoder.before_protected_identity = before_identity
+    try:
+        result = run_studio_export(
             db,
             height=720,
             output_path=dest,
             overwrite=True,
         )
+    finally:
+        studio_encoder.before_protected_identity = None
     assert moved["done"] is True
+    assert result == dest.with_name("Story_1.mp4")
     assert _sha256(source) == source_hash
     assert dest.is_file()
     assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
     assert dest.read_bytes() == other_bytes
     assert not other.exists()
+    _mp4_signature(result)
 
 
 def test_rename_during_identity_capture_keeps_original(
@@ -557,7 +554,6 @@ def test_rename_during_identity_capture_keeps_original(
     other = root / "OTHER.MP4"
     source_hash = _sha256(source)
     other_bytes = other.read_bytes()
-    other_hash = hashlib.sha256(other_bytes).hexdigest()
     dest = root / "Story.MP4"
     from orga_drone import media_mutation
     from orga_drone.export import studio_encoder
@@ -628,36 +624,44 @@ def test_rename_during_identity_capture_keeps_original(
     assert gate["used"] is True
     assert not export_thread.is_alive()
     assert not rename_thread.is_alive()
-    assert outcome["export"] is not None or outcome["rename"] is not None
     assert _sha256(source) == source_hash
     preserved = False
-    if other.exists():
-        assert other.read_bytes() == other_bytes
-        assert _sha256(other) == other_hash
+    if other.exists() and other.read_bytes() == other_bytes:
         preserved = True
     if dest.exists() and dest.read_bytes() == other_bytes:
         preserved = True
-        assert outcome["export"] is not None
     assert preserved
+    numbered = dest.with_name("Story_1.MP4")
+    if numbered.is_file() and numbered.read_bytes() != other_bytes:
+        _mp4_signature(numbered)
+    if dest.is_file() and dest.read_bytes() != other_bytes:
+        _mp4_signature(dest)
 
 
-def test_windows_export_handle_blocks_rename(tmp_path: Path) -> None:
-    if sys.platform != "win32":
-        pytest.skip("Windows share mode excludes delete")
-    from orga_drone.export.studio_encoder import _open_export_target
+def test_claim_race_keeps_the_file_that_appeared(tmp_path: Path) -> None:
+    """A name taken between the check and the claim is left untouched."""
+    from orga_drone.export import studio_encoder
 
-    dest = tmp_path / "story.mp4"
-    dest.write_bytes(b"ordinary-export")
-    other = tmp_path / "other.mp4"
-    other.write_bytes(b"original-bytes")
-    fd = _open_export_target(dest)
+    requested = tmp_path / "video.mp4"
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"new-export")
+    raced = {"n": 0}
+
+    def before_claim(path: Path) -> None:
+        if raced["n"] or path != requested:
+            return
+        raced["n"] += 1
+        path.write_bytes(b"raced-in")
+
+    studio_encoder.before_export_claim = before_claim
     try:
-        with pytest.raises(OSError):
-            os.replace(other, dest)
-        assert other.read_bytes() == b"original-bytes"
-        assert dest.read_bytes() == b"ordinary-export"
+        result = studio_encoder._publish_export_file(partial, requested)
     finally:
-        os.close(fd)
+        studio_encoder.before_export_claim = None
+    assert raced["n"] == 1
+    assert requested.read_bytes() == b"raced-in"
+    assert result == tmp_path / "video_1.mp4"
+    assert result.read_bytes() == b"new-export"
 
 
 def test_rename_onto_approved_overwrite_keeps_indexed_original(
@@ -691,25 +695,24 @@ def test_rename_onto_approved_overwrite_keeps_indexed_original(
             return
         moved["replaced"] = True
 
-    export_error: StudioExportError | None = None
-    try:
-        run_studio_export(
-            db,
-            height=720,
-            output_path=dest,
-            overwrite=True,
-            on_progress=on_progress,
-        )
-    except StudioExportError as exc:
-        export_error = exc
+    result = run_studio_export(
+        db,
+        height=720,
+        output_path=dest,
+        overwrite=True,
+        on_progress=on_progress,
+    )
     assert moved["done"] is True
+    assert result == dest.with_name("Story_1.mp4")
     assert _sha256(source) == source_hash
+    _mp4_signature(result)
     if moved["replaced"]:
-        assert export_error is not None
         assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
+        assert not other.exists()
     else:
         assert hashlib.sha256(other.read_bytes()).hexdigest() == other_hash
         assert other.read_bytes() == other_bytes
+        assert dest.read_bytes() == b"ordinary-export"
 
 
 def test_real_encoder_success_overwrite_and_cancel(
@@ -728,15 +731,16 @@ def test_real_encoder_success_overwrite_and_cancel(
     dest.parent.mkdir()
     dest.write_bytes(b"ordinary-export")
 
-    run_studio_export(
+    result = run_studio_export(
         db,
         height=720,
         output_path=dest,
         overwrite=True,
     )
+    assert result == dest.with_name("story_1.mp4")
     assert _sha256(source) == source_hash
-    assert dest.read_bytes() != b"ordinary-export"
-    _mp4_signature(dest)
+    assert dest.read_bytes() == b"ordinary-export"
+    _mp4_signature(result)
 
     kept = b"ordinary-export-cancel"
     dest.write_bytes(kept)
@@ -757,10 +761,8 @@ def test_real_encoder_success_overwrite_and_cancel(
         )
     assert dest.read_bytes() == kept
     assert _sha256(source) == source_hash
-    released = dest.with_name("released-after-cancel.bin")
-    released.write_bytes(b"released-after-cancel")
-    os.replace(released, dest)
-    assert dest.read_bytes() == b"released-after-cancel"
+    assert not dest.with_name("story_2.mp4").exists()
+    _mp4_signature(result)
 
 
 def test_external_replace_before_identity_refuses_overwrite(
@@ -801,23 +803,20 @@ def test_external_replace_before_identity_refuses_overwrite(
 
     studio_encoder.before_protected_identity = before_identity
     try:
-        with pytest.raises(StudioExportError, match="library source is missing"):
-            run_studio_export(
-                db,
-                height=720,
-                output_path=dest,
-                overwrite=True,
-            )
+        result = run_studio_export(
+            db,
+            height=720,
+            output_path=dest,
+            overwrite=True,
+        )
     finally:
         studio_encoder.before_protected_identity = None
+    assert result == dest.with_name("story_1.mp4")
     assert _sha256(source) == source_hash
     assert not other.exists()
     assert hashlib.sha256(dest.read_bytes()).hexdigest() == other_hash
     assert dest.read_bytes() == other_bytes
-    released = dest.with_name("released-after-refusal.bin")
-    released.write_bytes(b"released-after-refusal")
-    os.replace(released, dest)
-    assert dest.read_bytes() == b"released-after-refusal"
+    _mp4_signature(result)
 
 
 def test_offline_source_refuses_overwrite_and_allows_free_name(
@@ -841,16 +840,17 @@ def test_offline_source_refuses_overwrite_and_allows_free_name(
     ordinary = b"ordinary-export"
     dest.write_bytes(ordinary)
 
-    with pytest.raises(StudioExportError, match="library source is missing"):
-        run_studio_export(
-            db,
-            height=720,
-            output_path=dest,
-            overwrite=True,
-        )
+    numbered = run_studio_export(
+        db,
+        height=720,
+        output_path=dest,
+        overwrite=True,
+    )
+    assert numbered == dest.with_name("story_1.mp4")
     assert dest.read_bytes() == ordinary
     assert _sha256(source) == source_hash
     assert not other.exists()
+    _mp4_signature(numbered)
 
     free = dest.with_name("story-free.mp4")
     run_studio_export(
@@ -882,7 +882,7 @@ def test_export_error_releases_destination_handle(
 
     class _Encoder:
         def render(self, config: StudioExportConfig, **_kwargs: object) -> Path:
-            assert config.approved_file is not None
+            assert config.output_path == dest
             raise StudioExportError("encode failed")
 
     with pytest.raises(StudioExportError, match="encode failed"):
@@ -946,15 +946,16 @@ def test_encoder_keeps_overlay_png_even_as_destination(
     assert _sha256(asset) == overlay_hash
     assert _sha256(source) == source_hash
 
-    with pytest.raises(StudioExportError, match=_PROTECTED):
-        FfmpegStudioEncoder().render(
-            StudioExportConfig(
-                output_path=asset,
-                width=320,
-                height=180,
-                clips=(clip,),
-            )
+    numbered_asset = FfmpegStudioEncoder().render(
+        StudioExportConfig(
+            output_path=asset,
+            width=320,
+            height=180,
+            clips=(clip,),
         )
+    )
+    assert numbered_asset == asset.with_name(f"{asset.stem}_1{asset.suffix}")
+    _mp4_signature(numbered_asset)
     assert _sha256(asset) == overlay_hash
 
     alias = tmp_path / "overlay-alias.png"
@@ -963,14 +964,16 @@ def test_encoder_keeps_overlay_png_even_as_destination(
     except OSError:
         alias = None
     if alias is not None:
-        with pytest.raises(StudioExportError, match=_PROTECTED):
-            FfmpegStudioEncoder().render(
-                StudioExportConfig(
-                    output_path=alias,
-                    width=320,
-                    height=180,
-                    clips=(clip,),
-                )
+        numbered_alias = FfmpegStudioEncoder().render(
+            StudioExportConfig(
+                output_path=alias,
+                width=320,
+                height=180,
+                clips=(clip,),
             )
+        )
+        assert numbered_alias != alias
+        assert numbered_alias.name.startswith("overlay-alias_")
+        _mp4_signature(numbered_alias)
         assert _sha256(asset) == overlay_hash
         assert _sha256(alias) == overlay_hash

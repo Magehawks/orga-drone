@@ -151,6 +151,8 @@ def test_http_cancel_then_export_again(
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "/cancel" in script
     assert "exportCancelBtn.disabled = running" not in script
+    assert "msgExportOverwrite" not in script
+    assert "job.filename" in script
 
     out = tmp_path / "Videos" / "story.mp4"
     out.parent.mkdir()

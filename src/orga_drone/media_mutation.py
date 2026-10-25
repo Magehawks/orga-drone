@@ -1,11 +1,10 @@
-"""Process-wide lock for in-app renames and export destination approval.
+"""Process-wide lock for in-app renames and export name claims.
 
 The lock covers an in-app rename from the first file move through the database
 update, and an export while it reads protected paths, records their file
-identities, and approves the destination. It is not held during encoding.
-Renames performed by other programs are outside this lock. A confirmed
-overwrite is then limited to the handle opened at approval, and a name that
-was free is created exclusively.
+identities, and claims a free destination name. It is not held during encoding.
+Renames performed by other programs are outside this lock. A destination is
+always created exclusively; an existing file is never replaced.
 """
 
 from __future__ import annotations

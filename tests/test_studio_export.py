@@ -253,7 +253,7 @@ def test_http_export_options_and_fake_export(
     assert (tmp_path / "lib" / "CLIP.MP4").read_bytes() == b"fake"
 
 
-def test_run_studio_export_refuses_missing_overwrite(
+def test_export_numbers_taken_names_instead_of_overwriting(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
@@ -276,24 +276,20 @@ def test_run_studio_export_refuses_missing_overwrite(
     )
     out = tmp_path / "out.mp4"
     out.write_bytes(b"old")
-    fake = _FakeEncoder()
-    with pytest.raises(StudioExportError, match="already exists"):
-        run_studio_export(
-            db,
-            height=720,
-            output_path=out,
-            overwrite=False,
-            encoder=fake,
-        )
+    taken = tmp_path / "out_1.mp4"
+    taken.write_bytes(b"also-old")
+    from orga_drone.export.studio_encoder import _publish_export_file
+
+    partial = tmp_path / "partial.mp4"
+    partial.write_bytes(b"mp4-bytes")
+    result = _publish_export_file(partial, out)
+    assert result == tmp_path / "out_2.mp4"
+    assert result.read_bytes() == b"mp4-bytes"
     assert out.read_bytes() == b"old"
-    run_studio_export(
-        db,
-        height=720,
-        output_path=out,
-        overwrite=True,
-        encoder=fake,
-    )
-    assert out.read_bytes() == b"mp4-bytes"
+    assert taken.read_bytes() == b"also-old"
+    again = _publish_export_file(partial, out)
+    assert again == tmp_path / "out_3.mp4"
+    assert out.read_bytes() == b"old"
 
 
 def test_encoder_silent_video_fallback_preserves_source_start(

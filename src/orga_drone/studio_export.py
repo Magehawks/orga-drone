@@ -18,7 +18,7 @@ from orga_drone.export.studio_encoder import (
     ExportCancelled,
     StudioExportError,
     StudioVideoEncoder,
-    approve_export_destination,
+    _protected_identities,
     get_default_encoder,
     os_access_writable,
 )
@@ -452,16 +452,13 @@ def prepare_studio_export(
         raise StudioExportError("Export folder does not exist.")
     if not os_access_writable(dest.parent):
         raise StudioExportError("Export folder is not writable.")
-    # Overwrite may replace a previous export. It must not replace library
-    # media, sidecars, soundtrack files, or other project assets. The identity
-    # and, for a confirmed overwrite, the open handle are fixed here. The lock
-    # is not held while clips are built or while ffmpeg runs.
+    # ``overwrite`` is accepted for older clients and ignored. An existing file
+    # is never replaced. The protected snapshot is fixed here. The lock is not
+    # held while clips are built or while ffmpeg runs.
+    _ = overwrite
+    protected_paths = _protected_export_paths(db)
     with hold_media_mutation():
-        approval = approve_export_destination(
-            dest,
-            overwrite=overwrite,
-            protected=_protected_export_paths(db),
-        )
+        protected_identities = _protected_identities(protected_paths)
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
@@ -471,8 +468,6 @@ def prepare_studio_export(
             export_clips.append(built)
             source_items.append(clip)
     if not export_clips:
-        if approval.file is not None:
-            approval.file.close()
         raise StudioExportError("No available media to export.")
 
     from dataclasses import replace
@@ -521,22 +516,16 @@ def prepare_studio_export(
             )
         )
 
-    try:
-        return StudioExportConfig(
-            output_path=dest,
-            width=width,
-            height=int(height),
-            clips=tuple(export_clips),
-            project_title=project.title,
-            music_tracks=tuple(music_tracks),
-            approved_identity=approval.identity,
-            protected_identities=approval.protected_identities,
-            approved_file=approval.file,
-        )
-    except Exception:
-        if approval.file is not None:
-            approval.file.close()
-        raise
+    return StudioExportConfig(
+        output_path=dest,
+        width=width,
+        height=int(height),
+        clips=tuple(export_clips),
+        project_title=project.title,
+        music_tracks=tuple(music_tracks),
+        protected_identities=protected_identities,
+        protected_paths=tuple(str(path) for path in protected_paths),
+    )
 
 
 def append_export_log(message: str) -> None:
@@ -583,33 +572,29 @@ def run_studio_export(
         )
     enc = encoder or get_default_encoder()
     try:
-        try:
-            result = enc.render(
-                config,
-                on_progress=on_progress,
-                cancel_event=cancel_event,
-            )
-        except ExportCancelled:
-            append_export_log(
-                f"CANCEL title={config.project_title!r} height={config.height} "
-                f"clips={len(config.clips)} dest={config.output_path}"
-            )
-            raise
-        except StudioExportError as exc:
-            append_export_log(
-                f"FAIL title={config.project_title!r} height={config.height} "
-                f"clips={len(config.clips)} dest={config.output_path} error={exc}"
-            )
-            raise
-        except Exception as exc:
-            append_export_log(
-                f"FAIL title={config.project_title!r} height={config.height} "
-                f"clips={len(config.clips)} dest={config.output_path} error={exc}"
-            )
-            raise
-    finally:
-        if config.approved_file is not None:
-            config.approved_file.close()
+        result = enc.render(
+            config,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+        )
+    except ExportCancelled:
+        append_export_log(
+            f"CANCEL title={config.project_title!r} height={config.height} "
+            f"clips={len(config.clips)} dest={config.output_path}"
+        )
+        raise
+    except StudioExportError as exc:
+        append_export_log(
+            f"FAIL title={config.project_title!r} height={config.height} "
+            f"clips={len(config.clips)} dest={config.output_path} error={exc}"
+        )
+        raise
+    except Exception as exc:
+        append_export_log(
+            f"FAIL title={config.project_title!r} height={config.height} "
+            f"clips={len(config.clips)} dest={config.output_path} error={exc}"
+        )
+        raise
     set_last_export_directory(result.parent)
     append_export_log(
         f"OK title={config.project_title!r} height={config.height} "

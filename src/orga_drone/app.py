@@ -2133,7 +2133,7 @@ def create_app() -> FastAPI:
 
         store: ExportJobStore = app.state.export_jobs
         translate = get_translator(lang_from_request(request))
-        # Pre-flight validation (incl. overwrite 409) before creating a job.
+        # Pre-flight validation before creating a job. ``overwrite`` is ignored.
         try:
             await asyncio.to_thread(
                 prepare_studio_export,
@@ -2168,7 +2168,7 @@ def create_app() -> FastAPI:
                     db,
                     height=height,
                     output_path=Path(output_path),
-                    overwrite=True,  # preflight already confirmed overwrite
+                    overwrite=overwrite,
                     project_id=project_id,
                     on_progress=on_progress,
                     cancel_event=cancel_event,
