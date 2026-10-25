@@ -7,13 +7,14 @@ codec-agnostic. The default adapter uses the existing ffmpeg binary discovery.
 from __future__ import annotations
 
 import contextvars
+import os
 import re
 import shutil
 import subprocess
 import tempfile
 import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -666,6 +667,59 @@ class ExportCancelled(StudioExportError):
         super().__init__("Export cancelled.", code="cancelled")
 
 
+EXPORT_DESTINATION_PROTECTED = (
+    "Export destination matches a library source or project asset. "
+    "Choose a different file so the original is not overwritten."
+)
+
+
+def canonical_path_key(path: Path | str) -> str:
+    """Absolute, symlink-resolved path key. Comparison is case-insensitive."""
+    expanded = Path(path).expanduser()
+    try:
+        resolved = Path(os.path.realpath(expanded))
+    except (OSError, ValueError):
+        resolved = expanded.absolute()
+    return os.path.normcase(os.path.normpath(str(resolved)))
+
+
+def destination_matches_protected(
+    dest: Path, protected: Iterable[Path | str]
+) -> bool:
+    """True when ``dest`` is the same file as any protected path.
+
+    Matches resolved paths, Windows case aliases, symlinks, and hard links.
+    """
+    dest_key = canonical_path_key(dest)
+    try:
+        dest_exists = dest.exists()
+    except OSError:
+        dest_exists = False
+    for raw in protected:
+        other = Path(raw)
+        try:
+            if canonical_path_key(other) == dest_key:
+                return True
+        except (OSError, ValueError):
+            continue
+        if not dest_exists:
+            continue
+        try:
+            if other.exists() and os.path.samefile(dest, other):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def reject_protected_export_destination(
+    dest: Path, protected: Iterable[Path | str]
+) -> None:
+    """Refuse to publish an export onto a source or other protected file."""
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+
+
 _cancel_event: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
     "studio_export_cancel",
     default=None,
@@ -867,17 +921,18 @@ class FfmpegStudioEncoder:
     ) -> Path:
         if not config.clips:
             raise StudioExportError("Studio project has no exportable clips.")
-        ffmpeg = find_ffmpeg()
-        if not ffmpeg:
-            raise StudioExportError(
-                "ffmpeg is not available. Install ffmpeg or use a build that includes it."
-            )
         dest = config.output_path.expanduser().resolve()
         parent = dest.parent
         if not parent.is_dir():
             raise StudioExportError("Export folder does not exist.")
         if not os_access_writable(parent):
             raise StudioExportError("Export folder is not writable.")
+        reject_protected_export_destination(dest, _config_protected_paths(config))
+        ffmpeg = find_ffmpeg()
+        if not ffmpeg:
+            raise StudioExportError(
+                "ffmpeg is not available. Install ffmpeg or use a build that includes it."
+            )
 
         clip_total = len(config.clips)
         tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
@@ -944,6 +999,7 @@ class FfmpegStudioEncoder:
             _raise_if_cancelled()
             shutil.move(str(tmp_out), partial)
             _raise_if_cancelled()
+            reject_protected_export_destination(dest, _config_protected_paths(config))
             partial.replace(dest)
             _emit(
                 on_progress,
@@ -1559,6 +1615,17 @@ def _materialize_photo_still(source: Path, dest: Path) -> Path:
     if not dest.is_file() or dest.stat().st_size <= 0:
         raise StudioExportError(f"Could not prepare photo for export: {source.name}")
     return dest
+
+
+def _config_protected_paths(config: StudioExportConfig) -> list[Path]:
+    """Source media and soundtrack files this encode must not replace."""
+    protected: list[Path] = []
+    for clip in config.clips:
+        if clip.source_path is not None:
+            protected.append(clip.source_path)
+    for track in config.music_tracks:
+        protected.append(track.source_path)
+    return protected
 
 
 def os_access_writable(directory: Path) -> bool:

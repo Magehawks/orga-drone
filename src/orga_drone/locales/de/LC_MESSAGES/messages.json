@@ -265,6 +265,7 @@
   "Cancelling export…": "Export wird abgebrochen…",
   "No exportable video resolution in this project.": "In diesem Projekt gibt es keine exportierbare Videoauflösung.",
   "A file with this name already exists. Overwrite it?": "Eine Datei mit diesem Namen existiert bereits. Überschreiben?",
+  "Export destination matches a library source or project asset. Choose a different file so the original is not overwritten.": "Das Exportziel ist eine Bibliotheksdatei oder ein Projektmedium. Wähle eine andere Datei, damit das Original nicht überschrieben wird.",
   "Exporting…": "Exportiere…",
   "Export finished.": "Export fertig.",
   "Exported {filename}.": "{filename} exportiert.",

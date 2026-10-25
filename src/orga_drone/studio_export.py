@@ -20,6 +20,7 @@ from orga_drone.export.studio_encoder import (
     StudioVideoEncoder,
     get_default_encoder,
     os_access_writable,
+    reject_protected_export_destination,
 )
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
@@ -410,6 +411,18 @@ def _clip_to_export_clip(
     )
 
 
+def _protected_export_paths(db: Database) -> list[Path]:
+    """Indexed sources, soundtrack files, overlay assets, and the database."""
+    paths = [Path(item) for item in db.protected_export_paths()]
+    overlay_root = settings.data_dir / "overlay-assets"
+    try:
+        if overlay_root.is_dir():
+            paths.extend(path for path in overlay_root.iterdir() if path.is_file())
+    except OSError:
+        return paths
+    return paths
+
+
 def prepare_studio_export(
     db: Database,
     *,
@@ -438,6 +451,9 @@ def prepare_studio_export(
         raise StudioExportError("Export folder does not exist.")
     if not os_access_writable(dest.parent):
         raise StudioExportError("Export folder is not writable.")
+    # Overwrite may replace a previous export. It must not replace library
+    # media, sidecars, soundtrack files, or other project assets.
+    reject_protected_export_destination(dest, _protected_export_paths(db))
     if dest.exists() and not overwrite:
         raise StudioExportError("File already exists. Confirm overwrite to continue.")
 

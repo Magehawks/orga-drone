@@ -3756,24 +3756,41 @@ class Database:
             raise RuntimeError("cut succeeded but items missing from list")
         return left_item, right_item
 
+    def protected_export_paths(self) -> list[str]:
+        """Files an export must never replace.
+
+        Indexed media and assets, soundtrack files, and this database. Path
+        identity (case, symlinks, hard links) is applied by the caller.
+        """
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT path FROM media
+                UNION
+                SELECT path FROM assets
+                UNION
+                SELECT file_path FROM studio_audio_clips
+                """
+            ).fetchall()
+        paths = [str(row[0]) for row in rows if row[0]]
+        paths.append(str(self.path))
+        return paths
+
     def repath_studio_item(self, old_path: str, new_path: str) -> None:
+        """Point existing Story clips at a renamed path.
+
+        Another project may already reference ``new_path``. Those clips stay.
+        Clips on ``old_path`` keep their ids, trims, effects, masks, and order.
+        """
         if old_path == new_path:
             return
         with self.connect() as conn:
-            conflict = conn.execute(
-                "SELECT id FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
-                (new_path,),
-            ).fetchone()
-            if conflict:
-                conn.execute(
-                    "DELETE FROM studio_clips WHERE item_kind = 'media' AND media_path = ?",
-                    (old_path,),
-                )
-            else:
-                conn.execute(
-                    "UPDATE studio_clips SET media_path = ? WHERE item_kind = 'media' AND media_path = ?",
-                    (new_path, old_path),
-                )
+            conn.execute(
+                """UPDATE studio_clips
+                   SET media_path = ?
+                   WHERE item_kind = 'media' AND media_path = ?""",
+                (new_path, old_path),
+            )
 
     def link_studio_item_for_path(
         self,
