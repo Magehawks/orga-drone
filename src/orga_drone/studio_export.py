@@ -18,9 +18,11 @@ from orga_drone.export.studio_encoder import (
     ExportCancelled,
     StudioExportError,
     StudioVideoEncoder,
+    _protected_identities,
     get_default_encoder,
     os_access_writable,
 )
+from orga_drone.media_mutation import hold_media_mutation
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_estimate import DEFAULT_PHOTO_DURATION_S, effective_seconds
 from orga_drone.studio_frame import FrameTransform, frame_from_effect_settings
@@ -410,6 +412,18 @@ def _clip_to_export_clip(
     )
 
 
+def _protected_export_paths(db: Database) -> list[Path]:
+    """Indexed sources, soundtrack files, overlay assets, and the database."""
+    paths = [Path(item) for item in db.protected_export_paths()]
+    overlay_root = settings.data_dir / "overlay-assets"
+    try:
+        if overlay_root.is_dir():
+            paths.extend(path for path in overlay_root.iterdir() if path.is_file())
+    except OSError:
+        return paths
+    return paths
+
+
 def prepare_studio_export(
     db: Database,
     *,
@@ -438,8 +452,13 @@ def prepare_studio_export(
         raise StudioExportError("Export folder does not exist.")
     if not os_access_writable(dest.parent):
         raise StudioExportError("Export folder is not writable.")
-    if dest.exists() and not overwrite:
-        raise StudioExportError("File already exists. Confirm overwrite to continue.")
+    # ``overwrite`` is accepted for older clients and ignored. An existing file
+    # is never replaced. The protected snapshot is fixed here. The lock is not
+    # held while clips are built or while ffmpeg runs.
+    _ = overwrite
+    protected_paths = _protected_export_paths(db)
+    with hold_media_mutation():
+        protected_identities = _protected_identities(protected_paths)
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
@@ -504,6 +523,8 @@ def prepare_studio_export(
         clips=tuple(export_clips),
         project_title=project.title,
         music_tracks=tuple(music_tracks),
+        protected_identities=protected_identities,
+        protected_paths=tuple(str(path) for path in protected_paths),
     )
 
 

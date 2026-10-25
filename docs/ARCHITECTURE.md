@@ -124,7 +124,12 @@ project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4
 export via async job
 `POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
 determinate progress in the export dialog (elapsed time, ETA, current clip
-label; within-clip ffmpeg progress). On success the dialog closes and Studio
+label; within-clip ffmpeg progress). An export never replaces an existing file.
+If the requested name is taken, or it is a library source, soundtrack, or project
+asset, the file is written to the next free numbered name (`video.mp4`, then
+`video_1.mp4`, then `video_2.mp4`). That name is claimed exclusively. If it is
+taken before the claim, the next free name is used. The success banner shows the
+name that was written. On success the dialog closes and Studio
 shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
 successful output only). Desktop save dialog. Optional project soundtrack

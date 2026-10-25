@@ -306,7 +306,7 @@ def test_http_image_adjust_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-image-adjust" hidden' in page.text
+    assert 'id="inspector-image-adjust" data-inspector-tab="image" hidden' in page.text
     assert 'id="inspector-image-exposure"' in page.text
     assert 'id="inspector-image-contrast"' in page.text
     assert 'id="inspector-image-saturation"' in page.text

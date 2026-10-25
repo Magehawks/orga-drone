@@ -453,7 +453,7 @@ def test_http_frame_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-frame" hidden' in page.text
+    assert 'id="inspector-frame" data-inspector-tab="image" hidden' in page.text
     assert 'id="inspector-frame-zoom"' in page.text
     assert 'id="inspector-frame-motion"' in page.text
     assert ("Bildausschnitt" in page.text) or ("Framing" in page.text)

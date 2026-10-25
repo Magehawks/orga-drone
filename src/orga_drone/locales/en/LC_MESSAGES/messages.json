@@ -265,6 +265,7 @@
   "Cancelling export…": "Cancelling export…",
   "No exportable video resolution in this project.": "No exportable video resolution in this project.",
   "A file with this name already exists. Overwrite it?": "A file with this name already exists. Overwrite it?",
+  "Export destination matches a library source or project asset. Choose a different file so the original is not overwritten.": "Export destination matches a library source or project asset. Choose a different file so the original is not overwritten.",
   "Exporting…": "Exporting…",
   "Export finished.": "Export finished.",
   "Exported {filename}.": "Exported {filename}.",

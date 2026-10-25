@@ -332,7 +332,7 @@ def test_http_hud_inspector_and_rejection(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-hud" hidden' in page.text
+    assert 'id="inspector-hud" data-inspector-tab="effects" hidden' in page.text
     assert 'id="studio-preview-hud"' in page.text
     assert ("Telemetrie-HUD" in page.text) or ("Telemetry HUD" in page.text)
     assert '"available": true' in page.text
@@ -353,10 +353,22 @@ def test_http_hud_inspector_and_rejection(
     assert off.json()["enabled"] is False
 
 
+def _ffmpeg_has_filter(ffmpeg: str, name: str) -> bool:
+    listed = subprocess.run(
+        [ffmpeg, "-hide_banner", "-filters"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return any(part == name for line in listed.stdout.splitlines() for part in line.split())
+
+
 def test_ffmpeg_accepts_the_hud_chain(tmp_path: Path) -> None:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         pytest.skip("ffmpeg not available")
+    if not _ffmpeg_has_filter(ffmpeg, "drawtext"):
+        pytest.skip("ffmpeg has no drawtext filter")
     from orga_drone.export.studio_config import StudioExportConfig
     from orga_drone.export.studio_encoder import FfmpegStudioEncoder
     from orga_drone.studio_hud import HudInterval

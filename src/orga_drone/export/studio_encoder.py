@@ -7,18 +7,25 @@ codec-agnostic. The default adapter uses the existing ffmpeg binary discovery.
 from __future__ import annotations
 
 import contextvars
+import errno
+import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
 
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_config import (
+    StudioExportClip,
+    StudioExportConfig,
+)
+from orga_drone.media_mutation import hold_media_mutation
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
@@ -666,6 +673,248 @@ class ExportCancelled(StudioExportError):
         super().__init__("Export cancelled.", code="cancelled")
 
 
+EXPORT_DESTINATION_PROTECTED = (
+    "Export destination matches a library source or project asset. "
+    "Choose a different file so the original is not overwritten."
+)
+
+
+def canonical_path_key(path: Path | str) -> str:
+    """Absolute, symlink-resolved path key. Comparison is case-insensitive."""
+    expanded = Path(path).expanduser()
+    try:
+        resolved = Path(os.path.realpath(expanded))
+    except (OSError, ValueError):
+        resolved = expanded.absolute()
+    return os.path.normcase(os.path.normpath(str(resolved)))
+
+
+def destination_matches_protected(
+    dest: Path, protected: Iterable[Path | str]
+) -> bool:
+    """True when ``dest`` is the same file as any protected path.
+
+    Matches resolved paths, Windows case aliases, symlinks, and hard links.
+    """
+    dest_key = canonical_path_key(dest)
+    try:
+        dest_exists = dest.exists()
+    except OSError:
+        dest_exists = False
+    for raw in protected:
+        other = Path(raw)
+        try:
+            if canonical_path_key(other) == dest_key:
+                return True
+        except (OSError, ValueError):
+            continue
+        if not dest_exists:
+            continue
+        try:
+            if other.exists() and os.path.samefile(dest, other):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def reject_protected_export_destination(
+    dest: Path, protected: Iterable[Path | str]
+) -> None:
+    """Refuse to publish an export onto a source or other protected file."""
+    if destination_matches_protected(dest, protected):
+        raise StudioExportError(EXPORT_DESTINATION_PROTECTED)
+
+
+# Test seam. Called immediately before a protected path is identified.
+before_protected_identity: Callable[[Path], None] | None = None
+# Test seam. Called immediately before an exclusive claim, after the name
+# looked free. Runs while the mutation lock is held; it must not take that lock.
+before_export_claim: Callable[[Path], None] | None = None
+
+_MAX_EXPORT_NAME_TRIES = 10000
+EXPORT_NO_FREE_NAME = "Export could not find a free file name."
+
+
+def _protected_identities(
+    protected: Iterable[Path | str],
+) -> tuple[tuple[int, int], ...]:
+    """File identities of protected originals that are present and readable.
+
+    Missing or unreadable paths are skipped. An export never writes an existing
+    file, so a missing catalog path does not block a free name. The caller holds
+    ``hold_media_mutation`` when this snapshot must stay consistent with an
+    in-app rename.
+    """
+    found: list[tuple[int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for raw in protected:
+        path = Path(raw)
+        hook = before_protected_identity
+        if hook is not None:
+            hook(path)
+        try:
+            is_file = path.is_file()
+        except OSError:
+            is_file = False
+        if not is_file:
+            continue
+        identity = _file_identity(path)
+        if identity is None or identity in seen:
+            continue
+        seen.add(identity)
+        found.append(identity)
+    return tuple(found)
+
+
+def _merge_identities(
+    *groups: Iterable[tuple[int, int]],
+) -> tuple[tuple[int, int], ...]:
+    found: list[tuple[int, int]] = []
+    for group in groups:
+        for identity in group:
+            if identity not in found:
+                found.append(identity)
+    return tuple(found)
+
+
+def export_candidate_names(dest: Path) -> Iterable[Path]:
+    """Yield ``dest``, then ``stem_1.suffix``, ``stem_2.suffix``, and so on."""
+    yield dest
+    stem = dest.stem
+    suffix = dest.suffix
+    for number in range(1, _MAX_EXPORT_NAME_TRIES):
+        yield dest.with_name(f"{stem}_{number}{suffix}")
+
+
+def _file_identity(path: Path) -> tuple[int, int] | None:
+    """Device and file id, or None when the id is missing or not reliable."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return _identity_from_stat(st)
+
+
+def _identity_from_stat(st: os.stat_result) -> tuple[int, int] | None:
+    if not stat.S_ISREG(st.st_mode):
+        return None
+    ino = int(st.st_ino)
+    if ino <= 0:
+        return None
+    return (int(st.st_dev), ino)
+
+
+class _ExportNameTaken(Exception):
+    """The candidate name was claimed by another file before publish."""
+
+
+def _path_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
+def _publish_export_file(
+    partial: Path,
+    dest: Path,
+    *,
+    protected: Iterable[Path | str] = (),
+    protected_identities: Iterable[tuple[int, int]] = (),
+) -> Path:
+    """Create a new file for ``partial``. Never replace an existing file.
+
+    The requested name is used when it is free and not a protected original,
+    asset, or soundtrack. Otherwise the next numbered name is claimed
+    exclusively. A name that appears between the check and the claim is left
+    untouched, and the next free name is tried. The caller must not hold the
+    mutation lock; this function holds it only around the claim.
+    """
+    protected_ids = set(protected_identities)
+    with hold_media_mutation():
+        for candidate in export_candidate_names(dest):
+            if destination_matches_protected(candidate, protected):
+                continue
+            identity = _file_identity(candidate)
+            if identity is not None and identity in protected_ids:
+                continue
+            if identity is not None or _path_exists(candidate):
+                continue
+            hook = before_export_claim
+            if hook is not None:
+                hook(candidate)
+            try:
+                _claim_new_export_file(partial, candidate)
+            except _ExportNameTaken:
+                continue
+            return candidate
+    raise StudioExportError(EXPORT_NO_FREE_NAME)
+
+
+def _claim_new_export_file(partial: Path, dest: Path) -> None:
+    """Create ``dest`` only while the name is still absent."""
+    try:
+        os.link(partial, dest)
+        return
+    except FileExistsError as exc:
+        raise _ExportNameTaken from exc
+    except OSError as exc:
+        if _already_exists(exc) or _path_exists(dest):
+            raise _ExportNameTaken from exc
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    try:
+        fd = os.open(dest, flags)
+    except FileExistsError as exc:
+        raise _ExportNameTaken from exc
+    except OSError as exc:
+        if _already_exists(exc) or _path_exists(dest):
+            raise _ExportNameTaken from exc
+        raise StudioExportError(f"Export failed: {exc}") from exc
+    try:
+        written = _copy_file_into_fd(fd, partial)
+        if written <= 0:
+            raise StudioExportError("Export failed: empty output.")
+        os.ftruncate(fd, written)
+        os.fsync(fd)
+    except Exception:
+        os.close(fd)
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        raise
+    os.close(fd)
+
+
+def _already_exists(exc: OSError) -> bool:
+    if isinstance(exc, FileExistsError):
+        return True
+    if exc.errno == errno.EEXIST:
+        return True
+    winerror = getattr(exc, "winerror", None)
+    return winerror == 183
+
+
+def _copy_file_into_fd(fd: int, source: Path) -> int:
+    written = 0
+    with source.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            view = memoryview(chunk)
+            while view:
+                count = os.write(fd, view)
+                if count <= 0:
+                    raise StudioExportError("Export failed: could not write output.")
+                view = view[count:]
+                written += count
+    return written
+
+
 _cancel_event: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
     "studio_export_cancel",
     default=None,
@@ -760,12 +1009,13 @@ class StudioVideoEncoder(Protocol):
         on_progress: ProgressCallback | None = None,
         cancel_event: threading.Event | None = None,
     ) -> Path:
-        """Render ``config`` to a finished file at ``config.output_path``.
+        """Render ``config`` to a new file.
 
-        Implementations should write via a temporary file and only place the
-        final destination after success. Must not modify source media.
-        When ``cancel_event`` is set, stop the work and leave the destination
-        untouched.
+        The returned path is the file that was created. An existing file,
+        including ``config.output_path`` when that name is taken, is not
+        replaced. Must not modify source media, overlay images, or soundtrack
+        files. When ``cancel_event`` is set, stop the work and leave existing
+        files untouched.
         """
 
 
@@ -867,17 +1117,27 @@ class FfmpegStudioEncoder:
     ) -> Path:
         if not config.clips:
             raise StudioExportError("Studio project has no exportable clips.")
-        ffmpeg = find_ffmpeg()
-        if not ffmpeg:
-            raise StudioExportError(
-                "ffmpeg is not available. Install ffmpeg or use a build that includes it."
-            )
         dest = config.output_path.expanduser().resolve()
         parent = dest.parent
         if not parent.is_dir():
             raise StudioExportError("Export folder does not exist.")
         if not os_access_writable(parent):
             raise StudioExportError("Export folder is not writable.")
+        protected = [
+            *_config_protected_paths(config),
+            *[Path(path) for path in config.protected_paths],
+        ]
+        protected_identities = config.protected_identities
+        with hold_media_mutation():
+            source_identities = _protected_identities(protected)
+            protected_identities = _merge_identities(
+                config.protected_identities, source_identities
+            )
+        ffmpeg = find_ffmpeg()
+        if not ffmpeg:
+            raise StudioExportError(
+                "ffmpeg is not available. Install ffmpeg or use a build that includes it."
+            )
 
         clip_total = len(config.clips)
         tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
@@ -885,6 +1145,7 @@ class FfmpegStudioEncoder:
         partial = parent / f".{dest.name}.{uuid.uuid4().hex}.partial"
         token = _cancel_event.set(cancel_event)
         try:
+            _raise_if_cancelled()
             segments: list[Path] = []
             for index, clip in enumerate(config.clips):
                 _raise_if_cancelled()
@@ -944,7 +1205,12 @@ class FfmpegStudioEncoder:
             _raise_if_cancelled()
             shutil.move(str(tmp_out), partial)
             _raise_if_cancelled()
-            partial.replace(dest)
+            published = _publish_export_file(
+                partial,
+                dest,
+                protected=protected,
+                protected_identities=protected_identities,
+            )
             _emit(
                 on_progress,
                 phase="done",
@@ -952,7 +1218,7 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
                 current_label=None,
             )
-            return dest
+            return published
         except StudioExportError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -1561,6 +1827,54 @@ def _materialize_photo_still(source: Path, dest: Path) -> Path:
     return dest
 
 
+def _config_protected_paths(config: StudioExportConfig) -> list[Path]:
+    """Files this encode reads and must not replace.
+
+    Clip media, soundtrack files, image overlays, and a font the encode will
+    open. Comparison includes canonical paths and hard-link aliases.
+    """
+    protected: list[Path] = []
+    needs_font = False
+    for clip in config.clips:
+        if clip.source_path is not None:
+            protected.append(clip.source_path)
+        if clip.kind == "title_card":
+            needs_font = True
+        for overlay in clip.overlays:
+            if overlay.kind == "image" and overlay.asset_name:
+                asset = _overlay_asset_path(overlay.asset_name)
+                if asset is not None:
+                    protected.append(asset)
+            elif overlay.kind == "text" and overlay.text.strip():
+                needs_font = True
+    for track in config.music_tracks:
+        protected.append(track.source_path)
+    if needs_font:
+        font = _export_font_path()
+        if font is not None:
+            protected.append(font)
+    return protected
+
+
+def _overlay_asset_path(asset_name: str) -> Path | None:
+    from orga_drone.config import settings
+    from orga_drone.studio_overlay import resolve_overlay_asset
+
+    try:
+        return resolve_overlay_asset(settings.data_dir, asset_name)
+    except (ValueError, OSError):
+        return None
+
+
+def _export_font_path() -> Path | None:
+    from orga_drone.studio_title_card import TitleCardFontError, resolve_title_card_font
+
+    try:
+        return resolve_title_card_font()
+    except (TitleCardFontError, OSError):
+        return None
+
+
 def os_access_writable(directory: Path) -> bool:
     try:
         directory.mkdir(parents=True, exist_ok=True)
@@ -1719,7 +2033,11 @@ def _run_ffmpeg(
     finally:
         if popen is not None and event is not None:
             _unbind_export_process(event, popen)
-        err_path.unlink(missing_ok=True)
+        # A killed ffmpeg can still hold this temp file for a moment on Windows.
+        try:
+            err_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def get_default_encoder() -> StudioVideoEncoder:

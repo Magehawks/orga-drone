@@ -217,7 +217,6 @@
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportCancelling = root.dataset.exportCancelling || "Cancelling export…";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
-  const msgExportOverwrite = root.dataset.exportOverwrite || "A file with this name already exists. Overwrite it?";
   const msgExportRunning = root.dataset.exportRunning || "Exporting…";
   const msgExportDone = root.dataset.exportDone || "Export finished.";
   const msgExportPreparing = root.dataset.exportPreparing || "Preparing export…";
@@ -4606,7 +4605,6 @@
       return;
     }
 
-    let overwrite = false;
     const tryStart = async () => {
       const res = await fetch("/api/studio/export", {
         method: "POST",
@@ -4614,7 +4612,6 @@
         body: JSON.stringify({
           height,
           output_path: pickedPath,
-          overwrite,
           project_id: projectId || exportOptionsCache.project_id || null,
         }),
       });
@@ -4623,17 +4620,7 @@
     };
 
     try {
-      let { res, data } = await tryStart();
-      if (res.status === 409 && data && String(data.detail || "").toLowerCase().includes("already exists")) {
-        const ok = window.confirm(msgExportOverwrite);
-        if (!ok) {
-          setExportStatus(msgExportCancelled);
-          setExportRunningUi(false);
-          return;
-        }
-        overwrite = true;
-        ({ res, data } = await tryStart());
-      }
+      const { res, data } = await tryStart();
       if (!res.ok || !data || !data.ok || !data.job_id) {
         setExportStatus((data && data.detail) || msgExportFailed, { error: true });
         setExportRunningUi(false);

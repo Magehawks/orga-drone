@@ -71,6 +71,10 @@ class StudioExportConfig:
     project_title: str = "Your story"
     music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
     music: StudioExportMusic | None = None
+    # Identities of protected originals, captured before encoding starts.
+    protected_identities: tuple[tuple[int, int], ...] = ()
+    # Catalog paths an export must not create or replace, even when the file is absent.
+    protected_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.music is not None and not self.music_tracks:

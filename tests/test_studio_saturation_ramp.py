@@ -348,7 +348,7 @@ def test_http_saturation_ramp_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-saturation-ramp" hidden' in page.text
+    assert 'id="inspector-saturation-ramp" data-inspector-tab="image" hidden' in page.text
     assert 'id="inspector-bw-enabled"' in page.text
     assert 'id="inspector-bw-start"' in page.text
     assert 'id="inspector-bw-end"' in page.text
