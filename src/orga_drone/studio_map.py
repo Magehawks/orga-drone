@@ -6,9 +6,11 @@ marker that follows the clip clock. Placement uses the same fractions of the
 fitted picture as timed overlays, so letterboxing does not move it and the box
 cannot sit outside the export frame.
 
-This slice does not download, request, or bundle third-party map tiles. A clip
-with no usable GPS still keeps the box and shows an empty panel. Source files
-are never modified. The marker is not a tracker and does not invent positions
+When the network can reach OpenStreetMap, the panel is drawn on those tiles
+and the same tiles are cached under the local data directory. They are not
+bundled. If a tile cannot be fetched, the plain panel remains. A clip with no
+usable GPS still keeps the box and shows an empty panel. Source files are
+never modified. The marker is not a tracker and does not invent positions
 across a GPS gap longer than ``GAP_S``.
 """
 
@@ -16,6 +18,8 @@ from __future__ import annotations
 
 import json
 import math
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -42,6 +46,12 @@ _BG_RGBA = (20, 24, 29, 255)
 _ROUTE_RGBA = (126, 182, 255, 255)
 _MARKER_RGBA = (255, 159, 10, 255)
 _BORDER_RGBA = (197, 208, 220, 255)
+_MERCATOR_LIMIT = 85.05112878
+_STILL_HALF = 0.004
+_MAX_TILES = 12
+OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+OSM_USER_AGENT = "OrgaDrone/2.0 (local flight map)"
+OSM_CREDIT = "© OpenStreetMap"
 
 
 class MapRenderError(Exception):
@@ -204,6 +214,7 @@ def route_preview(
     return {
         "line": [point.as_dict() for point in line],
         "marker": [point.as_dict() for point in marker],
+        "tiles": osm_tile_layout(samples),
     }
 
 
@@ -306,12 +317,22 @@ def render_route_image(
     *,
     width: int,
     height: int,
+    background: Image.Image | None = None,
 ) -> Image.Image:
-    """Plain panel and, when at least two fixes exist, the route. No marker."""
+    """Panel and, when at least two fixes exist, the route. No marker.
+
+    ``background`` is an optional map image already fitted to the panel. The
+    route is drawn on top of it.
+    """
     panel_w = max(8, int(width))
     panel_h = max(8, int(height))
     image = Image.new("RGBA", (panel_w, panel_h), _BG_RGBA)
+    if background is not None:
+        fitted = background.convert("RGBA").resize((panel_w, panel_h), Image.Resampling.BILINEAR)
+        image.alpha_composite(fitted)
     draw = ImageDraw.Draw(image)
+    if background is not None:
+        draw.text((4, panel_h - 14), OSM_CREDIT, fill=(255, 255, 255, 230))
     draw.rectangle((0, 0, panel_w - 1, panel_h - 1), outline=_BORDER_RGBA)
     if len(points) >= 2:
         pad_x = max(1, int(round(panel_w * PAD)))
@@ -369,7 +390,9 @@ def flight_map_overlay(
 
     The marker is a second input whose ``x`` and ``y`` follow the source clock.
     Video filter ``t`` is that source clock because ``-ss`` stays an output option.
-    Photos start at 0. No network URL is included.
+    Photos start at 0. OpenStreetMap tiles are painted under the route when
+    they can be read from the local cache or fetched. A failed fetch keeps the
+    plain panel.
     """
     if not placement.enabled:
         raise MapRenderError("flight map is disabled")
@@ -378,8 +401,11 @@ def flight_map_overlay(
     dest_dir.mkdir(parents=True, exist_ok=True)
     route_path = dest_dir / "flight-map-route.png"
     line = project_route(track, media_duration_s=media_duration_s)
+    background = osm_basemap(track, width=box_w, height=box_h)
     try:
-        render_route_image(line, width=box_w, height=box_h).save(route_path, "PNG")
+        render_route_image(line, width=box_w, height=box_h, background=background).save(
+            route_path, "PNG"
+        )
     except OSError as exc:
         raise MapRenderError("flight map could not be drawn") from exc
     args = ["-loop", "1", "-framerate", str(int(fps)), "-i", str(route_path)]
@@ -450,25 +476,185 @@ def _null_island(lat: float, lon: float) -> bool:
     return abs(lat) < 0.0001 and abs(lon) < 0.0001
 
 
+def _mercator(lat: float, lon: float) -> tuple[float, float]:
+    """Web-Mercator metres-as-radians. ``y`` grows north."""
+    limited = max(-_MERCATOR_LIMIT, min(_MERCATOR_LIMIT, lat))
+    x_value = math.radians(lon)
+    y_value = math.log(math.tan(math.pi / 4 + math.radians(limited) / 2))
+    return x_value, y_value
+
+
+def _square_mercator(
+    samples: Sequence[GpsSample],
+) -> tuple[float, float, float, float] | None:
+    """Mercator square that the route fills. ``None`` when there is no fix."""
+    if not samples:
+        return None
+    points = [_mercator(sample.lat, sample.lon) for sample in samples]
+    if len(points) == 1:
+        x_value, y_value = points[0]
+        return (
+            x_value - _STILL_HALF,
+            y_value - _STILL_HALF,
+            x_value + _STILL_HALF,
+            y_value + _STILL_HALF,
+        )
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 1e-9)
+    center_x = (min(xs) + max(xs)) / 2
+    center_y = (min(ys) + max(ys)) / 2
+    half = span / 2
+    return center_x - half, center_y - half, center_x + half, center_y + half
+
+
 def _project_norm(samples: Sequence[GpsSample]) -> list[tuple[float, float]]:
     if len(samples) == 1:
         return [(0.5, 0.5)]
-    lats = [sample.lat for sample in samples]
-    mid = math.radians(sum(lats) / len(lats))
-    cos = max(0.2, math.cos(mid))
-    xs = [sample.lon * cos for sample in samples]
-    ys = lats
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    span = max(max_x - min_x, max_y - min_y, 1e-9)
-    center_x = (min_x + max_x) / 2
-    center_y = (min_y + max_y) / 2
+    box = _square_mercator(samples)
+    if box is None:
+        return []
+    min_x, min_y, max_x, max_y = box
+    span_x = max(max_x - min_x, 1e-12)
+    span_y = max(max_y - min_y, 1e-12)
     projected: list[tuple[float, float]] = []
-    for x_value, y_value in zip(xs, ys, strict=True):
-        nx = min(1.0, max(0.0, 0.5 + (x_value - center_x) / span))
-        ny = min(1.0, max(0.0, 0.5 - (y_value - center_y) / span))
+    for sample in samples:
+        x_value, y_value = _mercator(sample.lat, sample.lon)
+        nx = min(1.0, max(0.0, (x_value - min_x) / span_x))
+        ny = min(1.0, max(0.0, (max_y - y_value) / span_y))
         projected.append((nx, ny))
     return projected
+
+
+def _world_x(mercator_x: float) -> float:
+    return (mercator_x / math.pi + 1.0) / 2.0
+
+
+def _world_y(mercator_y: float) -> float:
+    return (1.0 - mercator_y / math.pi) / 2.0
+
+
+def osm_tile_layout(samples: Sequence[GpsSample]) -> list[dict[str, float]]:
+    """OpenStreetMap tiles covering the route square, in panel percentages.
+
+    Positions use the same square as the route, so a tile and a fix describe
+    one map. No tile is downloaded here.
+    """
+    box = _square_mercator(samples)
+    if box is None:
+        return []
+    min_x, min_y, max_x, max_y = box
+    zoom = 3
+    x0 = y0 = x1 = y1 = 0.0
+    for candidate in range(17, 2, -1):
+        scale = float(2**candidate)
+        x0 = _world_x(min_x) * scale
+        x1 = _world_x(max_x) * scale
+        y0 = _world_y(max_y) * scale
+        y1 = _world_y(min_y) * scale
+        across = math.floor(x1) - math.floor(x0) + 1
+        down = math.floor(y1) - math.floor(y0) + 1
+        zoom = candidate
+        if across * down <= _MAX_TILES:
+            break
+    scale = float(2**zoom)
+    tiles: list[dict[str, float]] = []
+    x_start = max(0, math.floor(x0))
+    x_stop = min(int(scale) - 1, math.floor(x1))
+    y_start = max(0, math.floor(y0))
+    y_stop = min(int(scale) - 1, math.floor(y1))
+    for tile_x in range(x_start, x_stop + 1):
+        for tile_y in range(y_start, y_stop + 1):
+            left = (tile_x / scale - _world_x(min_x)) / (_world_x(max_x) - _world_x(min_x))
+            right = ((tile_x + 1) / scale - _world_x(min_x)) / (
+                _world_x(max_x) - _world_x(min_x)
+            )
+            top = (tile_y / scale - _world_y(max_y)) / (_world_y(min_y) - _world_y(max_y))
+            bottom = ((tile_y + 1) / scale - _world_y(max_y)) / (
+                _world_y(min_y) - _world_y(max_y)
+            )
+            tiles.append(
+                {
+                    "z": float(zoom),
+                    "x": float(tile_x),
+                    "y": float(tile_y),
+                    "left": round(left * 100, 3),
+                    "top": round(top * 100, 3),
+                    "width": round((right - left) * 100, 3),
+                    "height": round((bottom - top) * 100, 3),
+                }
+            )
+    return tiles
+
+
+def cached_osm_tile(z: int, x: int, y: int) -> Path | None:
+    """Return a cached OpenStreetMap tile, fetching it once when it is missing."""
+    if z < 0 or z > 19:
+        return None
+    limit = 2**z
+    if x < 0 or y < 0 or x >= limit or y >= limit:
+        return None
+    from orga_drone.config import settings
+
+    dest = settings.data_dir / "osm-tiles" / str(z) / str(x) / f"{y}.png"
+    if dest.is_file() and dest.stat().st_size > 32:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(
+        OSM_TILE_URL.format(z=z, x=x, y=y),
+        headers={"User-Agent": OSM_USER_AGENT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=4) as response:
+            payload = response.read()
+    except (OSError, urllib.error.URLError, TimeoutError):
+        return None
+    if not payload.startswith(b"\x89PNG"):
+        return None
+    temporary = dest.with_suffix(".part")
+    temporary.write_bytes(payload)
+    temporary.replace(dest)
+    return dest
+
+
+def osm_basemap(
+    samples: Sequence[GpsSample],
+    *,
+    width: int,
+    height: int,
+    fetch: Any = None,
+) -> Image.Image | None:
+    """Fit cached or fetched tiles to the panel. ``None`` when none can be read."""
+    layout = osm_tile_layout(samples)
+    if not layout:
+        return None
+    panel_w = max(8, int(width))
+    panel_h = max(8, int(height))
+    pad_x = max(1, int(round(panel_w * PAD)))
+    pad_y = max(1, int(round(panel_h * PAD)))
+    inner_w = max(1, panel_w - 2 * pad_x)
+    inner_h = max(1, panel_h - 2 * pad_y)
+    image = Image.new("RGBA", (panel_w, panel_h), (0, 0, 0, 0))
+    found = False
+    loader = fetch if fetch is not None else cached_osm_tile
+    for tile in layout:
+        path = loader(int(tile["z"]), int(tile["x"]), int(tile["y"]))
+        if path is None:
+            continue
+        try:
+            tile_image = Image.open(path).convert("RGBA")
+        except OSError:
+            continue
+        left = pad_x + int(round(tile["left"] / 100 * inner_w))
+        top = pad_y + int(round(tile["top"] / 100 * inner_h))
+        box_w = max(1, int(round(tile["width"] / 100 * inner_w)))
+        box_h = max(1, int(round(tile["height"] / 100 * inner_h)))
+        resized = tile_image.resize((box_w, box_h), Image.Resampling.BILINEAR)
+        image.paste(resized, (left, top), resized)
+        found = True
+    if not found:
+        return None
+    return image
 
 
 def _read_unit(value: object, default: float) -> float:

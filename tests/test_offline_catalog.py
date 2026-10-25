@@ -71,7 +71,7 @@ def test_interrupted_discovery_does_not_clear_catalog(
 ) -> None:
     db, root_id, lib = _index(tmp_path)
 
-    def disconnected(root: Path, on_found=None, *, root_id: int | None = None):
+    def disconnected(root: Path, on_found=None, *, root_id: int | None = None, **_kwargs):
         shutil.rmtree(root)
         raise OSError("drive removed during discovery")
 
@@ -87,7 +87,7 @@ def test_listing_error_on_a_present_root_does_not_clear(
 ) -> None:
     db, root_id, lib = _index(tmp_path)
 
-    def broken(root: Path, on_found=None, *, root_id: int | None = None):
+    def broken(root: Path, on_found=None, *, root_id: int | None = None, **_kwargs):
         raise OSError("could not read a subdirectory")
 
     monkeypatch.setattr("orga_drone.scan.iter_media_files", broken)

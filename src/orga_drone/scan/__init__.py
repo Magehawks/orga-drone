@@ -3,13 +3,17 @@
 A rescan still walks a listable root and rebuilds flows and sessions.
 Metadata extraction is skipped when an indexed file has the same size and
 mtime. Issue #96 does not define a content fingerprint; those filesystem
-signals are the skip check. If a root cannot be listed, or disappears
-before the index is replaced, catalog entries stay and the source is
-offline. Files, user metadata, and Studio clips are never deleted.
+signals are the skip check. A sibling SRT is also compared by its own size
+and mtime, so a changed subtitle is read again. If a root cannot be listed,
+or disappears before the index is replaced, catalog entries stay and the
+source is offline. A child folder that cannot be listed keeps the catalog
+entries already stored under it. Files, user metadata, and Studio clips
+are never deleted.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +49,7 @@ def iter_media_files(
     on_found: ProgressCallback | None = None,
     *,
     root_id: int | None = None,
+    unreadable: list[Path] | None = None,
 ) -> list[Path]:
     """Collect media-extension files under ``root``.
 
@@ -53,22 +58,30 @@ def iter_media_files(
     """
     root_resolved = root.resolve()
     files: list[Path] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in MEDIA_EXTS:
-            continue
-        files.append(path)
-        if on_found is not None:
-            on_found(
-                ScanProgress(
-                    phase="discovering",
-                    discovered=len(files),
-                    processed=0,
-                    current_path=display_scan_path(path, root_resolved),
-                    root_id=root_id,
+    blocked = unreadable if unreadable is not None else []
+
+    def _onerror(exc: OSError) -> None:
+        filename = getattr(exc, "filename", None)
+        blocked.append(Path(filename) if filename else root)
+
+    for dirpath, _dirnames, filenames in os.walk(root, onerror=_onerror):
+        for name in filenames:
+            path = Path(dirpath) / name
+            if path.suffix.lower() not in MEDIA_EXTS:
+                continue
+            if not path.is_file():
+                continue
+            files.append(path)
+            if on_found is not None:
+                on_found(
+                    ScanProgress(
+                        phase="discovering",
+                        discovered=len(files),
+                        processed=0,
+                        current_path=display_scan_path(path, root_resolved),
+                        root_id=root_id,
+                    )
                 )
-            )
     return sorted(files)
 
 
@@ -147,6 +160,7 @@ def _empty_scan_counts() -> dict[str, int]:
         "unavailable": 0,
         "offline": 0,
         "preserved": 0,
+        "unreadable": 0,
     }
 
 
@@ -284,6 +298,49 @@ def _reuse_unchanged_file(
     return True
 
 
+def _sidecar_token(path: Path) -> str:
+    """Size and mtime of a sibling SRT, or empty when there is no sidecar.
+
+    The video file can keep the same size and mtime while this subtitle changes.
+    The token is what makes that scan read the video again.
+    """
+    for suffix in (".SRT", ".srt"):
+        candidate = path.with_suffix(suffix)
+        try:
+            if not candidate.is_file():
+                continue
+            stat = candidate.stat()
+        except OSError:
+            continue
+        return f"{int(stat.st_size)}:{float(stat.st_mtime):.6f}"
+    return ""
+
+
+def _paths_under(existing: dict[str, Any], folders: list[Path]) -> set[str]:
+    """Indexed paths that live in a folder the walk could not list."""
+    resolved_folders: list[Path] = []
+    for folder in folders:
+        try:
+            resolved_folders.append(folder.resolve())
+        except OSError:
+            resolved_folders.append(folder)
+    kept: set[str] = set()
+    for path in existing:
+        candidate = Path(path)
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            resolved = candidate
+        for folder in resolved_folders:
+            try:
+                resolved.relative_to(folder)
+            except ValueError:
+                continue
+            kept.add(path)
+            break
+    return kept
+
+
 def _must_reparse(
     indexed: dict[str, Any],
     resolved: Path,
@@ -319,8 +376,14 @@ def scan_root(
         return _finish_offline(on_progress, root_id)
 
     _emit(on_progress, phase="discovering", discovered=0, processed=0, root_id=root_id)
+    unreadable: list[Path] = []
     try:
-        files = iter_media_files(root_path, on_progress, root_id=root_id)
+        files = iter_media_files(
+            root_path,
+            on_progress,
+            root_id=root_id,
+            unreadable=unreadable,
+        )
     except OSError:
         if root_source_available(root_path):
             raise
@@ -357,6 +420,7 @@ def scan_root(
                 indexed is not None
                 and _fingerprint_matches(indexed, _file_fingerprint(path))
                 and not _must_reparse(indexed, resolved_key, live_sidecars)
+                and str(indexed.get("srt_token") or "") == _sidecar_token(path)
             ):
                 reuse_paths.append(path)
             else:
@@ -381,9 +445,17 @@ def scan_root(
     if not root_source_available(root_path):
         return _finish_offline(on_progress, root_id)
 
-    removed = db.remove_root_index_except(root_id, seen_paths)
+    keep_paths = set(seen_paths)
+    keep_paths.update(_paths_under(existing, unreadable))
+    removed = db.remove_root_index_except(root_id, keep_paths)
     counts = _empty_scan_counts()
     counts["removed"] = removed
+    counts["unreadable"] = len(unreadable)
+    if unreadable:
+        logging.getLogger(__name__).warning(
+            "Scan kept catalog entries for %s folder(s) that could not be listed",
+            len(unreadable),
+        )
 
     for index, path in enumerate(reuse_paths, start=1):
         resolved_key = _resolved_path(path)
@@ -518,6 +590,7 @@ def scan_root(
             size_bytes=parsed.size_bytes,
             recorded_at=recorded,
         )
+        db.set_media_srt_token(media_id, _sidecar_token(path))
         apply_auto_tags_to_media(
             db,
             media_id,

@@ -1553,9 +1553,11 @@
     const originX = event.clientX;
     const originY = event.clientY;
     const pointerId = event.pointerId;
-    if (event.currentTarget.setPointerCapture) {
+    const box = event.currentTarget;
+    if (box && box.classList) box.classList.add("is-dragging");
+    if (box && box.setPointerCapture) {
       try {
-        event.currentTarget.setPointerCapture(pointerId);
+        box.setPointerCapture(pointerId);
       } catch (_) {
         /* ignore */
       }
@@ -1583,6 +1585,7 @@
     };
     const up = () => {
       maskDragging = false;
+      if (box && box.classList) box.classList.remove("is-dragging");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       queueMaskSave(clip);
@@ -6159,14 +6162,15 @@
   }
 
   function readGps(clip) {
-    const empty = { line: [], marker: [] };
+    const empty = { line: [], marker: [], tiles: [] };
     if (!clip) return empty;
     try {
       const parsed = JSON.parse(clip.dataset.gps || "");
       if (!parsed || typeof parsed !== "object") return empty;
       const line = Array.isArray(parsed.line) ? parsed.line : [];
       const marker = Array.isArray(parsed.marker) ? parsed.marker : line;
-      return { line, marker };
+      const tiles = Array.isArray(parsed.tiles) ? parsed.tiles : [];
+      return { line, marker, tiles };
     } catch (_) {
       return empty;
     }
@@ -6221,13 +6225,49 @@
     const border = safeColor(mapModel.border, "#c5d0dc");
     const line = (gps.line || []).map(finitePoint).filter(Boolean);
     const samples = (gps.marker || []).map(finitePoint).filter(Boolean);
+    const tiles = Array.isArray(gps.tiles) ? gps.tiles : [];
     const parts = [
-      '<rect x="0" y="0" width="100" height="100" fill="' +
-        bg +
-        '" stroke="' +
-        border +
-        '" stroke-width="1"></rect>',
+      '<rect x="0" y="0" width="100" height="100" fill="' + bg + '"></rect>',
     ];
+    tiles.forEach((tile) => {
+      const z = Number(tile.z);
+      const x = Number(tile.x);
+      const y = Number(tile.y);
+      const left = Number(tile.left);
+      const top = Number(tile.top);
+      const width = Number(tile.width);
+      const height = Number(tile.height);
+      if (![z, x, y, left, top, width, height].every((value) => Number.isFinite(value))) return;
+      const origin = (value) => (pad + (value / 100) * span).toFixed(2);
+      const size = (value) => ((value / 100) * span).toFixed(2);
+      parts.push(
+        '<image href="/map-tiles/' +
+          z +
+          "/" +
+          x +
+          "/" +
+          y +
+          '.png" x="' +
+          origin(left) +
+          '" y="' +
+          origin(top) +
+          '" width="' +
+          size(width) +
+          '" height="' +
+          size(height) +
+          '" preserveAspectRatio="none"></image>'
+      );
+    });
+    parts.push(
+      '<rect x="0" y="0" width="100" height="100" fill="none" stroke="' +
+        border +
+        '" stroke-width="1"></rect>'
+    );
+    if (tiles.length) {
+      parts.push(
+        '<text x="2" y="97" fill="#ffffff" font-size="4" font-family="sans-serif">© OpenStreetMap</text>'
+      );
+    }
     if (line.length >= 2) {
       const d = line
         .map((point, index) => (index ? "L" : "M") + sx(point.x).toFixed(2) + " " + sy(point.y).toFixed(2))

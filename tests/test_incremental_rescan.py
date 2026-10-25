@@ -240,7 +240,7 @@ def test_sidecar_flag_and_live_photo_do_not_reparse_unchanged_video(
 
     calls = _parse_calls(monkeypatch)
     counts = scan_root(db, root_id, lib)
-    assert "clip.mp4" not in calls
+    assert "clip.mp4" in calls
     assert "IMG_0007.MOV" not in calls
     assert "clip.SRT" in calls
     assert "IMG_0007.JPG" in calls
@@ -252,7 +252,6 @@ def test_sidecar_flag_and_live_photo_do_not_reparse_unchanged_video(
     _jpg_id, jpg_row = by_name["IMG_0007.JPG"]
     assert jpg_row["kind"] == "photo"
     assert counts["live_sidecars"] == 1
-    assert counts["unchanged"] >= 1
 
 
 def test_unavailable_root_keeps_index_and_files(
@@ -330,3 +329,62 @@ def test_slow_extract_is_skipped_on_noop_rescan(
     assert calls == []
     assert second["unchanged"] == 6
     assert second_elapsed < first_elapsed
+
+
+def test_changed_srt_is_read_again_when_the_video_is_unchanged(tmp_path: Path) -> None:
+    lib = tmp_path / "lib"
+    video = lib / "clip.mp4"
+    _video(video)
+    srt = lib / "clip.SRT"
+    srt.write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\n[latitude: 47.1] [longitude: 8.2]\n",
+        encoding="utf-8",
+    )
+    db = Database(tmp_path / "srt.sqlite3")
+    root_id = db.add_root(lib, "cards")
+    scan_root(db, root_id, lib)
+    media_id, _row = _by_filename(db, root_id)["clip.mp4"]
+    first = db.get_media(media_id)
+    assert first is not None
+    assert first.latitude == pytest.approx(47.1)
+    video_mtime = video.stat().st_mtime
+    srt.write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\n[latitude: 48.5] [longitude: 9.1]\n",
+        encoding="utf-8",
+    )
+    os.utime(video, (video_mtime, video_mtime))
+    scan_root(db, root_id, lib)
+    second = db.get_media(media_id)
+    assert second is not None
+    assert second.latitude == pytest.approx(48.5)
+    assert video.stat().st_mtime == pytest.approx(video_mtime)
+
+
+def test_unreadable_child_folder_keeps_its_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lib = tmp_path / "lib"
+    locked = lib / "locked"
+    _video(locked / "keep.mp4")
+    _video(lib / "open.mp4")
+    _video(lib / "gone.mp4")
+    db = Database(tmp_path / "lock.sqlite3")
+    root_id = db.add_root(lib, "cards")
+    scan_root(db, root_id, lib)
+    (lib / "gone.mp4").unlink()
+
+    def fake_walk(root, topdown=True, onerror=None, followlinks=False):
+        del root, topdown, followlinks
+        if onerror is not None:
+            denied = PermissionError(13, "denied", str(locked))
+            denied.filename = str(locked)
+            onerror(denied)
+        yield str(lib), ["locked"], ["open.mp4"]
+
+    monkeypatch.setattr("orga_drone.scan.os.walk", fake_walk)
+    counts = scan_root(db, root_id, lib)
+    names = set(_by_filename(db, root_id))
+    assert "keep.mp4" in names
+    assert "open.mp4" in names
+    assert "gone.mp4" not in names
+    assert counts["unreadable"] == 1

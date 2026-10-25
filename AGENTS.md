@@ -90,7 +90,7 @@ The application helps users:
   export); a linear saturation ramp on video clips (start and end time, from the current grade toward black and white; preview approximates
   export); timed text, shape, and image overlays with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy masks on photo and video clips
   (up to 8; fixed for the whole clip; preview approximates export); per-clip zoom and pan (1×–3×, optional start/end motion; preview matches
-  the exported frame); optional flight map on photo and video clips (stored GPS route and a marker synced to the clip clock, plain background, no third-party map tiles, drag and resize inside the picture, empty state when GPS is missing; preview and MP4); optional telemetry HUD on a video clip when a sibling DJI SRT has timed cues (elapsed source time and relative altitude in preview and MP4; speed and home distance stay unavailable; gaps stay blank); slow motion at 0.5× or 0.25× on a selected section of a video clip
+  the exported frame); optional flight map on photo and video clips (stored GPS route and a marker synced to the clip clock, OpenStreetMap tiles when they can be fetched and cached locally, otherwise a plain panel, drag and resize inside the picture, empty state when GPS is missing; preview and MP4); optional telemetry HUD on a video clip when a sibling DJI SRT has timed cues (elapsed source time and relative altitude in preview and MP4; speed and home distance stay unavailable; gaps stay blank); slow motion at 0.5× or 0.25× on a selected section of a video clip
   (1× resets that section; neighboring sections keep their speed; source audio on a slowed
   section is muted; preview and MP4 share the speed and the longer duration; not optical-flow
   interpolation or fast-forward); local MP4 export with configurable
@@ -106,8 +106,10 @@ The application helps users:
 
 - A library rescan still walks each listable root and rebuilds flows and sessions.
   Unchanged files (same size and mtime) skip metadata extraction. This is not
-  a content hash. If a source drive or folder cannot be listed, that scan keeps
+  a content hash. A sibling SRT is re-read when its size or mtime changes.
+  If a source drive or folder cannot be listed, that scan keeps
   the root's catalog entries and user metadata, and the UI marks them offline.
+  A child folder that cannot be listed keeps the entries already stored under it.
   Scanning again after the folder is connected updates those entries without
   adding duplicate rows. Files removed from a folder that can still be listed
   are dropped on the next scan. Scan never deletes files, favorites, tags,
@@ -140,7 +142,7 @@ The application helps users:
   transitions, basic per-clip image adjustment, a linear video saturation ramp (not a keyframe editor), timed text, shape, and
   image overlays, rectangular blur/pixelate privacy masks (not tracking or a
   legal anonymization guarantee), per-clip zoom and pan (not tracking or a
-  keyframe editor), an optional flight map that draws the stored GPS route on a plain background (no downloaded or bundled map tiles; not live tracking), and an optional telemetry HUD (not a goggles display, not
+  keyframe editor), an optional flight map that draws the stored GPS route on OpenStreetMap tiles when online (tiles are cached locally and are not bundled; a plain panel when a tile cannot be fetched; not live tracking), and an optional telemetry HUD (not a goggles display, not
   tracking, and not a substitute for fields the SRT parser does not record), and slow motion
   at 0.5× or 0.25× for a selected video section (source audio on that section is muted;
   not optical-flow interpolation, fast-forward, reverse, or a speed curve).

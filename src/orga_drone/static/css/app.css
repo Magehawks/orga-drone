@@ -1588,9 +1588,12 @@ video.studio-preview-media.studio-preview-layer-b {
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
-  cursor: move;
+  cursor: grab;
   touch-action: none;
   background: transparent;
+}
+.studio-mask-box.is-dragging {
+  cursor: grabbing;
 }
 .studio-mask-box.is-selected {
   border: 2px solid var(--accent, #3d8bfd);
