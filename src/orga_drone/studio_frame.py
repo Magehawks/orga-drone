@@ -196,6 +196,25 @@ def sample_frame(frame: FrameTransform, progress: float) -> tuple[float, float, 
     return zoom, focal_x, focal_y
 
 
+def source_window(
+    zoom: float,
+    focal_x: float,
+    focal_y: float,
+    *,
+    source_width: int,
+    source_height: int,
+) -> tuple[float, float, float, float]:
+    """Visible crop in source pixels. Same window the preview samples from."""
+    src_w = max(1.0, float(source_width))
+    src_h = max(1.0, float(source_height))
+    zoom_value = min(ZOOM_MAX, max(ZOOM_MIN, float(zoom)))
+    view_w = src_w / zoom_value
+    view_h = src_h / zoom_value
+    left = min(src_w - view_w, max(0.0, float(focal_x) * src_w - view_w / 2.0))
+    top = min(src_h - view_h, max(0.0, float(focal_y) * src_h - view_h / 2.0))
+    return left, top, view_w, view_h
+
+
 def window_for(
     zoom: float,
     focal_x: float,

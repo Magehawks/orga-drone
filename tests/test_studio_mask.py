@@ -24,6 +24,7 @@ from orga_drone.export.studio_encoder import (
 from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_export import _clip_to_export_clip
 from orga_drone.studio_image import image_adjust_from_effect_settings
+from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_mask import (
     Mask,
     content_rect,
@@ -34,6 +35,8 @@ from orga_drone.studio_mask import (
     masks_from_effect_settings,
     parse_masks_payload,
     pixel_block_px,
+    preview_source_rect,
+    visible_picture_rect,
 )
 
 
@@ -298,6 +301,36 @@ def test_http_masks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert missing.status_code == 404
 
 
+def test_zoomed_mask_uses_the_visible_window() -> None:
+    mask = _mask(x=0.0, y=0.0, w=0.5, h=1.0)
+    frame = FrameTransform(zoom_start=2, zoom_end=2, x_start=1, y_start=0.5, x_end=1, y_end=0.5)
+    sx, _sy, sw, sh = preview_source_rect(
+        mask, source_width=64, source_height=64, frame=frame, progress=0
+    )
+    assert sx == pytest.approx(32.0)
+    assert sw == pytest.approx(16.0)
+    assert sh == pytest.approx(32.0)
+    unzoomed = preview_source_rect(mask, source_width=64, source_height=64)
+    assert unzoomed[0] == pytest.approx(0.0)
+    assert unzoomed[2] == pytest.approx(32.0)
+    fitted = visible_picture_rect(
+        frame_width=160,
+        frame_height=90,
+        source_width=64,
+        source_height=64,
+        frame=frame,
+    )
+    left, _top, width, height = mask_box_pixels(
+        mask, fitted, frame_width=160, frame_height=90
+    )
+    assert left == 0
+    assert width == pytest.approx(80, abs=2)
+    assert height == pytest.approx(90, abs=2)
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    assert "sourceWindowForMask" in script
+    assert "view.x + mask.x * view.w" in script
+
+
 def _split_jpeg(path: Path) -> None:
     image = Image.new("RGB", (64, 64), (0, 0, 0))
     white = Image.new("RGB", (32, 64), (255, 255, 255))
@@ -403,6 +436,44 @@ def test_photo_and_video_exports_mask_the_boundary(tmp_path: Path) -> None:
         )
         assert grabbed.returncode == 0, grabbed.stderr.decode("utf-8", errors="replace")
         _assert_split_is_masked(dest, width=size[0], height=size[1])
+
+
+def test_zoomed_photo_export_masks_the_visible_half(tmp_path: Path) -> None:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    still = tmp_path / "split.jpg"
+    _split_jpeg(still)
+    dest = tmp_path / "zoomed.mp4"
+    frame = FrameTransform(zoom_start=2, zoom_end=2, x_start=1, y_start=0.5, x_end=1, y_end=0.5)
+    FfmpegStudioEncoder().render(
+        StudioExportConfig(
+            output_path=dest,
+            width=160,
+            height=90,
+            clips=(
+                StudioExportClip(
+                    source_path=still,
+                    kind="photo",
+                    duration_s=0.3,
+                    masks=(_mask(x=0.0, y=0.0, w=0.5, h=1.0, strength=100),),
+                    frame=frame,
+                ),
+            ),
+        )
+    )
+    png = tmp_path / "zoomed.png"
+    grabbed = subprocess.run(
+        [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(dest), "-frames:v", "1", str(png)],
+        capture_output=True,
+        check=False,
+    )
+    assert grabbed.returncode == 0, grabbed.stderr.decode("utf-8", errors="replace")
+    with Image.open(png) as image:
+        left = _luma(image.getpixel((20, 45)))
+        right = _luma(image.getpixel((140, 45)))
+    assert left < 180
+    assert abs(right - left) < 80
 
 
 def test_mask_failure_does_not_write_unmasked_export(tmp_path: Path) -> None:
