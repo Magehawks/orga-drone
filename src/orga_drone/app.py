@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from orga_drone import __version__
 from orga_drone.app_prefs import get_check_updates, set_check_updates
 from orga_drone.config import settings
+from orga_drone.local_http import LoopbackOriginMiddleware
 from orga_drone.updates import OFFICIAL_DOWNLOAD_URL, UpdateChecker, installed_version
 from orga_drone.browse_timeline import (
     build_timeline_nav,
@@ -253,6 +254,7 @@ def create_app() -> FastAPI:
     db = Database(settings.db_path)
 
     app = FastAPI(title="orga-drone", version=__version__)
+    app.add_middleware(LoopbackOriginMiddleware)
     app.state.db = db
     app.state.scan_jobs = ScanJobStore()
     app.state.export_jobs = ExportJobStore()
