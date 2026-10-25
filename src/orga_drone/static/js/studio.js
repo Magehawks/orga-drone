@@ -3258,6 +3258,13 @@
     });
   }
 
+  function transitionOccupancyS(type, duration) {
+    const seconds = Number(duration) || 0;
+    if (type === "fade_black") return Math.max(0, seconds / 2);
+    if (type === "crossfade") return Math.max(0, seconds);
+    return 0;
+  }
+
   function refreshAppliedTransitions() {
     const list = clips().filter((c) => clipDuration(c) > 0);
     for (let i = 0; i < list.length - 1; i += 1) {
@@ -3272,12 +3279,34 @@
         duration = 0;
       } else if (stored !== "cut") {
         duration = Math.max(0.1, Math.min(2, duration));
-        if (duration > maxD) duration = Math.max(0.1, Math.floor(maxD * 10) / 10);
+        if (duration > maxD) duration = maxD;
       } else {
         duration = 0;
       }
       prev.dataset.appliedType = applied;
       prev.dataset.appliedDuration = String(applied === "cut" ? 0 : duration);
+    }
+    for (let i = 0; i < list.length; i += 1) {
+      const incoming = i > 0 ? list[i - 1] : null;
+      const outgoing = i < list.length - 1 ? list[i] : null;
+      const occIn = incoming
+        ? transitionOccupancyS(incoming.dataset.appliedType, incoming.dataset.appliedDuration)
+        : 0;
+      let occOut = outgoing
+        ? transitionOccupancyS(outgoing.dataset.appliedType, outgoing.dataset.appliedDuration)
+        : 0;
+      const budget = clipDuration(list[i]) - 0.1;
+      if (occIn + occOut <= budget + 1e-9) continue;
+      if (outgoing && (outgoing.dataset.appliedType || "cut") !== "cut") {
+        outgoing.dataset.appliedType = "cut";
+        outgoing.dataset.appliedDuration = "0";
+        occOut = 0;
+      }
+      if (occIn + occOut <= budget + 1e-9) continue;
+      if (incoming && (incoming.dataset.appliedType || "cut") !== "cut") {
+        incoming.dataset.appliedType = "cut";
+        incoming.dataset.appliedDuration = "0";
+      }
     }
     rebuildTransitions();
     applyTransitionsToDom();
