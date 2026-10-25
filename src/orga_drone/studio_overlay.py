@@ -8,8 +8,8 @@ fractions of the fitted picture, so letterboxing does not move them.
 Export draws each overlay onto a transparent PNG and composites it in the
 existing segment graph, after scale/pad and before fades. The stitch graph is
 unchanged: a crossfade blends finished segments, so an overlay cannot continue
-onto the next clip. Video filter time follows the source timestamp because
-``-ss`` stays an output option; enable windows are shifted by ``source_start``.
+onto the next clip. Video segments seek with input ``-ss``, so overlay enable
+windows are clip-relative from t=0.
 
 User text and colors never become FFmpeg expressions. Filter text is built only
 from formatted numbers.
@@ -361,6 +361,36 @@ def overlays_from_effect_settings(
     return tuple(kept)
 
 
+def split_overlay_settings(raw: str | None, cut_s: float, *, left_s: float, right_s: float) -> tuple[str, str]:
+    """Keep overlays that still fit each side of a cut. The right side is offset."""
+    left_items: list[Overlay] = []
+    right_items: list[Overlay] = []
+    cut = float(cut_s)
+    for overlay in overlays_from_effect_settings(
+        raw, duration_s=max(left_s + right_s, cut, MIN_SPAN_S)
+    ):
+        if overlay.end_s > cut + 1e-9 and overlay.start_s < cut - 1e-9:
+            left_start, left_end, _ok = clamp_overlay_timing(overlay.start_s, cut, left_s)
+            right_start, right_end, _ok_r = clamp_overlay_timing(
+                0.0, overlay.end_s - cut, right_s
+            )
+            left_items.append(
+                Overlay(**{**overlay.as_dict(), "start_s": left_start, "end_s": left_end})
+            )
+            right_items.append(
+                Overlay(**{**overlay.as_dict(), "id": overlay.id, "start_s": right_start, "end_s": right_end})
+            )
+            continue
+        if overlay.end_s <= cut + 1e-9:
+            if overlay.end_s - overlay.start_s >= MIN_SPAN_S and overlay.start_s < left_s:
+                start, end, _ok = clamp_overlay_timing(overlay.start_s, overlay.end_s, left_s)
+                left_items.append(Overlay(**{**overlay.as_dict(), "start_s": start, "end_s": end}))
+            continue
+        start, end, _ok = clamp_overlay_timing(overlay.start_s - cut, overlay.end_s - cut, right_s)
+        right_items.append(Overlay(**{**overlay.as_dict(), "start_s": start, "end_s": end}))
+    return dump_overlays(raw, tuple(left_items)), dump_overlays(raw, tuple(right_items))
+
+
 def dump_overlays(existing: str | None, overlays: tuple[Overlay, ...] | list[Overlay]) -> str:
     """Write overlays and keep unrelated effect_settings keys, including image."""
     data = _load_effect_object(existing)
@@ -466,11 +496,10 @@ def overlay_is_active(overlay: Overlay, local_s: float, *, duration_s: float) ->
 def filter_time_origin(*, kind: str, source_start_s: float) -> float:
     """Map clip-relative overlay time onto the segment filter clock.
 
-    Photos are generated from t=0. Videos keep output ``-ss``, so filter ``t``
-    is the source timestamp and the window shifts by the trim in-point.
+    Photos are generated from t=0. Videos seek with input ``-ss``, so filter
+    ``t`` starts at the kept in-point (0) rather than the original source time.
     """
-    if kind == "video":
-        return max(0.0, float(source_start_s))
+    _ = kind, source_start_s
     return 0.0
 
 
@@ -516,7 +545,7 @@ def ffmpeg_overlay_graph(
     """Composite full-frame PNGs onto the scaled segment, then run fades.
 
     ``windows`` are filter-clock seconds. Fade in/out uses the overlay input's
-    clock, which starts with the main input because ``-ss`` is an output option.
+    clock, which starts at the kept in-point because ``-ss`` is an input option.
     Slide in moves the finished PNG. The graph contains only formatted numbers.
     ``source_label`` continues a graph that already scaled the frame, such as
     privacy masks. The default still starts from ``[0:v]``.

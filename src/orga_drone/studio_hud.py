@@ -310,12 +310,12 @@ def ffmpeg_hud_chain(
     fontfile: Path,
     height: int,
     intervals: Sequence[HudInterval],
+    origin_s: float = 0.0,
 ) -> str:
     """Draw elapsed time for the whole segment and altitude on each window.
 
-    Video segments keep ``-ss`` as an output option, so filter ``t`` is the
-    source timestamp. The elapsed expression is that clock. Altitude ``enable``
-    windows are the same source times as the preview intervals.
+    Input ``-ss`` resets filter ``t`` to the kept in-point. Elapsed time adds
+    ``origin_s``. Altitude windows are source times minus that origin.
     """
     size = max(16, int(round(int(height) * 0.032)))
     margin = max(12, int(round(int(height) * 0.04)))
@@ -325,20 +325,24 @@ def ffmpeg_hud_chain(
         f"fontfile='{font}':fontsize={size}:fontcolor=white:"
         f"box=1:boxcolor=black@0.55:boxborderw={pad}"
     )
+    clock = f"(t+{max(0.0, float(origin_s)):.4f})"
     elapsed_text = (
-        "%{eif\\:floor(t/3600)\\:d\\:2}\\:"
-        "%{eif\\:mod(floor(t/60)\\,60)\\:d\\:2}\\:"
-        "%{eif\\:mod(floor(t)\\,60)\\:d\\:2}"
+        f"%{{eif\\:floor({clock}/3600)\\:d\\:2}}\\:"
+        f"%{{eif\\:mod(floor({clock}/60)\\,60)\\:d\\:2}}\\:"
+        f"%{{eif\\:mod(floor({clock})\\,60)\\:d\\:2}}"
     )
     parts = [
         f"drawtext={common}:text='{elapsed_text}':x={margin}:y={margin}",
     ]
     line_y = margin + size + max(6, size // 4)
+    origin = max(0.0, float(origin_s))
     for interval in intervals:
+        start = max(0.0, float(interval.start_s) - origin)
+        end = max(start, float(interval.end_s) - origin)
         parts.append(
             "drawtext="
             f"{common}:text='{interval.altitude_m:.1f} m':x={margin}:y={line_y}:"
-            f"enable='between(t\\,{interval.start_s:.4f}\\,{interval.end_s:.4f})'"
+            f"enable='between(t\\,{start:.4f}\\,{end:.4f})'"
         )
     return ",".join(parts)
 

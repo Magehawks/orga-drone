@@ -112,7 +112,7 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
     ramp = (
-        ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=clip.source_start_s)
+        ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=0.0)
         if clip.kind == "video"
         else ""
     )
@@ -121,7 +121,7 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     slow = _slow_timing(clip)
     trim = ""
     stretch = ""
-    frame_origin = clip.source_start_s
+    frame_origin = 0.0
     frame_duration = clip.duration_s
     if slow is not None:
         trim, stretch, frame_origin, frame_duration = slow
@@ -167,10 +167,12 @@ def _hud_filter_text(clip: StudioExportClip, height: int) -> str:
             "Telemetry HUD could not be rendered because no font was found.",
             code="hud_font_missing",
         ) from exc
+    origin = 0.0 if _slow_timing(clip) is not None else float(clip.source_start_s)
     return ffmpeg_hud_chain(
         fontfile=font,
         height=height,
         intervals=clip.hud_intervals,
+        origin_s=origin,
     )
 
 
@@ -1581,11 +1583,11 @@ class FfmpegStudioEncoder:
         cmd = [
             ffmpeg,
             "-y",
+            "-ss",
+            f"{start:.3f}",
             "-i",
             str(clip.source_path),
             *extra,
-            "-ss",
-            f"{start:.3f}",
             "-t",
             f"{dur:.3f}",
             *filters,
@@ -1611,6 +1613,8 @@ class FfmpegStudioEncoder:
             cmd_silent = [
                 ffmpeg,
                 "-y",
+                "-ss",
+                f"{start:.3f}",
                 "-i",
                 str(clip.source_path),
                 *extra,
@@ -1618,10 +1622,6 @@ class FfmpegStudioEncoder:
                 "lavfi",
                 "-i",
                 "anullsrc=channel_layout=stereo:sample_rate=48000",
-                # Keep decode-then-seek semantics: after the inputs, -ss is an
-                # output option and trims the video source rather than anullsrc.
-                "-ss",
-                f"{start:.3f}",
                 "-t",
                 f"{dur:.3f}",
                 *filters,

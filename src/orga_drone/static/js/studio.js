@@ -3296,6 +3296,60 @@
     });
   }
 
+  function transitionOccupancyS(type, duration) {
+    const seconds = Number(duration) || 0;
+    if (type === "fade_black") return Math.max(0, seconds / 2);
+    if (type === "crossfade") return Math.max(0, seconds);
+    return 0;
+  }
+
+  function refreshAppliedTransitions() {
+    const list = clips().filter((c) => clipDuration(c) > 0);
+    for (let i = 0; i < list.length - 1; i += 1) {
+      const prev = list[i];
+      const next = list[i + 1];
+      const stored = prev.dataset.transitionType || "cut";
+      let applied = stored;
+      let duration = Number(prev.dataset.transitionDuration) || 0.5;
+      const maxD = Math.min(clipDuration(prev), clipDuration(next)) - 0.1;
+      if (stored !== "cut" && maxD < 0.1) {
+        applied = "cut";
+        duration = 0;
+      } else if (stored !== "cut") {
+        duration = Math.max(0.1, Math.min(2, duration));
+        if (duration > maxD) duration = maxD;
+      } else {
+        duration = 0;
+      }
+      prev.dataset.appliedType = applied;
+      prev.dataset.appliedDuration = String(applied === "cut" ? 0 : duration);
+    }
+    for (let i = 0; i < list.length; i += 1) {
+      const incoming = i > 0 ? list[i - 1] : null;
+      const outgoing = i < list.length - 1 ? list[i] : null;
+      const occIn = incoming
+        ? transitionOccupancyS(incoming.dataset.appliedType, incoming.dataset.appliedDuration)
+        : 0;
+      let occOut = outgoing
+        ? transitionOccupancyS(outgoing.dataset.appliedType, outgoing.dataset.appliedDuration)
+        : 0;
+      const budget = clipDuration(list[i]) - 0.1;
+      if (occIn + occOut <= budget + 1e-9) continue;
+      if (outgoing && (outgoing.dataset.appliedType || "cut") !== "cut") {
+        outgoing.dataset.appliedType = "cut";
+        outgoing.dataset.appliedDuration = "0";
+        occOut = 0;
+      }
+      if (occIn + occOut <= budget + 1e-9) continue;
+      if (incoming && (incoming.dataset.appliedType || "cut") !== "cut") {
+        incoming.dataset.appliedType = "cut";
+        incoming.dataset.appliedDuration = "0";
+      }
+    }
+    rebuildTransitions();
+    applyTransitionsToDom();
+  }
+
   function rebuildTransitions() {
     const list = clips();
     grid.querySelectorAll(".studio-transition").forEach((el) => el.remove());
@@ -3955,8 +4009,7 @@
       });
       if (!res.ok) throw new Error("reorder failed");
       await res.json();
-      rebuildTransitions();
-      applyTransitionsToDom();
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -3975,7 +4028,7 @@
       const el = byId.get(id);
       if (el) grid.appendChild(el);
     });
-    rebuildTransitions();
+    refreshAppliedTransitions();
     layoutTimeline();
   }
 
@@ -4013,6 +4066,7 @@
           data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
         input.value = Number(shown).toFixed(1);
       }
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -4085,6 +4139,7 @@
       if (durationLine) {
         durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
       }
+      refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
       setSaveState(true);
@@ -4889,6 +4944,7 @@
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
       syncPreviewMedia();
+      refreshAppliedTransitions();
       layoutTimeline();
       setSaveState(true);
     } catch (err) {
@@ -5812,7 +5868,7 @@
       el.style.opacity = "";
       return;
     }
-    const sourceS = sourceInS(clip) + Math.max(0, Number(localS) || 0);
+    const sourceS = sourceClock(clip, localS);
     const lines = [formatHudElapsed(sourceS)];
     const altitude = hudAltitudeText(hud, sourceS);
     if (altitude) lines.push(altitude);
@@ -6214,10 +6270,14 @@
     }
   }
 
+  function sourceClock(clip, localS) {
+    const sample = sectionSampleS(clip, Math.max(0, Number(localS) || 0));
+    return sourceInS(clip) + sample * playbackSpeed(clip);
+  }
+
   function mapClock(clip, localS) {
-    const local = Number(localS) || 0;
-    if (clip && clip.dataset.kind === "video") return sourceInS(clip) + local;
-    return local;
+    if (clip && clip.dataset.kind === "video") return sourceClock(clip, localS);
+    return Number(localS) || 0;
   }
 
   function markerAt(points, timeS) {

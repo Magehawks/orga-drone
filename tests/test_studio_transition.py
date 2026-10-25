@@ -394,3 +394,35 @@ def test_stitch_filters_normalize_timebase_before_second_xfade() -> None:
     assert "[xv1][3:v]xfade" not in joined
     assert "[xv1]fps=30,format=yuv420p,settb=1/30[vl2]" in joined
     assert "[vl2][vr2]xfade=transition=fade:duration=0.5000:offset=7.3000[xv2]" in joined
+
+
+def test_preview_refreshes_transition_overlap_after_duration_changes() -> None:
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    persist_section = script.split("async function persistSection")[1].split("async function")[0]
+    persist_order = script.split("async function persistOrder")[1].split("async function")[0]
+    persist_photo = script.split("async function patchPhotoDuration")[1].split("async function")[0]
+    persist_title = script.split("async function persistTitlecard")[1].split("async function")[0]
+    refresh = script.split("function refreshAppliedTransitions()")[1].split("function ")[0]
+    assert "refreshAppliedTransitions();" in persist_section
+    assert "refreshAppliedTransitions();" in persist_order
+    assert "refreshAppliedTransitions();" in persist_photo
+    assert "refreshAppliedTransitions();" in persist_title
+    assert "Math.min(clipDuration(prev), clipDuration(next))" in refresh
+    assert "if (duration > maxD) duration = maxD;" in refresh
+    assert "Math.floor(maxD * 10)" not in refresh
+    occ = script.split("function transitionOccupancyS")[1].split("function ")[0]
+    assert 'type === "fade_black"' in occ
+    assert "seconds / 2" in occ
+    assert "occIn + occOut" in refresh
+    shortened = apply_boundaries([0.15, 2.0], [TYPE_CROSSFADE, TYPE_CUT], [0.5, None])
+    assert shortened[0].type == TYPE_CUT
+    assert shortened[0].duration_s == 0.0
+    clamped = apply_one_boundary(TYPE_CROSSFADE, 0.5, 0.35, 2.0)
+    assert clamped.type == TYPE_CROSSFADE
+    assert clamped.duration_s == pytest.approx(0.25)
+    crowded = apply_boundaries([3.0, 0.5, 3.0], [TYPE_CROSSFADE, TYPE_CROSSFADE, TYPE_CUT], [0.4, 0.4, None])
+    assert crowded[0].duration_s == pytest.approx(0.4)
+    assert crowded[1].type == TYPE_CUT
+    starts = story_starts_s([3.0, 0.5, 3.0], crowded)
+    assert starts[1] == pytest.approx(2.6)
+    assert starts[2] == pytest.approx(3.1)

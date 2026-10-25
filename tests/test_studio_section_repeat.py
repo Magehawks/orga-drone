@@ -317,3 +317,40 @@ def test_http_section_persists_and_leaves_photos_alone(
     )
     assert blocked.status_code == 400
     assert db.list_studio_items()[0].playback_speed == pytest.approx(1.0)
+
+
+def test_section_api_duration_includes_playback_speed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    video_id = _seed(db, tmp_path / "videos", "SLOW.MP4", 8.0)
+    db.set_studio_playback_speed(video_id, 0.25)
+    client = TestClient(app)
+    saved = client.patch(
+        f"/api/studio/{video_id}/section",
+        json={"source_in_s": 1.0, "source_out_s": 2.0, "repeats": 2},
+    )
+    assert saved.status_code == 200
+    body = saved.json()
+    expected = effective_seconds(
+        kind="video",
+        photo_duration_s=None,
+        duration_s=8.0,
+        available=True,
+        source_in_s=1.0,
+        source_out_s=2.0,
+        playback_speed=0.25,
+        section_repeats=2,
+    )
+    assert body["effective_duration_s"] == pytest.approx(8.0)
+    assert body["effective_duration_s"] == pytest.approx(expected)
+    stored = {item.id: item for item in db.list_studio_items()}[video_id]
+    summary = summarize_studio_items(db.list_studio_items())
+    assert summary.estimated_total_s == pytest.approx(8.0)
+    built = _clip_to_export_clip(db, stored)
+    assert built is not None
+    assert built.duration_s == pytest.approx(8.0)

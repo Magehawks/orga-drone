@@ -363,9 +363,7 @@ def test_encoder_silent_video_fallback_preserves_source_start(
     ]
     assert len(silent_commands) == 1
     silent_cmd = silent_commands[0]
-    assert silent_cmd.index("-ss") > silent_cmd.index(
-        "anullsrc=channel_layout=stereo:sample_rate=48000"
-    )
+    assert silent_cmd.index("-ss") < silent_cmd.index("-i")
 
     probed = subprocess.run(
         [ffmpeg, "-hide_banner", "-i", str(output)],
@@ -404,6 +402,89 @@ def test_encoder_silent_video_fallback_preserves_source_start(
     center = (24 * 64 + 32) * 3
     red, _green, blue = first_frame.stdout[center : center + 3]
     assert blue > red + 100
+
+
+def test_trimmed_fade_in_starts_at_kept_in_point(tmp_path: Path) -> None:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+    source = tmp_path / "white.mp4"
+    generated = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=white:s=64x48:r=30:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(source),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert generated.returncode == 0, generated.stderr
+    output = tmp_path / "faded.mp4"
+    FfmpegStudioEncoder().render(
+        StudioExportConfig(
+            output_path=output,
+            width=64,
+            height=48,
+            clips=(
+                StudioExportClip(
+                    source_path=source,
+                    kind="video",
+                    duration_s=1.0,
+                    source_start_s=1.0,
+                    source_end_s=2.0,
+                    fade_in_s=0.5,
+                ),
+            ),
+        )
+    )
+
+    def _luma_at(at_s: float) -> float:
+        frame = subprocess.run(
+            [
+                ffmpeg,
+                "-hide_banner",
+                "-ss",
+                f"{at_s:.3f}",
+                "-i",
+                str(output),
+                "-map",
+                "0:v:0",
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "pipe:1",
+            ],
+            check=False,
+            capture_output=True,
+        )
+        assert frame.returncode == 0, frame.stderr.decode(errors="replace")
+        assert len(frame.stdout) == 64 * 48 * 3
+        center = (24 * 64 + 32) * 3
+        red, green, blue = frame.stdout[center : center + 3]
+        return (red + green + blue) / 3
+
+    assert _luma_at(0.0) < 80
+    assert _luma_at(0.7) > 180
 
 
 def test_materialize_photo_still_heic_like(tmp_path: Path) -> None:
