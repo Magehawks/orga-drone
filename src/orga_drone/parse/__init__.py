@@ -660,41 +660,88 @@ def _normalize_tag_datetime(value: str) -> datetime | None:
     )
 
 
+def duration_s_from_ffmpeg_i_text(text: str) -> float | None:
+    """Read ``Duration: HH:MM:SS`` from ``ffmpeg -i`` output.
+
+    ``Duration: N/A`` is not a duration. A zero length is not usable.
+    """
+    match = re.search(r"Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)", text or "")
+    if not match:
+        return None
+    total = int(match.group(1)) * 3600 + int(match.group(2)) * 60 + float(match.group(3))
+    if total <= 0:
+        return None
+    return total
+
+
 def probe_video_with_ffprobe(
     path: Path,
 ) -> tuple[GpsPoint | None, datetime | None, float | None]:
-    """Best-effort GPS / creation time / duration via system ffprobe (if installed)."""
-    from orga_drone.ffmpeg_bin import find_ffprobe
+    """Best-effort GPS / creation time / duration.
+
+    ffprobe supplies GPS, creation time, and duration when it is installed.
+    The Windows package ships ffmpeg only, so duration then comes from
+    ``ffmpeg -i``.
+    """
+    from orga_drone.ffmpeg_bin import find_ffmpeg, find_ffprobe, subprocess_no_window_kwargs
 
     ffprobe = find_ffprobe()
-    if not ffprobe:
-        return None, None, None
-    cmd = [
-        ffprobe,
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
-        "-show_streams",
-        str(path),
-    ]
-    try:
-        proc = subprocess.run(
-            cmd,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None, None, None
-    if proc.returncode != 0 or not proc.stdout:
-        return None, None, None
-    try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None, None, None
+    gps = None
+    recorded = None
+    duration_s = None
+    if ffprobe:
+        cmd = [
+            ffprobe,
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            str(path),
+        ]
+        try:
+            proc = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                **subprocess_no_window_kwargs(),
+            )
+        except (OSError, subprocess.SubprocessError):
+            proc = None
+        if proc is not None and proc.returncode == 0 and proc.stdout:
+            try:
+                data = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                data = None
+            if data is not None:
+                gps, recorded, duration_s = _probe_fields_from_ffprobe_json(data)
+    if duration_s is None:
+        ffmpeg = find_ffmpeg()
+        if ffmpeg:
+            try:
+                banner = subprocess.run(
+                    [ffmpeg, "-hide_banner", "-i", str(path)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    **subprocess_no_window_kwargs(),
+                )
+            except (OSError, subprocess.SubprocessError):
+                banner = None
+            if banner is not None:
+                duration_s = duration_s_from_ffmpeg_i_text(
+                    f"{banner.stderr or ''}\n{banner.stdout or ''}"
+                )
+    return gps, recorded, duration_s
+
+
+def _probe_fields_from_ffprobe_json(
+    data: dict,
+) -> tuple[GpsPoint | None, datetime | None, float | None]:
 
     tags: dict[str, str] = {}
     fmt = data.get("format") or {}
@@ -732,6 +779,8 @@ def probe_video_with_ffprobe(
         if fmt.get("duration") is not None:
             duration_s = float(fmt["duration"])
     except (TypeError, ValueError):
+        duration_s = None
+    if duration_s is not None and duration_s <= 0:
         duration_s = None
 
     return gps, recorded, duration_s
@@ -839,7 +888,7 @@ def parse_media_file(path: Path) -> ParsedMedia:
                 media.longitude = start.lon
                 media.abs_alt = start.abs_alt
         else:
-            # No SRT required: optional ffprobe for GPS / date / duration
+            # No SRT required: ffprobe, or ffmpeg -i when the package has no ffprobe.
             if (
                 media.latitude is None
                 or media.recorded_at is None

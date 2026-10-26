@@ -4,7 +4,9 @@ A rescan still walks a listable root and rebuilds flows and sessions.
 Metadata extraction is skipped when an indexed file has the same size and
 mtime. Issue #96 does not define a content fingerprint; those filesystem
 signals are the skip check. A sibling SRT is also compared by its own size
-and mtime, so a changed subtitle is read again. If a root cannot be listed,
+and mtime, so a changed subtitle is read again. A video with no duration
+and no earlier duration probe is read once, then skipped like any other
+unchanged file. If a root cannot be listed,
 or disappears before the index is replaced, catalog entries stay and the
 source is offline. A child folder that cannot be listed keeps the catalog
 entries already stored under it. Files, user metadata, and Studio clips
@@ -353,6 +355,16 @@ def _must_reparse(
         return True
     if kind in {"video", "photo"} and indexed.get("media_id") is None:
         return True
+    # A video indexed before ffmpeg could supply duration has a null length
+    # and no probe mark. Read it once. A later scan keeps the skip.
+    if (
+        kind == "video"
+        and indexed.get("media_id") is not None
+        and not indexed.get("has_srt")
+        and indexed.get("duration_s") is None
+        and indexed.get("duration_probe") is None
+    ):
+        return True
     return False
 
 
@@ -569,6 +581,7 @@ def scan_root(
                 "has_srt": 1 if has_srt else 0,
                 "has_lrf": 1 if has_lrf else 0,
                 "track_json": track_to_json(parsed.track),
+                "duration_probe": 1,
             }
         )
         # Relink user metadata and Studio clips for parsed paths (new, changed, or repaired).

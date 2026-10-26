@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS media (
     abs_alt REAL,
     has_srt INTEGER NOT NULL DEFAULT 0,
     has_lrf INTEGER NOT NULL DEFAULT 0,
+    duration_probe INTEGER,
     track_json TEXT,
     auto_tags_json TEXT NOT NULL DEFAULT '[]',
     place_json TEXT,
@@ -558,6 +559,8 @@ class Database:
             conn.execute("ALTER TABLE media ADD COLUMN height INTEGER")
         if "srt_token" not in media_cols:
             conn.execute("ALTER TABLE media ADD COLUMN srt_token TEXT")
+        if "duration_probe" not in media_cols:
+            conn.execute("ALTER TABLE media ADD COLUMN duration_probe INTEGER")
         conn.execute(
             """CREATE TABLE IF NOT EXISTS geocode_cache (
                 lat_key REAL NOT NULL,
@@ -1058,7 +1061,8 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT a.id AS asset_id, a.path, a.kind, a.size_bytes, a.mtime,
-                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf, m.srt_token
+                          a.stem_base, m.id AS media_id, m.has_srt, m.has_lrf, m.srt_token,
+                          m.duration_s, m.duration_probe
                    FROM assets a
                    LEFT JOIN media m
                      ON m.path = a.path AND m.root_id = a.root_id
@@ -1078,6 +1082,10 @@ class Database:
                 "has_srt": int(row["has_srt"] or 0) if media_id is not None else 0,
                 "has_lrf": int(row["has_lrf"] or 0) if media_id is not None else 0,
                 "srt_token": None if row["srt_token"] is None else str(row["srt_token"]),
+                "duration_s": None if row["duration_s"] is None else float(row["duration_s"]),
+                "duration_probe": (
+                    None if row["duration_probe"] is None else int(row["duration_probe"])
+                ),
             }
         return found
 
@@ -1208,6 +1216,8 @@ class Database:
                 "track_json",
                 "updated_at",
             ]
+            if "duration_probe" in data:
+                cols.append("duration_probe")
             if row:
                 values = [data.get(c) for c in cols]
                 sets = ", ".join(f"{c}=?" for c in cols)

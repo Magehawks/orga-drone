@@ -398,3 +398,82 @@ def test_scan_live_photo_same_stem_two_dirs(tmp_path: Path) -> None:
     assert counts["videos"] == 1
     names = {i.filename for i in db.list_media() if i.kind == "video"}
     assert names == {"holiday.MOV"}
+
+
+def test_duration_from_ffmpeg_banner_ignores_not_available() -> None:
+    from orga_drone.parse import duration_s_from_ffmpeg_i_text
+
+    banner = (
+        "Duration: 00:00:14.20, start: 0.000000, bitrate: 10030 kb/s\n"
+        "Stream #0:0: Video: h264 (High), yuv420p, 1920x1080, 30 fps\n"
+        "Stream #0:1: Audio: aac (LC), 48000 Hz, stereo\n"
+    )
+    assert duration_s_from_ffmpeg_i_text(banner) == pytest.approx(14.20)
+    assert duration_s_from_ffmpeg_i_text("Duration: N/A, start: 0.000000") is None
+    assert duration_s_from_ffmpeg_i_text("Duration: 00:00:00.00, start: 0") is None
+
+
+def test_reimported_mp4_duration_without_ffprobe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Studio MP4 has no sibling SRT, and the Windows zip has no ffprobe.
+
+    Duration must still come from ffmpeg -i so Studio can preview and trim it.
+    """
+    import subprocess
+
+    from orga_drone.ffmpeg_bin import find_ffmpeg
+    from orga_drone.parse import parse_media_file
+    from orga_drone.studio_estimate import effective_seconds
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    out = tmp_path / "Deine Geschichte_test_720p.mp4"
+    proc = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=320x180:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(out),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr[-400:]
+    assert "Audio:" in proc.stderr or out.stat().st_size > 0
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: None)
+    media = parse_media_file(out)
+    assert media is not None
+    assert media.kind == "video"
+    assert media.duration_s is not None
+    assert media.duration_s == pytest.approx(1.0, abs=0.2)
+    seconds = effective_seconds(
+        kind="video",
+        photo_duration_s=None,
+        duration_s=media.duration_s,
+        available=True,
+    )
+    assert seconds is not None
+    assert seconds == pytest.approx(media.duration_s, abs=0.05)

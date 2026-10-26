@@ -388,3 +388,26 @@ def test_unreadable_child_folder_keeps_its_catalog(
     assert "open.mp4" in names
     assert "gone.mp4" not in names
     assert counts["unreadable"] == 1
+
+
+def test_video_without_duration_is_read_once_more(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rows saved before the ffmpeg duration fallback are probed once."""
+    lib = tmp_path / "lib"
+    _video(lib / "export.mp4")
+    db = Database(tmp_path / "backfill.sqlite3")
+    root_id = db.add_root(lib, "cards")
+    scan_root(db, root_id, lib)
+    media_id, _row = _by_filename(db, root_id)["export.mp4"]
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE media SET duration_s = NULL, duration_probe = NULL WHERE id = ?",
+            (media_id,),
+        )
+    calls = _parse_calls(monkeypatch)
+    again = scan_root(db, root_id, lib)
+    assert calls == ["export.mp4"]
+    assert again["unchanged"] == 0
+    calls.clear()
+    third = scan_root(db, root_id, lib)
+    assert calls == []
+    assert third["unchanged"] == 1
