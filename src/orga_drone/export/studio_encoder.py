@@ -195,6 +195,21 @@ def _complex_graph_body(filters: list[str]) -> str:
     return filters[1]
 
 
+def _linear_filter_body(filters: list[str]) -> str | None:
+    """Comma-separated chain from ``-vf`` or a spilled ``-filter_script:v`` file.
+
+    A telemetry HUD longer than the inline limit is the same chain as ``-vf``.
+    The flight map has to read that file before it can sit on the picture.
+    """
+    if not filters:
+        return None
+    if filters[0] == "-vf":
+        return filters[1]
+    if filters[0] == "-filter_script:v":
+        return Path(filters[1]).read_text(encoding="utf-8").rstrip("\r\n")
+    return None
+
+
 def _filter_args(body: str, work: Path, *, complex_graph: bool) -> list[str]:
     from orga_drone.studio_hud import video_filter_args
 
@@ -324,8 +339,8 @@ def _attach_flight_map(
     fades = _fade_filters(clip)
     source_w, source_h = _source_frame_size(clip)
     first_input = 1 + extra.count("-i")
-    if filters and filters[0] == "-vf":
-        body = filters[1]
+    body = _linear_filter_body(filters)
+    if body is not None:
         for fade in reversed(fades):
             token = "," + fade
             if body.endswith(token):
