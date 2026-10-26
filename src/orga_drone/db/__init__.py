@@ -1237,6 +1237,45 @@ class Database:
             assert media_id is not None
             return int(media_id)
 
+    def fill_video_duration_if_missing(self, media_id: int) -> float | None:
+        """Store a container duration when a video was indexed without one.
+
+        A Studio export has no sibling SRT. The Windows package has no ffprobe,
+        so an earlier scan can leave ``duration_s`` empty. Reading the file
+        header here lets Studio show the clip without a full library rescan.
+        A missing file is left unmarked so a later open can try again.
+        """
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT path, kind, duration_s, duration_probe
+                   FROM media WHERE id = ?""",
+                (media_id,),
+            ).fetchone()
+        if row is None or str(row["kind"]) != "video":
+            return None
+        if row["duration_s"] is not None:
+            try:
+                return float(row["duration_s"])
+            except (TypeError, ValueError):
+                return None
+        if row["duration_probe"]:
+            return None
+        path = Path(str(row["path"]))
+        if not path.is_file():
+            return None
+        from orga_drone.parse import probe_video_with_ffprobe
+
+        duration = probe_video_with_ffprobe(path)[2]
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE media
+                   SET duration_s = ?, duration_probe = 1, updated_at = ?
+                   WHERE id = ? AND duration_s IS NULL""",
+                (duration, now, media_id),
+            )
+        return duration
+
     def update_media_dimensions(
         self,
         media_id: int,

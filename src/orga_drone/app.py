@@ -883,6 +883,10 @@ def create_app() -> FastAPI:
         item = db.get_media(media_id)
         if not item:
             return render(request, "error.html", status_code=404, message="Not found")
+        if item.kind == "video" and item.duration_s is None:
+            filled = db.fill_video_duration_if_missing(item.id)
+            if filled is not None:
+                item.duration_s = filled
         clips = db.flow_clips(item.flow_id) if item.flow_id else []
         multi_flow = bool(item.flow_id and item.clip_count and item.clip_count > 1)
         if not multi_flow and item.flow_id and len(clips) > 1:
@@ -1040,6 +1044,14 @@ def create_app() -> FastAPI:
         projects = db.list_studio_projects()
         studio_mode = "editor" if project is not None else "browser"
         items = db.list_studio_items(project.id) if project is not None else []
+        for it in items:
+            if (it.kind or "") != "video" or it.duration_s is not None:
+                continue
+            if it.source_media_id is None:
+                continue
+            filled = db.fill_video_duration_if_missing(it.source_media_id)
+            if filled is not None:
+                it.duration_s = filled
         summary = summarize_studio_items(items)
         lang = lang_from_request(request)
         item_display: list[dict[str, Any]] = []

@@ -927,3 +927,43 @@ def test_http_studio_cut(
     assert page.status_code == 200
     assert "data-source-in=" in page.text
     assert 'data-transport="cut"' in page.text
+
+
+def test_reimported_video_gets_duration_when_studio_opens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.app.settings",
+        Settings(data_dir=tmp_path / "data"),
+    )
+    from orga_drone.app import create_app
+
+    calls: list[Path] = []
+
+    def fake_probe(path: Path):
+        calls.append(path)
+        return (None, None, 175.08)
+
+    monkeypatch.setattr("orga_drone.parse.probe_video_with_ffprobe", fake_probe)
+    app = create_app()
+    db: Database = app.state.db
+    mid = _seed_media(
+        db,
+        tmp_path / "lib",
+        filename="Deine Geschichte_test2_720p_1.mp4",
+        content=b"story",
+        duration_s=None,
+    )
+    _add_item(db, mid)
+    page = TestClient(app).get("/studio")
+    assert page.status_code == 200
+    assert 'data-media-duration="175.08"' in page.text
+    assert "175.1s" in page.text
+    stored = db.get_media(mid)
+    assert stored is not None
+    assert stored.duration_s == pytest.approx(175.08)
+    assert calls
+    calls.clear()
+    again = TestClient(app).get("/studio")
+    assert again.status_code == 200
+    assert calls == []
