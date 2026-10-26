@@ -129,6 +129,13 @@ jobs:
               ($banned.FullName -join ", "))
           }
 
+      - name: Write third-party notices
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python packaging/windows_third_party.py write dist/orga-drone
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Zip and checksum
         shell: pwsh
         run: |
@@ -160,6 +167,8 @@ jobs:
           $versionLine | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           "commit=${{ github.sha }}" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           "sha256=$hash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          python packaging/windows_third_party.py verify-zip orga-drone-windows-x64.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload release candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

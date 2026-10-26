@@ -58,7 +58,7 @@ select = ["E4", "E7", "E9", "F"]
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "src"
-files = ["src", "packaging/itch_channel.py"]
+files = ["src", "packaging/itch_channel.py", "packaging/windows_third_party.py"]
 explicit_package_bases = true
 warn_unused_configs = true
 show_error_codes = true

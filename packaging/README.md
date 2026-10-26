@@ -45,6 +45,13 @@ still prefers a system ffmpeg if one is present, then falls back to the
 bundled binary. imageio-ffmpeg typically ships ffmpeg only (no ffprobe);
 export already falls back to `ffmpeg -i` when ffprobe is absent.
 
+Before the zip is uploaded, `packaging/windows_third_party.py` runs the
+bundled ffmpeg, copies the notices it can actually read, and writes
+`THIRD_PARTY_NOTICES/ITCH_SALE_VERDICT.txt`. `verify-zip` exits 2 while that
+verdict is NO-GO, and the workflow stops before the upload. The evidence and
+the current NO-GO are in `packaging/WINDOWS_THIRD_PARTY.md`. That file is not
+a compliance certificate. The project license stays MIT.
+
 The exe is built with `console=False` (no black console window). For debugging a build,
 temporarily set `console=True` in `orga-drone.spec`.
 

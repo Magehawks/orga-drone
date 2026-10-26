@@ -1,0 +1,12 @@
+reverse-geocoder-LGPL-2.1.txt is a verbatim copy of
+https://raw.githubusercontent.com/thampiman/reverse-geocoder/master/LICENSE
+retrieved on 2026-10-26.
+
+That URL returned the GNU Lesser General Public License, version 2.1.
+The same branch's setup.py declares version 1.5.1 and license = lgpl.
+https://raw.githubusercontent.com/thampiman/reverse-geocoder/v1.5.1/LICENSE
+returned 404. The installed wheel reverse_geocoder 1.5.1 does not contain
+a LICENSE file. Nothing here proves that the wheel was built from that
+git revision.
+
+This file is not an Orga Drone license. The project license stays MIT.
