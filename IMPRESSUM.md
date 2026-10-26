@@ -9,7 +9,7 @@ Deutschland
 
 ## Kontakt
 
-E-Mail: [niwes.schult@gmail.com](mailto:niwes.schult@gmail.com)
+E-Mail: [wue3dprint@gmail.com](mailto:wue3dprint@gmail.com)
 
 ## Verantwortlich für journalistisch-redaktionelle Inhalte (soweit anwendbar)
 
