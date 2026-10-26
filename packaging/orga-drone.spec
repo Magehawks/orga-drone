@@ -16,6 +16,8 @@ datas = [
     (str(SRC / "locales"), "orga_drone/locales"),
 ]
 datas += collect_data_files("imageio_ffmpeg")
+# The dated GeoNames CSV is loaded by path from the geocode package.
+datas.append((str(SRC / "geocode" / "rg_cities1000.csv"), "orga_drone/geocode"))
 # pythonnet.load() needs filesystem __init__.py next to runtime/*.dll in the EXE.
 datas += collect_data_files("pythonnet", include_py_files=True)
 
@@ -81,6 +83,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
+    module_collection_mode={"reverse_geocoder": "py"},
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

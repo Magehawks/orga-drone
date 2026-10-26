@@ -1,0 +1,26 @@
+Place-name differences after replacing the reverse_geocoder 1.5.1 wheel CSV
+with the GeoNames cities1000 extract retrieved on 2026-10-26.
+
+The wheel file is 7,851,524 bytes and has no dump date. The dated extract
+formats to 9,900,190 bytes and 171,654 rows. Both queries use reverse_geocoder
+mode 1 (single-process nearest row) after restoring np.float64 for NumPy 2.
+
+Named coordinates:
+
+- Munich (48.137154, 11.576124): Munich, Bavaria, Upper Bavaria, DE. Unchanged.
+- New York (40.7128, -74.0060): New York City, New York, US. Unchanged.
+- San Francisco (37.78674, -122.39222): was San Francisco, California, San Francisco County, US. Now Chinatown, California, City and County of San Francisco, US.
+- London (51.5214588, -0.1729636): was Bayswater, England, Greater London, GB. Now Church Street, England, Greater London, GB.
+- Tokyo (35.6762, 139.6503): was Tokyo, Tokyo, JP. Now Eifuku, Tokyo, Suginami-ku, JP.
+- Sydney (-33.8688, 151.2093): was Sydney, New South Wales, City of Sydney, AU. Now Sydney, New South Wales, AU. The admin2 field is empty in the new row.
+- Reykjavik (64.1466, -21.9426): was Kopavogur, Capital Region, IS. Now Kopavogur, Capital Region, Kopavogsbaer, IS.
+- (0, 0): still Takoradi, Western, GH. The new row adds admin2 Secondi Takoradi.
+
+A sample of 200 coordinates taken from the wheel CSV changed on 108 rows.
+Most changes are a closer populated place in the newer dump, or a filled-in
+admin2 name. Offline lookup still returns the nearest row. It does not return
+the same row as the undated wheel file for every coordinate.
+
+Before this change, lookup_offline read attributes off the CSV dict and called
+np.float. On NumPy 2.5.1 both fail, and the exception handler returned no place.
+The dated file is what the application now searches.

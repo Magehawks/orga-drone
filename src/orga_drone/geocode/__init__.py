@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from orga_drone.geocode.countries import country_name
@@ -63,22 +65,59 @@ def place_from_json(raw: str | None) -> PlaceResult | None:
     return PlaceResult.from_dict(data)
 
 
-def _lookup_offline(lat: float, lon: float) -> PlaceResult | None:
+def _dataset_path() -> Path:
+    return Path(__file__).resolve().parent / "rg_cities1000.csv"
+
+
+def _field(hit: object, name: str) -> str:
+    if isinstance(hit, dict):
+        value = hit.get(name, "")
+    else:
+        value = getattr(hit, name, "")
+    return str(value or "").strip()
+
+
+def _geocoder() -> Any:
+    """Single-process tree over the dated GeoNames CSV.
+
+    The library's default search reads the undated wheel CSV and calls
+    ``np.float``, which NumPy 2 no longer provides. Mode 1 is that library's
+    single-process nearest-row query.
+    """
+    import numpy as np
+
+    if not hasattr(np, "float"):
+        np.float = np.float64  # type: ignore[attr-defined]
+    import reverse_geocoder as rg
+
+    cached = getattr(_geocoder, "instance", None)
+    if cached is not None:
+        return cached
+    for cell in rg.RGeocoder.__closure__ or ():
+        if isinstance(cell.cell_contents, dict):
+            cell.cell_contents.clear()
+    instance = rg.RGeocoder(
+        mode=1,
+        verbose=False,
+        stream=io.StringIO(_dataset_path().read_text(encoding="utf-8")),
+    )
+    _geocoder.instance = instance  # type: ignore[attr-defined]
+    return instance
+
+
+def lookup_offline(lat: float, lon: float) -> PlaceResult | None:
+    """Nearest populated place from the dated GeoNames extract."""
     try:
-        import reverse_geocoder as rg
-    except ImportError:
-        return None
-    try:
-        hits = rg.search((lat, lon))
+        hits = _geocoder().query([(lat, lon)])
     except Exception:
         return None
     if not hits:
         return None
     hit = hits[0]
-    cc = str(getattr(hit, "cc", "") or "").upper() or None
-    city = str(getattr(hit, "name", "") or "").strip() or None
-    region = str(getattr(hit, "admin1", "") or "").strip() or None
-    district = str(getattr(hit, "admin2", "") or "").strip() or None
+    cc = _field(hit, "cc").upper() or None
+    city = _field(hit, "name") or None
+    region = _field(hit, "admin1") or None
+    district = _field(hit, "admin2") or None
     if district and city and district.casefold() == city.casefold():
         district = None
     return PlaceResult(
@@ -108,7 +147,7 @@ def resolve(
         return cached
     if mode != "offline":
         return None
-    place = _lookup_offline(lat, lon)
+    place = lookup_offline(lat, lon)
     if place is not None:
         db.upsert_geocode_cache(lat_key, lon_key, place)
     return place

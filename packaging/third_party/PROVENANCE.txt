@@ -1,0 +1,61 @@
+ffmpeg-7.1-essentials-GPLv3.txt and ffmpeg-7.1-essentials-README.txt were
+extracted from
+https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip
+published 2024-09-30.
+
+bin/ffmpeg.exe in that zip has SHA256
+2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3
+and is 87638016 bytes. The same hash and size are the ffmpeg-win-x86_64-v7.1.exe
+inside imageio-ffmpeg 0.6.0 and imageio/imageio-binaries
+(commit f8f64710, 2025-01-16, renamed from the binary added the same day).
+
+The README in that zip says License: GPL v3 and
+Source Code: https://github.com/FFmpeg/FFmpeg/commit/b08d7969c5
+It also lists external library versions, including x264 v0.164.3192 and
+x265 4.0-6-ga009ec077. It does not contain those libraries' source trees
+or the scripts used to compile and link them. Those two files are evidence
+of identity. They are not the corresponding source of the static binary.
+
+reverse-geocoder-LGPL-2.1.txt is a verbatim copy of
+https://raw.githubusercontent.com/thampiman/reverse-geocoder/master/LICENSE
+retrieved on 2026-10-26. It is the GNU Lesser General Public License,
+version 2.1. The wheel reverse_geocoder 1.5.1 does not contain this file.
+__init__.py SHA256 64b4a62906216d6aa9718fae3b6332f323fc589cb57a048b2be15b1ed6cc0640
+and cKDTree_MP.py SHA256 932e77d70058e445a45773115dc22d939f07c2cbb91bc7a9433dc7b4b25b0cf9
+match that master tree. The tag URL v1.5.1/LICENSE returned 404.
+
+leaflet-1.9.4-BSD-2-Clause.txt is
+https://raw.githubusercontent.com/Leaflet/Leaflet/v1.9.4/LICENSE
+SHA256 53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb.
+src/orga_drone/static/vendor/leaflet/leaflet.js matches unpkg leaflet@1.9.4
+dist/leaflet.js SHA256 db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a.
+
+lucide-0.469.0-ISC.txt is
+https://raw.githubusercontent.com/lucide-icons/lucide/0.469.0/LICENSE
+SHA256 1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc.
+Each individual SVG under src/orga_drone/static/vendor/lucide/ matches
+lucide-static 0.469.0 on jsDelivr. sprite.svg is assembled in this repository
+and is not a file at that package's icons/ path.
+
+ffmpeg-7.1-essentials-SOURCE-GAP.txt records the 2026-10-26 search of the
+GitHub release, the essentials zip, the codexffmpeg tag, and gyan.dev.
+Corresponding source was not in those places. The draft request to
+builds@gyan.dev is ffmpeg-7.1-essentials-SOURCE-REQUEST.txt. It has not
+been sent. Neither file clears the sale gate.
+
+leaflet.markercluster-MIT-LICENCE.txt is
+https://raw.githubusercontent.com/Leaflet/Leaflet.markercluster/v1.5.3/MIT-LICENCE.txt
+SHA256 3133dacd38250bd1f524d8166cc60a016a382522e062fce143691c65bf5e4b3d.
+The same bytes are the v1.5.2 file. The vendored JS and both CSS files match
+unpkg leaflet.markercluster 1.5.2 and 1.5.3 dist. They do not match 1.5.1.
+
+fontsource-OFL-1.1.txt is the LICENSE file of @fontsource/outfit 5.2.5,
+SHA256 18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3.
+@fontsource/sora 5.2.5 and @fontsource/ibm-plex-mono 5.2.6 contain the same
+LICENSE bytes. All bundled Outfit and Sora woff2 files match those packages'
+files/*-latin-*-normal.woff2. Both IBM Plex Mono woff2 files match 5.2.6.
+The same woff2 bytes also match the previous patch of each package. The
+LICENSE header attributes the fonts to Google Inc. and does not name
+reserved font names.
+
+These files are not an Orga Drone license. The project license stays MIT.

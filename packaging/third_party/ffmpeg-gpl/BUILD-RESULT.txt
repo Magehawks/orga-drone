@@ -1,0 +1,15 @@
+gcc 16.2.0 x86_64-w64-mingw32
+nasm NASM version 3.02 compiled on Jul  4 2026
+e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf */c/Users/Niwes/Projects/orga-drone-e2e-pr/packaging/third_party/ffmpeg-gpl/bin/ffmpeg.exe
+7200f6bf14b7bd39332488bb06aace7ed9641fa6d14aa5021c24d6ab95ed9ae0 */c/Users/Niwes/Projects/orga-drone-e2e-pr/packaging/third_party/ffmpeg-gpl/bin/ffprobe.exe
+ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers
+built with gcc 16.2.0 (Rev6, Built by MSYS2 project)
+configuration: --prefix=/tmp/orga-ffmpeg-gpl-build/prefix --target-os=mingw32 --arch=x86_64 --enable-gpl --enable-version3 --enable-static --disable-shared --disable-debug --disable-doc --disable-ffplay --enable-libx264 --enable-libfreetype --enable-libharfbuzz --pkg-config-flags=--static --extra-cflags=-I/tmp/orga-ffmpeg-gpl-build/prefix/include --extra-ldflags='-L/tmp/orga-ffmpeg-gpl-build/prefix/lib -static'
+libavutil      59. 39.100 / 59. 39.100
+libavcodec     61. 19.100 / 61. 19.100
+libavformat    61.  7.100 / 61.  7.100
+libavdevice    61.  3.100 / 61.  3.100
+libavfilter    10.  4.100 / 10.  4.100
+libswscale      8.  3.100 /  8.  3.100
+libswresample   5.  3.100 /  5.  3.100
+libpostproc    58.  3.100 / 58.  3.100
