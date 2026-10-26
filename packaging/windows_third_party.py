@@ -30,17 +30,30 @@ _REQUIRED_IN_NOTICES = (
     "ffmpeg-version.txt",
     "ffmpeg-buildconf.txt",
     "ffmpeg-sha256.txt",
+    "ffmpeg-7.1-essentials-GPLv3.txt",
+    "ffmpeg-7.1-essentials-README.txt",
     "imageio-ffmpeg-LICENSE",
+    "leaflet-1.9.4-BSD-2-Clause.txt",
+    "lucide-0.469.0-ISC.txt",
+    "pyinstaller-COPYING.txt",
     "reverse-geocoder-LGPL-2.1.txt",
     "reverse-geocoder/__init__.py",
     "reverse-geocoder/cKDTree_MP.py",
     "reverse-geocoder/METADATA",
     "reverse-geocoder/WHEEL_HAS_NO_LICENSE.txt",
+    "dist-info-without-license.txt",
 )
+
+# Byte-identical to thampiman/reverse-geocoder master on 2026-10-26.
+_GEOCODER_SOURCE_SHA256 = {
+    "__init__.py": "64b4a62906216d6aa9718fae3b6332f323fc589cb57a048b2be15b1ed6cc0640",
+    "cKDTree_MP.py": "932e77d70058e445a45773115dc22d939f07c2cbb91bc7a9433dc7b4b25b0cf9",
+}
+_MATCHING_FFMPEG_SHA256 = "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3"
+_FFMPEG_COMMIT = "b08d7969c5"
 
 _GPL_FLAGS = ("--enable-gpl", "--enable-version3", "--enable-libx264")
 _SOURCE_DIR = "ffmpeg-corresponding-source"
-_SOURCE_SHA = "SOURCE_SHA256.txt"
 
 
 @dataclass(frozen=True)
@@ -96,27 +109,39 @@ def itch_sale_blockers(
     notices: Path,
     wheel_license_in_bundle: bool,
     geocoder_source_in_bundle: bool,
+    geocoder_py_matches_upstream: bool,
     geocoder_wheel_license: str,
+    csv_in_bundle: bool,
+    missing_license_files: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Reasons the inspected build is not shown to be sellable on itch.io.
+    """Reasons this onefolder is not shown to be sellable on itch.io.
 
-    An empty result would be GO. This tree does not produce an empty result
-    for the gyan.dev GPL binary, and it does not treat an empty result as
-    legal advice.
+    An empty tuple would be GO. Nothing here treats GO as legal advice.
+    A README and a GPLv3 text do not clear the FFmpeg blocker.
     """
     blockers: list[str] = []
     present = [flag for flag in _GPL_FLAGS if flag in evidence.flags]
-    source_sha = notices / _SOURCE_DIR / _SOURCE_SHA
-    recorded = source_sha.read_text(encoding="utf-8").strip().lower() if source_sha.is_file() else ""
-    source_matches = recorded == evidence.sha256
-    configure = notices / _SOURCE_DIR / "configure"
-    if present and not (source_matches and configure.is_file()):
+    libraries = notices / _SOURCE_DIR / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt"
+    recorded = libraries.read_text(encoding="utf-8").strip().lower() if libraries.is_file() else ""
+    if present and not recorded.startswith(evidence.sha256):
+        identified = ""
+        if evidence.sha256 == _MATCHING_FFMPEG_SHA256:
+            identified = (
+                " This executable matches gyan.dev GitHub release 7.1 "
+                "ffmpeg-7.1-essentials_build.zip (2024-09-30), whose README says GPL v3 "
+                "and names FFmpeg commit "
+                + _FFMPEG_COMMIT
+                + ". That README lists external library versions and does not include "
+                "their source or the build scripts. A general upstream link is not "
+                "corresponding source. GPLv3 section 6c's written offer is only for "
+                "occasional noncommercial copies and was not attached to this binary."
+            )
         blockers.append(
             "Bundled ffmpeg configuration includes "
             + ", ".join(present)
-            + ". FFmpeg's own legal page says that using GPL parts makes the GPL apply to "
-            "FFmpeg, and it names libx264 as a GPL library. The zip has no corresponding "
-            "source whose SOURCE_SHA256.txt matches this binary."
+            + ". FFmpeg's legal page says GPL parts make the GPL apply to FFmpeg, and it "
+            "names libx264 as a GPL library. The zip does not contain corresponding source."
+            + identified
         )
     if not wheel_license_in_bundle:
         blockers.append(
@@ -130,17 +155,28 @@ def itch_sale_blockers(
             + repr(geocoder_wheel_license)
             + ", not the expected 'lgpl'."
         )
+    if not geocoder_py_matches_upstream:
+        blockers.append(
+            "reverse-geocoder .py files do not match the upstream master hashes recorded "
+            "for the LGPL-2.1 text shipped here."
+        )
     if not geocoder_source_in_bundle:
         blockers.append(
-            "reverse-geocoder 1.5.1 is frozen as bytecode. The wheel ships no LICENSE file "
-            "and no copyright header. Upstream master has an LGPL-2.1 LICENSE, but the wheel "
-            "was not proven to be that git revision. Copying the .py files into this folder "
-            "does not show that a recipient can replace the frozen copy."
+            "reverse-geocoder is frozen as bytecode. The wheel has no copyright header. "
+            "Copying the matching .py files into this folder does not show that a recipient "
+            "can replace the frozen copy."
         )
-    blockers.append(
-        "Packages other than ffmpeg, imageio-ffmpeg, and reverse-geocoder in this "
-        "onefolder were not audited. This verdict does not clear them."
-    )
+    if not csv_in_bundle:
+        blockers.append(
+            "rg_cities1000.csv from the reverse-geocoder wheel is not in the onefolder, "
+            "so offline place lookup in the frozen app is not shown."
+        )
+    if missing_license_files:
+        blockers.append(
+            "These bundled dist-info directories have no LICENSE or COPYING file: "
+            + ", ".join(missing_license_files)
+            + "."
+        )
     return tuple(blockers)
 
 
@@ -158,28 +194,67 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
     (notices / "ffmpeg-buildconf.txt").write_text(evidence.buildconf_text, encoding="utf-8", newline="\n")
     (notices / "ffmpeg-sha256.txt").write_text(evidence.sha256 + "\n", encoding="utf-8", newline="\n")
     shutil.copyfile(license_path, notices / "imageio-ffmpeg-LICENSE")
-    lgpl = _repo_root() / "packaging" / "third_party" / "reverse-geocoder-LGPL-2.1.txt"
-    if not lgpl.is_file():
-        raise FileNotFoundError(lgpl)
-    shutil.copyfile(lgpl, notices / "reverse-geocoder-LGPL-2.1.txt")
+    third_party = _repo_root() / "packaging" / "third_party"
+    for name in (
+        "reverse-geocoder-LGPL-2.1.txt",
+        "ffmpeg-7.1-essentials-GPLv3.txt",
+        "ffmpeg-7.1-essentials-README.txt",
+        "leaflet-1.9.4-BSD-2-Clause.txt",
+        "lucide-0.469.0-ISC.txt",
+    ):
+        src = third_party / name
+        if not src.is_file():
+            raise FileNotFoundError(src)
+        shutil.copyfile(src, notices / name)
+    shutil.copyfile(_pyinstaller_copying(), notices / "pyinstaller-COPYING.txt")
     source = notices / "reverse-geocoder"
     source.mkdir()
     for name, path in geocoder_files.items():
         shutil.copyfile(path, source / name)
+    py_matches = _geocoder_sources_match(source)
+    csv_in_bundle = _csv_outside_notices(bundle)
+    if csv_in_bundle:
+        (notices / "GEONAMES_ATTRIBUTION.txt").write_text(
+            "rg_cities1000.csv is shipped inside the reverse-geocoder wheel and, when "
+            "packaging collects it, inside this onefolder.\n"
+            "https://www.geonames.org/export/ says the GeoNames dump is under a Creative "
+            "Commons attribution license and that commercial use is allowed. The page "
+            "does not state the CC version number. Credit GeoNames when redistributing "
+            "this file: https://www.geonames.org/\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    missing_licenses = _missing_dist_info_licenses(bundle)
+    (notices / "dist-info-without-license.txt").write_text(
+        "\n".join(missing_licenses) + ("\n" if missing_licenses else ""),
+        encoding="utf-8",
+        newline="\n",
+    )
     (source / "WHEEL_HAS_NO_LICENSE.txt").write_text(
         "The installed reverse_geocoder wheel has no LICENSE file.\n"
         "Metadata License field: "
         + geocoder_license
         + "\n"
-        "The LGPL-2.1 text next to this directory was copied from upstream git master.\n"
-        "See packaging/third_party/PROVENANCE.txt. That copy does not prove the wheel "
-        "was built from that revision.\n",
+        "__init__.py and cKDTree_MP.py match upstream master SHA256 "
+        + str(py_matches).lower()
+        + ".\n"
+        "Expected __init__.py "
+        + _GEOCODER_SOURCE_SHA256["__init__.py"]
+        + "\n"
+        "Expected cKDTree_MP.py "
+        + _GEOCODER_SOURCE_SHA256["cKDTree_MP.py"]
+        + "\n"
+        "The LGPL-2.1 text applies to those matching sources. The wheel still has no "
+        "copyright header. Frozen bytecode is not a replaceable copy.\n",
         encoding="utf-8",
         newline="\n",
     )
     blockers = itch_sale_blockers(
         evidence,
         notices=notices,
+        geocoder_py_matches_upstream=py_matches,
+        csv_in_bundle=csv_in_bundle,
+        missing_license_files=missing_licenses,
         wheel_license_in_bundle=license_was_bundled,
         geocoder_source_in_bundle=geocoder_was_bundled,
         geocoder_wheel_license=geocoder_license,
@@ -208,6 +283,8 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         "Orga Drone remains MIT. These notices do not relicense it.\n"
         "imageio-ffmpeg's BSD-2-Clause license covers that Python package.\n"
         "It does not license the ffmpeg executable shipped in the wheel.\n"
+        "Leaflet 1.9.4's BSD-2-Clause text and Lucide 0.469.0's ISC text are included.\n"
+        "They do not license FFmpeg, and they do not change the sale verdict.\n"
         "ffmpeg -version and ffmpeg -buildconf were run on the bundled executable.\n"
         "Sale verdict: " + verdict + "\n",
         encoding="utf-8",
@@ -321,6 +398,40 @@ def _dist_info_file(dist_name: str, name: str) -> Path:
             if path.is_file():
                 return path
     raise FileNotFoundError(f"{dist_name} has no dist-info file {name}")
+
+
+def _pyinstaller_copying() -> Path:
+    return _dist_info_file("pyinstaller", "COPYING.txt")
+
+
+def _geocoder_sources_match(source: Path) -> bool:
+    for name, expected in _GEOCODER_SOURCE_SHA256.items():
+        digest = hashlib.sha256((source / name).read_bytes()).hexdigest()
+        if digest != expected:
+            return False
+    return True
+
+
+def _csv_outside_notices(bundle: Path) -> bool:
+    for path in bundle.rglob("rg_cities1000.csv"):
+        if path.is_file() and NOTICES not in path.parts:
+            return True
+    return False
+
+
+def _missing_dist_info_licenses(bundle: Path) -> tuple[str, ...]:
+    missing: list[str] = []
+    for info in sorted(bundle.rglob("*.dist-info")):
+        if not info.is_dir() or NOTICES in info.parts:
+            continue
+        found = False
+        for path in info.rglob("*"):
+            if path.is_file() and path.name.upper().startswith(("LICENSE", "COPYING")):
+                found = True
+                break
+        if not found:
+            missing.append(info.name)
+    return tuple(missing)
 
 
 def _repo_root() -> Path:

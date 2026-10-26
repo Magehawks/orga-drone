@@ -10,12 +10,29 @@ GitHub Release [v2.0.1](https://github.com/Magehawks/orga-drone/releases/tag/v2.
 PyInstaller zip for v2.0.1. The tag workflow that would have built one was
 cancelled before it uploaded a zip.
 
-## What was inspected instead
+## Local onefolder from the v2.0.1 tree
 
-A local onefolder built on 2026-10-26 from commit `1293622` (parent of the
-version bump; the only later change on `dc76af4` is the version string).
-The frozen `src` copy still says `__version__ = "2.0.0"`. This folder is
-not the GitHub Release artifact:
+On 2026-10-26 a Windows onefolder was built from this branch. `src/` is the
+same as `dc76af4`. The only bundle change before notices is that the spec
+also collects `reverse_geocoder` data files. The frozen copy says
+`__version__ = "2.0.1"`. The ffmpeg executable is
+`ffmpeg-win-x86_64-v7.1.exe`, 87638016 bytes, SHA256
+
+```text
+2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3
+```
+
+`rg_cities1000.csv` is at `_internal/reverse_geocoder/rg_cities1000.csv`.
+`python packaging/windows_third_party.py write` then `verify-zip` on that
+folder's zip printed `NO-GO` and exited 2. `dist-info-without-license.txt`
+was empty. The notices folder contains the GPLv3 text, the gyan README,
+PyInstaller `COPYING.txt`, the reverse-geocoder sources and LGPL-2.1 text,
+the Leaflet 1.9.4 BSD-2-Clause text, the Lucide 0.469.0 ISC text, and
+`GEONAMES_ATTRIBUTION.txt`. It does not contain FFmpeg's corresponding
+source. This zip was not uploaded and is not a GitHub Release asset.
+
+An earlier local folder from commit `1293622` still says
+`__version__ = "2.0.0"` and is not this build. Its ffmpeg path was:
 
 `dist-main/orga-drone/_internal/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe`
 
@@ -73,6 +90,57 @@ The BSD-2-Clause text for imageio-ffmpeg requires its copyright and
 conditions to stay with that package. That text was in the onefolder. It
 does not license the ffmpeg executable.
 
+## Identity of the FFmpeg binary
+
+`ffmpeg.exe` inside
+`https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip`
+(published 2024-09-30, tag `7.1`) has the same size (87638016) and the same
+SHA256 as the imageio-ffmpeg 0.6.0 Windows binary. That release says the
+FFmpeg source is commit `b08d7969c5`. The package README says **GPL v3** and
+lists external library versions, including `x264 v0.164.3192` and
+`x265 4.0-6-ga009ec077`. imageio-binaries stores the same bytes
+(`ffmpeg-win-x86_64-v7.1.exe`, renamed 2025-01-16 in `f8f64710`).
+
+Those files are copied into `packaging/third_party/`. They identify the
+binary. They are not the corresponding source: the static link also contains
+the listed libraries, and the zip has neither their source trees nor the
+build scripts. GPLv3 section 6c's written offer applies only to occasional
+noncommercial distribution and only when the binary was received with such
+an offer. This binary was not. A paid itch.io download cannot use that offer.
+No written offer is made here.
+
+7.1.1 was published later (2025-03-12) and is a different source commit.
+The library versions inside `ffmpeg -version` (`libavcodec 61.19.100` and
+the rest) stay the same across the 7.1 point releases, so the version line
+alone does not identify the commit. The hash match does.
+
+## reverse-geocoder wheel
+
+`__init__.py` and `cKDTree_MP.py` in reverse_geocoder 1.5.1 are byte-identical
+to `thampiman/reverse-geocoder` master on 2026-10-26
+(`64b4a629…` and `932e77d7…`). That tree's `LICENSE` is LGPL-2.1. The wheel
+does not ship it. The sources have no copyright header. A normal interpreter
+with the wheel resolves `(48.137154, 11.576124)` offline to Munich, DE,
+because `rg_cities1000.csv` sits beside the package. The earlier onefolder
+did not collect that CSV. The spec now collects reverse-geocoder data files.
+GeoNames' export page says the dump is under a Creative Commons attribution
+license and allows commercial use; it does not state the CC version.
+
+## Other bundled pieces
+
+`leaflet.js` matches unpkg `leaflet@1.9.4` `dist/leaflet.js`
+(SHA256 `db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a`).
+The BSD-2-Clause text from tag `v1.9.4` is stored and copied into the notices.
+Each individual Lucide SVG matches `lucide-static` 0.469.0. `sprite.svg` is
+assembled in this repository. The ISC text from tag `0.469.0` is copied into
+the notices.
+
+Leaflet.markercluster's vendored JS and CSS have no license header and no
+identified upstream revision, so no MIT text is attached. The font
+`NOTICE.txt` names the SIL Open Font License 1.1 for Outfit, Sora, and IBM
+Plex Mono. The full OFL text is not in the tree. Neither gap clears or
+creates the FFmpeg blocker.
+
 ## itch.io sale
 
 **NO-GO.**
@@ -80,15 +148,28 @@ does not license the ffmpeg executable.
 A sale of a Windows build of this application on itch.io is not supported
 by the evidence above:
 
-1. v2.0.1 published no Windows zip, so there is no v2.0.1 binary to sell.
-2. The onefolder that matches the current Windows build inputs contains a
-   GPL-configured ffmpeg 7.1 binary without corresponding source.
-3. reverse-geocoder is LGPL only as far as the wheel metadata and an
-   unproven match to upstream master. The frozen copy is bytecode, and
-   replacing it was not demonstrated.
-4. The other bundled packages (including PyInstaller, pythonnet, numpy,
-   scipy, Pillow, and pywebview) were not audited. Their presence blocks
-   any claim about the whole zip.
+1. The public v2.0.1 GitHub Release still has no Windows zip. A local
+   onefolder from that source tree was built and checked. `verify-zip`
+   exited 2. That zip was not published.
+2. The matched gyan.dev 7.1 essentials binary is GPL v3 and statically links
+   libraries such as libx264. The FFmpeg commit and the library version list
+   are known. Their source trees and the build scripts are not in the zip.
+   The GPLv3 text and the gyan README are identity evidence. A general
+   upstream link is not corresponding source, and GPLv3 section 6c does not
+   cover a paid itch.io copy.
+3. reverse-geocoder's two Python files match upstream master and that
+   LICENSE is LGPL-2.1. The frozen copy is still bytecode, so replacement
+   was not demonstrated. The CSV is now in the onefolder. A separate frozen
+   probe printed `CSV_EXISTS True` and then stopped with WinError 1455
+   (page file too small) before a place result. The same call in the
+   interpreter returned Munich, DE. The GeoNames CC version number is not
+   stated.
+4. PyInstaller's COPYING.txt, including the bootloader exception, is copied
+   into the notices. That text appears to allow embedding an unmodified
+   bootloader. This note does not treat the exception as a legal opinion.
+   Every bundled dist-info in the local v2.0.1 onefolder had a LICENSE or
+   COPYING file. A file being present is not a review of its terms.
+   Markercluster's revision and the full OFL text remain gaps.
 
 `packaging/windows_third_party.py` writes these notices into a future
 onefolder and makes `verify-zip` exit 2 while the verdict is NO-GO. The

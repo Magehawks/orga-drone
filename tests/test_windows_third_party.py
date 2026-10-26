@@ -53,36 +53,62 @@ def test_buildconf_must_repeat_the_version_flags() -> None:
         notices.require_buildconf(_VERSION, "configuration:\n    --enable-gpl\n")
 
 
-def test_gpl_binary_without_matching_source_is_no_go(tmp_path: Path) -> None:
-    blockers = notices.itch_sale_blockers(
-        _evidence(),
-        notices=tmp_path,
-        wheel_license_in_bundle=True,
-        geocoder_source_in_bundle=False,
-        geocoder_wheel_license="lgpl",
-    )
-    text = "\n".join(blockers)
+def _blockers(tmp_path: Path, **overrides: object) -> tuple[str, ...]:
+    values = {
+        "notices": tmp_path,
+        "wheel_license_in_bundle": True,
+        "geocoder_source_in_bundle": False,
+        "geocoder_py_matches_upstream": True,
+        "geocoder_wheel_license": "lgpl",
+        "csv_in_bundle": True,
+        "missing_license_files": (),
+    }
+    values.update(overrides)
+    return notices.itch_sale_blockers(_evidence(), **values)
+
+
+def test_gpl_binary_without_library_sources_is_no_go(tmp_path: Path) -> None:
+    text = "\n".join(_blockers(tmp_path))
     assert "--enable-gpl" in text
-    assert "corresponding source" in text
+    assert "does not contain corresponding source" in text
     assert "replace the frozen copy" in text
-    assert "were not audited" in text
+    assert "b08d7969c5" not in text
 
 
-def test_matching_source_hash_does_not_clear_the_other_blockers(tmp_path: Path) -> None:
-    source = tmp_path / "ffmpeg-corresponding-source"
-    source.mkdir()
-    (source / "SOURCE_SHA256.txt").write_text("abc\n", encoding="utf-8")
-    (source / "configure").write_text("#!/bin/sh\n", encoding="utf-8")
+def test_identified_gyan_binary_still_has_no_corresponding_source(tmp_path: Path) -> None:
+    evidence = notices.FfmpegEvidence(
+        sha256=notices._MATCHING_FFMPEG_SHA256,
+        version_text=_VERSION,
+        buildconf_text=_BUILDCONF,
+        flags=notices.configuration_flags(_VERSION),
+    )
     blockers = notices.itch_sale_blockers(
-        _evidence(),
+        evidence,
         notices=tmp_path,
         wheel_license_in_bundle=True,
         geocoder_source_in_bundle=True,
+        geocoder_py_matches_upstream=True,
         geocoder_wheel_license="lgpl",
+        csv_in_bundle=True,
+        missing_license_files=(),
     )
     text = "\n".join(blockers)
-    assert "corresponding source" not in text
-    assert "were not audited" in text
+    assert "b08d7969c5" in text
+    assert "not corresponding source" in text
+    source = tmp_path / "ffmpeg-corresponding-source"
+    source.mkdir()
+    (source / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt").write_text("not-the-hash\n", encoding="utf-8")
+    still = notices.itch_sale_blockers(
+        evidence,
+        notices=tmp_path,
+        wheel_license_in_bundle=True,
+        geocoder_source_in_bundle=True,
+        geocoder_py_matches_upstream=True,
+        geocoder_wheel_license="lgpl",
+        csv_in_bundle=True,
+        missing_license_files=(),
+    )
+    assert any("not corresponding source" in item for item in still)
 
 
 def test_verify_zip_exits_2_for_no_go(tmp_path: Path) -> None:
@@ -144,6 +170,18 @@ def test_write_notices_from_the_inspected_binary_stays_no_go(tmp_path: Path) -> 
     stored = (tmp_path / notices.NOTICES / "reverse-geocoder-LGPL-2.1.txt").read_bytes()
     upstream = (Path(__file__).resolve().parents[1] / "packaging" / "third_party" / "reverse-geocoder-LGPL-2.1.txt").read_bytes()
     assert stored == upstream
+    readme = (tmp_path / notices.NOTICES / "ffmpeg-7.1-essentials-README.txt").read_text(encoding="utf-8")
+    assert "b08d7969c5" in readme
+    assert "x264 v0.164.3192" in readme
+    gpl = (tmp_path / notices.NOTICES / "ffmpeg-7.1-essentials-GPLv3.txt").read_text(encoding="utf-8")
+    assert "GNU GENERAL PUBLIC LICENSE" in gpl
+    assert "Version 3, 29 June 2007" in gpl
+    copying = (tmp_path / notices.NOTICES / "pyinstaller-COPYING.txt").read_text(encoding="utf-8")
+    assert "Bootloader Exception" in copying
+    leaflet = (tmp_path / notices.NOTICES / "leaflet-1.9.4-BSD-2-Clause.txt").read_text(encoding="utf-8")
+    assert "Copyright (c) 2010-2023, Volodymyr Agafonkin" in leaflet
+    lucide = (tmp_path / notices.NOTICES / "lucide-0.469.0-ISC.txt").read_text(encoding="utf-8")
+    assert "Lucide Contributors 2022" in lucide
 
 
 def _windows_ffmpeg() -> Path | None:

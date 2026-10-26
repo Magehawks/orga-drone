@@ -16,6 +16,8 @@ datas = [
     (str(SRC / "locales"), "orga_drone/locales"),
 ]
 datas += collect_data_files("imageio_ffmpeg")
+# reverse_geocoder looks for rg_cities1000.csv beside its own file.
+datas += collect_data_files("reverse_geocoder")
 # pythonnet.load() needs filesystem __init__.py next to runtime/*.dll in the EXE.
 datas += collect_data_files("pythonnet", include_py_files=True)
 
