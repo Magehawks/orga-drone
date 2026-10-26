@@ -20,7 +20,10 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 1. Copy `0000-template.md` to `NNNN-short-title.md` (next free number).
 2. Fill Context / Decision / Consequences.
 3. Status starts as `Proposed`; set to `Accepted` when merged.
-4. Superseded decisions stay in place with a pointer to the replacement.
+4. A record that says merging does not adopt it stays `Proposed` until the
+   human accepts the decision itself. ADR 0024 is that kind of record: it
+   documents a license proposal and does not change `LICENSE`.
+5. Superseded decisions stay in place with a pointer to the replacement.
 
 ## Index
 
@@ -49,3 +52,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0021](0021-studio-section-repeat.md) | Studio video section repeat | Accepted |
 | [0022](0022-studio-telemetry-hud.md) | Studio telemetry HUD | Accepted |
 | [0023](0023-studio-flight-map.md) | Studio flight map without third-party tiles | Accepted |
+| [0024](0024-licensing-model-proposal.md) | Licensing model for paid Windows builds | Proposed (not a license change) |

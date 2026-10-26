@@ -115,3 +115,5 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). Be respectf
 ## License
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
+
+**DRAFT — not in effect.** [ADR 0024](docs/decisions/0024-licensing-model-proposal.md) proposes a future model for official Windows builds. That proposal is not adopted. Contributions are still accepted under MIT. Published tags `v1.1.0` through `v2.0.0` stay MIT.

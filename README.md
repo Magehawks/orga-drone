@@ -334,3 +334,10 @@ If video browsing feels heavy under Windows Defender, exclude the unzipped `orga
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+**DRAFT — not in effect.** A future licensing model for official Windows
+builds is proposed in
+[ADR 0024](docs/decisions/0024-licensing-model-proposal.md) and is not
+adopted. This note is not a license. The MIT License still governs this
+repository. Published tags `v1.1.0` through `v2.0.0`, including the source
+at `v2.0.0` and the public `v1.9.0` Windows zip, stay MIT.
