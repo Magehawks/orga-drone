@@ -91,6 +91,14 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           pyinstaller packaging/orga-drone.spec --noconfirm --clean --distpath dist
+          $built = "packaging\third_party\ffmpeg-gpl\bin\ffmpeg.exe"
+          if (Test-Path $built) {
+            $targets = Get-ChildItem -Path "dist\orga-drone" -Recurse -File -Filter "ffmpeg*.exe"
+            if (-not $targets) { throw "PyInstaller collected no ffmpeg.exe to replace" }
+            foreach ($target in $targets) {
+              Copy-Item $built $target.FullName -Force
+            }
+          }
 
       - name: Check bundle layout
         shell: pwsh

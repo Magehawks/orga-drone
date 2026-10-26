@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import webbrowser
+from pathlib import Path
 from threading import Timer
 from typing import Any
 
@@ -124,8 +125,34 @@ def _run_desktop(host: str, port: int) -> None:
     )
 
 
+def _geocode_probe() -> None:
+    """Write one offline lookup. Used to show the frozen LGPL modules are the ones that run."""
+    import reverse_geocoder
+
+    from orga_drone.geocode import lookup_offline
+
+    place = lookup_offline(48.137154, 11.576124)
+    lines = [
+        f"module {reverse_geocoder.__file__}",
+        f"author {reverse_geocoder.__author__}",
+        f"city {place.city if place else ''}",
+        f"region {place.region if place else ''}",
+        f"cc {place.country_code if place else ''}",
+    ]
+    text = "\n".join(lines) + "\n"
+    if getattr(sys, "frozen", False):
+        dest = Path(sys.executable).resolve().parent / "geocode-probe.txt"
+    else:
+        dest = Path.cwd() / "geocode-probe.txt"
+    dest.write_text(text, encoding="utf-8")
+
+
 def main() -> None:
     from orga_drone.config import is_packaged, settings
+
+    if _env_truthy("ORGA_DRONE_GEOCODE_PROBE"):
+        _geocode_probe()
+        return
 
     # Must run before any uvicorn.Config / uvicorn.run (windowed EXE: stdout is None).
     _prepare_runtime()

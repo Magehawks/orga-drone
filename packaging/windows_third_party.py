@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.metadata
+import shlex
 import shutil
 import subprocess
 import sys
@@ -72,7 +73,9 @@ def configuration_flags(version_text: str) -> tuple[str, ...]:
     for line in version_text.splitlines():
         stripped = line.strip()
         if stripped.startswith("configuration:"):
-            flags = tuple(part for part in stripped.split()[1:] if part.startswith("--"))
+            flags = tuple(
+                part for part in shlex.split(stripped, posix=True)[1:] if part.startswith("--")
+            )
             if not flags:
                 raise ValueError("ffmpeg configuration line has no flags")
             return flags
@@ -80,9 +83,13 @@ def configuration_flags(version_text: str) -> tuple[str, ...]:
 
 
 def buildconf_flags(buildconf_text: str) -> tuple[str, ...]:
-    flags = tuple(
-        line.strip() for line in buildconf_text.splitlines() if line.strip().startswith("--")
-    )
+    flags_list: list[str] = []
+    for line in buildconf_text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("--"):
+            continue
+        flags_list.extend(part for part in shlex.split(stripped, posix=True) if part.startswith("--"))
+    flags = tuple(flags_list)
     if not flags:
         raise ValueError("ffmpeg -buildconf has no flags")
     return flags
@@ -115,6 +122,7 @@ def itch_sale_blockers(
     geocoder_py_matches_upstream: bool,
     geocoder_wheel_license: str,
     csv_in_bundle: bool,
+    geonames_csv_matches: bool,
     missing_license_files: tuple[str, ...],
 ) -> tuple[str, ...]:
     """Reasons this onefolder is not shown to be sellable on itch.io.
@@ -124,9 +132,7 @@ def itch_sale_blockers(
     """
     blockers: list[str] = []
     present = [flag for flag in _GPL_FLAGS if flag in evidence.flags]
-    libraries = notices / _SOURCE_DIR / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt"
-    recorded = libraries.read_text(encoding="utf-8").strip().lower() if libraries.is_file() else ""
-    if present and not recorded.startswith(evidence.sha256):
+    if present and not _corresponding_source_matches(notices, evidence.sha256):
         identified = ""
         if evidence.sha256 == _MATCHING_FFMPEG_SHA256:
             identified = (
@@ -171,8 +177,13 @@ def itch_sale_blockers(
         )
     if not csv_in_bundle:
         blockers.append(
-            "rg_cities1000.csv from the reverse-geocoder wheel is not in the onefolder, "
+            "rg_cities1000.csv from the dated GeoNames extract is not in the onefolder, "
             "so offline place lookup in the frozen app is not shown."
+        )
+    elif not geonames_csv_matches:
+        blockers.append(
+            "rg_cities1000.csv in the onefolder does not match the GeoNames cities1000 "
+            "extract retrieved on 2026-10-26."
         )
     if missing_license_files:
         blockers.append(
@@ -220,19 +231,17 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
     py_matches = _geocoder_sources_match(source)
     csv_in_bundle = _csv_outside_notices(bundle)
     if csv_in_bundle:
+        provenance = _repo_root() / "packaging" / "third_party" / "geonames" / "PROVENANCE.txt"
+        attribution = provenance.read_text(encoding="utf-8") if provenance.is_file() else ""
+        match = "matches" if _geonames_csv_matches(bundle) else "does not match"
         (notices / "GEONAMES_ATTRIBUTION.txt").write_text(
-            "rg_cities1000.csv is shipped inside the reverse-geocoder wheel and, when "
-            "packaging collects it, inside this onefolder.\n"
-            "https://www.geonames.org/export/ says the data is under a Creative Commons "
-            "attribution license and that commercial use is allowed. "
-            "https://download.geonames.org/export/dump/readme.txt retrieved 2026-10-26 "
-            "says the gazetteer extract files are Creative Commons Attribution 4.0. "
-            "The bundled CSV is the reduced reverse_geocoder 1.5.1 file, has no license "
-            "header, and was not hash-matched to a dated dump. Credit GeoNames: "
-            "https://www.geonames.org/\n",
+            "rg_cities1000.csv " + match + " the GeoNames cities1000 extract retrieved "
+            "on 2026-10-26. The dump readme states Creative Commons Attribution 4.0. "
+            "Credit GeoNames: https://www.geonames.org/\n\n" + attribution,
             encoding="utf-8",
             newline="\n",
         )
+    _publish_corresponding_source(notices, evidence)
     missing_licenses = _missing_dist_info_licenses(bundle)
     (notices / "dist-info-without-license.txt").write_text(
         "\n".join(missing_licenses) + ("\n" if missing_licenses else ""),
@@ -263,6 +272,7 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         notices=notices,
         geocoder_py_matches_upstream=py_matches,
         csv_in_bundle=csv_in_bundle,
+        geonames_csv_matches=_geonames_csv_matches(bundle),
         missing_license_files=missing_licenses,
         wheel_license_in_bundle=license_was_bundled,
         geocoder_source_in_bundle=geocoder_was_bundled,
@@ -297,6 +307,17 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
     lines.extend("- " + item for item in _open_legal_questions())
     text = "\n".join(lines) + "\n"
     (notices / VERDICT_NAME).write_text(text, encoding="utf-8", newline="\n")
+    if _corresponding_source_matches(notices, evidence.sha256):
+        ffmpeg_note = (
+            "ffmpeg-corresponding-source/ holds the pinned tarballs and build-win64.sh\n"
+            "for the bundled executable. ffmpeg-7.1-essentials-SOURCE-GAP.txt describes\n"
+            "the older gyan.dev binary and does not describe this executable.\n"
+        )
+    else:
+        ffmpeg_note = (
+            "ffmpeg-7.1-essentials-SOURCE-GAP.txt records the missing corresponding source.\n"
+            "That gap file does not clear the sale verdict.\n"
+        )
     (notices / "README.txt").write_text(
         "Notices collected from the onefolder and the wheels used to build it.\n"
         "Orga Drone remains MIT. These notices do not relicense it.\n"
@@ -304,9 +325,8 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         "It does not license the ffmpeg executable shipped in the wheel.\n"
         "Leaflet 1.9.4, Leaflet.markercluster 1.5.2/1.5.3, Lucide 0.469.0, and the\n"
         "matched Fontsource OFL text are included. They do not license FFmpeg.\n"
-        "ffmpeg-7.1-essentials-SOURCE-GAP.txt records the missing corresponding source.\n"
-        "That gap file does not clear the sale verdict.\n"
-        "ffmpeg -version and ffmpeg -buildconf were run on the bundled executable.\n"
+        + ffmpeg_note
+        + "ffmpeg -version and ffmpeg -buildconf were run on the bundled executable.\n"
         "Sale verdict: " + verdict + "\n",
         encoding="utf-8",
         newline="\n",
@@ -433,11 +453,99 @@ def _geocoder_sources_match(source: Path) -> bool:
     return True
 
 
+def _dated_geonames_csv() -> Path:
+    return _repo_root() / "src" / "orga_drone" / "geocode" / "rg_cities1000.csv"
+
+
+def _bundled_geonames_csvs(bundle: Path) -> list[Path]:
+    return [
+        path
+        for path in bundle.rglob("rg_cities1000.csv")
+        if path.is_file() and NOTICES not in path.parts
+    ]
+
+
 def _csv_outside_notices(bundle: Path) -> bool:
-    for path in bundle.rglob("rg_cities1000.csv"):
-        if path.is_file() and NOTICES not in path.parts:
-            return True
-    return False
+    return bool(_bundled_geonames_csvs(bundle))
+
+
+def _geonames_csv_matches(bundle: Path) -> bool:
+    found = _bundled_geonames_csvs(bundle)
+    dated = _dated_geonames_csv()
+    if len(found) != 1 or not dated.is_file():
+        return False
+    return hashlib.sha256(found[0].read_bytes()).digest() == hashlib.sha256(dated.read_bytes()).digest()
+
+
+def _tarball_digests() -> tuple[str, ...]:
+    sums = _repo_root() / "packaging" / "third_party" / "ffmpeg-gpl" / "SHA256SUMS"
+    digests: list[str] = []
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        digests.append(stripped.split()[0])
+    return tuple(digests)
+
+
+def _publish_corresponding_source(notices: Path, evidence: FfmpegEvidence) -> None:
+    """Copy the pinned tarballs when this onefolder contains that built ffmpeg."""
+    root = _repo_root() / "packaging" / "third_party" / "ffmpeg-gpl"
+    built = root / "bin" / "ffmpeg.exe"
+    if not built.is_file():
+        return
+    if hashlib.sha256(built.read_bytes()).hexdigest() != evidence.sha256:
+        return
+    dest = notices / _SOURCE_DIR
+    dest.mkdir(parents=True, exist_ok=True)
+    lines = [evidence.sha256, ""]
+    for digest, name in _tarball_lines():
+        src = root / "tarballs" / name
+        if hashlib.sha256(src.read_bytes()).hexdigest() != digest:
+            raise RuntimeError(f"pinned tarball hash mismatch: {name}")
+        shutil.copyfile(src, dest / name)
+        lines.append(f"{digest}  {name}")
+    for name in ("build-win64.sh", "SHA256SUMS"):
+        shutil.copyfile(root / name, dest / name)
+    license_dir = root / "licenses"
+    if license_dir.is_dir():
+        for path in sorted(license_dir.iterdir()):
+            if path.is_file():
+                shutil.copyfile(path, dest / path.name)
+                lines.append(f"license {path.name}")
+    result = root / "BUILD-RESULT.txt"
+    if result.is_file():
+        shutil.copyfile(result, dest / result.name)
+    lines.append("")
+    lines.append("Build script: build-win64.sh")
+    lines.append("Compiler packages are general-purpose MSYS2 tools and are named in BUILD-RESULT.txt.")
+    (dest / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _tarball_lines() -> tuple[tuple[str, str], ...]:
+    sums = _repo_root() / "packaging" / "third_party" / "ffmpeg-gpl" / "SHA256SUMS"
+    rows: list[tuple[str, str]] = []
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        digest, name = stripped.split()
+        rows.append((digest, name))
+    return tuple(rows)
+
+
+def _corresponding_source_matches(notices: Path, exe_sha: str) -> bool:
+    libraries = notices / _SOURCE_DIR / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt"
+    if not libraries.is_file():
+        return False
+    text = libraries.read_text(encoding="utf-8")
+    if not text.startswith(exe_sha):
+        return False
+    return all(digest in text for digest in _tarball_digests())
 
 
 def _missing_dist_info_licenses(bundle: Path) -> tuple[str, ...]:
@@ -458,11 +566,6 @@ def _missing_dist_info_licenses(bundle: Path) -> tuple[str, ...]:
 def _open_legal_questions() -> tuple[str, ...]:
     return (
         "The effect of a separate ffmpeg process on the MIT application is undecided.",
-        "Whether copied reverse-geocoder .py files satisfy LGPL-2.1 section 6 for a "
-        "PyInstaller PYZ is undecided. WinError 1455 during a frozen probe was a "
-        "page-file failure, not a license finding.",
-        "rg_cities1000.csv was not hash-matched to a GeoNames dump. The dump readme "
-        "retrieved on 2026-10-26 says the extract files are CC BY 4.0.",
         "The PyInstaller bootloader exception is included as text. Its legal effect "
         "is undecided.",
     )

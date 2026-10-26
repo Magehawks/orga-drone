@@ -47,10 +47,14 @@ export already falls back to `ffmpeg -i` when ffprobe is absent.
 
 Before the zip is uploaded, `packaging/windows_third_party.py` runs the
 bundled ffmpeg, copies the notices it can actually read, and writes
-`THIRD_PARTY_NOTICES/ITCH_SALE_VERDICT.txt`. `verify-zip` exits 2 while that
-verdict is NO-GO, and the workflow stops before the upload. The evidence and
-the current NO-GO are in `packaging/WINDOWS_THIRD_PARTY.md`. That file is not
-a compliance certificate. The project license stays MIT.
+`THIRD_PARTY_NOTICES/ITCH_SALE_VERDICT.txt`. `verify-zip` exits 0 when that
+verdict is GO and exits 2 when it is NO-GO. The workflow stops before the
+upload on any non-zero exit. When
+`packaging/third_party/ffmpeg-gpl/bin/ffmpeg.exe` is present, the workflow
+copies it over the imageio-ffmpeg binary. Without that file the wheel binary
+stays in the zip and the verdict stays NO-GO. The evidence is in
+`packaging/WINDOWS_THIRD_PARTY.md`. That file is not a compliance certificate.
+The project license stays MIT.
 
 The exe is built with `console=False` (no black console window). For debugging a build,
 temporarily set `console=True` in `orga-drone.spec`.
@@ -77,7 +81,7 @@ system browser. Rebuild and publish a new release so end users get double-click 
 
 User data stays outside the binary (`%APPDATA%/orga-drone`). Do not embed library paths, `.env`, or media in artifacts.
 
-Offline reverse geocoding (`reverse-geocoder`, for scan auto-tags) is bundled — no network required. Set `ORGA_DRONE_GEOCODE=off` to disable place lookup.
+Offline reverse geocoding (`reverse-geocoder`, for scan auto-tags) uses the dated GeoNames extract beside `orga_drone.geocode` — no network required. Set `ORGA_DRONE_GEOCODE=off` to disable place lookup.
 
 Media files are always streamed from the configured library roots on disk — never from
 `sys._MEIPASS`. Only UI assets (templates/static/locales) live in the package.

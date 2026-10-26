@@ -1,0 +1,12 @@
+GeoNames gazetteer extract retrieved 2026-10-26 from
+https://download.geonames.org/export/dump/
+readme.txt in this directory states Creative Commons Attribution 4.0.
+https://creativecommons.org/licenses/by/4.0/
+The formatted CSV uses the reverse_geocoder 1.5.1 column mapping.
+rows 171654
+
+289fa72adcf173bdd3ae23b12f2e4a63d29c096877eb3eba54a595fa26abc73f  upstream/cities1000.zip  11083154
+2e4867f5397acb056ea26377601b57af37cb4c81399770225018e9e439e91ad3  upstream/admin1CodesASCII.txt  151571
+80ebc9e9b8f1ff538023e27b0294ffbb9aa8fe153cc14ab8120de2af7026f513  upstream/admin2Codes.txt  2371940
+b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5  upstream/readme.txt  8843
+ccff799ddc2f2be84213cdd50abf9baab8c5cd061be2b4817261bd7082961c22  src/orga_drone/geocode/rg_cities1000.csv  9900190

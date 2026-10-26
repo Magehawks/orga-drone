@@ -15,6 +15,17 @@ from orga_drone.db import Database
 from orga_drone.geocode import PlaceResult, round_coord
 
 
+def test_dated_geonames_lookup_finds_munich() -> None:
+    from orga_drone.geocode import lookup_offline
+
+    place = lookup_offline(48.137154, 11.576124)
+    assert place is not None
+    assert place.city == "Munich"
+    assert place.region == "Bavaria"
+    assert place.country_code == "DE"
+    assert place.country == "Germany"
+
+
 def test_time_tags_from_recorded_at() -> None:
     assert time_tags_from_recorded_at("2025-11-05T10:00:00") == ["2025", "2025-11"]
     assert time_tags_from_recorded_at(None) == []
@@ -47,7 +58,7 @@ def test_geocode_cache_hit(tmp_path: Path) -> None:
     lon_key = round_coord(lon)
     db.upsert_geocode_cache(lat_key, lon_key, place)
 
-    with patch("orga_drone.geocode._lookup_offline") as lookup:
+    with patch("orga_drone.geocode.lookup_offline") as lookup:
         from orga_drone.geocode import resolve
 
         hit = resolve(db, lat, lon, mode="offline")

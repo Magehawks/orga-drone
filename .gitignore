@@ -37,6 +37,9 @@ desktop.ini
 !.cursor/rules/
 !.cursor/rules/**
 
+# ffprobe is produced by the same build and is not the bundled encoder.
+packaging/third_party/ffmpeg-gpl/bin/ffprobe.exe
+
 # Packaging / PyInstaller
 *.spec
 !packaging/*.spec

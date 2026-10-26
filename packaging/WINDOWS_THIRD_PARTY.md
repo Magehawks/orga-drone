@@ -122,7 +122,8 @@ to `thampiman/reverse-geocoder` master on 2026-10-26
 does not ship it. The sources have no copyright header. A normal interpreter
 with the wheel resolves `(48.137154, 11.576124)` offline to Munich, DE,
 because `rg_cities1000.csv` sits beside the package. The earlier onefolder
-did not collect that CSV. The spec now collects reverse-geocoder data files.
+did not collect that CSV. A later spec change collected the wheel CSV.
+The current spec does not. See the controlled build below.
 GeoNames' export page says the data is under a Creative Commons attribution
 license and allows commercial use. The dump readme at
 `https://download.geonames.org/export/dump/readme.txt`, retrieved 2026-10-26,
@@ -167,40 +168,117 @@ to `ffmpeg-7.1-essentials-SOURCE-GAP.txt`. A draft request to `builds@gyan.dev`
 is `ffmpeg-7.1-essentials-SOURCE-REQUEST.txt`. It has not been sent. Neither
 file clears the gate.
 
+The sections above describe the imageio-ffmpeg / gyan.dev binary. That binary
+is not the encoder in the controlled build below. Shipping it still fails
+`verify-zip`.
+
+## Controlled GPL build checked on 2026-10-26
+
+An LGPL FFmpeg without libx264 does not meet the current export command.
+`studio_encoder.py` sets `-c:v libx264 -preset veryfast`. The HUD uses
+`drawtext` with `fontfile`. FFmpeg 7.1 builds `drawtext` only when both
+libfreetype and libharfbuzz are enabled. `filter_script` and
+`filter_complex_script` are still present in 7.1. They are not present in
+current FFmpeg master, so the pin is 7.1 rather than a newer release.
+
+The build is `packaging/third_party/ffmpeg-gpl/build-win64.sh`, run in MSYS2
+mingw64 (gcc 16.2.0, nasm 3.02, meson 1.12.1, ninja 1.13.2). It checks
+`SHA256SUMS`, then builds static zlib 1.3.1, libpng 1.6.49, FreeType 2.13.3,
+HarfBuzz 15.0.0, x264 `b35605ace3ddf7c1a5d67a2eb553f034aef41d55`, and FFmpeg
+7.1 with `--enable-gpl --enable-version3 --enable-static --enable-libx264
+--enable-libfreetype --enable-libharfbuzz`. Those tarballs and their license
+texts are in `packaging/third_party/ffmpeg-gpl/`. The compiler packages are
+unmodified general-purpose tools, recorded by version. They are not vendored.
+A bit-for-bit rebuild is not claimed.
+
+The built `ffmpeg.exe` is 29928960 bytes, SHA256
+
+```text
+e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf
+```
+
+`ffmpeg -version` on that file prints `ffmpeg version 7.1`, gcc 16.2.0, and
+the flags above. A one-second lavfi encode with `drawtext` and
+`-c:v libx264 -preset veryfast` produced an MP4. `pytest` with this binary
+first on `PATH` was 549 passed. That run includes the existing Studio export
+tests. It is not a click-through of the windowed app.
+
+The onefolder `dist/orga-drone` (`__version__ = "2.0.1"`) replaces the
+collected imageio binary with this file. PyInstaller collects
+`reverse_geocoder` as source (`module_collection_mode` `py`). The wheel CSV
+is not collected. The dated extract is
+`_internal/orga_drone/geocode/rg_cities1000.csv` (9,900,190 bytes).
+
+`ORGA_DRONE_GEOCODE_PROBE=1` on the windowed exe wrote `geocode-probe.txt`
+beside the exe: module path
+`_internal/reverse_geocoder/__init__.py`, author `Ajay Thampi`, city
+`Munich`, region `Bavaria`, cc `DE`, exit 0. After that author string in the
+loose `.py` was changed to `Ajay Thampi REPLACED`, a second probe printed the
+new author and still printed Munich. The original `.py` bytes were restored.
+The probe hook is for this check. It is not a user feature.
+
+The place file is the GeoNames `cities1000.zip` retrieved 2026-10-26, formatted
+the same way as reverse-geocoder 1.5.1. `readme.txt` from that download says
+CC BY 4.0. Hashes are in `packaging/third_party/geonames/PROVENANCE.txt`.
+`LOOKUP_DIFFERENCES.txt` records the comparison with the old wheel CSV.
+Munich and New York City stayed the same. A sample of 200 coordinates had
+108 different nearest rows, mostly a closer place or a filled admin name.
+San Francisco's sample point moved to Chinatown; London's to Church Street;
+Tokyo's to Eifuku.
+
+`python packaging/windows_third_party.py write dist/orga-drone` printed `GO`.
+The zip `dist/orga-drone-windows-x64.zip` (133,304,496 bytes) then printed
+`GO` from `verify-zip` and exited 0. The notices include
+`ffmpeg-corresponding-source/` with the pinned tarballs, `build-win64.sh`,
+`SHA256SUMS`, the license texts, and
+`LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt` starting with the exe SHA256 above.
+That zip was not uploaded. The public GitHub Release v2.0.1 still has no
+assets. The MOTW smoke in the draft-release notes has not been run on this
+zip.
+
+## What the gate treats as shown
+
+Mandatory for this script's GO, and present in the zip above:
+
+- the GPL text for the FFmpeg executable that is actually bundled
+- the pinned library tarballs, the build script, and the SHA256 list for
+  that executable
+- reverse-geocoder as replaceable `.py`, demonstrated by editing the file
+  the frozen exe loaded
+- the LGPL-2.1 text
+- the dated GeoNames extract, its CC BY 4.0 attribution, and a hash match
+  against the file in the onefolder
+
+Not claimed:
+
+- bit-for-bit reproduction of `ffmpeg.exe` from those tarballs on another
+  machine. The script records the sources and the script. It does not require
+  the MSYS2 toolchain to be inside the zip.
+- a legal opinion. The verdict still says it is not one.
+
+Still open, and still not a switch for GO or NO-GO:
+
+- whether starting ffmpeg as a separate process makes the MIT application a
+  GPL work
+- the legal effect of the PyInstaller bootloader exception, whose text is
+  copied into the notices
+
 ## itch.io sale
 
-**NO-GO.**
+**GO for this local zip's technical gate. Not published.**
 
-A sale of a Windows build of this application on itch.io is not supported
-by the evidence above:
-
-1. The public v2.0.1 GitHub Release still has no Windows zip. A local
-   onefolder from that source tree was built and checked. `verify-zip`
-   exited 2. That zip was not published.
-2. The matched gyan.dev 7.1 essentials binary is GPL v3 and statically links
-   libraries such as libx264. The FFmpeg commit and the library version list
-   are known. Their source trees and the build scripts are not in the zip.
-   The GPLv3 text and the gyan README are identity evidence. A general
-   upstream link is not corresponding source, and GPLv3 section 6c does not
-   cover a paid itch.io copy.
-3. reverse-geocoder's two Python files match upstream master and that
-   LICENSE is LGPL-2.1. The frozen copy is still bytecode, so replacement
-   was not demonstrated. The CSV is in the onefolder. A separate frozen
-   probe printed `CSV_EXISTS True` and then stopped with WinError 1455
-   (page file too small) before a place result. That error is a machine
-   limit, not a license blocker. The same call in the interpreter returned
-   Munich, DE. The current GeoNames dump readme says CC BY 4.0; the wheel
-   CSV was not hash-matched to a dump.
-4. PyInstaller's COPYING.txt, including the bootloader exception, is copied
-   into the notices. The verdict lists that exception, the separate-process
-   question, the LGPL replacement question, and the unmatched GeoNames file
-   as open legal questions. Those lines do not change the verdict, and a
-   technical GO would not be a legal opinion. Every bundled dist-info in
-   the local v2.0.1 onefolder had a LICENSE or COPYING file. A file being
-   present is not a review of its terms. Markercluster 1.5.2/1.5.3 and the
-   matched Fontsource OFL text are now included.
-
-`packaging/windows_third_party.py` writes these notices into a future
-onefolder and makes `verify-zip` exit 2 while the verdict is NO-GO. The
-Windows release workflow stops before uploading that zip. Exit 2 is the
-missing proof. It is not a finding that a different build would be lawful.
+1. The gyan.dev 7.1 essentials binary remains NO-GO. This candidate does not
+   ship it. `verify-zip` on `dist/orga-drone-windows-x64.zip` exited 0.
+2. Corresponding source for the bundled executable is the pinned tarball set
+   and `build-win64.sh`, copied into the notices and tied to SHA256
+   `e9041e42…`. A written offer under GPLv3 section 6c is not used.
+3. reverse-geocoder's loose sources were loaded by the frozen exe, and
+   editing them changed the probe output. The place file is the 2026-10-26
+   GeoNames extract, not the undated wheel CSV. Lookup differences are
+   listed in `LOOKUP_DIFFERENCES.txt`.
+4. The separate-process question and the bootloader-exception question stay
+   in the verdict. They do not flip it. A technical GO is not a legal opinion.
+5. No itch.io upload and no change to the public GitHub Release were made.
+   The Windows release workflow still uploads only a draft, and only after a
+   tag whose `verify-zip` exits 0. The human MOTW check named in that draft
+   has not been run on this zip.

@@ -48,6 +48,23 @@ def test_configuration_line_keeps_gpl_flags() -> None:
     )
 
 
+def test_quoted_linker_flag_matches_buildconf() -> None:
+    version = (
+        "ffmpeg version 7.1\n"
+        "configuration: --enable-gpl --enable-libx264 "
+        "--extra-ldflags='-L/tmp/prefix/lib -static'\n"
+    )
+    buildconf = (
+        "configuration:\n"
+        "    --enable-gpl\n"
+        "    --enable-libx264\n"
+        "    --extra-ldflags='-L/tmp/prefix/lib -static'\n"
+    )
+    flags = notices.require_buildconf(version, buildconf)
+    assert "--enable-libx264" in flags
+    assert any(flag.startswith("--extra-ldflags=") for flag in flags)
+
+
 def test_buildconf_must_repeat_the_version_flags() -> None:
     with pytest.raises(ValueError, match="missing flags"):
         notices.require_buildconf(_VERSION, "configuration:\n    --enable-gpl\n")
@@ -61,6 +78,7 @@ def _blockers(tmp_path: Path, **overrides: object) -> tuple[str, ...]:
         "geocoder_py_matches_upstream": True,
         "geocoder_wheel_license": "lgpl",
         "csv_in_bundle": True,
+        "geonames_csv_matches": False,
         "missing_license_files": (),
     }
     values.update(overrides)
@@ -90,6 +108,7 @@ def test_identified_gyan_binary_still_has_no_corresponding_source(tmp_path: Path
         geocoder_py_matches_upstream=True,
         geocoder_wheel_license="lgpl",
         csv_in_bundle=True,
+        geonames_csv_matches=False,
         missing_license_files=(),
     )
     text = "\n".join(blockers)
@@ -106,9 +125,55 @@ def test_identified_gyan_binary_still_has_no_corresponding_source(tmp_path: Path
         geocoder_py_matches_upstream=True,
         geocoder_wheel_license="lgpl",
         csv_in_bundle=True,
+        geonames_csv_matches=False,
         missing_license_files=(),
     )
     assert any("not corresponding source" in item for item in still)
+
+
+def test_exe_sha_without_pinned_tarball_hashes_stays_blocked(tmp_path: Path) -> None:
+    source = tmp_path / "ffmpeg-corresponding-source"
+    source.mkdir()
+    (source / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt").write_text(
+        notices._MATCHING_FFMPEG_SHA256 + "\n",
+        encoding="utf-8",
+    )
+    blockers = notices.itch_sale_blockers(
+        notices.FfmpegEvidence(
+            sha256=notices._MATCHING_FFMPEG_SHA256,
+            version_text=_VERSION,
+            buildconf_text=_BUILDCONF,
+            flags=notices.configuration_flags(_VERSION),
+        ),
+        notices=tmp_path,
+        wheel_license_in_bundle=True,
+        geocoder_source_in_bundle=True,
+        geocoder_py_matches_upstream=True,
+        geocoder_wheel_license="lgpl",
+        csv_in_bundle=True,
+        geonames_csv_matches=True,
+        missing_license_files=(),
+    )
+    assert any("not corresponding source" in item for item in blockers)
+
+
+def test_pinned_tarball_list_clears_the_ffmpeg_blocker(tmp_path: Path) -> None:
+    source = tmp_path / "ffmpeg-corresponding-source"
+    source.mkdir()
+    body = "abc\n" + "\n".join(notices._tarball_digests()) + "\n"
+    (source / "LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt").write_text(body, encoding="utf-8")
+    blockers = notices.itch_sale_blockers(
+        _evidence("abc"),
+        notices=tmp_path,
+        wheel_license_in_bundle=True,
+        geocoder_source_in_bundle=True,
+        geocoder_py_matches_upstream=True,
+        geocoder_wheel_license="lgpl",
+        csv_in_bundle=True,
+        geonames_csv_matches=True,
+        missing_license_files=(),
+    )
+    assert blockers == ()
 
 
 def test_verify_zip_exits_2_for_no_go(tmp_path: Path) -> None:
