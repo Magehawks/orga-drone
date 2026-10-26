@@ -1032,10 +1032,21 @@
   <form method="dialog" class="studio-export-form" id="studio-export-form">
     <h2>{{ _('Export memory') }}</h2>
     <p class="hint">{{ _('Choose an export resolution up to your highest source video. Source files are never modified.') }}</p>
-    <label class="studio-inspector-field" for="studio-export-resolution">
-      <span>{{ _('Resolution') }}</span>
-      <select id="studio-export-resolution" aria-label="{{ _('Export resolution') }}"></select>
-    </label>
+    <div class="studio-export-pair">
+      <label class="studio-inspector-field" for="studio-export-resolution">
+        <span>{{ _('Resolution') }}</span>
+        <select id="studio-export-resolution" aria-label="{{ _('Export resolution') }}"></select>
+      </label>
+      <label class="studio-inspector-field" for="studio-export-quality">
+        <span>{{ _('Quality') }}</span>
+        <select id="studio-export-quality" aria-label="{{ _('Export quality') }}">
+          <option value="standard">{{ _('Standard — smaller file') }}</option>
+          <option value="high" selected>{{ _('High — recommended') }}</option>
+          <option value="best">{{ _('Best quality — slower, larger file') }}</option>
+        </select>
+      </label>
+    </div>
+    <p class="hint">{{ _('Best quality takes longer and makes a larger file. It does not go beyond the source.') }}</p>
     <label class="studio-inspector-field" for="studio-export-filename">
       <span>{{ _('Filename') }}</span>
       <input id="studio-export-filename" type="text" autocomplete="off" spellcheck="false"

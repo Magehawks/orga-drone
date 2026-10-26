@@ -21,7 +21,7 @@ behind their adventures.**
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (order + estimated runtime; multiple local Studio projects; synced Story
-preview; local MP4 export with configurable resolution, including photo-only
+preview; local MP4 export with configurable resolution and a Standard / High / Best quality choice, including photo-only
 stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
@@ -157,7 +157,7 @@ professional video-editing knowledge.
 | Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the inspector, the media browser, and the Story tracks can be dragged and the size is kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
-| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
+| Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; Standard / High / Best quality next to resolution, High by default; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Further light editing (curves, freeform masks, keyframes, tracking), extra transition types | **Later** |
 | Music-lane time mapping | **Later** |
@@ -171,7 +171,7 @@ Sharing is the final step of the journey.
 | Example | Status |
 |---------|--------|
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
-| Simple Studio MP4 export | **Available now** (local file; resolution choice; optional music) |
+| Simple Studio MP4 export | **Available now** (local file; resolution and quality choice; optional music) |
 | One photo or video from its detail page | **Available now** (local file only: best quality, or a WhatsApp, Instagram, or TikTok preset; nothing is uploaded or posted; a photo stays an image and a video stays an MP4) |
 | Open video / Show in folder after Studio export | **Available now** (Windows desktop; also after a detail-page export) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
@@ -254,7 +254,7 @@ See `README.md` for the detailed feature status table. In short:
   clip can play that in/out range again, up to 8 times, at the same speed;
   the Story length, preview, and MP4 include each play. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4
-  export with configurable resolution (desktop), including photo-only stories at
+  export with configurable resolution and quality (desktop), including photo-only stories at
   720/1080. Title Cards persist as generated
   `studio_clips` (not media files). An optional sequential soundtrack playlist
   (up to 8 local songs) persists with the project, plays in preview, and is mixed

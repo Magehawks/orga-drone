@@ -4280,6 +4280,7 @@
   });
 
   const exportResolution = document.getElementById("studio-export-resolution");
+  const exportQuality = document.getElementById("studio-export-quality");
   const exportFilename = document.getElementById("studio-export-filename");
   let exportFilenameAuto = "";
   const exportStatus = document.getElementById("studio-export-status");
@@ -4389,6 +4390,7 @@
   function setExportRunningUi(running) {
     if (exportRunBtn) exportRunBtn.disabled = running;
     if (exportResolution) exportResolution.disabled = running;
+    if (exportQuality) exportQuality.disabled = running;
     if (exportFilename) exportFilename.disabled = running;
     if (exportCancelBtn && !exportCancelRequested) exportCancelBtn.disabled = false;
   }
@@ -4648,6 +4650,12 @@
           exportResolution.appendChild(option);
         });
       }
+      if (exportQuality && data.default_quality) {
+        exportQuality.value = String(data.default_quality);
+        if (exportQuality.value !== String(data.default_quality)) {
+          exportQuality.value = "high";
+        }
+      }
       syncExportFilename(
         exportResolution ? exportResolution.value : data.default_height,
         { reset: true }
@@ -4707,6 +4715,7 @@
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           height,
+          quality: exportQuality ? exportQuality.value : "high",
           output_path: pickedPath,
           project_id: projectId || exportOptionsCache.project_id || null,
         }),

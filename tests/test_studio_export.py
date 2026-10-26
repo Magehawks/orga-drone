@@ -791,6 +791,15 @@ def test_prepare_export_without_music_skips_mix(
     out = tmp_path / "out.mp4"
     config = prepare_studio_export(db, height=720, output_path=out, overwrite=True)
     assert config.music is None
+    assert config.quality == "high"
+    best = prepare_studio_export(
+        db, height=720, output_path=out, overwrite=True, quality="best"
+    )
+    assert best.quality == "best"
+    with pytest.raises(StudioExportError, match="export quality"):
+        prepare_studio_export(
+            db, height=720, output_path=out, overwrite=True, quality="lossless"
+        )
 
 
 def test_prepare_export_missing_music_fails(

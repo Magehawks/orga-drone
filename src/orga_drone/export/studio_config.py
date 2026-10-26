@@ -67,6 +67,8 @@ class StudioExportConfig:
     output_path: Path
     width: int
     height: int
+    # standard | high | best. Missing callers use High.
+    quality: str = "high"
     clips: tuple[StudioExportClip, ...] = field(default_factory=tuple)
     project_title: str = "Your story"
     music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
@@ -87,6 +89,7 @@ class StudioExportConfig:
             "output_path": str(self.output_path),
             "width": self.width,
             "height": self.height,
+            "quality": self.quality,
             "project_title": self.project_title,
             "clip_count": len(self.clips),
             "has_music": bool(self.music_tracks),

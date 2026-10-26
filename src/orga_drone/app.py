@@ -2141,6 +2141,7 @@ def create_app() -> FastAPI:
         output_path = payload.get("output_path")
         overwrite = bool(payload.get("overwrite"))
         project_id = payload.get("project_id")
+        quality = payload.get("quality")
         if not isinstance(height, int) or isinstance(height, bool):
             raise HTTPException(status_code=400, detail="height must be an integer")
         if not isinstance(output_path, str) or not output_path.strip():
@@ -2160,6 +2161,7 @@ def create_app() -> FastAPI:
                 output_path=Path(output_path),
                 overwrite=overwrite,
                 project_id=project_id,
+                quality=quality,
             )
         except StudioExportError as exc:
             msg = translate(str(exc))
@@ -2176,6 +2178,7 @@ def create_app() -> FastAPI:
                 output_path=Path(output_path),
                 overwrite=overwrite,
                 project_id=project_id,
+                quality=quality,
                 on_progress=on_progress,
                 cancel_event=cancel_event,
             )

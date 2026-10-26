@@ -6,7 +6,18 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from orga_drone.app_prefs import get_last_export_directory, set_last_export_directory
+from orga_drone.app_prefs import (
+    get_last_export_directory,
+    get_last_export_quality,
+    set_last_export_directory,
+    set_last_export_quality,
+)
+from orga_drone.export.studio_quality import (
+    DEFAULT_EXPORT_QUALITY,
+    SHARE_EXPORT_QUALITY,
+    coerce_export_quality,
+    export_quality_ids,
+)
 from orga_drone.config import settings
 from orga_drone.db import Database, MediaRow, StudioClip, StudioProject, track_from_json
 from orga_drone.export.studio_config import (
@@ -242,6 +253,10 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
         default_h = generated_only_default_height()
     last_dir = get_last_export_directory()
     directory = resolve_export_directory(last_dir)
+    try:
+        default_quality = coerce_export_quality(get_last_export_quality())
+    except ValueError:
+        default_quality = DEFAULT_EXPORT_QUALITY
     option_rows: list[dict[str, int | str | bool]] = []
     for option in options:
         row = option.as_dict()
@@ -259,6 +274,8 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
         "default_directory": str(directory),
         "last_export_directory": last_dir,
         "default_height": default_h,
+        "default_quality": default_quality,
+        "qualities": list(export_quality_ids()),
         "options": option_rows,
         "has_video_resolution": bool(options),
     }
@@ -470,6 +487,7 @@ def prepare_studio_export(
     output_path: Path,
     overwrite: bool = False,
     project_id: int | None = None,
+    quality: str | None = None,
 ) -> StudioExportConfig:
     """Validate export request and build a codec-agnostic config (no render)."""
     project = _resolve_export_project(db, project_id)
@@ -482,6 +500,10 @@ def prepare_studio_export(
         raise StudioExportError(
             "Selected export resolution is not available for this project."
         )
+    try:
+        chosen_quality = coerce_export_quality(quality)
+    except ValueError as exc:
+        raise StudioExportError(str(exc)) from exc
     width = height_to_width(int(height))
     dest, protected_identities, protected_path_strs = _snapshot_export_destination(
         db,
@@ -546,10 +568,12 @@ def prepare_studio_export(
             )
         )
 
+    set_last_export_quality(chosen_quality)
     return StudioExportConfig(
         output_path=dest,
         width=width,
         height=int(height),
+        quality=chosen_quality,
         clips=tuple(export_clips),
         project_title=project.title,
         music_tracks=tuple(music_tracks),
@@ -580,6 +604,7 @@ def run_studio_export(
     output_path: Path,
     overwrite: bool = False,
     project_id: int | None = None,
+    quality: str | None = None,
     encoder: StudioVideoEncoder | None = None,
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
@@ -590,6 +615,7 @@ def run_studio_export(
         output_path=output_path,
         overwrite=overwrite,
         project_id=project_id,
+        quality=quality,
     )
     return _execute_export_config(
         config,
@@ -807,6 +833,7 @@ def _video_export_config(
         output_path=dest,
         width=width,
         height=height,
+        quality=SHARE_EXPORT_QUALITY,
         clips=(clip,),
         project_title=_export_stem(media),
         music_tracks=(),

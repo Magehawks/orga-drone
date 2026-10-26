@@ -18,7 +18,10 @@ def test_subprocess_no_window_kwargs_on_windows(
     monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", "win32")
     monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
     kwargs = subprocess_no_window_kwargs()
-    assert kwargs == {"creationflags": 0x08000000}
+    assert kwargs["creationflags"] == 0x08000000
+    startupinfo = kwargs["startupinfo"]
+    assert startupinfo.dwFlags & subprocess.STARTF_USESHOWWINDOW
+    assert startupinfo.wShowWindow == subprocess.SW_HIDE
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin"])

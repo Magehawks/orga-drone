@@ -26,6 +26,11 @@ from orga_drone.export.studio_config import (
     StudioExportConfig,
 )
 from orga_drone.media_mutation import hold_media_mutation
+from orga_drone.export.studio_quality import (
+    DEFAULT_EXPORT_QUALITY,
+    coerce_export_quality,
+    x264_preset_and_crf,
+)
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
 from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
@@ -39,9 +44,12 @@ from orga_drone.studio_speed import (
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
-# Internal encode speed/quality tradeoff (not a user setting). Prefer share-friendly
-# turnaround; higher-quality / social profiles can come later if needed.
+# High and Standard keep this preset. Best quality uses a slower one.
 X264_PRESET = "veryfast"
+_encode_quality: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "studio_encode_quality",
+    default=DEFAULT_EXPORT_QUALITY,
+)
 # All segments use CFR + limited-range yuv420p; final concat re-encodes for a
 # clean timeline (photo JPEG full-range vs DJI video previously broke playback).
 EXPORT_FPS = 30
@@ -64,7 +72,9 @@ def _x264_color_args() -> list[str]:
 
 
 def _x264_video_args() -> list[str]:
-    return ["-c:v", "libx264", "-preset", X264_PRESET, *_x264_color_args()]
+    """H.264 args for the quality selected on the active export."""
+    preset, crf = x264_preset_and_crf(_encode_quality.get())
+    return ["-c:v", "libx264", "-preset", preset, "-crf", crf, *_x264_color_args()]
 
 
 def _segment_vf(width: int, height: int) -> str:
@@ -1181,7 +1191,12 @@ class FfmpegStudioEncoder:
         tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
         tmp_out = tmp_dir / "export_tmp.mp4"
         partial = parent / f".{dest.name}.{uuid.uuid4().hex}.partial"
+        try:
+            chosen_quality = coerce_export_quality(config.quality)
+        except ValueError as exc:
+            raise StudioExportError(str(exc)) from exc
         token = _cancel_event.set(cancel_event)
+        quality_token = _encode_quality.set(chosen_quality)
         try:
             _raise_if_cancelled()
             segments: list[Path] = []
@@ -1264,6 +1279,7 @@ class FfmpegStudioEncoder:
         finally:
             partial.unlink(missing_ok=True)
             shutil.rmtree(tmp_dir, ignore_errors=True)
+            _encode_quality.reset(quality_token)
             _cancel_event.reset(token)
 
     def _render_clip(

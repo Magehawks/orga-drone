@@ -11,13 +11,26 @@ from orga_drone.export.studio_encoder import (
 )
 
 
-def test_x264_preset_is_veryfast() -> None:
-    from orga_drone.export.studio_encoder import X264_PRESET, _x264_video_args
+def test_x264_quality_presets() -> None:
+    from orga_drone.export.studio_encoder import _encode_quality, _x264_video_args
 
-    assert X264_PRESET == "veryfast"
-    args = _x264_video_args()
-    assert args[args.index("-c:v") + 1] == "libx264"
-    assert args[args.index("-preset") + 1] == "veryfast"
+    def args_for(quality: str) -> list[str]:
+        token = _encode_quality.set(quality)
+        try:
+            return _x264_video_args()
+        finally:
+            _encode_quality.reset(token)
+
+    high = args_for("high")
+    assert high[high.index("-c:v") + 1] == "libx264"
+    assert high[high.index("-preset") + 1] == "veryfast"
+    assert high[high.index("-crf") + 1] == "20"
+    standard = args_for("standard")
+    assert standard[standard.index("-preset") + 1] == "veryfast"
+    assert standard[standard.index("-crf") + 1] == "23"
+    best = args_for("best")
+    assert best[best.index("-preset") + 1] == "slow"
+    assert best[best.index("-crf") + 1] == "17"
 
 
 def test_segment_vf_forces_cfr_and_yuv420p() -> None:

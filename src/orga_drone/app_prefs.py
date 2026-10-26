@@ -46,6 +46,19 @@ def set_last_export_directory(directory: str | Path) -> None:
     save_prefs(data)
 
 
+def get_last_export_quality() -> str | None:
+    raw = load_prefs().get("last_export_quality")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    return None
+
+
+def set_last_export_quality(quality: str) -> None:
+    data = load_prefs()
+    data["last_export_quality"] = quality
+    save_prefs(data)
+
+
 def get_check_updates() -> bool:
     """Startup update check. Missing or non-true values stay off."""
     return load_prefs().get("check_updates") is True

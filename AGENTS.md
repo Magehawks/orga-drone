@@ -6,7 +6,7 @@ Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut + slow motion on a selected video section + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
-with configurable resolution (suggested filename includes that resolution; an existing file is never replaced, a taken name is saved as the next free numbered file, and that name is shown after export; Cancel export stops the running encode); after export, Open video / Show in folder on
+with configurable resolution and a Standard / High / Best quality choice (CRF 23 / 20 / 17; Best uses the slow x264 preset and takes longer; suggested filename includes that resolution; an existing file is never replaced, a taken name is saved as the next free numbered file, and that name is shown after export; Cancel export stops the running encode); after export, Open video / Show in folder on
 Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
 in preview and MP4 export; Title Cards as generated Story items; basic rendered
 visual transitions with labeled boundary overlays; basic per-clip image
@@ -97,7 +97,7 @@ The application helps users:
   (1× resets that section; neighboring sections keep their speed; source audio on a slowed
   section is muted; preview and MP4 share the speed and the longer duration; not optical-flow
   interpolation or fast-forward); local MP4 export with configurable
-  resolution on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; an existing file is never replaced, and a taken name is saved as the next free numbered file (`name_1`, `name_2`, …) which the success banner shows; Cancel export stops the running encode; after a successful export, Open video / Show in folder
+  resolution and a Standard / High / Best quality choice on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; an existing file is never replaced, and a taken name is saved as the next free numbered file (`name_1`, `name_2`, …) which the success banner shows; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
   canvas; loop still repeats a single song to Story end). The open project is

@@ -2518,6 +2518,14 @@ img.studio-preview-media,
   gap: 0.65rem;
 }
 .studio-export-form h2 { margin: 0; font-family: var(--display); }
+.studio-export-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+@media (max-width: 520px) {
+  .studio-export-pair { grid-template-columns: 1fr; }
+}
 .studio-export-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 .studio-export-dialog .meta-line.is-error { color: var(--danger, #b00020); }
 .studio-export-progress {
