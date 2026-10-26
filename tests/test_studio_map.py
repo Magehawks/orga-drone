@@ -246,6 +246,101 @@ def test_long_filter_script_still_draws_the_flight_map(
     assert not _uses_filter_graph(["-vf", "scale=320:180"])
 
 
+def _filter_graph_text(filters: list[str]) -> str:
+    if filters[0] in {"-filter_complex_script", "-filter_script:v"}:
+        return Path(filters[1]).read_text(encoding="utf-8")
+    return filters[1]
+
+
+def test_flight_map_places_on_a_spilled_simple_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A long simple chain is written to a script file. The map must still composite it.
+
+    Orga Drone 2.0.0 failed a 17-clip Windows export with
+    "The flight map could not be placed on this clip." The first clip was a
+    127s video whose telemetry HUD exceeded the inline filter limit, so ffmpeg
+    received ``-filter_script:v``. The map only accepted ``-vf``.
+    """
+    monkeypatch.setattr("orga_drone.studio_hud.FILTER_INLINE_LIMIT", 0)
+    monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
+    still = tmp_path / "still.jpg"
+    Image.new("RGB", (320, 180), (30, 40, 50)).save(still, "JPEG")
+    placement = MapPlacement(enabled=True, x=0.6, y=0.56, w=0.28, h=0.28)
+    photo = StudioExportClip(
+        source_path=still,
+        kind="photo",
+        duration_s=2.0,
+        fade_in_s=0.2,
+        map_placement=placement,
+        gps_track=_track(),
+        media_duration_s=4.0,
+    )
+    extra, filters = _segment_filter_invocation(photo, 320, 180, tmp_path)
+    assert filters[0] in {"-filter_complex", "-filter_complex_script"}
+    body = _filter_graph_text(filters)
+    assert "flight-map-route.png" in " ".join(extra)
+    assert "flight-map-marker.png" in " ".join(extra)
+    assert "scale=320:180" in body
+    assert body.count("fade=t=in") == 1
+    assert body.rindex("fade=t=in") > body.rindex("mapout")
+
+    plain = StudioExportClip(source_path=still, kind="photo", duration_s=2.0)
+    _plain_extra, plain_filters = _segment_filter_invocation(plain, 320, 180, tmp_path)
+    assert plain_filters[0] == "-filter_script:v"
+    assert "flight-map" not in _filter_graph_text(plain_filters)
+
+    slowed = StudioExportClip(
+        source_path=tmp_path / "missing.mp4",
+        kind="video",
+        duration_s=4.0,
+        source_start_s=1.0,
+        source_end_s=3.0,
+        playback_speed=0.5,
+        fade_in_s=0.3,
+        map_placement=placement,
+        gps_track=_track(),
+        media_duration_s=8.0,
+    )
+    _slow_extra, slow_filters = _segment_filter_invocation(slowed, 320, 180, tmp_path)
+    slow_body = _filter_graph_text(slow_filters)
+    assert "trim=start=1.000000:end=3.000000" in slow_body
+    assert "setpts=2.0*PTS" in slow_body
+    assert slow_body.count("fade=t=in") == 1
+    assert slow_body.rindex("fade=t=in") > slow_body.rindex("mapout")
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    proc = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-loop",
+            "1",
+            "-framerate",
+            "30",
+            "-i",
+            str(still),
+            *extra,
+            "-t",
+            "0.3",
+            *filters,
+            "-frames:v",
+            "2",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", errors="replace")
+
+
 def test_export_graph_draws_the_marker_before_fades(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
     still = tmp_path / "still.jpg"
