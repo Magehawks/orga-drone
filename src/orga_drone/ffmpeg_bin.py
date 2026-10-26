@@ -50,7 +50,12 @@ def subprocess_no_window_kwargs() -> dict[str, Any]:
     flag = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if not flag:
         return {}
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    startupinfo.wShowWindow = subprocess.SW_HIDE
+    startup_cls = getattr(subprocess, "STARTUPINFO", None)
+    show_flag = getattr(subprocess, "STARTF_USESHOWWINDOW", None)
+    hide = getattr(subprocess, "SW_HIDE", None)
+    if startup_cls is None or show_flag is None or hide is None:
+        return {"creationflags": flag}
+    startupinfo = startup_cls()
+    startupinfo.dwFlags |= show_flag
+    startupinfo.wShowWindow = hide
     return {"creationflags": flag, "startupinfo": startupinfo}

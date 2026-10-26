@@ -15,8 +15,16 @@ def test_subprocess_no_window_kwargs_on_windows(
 ) -> None:
     import subprocess
 
+    class _StartupInfo:
+        def __init__(self) -> None:
+            self.dwFlags = 0
+            self.wShowWindow = 0
+
     monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", "win32")
     monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(subprocess, "STARTUPINFO", _StartupInfo, raising=False)
+    monkeypatch.setattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001, raising=False)
+    monkeypatch.setattr(subprocess, "SW_HIDE", 0, raising=False)
     kwargs = subprocess_no_window_kwargs()
     assert kwargs["creationflags"] == 0x08000000
     startupinfo = kwargs["startupinfo"]
