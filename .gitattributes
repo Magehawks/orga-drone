@@ -1,0 +1,4 @@
+src/orga_drone/geocode/rg_cities1000.csv -text
+packaging/third_party/geonames/upstream/** -text
+packaging/third_party/ffmpeg-gpl/bin/** -text
+packaging/third_party/ffmpeg-gpl/tarballs/** -text
