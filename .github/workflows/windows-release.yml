@@ -167,11 +167,15 @@ jobs:
           )
           $versionLine = python packaging/verify_release_version.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @(
-            $versionLine,
+          $releaseText = @(
+            $versionLine.Trim(),
             "commit=${{ github.sha }}",
             "sha256=$hash"
-          ) | Set-Content -Encoding ascii release-build.txt
+          ) -join "`n"
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "release-build.txt"),
+            $releaseText + "`n"
+          )
           $versionLine | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           "commit=${{ github.sha }}" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           "sha256=$hash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
@@ -212,9 +216,9 @@ jobs:
           set -euo pipefail
           cd release-assets
           sha256sum -c orga-drone-windows-x64.zip.sha256
-          version="$(sed -n 's/^version=//p' release-build.txt)"
-          commit="$(sed -n 's/^commit=//p' release-build.txt)"
-          sha="$(awk '{print $1}' orga-drone-windows-x64.zip.sha256)"
+          version="$(sed -n 's/^version=//p' release-build.txt | tr -d '\r')"
+          commit="$(sed -n 's/^commit=//p' release-build.txt | tr -d '\r')"
+          sha="$(awk '{print $1}' orga-drone-windows-x64.zip.sha256 | tr -d '\r')"
           if [ -z "${version}" ] || [ -z "${commit}" ] || [ -z "${sha}" ]; then
             echo "release-build.txt is missing version, commit, or checksum"
             exit 1
