@@ -182,6 +182,17 @@ def test_write_notices_from_the_inspected_binary_stays_no_go(tmp_path: Path) -> 
     assert "Copyright (c) 2010-2023, Volodymyr Agafonkin" in leaflet
     lucide = (tmp_path / notices.NOTICES / "lucide-0.469.0-ISC.txt").read_text(encoding="utf-8")
     assert "Lucide Contributors 2022" in lucide
+    markercluster = (tmp_path / notices.NOTICES / "leaflet.markercluster-MIT-LICENCE.txt").read_text(
+        encoding="utf-8"
+    )
+    assert "Copyright 2012 David Leaver" in markercluster
+    ofl = (tmp_path / notices.NOTICES / "fontsource-OFL-1.1.txt").read_text(encoding="utf-8")
+    assert "SIL OPEN FONT LICENSE Version 1.1" in ofl
+    gap = (tmp_path / notices.NOTICES / "ffmpeg-7.1-essentials-SOURCE-GAP.txt").read_text(encoding="utf-8")
+    assert "does not clear the sale gate" in gap
+    assert "Open legal questions" in verdict
+    assert "not a legal opinion" in verdict
+    assert "GPLv3 has been satisfied" not in verdict
 
 
 def _windows_ffmpeg() -> Path | None:

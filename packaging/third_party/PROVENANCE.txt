@@ -37,4 +37,25 @@ Each individual SVG under src/orga_drone/static/vendor/lucide/ matches
 lucide-static 0.469.0 on jsDelivr. sprite.svg is assembled in this repository
 and is not a file at that package's icons/ path.
 
+ffmpeg-7.1-essentials-SOURCE-GAP.txt records the 2026-10-26 search of the
+GitHub release, the essentials zip, the codexffmpeg tag, and gyan.dev.
+Corresponding source was not in those places. The draft request to
+builds@gyan.dev is ffmpeg-7.1-essentials-SOURCE-REQUEST.txt. It has not
+been sent. Neither file clears the sale gate.
+
+leaflet.markercluster-MIT-LICENCE.txt is
+https://raw.githubusercontent.com/Leaflet/Leaflet.markercluster/v1.5.3/MIT-LICENCE.txt
+SHA256 3133dacd38250bd1f524d8166cc60a016a382522e062fce143691c65bf5e4b3d.
+The same bytes are the v1.5.2 file. The vendored JS and both CSS files match
+unpkg leaflet.markercluster 1.5.2 and 1.5.3 dist. They do not match 1.5.1.
+
+fontsource-OFL-1.1.txt is the LICENSE file of @fontsource/outfit 5.2.5,
+SHA256 18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3.
+@fontsource/sora 5.2.5 and @fontsource/ibm-plex-mono 5.2.6 contain the same
+LICENSE bytes. All bundled Outfit and Sora woff2 files match those packages'
+files/*-latin-*-normal.woff2. Both IBM Plex Mono woff2 files match 5.2.6.
+The same woff2 bytes also match the previous patch of each package. The
+LICENSE header attributes the fonts to Google Inc. and does not name
+reserved font names.
+
 These files are not an Orga Drone license. The project license stays MIT.

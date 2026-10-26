@@ -33,8 +33,11 @@ _REQUIRED_IN_NOTICES = (
     "ffmpeg-7.1-essentials-GPLv3.txt",
     "ffmpeg-7.1-essentials-README.txt",
     "imageio-ffmpeg-LICENSE",
+    "ffmpeg-7.1-essentials-SOURCE-GAP.txt",
     "leaflet-1.9.4-BSD-2-Clause.txt",
+    "leaflet.markercluster-MIT-LICENCE.txt",
     "lucide-0.469.0-ISC.txt",
+    "fontsource-OFL-1.1.txt",
     "pyinstaller-COPYING.txt",
     "reverse-geocoder-LGPL-2.1.txt",
     "reverse-geocoder/__init__.py",
@@ -199,8 +202,11 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         "reverse-geocoder-LGPL-2.1.txt",
         "ffmpeg-7.1-essentials-GPLv3.txt",
         "ffmpeg-7.1-essentials-README.txt",
+        "ffmpeg-7.1-essentials-SOURCE-GAP.txt",
         "leaflet-1.9.4-BSD-2-Clause.txt",
+        "leaflet.markercluster-MIT-LICENCE.txt",
         "lucide-0.469.0-ISC.txt",
+        "fontsource-OFL-1.1.txt",
     ):
         src = third_party / name
         if not src.is_file():
@@ -217,10 +223,13 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         (notices / "GEONAMES_ATTRIBUTION.txt").write_text(
             "rg_cities1000.csv is shipped inside the reverse-geocoder wheel and, when "
             "packaging collects it, inside this onefolder.\n"
-            "https://www.geonames.org/export/ says the GeoNames dump is under a Creative "
-            "Commons attribution license and that commercial use is allowed. The page "
-            "does not state the CC version number. Credit GeoNames when redistributing "
-            "this file: https://www.geonames.org/\n",
+            "https://www.geonames.org/export/ says the data is under a Creative Commons "
+            "attribution license and that commercial use is allowed. "
+            "https://download.geonames.org/export/dump/readme.txt retrieved 2026-10-26 "
+            "says the gazetteer extract files are Creative Commons Attribution 4.0. "
+            "The bundled CSV is the reduced reverse_geocoder 1.5.1 file, has no license "
+            "header, and was not hash-matched to a dated dump. Credit GeoNames: "
+            "https://www.geonames.org/\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -264,7 +273,11 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         verdict,
         "",
         "This file is not a compliance certificate and not legal advice.",
-        "itch.io sale of this Windows build is not shown to be permitted.",
+        (
+            "No technical blocker was recorded. This is not a legal opinion."
+            if not blockers
+            else "itch.io sale of this Windows build is not shown to be permitted."
+        ),
         "",
         "ffmpeg sha256: " + evidence.sha256,
         "imageio-ffmpeg LICENSE already in the onefolder: " + str(license_was_bundled).lower(),
@@ -276,6 +289,12 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         lines.extend("- " + item for item in blockers)
     else:
         lines.append("No blocker was recorded by this script.")
+    lines.append("")
+    lines.append(
+        "Open legal questions. These lines do not change GO or NO-GO. "
+        "A technical GO is not a legal opinion."
+    )
+    lines.extend("- " + item for item in _open_legal_questions())
     text = "\n".join(lines) + "\n"
     (notices / VERDICT_NAME).write_text(text, encoding="utf-8", newline="\n")
     (notices / "README.txt").write_text(
@@ -283,8 +302,10 @@ def write_notices(bundle: Path) -> tuple[str, ...]:
         "Orga Drone remains MIT. These notices do not relicense it.\n"
         "imageio-ffmpeg's BSD-2-Clause license covers that Python package.\n"
         "It does not license the ffmpeg executable shipped in the wheel.\n"
-        "Leaflet 1.9.4's BSD-2-Clause text and Lucide 0.469.0's ISC text are included.\n"
-        "They do not license FFmpeg, and they do not change the sale verdict.\n"
+        "Leaflet 1.9.4, Leaflet.markercluster 1.5.2/1.5.3, Lucide 0.469.0, and the\n"
+        "matched Fontsource OFL text are included. They do not license FFmpeg.\n"
+        "ffmpeg-7.1-essentials-SOURCE-GAP.txt records the missing corresponding source.\n"
+        "That gap file does not clear the sale verdict.\n"
         "ffmpeg -version and ffmpeg -buildconf were run on the bundled executable.\n"
         "Sale verdict: " + verdict + "\n",
         encoding="utf-8",
@@ -432,6 +453,19 @@ def _missing_dist_info_licenses(bundle: Path) -> tuple[str, ...]:
         if not found:
             missing.append(info.name)
     return tuple(missing)
+
+
+def _open_legal_questions() -> tuple[str, ...]:
+    return (
+        "The effect of a separate ffmpeg process on the MIT application is undecided.",
+        "Whether copied reverse-geocoder .py files satisfy LGPL-2.1 section 6 for a "
+        "PyInstaller PYZ is undecided. WinError 1455 during a frozen probe was a "
+        "page-file failure, not a license finding.",
+        "rg_cities1000.csv was not hash-matched to a GeoNames dump. The dump readme "
+        "retrieved on 2026-10-26 says the extract files are CC BY 4.0.",
+        "The PyInstaller bootloader exception is included as text. Its legal effect "
+        "is undecided.",
+    )
 
 
 def _repo_root() -> Path:

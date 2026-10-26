@@ -1,0 +1,47 @@
+Draft request. Not sent.
+
+To: builds@gyan.dev
+Subject: Corresponding source for ffmpeg-7.1-essentials_build.zip published 2024-09-30
+
+Hello,
+
+I redistribute one executable from your FFmpeg 7.1 essentials build and need
+the corresponding source for that exact binary.
+
+Binary
+  Package: ffmpeg-7.1-essentials_build.zip
+  Published: 2024-09-30
+  URL: https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip
+  File: bin/ffmpeg.exe
+  Size: 87638016 bytes
+  SHA256: 2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3
+  Version string: ffmpeg version 7.1-essentials_build-www.gyan.dev
+  README source line: https://github.com/FFmpeg/FFmpeg/commit/b08d7969c5
+  Configuration includes: --enable-gpl --enable-version3 --enable-static --enable-libx264
+
+The zip contains the executables, generated HTML documentation, LICENSE, and
+README.txt. The release has no library source archive and no build script.
+The FFmpeg commit link does not include the statically linked libraries or
+the scripts used to compile them.
+
+Please provide, for this SHA256:
+
+1. Complete source for FFmpeg commit b08d7969c5 as you compiled it, including
+   any patch that is not in that commit.
+2. Complete source for every statically linked library at the revision you
+   compiled, including x264. The README says "x264 v0.164.3192" and does not
+   give a commit id. Please name the exact commit or tarball and include any
+   patch.
+3. The same for the other libraries in that README's version list, and for
+   bzlib, fontconfig, gmp, gnutls, iconv, libxml2, lzma, and zlib.
+4. The build scripts, media-autobuild_suite revision, ini, per-library
+   configure lines, nasm version, and the MSYS2 package versions used with
+   gcc 14.2.0 (Rev1, Built by MSYS2 project).
+5. Any build log that shows those inputs produced this executable.
+
+A link to current media-autobuild_suite master, or to the FFmpeg commit
+alone, does not identify this binary. I will not treat this request as
+permission to redistribute until you send the material above or say that
+you do not have it.
+
+Thank you.

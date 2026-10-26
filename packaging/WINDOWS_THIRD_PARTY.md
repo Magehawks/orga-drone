@@ -123,8 +123,12 @@ does not ship it. The sources have no copyright header. A normal interpreter
 with the wheel resolves `(48.137154, 11.576124)` offline to Munich, DE,
 because `rg_cities1000.csv` sits beside the package. The earlier onefolder
 did not collect that CSV. The spec now collects reverse-geocoder data files.
-GeoNames' export page says the dump is under a Creative Commons attribution
-license and allows commercial use; it does not state the CC version.
+GeoNames' export page says the data is under a Creative Commons attribution
+license and allows commercial use. The dump readme at
+`https://download.geonames.org/export/dump/readme.txt`, retrieved 2026-10-26,
+says the gazetteer extract files are CC BY 4.0. The wheel CSV has no license
+header and was not hash-matched to a dated dump, so that readme is not proof
+for these exact bytes.
 
 ## Other bundled pieces
 
@@ -135,11 +139,33 @@ Each individual Lucide SVG matches `lucide-static` 0.469.0. `sprite.svg` is
 assembled in this repository. The ISC text from tag `0.469.0` is copied into
 the notices.
 
-Leaflet.markercluster's vendored JS and CSS have no license header and no
-identified upstream revision, so no MIT text is attached. The font
-`NOTICE.txt` names the SIL Open Font License 1.1 for Outfit, Sora, and IBM
-Plex Mono. The full OFL text is not in the tree. Neither gap clears or
-creates the FFmpeg blocker.
+`leaflet.markercluster.js`, `MarkerCluster.css`, and
+`MarkerCluster.Default.css` match unpkg `leaflet.markercluster` 1.5.2 and
+1.5.3 `dist`. They do not match 1.5.1. Both tags carry the same
+`MIT-LICENCE.txt` (Copyright 2012 David Leaver). That text is copied into
+the notices.
+
+Every bundled Outfit and Sora woff2 matches `@fontsource/outfit` 5.2.5 and
+`@fontsource/sora` 5.2.5 `files/*-latin-*-normal.woff2`. Both IBM Plex Mono
+files match `@fontsource/ibm-plex-mono` 5.2.6. Those three packages contain
+the same `LICENSE` bytes, the SIL Open Font License 1.1, with the header
+"Google Inc." The file does not name reserved font names. It is copied into
+the notices.
+
+## Corresponding source search
+
+Searched on 2026-10-26: the GitHub release tag `7.1` (six binary archives;
+the tag tree is only `README.md`), the essentials zip (executables, generated
+HTML docs, libvpx presets, `LICENSE`, `README.txt`), and
+`https://www.gyan.dev/ffmpeg/builds/`. **Corresponding source: no.**
+The FFmpeg commit and the library version strings are identified.
+`x264 v0.164.3192` has no commit id. bzlib, fontconfig, gmp, gnutls, iconv,
+libxml2, lzma, and zlib are in the configuration and absent from the version
+list. No suite revision, ini, patches, or build log for 2024-09-30 was found.
+Current `media-autobuild_suite` master is not that build. The gap is written
+to `ffmpeg-7.1-essentials-SOURCE-GAP.txt`. A draft request to `builds@gyan.dev`
+is `ffmpeg-7.1-essentials-SOURCE-REQUEST.txt`. It has not been sent. Neither
+file clears the gate.
 
 ## itch.io sale
 
@@ -159,17 +185,20 @@ by the evidence above:
    cover a paid itch.io copy.
 3. reverse-geocoder's two Python files match upstream master and that
    LICENSE is LGPL-2.1. The frozen copy is still bytecode, so replacement
-   was not demonstrated. The CSV is now in the onefolder. A separate frozen
+   was not demonstrated. The CSV is in the onefolder. A separate frozen
    probe printed `CSV_EXISTS True` and then stopped with WinError 1455
-   (page file too small) before a place result. The same call in the
-   interpreter returned Munich, DE. The GeoNames CC version number is not
-   stated.
+   (page file too small) before a place result. That error is a machine
+   limit, not a license blocker. The same call in the interpreter returned
+   Munich, DE. The current GeoNames dump readme says CC BY 4.0; the wheel
+   CSV was not hash-matched to a dump.
 4. PyInstaller's COPYING.txt, including the bootloader exception, is copied
-   into the notices. That text appears to allow embedding an unmodified
-   bootloader. This note does not treat the exception as a legal opinion.
-   Every bundled dist-info in the local v2.0.1 onefolder had a LICENSE or
-   COPYING file. A file being present is not a review of its terms.
-   Markercluster's revision and the full OFL text remain gaps.
+   into the notices. The verdict lists that exception, the separate-process
+   question, the LGPL replacement question, and the unmatched GeoNames file
+   as open legal questions. Those lines do not change the verdict, and a
+   technical GO would not be a legal opinion. Every bundled dist-info in
+   the local v2.0.1 onefolder had a LICENSE or COPYING file. A file being
+   present is not a review of its terms. Markercluster 1.5.2/1.5.3 and the
+   matched Fontsource OFL text are now included.
 
 `packaging/windows_third_party.py` writes these notices into a future
 onefolder and makes `verify-zip` exit 2 while the verdict is NO-GO. The

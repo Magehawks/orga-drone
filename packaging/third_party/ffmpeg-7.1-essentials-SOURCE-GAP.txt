@@ -1,0 +1,58 @@
+Corresponding source for the bundled ffmpeg binary was not found.
+This file does not clear the sale gate. The gate still requires
+THIRD_PARTY_NOTICES/ffmpeg-corresponding-source/LIBRARY_SOURCES_AND_BUILD_SCRIPTS.txt
+to begin with the binary SHA256. That file is intentionally absent.
+This note is not a statement that GPLv3 has been satisfied.
+
+Binary
+  name: ffmpeg-win-x86_64-v7.1.exe
+  size: 87638016
+  sha256: 2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3
+  same bytes: bin/ffmpeg.exe inside
+    https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip
+    published 2024-09-30, tag 7.1, zip size 92100272
+
+What that release contains
+  GitHub release assets, retrieved 2026-10-26: six binary archives only
+    ffmpeg-7.1-essentials_build.7z
+    ffmpeg-7.1-essentials_build.zip
+    ffmpeg-7.1-full_build.7z
+    ffmpeg-7.1-full_build.zip
+    ffmpeg-7.1-full_build-shared.7z
+    ffmpeg-7.1-full_build-shared.zip
+  The essentials zip contains bin/ffmpeg.exe, bin/ffplay.exe, bin/ffprobe.exe,
+  generated HTML documentation, libvpx ffpresets, LICENSE, and README.txt.
+  It does not contain library source trees, patches, a configure script for
+  the libraries, or a build log.
+  The git tag 7.1 of GyanD/codexffmpeg contains only README.md.
+  Its automatic GitHub zipball is that README, not the FFmpeg source.
+
+What the README identifies
+  License: GPL v3
+  FFmpeg source: https://github.com/FFmpeg/FFmpeg/commit/b08d7969c5
+  Compiler line from ffmpeg -version: gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  External library version strings, including x264 v0.164.3192 (no commit id)
+  and x265 4.0-6-ga009ec077 (short id only).
+  https://www.gyan.dev/ffmpeg/builds/ (page v59, retrieved 2026-10-26) says
+  the static builds are GPLv3 and links each current build to one FFmpeg
+  commit. It does not publish the library sources or the build scripts.
+  Queries are directed to builds at that domain.
+
+What is still missing for this exact static binary
+  - source archives for every library named in the README version list,
+    at the commit or tarball actually compiled, including patches
+  - a unique x264 commit; "v0.164.3192" is only a version string
+  - source and package versions for libraries enabled in the configuration
+    but absent from that version list: bzlib, fontconfig, gmp, gnutls,
+    iconv, libxml2, lzma, zlib
+  - nasm version
+  - the exact MSYS2 package set behind gcc 14.2.0 Rev1
+  - the media-autobuild_suite revision, ini, and per-library configure flags
+    used on 2024-09-30
+  - a build log showing those inputs produced this SHA256
+  Current media-autobuild_suite master fetches current git checkouts. It is
+  not a record of this build. A link to FFmpeg commit b08d7969c5 is not the
+  corresponding source of the static executable.
+
+No written offer was attached to the binary. None is made here.
+GPLv3 section 6c is limited to occasional noncommercial copies.
