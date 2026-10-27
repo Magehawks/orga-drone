@@ -640,6 +640,14 @@
                         aria-label="{{ _('Drag to reorder') }}" title="{{ _('Drag to reorder') }}">
                   <span aria-hidden="true">≡</span>
                 </button>
+                {% if item.kind == 'video' and item.duration_s %}
+                <button type="button" class="studio-edge studio-edge-in" data-edge="in"
+                        aria-label="{{ _('Trim start') }}"
+                        title="{{ _('Drag to change where this clip starts in the original.') }}"></button>
+                <button type="button" class="studio-edge studio-edge-out" data-edge="out"
+                        aria-label="{{ _('Trim end') }}"
+                        title="{{ _('Drag to change where this clip ends in the original.') }}"></button>
+                {% endif %}
                 <button type="button" class="studio-clip-body" data-select-clip="{{ item.id }}">
                   <span class="studio-clip-thumb">
                     {% if item.kind == 'title_card' %}

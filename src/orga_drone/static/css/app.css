@@ -2264,6 +2264,52 @@ img.studio-preview-media,
   touch-action: none;
 }
 .studio-drag-handle:active { cursor: grabbing; }
+.studio-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 5;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.studio-edge::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+.studio-edge-in { left: 0; }
+.studio-edge-in::after { left: 0; }
+.studio-edge-out { right: 0; }
+.studio-edge-out::after { right: 0; }
+.studio-edge:hover::after,
+.studio-clip.is-edge-target .studio-edge::after {
+  width: 4px;
+  opacity: 1;
+}
+html.is-edge-drag,
+html.is-edge-drag * {
+  cursor: ew-resize !important;
+}
+.studio-edge-readout {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
 .studio-clip-body {
   flex: 1;
   min-width: 0;
