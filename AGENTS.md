@@ -16,6 +16,19 @@ toward black and white); Inspector headings that
 distinguish selection from the playhead-active clip; time-based Story canvas
 with Fit to story / zoom; read-only soundtrack coverage on that canvas).
 
+The app opens on a Home screen. An empty library shows the Orga Drone logo and
+starts in the existing folder import. When a recent file already has a local
+thumbnail and is still on disk, that image is the hero; a missing or offline
+file falls back to the logo without decoding video at startup. A sidebar
+(Home, media library, Studio, flight map, sources, albums, duplicates, and
+Settings at the bottom) stays on those areas. On a narrow window the same
+destinations use the existing bottom bar. Settings stores the existing dark,
+light, or custom theme and German or English, and can clear only the thumbnail
+and map-tile caches. There is no separate Back control: Home is a direct link,
+and detail pages keep their own return links. Studio edits already saved in
+the database stay when you leave; Undo and Redo still exist only for the
+running session.
+
 It indexes photos and videos on the user’s machine, extracts DJI and standard
 media metadata, groups split clips and heuristic flight sessions, and shows
 locations on a map. A photo or video detail page can export that one file

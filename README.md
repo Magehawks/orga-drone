@@ -79,6 +79,7 @@ After each library scan, flows are rebuilt first, then sessions. Split parts of 
 
 | Area | Status | Notes |
 |------|--------|--------|
+| Home and shared navigation | Available | Home shows the app logo, or one already cached local thumbnail when that file is still on disk. The sidebar reaches the library, Studio, the flight map, and Settings. Narrow windows use the bottom bar. Settings keeps dark/light/custom and German/English, and can clear thumbnail and map-tile caches only |
 | Folder library + browse/list | Available | Rescan per root; unchanged files skip metadata extraction (size + mtime, not a content hash); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio; Timeline groups photos and videos by recording date |
 | DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
 | Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
