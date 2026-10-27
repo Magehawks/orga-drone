@@ -168,6 +168,84 @@ msgstr "Wiederholen"
 msgid "Repeat plays this in/out range again, up to 8 times, at the same speed."
 msgstr "Wiederholen spielt diesen In/Out-Bereich erneut ab, höchstens 8-mal, mit gleicher Geschwindigkeit."
 
+msgid "Loop transition"
+msgstr "Schleifenübergang"
+
+msgid "Off"
+msgstr "Aus"
+
+msgid "Repeat to soundtrack"
+msgstr "Bis zum Soundtrack wiederholen"
+
+msgid "Blends the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Where the start and end frames differ, a double image can remain. This does not match those frames automatically. The soundtrack plays once and is not blended."
+msgstr "Blendet das Ende jeder Wiederholung in den Anfang der nächsten. Beide laufen vorwärts weiter und behalten die Farbeinstellungen dieses Clips. Wenn Anfang und Ende unterschiedlich aussehen, kann ein Doppelbild bleiben. Die Bilder werden nicht automatisch angeglichen. Der Soundtrack spielt einmal und wird nicht überblendet."
+
+msgid "This section is too short for a crossfade, so the joins stay hard cuts."
+msgstr "Dieser Abschnitt ist zu kurz für eine Überblendung, deshalb bleiben die Übergänge harte Schnitte."
+
+msgid "Crossfade is shortened to {seconds} s so it fits this section."
+msgstr "Die Überblendung wird auf {seconds} s gekürzt, damit sie in diesen Abschnitt passt."
+
+msgid "The soundtrack ends before a second repetition, so there is no join to blend."
+msgstr "Der Soundtrack endet vor einer zweiten Wiederholung, deshalb gibt es keinen Übergang zum Überblenden."
+
+msgid "Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect."
+msgstr "Wiederholt diesen Abschnitt vorwärts, bis der Soundtrack endet. Der Soundtrack spielt einmal und wird an den Übergängen nicht neu gestartet. Die Übergänge nutzen den Schleifeneffekt."
+
+msgid "Loop effect"
+msgstr "Schleifeneffekt"
+
+msgid "Cinematic blend"
+msgstr "Filmische Überblendung"
+
+msgid "Curve"
+msgstr "Verlauf"
+
+msgid "Linear"
+msgstr "Linear"
+
+msgid "Smooth"
+msgstr "Weich"
+
+msgid "Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended."
+msgstr "Blendet das Ende jeder Wiederholung weich in den Anfang der nächsten. Beide laufen vorwärts weiter und behalten die Farbeinstellungen. Straßen, Bäume und andere Objekte können doppelt erscheinen, wenn die Blickwinkel verschieden sind. Das ist keine unsichtbare Schleife. Der Soundtrack spielt einmal und wird nicht überblendet."
+
+msgid "Blend is shortened to {seconds} s so it fits this section."
+msgstr "Die Überblendung wird auf {seconds} s gekürzt, damit sie in diesen Abschnitt passt."
+
+msgid "Repeat this section more than once to use a loop effect."
+msgstr "Wiederholen Sie diesen Abschnitt mehr als einmal, um einen Schleifeneffekt zu nutzen."
+
+msgid "Smart frame matching (experimental)"
+msgstr "Szenenübergang suchen (experimentell)"
+
+msgid "No reliable seam was found. The original range stays, with a hard cut."
+msgstr "Es wurde keine verlässliche Nahtstelle gefunden. Der ursprüngliche Bereich bleibt, mit einem harten Schnitt."
+
+msgid "Effective loop: {start}–{end} s. This is not a guaranteed seamless join."
+msgstr "Wirksame Schleife: {start}–{end} s. Das ist keine garantiert unsichtbare Naht."
+
+msgid "The section changed. Run smart frame matching again to update the seam."
+msgstr "Der Abschnitt hat sich geändert. Suchen Sie die Nahtstelle erneut."
+
+msgid "A short crossfade was added at the seam. Both pictures keep moving forward."
+msgstr "An der Naht liegt eine kurze Überblendung. Beide Bilder laufen vorwärts weiter."
+
+msgid "Soundtrack duration is unknown, so this section is not repeated to it."
+msgstr "Die Soundtrack-Dauer ist unbekannt, deshalb wird dieser Abschnitt nicht bis zum Soundtrack wiederholt."
+
+msgid "The rest of the story is already as long as the soundtrack, so this section is not extended."
+msgstr "Der Rest der Story ist bereits so lang wie der Soundtrack, deshalb wird dieser Abschnitt nicht verlängert."
+
+msgid "This section is too short to repeat through the soundtrack."
+msgstr "Dieser Abschnitt ist zu kurz, um ihn bis zum Ende des Soundtracks zu wiederholen."
+
+msgid "Another clip already repeats to the soundtrack."
+msgstr "Ein anderer Clip wiederholt bereits bis zum Soundtrack."
+
+msgid "Could not save the soundtrack loop."
+msgstr "Die Soundtrack-Wiederholung konnte nicht gespeichert werden."
+
 msgid "Could not save the section."
 msgstr "Der Abschnitt konnte nicht gespeichert werden."
 

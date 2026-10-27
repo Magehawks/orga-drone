@@ -7,7 +7,7 @@ trim. Persist canonical type ids and a duration number — never ffmpeg strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 TYPE_CUT = "cut"
 TYPE_FADE_BLACK = "fade_black"
@@ -371,43 +371,75 @@ def resolve_story_time(
 
 
 def item_effective_seconds(item: object) -> float | None:
-    """Duration used on estimate/preview surfaces (skip unavailable video)."""
+    """Duration used on estimate/preview surfaces (skip unavailable video).
+
+    A repeated video with a loop crossfade is shorter by the overlaps.
+    A confident smart seam uses that range. One play is unchanged.
+    """
     from orga_drone.studio_estimate import effective_seconds
 
     kind = getattr(item, "kind", None) or "unknown"
     repeats = 1
+    raw_effects = getattr(item, "effect_settings", None)
+    settings = raw_effects if isinstance(raw_effects, str) else None
+    source_in = getattr(item, "source_in_s", None)
+    source_out = getattr(item, "source_out_s", None)
     if kind == "video":
         from orga_drone.studio_cut import section_repeats_from_effect_settings
+        from orga_drone.studio_forward_loop import _playback_bounds
 
-        raw_effects = getattr(item, "effect_settings", None)
-        repeats = section_repeats_from_effect_settings(
-            raw_effects if isinstance(raw_effects, str) else None
-        )
-    return effective_seconds(
+        repeats = section_repeats_from_effect_settings(settings)
+        start, end, _path = _playback_bounds(item)
+        if start is not None:
+            source_in = start
+        if end is not None:
+            source_out = end
+    seconds = effective_seconds(
         kind=kind,
         photo_duration_s=getattr(item, "photo_duration_s", None),
         duration_s=getattr(item, "duration_s", None),
         available=bool(getattr(item, "available", False)),
-        source_in_s=getattr(item, "source_in_s", None),
-        source_out_s=getattr(item, "source_out_s", None),
+        source_in_s=source_in,
+        source_out_s=source_out,
         card_duration_s=getattr(item, "card_duration_s", None),
         playback_speed=getattr(item, "playback_speed", None),
         section_repeats=repeats,
     )
+    if kind != "video" or seconds is None or repeats < 2:
+        return seconds
+    from orga_drone.studio_forward_loop import _manual_overlap_s
+
+    overlap = _manual_overlap_s(item, settings)
+    if overlap <= 0:
+        return seconds
+    return seconds - overlap * (repeats - 1)
 
 
-def apply_for_items(items: Iterable[object]) -> tuple[list[float], list[AppliedTransition], list[int]]:
+def apply_for_items(
+    items: Iterable[object],
+    *,
+    duration_overrides: Mapping[int, float] | None = None,
+) -> tuple[list[float], list[AppliedTransition], list[int]]:
     """Apply transitions to items with a positive effective duration.
+
+    ``duration_overrides`` replaces the ordinary duration for those clip ids
+    (a forward loop derived from a known soundtrack). Missing ids are unchanged.
 
     Returns ``(durations, applied, source_indexes)`` where ``source_indexes``
     maps sequence positions back to the original item list.
     """
+    overrides = duration_overrides or {}
     durations: list[float] = []
     types: list[str | None] = []
     durs: list[float | None] = []
     indexes: list[int] = []
     for idx, item in enumerate(items):
-        seconds = item_effective_seconds(item)
+        item_id = getattr(item, "id", None)
+        seconds: float | None
+        if isinstance(item_id, int) and item_id in overrides:
+            seconds = float(overrides[item_id])
+        else:
+            seconds = item_effective_seconds(item)
         if seconds is None or seconds <= 0:
             continue
         durations.append(float(seconds))

@@ -168,6 +168,84 @@ msgstr "Repeat"
 msgid "Repeat plays this in/out range again, up to 8 times, at the same speed."
 msgstr "Repeat plays this in/out range again, up to 8 times, at the same speed."
 
+msgid "Loop transition"
+msgstr "Loop transition"
+
+msgid "Off"
+msgstr "Off"
+
+msgid "Repeat to soundtrack"
+msgstr "Repeat to soundtrack"
+
+msgid "Blends the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Where the start and end frames differ, a double image can remain. This does not match those frames automatically. The soundtrack plays once and is not blended."
+msgstr "Blends the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Where the start and end frames differ, a double image can remain. This does not match those frames automatically. The soundtrack plays once and is not blended."
+
+msgid "This section is too short for a crossfade, so the joins stay hard cuts."
+msgstr "This section is too short for a crossfade, so the joins stay hard cuts."
+
+msgid "Crossfade is shortened to {seconds} s so it fits this section."
+msgstr "Crossfade is shortened to {seconds} s so it fits this section."
+
+msgid "The soundtrack ends before a second repetition, so there is no join to blend."
+msgstr "The soundtrack ends before a second repetition, so there is no join to blend."
+
+msgid "Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect."
+msgstr "Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect."
+
+msgid "Loop effect"
+msgstr "Loop effect"
+
+msgid "Cinematic blend"
+msgstr "Cinematic blend"
+
+msgid "Curve"
+msgstr "Curve"
+
+msgid "Linear"
+msgstr "Linear"
+
+msgid "Smooth"
+msgstr "Smooth"
+
+msgid "Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended."
+msgstr "Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended."
+
+msgid "Blend is shortened to {seconds} s so it fits this section."
+msgstr "Blend is shortened to {seconds} s so it fits this section."
+
+msgid "Repeat this section more than once to use a loop effect."
+msgstr "Repeat this section more than once to use a loop effect."
+
+msgid "Smart frame matching (experimental)"
+msgstr "Smart frame matching (experimental)"
+
+msgid "No reliable seam was found. The original range stays, with a hard cut."
+msgstr "No reliable seam was found. The original range stays, with a hard cut."
+
+msgid "Effective loop: {start}–{end} s. This is not a guaranteed seamless join."
+msgstr "Effective loop: {start}–{end} s. This is not a guaranteed seamless join."
+
+msgid "The section changed. Run smart frame matching again to update the seam."
+msgstr "The section changed. Run smart frame matching again to update the seam."
+
+msgid "A short crossfade was added at the seam. Both pictures keep moving forward."
+msgstr "A short crossfade was added at the seam. Both pictures keep moving forward."
+
+msgid "Soundtrack duration is unknown, so this section is not repeated to it."
+msgstr "Soundtrack duration is unknown, so this section is not repeated to it."
+
+msgid "The rest of the story is already as long as the soundtrack, so this section is not extended."
+msgstr "The rest of the story is already as long as the soundtrack, so this section is not extended."
+
+msgid "This section is too short to repeat through the soundtrack."
+msgstr "This section is too short to repeat through the soundtrack."
+
+msgid "Another clip already repeats to the soundtrack."
+msgstr "Another clip already repeats to the soundtrack."
+
+msgid "Could not save the soundtrack loop."
+msgstr "Could not save the soundtrack loop."
+
 msgid "Could not save the section."
 msgstr "Could not save the section."
 

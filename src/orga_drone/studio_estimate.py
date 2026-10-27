@@ -109,7 +109,12 @@ def effective_seconds(
     return None
 
 
-def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary:
+def summarize_studio_items(
+    items: Iterable[StudioEstimateItem],
+    *,
+    soundtrack_once_s: float | None = None,
+) -> StudioSummary:
+    from orga_drone.studio_forward_loop import resolve_forward_loop
     from orga_drone.studio_transition import apply_for_items, story_length_s
 
     rows = list(items)
@@ -121,7 +126,10 @@ def summarize_studio_items(items: Iterable[StudioEstimateItem]) -> StudioSummary
             photo_count += 1
         elif kind == "video":
             video_count += 1
-    durations, applied, _indexes = apply_for_items(rows)
+    resolution = resolve_forward_loop(rows, soundtrack_once_s)
+    durations, applied, _indexes = apply_for_items(
+        rows, duration_overrides=resolution.overrides
+    )
     total = story_length_s(durations, applied)
     return StudioSummary(
         photo_count=photo_count,

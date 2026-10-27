@@ -1518,8 +1518,19 @@ video.studio-preview-media.studio-preview-layer-b {
   align-items: center;
   gap: 0.4rem;
 }
-#inspector-bw-enabled {
+#inspector-bw-enabled,
+#inspector-forward-loop {
   width: auto;
+}
+.studio-loop-effect {
+  margin: 0.75rem 0 0.35rem;
+}
+.studio-loop-effect summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.studio-loop-effect[open] summary {
+  margin-bottom: 0.45rem;
 }
 .studio-frame-target,
 .studio-speed-choices {

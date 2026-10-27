@@ -282,7 +282,11 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
 
 
 def _clip_to_export_clip(
-    db: Database, clip: StudioClip, *, locale: str = "en"
+    db: Database,
+    clip: StudioClip,
+    *,
+    locale: str = "en",
+    forward: object | None = None,
 ) -> StudioExportClip | None:
     if clip.item_kind == TITLE_CARD_KIND or clip.kind == TITLE_CARD_KIND:
         seconds = effective_seconds(
@@ -323,13 +327,44 @@ def _clip_to_export_clip(
         if kind == "video"
         else 1
     )
+    forward_active = False
+    forward_cycle = 0.0
+    forward_total_s = 0.0
+    forward_total = getattr(forward, "total_s", None)
+    forward_cycle_raw = getattr(forward, "cycle_s", None)
+    if (
+        kind == "video"
+        and getattr(forward, "active", False)
+        and getattr(forward, "item_id", None) == clip.id
+        and isinstance(forward_total, (int, float))
+        and not isinstance(forward_total, bool)
+        and isinstance(forward_cycle_raw, (int, float))
+        and not isinstance(forward_cycle_raw, bool)
+        and float(forward_total) > 0
+        and float(forward_cycle_raw) > 0
+    ):
+        forward_active = True
+        forward_cycle = float(forward_cycle_raw)
+        forward_total_s = float(forward_total)
+        repeats = 1
+    from orga_drone.studio_forward_loop import (
+        _playback_bounds,
+        applied_join_s,
+        loop_transition_curve,
+    )
+
+    play_in, play_out, media_path = _playback_bounds(clip)
+    if play_in is None:
+        play_in = clip.source_start
+    if play_out is None:
+        play_out = clip.source_end
     one_play = effective_seconds(
         kind=kind or "unknown",
         photo_duration_s=clip.photo_duration_s,
         duration_s=clip.duration_s,
         available=True,
-        source_in_s=clip.source_start,
-        source_out_s=clip.source_end,
+        source_in_s=play_in,
+        source_out_s=play_out,
         playback_speed=speed,
         section_repeats=1,
     )
@@ -338,11 +373,13 @@ def _clip_to_export_clip(
         photo_duration_s=clip.photo_duration_s,
         duration_s=clip.duration_s,
         available=True,
-        source_in_s=clip.source_start,
-        source_out_s=clip.source_end,
+        source_in_s=play_in,
+        source_out_s=play_out,
         playback_speed=speed,
         section_repeats=repeats,
     )
+    if forward_active:
+        seconds = forward_total_s
     if seconds is None or seconds <= 0:
         if kind == "photo":
             seconds = (
@@ -352,8 +389,19 @@ def _clip_to_export_clip(
             )
         else:
             return None
-    start = float(clip.source_start) if clip.source_start is not None else 0.0
-    end = float(clip.source_end) if clip.source_end is not None else None
+    start = float(play_in) if play_in is not None else 0.0
+    end = float(play_out) if play_out is not None else None
+    loop_join = 0.0
+    if kind == "video" and one_play is not None and not forward_active and repeats > 1:
+        loop_join = applied_join_s(
+            clip.effect_settings,
+            float(one_play),
+            path=media_path,
+            source_in_s=float(clip.source_start) if clip.source_start is not None else None,
+            source_out_s=float(clip.source_end) if clip.source_end is not None else None,
+        )
+        if loop_join > 0 and seconds is not None:
+            seconds = float(seconds) - loop_join * (repeats - 1)
     image = (
         image_adjust_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
@@ -428,6 +476,16 @@ def _clip_to_export_clip(
         source_end_s=end,
         playback_speed=speed,
         section_repeats=repeats if kind == "video" else 1,
+        forward_loop=forward_active,
+        forward_cycle_s=forward_cycle if forward_active else 0.0,
+        forward_transition_s=(
+            float(getattr(getattr(forward, "plan", None), "overlap_s", 0.0) or 0.0)
+            if forward_active
+            else loop_join
+        ),
+        forward_transition_curve=(
+            loop_transition_curve(clip.effect_settings) if kind == "video" else "linear"
+        ),
         image=image,
         saturation_ramp=saturation_ramp,
         frame=frame,
@@ -512,10 +570,16 @@ def prepare_studio_export(
         suffix=".mp4",
     )
 
+    from orga_drone.studio_forward_loop import resolve_forward_loop, soundtrack_once_s
+
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
-    for clip in db.list_studio_items(project.id):
-        built = _clip_to_export_clip(db, clip)
+    source_rows = db.list_studio_items(project.id)
+    forward = resolve_forward_loop(
+        source_rows, soundtrack_once_s(db.list_studio_music(project.id))
+    )
+    for clip in source_rows:
+        built = _clip_to_export_clip(db, clip, forward=forward)
         if built is not None:
             export_clips.append(built)
             source_items.append(clip)

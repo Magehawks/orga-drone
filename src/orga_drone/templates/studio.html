@@ -129,6 +129,23 @@
          data-source-in="{{ _('Source in')|e }}"
          data-source-out="{{ _('Source out')|e }}"
          data-section-failed="{{ _('Could not save the section.')|e }}"
+         data-forward-loop-hint="{{ _('Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect.')|e }}"
+         data-loop-effect-idle="{{ _('Repeat this section more than once to use a loop effect.')|e }}"
+         data-loop-match-low="{{ _('No reliable seam was found. The original range stays, with a hard cut.')|e }}"
+         data-loop-match-ok="{{ _('Effective loop: {start}–{end} s. This is not a guaranteed seamless join.')|e }}"
+         data-loop-match-stale="{{ _('The section changed. Run smart frame matching again to update the seam.')|e }}"
+         data-loop-match-fade="{{ _('A short crossfade was added at the seam. Both pictures keep moving forward.')|e }}"
+         data-forward-loop-unknown="{{ _('Soundtrack duration is unknown, so this section is not repeated to it.')|e }}"
+         data-forward-loop-filled="{{ _('The rest of the story is already as long as the soundtrack, so this section is not extended.')|e }}"
+         data-forward-loop-short="{{ _('This section is too short to repeat through the soundtrack.')|e }}"
+         data-forward-loop-other="{{ _('Another clip already repeats to the soundtrack.')|e }}"
+         data-forward-loop-failed="{{ _('Could not save the soundtrack loop.')|e }}"
+         data-loop-crossfade-hint="{{ _('Blends the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Where the start and end frames differ, a double image can remain. This does not match those frames automatically. The soundtrack plays once and is not blended.')|e }}"
+         data-loop-cinematic-hint="{{ _('Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended.')|e }}"
+         data-loop-blend-clamped="{{ _('Blend is shortened to {seconds} s so it fits this section.')|e }}"
+         data-loop-transition-short="{{ _('This section is too short for a crossfade, so the joins stay hard cuts.')|e }}"
+         data-loop-transition-clamped="{{ _('Crossfade is shortened to {seconds} s so it fits this section.')|e }}"
+         data-loop-transition-once="{{ _('The soundtrack ends before a second repetition, so there is no join to blend.')|e }}"
          data-in-story="{{ _('In story')|e }}"
          data-cut-hint="{{ _('Cut splits this video at the playhead. Source files stay unchanged.')|e }}"
          data-speed-failed="{{ _('Could not change speed.')|e }}"
@@ -507,6 +524,18 @@
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
                   data-playback-speed="{{ item.playback_speed }}"
                   data-section-repeats="{{ row.section_repeats }}"
+                  data-forward-loop="{{ '1' if row.forward_loop.requested else '0' }}"
+                  data-forward-loop-active="{{ '1' if row.forward_loop.active else '0' }}"
+                  data-forward-loop-reason="{{ row.forward_loop.reason }}"
+                  data-forward-loop-transition="{{ row.forward_loop.transition }}"
+                  data-forward-loop-transition-s="{{ '%.3f'|format(row.forward_loop.transition_s) }}"
+                  data-loop-transition-curve="{{ row.forward_loop.curve }}"
+                  data-forward-loop-overlap="{{ '%.3f'|format(row.forward_loop.overlap_s) }}"
+                  data-forward-loop-plays="{{ row.forward_loop.plays }}"
+                  data-forward-loop-partial="{{ '%.3f'|format(row.forward_loop.partial_s) }}"
+                  data-loop-match-state="{{ row.forward_loop.match_state }}"
+                  data-loop-match-in="{{ '%.3f'|format(row.forward_loop.match_in_s) }}"
+                  data-loop-match-out="{{ '%.3f'|format(row.forward_loop.match_out_s) }}"
                   data-effective-duration="{{ row.effective_duration_s if row.effective_duration_s is not none else '' }}"
                   data-transition-type="{{ row.stored_transition }}"
                   data-transition-duration="{{ row.stored_transition_duration_s if row.stored_transition_duration_s is not none else '' }}"
@@ -629,6 +658,39 @@
                    inputmode="numeric" aria-label="{{ _('Repeat') }}">
           </label>
           <p class="hint">{{ _('Repeat plays this in/out range again, up to 8 times, at the same speed.') }}</p>
+          <label class="studio-inspector-field studio-frame-motion" for="inspector-forward-loop">
+            <input type="checkbox" id="inspector-forward-loop">
+            <span>{{ _('Repeat to soundtrack') }}</span>
+          </label>
+          <p class="hint" id="inspector-forward-loop-hint">{{ _('Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect.') }}</p>
+          <details class="studio-loop-effect" id="inspector-loop-effect" open>
+            <summary>{{ _('Loop effect') }}</summary>
+            <p class="hint" id="inspector-loop-effect-idle">{{ _('Repeat this section more than once to use a loop effect.') }}</p>
+            <div id="inspector-loop-effect-controls">
+              <label class="studio-inspector-field" for="inspector-loop-transition">
+                {{ _('Loop effect') }}
+                <select id="inspector-loop-transition" aria-label="{{ _('Loop effect') }}">
+                  <option value="off">{{ _('Off') }}</option>
+                  <option value="crossfade">{{ _('Crossfade') }}</option>
+                  <option value="cinematic">{{ _('Cinematic blend') }}</option>
+                  <option value="match">{{ _('Smart frame matching (experimental)') }}</option>
+                </select>
+              </label>
+              <label class="studio-inspector-field" id="inspector-loop-transition-duration-wrap" for="inspector-loop-transition-duration" hidden>
+                {{ _('Duration (s)') }}
+                <input type="number" id="inspector-loop-transition-duration" min="0.5" max="2" step="0.1" value="1.0"
+                       inputmode="decimal" aria-label="{{ _('Duration (s)') }}">
+              </label>
+              <label class="studio-inspector-field" id="inspector-loop-transition-curve-wrap" for="inspector-loop-transition-curve" hidden>
+                {{ _('Curve') }}
+                <select id="inspector-loop-transition-curve" aria-label="{{ _('Curve') }}">
+                  <option value="linear">{{ _('Linear') }}</option>
+                  <option value="smooth">{{ _('Smooth') }}</option>
+                </select>
+              </label>
+              <p class="hint" id="inspector-loop-transition-hint" hidden></p>
+            </div>
+          </details>
           <p class="hint" data-field="cut-hint">{{ _('Cut splits this video at the playhead. Source files stay unchanged.') }}</p>
         </div>
         <div id="inspector-speed" data-inspector-tab="clip" hidden>

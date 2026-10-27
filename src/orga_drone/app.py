@@ -33,6 +33,12 @@ from orga_drone.dupes import (
     media_row_to_fingerprint,
 )
 from orga_drone.studio_cut import section_repeats_from_effect_settings
+from orga_drone.studio_forward_loop import (
+    clip_forward_loop_view,
+    effective_item_seconds,
+    resolve_forward_loop,
+    soundtrack_once_s,
+)
 from orga_drone.studio_estimate import (
     DEFAULT_PHOTO_DURATION_S,
     effective_seconds,
@@ -66,6 +72,7 @@ from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.studio_transition import (
     apply_for_items,
     clip_flex_s,
+    item_effective_seconds,
     normalize_type,
 )
 from orga_drone.export import build_spot_geojson, spot_download_filename
@@ -561,6 +568,12 @@ def create_app() -> FastAPI:
             ]
         }
 
+    def _studio_summary(project_id: int, items: list[Any]) -> Any:
+        return summarize_studio_items(
+            items,
+            soundtrack_once_s=soundtrack_once_s(db.list_studio_music(project_id)),
+        )
+
     def _raise_music_value_error(exc: ValueError) -> NoReturn:
         msg = str(exc)
         if msg == "music_limit":
@@ -1052,13 +1065,21 @@ def create_app() -> FastAPI:
             filled = db.fill_video_duration_if_missing(it.source_media_id)
             if filled is not None:
                 it.duration_s = filled
-        summary = summarize_studio_items(items)
+        soundtrack_once = (
+            soundtrack_once_s(db.list_studio_music(project.id))
+            if project is not None
+            else None
+        )
+        forward_resolution = resolve_forward_loop(items, soundtrack_once)
+        summary = summarize_studio_items(items, soundtrack_once_s=soundtrack_once)
         lang = lang_from_request(request)
         item_display: list[dict[str, Any]] = []
         favorite_media: list[Any] = []
         applied_by_id: dict[int, Any] = {}
         if project is not None:
-            _durs, applied_list, source_indexes = apply_for_items(items)
+            _durs, applied_list, source_indexes = apply_for_items(
+                items, duration_overrides=forward_resolution.overrides
+            )
             for seq_i, item_idx in enumerate(source_indexes):
                 if seq_i < len(applied_list):
                     applied_by_id[items[item_idx].id] = applied_list[seq_i]
@@ -1078,17 +1099,15 @@ def create_app() -> FastAPI:
                     card_duration_s=it.card_duration_s,
                     section_repeats=1,
                 )
-                seconds = effective_seconds(
-                    kind=it.kind or "unknown",
-                    photo_duration_s=it.photo_duration_s,
-                    duration_s=it.duration_s,
-                    available=it.available,
-                    source_in_s=it.source_start,
-                    source_out_s=it.source_end,
-                    card_duration_s=it.card_duration_s,
-                    playback_speed=it.playback_speed,
-                    section_repeats=repeats,
-                )
+                seconds: float | None
+                if (
+                    forward_resolution.active
+                    and forward_resolution.item_id == it.id
+                    and forward_resolution.total_s is not None
+                ):
+                    seconds = float(forward_resolution.total_s)
+                else:
+                    seconds = item_effective_seconds(it)
                 stream_url = ""
                 proxy_url = ""
                 preview_url = ""
@@ -1139,6 +1158,9 @@ def create_app() -> FastAPI:
                     {
                         "item": it,
                         "section_repeats": repeats,
+                        "forward_loop": clip_forward_loop_view(
+                            it, forward_resolution, soundtrack_once
+                        ),
                         "effective_duration_s": seconds,
                         "display_duration_s": (
                             it.card_duration_s
@@ -1484,7 +1506,7 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         items = db.list_studio_items(open_project.id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(open_project.id, items)
         return JSONResponse(
             {"ok": True, "ordered_ids": ordered, "summary": summary.as_dict()}
         )
@@ -1501,7 +1523,7 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         items = db.list_studio_items(open_project.id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(open_project.id, items)
         return JSONResponse(
             {
                 "ok": True,
@@ -1555,7 +1577,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(clip.project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(clip.project_id, items)
         lang = lang_from_request(request)
         primary, secondary = display_lines(clip.title_text, clip.subtitle_text, lang)
         return JSONResponse(
@@ -1599,7 +1621,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(item.project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(item.project_id, items)
         seconds = effective_seconds(
             kind=item.kind or "unknown",
             photo_duration_s=item.photo_duration_s,
@@ -1904,18 +1926,12 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(item.project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(item.project_id, items)
         repeats = section_repeats_from_effect_settings(item.effect_settings)
-        seconds = effective_seconds(
-            kind=item.kind or "unknown",
-            photo_duration_s=item.photo_duration_s,
-            duration_s=item.duration_s,
-            available=item.available,
-            source_in_s=item.source_in_s,
-            source_out_s=item.source_out_s,
-            card_duration_s=item.card_duration_s,
-            playback_speed=item.playback_speed,
-            section_repeats=repeats if (item.kind or "") == "video" else 1,
+        seconds = effective_item_seconds(
+            item,
+            items,
+            soundtrack_once_s(db.list_studio_music(item.project_id)),
         )
         return JSONResponse(
             {
@@ -1925,6 +1941,143 @@ def create_app() -> FastAPI:
                 "source_out_s": item.source_out_s,
                 "section_repeats": repeats,
                 "effective_duration_s": seconds,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/forward-loop")
+    async def api_studio_forward_loop(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "enabled" not in payload:
+            raise HTTPException(status_code=400, detail="JSON body must include enabled")
+        enabled = payload.get("enabled")
+        if not isinstance(enabled, bool):
+            raise HTTPException(status_code=400, detail="enabled must be true or false")
+        transition: str | None = None
+        if "transition" in payload:
+            raw_transition = payload.get("transition")
+            if raw_transition not in {"off", "crossfade"}:
+                raise HTTPException(
+                    status_code=400, detail="transition must be off or crossfade"
+                )
+            transition = str(raw_transition)
+        transition_s: float | None = None
+        if "duration_s" in payload and payload.get("duration_s") is not None:
+            raw_duration = payload.get("duration_s")
+            if isinstance(raw_duration, bool) or not isinstance(raw_duration, (int, float)):
+                raise HTTPException(status_code=400, detail="duration_s must be a number")
+            transition_s = float(raw_duration)
+        try:
+            item = db.set_studio_forward_loop(
+                studio_item_id,
+                enabled,
+                transition=transition,
+                transition_s=transition_s,
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(item.project_id)
+        once = soundtrack_once_s(db.list_studio_music(item.project_id))
+        resolution = resolve_forward_loop(items, once)
+        summary = summarize_studio_items(items, soundtrack_once_s=once)
+        seconds = effective_item_seconds(item, items, once)
+        active = bool(
+            resolution.active and resolution.item_id == item.id
+        )
+        view = clip_forward_loop_view(item, resolution, once)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "enabled": bool(view["requested"]),
+                "active": active,
+                "reason": view["reason"],
+                "effective_duration_s": seconds,
+                "section_repeats": section_repeats_from_effect_settings(
+                    item.effect_settings
+                ),
+                "transition": view["transition"],
+                "transition_s": view["transition_s"],
+                "overlap_s": view["overlap_s"],
+                "plays": view["plays"],
+                "partial_s": view["partial_s"],
+                "clamped": view["clamped"],
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/loop-effect")
+    async def api_studio_loop_effect(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "transition" not in payload:
+            raise HTTPException(status_code=400, detail="JSON body must include transition")
+        raw_transition = payload.get("transition")
+        if raw_transition not in {"off", "crossfade", "cinematic", "match"}:
+            raise HTTPException(
+                status_code=400,
+                detail="transition must be off, crossfade, cinematic, or match",
+            )
+        transition_s: float | None = None
+        if "duration_s" in payload and payload.get("duration_s") is not None:
+            raw_duration = payload.get("duration_s")
+            if isinstance(raw_duration, bool) or not isinstance(raw_duration, (int, float)):
+                raise HTTPException(status_code=400, detail="duration_s must be a number")
+            transition_s = float(raw_duration)
+        curve: str | None = None
+        if payload.get("curve") is not None:
+            raw_curve = payload.get("curve")
+            if raw_curve not in {"linear", "smooth"}:
+                raise HTTPException(status_code=400, detail="curve must be linear or smooth")
+            curve = str(raw_curve)
+        try:
+            item = db.set_studio_loop_effect(
+                studio_item_id,
+                transition=str(raw_transition),
+                duration_s=transition_s,
+                curve=curve,
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(item.project_id)
+        once = soundtrack_once_s(db.list_studio_music(item.project_id))
+        resolution = resolve_forward_loop(items, once)
+        summary = summarize_studio_items(items, soundtrack_once_s=once)
+        seconds = effective_item_seconds(item, items, once)
+        view = clip_forward_loop_view(item, resolution, once)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "effective_duration_s": seconds,
+                "section_repeats": section_repeats_from_effect_settings(item.effect_settings),
+                "transition": view["transition"],
+                "transition_s": view["transition_s"],
+                "overlap_s": view["overlap_s"],
+                "plays": view["plays"],
+                "partial_s": view["partial_s"],
+                "clamped": view["clamped"],
+                "match_state": view["match_state"],
+                "match_in_s": view["match_in_s"],
+                "match_out_s": view["match_out_s"],
+                "curve": view["curve"],
                 "summary": summary.as_dict(),
             }
         )
@@ -1965,7 +2118,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(item.project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(item.project_id, items)
         _durs, applied_list, source_indexes = apply_for_items(items)
         applied = None
         for seq_i, item_idx in enumerate(source_indexes):
@@ -2030,7 +2183,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(changed[0].project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(changed[0].project_id, items)
 
         def _speed_row(clip: Any) -> dict[str, Any]:
             return {
@@ -2082,7 +2235,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
         items = db.list_studio_items(left.project_id)
-        summary = summarize_studio_items(items)
+        summary = _studio_summary(left.project_id, items)
         return JSONResponse(
             {
                 "ok": True,
