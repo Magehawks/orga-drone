@@ -9,14 +9,16 @@ and no earlier duration probe is read once, then skipped like any other
 unchanged file. If a root cannot be listed,
 or disappears before the index is replaced, catalog entries stay and the
 source is offline. A child folder that cannot be listed keeps the catalog
-entries already stored under it. Files, user metadata, and Studio clips
-are never deleted.
+entries already stored under it. A media file that cannot be read
+(permission or a sharing lock) stays indexed too. Files, user metadata,
+and Studio clips are never deleted.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import stat
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -71,7 +73,7 @@ def iter_media_files(
             path = Path(dirpath) / name
             if path.suffix.lower() not in MEDIA_EXTS:
                 continue
-            if not path.is_file():
+            if not _keep_discovered_file(path, blocked):
                 continue
             files.append(path)
             if on_found is not None:
@@ -85,6 +87,23 @@ def iter_media_files(
                     )
                 )
     return sorted(files)
+
+
+def _keep_discovered_file(path: Path, blocked: list[Path]) -> bool:
+    """True when ``path`` is a regular file the scan may index.
+
+    ``Path.is_file`` turns ``PermissionError`` and a Windows sharing lock into
+    ``False``, which looks like a deleted file. Those rows must stay. A file
+    that is actually gone is still omitted so a later scan can drop it.
+    """
+    try:
+        info = path.stat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        blocked.append(path)
+        return False
+    return stat.S_ISREG(info.st_mode)
 
 
 def _siblings(stem_base: str, by_stem: dict[str, list[Path]]) -> dict[str, Path]:
@@ -465,7 +484,7 @@ def scan_root(
     counts["unreadable"] = len(unreadable)
     if unreadable:
         logging.getLogger(__name__).warning(
-            "Scan kept catalog entries for %s folder(s) that could not be listed",
+            "Scan kept catalog entries for %s path(s) that could not be read",
             len(unreadable),
         )
 

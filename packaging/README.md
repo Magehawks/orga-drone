@@ -15,7 +15,8 @@ writes `orga-drone.log` plus `startup-crash.log`. It does **not** open the syste
 browser (native folder / soundtrack / export dialogs need the desktop window).
 Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 
-First launch with an empty library opens the **Library** page so “Add folder” is obvious.
+First launch with an empty library opens **Home**. The hero is the Orga Drone
+logo, and **Add media** starts the existing folder import.
 
 ## Windows build (PyInstaller)
 

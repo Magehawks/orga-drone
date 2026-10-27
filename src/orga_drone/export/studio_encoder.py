@@ -15,6 +15,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import replace
@@ -962,6 +963,29 @@ def _claim_new_export_file(partial: Path, dest: Path) -> None:
     os.close(fd)
 
 
+def _unlink_export_temp(path: Path) -> None:
+    """Remove a temp export file without failing the export.
+
+    Windows can return WinError 32 while a killed ffmpeg still holds the file.
+    A short retry covers that. Cleanup must not replace a successful publish
+    or a cancel with that lock error.
+    """
+    for attempt in range(3):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except OSError as exc:
+            winerror = getattr(exc, "winerror", None)
+            locked = winerror in {5, 32} or exc.errno in {
+                errno.EACCES,
+                errno.EPERM,
+                errno.EBUSY,
+            }
+            if not locked or attempt == 2:
+                return
+            time.sleep(0.05)
+
+
 def _already_exists(exc: OSError) -> bool:
     if isinstance(exc, FileExistsError):
         return True
@@ -1382,7 +1406,7 @@ class FfmpegStudioEncoder:
         except Exception as exc:  # noqa: BLE001
             raise StudioExportError(f"Export failed: {exc}") from exc
         finally:
-            partial.unlink(missing_ok=True)
+            _unlink_export_temp(partial)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             _encode_quality.reset(quality_token)
             _cancel_event.reset(token)
@@ -2232,13 +2256,21 @@ def _run_ffmpeg(
         if on_time is not None and last_emit < 0 and duration_s is not None:
             on_time(duration_s)
     finally:
-        if popen is not None and event is not None:
-            _unbind_export_process(event, popen)
+        proc = popen
+        if proc is not None and event is not None:
+            _unbind_export_process(event, proc)
+        stdout = getattr(proc, "stdout", None) if proc is not None else None
+        close = getattr(stdout, "close", None)
+        if callable(close) and callable(getattr(stdout, "fileno", None)):
+            try:
+                close()
+            except OSError:
+                pass
+        poll = getattr(proc, "poll", None) if proc is not None else None
+        if proc is not None and callable(poll) and poll() is None:
+            _terminate_ffmpeg(proc)
         # A killed ffmpeg can still hold this temp file for a moment on Windows.
-        try:
-            err_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        _unlink_export_temp(err_path)
 
 
 def get_default_encoder() -> StudioVideoEncoder:

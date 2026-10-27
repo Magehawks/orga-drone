@@ -1323,6 +1323,9 @@ button.cta, .button.cta {
   font-weight: 700;
 }
 .studio-project-landing {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding: 1.25rem 1.5rem 2rem;
   display: flex;
   flex-direction: column;
@@ -1382,9 +1385,11 @@ button.cta, .button.cta {
 .studio-projects-dialog {
   max-width: 36rem;
   width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
 }
 .studio-projects-dialog .studio-project-list {
-  max-height: 18rem;
+  max-height: min(18rem, max(8rem, calc(100vh - 14rem)));
   overflow: auto;
 }
 

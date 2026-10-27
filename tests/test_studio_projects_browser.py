@@ -441,6 +441,34 @@ def test_clear_only_affects_open_project(
     assert db.get_media(mid_b) is not None
 
 
+def test_project_lists_scroll_inside_a_short_window() -> None:
+    """Many projects stay reachable when the Studio window is shorter than the list.
+
+    The landing and the Projects dialog are the scroll containers. Their rows
+    are buttons, so Tab moves through them and the browser scrolls the focused
+    row into view. The dialog also keeps a max-height so Close stays in the window.
+    """
+    css = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "orga_drone"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+    landing = css.split(".studio-project-landing {", 1)[1].split("}", 1)[0]
+    assert "min-height: 0" in landing
+    assert "overflow: auto" in landing
+    dialog = css.split(".studio-projects-dialog {", 1)[1].split("}", 1)[0]
+    assert "max-height: calc(100vh - 2rem)" in dialog
+    assert "overflow: auto" in dialog
+    project_list = css.split(".studio-projects-dialog .studio-project-list {", 1)[1].split(
+        "}", 1
+    )[0]
+    assert "overflow: auto" in project_list
+    assert "calc(100vh - 14rem)" in project_list
+
+
 def test_export_options_without_open_project_is_400(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
