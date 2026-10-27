@@ -70,6 +70,7 @@ from orga_drone.studio_map import (
 )
 from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
 from orga_drone.studio_merge import MERGE_REASONS, MergeBlocked
+from orga_drone.studio_reuse import REUSE_REASONS, ReuseBlocked
 from orga_drone.studio_overlay import (
     overlay_preview_model,
     overlays_from_effect_settings,
@@ -1284,6 +1285,42 @@ def create_app() -> FastAPI:
             if project is not None
             else {"tracks": []}
         )
+        studio_originals: list[dict[str, Any]] = []
+        if project is not None:
+            db.sync_studio_originals(project.id)
+            for original in db.list_studio_originals(project.id):
+                media_id = original["media_id"]
+                duration_s = original["duration_s"]
+                if media_id is not None and duration_s is None:
+                    filled = db.fill_video_duration_if_missing(int(media_id))
+                    if filled is not None:
+                        duration_s = filled
+                stream_url = ""
+                proxy_url = ""
+                has_proxy = False
+                can_play = False
+                available = media_id is not None
+                if media_id is not None:
+                    media_row = db.get_media(int(media_id))
+                    if media_row is not None and resolve_media_file(db, media_row) is not None:
+                        can_play = True
+                        stream_url = f"/media/{media_id}/stream"
+                        if media_row.kind == "video" and resolve_proxy_file(db, media_row) is not None:
+                            has_proxy = True
+                            proxy_url = f"/media/{media_id}/proxy"
+                    elif media_row is None:
+                        available = False
+                studio_originals.append(
+                    {
+                        **original,
+                        "duration_s": duration_s,
+                        "available": available,
+                        "can_play": can_play and duration_s is not None and float(duration_s) > 0,
+                        "stream_url": stream_url,
+                        "proxy_url": proxy_url,
+                        "has_proxy": has_proxy,
+                    }
+                )
         story_history = history_flags(project.id if project is not None else None)
         return render(
             request,
@@ -1301,6 +1338,7 @@ def create_app() -> FastAPI:
             overlay_model=overlay_preview_model(),
             map_model=map_preview_model(),
             favorite_media=favorite_media,
+            studio_originals=studio_originals,
             music_payload=music_payload,
             can_undo=story_history["can_undo"],
             can_redo=story_history["can_redo"],
@@ -2389,6 +2427,108 @@ def create_app() -> FastAPI:
                     playback_speed=merged.playback_speed,
                     section_repeats=section_repeats_from_effect_settings(
                         merged.effect_settings
+                    ),
+                ),
+            }
+        )
+
+    def _reuse_reason(request: Request, code: str) -> str:
+        translate = get_translator(lang_from_request(request))
+        return translate(REUSE_REASONS.get(code, REUSE_REASONS["outside"]))
+
+    @app.post("/api/studio/{studio_item_id}/reuse-source")
+    async def api_studio_reuse_source(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail=_reuse_reason(request, "outside"))
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id)):
+                created = db.reuse_studio_source(
+                    studio_item_id,
+                    payload.get("source_in_s"),
+                    payload.get("source_out_s"),
+                )
+        except ReuseBlocked as exc:
+            status = 404 if exc.code == "not_found" else 400
+            raise HTTPException(
+                status_code=status, detail=_reuse_reason(request, exc.code)
+            ) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": created.id,
+                "source_in_s": created.source_in_s,
+                "source_out_s": created.source_out_s,
+                "effective_duration_s": effective_seconds(
+                    kind=created.kind or "unknown",
+                    photo_duration_s=created.photo_duration_s,
+                    duration_s=created.duration_s,
+                    available=created.available,
+                    source_in_s=created.source_in_s,
+                    source_out_s=created.source_out_s,
+                    playback_speed=created.playback_speed,
+                    section_repeats=section_repeats_from_effect_settings(
+                        created.effect_settings
+                    ),
+                ),
+            }
+        )
+
+    @app.post("/api/studio/media/{media_id}/reuse-source")
+    async def api_studio_original_scene(
+        media_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        project = db.resolve_studio_page_project()
+        if project is None:
+            raise HTTPException(status_code=404, detail=_reuse_reason(request, "not_found"))
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail=_reuse_reason(request, "outside"))
+        before_id = payload.get("before_id")
+        if before_id is not None and (
+            isinstance(before_id, bool) or not isinstance(before_id, int)
+        ):
+            raise HTTPException(status_code=400, detail=_reuse_reason(request, "outside"))
+        try:
+            with story_edit(db, project.id):
+                created = db.insert_studio_original_scene(
+                    project.id,
+                    media_id,
+                    payload.get("source_in_s"),
+                    payload.get("source_out_s"),
+                    before_id=before_id,
+                )
+        except ReuseBlocked as exc:
+            status = 404 if exc.code == "not_found" else 400
+            raise HTTPException(
+                status_code=status, detail=_reuse_reason(request, exc.code)
+            ) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": created.id,
+                "source_in_s": created.source_in_s,
+                "source_out_s": created.source_out_s,
+                "effective_duration_s": effective_seconds(
+                    kind=created.kind or "unknown",
+                    photo_duration_s=created.photo_duration_s,
+                    duration_s=created.duration_s,
+                    available=created.available,
+                    source_in_s=created.source_in_s,
+                    source_out_s=created.source_out_s,
+                    playback_speed=created.playback_speed,
+                    section_repeats=section_repeats_from_effect_settings(
+                        created.effect_settings
                     ),
                 ),
             }

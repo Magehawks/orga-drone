@@ -563,6 +563,8 @@
 
   const MIN_CUT_SEGMENT_S = 0.05;
   const CUT_RESTORE_KEY = "orga-drone-studio-cut-restore";
+  let reuseDraft = null;
+  let dragOriginalMediaId = null;
   const cutBtn = root.querySelector('[data-transport="cut"]');
   const cutFailedMsg = root.dataset.cutFailed || "Could not cut clip.";
 
@@ -2906,6 +2908,7 @@
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
+    if (reuseDraft) return;
     void seek;
     const hit = resolveAt(state.projectTimeS);
     if (!hit) {
@@ -2962,6 +2965,7 @@
   }
 
   function setProjectTime(t, { resume = false, fromVideo = false } = {}) {
+    if (reuseDraft) return;
     const total = totalDuration();
     let next = Math.max(0, Number(t) || 0);
     if (total > 0 && next > total) next = total;
@@ -3085,6 +3089,7 @@
   }
 
   function startPlayback() {
+    if (reuseDraft) return;
     const total = totalDuration();
     if (total <= 0) return;
     if (state.projectTimeS >= total - 0.001) {
@@ -3097,6 +3102,10 @@
   }
 
   function onVideoTimeUpdate() {
+    if (reuseDraft && previewVideo) {
+      if (previewVideo.currentTime >= reuseDraft.outS - 0.02) previewVideo.pause();
+      return;
+    }
     if (!state.playing || suppressVideoClock || !previewVideo) return;
     if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
     const playing = clips().find(
@@ -3879,6 +3888,11 @@
   }
 
   function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
+    if (reuseDraft) {
+      const draftClipId = reuseDraft.clip && reuseDraft.clip.dataset.studioId;
+      if (draftClipId == null || String(draftClipId) !== String(id)) cancelReuseDraft();
+      else return;
+    }
     state.selected = { type: "clip", id: String(id) };
     const clip = clips().find((c) => String(c.dataset.studioId) === String(id));
     if (!clip) {
@@ -4029,6 +4043,7 @@
   let speedApplyPending = false;
 
   async function applyClipSpeed(speed) {
+    if (reuseDraft) return;
     if (speedApplyPending) return;
     const selected = clips().find(
       (c) => state.selected && String(c.dataset.studioId) === String(state.selected.id)
@@ -4197,6 +4212,7 @@
         button.title = text;
         setClipMenuReason(text);
       }
+      reuseReasonWins();
     } catch (_) {
       const menu = document.getElementById("studio-clip-menu");
       if (!menu || menu.hidden) return;
@@ -4205,6 +4221,7 @@
       button.setAttribute("aria-disabled", "true");
       button.title = fallback;
       setClipMenuReason(fallback);
+      reuseReasonWins();
     }
   }
 
@@ -4236,6 +4253,7 @@
   }
 
   function removeSelectedStoryClip() {
+    if (reuseDraft) return;
     const clip = selectedStoryClip();
     if (!clip) return;
     hideClipMenu();
@@ -4247,6 +4265,7 @@
   }
 
   async function cutSelectedAtPlayhead() {
+    if (reuseDraft) return;
     const hit = resolveAt(state.projectTimeS);
     if (!canCutAtHit(hit)) return;
     const studioId = hit.clip.dataset.studioId;
@@ -4285,6 +4304,7 @@
   }
 
   function selectTransition(el) {
+    if (reuseDraft) cancelReuseDraft();
     state.selected = { type: "transition", id: el.dataset.transitionAfter || "" };
     clips().forEach((c) => {
       c.classList.remove("is-selected");
@@ -4339,6 +4359,7 @@
   }
 
   function selectMusic(trackId) {
+    if (reuseDraft) cancelReuseDraft();
     const track = state.tracks.find((item) => String(item.id) === String(trackId));
     if (!track) return;
     state.selected = { type: "music", id: String(track.id) };
@@ -4897,6 +4918,7 @@
   }
 
   async function persistForwardLoop(clip, enabled) {
+    if (reuseDraft) return;
     const box = document.getElementById("inspector-forward-loop");
     const prevLoop = clip.dataset.forwardLoop;
     const prevActive = clip.dataset.forwardLoopActive;
@@ -4941,6 +4963,7 @@
   }
 
   async function persistSection(clip) {
+    if (reuseDraft) return;
     const inEl = document.getElementById("inspector-source-in");
     const outEl = document.getElementById("inspector-source-out");
     const repeatEl = document.getElementById("inspector-section-repeats");
@@ -5005,6 +5028,7 @@
       refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
+      ensureOriginalRow(clip);
       setSaveState(true);
       showFlash("");
     } catch (err) {
@@ -5017,6 +5041,7 @@
   }
 
   function seekFromClientX(clientX, { resumeAfter = false } = {}) {
+    if (reuseDraft) return;
     const originEl = timelineCanvasEl || tracksEl;
     if (!originEl) return;
     const rect = originEl.getBoundingClientRect();
@@ -5049,16 +5074,422 @@
   });
 
   document.getElementById("studio-undo")?.addEventListener("click", () => {
+    if (reuseDraft) return;
     applyStudioHistory("undo");
   });
   document.getElementById("studio-redo")?.addEventListener("click", () => {
+    if (reuseDraft) return;
     applyStudioHistory("redo");
   });
+  function reuseReasonWins() {
+    const reuseItem = document.getElementById("studio-clip-menu-reuse");
+    if (!reuseItem || reuseItem.hidden) return;
+    const text = reuseItem.dataset.reason || "";
+    if (reuseItem.getAttribute("aria-disabled") === "true" && text) setClipMenuReason(text);
+  }
+  function catalogDurationS(clip) {
+    const n = Number(clip && clip.dataset.mediaDuration);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  function reuseMenuState(clip) {
+    if (!clip || clip.dataset.kind !== "video") return { show: false, reason: "" };
+    if (clip.dataset.available !== "1" || clip.dataset.canPlay !== "1") {
+      return {
+        show: true,
+        reason:
+          root.dataset.reuseOffline ||
+          "This recording is offline, so another scene cannot be chosen.",
+      };
+    }
+    if (catalogDurationS(clip) == null) {
+      return {
+        show: true,
+        reason:
+          root.dataset.reuseUnknown ||
+          "The length of this recording is unknown, so a range cannot be chosen.",
+      };
+    }
+    return { show: true, reason: "" };
+  }
+  function defaultReuseRange(clip, catalog) {
+    const inn = sourceInS(clip);
+    const out = sourceOutS(clip);
+    if (catalog - out >= MIN_CUT_SEGMENT_S) return { inS: out, outS: catalog, whole: false };
+    if (inn >= MIN_CUT_SEGMENT_S) return { inS: 0, outS: inn, whole: false };
+    return { inS: 0, outS: catalog, whole: true };
+  }
+  function fillReuseTemplate(template, token, value) {
+    return String(template || "").replace(token, value);
+  }
+  function setReusePieceHidden(id, hidden) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const label = el.closest("label");
+    if (label) label.hidden = hidden;
+    else el.hidden = hidden;
+  }
+  function showReuseChrome(on) {
+    const draft = document.getElementById("inspector-reuse-draft");
+    const actions = document.getElementById("inspector-reuse-actions");
+    if (draft) draft.hidden = !on;
+    if (actions) actions.hidden = !on;
+    document.querySelectorAll("[data-inspector-tab-button]").forEach((btn) => {
+      if (btn.getAttribute("data-inspector-tab-button") === "clip") return;
+      btn.hidden = on;
+    });
+    setReusePieceHidden("inspector-section-repeats", on);
+    const repeats = document.getElementById("inspector-section-repeats");
+    const repeatsHint = repeats && repeats.closest("label") && repeats.closest("label").nextElementSibling;
+    if (repeatsHint && repeatsHint.classList.contains("hint")) repeatsHint.hidden = on;
+    setReusePieceHidden("inspector-forward-loop", on);
+    const loopHint = document.getElementById("inspector-forward-loop-hint");
+    if (loopHint) loopHint.hidden = on;
+    const loopEffect = document.getElementById("inspector-loop-effect");
+    if (loopEffect) loopEffect.hidden = on;
+    const cutHint = document.querySelector("#inspector-video-timing [data-field='cut-hint']");
+    if (cutHint) cutHint.hidden = on;
+    const speed = document.getElementById("inspector-speed");
+    if (on && speed) speed.hidden = true;
+  }
+  function reuseDraftName() {
+    if (!reuseDraft) return "";
+    if (reuseDraft.filename) return reuseDraft.filename;
+    return (reuseDraft.clip && reuseDraft.clip.dataset.filename) || "";
+  }
+  function reusePreviewSrc() {
+    if (!reuseDraft) return "";
+    if (reuseDraft.hasProxy && reuseDraft.proxyUrl) return reuseDraft.proxyUrl;
+    if (reuseDraft.streamUrl) return reuseDraft.streamUrl;
+    if (reuseDraft.clip) return videoSrcFor(reuseDraft.clip);
+    return "";
+  }
+  function paintReuseDraft() {
+    if (!reuseDraft) return;
+    const inEl = document.getElementById("inspector-source-in");
+    const outEl = document.getElementById("inspector-source-out");
+    if (inEl) inEl.value = reuseDraft.inS.toFixed(2);
+    if (outEl) outEl.value = reuseDraft.outS.toFixed(2);
+    const timing = document.getElementById("inspector-video-timing");
+    if (timing) timing.hidden = false;
+    showInspector("inspector-clip");
+    const mode = document.getElementById("studio-view-mode");
+    if (mode) {
+      mode.hidden = false;
+      mode.textContent = root.dataset.viewOriginal || "Original";
+    }
+    const play = document.querySelector('[data-transport="toggle"]');
+    if (play) play.disabled = false;
+    const note = document.getElementById("inspector-reuse-note");
+    if (note) {
+      note.textContent = reuseDraft.clip
+        ? root.dataset.reuseNote || "The clip already in the Story is not changed."
+        : root.dataset.originalKeep || "The scenes already in the Story stay as they are.";
+    }
+    const meta = document.getElementById("inspector-reuse-meta");
+    if (meta) {
+      const original = fillReuseTemplate(
+        root.dataset.reuseOriginal || "Original {length}",
+        "{length}",
+        `${reuseDraft.catalog.toFixed(1)} s`
+      );
+      const scene = fillReuseTemplate(
+        root.dataset.reuseScene || "New scene {length}",
+        "{length}",
+        `${Math.max(0, reuseDraft.outS - reuseDraft.inS).toFixed(1)} s`
+      );
+      meta.textContent = `${original} · ${scene}`;
+    }
+    const whole = document.getElementById("inspector-reuse-whole");
+    if (whole) {
+      whole.hidden = !reuseDraft.whole;
+      whole.textContent =
+        root.dataset.reuseWhole ||
+        "Add will use the whole recording unless the range is narrowed.";
+    }
+    const add = document.getElementById("inspector-reuse-add");
+    if (add) add.disabled = reuseDraft.outS - reuseDraft.inS < MIN_CUT_SEGMENT_S;
+    showReuseChrome(true);
+    setInspectorTab("clip");
+    setInspectorHeading(
+      fillReuseTemplate(
+        root.dataset.reuseHeading || "Another scene from {name}",
+        "{name}",
+        reuseDraftName()
+      )
+    );
+    if (inEl) inEl.focus();
+  }
+  function readReuseFields(seekEdge) {
+    if (!reuseDraft) return;
+    const inEl = document.getElementById("inspector-source-in");
+    const outEl = document.getElementById("inspector-source-out");
+    const catalog = reuseDraft.catalog;
+    let inn = Number(inEl && inEl.value);
+    let out = Number(outEl && outEl.value);
+    if (!Number.isFinite(inn)) inn = 0;
+    if (!Number.isFinite(out)) out = catalog;
+    inn = Math.max(0, Math.min(catalog, inn));
+    out = Math.max(0, Math.min(catalog, out));
+    reuseDraft.inS = inn;
+    reuseDraft.outS = out;
+    reuseDraft.whole = inn <= 1e-4 && out >= catalog - 1e-3;
+    const add = document.getElementById("inspector-reuse-add");
+    if (add) add.disabled = out - inn < MIN_CUT_SEGMENT_S;
+    const meta = document.getElementById("inspector-reuse-meta");
+    if (meta) {
+      const original = fillReuseTemplate(
+        root.dataset.reuseOriginal || "Original {length}",
+        "{length}",
+        `${catalog.toFixed(1)} s`
+      );
+      const scene = fillReuseTemplate(
+        root.dataset.reuseScene || "New scene {length}",
+        "{length}",
+        `${Math.max(0, out - inn).toFixed(1)} s`
+      );
+      meta.textContent = `${original} · ${scene}`;
+    }
+    const whole = document.getElementById("inspector-reuse-whole");
+    if (whole) whole.hidden = !reuseDraft.whole;
+    seekCatalog(seekEdge === "out" ? out : inn);
+  }
+  function seekCatalog(seconds) {
+    if (!previewVideo || !reuseDraft) return;
+    const src = reusePreviewSrc();
+    if (!src) return;
+    const catalog = reuseDraft.catalog;
+    const apply = () => {
+      if (!reuseDraft) return;
+      let max = catalog;
+      const known = Number(previewVideo.duration);
+      if (Number.isFinite(known) && known > 0) max = Math.min(max, known);
+      const target = Math.max(0, Math.min(Number(seconds) || 0, max));
+      try {
+        previewVideo.hidden = false;
+        if (previewImage) previewImage.hidden = true;
+        if (previewPlaceholder) previewPlaceholder.hidden = true;
+        previewVideo.playbackRate = 1;
+        previewVideo.muted = false;
+        previewVideo.volume = state.volume;
+        previewVideo.currentTime = target;
+      } catch (_) {
+        /* ignore seek errors while loading */
+      }
+    };
+    suppressVideoClock = true;
+    if (loadedVideoSrc !== src) {
+      loadedVideoSrc = src;
+      previewVideo.src = src;
+      previewVideo.load();
+      previewVideo.addEventListener("loadedmetadata", apply, { once: true });
+      return;
+    }
+    if (previewVideo.readyState >= 1) apply();
+    else previewVideo.addEventListener("loadedmetadata", apply, { once: true });
+  }
+  function toggleReusePreview() {
+    if (!previewVideo || !reuseDraft) return;
+    if (!previewVideo.paused) {
+      previewVideo.pause();
+      return;
+    }
+    if (previewVideo.currentTime >= reuseDraft.outS - 0.05) seekCatalog(reuseDraft.inS);
+    suppressVideoClock = true;
+    previewVideo.play().catch(() => {});
+  }
+  function cancelReuseDraft() {
+    if (!reuseDraft) return;
+    const clip = reuseDraft.clip;
+    const time = state.projectTimeS;
+    reuseDraft = null;
+    suppressVideoClock = false;
+    if (previewVideo) {
+      try {
+        previewVideo.pause();
+      } catch (_) {}
+    }
+    showReuseChrome(false);
+    const mode = document.getElementById("studio-view-mode");
+    if (mode) mode.hidden = true;
+    if (!clips().length) {
+      const play = document.querySelector('[data-transport="toggle"]');
+      if (play) play.disabled = true;
+      showInspector("inspector-empty");
+      const timing = document.getElementById("inspector-video-timing");
+      if (timing) timing.hidden = true;
+      if (previewPlaceholder) previewPlaceholder.hidden = false;
+    }
+    if (clip && clip.isConnected) selectClip(clip.dataset.studioId, { movePlayhead: false });
+    setProjectTime(time);
+  }
+  function ensureOriginalRow(clip) {
+    if (!clip || clip.dataset.kind !== "video") return;
+    if (!clip.dataset.sourceIn && !clip.dataset.sourceOut) return;
+    const mediaId = clip.dataset.mediaId;
+    if (!mediaId) return;
+    if (document.querySelector(`[data-original-media-id="${CSS.escape(mediaId)}"]`)) return;
+    const panel = document.querySelector('[data-browser-panel="story"]');
+    if (!panel) return;
+    let box = document.getElementById("studio-originals");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "studio-originals";
+      box.className = "studio-originals";
+      const label = document.createElement("p");
+      label.className = "studio-originals-label";
+      label.textContent = root.dataset.originalLabel || "Original";
+      const list = document.createElement("ul");
+      list.className = "studio-browser-list";
+      const hint = document.createElement("p");
+      hint.className = "hint studio-originals-hint";
+      hint.textContent = root.dataset.originalHint || "";
+      box.append(label, list, hint);
+      const empty = panel.querySelector(".studio-browser-empty");
+      if (empty) empty.hidden = true;
+      panel.insertBefore(box, panel.firstChild);
+    }
+    const li = document.createElement("li");
+    li.className = "studio-browser-item studio-original-item";
+    li.draggable = clip.dataset.canPlay === "1";
+    li.dataset.originalMediaId = mediaId;
+    li.dataset.filename = clip.dataset.filename || "";
+    li.dataset.mediaDuration = clip.dataset.mediaDuration || "";
+    li.dataset.streamUrl = clip.dataset.streamUrl || "";
+    li.dataset.proxyUrl = clip.dataset.proxyUrl || "";
+    li.dataset.hasProxy = clip.dataset.hasProxy || "0";
+    li.dataset.canPlay = clip.dataset.canPlay || "0";
+    li.dataset.available = clip.dataset.available || "0";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "studio-browser-pick";
+    button.dataset.openOriginal = mediaId;
+    const thumb = document.createElement("span");
+    thumb.className = "studio-browser-thumb";
+    if (clip.dataset.thumb) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = clip.dataset.thumb;
+      thumb.appendChild(img);
+    }
+    const meta = document.createElement("span");
+    meta.className = "studio-browser-meta";
+    const strong = document.createElement("strong");
+    strong.textContent = clip.dataset.filename || "";
+    const kind = document.createElement("span");
+    kind.textContent = root.dataset.originalFull || "Full recording";
+    meta.append(strong, kind);
+    button.append(thumb, meta);
+    li.appendChild(button);
+    box.querySelector("ul").appendChild(li);
+  }
+  function openOriginalDraft(row) {
+    if (!row || row.dataset.canPlay !== "1") return;
+    clips().forEach((c) => {
+      c.classList.remove("is-selected");
+      c.removeAttribute("aria-selected");
+    });
+    const catalog = Number(row.dataset.mediaDuration);
+    if (!Number.isFinite(catalog) || catalog <= 0) return;
+    pausePlayback();
+    reuseDraft = {
+      clip: null,
+      mediaId: row.dataset.originalMediaId || "",
+      filename: row.dataset.filename || "",
+      streamUrl: row.dataset.streamUrl || "",
+      proxyUrl: row.dataset.proxyUrl || "",
+      hasProxy: row.dataset.hasProxy === "1",
+      catalog,
+      inS: 0,
+      outS: catalog,
+      whole: true,
+      beforeId: null,
+    };
+    suppressVideoClock = true;
+    paintReuseDraft();
+    seekCatalog(0);
+  }
+  function openReuseDraft(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    const catalog = catalogDurationS(clip);
+    if (!clip || catalog == null) return;
+    if (clip.dataset.kind !== "video") return;
+    if (clip.dataset.available !== "1" || clip.dataset.canPlay !== "1") return;
+    hideClipMenu();
+    pausePlayback();
+    const range = defaultReuseRange(clip, catalog);
+    reuseDraft = {
+      clip,
+      mediaId: clip.dataset.mediaId || "",
+      filename: clip.dataset.filename || "",
+      streamUrl: clip.dataset.streamUrl || "",
+      proxyUrl: clip.dataset.proxyUrl || "",
+      hasProxy: clip.dataset.hasProxy === "1",
+      catalog,
+      inS: range.inS,
+      outS: range.outS,
+      whole: range.whole,
+    };
+    suppressVideoClock = true;
+    paintReuseDraft();
+    seekCatalog(range.inS);
+  }
+  async function addReuseScene() {
+    if (!reuseDraft) return;
+    const span = reuseDraft.outS - reuseDraft.inS;
+    if (span < MIN_CUT_SEGMENT_S) return;
+    const sourceIn = reuseDraft.inS;
+    const sourceOut = reuseDraft.outS;
+    const body = { source_in_s: sourceIn, source_out_s: sourceOut };
+    let url = "";
+    if (reuseDraft.clip) {
+      url = `/api/studio/${reuseDraft.clip.dataset.studioId}/reuse-source`;
+    } else if (reuseDraft.mediaId) {
+      url = `/api/studio/media/${reuseDraft.mediaId}/reuse-source`;
+      if (reuseDraft.beforeId) body.before_id = Number(reuseDraft.beforeId);
+    }
+    if (!url) return;
+    if (previewVideo) previewVideo.pause();
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok || data.id == null) {
+        showFlash((data && data.detail) || root.dataset.reuseFailed || "Could not add the scene.");
+        return;
+      }
+      try {
+        sessionStorage.setItem(
+          CUT_RESTORE_KEY,
+          JSON.stringify({ selectId: String(data.id), atClipStart: true })
+        );
+      } catch (_) {
+        /* ignore */
+      }
+      window.location.reload();
+    } catch (_) {
+      showFlash(root.dataset.reuseFailed || "Could not add the scene.");
+    }
+  }
   function showStoryContextMenu(event, anchor, mode, mergeId) {
     const removeItem = document.getElementById("studio-clip-menu-remove");
     const mergeItem = document.getElementById("studio-clip-menu-merge");
     const uncutItem = document.getElementById("studio-clip-menu-uncut");
+    const reuseItem = document.getElementById("studio-clip-menu-reuse");
+    const clipEl =
+      mode === "clip"
+        ? (anchor.closest && anchor.closest(".studio-clip")) || anchor
+        : null;
+    const reuse = mode === "clip" ? reuseMenuState(clipEl) : { show: false, reason: "" };
     if (removeItem) removeItem.hidden = mode !== "clip";
+    if (reuseItem) {
+      reuseItem.hidden = !reuse.show;
+      reuseItem.setAttribute("aria-disabled", reuse.reason ? "true" : "false");
+      reuseItem.dataset.studioId = (clipEl && clipEl.dataset.studioId) || "";
+      reuseItem.dataset.reason = reuse.reason || "";
+    }
     if (mergeItem) {
       mergeItem.hidden = mode !== "clip" || !mergeId;
       mergeItem.setAttribute("aria-disabled", "true");
@@ -5069,7 +5500,7 @@
       uncutItem.setAttribute("aria-disabled", "true");
       uncutItem.dataset.studioId = mergeId || "";
     }
-    setClipMenuReason("");
+    setClipMenuReason(reuse.reason || "");
     const opener =
       (anchor.querySelector && anchor.querySelector("[data-select-clip]")) || anchor;
     showClipMenu(event.clientX, event.clientY, opener);
@@ -5114,6 +5545,34 @@
     if (mergeItemBlocked(button)) return;
     mergeWithPrevious(button.dataset.studioId);
   });
+  document.getElementById("studio-clip-menu-reuse")?.addEventListener("click", () => {
+    const button = document.getElementById("studio-clip-menu-reuse");
+    if (mergeItemBlocked(button)) return;
+    openReuseDraft(button.dataset.studioId);
+  });
+  document.getElementById("inspector-reuse-add")?.addEventListener("click", () => {
+    addReuseScene();
+  });
+  document.querySelector(".studio-clear-form")?.addEventListener(
+    "submit",
+    (event) => {
+      if (!reuseDraft) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true
+  );
+  ["inspector-source-in", "inspector-source-out"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", () => {
+      if (!reuseDraft) return;
+      const edge = id === "inspector-source-out" ? "out" : "in";
+      readReuseFields(edge);
+    });
+    document.getElementById(id)?.addEventListener("keydown", (event) => {
+      if (!reuseDraft || event.key !== "Enter") return;
+      event.preventDefault();
+    });
+  });
   document.getElementById("studio-clip-menu")?.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Tab") {
       event.preventDefault();
@@ -5147,7 +5606,9 @@
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") hideClipMenu();
+    if (event.key === "Escape" && reuseDraft) cancelReuseDraft();
     if (event.key !== "Delete") return;
+    if (reuseDraft) return;
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (isTextEditingTarget(document.activeElement)) return;
     if (privacyMaskDeleteActive()) return;
@@ -5163,12 +5624,22 @@
     const key = event.key.toLowerCase();
     if (key !== "z" && key !== "y") return;
     if (isTextEditingTarget(document.activeElement)) return;
+    if (reuseDraft) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     if (key === "z") applyStudioHistory("undo");
     else applyStudioHistory("redo");
   });
 
   root.addEventListener("click", (event) => {
+    const opener = event.target.closest && event.target.closest("[data-open-original]");
+    if (opener) {
+      const row = opener.closest(".studio-original-item");
+      if (row) openOriginalDraft(row);
+      return;
+    }
     const pick = event.target.closest && event.target.closest("[data-select-clip]");
     if (pick) {
       let seekTimeS = null;
@@ -5188,6 +5659,10 @@
       const action = transport.getAttribute("data-transport");
       const list = clips().filter((c) => clipDuration(c) > 0);
       if (action === "toggle") {
+        if (reuseDraft) {
+          toggleReusePreview();
+          return;
+        }
         if (state.playing) pausePlayback();
         else startPlayback();
         return;
@@ -5200,6 +5675,7 @@
         }
         return;
       }
+      if (reuseDraft) return;
       const wasPlaying = state.playing;
       if (wasPlaying) pausePlayback();
       if (action === "start") setProjectTime(0);
@@ -7122,6 +7598,10 @@
 
   ["inspector-source-in", "inspector-source-out", "inspector-section-repeats"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", () => {
+      if (reuseDraft) {
+        readReuseFields(id === "inspector-source-out" ? "out" : "in");
+        return;
+      }
       if (state.selected.type !== "clip") return;
       const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
       if (!clip || clip.dataset.kind !== "video") return;
@@ -7201,6 +7681,36 @@
     });
   }
 
+  function clearOriginalDropMark() {
+    grid.querySelectorAll(".is-drop-before").forEach((el) => el.classList.remove("is-drop-before"));
+  }
+  function originalDropBeforeId(event) {
+    const clip = event.target.closest && event.target.closest(".studio-clip");
+    if (!clip) return null;
+    const rect = clip.getBoundingClientRect();
+    if (event.clientX < rect.left + rect.width / 2) return clip.dataset.studioId || null;
+    let next = clip.nextElementSibling;
+    while (next && !next.classList.contains("studio-clip")) next = next.nextElementSibling;
+    return next && next.dataset.studioId ? next.dataset.studioId : null;
+  }
+  root.addEventListener("dragstart", (event) => {
+    const item = event.target.closest && event.target.closest(".studio-original-item");
+    if (!item || item.dataset.canPlay !== "1") return;
+    dragOriginalMediaId = item.dataset.originalMediaId || "";
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "copy";
+      try {
+        event.dataTransfer.setData("text/plain", `original:${dragOriginalMediaId}`);
+      } catch (_) {
+        /* older WebViews */
+      }
+    }
+  });
+  root.addEventListener("dragend", () => {
+    dragOriginalMediaId = null;
+    clearOriginalDropMark();
+  });
+
   grid.addEventListener("dragstart", (event) => {
     const handle = event.target.closest && event.target.closest(".studio-drag-handle");
     if (!handle) {
@@ -7233,6 +7743,21 @@
   });
 
   grid.addEventListener("dragover", (event) => {
+    if (dragOriginalMediaId) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      clearOriginalDropMark();
+      const clip = event.target.closest && event.target.closest(".studio-clip");
+      if (clip) {
+        const rect = clip.getBoundingClientRect();
+        const mark = event.clientX < rect.left + rect.width / 2 ? clip : clip.nextElementSibling;
+        const target = mark && mark.classList && mark.classList.contains("studio-clip")
+          ? mark
+          : null;
+        if (target) target.classList.add("is-drop-before");
+      }
+      return;
+    }
     if (!dragCard) return;
     event.preventDefault();
     const target = event.target.closest && event.target.closest(".studio-clip");
@@ -7251,6 +7776,24 @@
   });
 
   grid.addEventListener("drop", (event) => {
+    if (dragOriginalMediaId) {
+      event.preventDefault();
+      const mediaId = dragOriginalMediaId;
+      const beforeId = originalDropBeforeId(event);
+      clearOriginalDropMark();
+      dragOriginalMediaId = null;
+      const row = document.querySelector(
+        `[data-original-media-id="${CSS.escape(mediaId)}"]`
+      );
+      if (!row || row.dataset.canPlay !== "1") return;
+      if (!reuseDraft || String(reuseDraft.mediaId) !== String(mediaId) || reuseDraft.clip) {
+        openOriginalDraft(row);
+      }
+      if (!reuseDraft) return;
+      reuseDraft.beforeId = beforeId;
+      addReuseScene();
+      return;
+    }
     event.preventDefault();
   });
 

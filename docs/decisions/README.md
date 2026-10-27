@@ -53,3 +53,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0022](0022-studio-telemetry-hud.md) | Studio telemetry HUD | Accepted |
 | [0023](0023-studio-flight-map.md) | Studio flight map without third-party tiles | Accepted |
 | [0024](0024-licensing-model-proposal.md) | Licensing model for paid Windows builds | Proposed (not a license change) |
+| [0025](0025-studio-reuse-source.md) | Another scene from the same Studio source | Accepted |

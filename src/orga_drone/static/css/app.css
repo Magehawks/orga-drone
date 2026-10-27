@@ -1448,6 +1448,31 @@ body.studio-app { padding-bottom: 0; }
 .studio-browser-add button { width: 100%; font-size: 0.75rem; padding: 0.3rem; }
 .studio-browser-empty,
 .studio-browser-empty + .studio-add-media { color: var(--muted); font-size: 0.85rem; }
+.studio-originals { margin: 0 0 0.75rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border); }
+.studio-originals-label {
+  margin: 0.35rem 0.7rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.studio-originals-hint { margin: 0.15rem 0.7rem 0.35rem; }
+.studio-clip.is-drop-before { box-shadow: inset 3px 0 0 var(--accent, #7eb6ff); }
+.studio-view-mode {
+  position: absolute;
+  z-index: 4;
+  top: 0.45rem;
+  left: 0.45rem;
+  margin: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .studio-add-media { width: 100%; text-align: center; }
 
 .studio-stage {
@@ -1951,6 +1976,12 @@ img.studio-preview-media,
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.35;
+}
+.studio-reuse-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.75rem;
 }
 .studio-transport-play { min-width: 2.5rem; }
 .studio-transport-icon[hidden] { display: none !important; }

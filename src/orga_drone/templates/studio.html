@@ -111,6 +111,19 @@
          data-transition-failed="{{ _('Could not save the transition.')|e }}"
          data-merge-failed="{{ _('Could not remove the cut.')|e }}"
          data-merge-check-failed="{{ _('Could not check whether these clips can be joined.')|e }}"
+         data-reuse-offline="{{ _('This recording is offline, so another scene cannot be chosen.')|e }}"
+         data-reuse-unknown="{{ _('The length of this recording is unknown, so a range cannot be chosen.')|e }}"
+         data-reuse-note="{{ _('The clip already in the Story is not changed.')|e }}"
+         data-reuse-heading="{{ _('Another scene from {name}')|e }}"
+         data-reuse-original="{{ _('Original {length}')|e }}"
+         data-reuse-scene="{{ _('New scene {length}')|e }}"
+         data-reuse-whole="{{ _('Add will use the whole recording unless the range is narrowed.')|e }}"
+         data-reuse-failed="{{ _('Could not add the scene.')|e }}"
+         data-original-label="{{ _('Original')|e }}"
+         data-original-full="{{ _('Full recording')|e }}"
+         data-original-hint="{{ _('Drag onto the Story, or set a range and choose Add scene.')|e }}"
+         data-original-keep="{{ _('The scenes already in the Story stay as they are.')|e }}"
+         data-view-original="{{ _('Original')|e }}"
          data-music-empty="{{ _('No music yet')|e }}"
          data-music-loop-badge="{{ _('Loop · repeats to Story end')|e }}"
          data-music-silence-badge="{{ _('then silence')|e }}"
@@ -254,6 +267,47 @@
       </div>
 
       <div class="studio-browser-panel is-active" data-browser-panel="story" role="tabpanel">
+        {% if studio_originals %}
+        <div class="studio-originals" id="studio-originals">
+          <p class="studio-originals-label">{{ _('Original') }}</p>
+          <ul class="studio-browser-list">
+            {% for original in studio_originals %}
+            <li class="studio-browser-item studio-original-item {% if not original.available %}is-unavailable{% endif %}"
+                draggable="{{ 'true' if original.can_play else 'false' }}"
+                data-original-media-id="{{ original.media_id or '' }}"
+                data-filename="{{ original.filename|e }}"
+                data-media-duration="{{ original.duration_s if original.duration_s is not none else '' }}"
+                data-stream-url="{{ original.stream_url }}"
+                data-proxy-url="{{ original.proxy_url }}"
+                data-has-proxy="{{ '1' if original.has_proxy else '0' }}"
+                data-can-play="{{ '1' if original.can_play else '0' }}"
+                data-available="{{ '1' if original.available else '0' }}">
+              {% if original.available and original.media_id %}
+              <button type="button" class="studio-browser-pick" data-open-original="{{ original.media_id }}">
+                <span class="studio-browser-thumb">
+                  <img src="/media/{{ original.media_id }}/thumb" alt="" loading="lazy" decoding="async">
+                  <span class="thumb-play" aria-hidden="true"><span class="play-icon"></span></span>
+                </span>
+                <span class="studio-browser-meta">
+                  <strong>{{ original.filename }}</strong>
+                  <span>{{ _('Full recording') }}</span>
+                </span>
+              </button>
+              {% else %}
+              <div class="studio-browser-pick is-static">
+                <span class="studio-browser-thumb thumb-placeholder" aria-hidden="true"></span>
+                <span class="studio-browser-meta">
+                  <strong>{{ original.filename }}</strong>
+                  <span class="badge unavailable">{{ _('Unavailable') }}</span>
+                </span>
+              </div>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          <p class="hint studio-originals-hint">{{ _('Drag onto the Story, or set a range and choose Add scene.') }}</p>
+        </div>
+        {% endif %}
         {% if items %}
         <ul class="studio-browser-list" id="studio-browser-story">
           {% for row in item_display %}
@@ -296,7 +350,7 @@
           </li>
           {% endfor %}
         </ul>
-        {% else %}
+        {% elif not studio_originals %}
         <p class="studio-browser-empty">{{ _('No media in this story yet.') }}</p>
         {% endif %}
       </div>
@@ -344,8 +398,9 @@
 
     <div class="studio-stage">
       <div class="studio-preview" id="studio-preview">
-        {% if items %}
+        {% if items or studio_originals %}
         <div class="studio-preview-frame" id="studio-preview-frame">
+          <p id="studio-view-mode" class="studio-view-mode" hidden></p>
           <svg class="studio-preview-filters" aria-hidden="true" focusable="false" width="0" height="0">
             <filter id="studio-preview-grade" color-interpolation-filters="sRGB">
               <feColorMatrix id="studio-preview-grade-matrix" type="matrix"
@@ -447,6 +502,7 @@
       </div>
       <div id="studio-clip-menu" class="studio-clip-menu" role="menu" hidden>
         <button type="button" role="menuitem" id="studio-clip-menu-remove">{{ _('Remove from story') }}</button>
+        <button type="button" role="menuitem" id="studio-clip-menu-reuse" hidden>{{ _('Use another scene from the original') }}</button>
         <button type="button" role="menuitem" id="studio-clip-menu-merge" hidden>{{ _('Merge with previous') }}</button>
         <button type="button" role="menuitem" id="studio-clip-menu-uncut" hidden>{{ _('Remove cut') }}</button>
         <p id="studio-clip-menu-reason" class="studio-clip-menu-reason" hidden></p>
@@ -659,6 +715,11 @@
         <p class="meta-line" data-field="recorded" data-inspector-tab="clip"></p>
         <p class="meta-line" data-field="duration-line" data-inspector-tab="clip"></p>
         <div id="inspector-video-timing" data-inspector-tab="clip" hidden>
+          <div id="inspector-reuse-draft" hidden>
+            <p class="hint" id="inspector-reuse-note"></p>
+            <p class="meta-line" id="inspector-reuse-meta"></p>
+            <p class="hint" id="inspector-reuse-whole" hidden></p>
+          </div>
           <label class="studio-inspector-field" for="inspector-source-in">
             {{ _('Source in') }}
             <input type="number" id="inspector-source-in" min="0" step="0.1" inputmode="decimal"
@@ -669,6 +730,10 @@
             <input type="number" id="inspector-source-out" min="0" step="0.1" inputmode="decimal"
                    aria-label="{{ _('Source out') }}">
           </label>
+          <div class="studio-reuse-actions" id="inspector-reuse-actions" hidden>
+            <button type="button" class="button" id="inspector-reuse-add">{{ _('Add scene') }}</button>
+            <button type="button" class="button ghost" id="inspector-reuse-cancel">{{ _('Cancel') }}</button>
+          </div>
           <label class="studio-inspector-field" for="inspector-section-repeats">
             {{ _('Repeat') }}
             <input type="number" id="inspector-section-repeats" min="1" max="8" step="1" value="1"

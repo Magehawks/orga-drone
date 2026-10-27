@@ -183,6 +183,19 @@ CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id,
 CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
 CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
 
+-- Full recording kept beside a cut Story (Issue #156). Rows stay when the
+-- Story clips of that file are removed. Source files are not copied.
+CREATE TABLE IF NOT EXISTS studio_originals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+    media_path TEXT NOT NULL,
+    source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+    filename_snapshot TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (project_id, media_path)
+);
+CREATE INDEX IF NOT EXISTS idx_studio_originals_project ON studio_originals(project_id);
+
 -- Optional soundtrack playlist per project (Issue #25 / #38 / ADR 0008).
 CREATE TABLE IF NOT EXISTS studio_audio_clips (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,6 +271,30 @@ def make_identity_key(
     """Stable key across rescans when path is unchanged or rematched."""
     payload = f"{filename.lower()}|{int(size_bytes)}|{recorded_at or ''}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def remember_studio_original(
+    conn: sqlite3.Connection,
+    *,
+    project_id: int,
+    media_path: str,
+    source_media_id: int | None,
+    filename: str,
+    now: str,
+) -> None:
+    """Keep one Original row for a cut video. A second cut does not add another."""
+    conn.execute(
+        """INSERT INTO studio_originals (
+             project_id, media_path, source_media_id, filename_snapshot, created_at
+           ) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(project_id, media_path) DO UPDATE SET
+             source_media_id = COALESCE(
+               excluded.source_media_id, studio_originals.source_media_id
+             ),
+             filename_snapshot = excluded.filename_snapshot
+        """,
+        (project_id, media_path, source_media_id, filename, now),
+    )
 
 
 def parse_tags(raw: str | list[str] | None) -> list[str]:
@@ -629,6 +666,7 @@ class Database:
         Database._migrate_studio_clips_transition_duration(conn)
         Database._migrate_studio_audio_clips(conn)
         Database._migrate_albums(conn)
+        Database._migrate_studio_originals(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
@@ -996,6 +1034,24 @@ class Database:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id)"
+        )
+
+    @staticmethod
+    def _migrate_studio_originals(conn: sqlite3.Connection) -> None:
+        """One Original row per cut video in a project. Existing libraries gain the table."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS studio_originals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                media_path TEXT NOT NULL,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                filename_snapshot TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE (project_id, media_path)
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_studio_originals_project ON studio_originals(project_id)"
         )
 
     def list_roots(self) -> list[sqlite3.Row]:
@@ -3626,7 +3682,8 @@ class Database:
         with self.connect() as conn:
             row = conn.execute(
                 """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
-                          s.effect_settings,
+                          s.effect_settings, s.media_path, s.filename_snapshot,
+                          s.source_media_id,
                           m.kind AS live_kind, m.id AS media_id, m.duration_s
                    FROM studio_clips s
                    LEFT JOIN media m ON m.path = s.media_path
@@ -3676,6 +3733,20 @@ class Database:
                 (store_start, store_end, blob, studio_item_id),
             )
             now = datetime.now().isoformat(timespec="seconds")
+            if store_start is not None or store_end is not None:
+                media_id = int(row["media_id"]) if row["media_id"] is not None else None
+                if media_id is None and row["source_media_id"] is not None:
+                    media_id = int(row["source_media_id"])
+                path = row["media_path"]
+                if path:
+                    remember_studio_original(
+                        conn,
+                        project_id=project_id,
+                        media_path=str(path),
+                        source_media_id=media_id,
+                        filename=str(row["filename_snapshot"] or ""),
+                        now=now,
+                    )
             conn.execute(
                 "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
                 (now, project_id),
@@ -4016,6 +4087,14 @@ class Database:
                     now,
                 ),
             )
+            remember_studio_original(
+                conn,
+                project_id=project_id,
+                media_path=str(row["media_path"]),
+                source_media_id=source_media_id,
+                filename=str(row["filename_snapshot"] or ""),
+                now=now,
+            )
             conn.execute(
                 "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
                 (now, project_id),
@@ -4080,6 +4159,308 @@ class Database:
             raise RuntimeError("merge succeeded but the clip is missing")
         return merged
 
+    def reuse_studio_source(
+        self,
+        anchor_id: int,
+        source_in_s: object,
+        source_out_s: object,
+    ) -> StudioClip:
+        """Insert a new Story clip after ``anchor_id`` for another source range.
+
+        The new row uses the same media path and library id. Speed is 1, effects
+        are empty, and the outgoing transition is a hard cut. The anchor row is
+        not updated. Source files are not copied or modified. Raises
+        ``ReuseBlocked`` before any write when the range cannot be added.
+        """
+        from orga_drone.media_files import resolve_media_file
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_reuse import ReuseBlocked, stored_source_range
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.media_path, s.identity_key,
+                          s.source_media_id, s.position, s.filename_snapshot,
+                          s.recorded_at_snapshot, s.kind_snapshot,
+                          m.id AS media_id, m.kind AS live_kind, m.duration_s AS live_duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (anchor_id,),
+            ).fetchone()
+            if row is None:
+                raise ReuseBlocked("not_found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ReuseBlocked("not_video")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ReuseBlocked("not_video")
+            media_id = int(row["media_id"]) if row["media_id"] is not None else None
+            if media_id is None:
+                raise ReuseBlocked("offline")
+            duration = (
+                float(row["live_duration_s"])
+                if row["live_duration_s"] is not None
+                else None
+            )
+            ordered = conn.execute(
+                """SELECT id, position FROM studio_clips
+                   WHERE project_id = ?
+                   ORDER BY position ASC, id ASC""",
+                (project_id,),
+            ).fetchall()
+
+        media = self.get_media(media_id)
+        if media is None or resolve_media_file(self, media) is None:
+            raise ReuseBlocked("offline")
+        if duration is None or duration <= 0:
+            raise ReuseBlocked("duration_unknown")
+        store_start, store_end = stored_source_range(source_in_s, source_out_s, duration)
+
+        anchor_position = int(row["position"])
+        ordered_ids = [int(item["id"]) for item in ordered]
+        if anchor_id not in ordered_ids:
+            raise ReuseBlocked("not_found")
+        tail = ordered[ordered_ids.index(anchor_id) + 1 :]
+        source_media_id = (
+            int(row["source_media_id"])
+            if row["source_media_id"] is not None
+            else media_id
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            remember_studio_original(
+                conn,
+                project_id=project_id,
+                media_path=str(row["media_path"]),
+                source_media_id=source_media_id,
+                filename=str(row["filename_snapshot"] or ""),
+                now=now,
+            )
+            for offset, tail_row in enumerate(tail, start=2):
+                conn.execute(
+                    "UPDATE studio_clips SET position = ? WHERE id = ? AND project_id = ?",
+                    (anchor_position + offset, int(tail_row["id"]), project_id),
+                )
+            cur = conn.execute(
+                """INSERT INTO studio_clips(
+                     project_id, item_kind, media_path, identity_key, source_media_id,
+                     position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, transition_duration_s,
+                     effect_settings, added_at
+                   ) VALUES (?, 'media', ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1.0, 1.0,
+                             NULL, NULL, '{}', ?)""",
+                (
+                    project_id,
+                    str(row["media_path"]),
+                    str(row["identity_key"]),
+                    source_media_id,
+                    anchor_position + 1,
+                    str(row["filename_snapshot"]),
+                    row["recorded_at_snapshot"],
+                    str(row["kind_snapshot"] or "video"),
+                    store_start,
+                    store_end,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+            new_id = cur.lastrowid
+            assert new_id is not None
+            present = conn.execute(
+                "SELECT id FROM studio_clips WHERE id = ? AND project_id = ?",
+                (int(new_id), project_id),
+            ).fetchone()
+            if present is None:
+                raise ReuseBlocked("not_found")
+
+        created = next(
+            (item for item in self.list_studio_items(project_id) if item.id == int(new_id)),
+            None,
+        )
+        if created is None:
+            raise RuntimeError("reuse succeeded but the clip is missing")
+        return created
+
+    def sync_studio_originals(self, project_id: int) -> None:
+        """Remember Original rows for videos that are already trimmed or split.
+
+        Rows that outlive their Story clips stay. A full, uncut clip does not
+        gain one.
+        """
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT media_path,
+                          MAX(source_media_id) AS source_media_id,
+                          MAX(filename_snapshot) AS filename_snapshot
+                   FROM studio_clips
+                   WHERE project_id = ?
+                     AND item_kind = 'media'
+                     AND kind_snapshot = 'video'
+                     AND media_path IS NOT NULL
+                     AND (source_start IS NOT NULL OR source_end IS NOT NULL)
+                   GROUP BY media_path""",
+                (project_id,),
+            ).fetchall()
+            for item in rows:
+                remember_studio_original(
+                    conn,
+                    project_id=project_id,
+                    media_path=str(item["media_path"]),
+                    source_media_id=(
+                        int(item["source_media_id"])
+                        if item["source_media_id"] is not None
+                        else None
+                    ),
+                    filename=str(item["filename_snapshot"] or ""),
+                    now=now,
+                )
+
+    def list_studio_originals(self, project_id: int) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT o.id, o.media_path, o.filename_snapshot,
+                          COALESCE(m.id, o.source_media_id) AS media_id,
+                          m.duration_s, m.kind, m.filename AS live_filename
+                   FROM studio_originals o
+                   LEFT JOIN media m ON m.path = o.media_path
+                   WHERE o.project_id = ?
+                   ORDER BY o.id ASC""",
+                (project_id,),
+            ).fetchall()
+        listed: list[dict[str, Any]] = []
+        for row in rows:
+            listed.append(
+                {
+                    "id": int(row["id"]),
+                    "media_path": str(row["media_path"]),
+                    "media_id": int(row["media_id"]) if row["media_id"] is not None else None,
+                    "filename": str(row["live_filename"] or row["filename_snapshot"] or ""),
+                    "duration_s": (
+                        float(row["duration_s"]) if row["duration_s"] is not None else None
+                    ),
+                    "kind": str(row["kind"]) if row["kind"] else "video",
+                }
+            )
+        return listed
+
+    def insert_studio_original_scene(
+        self,
+        project_id: int,
+        media_id: int,
+        source_in_s: object,
+        source_out_s: object,
+        *,
+        before_id: int | None = None,
+    ) -> StudioClip:
+        """Append a Story clip from a saved Original, or insert it before ``before_id``.
+
+        The Original row must already exist. Existing clips keep their trims and
+        effects. Source files are not copied. Raises ``ReuseBlocked`` before any
+        clip write when the range cannot be added.
+        """
+        from orga_drone.media_files import resolve_media_file
+        from orga_drone.studio_reuse import ReuseBlocked, stored_source_range
+
+        media = self.get_media(media_id)
+        if media is None or media.kind != "video":
+            raise ReuseBlocked("not_video")
+        if resolve_media_file(self, media) is None:
+            raise ReuseBlocked("offline")
+        if media.duration_s is None or float(media.duration_s) <= 0:
+            filled = self.fill_video_duration_if_missing(media_id)
+            if filled is not None:
+                media = self.get_media(media_id)
+        duration = (
+            float(media.duration_s)
+            if media is not None and media.duration_s is not None
+            else None
+        )
+        if media is None or duration is None or duration <= 0:
+            raise ReuseBlocked("duration_unknown")
+        store_start, store_end = stored_source_range(source_in_s, source_out_s, duration)
+        with self.connect() as conn:
+            kept = conn.execute(
+                """SELECT id FROM studio_originals
+                   WHERE project_id = ? AND media_path = ?""",
+                (project_id, media.path),
+            ).fetchone()
+            if kept is None:
+                raise ReuseBlocked("not_found")
+            ordered = conn.execute(
+                """SELECT id, position FROM studio_clips
+                   WHERE project_id = ?
+                   ORDER BY position ASC, id ASC""",
+                (project_id,),
+            ).fetchall()
+            if before_id is None:
+                pos_row = conn.execute(
+                    """SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+                       FROM studio_clips WHERE project_id = ?""",
+                    (project_id,),
+                ).fetchone()
+                position = int(pos_row["next_pos"])
+            else:
+                ordered_ids = [int(item["id"]) for item in ordered]
+                if before_id not in ordered_ids:
+                    raise ReuseBlocked("not_found")
+                index = ordered_ids.index(before_id)
+                position = int(ordered[index]["position"])
+                for offset, tail_row in enumerate(ordered[index:]):
+                    conn.execute(
+                        """UPDATE studio_clips SET position = ?
+                           WHERE id = ? AND project_id = ?""",
+                        (position + 1 + offset, int(tail_row["id"]), project_id),
+                    )
+            now = datetime.now().isoformat(timespec="seconds")
+            cur = conn.execute(
+                """INSERT INTO studio_clips(
+                     project_id, item_kind, media_path, identity_key, source_media_id,
+                     position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, transition_duration_s,
+                     effect_settings, added_at
+                   ) VALUES (?, 'media', ?, ?, ?, ?, ?, ?, 'video', NULL, ?, ?,
+                             1.0, 1.0, NULL, NULL, '{}', ?)""",
+                (
+                    project_id,
+                    media.path,
+                    make_identity_key(media.filename, media.size_bytes, media.recorded_at),
+                    media.id,
+                    position,
+                    media.filename,
+                    media.recorded_at,
+                    store_start,
+                    store_end,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+            new_id = cur.lastrowid
+            assert new_id is not None
+        created = next(
+            (item for item in self.list_studio_items(project_id) if item.id == int(new_id)),
+            None,
+        )
+        if created is None:
+            raise RuntimeError("original scene succeeded but the clip is missing")
+        return created
+
     def protected_export_paths(self) -> list[str]:
         """Files an export must never replace.
 
@@ -4114,6 +4495,17 @@ class Database:
                    SET media_path = ?
                    WHERE item_kind = 'media' AND media_path = ?""",
                 (new_path, old_path),
+            )
+            conn.execute(
+                """UPDATE studio_originals
+                   SET media_path = ?
+                   WHERE media_path = ?
+                     AND NOT EXISTS (
+                       SELECT 1 FROM studio_originals newer
+                       WHERE newer.project_id = studio_originals.project_id
+                         AND newer.media_path = ?
+                     )""",
+                (new_path, old_path, new_path),
             )
 
     def link_studio_item_for_path(
