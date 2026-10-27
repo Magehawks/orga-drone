@@ -267,6 +267,57 @@ msgstr "Merge with previous"
 msgid "Remove cut"
 msgstr "Remove cut"
 
+msgid "Use another scene from the original"
+msgstr "Use another scene from the original"
+
+msgid "Add scene"
+msgstr "Add scene"
+
+msgid "Another scene from {name}"
+msgstr "Another scene from {name}"
+
+msgid "The clip already in the Story is not changed."
+msgstr "The clip already in the Story is not changed."
+
+msgid "This recording is offline, so another scene cannot be chosen."
+msgstr "This recording is offline, so another scene cannot be chosen."
+
+msgid "The length of this recording is unknown, so a range cannot be chosen."
+msgstr "The length of this recording is unknown, so a range cannot be chosen."
+
+msgid "Add will use the whole recording unless the range is narrowed."
+msgstr "Add will use the whole recording unless the range is narrowed."
+
+msgid "Could not add the scene."
+msgstr "Could not add the scene."
+
+msgid "Original"
+msgstr "Original"
+
+msgid "Full recording"
+msgstr "Full recording"
+
+msgid "Drag onto the Story, or set a range and choose Add scene."
+msgstr "Drag onto the Story, or set a range and choose Add scene."
+
+msgid "The scenes already in the Story stay as they are."
+msgstr "The scenes already in the Story stay as they are."
+
+msgid "Another scene can only be chosen from a video."
+msgstr "Another scene can only be chosen from a video."
+
+msgid "That range is too short."
+msgstr "That range is too short."
+
+msgid "That range is outside the recording."
+msgstr "That range is outside the recording."
+
+msgid "Original {length}"
+msgstr "Original {length}"
+
+msgid "New scene {length}"
+msgstr "New scene {length}"
+
 msgid "Could not remove the cut."
 msgstr "Could not remove the cut."
 

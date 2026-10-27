@@ -91,6 +91,10 @@ The transport trash button, the Delete key, and the Story clip context menu remo
 
 Removing a cut joins the clip with the one before it through `POST /api/studio/{id}/merge-previous`. The left row keeps its id and grows to the right row's source end. The right row is deleted. Settings are copied only when they match, including masks and grade. Overlay times shift back onto one timeline. A saturation ramp is kept when the right-hand times are the left-hand ramp shifted by the left source duration. Source ends must meet within 0.001 s. A repeat, a soundtrack loop, a different speed, or a transition other than a cut between the two clips is refused. The refusal does not become an Undo step. A successful join is one Undo step in the existing story history.
 
+Another scene from the same original is `POST /api/studio/{id}/reuse-source`. It inserts one new `studio_clips` row immediately after the clicked video, in story order, and shifts only the clips that follow. The new row copies the media path, identity, and library id, stores the chosen source range (NULL, NULL when it covers the whole file), and starts with empty effects, speed 1, and a hard cut out. The clicked row is not updated. The preview seek during the draft is client-side and does not write. Cancel writes nothing. A refusal is not an Undo step. A successful add is one Undo step; Undo removes the new row and restores the later positions.
+
+A cut or a trimmed video also stores one `studio_originals` row for that project and file. Removing the Story clips does not remove it, and it is still there after a restart. `POST /api/studio/media/{media_id}/reuse-source` inserts one new clip from that row, at the end or before `before_id`, in one Undo step. The Original row is not part of the session snapshot, so Undo of the new scene leaves the Original in the Story browser.
+
 ## Scan / index pipeline
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
