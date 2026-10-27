@@ -341,3 +341,5 @@ rollback notes are in [`packaging/itch/README.md`](itch/README.md). The helper
 
 There is no in-app updater. Copies installed from a ZIP do not receive
 itch.io desktop-app updates. User data stays in `%APPDATA%\orga-drone`.
+
+Publishing a GitHub Release can notify Discord that this version is available on the itch.io test channel. The webhook lives in the GitHub Actions secret `DISCORD_RELEASE_WEBHOOK`, not in the repo.
