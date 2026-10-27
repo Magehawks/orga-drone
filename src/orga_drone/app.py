@@ -38,6 +38,7 @@ from orga_drone.dupes import (
     find_duplicate_groups,
     media_row_to_fingerprint,
 )
+from orga_drone.studio_audio import detached_audio_from_effect_settings
 from orga_drone.studio_cut import section_repeats_from_effect_settings
 from orga_drone.studio_forward_loop import (
     clip_forward_loop_view,
@@ -45,6 +46,7 @@ from orga_drone.studio_forward_loop import (
     resolve_forward_loop,
     soundtrack_once_s,
 )
+from orga_drone.studio_effect_lane import stored_lane
 from orga_drone.studio_estimate import (
     DEFAULT_PHOTO_DURATION_S,
     effective_seconds,
@@ -853,6 +855,7 @@ def create_app() -> FastAPI:
             items=items,
             studio_paths=studio_paths,
             drones=db.distinct_drones(),
+            source_buckets=db.source_bucket_counts(),
             view=current_view,
             nav_active="browse",
             browse_detail_qs=browse_detail_qs_from_request(request),
@@ -1122,6 +1125,61 @@ def create_app() -> FastAPI:
             albums_available=albums_available,
         )
 
+    def studio_gallery_cards() -> list[dict[str, Any]]:
+        """Gallery rows in last-edited order. Thumbs are existing files only."""
+        cards: list[dict[str, Any]] = []
+        for project in db.list_studio_projects():
+            items = db.list_studio_items(project.id)
+            summary = summarize_studio_items(items)
+            thumb_id: int | None = None
+            for item in items:
+                if item.item_kind == "title_card" or item.source_media_id is None:
+                    continue
+                media = db.get_media(item.source_media_id)
+                if media is None or resolve_media_file(db, media) is None:
+                    continue
+                if cached_thumbnail(settings.data_dir, media.id) is None:
+                    continue
+                thumb_id = media.id
+                break
+            cards.append(
+                {
+                    "id": project.id,
+                    "title": project.title,
+                    "updated_at": project.updated_at.replace("T", " "),
+                    "duration_label": summary.estimated_total_label,
+                    "thumb_id": thumb_id,
+                }
+            )
+        return cards
+
+    @app.get("/studio/projects", response_class=HTMLResponse)
+    async def studio_projects_page(
+        request: Request, msg: str | None = None
+    ) -> HTMLResponse:
+        return render(
+            request,
+            "studio_projects.html",
+            projects=studio_gallery_cards(),
+            nav_active="studio",
+            flash_msg=msg,
+        )
+
+    @app.post("/studio/projects")
+    async def studio_project_create(request: Request) -> RedirectResponse:
+        """Create an empty project and open it. Never reuses another project."""
+        title = get_translator(lang_from_request(request))("Your story")
+        project = db.create_studio_project(title)
+        db.set_open_studio_project_id(project.id)
+        return RedirectResponse(url="/studio", status_code=303)
+
+    @app.post("/studio/projects/{project_id}/delete")
+    async def studio_project_delete(project_id: int) -> RedirectResponse:
+        deleted = db.delete_studio_project(project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="studio project not found")
+        return RedirectResponse(url="/studio/projects", status_code=303)
+
     @app.get("/studio", response_class=HTMLResponse)
     async def studio_page(
         request: Request,
@@ -1139,8 +1197,13 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=f"/studio{suffix}", status_code=303)
 
         project = db.resolve_studio_page_project()
+        if project is None:
+            gallery_url = "/studio/projects"
+            if msg:
+                gallery_url = f"{gallery_url}?msg={msg}"
+            return RedirectResponse(url=gallery_url, status_code=303)
         projects = db.list_studio_projects()
-        studio_mode = "editor" if project is not None else "browser"
+        studio_mode = "editor"
         items = db.list_studio_items(project.id) if project is not None else []
         for it in items:
             if (it.kind or "") != "video" or it.duration_s is not None:
@@ -1294,6 +1357,11 @@ def create_app() -> FastAPI:
                         if it.kind in {"photo", "video"}
                         else [],
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
+                        "zoom_bar": stored_lane(it.effect_settings)["zoom_bar"],
+                        "slow_bar": stored_lane(it.effect_settings)["slow_bar"],
+                        "clip_audio": detached_audio_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "map": map_from_effect_settings(it.effect_settings).as_dict(),
                         "gps": (
                             route_preview(
@@ -1826,6 +1894,85 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "saturation_ramp": ramp.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/effect-lane")
+    async def api_studio_effect_lane(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include an effect bar")
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.update_effect_lane(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        from orga_drone.studio_effect_lane import stored_lane
+
+        stored = stored_lane(item.effect_settings)
+        seconds = effective_seconds(
+            kind=item.kind or "video",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+            source_in_s=item.source_start,
+            source_out_s=item.source_end,
+            playback_speed=item.playback_speed,
+            effect_settings=item.effect_settings,
+        )
+        zoom = stored.get("zoom_bar")
+        slow = stored.get("slow_bar")
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "playback_speed": item.playback_speed,
+                "effective_duration_s": seconds,
+                "frame": frame_from_effect_settings(item.effect_settings).as_dict(),
+                "masks": [
+                    mask.as_dict() for mask in masks_from_effect_settings(item.effect_settings)
+                ],
+                "zoom_bar": zoom if isinstance(zoom, dict) else None,
+                "slow_bar": slow if isinstance(slow, dict) else None,
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/clip-audio")
+    async def api_studio_clip_audio(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include an audio range")
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_clip_audio(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        audio = detached_audio_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "source_in_s": item.source_start,
+                "source_out_s": item.source_end,
+                "audio": audio.as_dict(),
             }
         )
 
@@ -3345,6 +3492,7 @@ def create_app() -> FastAPI:
             request,
             "library.html",
             roots=db.list_roots(),
+            source_buckets=db.source_bucket_counts(),
             scan_result=None,
             scan_error=scan_error,
             scan_job_id=scan_job,

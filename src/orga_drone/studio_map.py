@@ -12,6 +12,10 @@ bundled. If a tile cannot be fetched, the plain panel remains. A clip with no
 usable GPS still keeps the box and shows an empty panel. Source files are
 never modified. The marker is not a tracker and does not invent positions
 across a GPS gap longer than ``GAP_S``.
+
+The route is projected into a square. The default box is that same square in
+pixels, smaller than a quarter of the short side of the picture. ``opacity``
+covers the whole panel, route, and marker together.
 """
 
 from __future__ import annotations
@@ -30,11 +34,15 @@ from orga_drone.studio_overlay import content_rect
 
 MIN_BOX = 0.12
 MAX_BOX = 0.72
-DEFAULT_W = 0.28
-DEFAULT_H = 0.28
+# A bit under a quarter of the shorter side of the fitted picture.
+DEFAULT_SHORT_SIDE = 0.22
 DEFAULT_MARGIN = 0.04
-DEFAULT_X = round(1.0 - DEFAULT_W - DEFAULT_MARGIN, 4)
-DEFAULT_Y = round(1.0 - DEFAULT_H - DEFAULT_MARGIN, 4)
+DEFAULT_OPACITY = 1.0
+# Equal fractions of a wide frame. Kept so an old untouched box can be squared.
+LEGACY_W = 0.28
+LEGACY_H = 0.28
+LEGACY_X = round(1.0 - LEGACY_W - DEFAULT_MARGIN, 4)
+LEGACY_Y = round(1.0 - LEGACY_H - DEFAULT_MARGIN, 4)
 PAD = 0.08
 GAP_S = 2.0
 MAX_MARKER_SAMPLES = 32
@@ -79,15 +87,75 @@ class RoutePoint:
         return {"x": self.x, "y": self.y, "t": self.t}
 
 
+def _clamp_box(x: float, y: float, w: float, h: float) -> tuple[float, float, float, float]:
+    if not all(math.isfinite(value) for value in (x, y, w, h)):
+        raise ValueError("map position must be a finite number")
+    width = round(min(MAX_BOX, max(MIN_BOX, float(w))), 4)
+    height = round(min(MAX_BOX, max(MIN_BOX, float(h))), 4)
+    width = min(width, 1.0)
+    height = min(height, 1.0)
+    left = round(min(max(0.0, float(x)), 1.0 - width), 4)
+    top = round(min(max(0.0, float(y)), 1.0 - height), 4)
+    if left + width > 1:
+        left = round(1.0 - width, 4)
+    if top + height > 1:
+        top = round(1.0 - height, 4)
+    return left, top, width, height
+
+
+def _clamp_opacity(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("opacity must be a finite number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("opacity must be a finite number")
+    return round(min(1.0, max(0.0, number)), 2)
+
+
+def default_map_box(
+    content_width: float,
+    content_height: float,
+) -> tuple[float, float, float, float]:
+    """Lower-right square, a bit under a quarter of the shorter side.
+
+    ``w`` and ``h`` are fractions of the fitted picture. The map itself is a
+    square, so those fractions differ when the picture is not square. The box
+    stays inside the frame.
+    """
+    width_px = float(content_width)
+    height_px = float(content_height)
+    if (
+        not math.isfinite(width_px)
+        or not math.isfinite(height_px)
+        or width_px <= 0
+        or height_px <= 0
+    ):
+        width_px, height_px = 16.0, 9.0
+    side = DEFAULT_SHORT_SIDE * min(width_px, height_px)
+    min_side = MIN_BOX * max(width_px, height_px)
+    max_side = MAX_BOX * min(width_px, height_px)
+    side = min(max(side, min_side), max(min_side, max_side))
+    side = min(side, (1.0 - DEFAULT_MARGIN) * width_px, (1.0 - DEFAULT_MARGIN) * height_px)
+    box_w = side / width_px
+    box_h = side / height_px
+    left = 1.0 - box_w - DEFAULT_MARGIN
+    top = 1.0 - box_h - DEFAULT_MARGIN
+    return _clamp_box(left, top, box_w, box_h)
+
+
+DEFAULT_X, DEFAULT_Y, DEFAULT_W, DEFAULT_H = default_map_box(16, 9)
+
+
 @dataclass(frozen=True)
 class MapPlacement:
-    """Enabled flag and box in fractions of the fitted picture."""
+    """Enabled flag, opacity, and box in fractions of the fitted picture."""
 
     enabled: bool = False
     x: float = DEFAULT_X
     y: float = DEFAULT_Y
     w: float = DEFAULT_W
     h: float = DEFAULT_H
+    opacity: float = DEFAULT_OPACITY
 
     def __post_init__(self) -> None:
         x, y, w, h = _clamp_box(self.x, self.y, self.w, self.h)
@@ -95,6 +163,7 @@ class MapPlacement:
         object.__setattr__(self, "y", y)
         object.__setattr__(self, "w", w)
         object.__setattr__(self, "h", h)
+        object.__setattr__(self, "opacity", _clamp_opacity(self.opacity))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -103,7 +172,18 @@ class MapPlacement:
             "y": self.y,
             "w": self.w,
             "h": self.h,
+            "opacity": self.opacity,
         }
+
+
+def _is_legacy_stretch(placement: MapPlacement) -> bool:
+    """True when the box is still the old equal-fraction default."""
+    return (
+        abs(placement.w - LEGACY_W) < 0.001
+        and abs(placement.h - LEGACY_H) < 0.001
+        and abs(placement.x - LEGACY_X) < 0.001
+        and abs(placement.y - LEGACY_Y) < 0.001
+    )
 
 
 def map_preview_model() -> dict[str, object]:
@@ -117,6 +197,13 @@ def map_preview_model() -> dict[str, object]:
         "defaultY": DEFAULT_Y,
         "defaultW": DEFAULT_W,
         "defaultH": DEFAULT_H,
+        "shortSide": DEFAULT_SHORT_SIDE,
+        "margin": DEFAULT_MARGIN,
+        "defaultOpacity": DEFAULT_OPACITY,
+        "legacyX": LEGACY_X,
+        "legacyY": LEGACY_Y,
+        "legacyW": LEGACY_W,
+        "legacyH": LEGACY_H,
         "bg": MAP_BG,
         "route": MAP_ROUTE,
         "marker": MAP_MARKER,
@@ -264,6 +351,7 @@ def map_from_effect_settings(raw: str | None) -> MapPlacement:
         y=_read_unit(item.get("y"), DEFAULT_Y),
         w=_read_unit(item.get("w"), DEFAULT_W),
         h=_read_unit(item.get("h"), DEFAULT_H),
+        opacity=_read_opacity(item.get("opacity"), DEFAULT_OPACITY),
     )
 
 
@@ -275,12 +363,16 @@ def parse_map_payload(payload: Mapping[str, object]) -> MapPlacement:
     enabled = raw.get("enabled")
     if not isinstance(enabled, bool):
         raise ValueError("enabled must be true or false")
+    opacity = DEFAULT_OPACITY
+    if "opacity" in raw:
+        opacity = _clamp_opacity(raw.get("opacity"))
     return MapPlacement(
         enabled=enabled,
         x=_require_unit(raw.get("x", DEFAULT_X), "x"),
         y=_require_unit(raw.get("y", DEFAULT_Y), "y"),
         w=_require_unit(raw.get("w", DEFAULT_W), "w"),
         h=_require_unit(raw.get("h", DEFAULT_H), "h"),
+        opacity=opacity,
     )
 
 
@@ -397,6 +489,18 @@ def flight_map_overlay(
     if not placement.enabled:
         raise MapRenderError("flight map is disabled")
     rect = content_rect(frame_width, frame_height, source_width, source_height)
+    if _is_legacy_stretch(placement):
+        ref_w = source_width if source_width > 0 else rect[2]
+        ref_h = source_height if source_height > 0 else rect[3]
+        squared = default_map_box(ref_w, ref_h)
+        placement = MapPlacement(
+            enabled=True,
+            x=squared[0],
+            y=squared[1],
+            w=squared[2],
+            h=squared[3],
+            opacity=placement.opacity,
+        )
     left, top, box_w, box_h = box_pixels(placement, rect)
     dest_dir.mkdir(parents=True, exist_ok=True)
     route_path = dest_dir / "flight-map-route.png"
@@ -409,11 +513,8 @@ def flight_map_overlay(
     except OSError as exc:
         raise MapRenderError("flight map could not be drawn") from exc
     args = ["-loop", "1", "-framerate", str(int(fps)), "-i", str(route_path)]
-    parts = [
-        f"[{int(first_input)}:v]format=rgba[mapbg]",
-        f"[{picture_label}][mapbg]overlay={left}:{top}:format=auto[mapon]",
-    ]
-    label = "mapon"
+    parts = [f"[{int(first_input)}:v]format=rgba[mapbg]"]
+    panel_label = "mapbg"
     marker_points = downsample_route(line)
     if marker_points:
         pad_x = max(1, int(round(box_w * PAD)))
@@ -436,31 +537,23 @@ def flight_map_overlay(
         args.extend(["-loop", "1", "-framerate", str(int(fps)), "-i", str(marker_path)])
         nx = axis_expr([(point.t, point.x) for point in marker_points])
         ny = axis_expr([(point.t, point.y) for point in marker_points])
-        x_expr = f"{(left + pad_x):.2f}+{inner_w:.2f}*({nx})-{half}"
-        y_expr = f"{(top + pad_y):.2f}+{inner_h:.2f}*({ny})-{half}"
+        # Panel-local, so one later overlay can fade the route and the marker together.
+        x_expr = f"{pad_x:.2f}+{inner_w:.2f}*({nx})-{half}"
+        y_expr = f"{pad_y:.2f}+{inner_h:.2f}*({ny})-{half}"
         dot = int(first_input) + 1
         parts.append(f"[{dot}:v]format=rgba[mapdot]")
         parts.append(
-            f"[mapon][mapdot]overlay=x='{x_expr}':y='{y_expr}':format=auto[mapout]"
+            f"[mapbg][mapdot]overlay=x='{x_expr}':y='{y_expr}':format=auto[mapjoined]"
         )
-        label = "mapout"
-    return args, ";".join(parts), label
-
-
-def _clamp_box(x: float, y: float, w: float, h: float) -> tuple[float, float, float, float]:
-    if not all(math.isfinite(value) for value in (x, y, w, h)):
-        raise ValueError("map position must be a finite number")
-    width = round(min(MAX_BOX, max(MIN_BOX, float(w))), 4)
-    height = round(min(MAX_BOX, max(MIN_BOX, float(h))), 4)
-    width = min(width, 1.0)
-    height = min(height, 1.0)
-    left = round(min(max(0.0, float(x)), 1.0 - width), 4)
-    top = round(min(max(0.0, float(y)), 1.0 - height), 4)
-    if left + width > 1:
-        left = round(1.0 - width, 4)
-    if top + height > 1:
-        top = round(1.0 - height, 4)
-    return left, top, width, height
+        panel_label = "mapjoined"
+    faded = _fade_label(panel_label, placement.opacity)
+    if faded is not None:
+        parts.append(faded[0])
+        panel_label = faded[1]
+    parts.append(
+        f"[{picture_label}][{panel_label}]overlay={left}:{top}:format=auto[mapout]"
+    )
+    return args, ";".join(parts), "mapout"
 
 
 def _coord(value: object) -> float | None:
@@ -655,6 +748,25 @@ def osm_basemap(
     if not found:
         return None
     return image
+
+
+def _fade_label(source: str, opacity: float) -> tuple[str, str] | None:
+    """One alpha for the finished panel. Full opacity leaves the graph unchanged."""
+    if opacity >= 0.999:
+        return None
+    return (
+        f"[{source}]format=rgba,colorchannelmixer=aa={opacity:.2f}[mapfade]",
+        "mapfade",
+    )
+
+
+def _read_opacity(value: object, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        return _clamp_opacity(value)
+    except ValueError:
+        return default
 
 
 def _read_unit(value: object, default: float) -> float:

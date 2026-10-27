@@ -15,6 +15,7 @@
   <span class="breadcrumb-sep" aria-hidden="true">/</span>
   <span class="breadcrumb-current">{{ _('Browse') }}</span>
 </nav>
+<div class="browse-layout">
 <section class="panel filters">
   <form method="get" action="/browse" class="filter-grid" id="filter-form">
     <input type="hidden" name="view" value="{{ view }}">
@@ -58,6 +59,7 @@
         <option value="asc" {% if filters.order=='asc' %}selected{% endif %}>{{ _('Ascending') }}</option>
       </select>
     </label>
+    {% if drones|length > 1 %}
     <label>
       {{ _('Drone') }}
       <select name="drone">
@@ -67,6 +69,7 @@
         {% endfor %}
       </select>
     </label>
+    {% endif %}
     <label>
       {{ _('Video') }} / {{ _('Photo') }}
       <select name="kind">
@@ -75,14 +78,23 @@
         <option value="photo" {% if filters.kind=='photo' %}selected{% endif %}>{{ _('Photo') }}</option>
       </select>
     </label>
+    {% if source_buckets|length > 1 %}
     <label>
       {{ _('Source') }}
       <select name="source">
         <option value="">{{ _('All sources') }}</option>
+        {% if source_buckets.drone %}
         <option value="drone" {% if filters.source=='drone' %}selected{% endif %}>{{ _('Drone') }}</option>
-        <option value="other" {% if filters.source=='other' %}selected{% endif %}>{{ _('Other devices') }}</option>
+        {% endif %}
+        {% if source_buckets.camera %}
+        <option value="camera" {% if filters.source=='camera' %}selected{% endif %}>{{ _('Camera') }}</option>
+        {% endif %}
+        {% if source_buckets.other %}
+        <option value="other" {% if filters.source=='other' %}selected{% endif %}>{{ _('Other') }}</option>
+        {% endif %}
       </select>
     </label>
+    {% endif %}
     <label>
       {{ _('GPS') }}
       <select name="gps">
@@ -151,6 +163,7 @@
   <p class="timeline-note">{{ _('Timeline follows the recording date.') }}</p>
   {% endif %}
 </section>
+<div class="browse-main">
 
 {% if flash_msg == 'studio_bulk_added' %}
   <div class="flash ok" role="status">
@@ -460,6 +473,8 @@
   </nav>
   {% endif %}
 {% endif %}
+</div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/thumbs.js"></script>

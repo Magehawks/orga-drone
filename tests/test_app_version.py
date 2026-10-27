@@ -41,6 +41,7 @@ def test_studio_topbar_shows_package_version(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client = _client(tmp_path, monkeypatch)
+    client.post("/studio/projects")
     html = client.get("/studio").text
     assert '<span class="app-version studio-app-version"' in html
     assert f">v{__version__}</span>" in html

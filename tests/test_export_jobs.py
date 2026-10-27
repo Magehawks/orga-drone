@@ -75,6 +75,40 @@ def test_export_progress_percent_steps() -> None:
     assert export_progress_percent(clip_index=3, clip_total=3, phase="done") == 100
 
 
+def test_single_clip_concat_progress_does_not_stall_at_50() -> None:
+    """A one-clip export encodes the clip, then re-encodes it in concat.
+
+    The first pass ends at 50% because both passes are real work of the same
+    duration. Concat must keep moving through the second half. Fraction 1 is
+    ffmpeg ``progress=end`` against that real duration, and publishing is 100.
+    Ignoring the concat fraction leaves the bar at 50% until the job finishes.
+    """
+    rendered = export_progress_percent(
+        clip_index=1, clip_total=1, phase="rendering", clip_fraction=1.0
+    )
+    assert rendered == 50
+    halfway = export_progress_percent(
+        clip_index=1, clip_total=1, phase="concat", clip_fraction=0.5
+    )
+    assert halfway == 75
+    finished_encode = export_progress_percent(
+        clip_index=1, clip_total=1, phase="concat", clip_fraction=1.0
+    )
+    assert finished_encode >= 99
+    assert export_progress_percent(clip_index=1, clip_total=1, phase="done") == 100
+
+
+def test_export_progress_dialog_shows_one_time() -> None:
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    start = script.index("function updateExportProgress")
+    end = script.index("function setExportRunningUi")
+    body = script[start:end]
+    assert "${elapsedText} · ${etaText}" not in body
+    assert "msgExportEta" not in body
+    assert "About {time} left" not in body
+    assert "elapsedText" in body
+
+
 def test_estimate_eta_s() -> None:
     assert estimate_eta_s(10.0, 0) is None
     assert estimate_eta_s(10.0, 4) is None

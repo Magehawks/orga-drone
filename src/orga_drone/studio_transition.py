@@ -404,6 +404,7 @@ def item_effective_seconds(item: object) -> float | None:
         card_duration_s=getattr(item, "card_duration_s", None),
         playback_speed=getattr(item, "playback_speed", None),
         section_repeats=repeats,
+        effect_settings=settings,
     )
     if kind != "video" or seconds is None or repeats < 2:
         return seconds

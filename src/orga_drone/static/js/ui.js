@@ -1,4 +1,15 @@
 (function () {
+  try {
+    const saved = sessionStorage.getItem("orga-drone:browse-filters");
+    const here = window.location.pathname;
+    if (saved && here !== "/browse" && !here.startsWith("/media")) {
+      document.querySelectorAll('a[data-nav="library"]').forEach((link) => {
+        link.setAttribute("href", saved);
+      });
+    }
+  } catch (_) {
+    /* ignore quota / private mode */
+  }
   // Loading overlay + button state on scan / long-running form submits
   function isLongRunningForm(form) {
     const action = (form.getAttribute("action") || "").toLowerCase();

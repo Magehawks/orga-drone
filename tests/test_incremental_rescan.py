@@ -390,6 +390,86 @@ def test_unreadable_child_folder_keeps_its_catalog(
     assert counts["unreadable"] == 1
 
 
+def test_unreadable_file_keeps_favorites_album_and_studio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sharing lock or PermissionError must not look like a deleted file."""
+    lib = tmp_path / "lib"
+    _video(lib / "locked.mp4")
+    _video(lib / "open.mp4")
+    db = Database(tmp_path / "file-lock.sqlite3")
+    root_id = db.add_root(lib, "cards")
+    scan_root(db, root_id, lib)
+    media_id, _row = _by_filename(db, root_id)["locked.mp4"]
+    item = db.get_media(media_id)
+    assert item is not None
+    db.upsert_media_meta(item.path, favorite=True, tags=["keep"], notes="stay")
+    album = db.create_album("Trip")
+    assert db.add_media_to_album(album.id, media_id) == "added"
+    clip_id, _created = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=media_id,
+    )
+    real_stat = Path.stat
+
+    def locked_stat(self: Path, *args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        if self.name == "locked.mp4":
+            denied = PermissionError(13, "denied", str(self))
+            denied.winerror = 32  # type: ignore[attr-defined]
+            raise denied
+        return real_stat(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", locked_stat)
+    counts = scan_root(db, root_id, lib)
+    monkeypatch.setattr(Path, "stat", real_stat)
+    assert counts["unreadable"] == 1
+    kept = db.get_media(media_id)
+    assert kept is not None
+    assert kept.favorite is True
+    assert kept.tags == ["keep"]
+    assert kept.notes == "stay"
+    album_items = db.list_album_items(album.id)
+    assert len(album_items) == 1
+    assert album_items[0].media_id == media_id
+    clips = db.list_studio_items()
+    assert len(clips) == 1
+    assert clips[0].id == clip_id
+    assert clips[0].source_media_id == media_id
+    assert "open.mp4" in _by_filename(db, root_id)
+
+
+def test_aborted_rescan_keeps_the_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lib = tmp_path / "lib"
+    video = lib / "stay.mp4"
+    _video(video)
+    db = Database(tmp_path / "abort.sqlite3")
+    root_id = db.add_root(lib, "cards")
+    scan_root(db, root_id, lib)
+    media_id, _row = _by_filename(db, root_id)["stay.mp4"]
+    item = db.get_media(media_id)
+    assert item is not None
+    db.upsert_media_meta(item.path, favorite=True, tags=["flight"])
+    os.utime(video, None)
+    import orga_drone.scan as scan_mod
+
+    def boom(path: Path):
+        raise OSError("scan aborted")
+
+    monkeypatch.setattr(scan_mod, "parse_media_file", boom)
+    with pytest.raises(OSError, match="scan aborted"):
+        scan_root(db, root_id, lib)
+    kept = db.get_media(media_id)
+    assert kept is not None
+    assert kept.favorite is True
+    assert kept.tags == ["flight"]
+
+
 def test_video_without_duration_is_read_once_more(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Rows saved before the ffmpeg duration fallback are probed once."""
     lib = tmp_path / "lib"

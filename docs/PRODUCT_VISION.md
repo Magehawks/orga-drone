@@ -41,8 +41,9 @@ The app opens on Home: the Orga Drone logo when the library is empty or no
 saved preview is available, otherwise one already cached local thumbnail.
 The same sidebar reaches the library, Studio, the flight map, and Settings
 (dark, light, or custom theme; German or English; thumbnail and map-tile
-cache only). Original files, projects, and exports are not deleted from
-Settings.
+cache only). Studio opens a project gallery. Choosing a project or creating
+one opens the editor. Original files, projects, and exports are not deleted
+from Settings.
 
 Treat everything labeled Later as **planned** unless the codebase already
 implements it. The Studio MVP local journey (import → arrange → optional music
@@ -129,7 +130,7 @@ orga-drone.
 | Map | **Available now** |
 | Sessions / flows in UI | **Available now** |
 | Rule-based “Ask the library” | **Available now** (not an LLM) |
-| Timeline product UI | **Available now** (Browse year/month/day groups by recording date; existing filters; missing or non-calendar dates called out; page size 50/100/200). This is not the Studio editor timeline. |
+| Timeline product UI | **Available now** (Browse year/month/day groups by recording date; filters stay when you leave and come back, sit on the left, and can limit DJI, camera, or other files without showing empty buckets; the flight map can hide stored place names and filter drone, camera, or both, and both includes unclear files; missing or non-calendar dates called out; page size 50/100/200). This is not the Studio editor timeline. |
 
 ### 3. Studio
 
@@ -161,11 +162,11 @@ professional video-editing knowledge.
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
-| Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8 per photo or video clip; fixed for the whole clip; select one in the preview or inspector and remove it without touching the file; preview approximates export) |
-| Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (photo and video clips; 1×–3×; preview matches the exported frame; not tracking or a keyframe editor) |
+| Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8; rectangular, not tracking; on a video clip each mask is a timed bar on the one Effekt lane and is off outside that bar; photos have no Effekt lane; preview matches the MP4) |
+| Per-clip zoom and pan (static crop, or start/end motion) | **Available now** (1×–3×; on a video clip the zoom is a timed bar on the same Effekt lane and is 1× outside that bar; photos have no Effekt lane; preview matches the MP4; not tracking or a keyframe editor) |
 | Flight map overlay | **Available now** (optional per photo or video clip; route and moving marker from GPS already stored; OpenStreetMap tiles when they can be fetched and cached locally, otherwise a plain panel; tiles are not bundled; drag and resize inside the picture; empty state without GPS; preview and MP4) |
 | Optional telemetry HUD | **Available now** (one preset on a video clip when a sibling DJI SRT has timed cues; elapsed source time and relative altitude; speed and home distance stay unavailable; preview and MP4; not a goggles display or tracking) |
-| Slow motion on a selected video section (0.5×, 0.25×, or 1× to reset) | **Available now** (that section only; neighboring sections keep their speed; Story length updates; preview and MP4 match; source audio on a slowed section is muted; not optical-flow interpolation or fast-forward) |
+| Slow motion on a selected video section (0.5×, 0.25×, or 1× to reset) | **Available now** (a Verlangsamen bar on the one Effekt lane; 0.5× or 0.25× only inside the bar; removing the bar returns that range to 1×; preview and MP4 match; source audio on a slowed bar is muted; not optical-flow interpolation or fast-forward) |
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the inspector, the media browser, and the Story tracks can be dragged and the size is kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
@@ -294,6 +295,7 @@ See `README.md` for the detailed feature status table. In short:
   drawn under that route; otherwise the panel stays plain. Tiles are not
   bundled. The box uses the fitted picture, can be
   dragged and resized inside the frame, and is saved with the Story clip.
+  The default box is a smaller undistorted square, and opacity is adjustable.
   A clip with no GPS shows an empty
   panel. This is not live tracking. A video clip can also turn on one telemetry HUD when a
   sibling DJI SRT has timed cues. It shows elapsed source time and relative
@@ -341,17 +343,15 @@ See `README.md` for the detailed feature status table. In short:
   headings, read-only time-proportional soundtrack coverage on that canvas,
   basic rendered visual transitions, basic per-clip image adjustment, a linear
   video saturation ramp (not a keyframe editor), timed text,
-  shape, and image overlays, rectangular blur/pixelate privacy masks (fixed for
-  the clip; not tracking), per-clip zoom and pan (1×–3×, optional start/end
-  motion; preview matches the exported frame; not tracking or a keyframe editor),
+  shape, and image overlays. Zoom, blur, pixelate, and slow motion are timed bars on one Effekt lane (1×–3× zoom, rectangular masks up to 8, slow motion only at 0.5× or 0.25×; off outside the bar; photos have no lane; not tracking or a keyframe editor),
   an optional flight map (stored GPS route and synced marker on OpenStreetMap
   tiles when online, otherwise a plain panel; tiles are cached locally and are
-  not bundled; not live tracking), and an optional telemetry HUD on a
+  not bundled; the default box is a smaller undistorted square and opacity is adjustable; not live tracking), and an optional telemetry HUD on a
   video clip with a sibling DJI SRT (elapsed time and relative altitude only; not a
   goggles display or tracking; not a professional grade or NLE). A selected section
-  of a video clip can use slow motion at 0.5× or 0.25× (1× resets that section;
-  source audio on the slowed section is muted; not optical-flow interpolation,
-  fast-forward, or reverse). A video section repeat plays an in/out range up to 8
+  of a video clip can use slow motion at 0.5× or 0.25× inside its Effekt-lane bar (removing the bar returns that range to 1×;
+  source audio on the slowed bar is muted; not optical-flow interpolation,
+  fast-forward, or reverse). A video clip's embedded audio plays in preview and in the MP4 at 1× and is shown on its own story audio lane. That bar can be dragged in time, and its edges shorten only the sound; the picture's edge handles still trim the picture. The source file is not modified. A video section repeat plays an in/out range up to 8
   times at the same speed (hard cuts, not reverse). Separately, one video
   section can repeat forward until a soundtrack with a known duration ends.
   The soundtrack plays once and does not restart or blend at each join. The last play

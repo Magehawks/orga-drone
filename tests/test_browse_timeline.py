@@ -324,7 +324,7 @@ def test_browse_timeline_navigation_filters_and_pagination(
 
     studio = client.get("/studio", cookies={"lang": "en"})
     assert studio.status_code == 200
-    assert "studio.js" in studio.text
+    assert "studio-gallery" in studio.text
     assert "timeline-nav" not in studio.text
     assert "media-timeline" not in studio.text
 

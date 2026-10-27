@@ -96,6 +96,33 @@ def test_render_cancel_before_publish_leaves_destination(tmp_path: Path) -> None
     assert list(dest.parent.glob("*.partial")) == []
 
 
+def test_locked_partial_does_not_hide_cancel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WinError 32 while deleting the partial must not replace ExportCancelled."""
+    still = tmp_path / "still.jpg"
+    still.write_bytes(b"still")
+    dest = tmp_path / "out" / "story.mp4"
+    dest.parent.mkdir()
+    dest.write_bytes(b"keep")
+    real_unlink = Path.unlink
+
+    def locked_unlink(self: Path, missing_ok: bool = False):  # type: ignore[no-untyped-def]
+        if self.name.endswith(".partial") or ".partial" in self.name:
+            denied = PermissionError(13, "used by another process", str(self))
+            denied.winerror = 32  # type: ignore[attr-defined]
+            raise denied
+        return real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", locked_unlink)
+    monkeypatch.setattr("orga_drone.export.studio_encoder.time.sleep", lambda _seconds: None)
+    event = threading.Event()
+    event.set()
+    clip = StudioExportClip(source_path=still, kind="photo", duration_s=30.0)
+    config = StudioExportConfig(output_path=dest, width=320, height=180, clips=(clip,))
+    with pytest.raises(ExportCancelled):
+        FfmpegStudioEncoder().render(config, cancel_event=event)
+    assert dest.read_bytes() == b"keep"
+
+
 def test_http_cancel_then_export_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

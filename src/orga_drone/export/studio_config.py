@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from orga_drone.studio_audio import DetachedAudio
 from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_hud import HudInterval
 from orga_drone.studio_image import ImageAdjust, SaturationRamp
@@ -58,6 +59,10 @@ class StudioExportClip:
     media_duration_s: float | None = None
     hud_enabled: bool = False
     hud_intervals: tuple[HudInterval, ...] = ()
+    detached_audio: DetachedAudio | None = None
+    # Clip-local source seconds. None keeps the existing whole-clip zoom or speed.
+    zoom_span: tuple[float, float] | None = None
+    slow_span: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)

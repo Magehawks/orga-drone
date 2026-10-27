@@ -80,7 +80,7 @@ def test_empty_home_shows_logo_and_shared_nav(
     assert "Welcome to orga-drone" in page.text or "Willkommen bei orga-drone" in page.text
     assert 'href="/library"' in page.text
     assert 'href="/browse"' in page.text
-    assert 'href="/studio"' in page.text
+    assert 'href="/studio/projects"' in page.text
     assert 'href="/map"' in page.text
     assert 'href="/settings"' in page.text
     assert 'class="app-sidebar"' in page.text

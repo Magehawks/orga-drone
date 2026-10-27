@@ -539,6 +539,17 @@ def test_run_ffmpeg_progress_does_not_pipe_stderr(
         duration_s=2.0,
     )
     assert times and times[0] == 0.5
+    # progress=end completes the real 2s step, so a one-clip concat is not left at 50%.
+    assert times[-1] == 2.0
+    assert (
+        se.export_progress_percent(
+            clip_index=1,
+            clip_total=1,
+            phase="concat",
+            clip_fraction=times[-1] / 2.0,
+        )
+        >= 99
+    )
     assert captured["kwargs"]["stdout"] is se.subprocess.PIPE
     # stderr must be a file object, never PIPE
     assert captured["kwargs"]["stderr"] is not se.subprocess.PIPE
@@ -1106,3 +1117,156 @@ def test_encoder_playlist_concat_when_two_songs(
     assert "-stream_loop" not in mix_cmds[-1]
     assert str(songs[0]) in mix_cmds[-1]
     assert str(songs[1]) in mix_cmds[-1]
+
+
+def _ffmpeg_banner(ffmpeg: str, path: Path) -> str:
+    probed = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return probed.stderr
+
+
+def test_export_reimport_preview_and_second_export_keep_duration_and_audio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Studio MP4s have no SRT, and the Windows package has no ffprobe.
+
+    Duration and audio must survive import, the Studio page, and a second export.
+    """
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: None)
+    source = tmp_path / "lib" / "memory.mp4"
+    source.parent.mkdir()
+    generated = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=320x180:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(source),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert generated.returncode == 0, generated.stderr[-400:]
+    assert "Audio:" in _ffmpeg_banner(ffmpeg, source)
+
+    from orga_drone.parse import parse_media_file
+
+    parsed = parse_media_file(source)
+    assert parsed.duration_s is not None
+    assert parsed.duration_s == pytest.approx(1.0, abs=0.2)
+
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    root_id = db.add_root(source.parent, label="lib")
+    media_id = db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "video",
+            "filename": source.name,
+            "path": str(source.resolve()),
+            "size_bytes": source.stat().st_size,
+            "duration_s": None,
+            "width": 320,
+            "height": 180,
+            "recorded_at": "2024-01-02T10:00:00",
+            "sequence": 1,
+            "mode": None,
+            "drone_model": "Avata 2",
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+            "duration_probe": None,
+        }
+    )
+    item = db.get_media(media_id)
+    assert item is not None
+    db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        source_media_id=media_id,
+    )
+    page = TestClient(app).get("/studio")
+    assert page.status_code == 200
+    stored = db.get_media(media_id)
+    assert stored is not None
+    assert stored.duration_s == pytest.approx(parsed.duration_s, abs=0.05)
+    assert f'data-media-duration="{stored.duration_s}' in page.text
+
+    first = tmp_path / "exports" / "first.mp4"
+    first.parent.mkdir()
+    first_config = StudioExportConfig(
+        output_path=first,
+        width=320,
+        height=180,
+        clips=(
+            StudioExportClip(
+                source_path=source,
+                kind="video",
+                duration_s=float(stored.duration_s),
+            ),
+        ),
+    )
+    assert FfmpegStudioEncoder().render(first_config) == first
+    first_banner = _ffmpeg_banner(ffmpeg, first)
+    assert "Audio:" in first_banner
+    reimported = parse_media_file(first)
+    assert reimported.duration_s is not None
+    assert reimported.duration_s == pytest.approx(float(stored.duration_s), abs=0.25)
+
+    second = tmp_path / "exports" / "second.mp4"
+    second_config = StudioExportConfig(
+        output_path=second,
+        width=320,
+        height=180,
+        clips=(
+            StudioExportClip(
+                source_path=first,
+                kind="video",
+                duration_s=float(reimported.duration_s),
+            ),
+        ),
+    )
+    assert FfmpegStudioEncoder().render(second_config) == second
+    assert "Audio:" in _ffmpeg_banner(ffmpeg, second)
+    second_parsed = parse_media_file(second)
+    assert second_parsed.duration_s is not None
+    assert second_parsed.duration_s == pytest.approx(float(reimported.duration_s), abs=0.25)

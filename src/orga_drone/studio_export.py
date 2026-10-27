@@ -367,6 +367,7 @@ def _clip_to_export_clip(
         source_out_s=play_out,
         playback_speed=speed,
         section_repeats=1,
+        effect_settings=clip.effect_settings if kind == "video" else None,
     )
     seconds = effective_seconds(
         kind=kind or "unknown",
@@ -377,6 +378,7 @@ def _clip_to_export_clip(
         source_out_s=play_out,
         playback_speed=speed,
         section_repeats=repeats,
+        effect_settings=clip.effect_settings if kind == "video" else None,
     )
     if forward_active:
         seconds = forward_total_s
@@ -468,6 +470,30 @@ def _clip_to_export_clip(
                     for row in raw_intervals
                     if isinstance(row, dict)
                 )
+    zoom_span = None
+    slow_span = None
+    detached = None
+    if kind == "video" and end is not None:
+        from orga_drone.studio_audio import detached_audio_from_effect_settings
+        from orga_drone.studio_effect_lane import slow_bar, zoom_bar
+
+        source_len = max(0.0, float(end) - float(start))
+        zoom = zoom_bar(clip.effect_settings, source_len)
+        if zoom is not None and not (
+            zoom.start_s <= 0.05 and zoom.end_s >= source_len - 0.05
+        ):
+            zoom_span = (zoom.start_s, zoom.end_s)
+        slowed = slow_bar(clip.effect_settings, source_len, speed)
+        if slowed is not None:
+            full = slowed.start_s <= 0.05 and slowed.end_s >= source_len - 0.05
+            if full:
+                speed = slowed.speed
+            else:
+                slow_span = (slowed.start_s, slowed.end_s, slowed.speed)
+                speed = 1.0
+        detached = detached_audio_from_effect_settings(clip.effect_settings)
+        if detached is not None and not detached.is_heard:
+            detached = None
     return StudioExportClip(
         source_path=path,
         kind=kind or "video",
@@ -475,6 +501,9 @@ def _clip_to_export_clip(
         source_start_s=start,
         source_end_s=end,
         playback_speed=speed,
+        zoom_span=zoom_span,
+        slow_span=slow_span,
+        detached_audio=detached,
         section_repeats=repeats if kind == "video" else 1,
         forward_loop=forward_active,
         forward_cycle_s=forward_cycle if forward_active else 0.0,

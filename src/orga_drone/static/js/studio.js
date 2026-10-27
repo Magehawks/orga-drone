@@ -304,8 +304,6 @@
   const msgExportUnavailable = root.dataset.exportUnavailable || "Export needs the desktop app for the save dialog.";
   const msgExportRunningHint = root.dataset.exportRunningHint || "Export is running…";
   const msgExportElapsed = root.dataset.exportElapsed || "Elapsed {time}";
-  const msgExportEta = root.dataset.exportEta || "About {time} left";
-  const msgExportEstimating = root.dataset.exportEstimating || "Estimating…";
   const msgExportDoneIn = root.dataset.exportDoneIn || "Done in {time}";
   const msgExportSuccess = root.dataset.exportSuccess || "Exported {filename}.";
   const msgExportFileMissing = root.dataset.exportFileMissing || "The exported file is no longer available.";
@@ -615,19 +613,157 @@
     return Math.max(0, sourceOutS(clip) - sourceInS(clip));
   }
 
+  function readStoredBar(clip, key) {
+    if (!clip) return null;
+    try {
+      const parsed = JSON.parse(clip.dataset[key] || "null");
+      if (!parsed || typeof parsed !== "object") return null;
+      const start = Number(parsed.start_s);
+      const end = Number(parsed.end_s);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 0.05) return null;
+      return { start, end, speed: Number(parsed.speed) };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function zoomBarOf(clip) {
+    if (!clip || clip.dataset.kind !== "video") return null;
+    const frame = readFrame(clip);
+    const zoom = Math.max(frame.zoom_start, frame.zoom_end);
+    if (zoom <= 1.001) return null;
+    const dur = Math.max(0.05, sourceDurationS(clip));
+    const stored = readStoredBar(clip, "zoomBar");
+    return stored ? { start: stored.start, end: Math.min(dur, stored.end), zoom } : { start: 0, end: dur, zoom };
+  }
+
+  function slowBarOf(clip) {
+    if (!clip || clip.dataset.kind !== "video") return null;
+    const dur = sourceDurationS(clip);
+    const stored = readStoredBar(clip, "slowBar");
+    if (stored && (stored.speed === 0.5 || stored.speed === 0.25)) {
+      return { start: stored.start, end: stored.end, speed: stored.speed };
+    }
+    const speed = playbackSpeed(clip);
+    if (speed >= 0.999 || dur < 0.05) return null;
+    return { start: 0, end: dur, speed };
+  }
+
+  function speedAtSource(clip, offset) {
+    const bar = slowBarOf(clip);
+    if (!bar) return playbackSpeed(clip);
+    if (offset >= bar.start - 0.001 && offset <= bar.end + 0.001) return bar.speed;
+    return 1;
+  }
+
+  function sourceToStory(clip, offset) {
+    const bar = slowBarOf(clip);
+    const off = Math.max(0, offset);
+    if (!bar || playbackSpeed(clip) < 0.999) return off / playbackSpeed(clip);
+    if (off <= bar.start) return off;
+    if (off <= bar.end) return bar.start + (off - bar.start) / bar.speed;
+    return bar.start + (bar.end - bar.start) / bar.speed + (off - bar.end);
+  }
+
+  function storyToSource(clip, localS) {
+    const bar = slowBarOf(clip);
+    const local = Math.max(0, localS);
+    if (!bar || playbackSpeed(clip) < 0.999) return local * playbackSpeed(clip);
+    if (local <= bar.start) return local;
+    const slowed = (bar.end - bar.start) / bar.speed;
+    if (local <= bar.start + slowed) return bar.start + (local - bar.start) * bar.speed;
+    return bar.end + (local - (bar.start + slowed));
+  }
+
+  let clipAudio = null;
+  function clipAudioEl() {
+    if (clipAudio) return clipAudio;
+    clipAudio = document.createElement("audio");
+    clipAudio.preload = "auto";
+    clipAudio.hidden = true;
+    document.body.appendChild(clipAudio);
+    return clipAudio;
+  }
+
+  function syncClipAudio(video, clip) {
+    const audio = clipAudioEl();
+    if (!video || video !== previewVideo || !clip || clip.dataset.kind !== "video") {
+      audio.pause();
+      return;
+    }
+    const offset = Math.max(0, (video.currentTime || 0) - sourceInS(clip));
+    const slow = speedAtSource(clip, offset) < 0.999;
+    const stream = clip.dataset.streamUrl || "";
+    const proxy = clip.dataset.hasProxy === "1";
+    const range = audioPlacement(clip);
+    if (slow) {
+      audio.pause();
+      video.muted = true;
+      return;
+    }
+    if (range.custom) {
+      video.muted = true;
+      const speed = playbackSpeed(clip) || 1;
+      const story = slowBarOf(clip) && playbackSpeed(clip) >= 0.999
+        ? sourceToStory(clip, offset)
+        : offset / speed;
+      const into = story - range.place;
+      if (!stream || into < -0.03 || into > range.story + 0.03) {
+        audio.pause();
+        return;
+      }
+      if (audio.dataset.src !== stream) {
+        audio.src = stream;
+        audio.dataset.src = stream;
+      }
+      const target = range.sourceIn + Math.max(0, into) * speed;
+      if (Math.abs((audio.currentTime || 0) - target) > 0.35) {
+        try { audio.currentTime = target; } catch (_) { /* seek while loading */ }
+      }
+      audio.volume = state.volume;
+      if (video.paused) audio.pause();
+      else audio.play().catch(() => {});
+      return;
+    }
+    if (!stream) {
+      audio.pause();
+      video.muted = false;
+      video.volume = state.volume;
+      return;
+    }
+    if (proxy) {
+      video.muted = true;
+      if (audio.dataset.src !== stream) {
+        audio.src = stream;
+        audio.dataset.src = stream;
+      }
+      const target = sourceInS(clip) + offset;
+      if (Math.abs((audio.currentTime || 0) - target) > 0.35) {
+        try { audio.currentTime = target; } catch (_) { /* seek while loading */ }
+      }
+      audio.volume = state.volume;
+      if (video.paused) audio.pause();
+      else audio.play().catch(() => {});
+      return;
+    }
+    audio.pause();
+    video.muted = false;
+    video.volume = state.volume;
+  }
+
   function applyClipPlayback(video, clip) {
     if (!video) return;
-    const speed = clip ? playbackSpeed(clip) : 1;
+    let speed = clip ? playbackSpeed(clip) : 1;
+    if (clip && video === previewVideo && clip.dataset.kind === "video") {
+      const offset = Math.max(0, (video.currentTime || 0) - sourceInS(clip));
+      if (slowBarOf(clip) && playbackSpeed(clip) >= 0.999) speed = speedAtSource(clip, offset);
+    }
     try {
       if (video.playbackRate !== speed) video.playbackRate = speed;
     } catch (_) {
       /* ignore unsupported rates */
     }
-    if (video === previewVideo) {
-      const slow = speed < 0.999;
-      video.muted = slow;
-      if (!slow) video.volume = state.volume;
-    }
+    if (video === previewVideo) syncClipAudio(video, clip);
   }
 
   function forwardLoopActive(clip) {
@@ -888,6 +1024,413 @@
     return Math.max(0, xPx) / pps;
   }
 
+  let selectedEffectBar = null;
+
+  function effectLabel(kind) {
+    const lane = document.getElementById("studio-effect-lane");
+    if (!lane) return kind;
+    if (kind === "zoom") return lane.dataset.labelZoom || "Zoom";
+    if (kind === "blur") return lane.dataset.labelBlur || "Blur";
+    if (kind === "pixelate") return lane.dataset.labelPixelate || "Pixelate";
+    return lane.dataset.labelSlow || "Slow motion";
+  }
+
+  function layoutEffectBars() {
+    const lane = document.getElementById("studio-effect-lane");
+    const label = document.getElementById("studio-effect-label");
+    if (!lane) return;
+    const videos = clips().filter((clip) => clip.dataset.kind === "video");
+    const show = videos.length > 0;
+    lane.hidden = !show;
+    if (label) {
+      label.hidden = !show;
+      if (!show) label.style.minHeight = "";
+    }
+    if (!show) {
+      lane.replaceChildren();
+      lane.style.minHeight = "";
+      return;
+    }
+    const pps = timelinePxPerSecond();
+    const effectBarPx = 32;
+    const effectBarGapPx = 4;
+    lane.replaceChildren();
+    let stack = 1;
+    videos.forEach((clip) => {
+      const left = Number.parseFloat(clip.style.left) || 0;
+      const bars = [];
+      const zoom = zoomBarOf(clip);
+      if (zoom) bars.push({ kind: "zoom", id: "", start: zoom.start, end: zoom.end, label: `${effectLabel("zoom")} ${zoom.zoom.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}×` });
+      readMasks(clip).forEach((mask) => {
+        const dur = Math.max(0.05, sourceDurationS(clip));
+        const start = mask.start_s == null ? 0 : Number(mask.start_s);
+        const end = mask.end_s == null ? dur : Number(mask.end_s);
+        bars.push({ kind: mask.effect, id: mask.id, start, end, label: effectLabel(mask.effect) });
+      });
+      const slow = slowBarOf(clip);
+      if (slow) bars.push({ kind: "slow", id: "", start: slow.start, end: slow.end, speed: slow.speed, label: `${effectLabel("slow")} ${slow.speed}×` });
+      bars.forEach((bar, index) => {
+        const storyStart = sourceToStory(clip, bar.start);
+        const storyEnd = sourceToStory(clip, bar.end);
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "studio-effect-bar";
+        const step = effectBarPx + effectBarGapPx;
+        el.style.left = `${left + storyStart * pps}px`;
+        el.style.width = `${Math.max(12, (storyEnd - storyStart) * pps)}px`;
+        el.style.top = `${effectBarGapPx + index * step}px`;
+        el.style.height = `${effectBarPx}px`;
+        el.dataset.kind = bar.kind === "blur" || bar.kind === "pixelate" ? "mask" : bar.kind;
+        el.dataset.effect = bar.kind;
+        el.dataset.maskId = bar.id;
+        el.dataset.studioId = clip.dataset.studioId || "";
+        el.dataset.speed = bar.speed ? String(bar.speed) : "";
+        el.textContent = bar.label;
+        const edgeIn = document.createElement("span");
+        edgeIn.className = "studio-effect-edge studio-effect-edge-in";
+        const edgeOut = document.createElement("span");
+        edgeOut.className = "studio-effect-edge studio-effect-edge-out";
+        el.append(edgeIn, edgeOut);
+        if (selectedEffectBar && selectedEffectBar.studioId === el.dataset.studioId && selectedEffectBar.kind === el.dataset.kind && selectedEffectBar.id === el.dataset.maskId) {
+          el.classList.add("is-selected");
+        }
+        el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
+        lane.appendChild(el);
+        stack = Math.max(stack, index + 1);
+      });
+    });
+    const step = effectBarPx + effectBarGapPx;
+    lane.style.minHeight = `${effectBarGapPx + stack * step}px`;
+    if (label) label.style.minHeight = lane.style.minHeight;
+  }
+
+  let suppressTimelineClick = false;
+
+  function readClipAudio(clip) {
+    if (!clip) return null;
+    try {
+      const parsed = JSON.parse(clip.dataset.clipAudio || "null");
+      if (!parsed || parsed.active !== true) return null;
+      const sourceIn = Number(parsed.source_in_s);
+      const sourceOut = Number(parsed.source_out_s);
+      const place = Number(parsed.place_s);
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut - sourceIn < 0.05) return null;
+      return { sourceIn, sourceOut, place: Number.isFinite(place) ? place : 0 };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function audioPlacement(clip) {
+    const speed = playbackSpeed(clip) || 1;
+    const stored = readClipAudio(clip);
+    if (!stored) {
+      const sourceIn = sourceInS(clip);
+      const sourceOut = Math.max(sourceIn + 0.05, sourceOutS(clip));
+      return {
+        sourceIn,
+        sourceOut,
+        place: 0,
+        custom: false,
+        story: Math.max(0.05, (sourceOut - sourceIn) / speed),
+      };
+    }
+    return {
+      sourceIn: stored.sourceIn,
+      sourceOut: stored.sourceOut,
+      place: stored.place,
+      custom: true,
+      story: Math.max(0.05, (stored.sourceOut - stored.sourceIn) / speed),
+    };
+  }
+
+  function makeAudioBar(clip, left, width) {
+    const bar = document.createElement("button");
+    bar.type = "button";
+    bar.className = "studio-clip-audio-bar";
+    bar.style.left = `${left}px`;
+    bar.style.width = `${Math.max(8, width)}px`;
+    bar.dataset.studioId = clip.dataset.studioId || "";
+    bar.setAttribute("aria-label", clip.dataset.filename || "Audio");
+    bar.textContent = clip.dataset.filename || "";
+    const edgeIn = document.createElement("span");
+    edgeIn.className = "studio-clip-audio-edge studio-clip-audio-edge-in";
+    const edgeOut = document.createElement("span");
+    edgeOut.className = "studio-clip-audio-edge studio-clip-audio-edge-out";
+    bar.append(edgeIn, edgeOut);
+    bar.addEventListener("pointerdown", (event) => onAudioPointerDown(event, bar, clip));
+    bar.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    return bar;
+  }
+
+  function layoutClipAudio() {
+    const host = document.getElementById("studio-clip-audio");
+    const lane = document.getElementById("studio-clip-audio-lane");
+    const label = document.getElementById("studio-audio-label");
+    if (!host) return;
+    host.replaceChildren();
+    const videos = clips().filter((clip) => clip.dataset.kind === "video");
+    const show = videos.length > 0;
+    if (lane) lane.hidden = !show;
+    if (label) label.hidden = !show;
+    if (!show) return;
+    const pps = timelinePxPerSecond() || 1;
+    videos.forEach((clip) => {
+      const clipLeft = Number.parseFloat(clip.style.left) || 0;
+      const clipWidth = Number.parseFloat(clip.style.width) || 0;
+      const range = audioPlacement(clip);
+      if (!range.custom) {
+        if (clipWidth < 4) return;
+        host.appendChild(makeAudioBar(clip, clipLeft, clipWidth));
+        return;
+      }
+      const reps = Math.max(1, sectionRepeats(clip));
+      const cycle = sectionCycleS(clip);
+      const width = Math.max(8, range.story * pps);
+      if (reps > 1 && cycle > 0.05) {
+        for (let i = 0; i < reps; i += 1) {
+          host.appendChild(makeAudioBar(clip, clipLeft + (i * cycle + range.place) * pps, width));
+        }
+        return;
+      }
+      host.appendChild(makeAudioBar(clip, clipLeft + range.place * pps, width));
+    });
+  }
+
+  function onAudioPointerDown(event, el, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressTimelineClick = true;
+    const edge = event.target.closest ? event.target.closest(".studio-clip-audio-edge") : null;
+    const mode = edge && edge.classList.contains("studio-clip-audio-edge-in")
+      ? "start"
+      : edge && edge.classList.contains("studio-clip-audio-edge-out")
+        ? "end"
+        : "move";
+    const origin = audioPlacement(clip);
+    const originLeft = Number.parseFloat(el.style.left) || 0;
+    const startX = event.clientX;
+    const pps = timelinePxPerSecond() || 1;
+    const speed = playbackSpeed(clip) || 1;
+    const group = "audio" + String(event.pointerId || Date.now());
+    pausePlayback();
+    selectClip(clip.dataset.studioId, { movePlayhead: false });
+    const move = (ev) => {
+      const deltaStory = (ev.clientX - startX) / pps;
+      let sourceIn = origin.sourceIn;
+      let sourceOut = origin.sourceOut;
+      let place = origin.place;
+      if (mode === "move") {
+        const span = origin.story;
+        const limit = Math.max(span, sectionCycleS(clip) || clipDuration(clip) || span);
+        place = origin.place + deltaStory;
+        place = Math.max(Math.min(0, 0.05 - span), Math.min(Math.max(0, limit - 0.05), place));
+      } else if (mode === "start") {
+        const next = Math.max(origin.sourceIn, Math.min(origin.sourceOut - 0.05, origin.sourceIn + deltaStory * speed));
+        place = origin.place + (next - origin.sourceIn) / speed;
+        sourceIn = next;
+      } else {
+        sourceOut = Math.max(origin.sourceIn + 0.05, Math.min(origin.sourceOut, origin.sourceOut + deltaStory * speed));
+      }
+      const story = Math.max(0.05, (sourceOut - sourceIn) / speed);
+      el.style.left = `${originLeft + (place - origin.place) * pps}px`;
+      el.style.width = `${Math.max(8, story * pps)}px`;
+      el.dataset.draftIn = String(sourceIn);
+      el.dataset.draftOut = String(sourceOut);
+      el.dataset.draftPlace = String(place);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.setTimeout(() => {
+        suppressTimelineClick = false;
+      }, 0);
+      const sourceIn = Number(el.dataset.draftIn);
+      const sourceOut = Number(el.dataset.draftOut);
+      const place = Number(el.dataset.draftPlace);
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || !Number.isFinite(place)) return;
+      if (
+        Math.abs(sourceIn - origin.sourceIn) < 0.001 &&
+        Math.abs(sourceOut - origin.sourceOut) < 0.001 &&
+        Math.abs(place - origin.place) < 0.001
+      ) {
+        return;
+      }
+      historyGesture = group;
+      void saveClipAudio(clip, {
+        source_in_s: sourceIn,
+        source_out_s: sourceOut,
+        place_s: place,
+      });
+      historyGesture = "";
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  async function saveClipAudio(clip, body) {
+    let res;
+    try {
+      res = await fetch(`/api/studio/${clip.dataset.studioId}/clip-audio`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (_) {
+      showFlash("Could not update the audio.");
+      layoutClipAudio();
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok) {
+      showFlash((data && data.detail) || "Could not update the audio.");
+      layoutClipAudio();
+      return;
+    }
+    clip.dataset.clipAudio = JSON.stringify(data.audio || {});
+    layoutClipAudio();
+    applyClipPlayback(previewVideo, clip);
+  }
+
+  function onEffectPointerDown(event, el, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (el.dataset.kind === "mask" && el.dataset.maskId) {
+      selectedMaskId = el.dataset.maskId;
+      const already =
+        state.selected &&
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(clip.dataset.studioId);
+      if (!already) selectClip(clip.dataset.studioId, { movePlayhead: false });
+      else {
+        try {
+          fillMaskInspector(clip);
+        } catch (_) {
+          /* The preview frame still follows the selected mask. */
+        }
+        drawPrivacyMasks();
+      }
+    }
+    selectedEffectBar = {
+      studioId: el.dataset.studioId,
+      kind: el.dataset.kind,
+      id: el.dataset.maskId || "",
+    };
+    document.querySelectorAll(".studio-effect-bar.is-selected").forEach((node) => node.classList.remove("is-selected"));
+    el.classList.add("is-selected");
+    const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
+    const mode = edge && edge.classList.contains("studio-effect-edge-in")
+      ? "start"
+      : edge && edge.classList.contains("studio-effect-edge-out")
+        ? "end"
+        : "move";
+    const dur = Math.max(0.05, sourceDurationS(clip));
+    const origin = sourceRangeForBar(clip, el);
+    const startX = event.clientX;
+    const pps = timelinePxPerSecond() || 1;
+    const move = (ev) => {
+      const deltaStory = (ev.clientX - startX) / pps;
+      const delta = playbackSpeed(clip) < 0.999 ? deltaStory * playbackSpeed(clip) : deltaStory;
+      let start = origin.start;
+      let end = origin.end;
+      if (mode === "move") {
+        const span = end - start;
+        start = Math.max(0, Math.min(dur - span, origin.start + delta));
+        end = start + span;
+      } else if (mode === "start") {
+        start = Math.max(0, Math.min(end - 0.05, origin.start + delta));
+      } else {
+        end = Math.max(start + 0.05, Math.min(dur, origin.end + delta));
+      }
+      const left = Number.parseFloat(clip.style.left) || 0;
+      el.style.left = `${left + sourceToStory(clip, start) * pps}px`;
+      el.style.width = `${Math.max(12, (sourceToStory(clip, end) - sourceToStory(clip, start)) * pps)}px`;
+      el.dataset.draftStart = String(start);
+      el.dataset.draftEnd = String(end);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const start = Number(el.dataset.draftStart);
+      const end = Number(el.dataset.draftEnd);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      saveEffectBar(clip, {
+        kind: el.dataset.kind,
+        op: "update",
+        id: el.dataset.maskId || "",
+        start_s: start,
+        end_s: end,
+        speed: el.dataset.effect === "slow" ? Number(el.dataset.speed) || slowBarOf(clip)?.speed || 0.5 : undefined,
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function sourceRangeForBar(clip, el) {
+    const dur = Math.max(0.05, sourceDurationS(clip));
+    if (el.dataset.kind === "zoom") {
+      const bar = zoomBarOf(clip);
+      return bar || { start: 0, end: dur };
+    }
+    if (el.dataset.kind === "slow") {
+      const bar = slowBarOf(clip);
+      return bar || { start: 0, end: dur };
+    }
+    const mask = readMasks(clip).find((item) => item.id === el.dataset.maskId);
+    if (mask && mask.start_s != null) return { start: Number(mask.start_s), end: Number(mask.end_s) };
+    return { start: 0, end: dur };
+  }
+
+  async function saveEffectBar(clip, body) {
+    const res = await fetch(`/api/studio/${clip.dataset.studioId}/effect-lane`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok) {
+      showFlash((data && data.detail) || "Could not update the effect.");
+      layoutEffectBars();
+      return;
+    }
+    clip.dataset.frame = JSON.stringify(data.frame || {});
+    clip.dataset.masks = JSON.stringify(data.masks || []);
+    clip.dataset.zoomBar = JSON.stringify(data.zoom_bar);
+    clip.dataset.slowBar = JSON.stringify(data.slow_bar);
+    if (data.playback_speed != null) clip.dataset.playbackSpeed = String(data.playback_speed);
+    if (data.effective_duration_s != null) clip.dataset.effectiveDuration = String(data.effective_duration_s);
+    layoutTimeline();
+    applyFramePreview(resolveAt(state.projectTimeS));
+    drawPrivacyMasks();
+    applyClipPlayback(previewVideo, clip);
+  }
+
+  function deleteSelectedEffectBar() {
+    if (!selectedEffectBar) return false;
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(selectedEffectBar.studioId));
+    if (!clip) return false;
+    const body = {
+      kind: selectedEffectBar.kind,
+      op: "delete",
+      id: selectedEffectBar.id,
+    };
+    if (selectedEffectBar.kind === "slow") {
+      const bar = slowBarOf(clip);
+      body.speed = bar ? bar.speed : 0.5;
+    }
+    selectedEffectBar = null;
+    saveEffectBar(clip, body);
+    return true;
+  }
+
   function layoutTimeline() {
     if (!timelineCanvasEl || !grid) return;
     const total = totalDuration();
@@ -929,6 +1472,8 @@
     updatePlayheadChrome();
     updateZoomControls();
     layoutMusicSpans();
+    layoutEffectBars();
+    layoutClipAudio();
   }
 
   function centerPlayheadInView() {
@@ -1160,6 +1705,7 @@
   function revealPreviewMedia(el) {
     if (el) el.classList.remove("is-pending");
     setPreviewLoading(false);
+    schedulePreviewBlit();
   }
 
   function holdPreviewMedia(el) {
@@ -1228,6 +1774,7 @@
       }
     }
     pauseMusicAudio();
+    if (clipAudio) clipAudio.pause();
     setToggleLabel();
   }
 
@@ -1346,12 +1893,6 @@
   function cssFilterFor(adjust, rampMultiplier) {
     const model = imageAdjustModel;
     const parts = [];
-    // Leftmost saturate is applied last and matches hue after the grade.
-    // Keep the 0..1 multiplier in lockstep with saturation_multiplier.
-    const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
-    if (mult < 0.9995) {
-      parts.push(`saturate(${Math.max(0, mult).toFixed(4)})`);
-    }
     if (adjust.saturation) {
       const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
       parts.push(`saturate(${factor.toFixed(4)})`);
@@ -1363,6 +1904,10 @@
     if (adjust.exposure) {
       const ev = (adjust.exposure / 100) * model.exposureEvAtFull;
       parts.push(`brightness(${Math.pow(2, ev).toFixed(4)})`);
+    }
+    const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
+    if (mult < 0.9995) {
+      parts.push(`saturate(${Math.max(0, mult).toFixed(4)})`);
     }
     return parts.join(" ");
   }
@@ -1509,6 +2054,12 @@
       "studio-preview-grade-matrix-b",
       incomingLocal
     );
+    schedulePreviewBlit();
+  }
+
+  function canvasFilterFrom(styleFilter) {
+    const text = String(styleFilter || "none").replace(/url\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+    return text || "none";
   }
 
   const IMAGE_ADJUST_FIELDS = [
@@ -1619,7 +2170,7 @@
     const minBox = Number(maskModel.minBox) || 0.04;
     const width = Math.min(1, Math.max(minBox, Number(mask.w) || minBox));
     const height = Math.min(1, Math.max(minBox, Number(mask.h) || minBox));
-    return {
+    const box = {
       id: String(mask.id || ""),
       effect: mask.effect === "pixelate" ? "pixelate" : "blur",
       strength: clampMaskStrength(mask.strength),
@@ -1628,6 +2179,21 @@
       w: width,
       h: height,
     };
+    const start = Number(mask.start_s);
+    const end = Number(mask.end_s);
+    if (Number.isFinite(start) && Number.isFinite(end) && end - start >= 0.05) {
+      box.start_s = start;
+      box.end_s = end;
+    }
+    return box;
+  }
+
+  function masksAt(clip, localS) {
+    const offset = storyToSource(clip, Number(localS) || 0);
+    return readMasks(clip).filter((mask) => {
+      if (mask.start_s == null || mask.end_s == null) return true;
+      return offset >= Number(mask.start_s) - 0.001 && offset <= Number(mask.end_s) + 0.001;
+    });
   }
 
   function readMasks(clip) {
@@ -1643,6 +2209,7 @@
 
   function writeMasks(clip, masks) {
     clip.dataset.masks = JSON.stringify(masks.map((item) => clampMaskBox(item)));
+    if (!maskDragging) layoutEffectBars();
   }
 
   function maskEffectLabel(effect) {
@@ -1683,8 +2250,36 @@
     return Math.max(1, amount);
   }
 
+  function visibleContentBox(media) {
+    if (!media || media.hidden) return null;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    const frameW = previewFrame ? previewFrame.clientWidth : 0;
+    const frameH = previewFrame ? previewFrame.clientHeight : 0;
+    if (!srcW || !srcH || frameW < 2 || frameH < 2) return null;
+    const fit = contentRect(frameW, frameH, srcW, srcH);
+    if (!fit || fit.w < 2 || fit.h < 2) return null;
+    return { left: fit.x, top: fit.y, width: fit.w, height: fit.h };
+  }
+
+  function boxMatchingCanvas(canvas, media) {
+    const fitted = media ? visibleContentBox(media) : null;
+    if (!canvas || canvas.hidden || !previewFrame || !fitted) return fitted;
+    const painted = canvas.getBoundingClientRect();
+    const frame = previewFrame.getBoundingClientRect();
+    if (painted.width < 2 || painted.height < 2) return fitted;
+    return {
+      left: painted.left - frame.left - previewFrame.clientLeft,
+      top: painted.top - frame.top - previewFrame.clientTop,
+      width: painted.width,
+      height: painted.height,
+    };
+  }
+
   function sourceWindowForMask(media, srcW, srcH) {
-    const frameRect = media.getBoundingClientRect();
+    const laidOut = media.getBoundingClientRect();
+    const frameW = previewFrame && previewFrame.clientWidth > 2 ? previewFrame.clientWidth : laidOut.width;
+    const frameH = previewFrame && previewFrame.clientHeight > 2 ? previewFrame.clientHeight : laidOut.height;
     const clip = clipForPreviewMedia(media);
     const frame = clip ? readFrame(clip) : { zoom_start: 1, zoom_end: 1, x_start: 0.5, y_start: 0.5, x_end: 0.5, y_end: 0.5 };
     const hit = resolveAt(state.projectTimeS);
@@ -1698,7 +2293,7 @@
     if (sample.zoom <= 1.001) {
       return { x: 0, y: 0, w: srcW, h: srcH };
     }
-    const win = windowFor(sample.zoom, sample.x, sample.y, frameRect.width, frameRect.height, srcW, srcH);
+    const win = windowFor(sample.zoom, sample.x, sample.y, frameW, frameH, srcW, srcH);
     const scale = srcW / win.content.w;
     return {
       x: (win.x - win.content.x) * scale,
@@ -1784,7 +2379,7 @@
       canvas.hidden = true;
       return;
     }
-    const box = mediaContentBox(media);
+    const box = visibleContentBox(media);
     const srcW = media.videoWidth || media.naturalWidth || 0;
     const srcH = media.videoHeight || media.naturalHeight || 0;
     if (!box || !srcW || !srcH) {
@@ -1832,15 +2427,18 @@
   function renderMaskHandles(clip, box) {
     const layer = previewMaskHandles;
     if (!layer) return;
-    const selected =
+    if (maskDragging) return;
+    const hit = resolveAt(state.projectTimeS);
+    const onPlayhead =
       clip &&
-      state.selected &&
-      state.selected.type === "clip" &&
-      String(state.selected.id) === String(clip.dataset.studioId);
-    const masks = selected ? readMasks(clip) : [];
-    if (!selected || !box || !masks.length) {
+      hit &&
+      hit.clip &&
+      String(hit.clip.dataset.studioId) === String(clip.dataset.studioId);
+    const masks = onPlayhead ? masksAt(clip, hit.localS) : [];
+    if (!onPlayhead || !box || !masks.length) {
+      if (maskDragging) return;
       layer.hidden = true;
-      if (!maskDragging) layer.replaceChildren();
+      layer.replaceChildren();
       return;
     }
     layer.hidden = false;
@@ -1855,6 +2453,7 @@
       boxEl.className = "studio-mask-box";
       if (mask.id === selectedMaskId) boxEl.classList.add("is-selected");
       boxEl.dataset.maskId = mask.id;
+      boxEl.dataset.studioId = clip.dataset.studioId || "";
       boxEl.style.left = `${mask.x * 100}%`;
       boxEl.style.top = `${mask.y * 100}%`;
       boxEl.style.width = `${mask.w * 100}%`;
@@ -1862,6 +2461,10 @@
       boxEl.setAttribute("role", "button");
       boxEl.tabIndex = 0;
       boxEl.setAttribute("aria-label", maskEffectLabel(mask.effect));
+      const hitPad = document.createElement("span");
+      hitPad.className = "studio-mask-hit";
+      hitPad.setAttribute("aria-hidden", "true");
+      boxEl.appendChild(hitPad);
       const handle = document.createElement("span");
       handle.className = "studio-mask-resize";
       handle.dataset.resize = "1";
@@ -1885,41 +2488,168 @@
         });
         boxEl.appendChild(close);
       }
-      boxEl.addEventListener("pointerdown", (event) => onMaskPointerDown(event, clip, mask.id));
+      boxEl.addEventListener("pointerdown", (event) => {
+        if (maskDragging) return;
+        beginMaskDrag(event, boxEl);
+      });
       layer.appendChild(boxEl);
     });
   }
 
-  function onMaskPointerDown(event, clip, maskId) {
-    if (event.button != null && event.button !== 0) return;
-    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
-    event.preventDefault();
-    event.stopPropagation();
+  function maskBoxAtPoint(clientX, clientY) {
     const layer = previewMaskHandles;
-    if (!layer) return;
-    selectedMaskId = maskId;
-    fillMaskInspector(clip);
-    if (event.currentTarget && event.currentTarget.focus) event.currentTarget.focus();
-    const masks = readMasks(clip);
-    const startMask = masks.find((item) => item.id === maskId);
-    if (!startMask) return;
-    const resizing = Boolean(event.target && event.target.dataset && event.target.dataset.resize);
-    const bounds = layer.getBoundingClientRect();
-    if (bounds.width < 2 || bounds.height < 2) return;
-    maskDragging = true;
-    const originX = event.clientX;
-    const originY = event.clientY;
-    const pointerId = event.pointerId;
-    const box = event.currentTarget;
-    if (box && box.classList) box.classList.add("is-dragging");
-    if (box && box.setPointerCapture) {
-      try {
-        box.setPointerCapture(pointerId);
-      } catch (_) {
-        /* ignore */
+    if (!layer || layer.hidden) return null;
+    const nodes = layer.querySelectorAll(".studio-mask-box, .studio-mask-resize");
+    for (let i = 0; i < nodes.length; i += 1) {
+      const node = nodes[i];
+      const rect = node.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        return node.closest(".studio-mask-box");
       }
     }
+    return null;
+  }
+
+  function maskCanvasHit(clientX, clientY) {
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || !hit.clip) return null;
+    const layers = [{ canvas: previewMasks, clip: hit.clip, localS: hit.localS }];
+    if (hit.overlapClip && hit.crossfadeProgress != null) {
+      layers.unshift({
+        canvas: previewMasksB,
+        clip: hit.overlapClip,
+        localS: hit.overlapLocalS,
+      });
+    }
+    let found = null;
+    for (let layerIndex = 0; layerIndex < layers.length; layerIndex += 1) {
+      const layer = layers[layerIndex];
+      const canvas = layer.canvas;
+      if (!canvas || canvas.hidden || !layer.clip) continue;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) continue;
+      const masks = masksAt(layer.clip, layer.localS);
+      for (let i = 0; i < masks.length; i += 1) {
+        const mask = masks[i];
+        const left = rect.left + mask.x * rect.width;
+        const top = rect.top + mask.y * rect.height;
+        const right = left + Math.max(1, mask.w * rect.width);
+        const bottom = top + Math.max(1, mask.h * rect.height);
+        const onResize =
+          clientX >= right - 18 &&
+          clientX <= right + 12 &&
+          clientY >= bottom - 18 &&
+          clientY <= bottom + 12;
+        const inside =
+          clientX >= left && clientX <= right && clientY >= top && clientY <= bottom;
+        if (onResize || inside) {
+          found = { mask, clip: layer.clip, resizing: onResize, rect };
+        }
+      }
+    }
+    return found;
+  }
+
+  function maskBoxForId(maskId) {
+    const layer = previewMaskHandles;
+    if (!layer) return null;
+    const nodes = layer.querySelectorAll(".studio-mask-box");
+    for (let i = 0; i < nodes.length; i += 1) {
+      if (nodes[i].dataset.maskId === maskId) return nodes[i];
+    }
+    return null;
+  }
+
+  function maskDragBounds(layer, box, startMask, geomRect) {
+    if (geomRect && geomRect.width >= 2 && geomRect.height >= 2) return geomRect;
+    if (layer) {
+      const layerRect = layer.getBoundingClientRect();
+      if (layerRect.width >= 2 && layerRect.height >= 2) return layerRect;
+    }
+    if (!box) {
+      return {
+        width: Math.max(2, geomRect ? geomRect.width : 2),
+        height: Math.max(2, geomRect ? geomRect.height : 2),
+      };
+    }
+    const boxRect = box.getBoundingClientRect();
+    const w = Math.max(0.04, Number(startMask.w) || 0.04);
+    const h = Math.max(0.04, Number(startMask.h) || 0.04);
+    return {
+      width: Math.max(2, boxRect.width / w),
+      height: Math.max(2, boxRect.height / h),
+    };
+  }
+
+  function beginMaskDrag(event, box, geom) {
+    if (maskDragging) return false;
+    if (event.button != null && event.button !== 0) return false;
+    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return false;
+    const layer = previewMaskHandles;
+    if (!layer) return false;
+    const maskId = (box && box.dataset.maskId) || (geom && geom.mask && geom.mask.id) || "";
+    const studioId =
+      (box && box.dataset.studioId) ||
+      (geom && geom.clip && geom.clip.dataset.studioId) ||
+      "";
+    const clip =
+      (geom && geom.clip) ||
+      clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip || !maskId) return false;
+    const startMask = readMasks(clip).find((item) => item.id === maskId);
+    if (!startMask) return false;
+    let resizing = Boolean(geom && geom.resizing);
+    if (
+      event.target &&
+      event.target.closest &&
+      event.target.closest(".studio-mask-box [data-resize]")
+    ) {
+      resizing = true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    selectedMaskId = maskId;
+    if (
+      !state.selected ||
+      state.selected.type !== "clip" ||
+      String(state.selected.id) !== String(clip.dataset.studioId)
+    ) {
+      selectClip(clip.dataset.studioId, { movePlayhead: false });
+    }
+    renderMaskHandles(clip, boxMatchingCanvas(previewMasks, visiblePrimaryMedia()));
+    if (!box || !box.isConnected) box = maskBoxForId(maskId);
+    maskDragging = true;
+    if (box) box.classList.add("is-dragging", "is-selected");
+    const pointerId = event.pointerId;
+    const captureEl = previewFrame || box;
+    try {
+      if (captureEl) captureEl.setPointerCapture(pointerId);
+    } catch (_) {
+      /* Window listeners still follow the pointer. */
+    }
+    try {
+      fillMaskInspector(clip);
+    } catch (_) {
+      /* The drag still updates the mask if the inspector cannot refresh. */
+    }
+    const bounds = maskDragBounds(layer, box, startMask, geom && geom.rect);
+    const originX = event.clientX;
+    const originY = event.clientY;
+    let ended = false;
+    let acceptCancel = false;
+    window.setTimeout(() => {
+      acceptCancel = true;
+    }, 0);
     const move = (ev) => {
+      if (ended) return;
+      if (ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      ev.preventDefault();
+      ev.stopPropagation();
       const dx = (ev.clientX - originX) / bounds.width;
       const dy = (ev.clientY - originY) / bounds.height;
       const next = readMasks(clip).map((item) => {
@@ -1931,26 +2661,51 @@
       });
       writeMasks(clip, next);
       const current = next.find((item) => item.id === maskId);
-      const el = layer.querySelector(`[data-mask-id="${CSS.escape(maskId)}"]`);
-      if (el && current) {
-        el.style.left = `${current.x * 100}%`;
-        el.style.top = `${current.y * 100}%`;
-        el.style.width = `${current.w * 100}%`;
-        el.style.height = `${current.h * 100}%`;
+      if (current && box) {
+        box.style.left = `${current.x * 100}%`;
+        box.style.top = `${current.y * 100}%`;
+        box.style.width = `${current.w * 100}%`;
+        box.style.height = `${current.h * 100}%`;
       }
       drawPrivacyMasks();
     };
-    const up = () => {
+    const up = (ev) => {
+      if (ended) return;
+      if (ev && ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      if (ev && ev.type === "pointercancel" && !acceptCancel) return;
+      ended = true;
       maskDragging = false;
-      if (box && box.classList) box.classList.remove("is-dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
+      if (box) box.classList.remove("is-dragging");
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+      try {
+        if (captureEl) captureEl.releasePointerCapture(pointerId);
+      } catch (_) {
+        /* already released */
+      }
+      layoutEffectBars();
       queueMaskSave(clip);
       drawPrivacyMasks();
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
+    return true;
   }
+
+  function onDocumentMaskPointerDown(event) {
+    if (event.button != null && event.button !== 0) return;
+    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
+    const geom = maskCanvasHit(event.clientX, event.clientY);
+    const direct = event.target && event.target.closest && event.target.closest(".studio-mask-box");
+    const box = direct || maskBoxAtPoint(event.clientX, event.clientY);
+    if (!box && !geom) return;
+    if (box && previewFrame && !previewFrame.contains(box) && !geom) return;
+    if (beginMaskDrag(event, box, geom)) event.stopPropagation();
+  }
+
+  document.addEventListener("pointerdown", onDocumentMaskPointerDown, true);
 
   function drawPrivacyMasks() {
     const hit = resolveAt(state.projectTimeS);
@@ -1960,16 +2715,16 @@
     }
     const primary = visiblePrimaryMedia();
     const primaryOpacity = primary ? primary.style.opacity : "1";
-    drawMaskCanvas(previewMasks, primary, readMasks(hit.clip), primaryOpacity);
+    drawMaskCanvas(previewMasks, primary, masksAt(hit.clip, hit.localS), primaryOpacity);
     const overlap = hit.overlapClip && hit.crossfadeProgress != null;
     const secondary = overlap ? visibleSecondaryMedia() : null;
     drawMaskCanvas(
       previewMasksB,
       secondary,
-      overlap ? readMasks(hit.overlapClip) : [],
+      overlap ? masksAt(hit.overlapClip, hit.overlapLocalS) : [],
       secondary ? secondary.style.opacity : "1"
     );
-    renderMaskHandles(hit.clip, primary ? mediaContentBox(primary) : null);
+    renderMaskHandles(hit.clip, primary ? boxMatchingCanvas(previewMasks, primary) : null);
   }
 
   function fillMaskInspector(clip) {
@@ -2257,6 +3012,7 @@
       ) {
         return;
       }
+      if (selectedEffectBar) return;
       if (!privacyMaskDeleteActive()) return;
       event.preventDefault();
       removeSelectedMask();
@@ -2382,6 +3138,7 @@
       x_end: Number(clampFocal(frame.x_end).toFixed(4)),
       y_end: Number(clampFocal(frame.y_end).toFixed(4)),
     });
+    layoutEffectBars();
   }
 
   function frameMotionChecked() {
@@ -2480,6 +3237,16 @@
       return;
     }
     const frame = readFrame(clip);
+    if (clip.dataset.kind === "video") {
+      const bar = zoomBarOf(clip);
+      if (bar) {
+        const offset = storyToSource(clip, localS);
+        if (offset < bar.start - 0.001 || offset > bar.end + 0.001) {
+          clearFrameTransform(el);
+          return;
+        }
+      }
+    }
     const sample = sampleFrame(frame, framePreviewProgress(clip, localS, sampleOverride));
     if (sample.zoom <= 1.001) {
       clearFrameTransform(el);
@@ -2657,6 +3424,7 @@
     if (previewFrame) previewFrame.classList.remove("is-framing", "is-panning");
     if (previewImage) previewImage.classList.remove("is-pending");
     setPreviewLoading(false);
+    paintPreviewBlit();
   }
 
   function showImage(src) {
@@ -2696,7 +3464,10 @@
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
     videoLoopIndex = point.index;
     const speed = clip ? playbackSpeed(clip) : 1;
-    const target = Math.max(inS, inS + Math.max(0, point.offset) * speed);
+    const mapped = clip && slowBarOf(clip) && speed >= 0.999
+      ? storyToSource(clip, point.offset)
+      : Math.max(0, point.offset) * speed;
+    const target = Math.max(inS, inS + mapped);
     const apply = () => {
       try {
         applyClipPlayback(previewVideo, clip);
@@ -2953,6 +3724,174 @@
     drawFlightMap(hit);
     applyFramePreview(hit);
     syncHud(hit);
+    schedulePreviewBlit();
+  }
+
+  // A CSS-sized video is rasterized in CSS pixels. Grade filters, zoom scale,
+  // and a large high-DPI pane then stretch that bitmap, so the live picture
+  // looks grainy while export still scales the source frame. Blit the visible
+  // picture at device pixels with smoothing. Privacy pixelate keeps its own
+  // unsmoothed scratch canvas.
+  let previewBlitCanvas = null;
+  let previewBlitRaf = 0;
+
+  function previewBackingRatio(cssW, cssH) {
+    let dpr = Number(window.devicePixelRatio);
+    if (!Number.isFinite(dpr) || dpr < 1) dpr = 1;
+    dpr = Math.min(dpr, 3);
+    const longEdge = Math.max(Number(cssW) || 0, Number(cssH) || 0);
+    if (longEdge > 0 && longEdge * dpr > 4096) dpr = Math.max(1, 4096 / longEdge);
+    return dpr;
+  }
+
+  function readPreviewTransform(el) {
+    const text = (el && el.style && el.style.transform) || "";
+    const match = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/.exec(text);
+    if (!match) return { tx: 0, ty: 0, scale: 1 };
+    const scale = Number(match[3]);
+    return {
+      tx: Number(match[1]) || 0,
+      ty: Number(match[2]) || 0,
+      scale: scale > 0 ? scale : 1,
+    };
+  }
+
+  function previewLayerReady(media) {
+    if (!media || media.hidden || media.classList.contains("is-pending")) return false;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    return srcW > 0 && srcH > 0;
+  }
+
+  let previewGradeScratch = null;
+
+  function previewGradeSource(media, filter) {
+    if (!filter || filter === "none") return media;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    if (!srcW || !srcH) return media;
+    if (!previewGradeScratch) previewGradeScratch = document.createElement("canvas");
+    if (previewGradeScratch.width !== srcW || previewGradeScratch.height !== srcH) {
+      previewGradeScratch.width = srcW;
+      previewGradeScratch.height = srcH;
+    }
+    const scratch = previewGradeScratch.getContext("2d");
+    if (!scratch) return media;
+    scratch.filter = "none";
+    scratch.clearRect(0, 0, srcW, srcH);
+    scratch.drawImage(media, 0, 0, srcW, srcH);
+    return previewGradeScratch;
+  }
+
+  function drawPreviewLayer(ctx, media, frameW, frameH) {
+    if (!previewLayerReady(media)) return false;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    const fit = contentRect(frameW, frameH, srcW, srcH);
+    const xform = readPreviewTransform(media);
+    const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
+    const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
+    if (alpha <= 0.001) return true;
+    const filter = canvasFilterFrom(media.style.filter);
+    ctx.save();
+    try {
+      ctx.globalAlpha = alpha;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.translate(xform.tx, xform.ty);
+      ctx.scale(xform.scale, xform.scale);
+      const source = previewGradeSource(media, filter);
+      ctx.filter = filter || "none";
+      ctx.drawImage(source, fit.x, fit.y, fit.w, fit.h);
+      return true;
+    } catch (_) {
+      try {
+        ctx.filter = "none";
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(media, fit.x, fit.y, fit.w, fit.h);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  function ensurePreviewBlit() {
+    if (previewBlitCanvas || !previewFrame) return previewBlitCanvas;
+    const canvas = document.createElement("canvas");
+    canvas.id = "studio-preview-blit";
+    canvas.className = "studio-preview-blit";
+    canvas.hidden = true;
+    canvas.setAttribute("aria-hidden", "true");
+    const before = previewMasksB || previewMasks || null;
+    if (before && before.parentNode === previewFrame) previewFrame.insertBefore(canvas, before);
+    else previewFrame.appendChild(canvas);
+    previewBlitCanvas = canvas;
+    [previewVideo, previewVideoB, previewImage, previewImageB].forEach((media) => {
+      if (!media) return;
+      const kick = () => schedulePreviewBlit();
+      media.addEventListener("loadeddata", kick);
+      media.addEventListener("seeked", kick);
+      media.addEventListener("play", kick);
+      media.addEventListener("load", kick);
+    });
+    if (typeof ResizeObserver === "function") {
+      const observer = new ResizeObserver(() => schedulePreviewBlit());
+      observer.observe(previewFrame);
+    }
+    return canvas;
+  }
+
+  function paintPreviewBlit() {
+    const canvas = ensurePreviewBlit();
+    if (!canvas || !previewFrame) return;
+    const cssW = previewFrame.clientWidth;
+    const cssH = previewFrame.clientHeight;
+    if (cssW < 2 || cssH < 2) {
+      canvas.hidden = true;
+      return;
+    }
+    const dpr = previewBackingRatio(cssW, cssH);
+    const pixelW = Math.max(1, Math.round(cssW * dpr));
+    const pixelH = Math.max(1, Math.round(cssH * dpr));
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      canvas.hidden = true;
+      return;
+    }
+    const secondary = visibleSecondaryMedia();
+    const primary = visiblePrimaryMedia();
+    if (!previewLayerReady(secondary) && !previewLayerReady(primary)) {
+      canvas.hidden = true;
+      return;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, cssW, cssH);
+    const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH);
+    const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH);
+    canvas.hidden = !(drewSecondary || drewPrimary);
+  }
+
+  function schedulePreviewBlit() {
+    if (previewBlitRaf) return;
+    previewBlitRaf = requestAnimationFrame(() => {
+      previewBlitRaf = 0;
+      paintPreviewBlit();
+      const playing = [previewVideo, previewVideoB].some(
+        (video) => video && !video.hidden && !video.paused && !video.ended
+      );
+      if (playing) schedulePreviewBlit();
+    });
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
@@ -3170,7 +4109,10 @@
     const cycle = sectionCycleS(playing);
     const mediaTime = previewVideo.currentTime || 0;
     applyClipPlayback(previewVideo, playing);
-    const within = Math.max(0, (mediaTime - inS) / speed);
+    const offset = Math.max(0, mediaTime - inS);
+    const within = slowBarOf(playing) && speed >= 0.999
+      ? sourceToStory(playing, offset)
+      : offset / speed;
     const loopOverlap = forwardLoopOverlapS(playing);
     const loopSpans = loopOverlap > 0 ? forwardLoopSpans(playing) : [];
     let local = reps > 1 ? videoLoopIndex * cycle + within : within;
@@ -3789,6 +4731,25 @@
     titleSaveTimer = 0;
     persistProjectTitle();
   };
+  document.addEventListener("click", (event) => {
+    const raw = event.target;
+    const link = raw && raw.closest ? raw.closest("a[href]") : null;
+    if (!link || !titleSaveTimer) return;
+    let path = "";
+    try {
+      path = new URL(link.href, window.location.href).pathname;
+    } catch (_) {
+      return;
+    }
+    if (path !== "/studio/projects") return;
+    event.preventDefault();
+    const href = link.href;
+    window.clearTimeout(titleSaveTimer);
+    titleSaveTimer = 0;
+    Promise.resolve(persistProjectTitle()).finally(() => {
+      window.location.assign(href);
+    });
+  });
 
   function applyTransitionsToDom() {
     grid.querySelectorAll(".studio-transition").forEach((el) => {
@@ -5569,6 +6530,7 @@
       } catch (_) {
         /* ignore seek errors while loading */
       }
+      schedulePreviewBlit();
     };
     suppressVideoClock = true;
     if (loadedVideoSrc !== src) {
@@ -5905,6 +6867,10 @@
     if (reuseDraft) return;
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (isTextEditingTarget(document.activeElement)) return;
+    if (deleteSelectedEffectBar()) {
+      event.preventDefault();
+      return;
+    }
     if (privacyMaskDeleteActive()) return;
     if (!storyClipDeleteContext(document.activeElement)) return;
     if (!selectedStoryClip()) return;
@@ -6128,18 +7094,12 @@
       "{time}",
       formatExportDuration(elapsed)
     );
-    let etaText = msgExportEstimating;
-    let etaS = job.eta_s;
-    if (etaS == null && percent >= 5 && elapsed > 0 && percent < 100) {
-      etaS = (elapsed / (percent / 100)) * (1 - percent / 100);
-    }
-    if (job.state === "completed") {
-      etaText = msgExportDoneIn.replace("{time}", formatExportDuration(elapsed));
-    } else if (etaS != null && Number.isFinite(Number(etaS))) {
-      etaText = msgExportEta.replace("{time}", formatExportDuration(etaS));
-    }
     if (exportProgressMeta) {
-      exportProgressMeta.textContent = `${elapsedText} · ${etaText}`;
+      // One time only. Elapsed while encoding; total time once the job is done.
+      exportProgressMeta.textContent =
+        job.state === "completed"
+          ? msgExportDoneIn.replace("{time}", formatExportDuration(elapsed))
+          : elapsedText;
     }
   }
 
@@ -6855,52 +7815,68 @@
     queueImageAdjustSave(clip);
   });
 
-  const BW_TIME_FIELDS = [
-    ["start_s", "inspector-bw-start"],
-    ["end_s", "inspector-bw-end"],
-  ];
-  const BW_PERCENT_FIELDS = [
-    ["start_saturation", "inspector-bw-start-sat", "inspector-bw-start-sat-value"],
-    ["end_saturation", "inspector-bw-end-sat", "inspector-bw-end-sat-value"],
-  ];
-
   function selectedVideoClip() {
     const clip = selectedAdjustableClip();
     if (!clip || clip.dataset.kind !== "video") return null;
     return clip;
   }
 
+  function bwPartial(ramp, clip) {
+    const duration = Math.max(0.1, clipDuration(clip));
+    return ramp.start_s > 0.05 || ramp.end_s < duration - 0.05;
+  }
+
+  function syncBwPanels(clip) {
+    const ramp = clip ? readSaturationRamp(clip) : neutralSaturationRamp();
+    const on = Boolean(ramp.enabled);
+    const off = document.getElementById("inspector-bw-off");
+    const panel = document.getElementById("inspector-bw-on");
+    const partial = document.getElementById("inspector-bw-partial");
+    const fields = document.getElementById("inspector-bw-partial-fields");
+    if (off) off.hidden = on;
+    if (panel) panel.hidden = !on;
+    const isPartial = clip ? bwPartial(ramp, clip) : false;
+    if (partial) partial.checked = isPartial;
+    if (fields) fields.hidden = !on || !isPartial;
+  }
+
   function fillSaturationRamp(clip) {
     const ramp = readSaturationRamp(clip);
     const enabled = document.getElementById("inspector-bw-enabled");
     if (enabled) enabled.checked = ramp.enabled;
-    BW_TIME_FIELDS.forEach(([key, inputId]) => {
-      const input = document.getElementById(inputId);
-      if (input) input.value = String(ramp[key]);
-    });
-    BW_PERCENT_FIELDS.forEach(([key, inputId, valueId]) => {
-      const input = document.getElementById(inputId);
-      const valueEl = document.getElementById(valueId);
-      if (input) input.value = String(ramp[key]);
-      if (valueEl) valueEl.textContent = String(ramp[key]);
-    });
+    const strength = document.getElementById("inspector-bw-strength");
+    if (strength) strength.value = String(Math.round(100 - Number(ramp.end_saturation)));
+    const start = document.getElementById("inspector-bw-start");
+    const end = document.getElementById("inspector-bw-end");
+    if (start) start.value = String(ramp.start_s);
+    if (end) end.value = String(ramp.end_s);
+    syncBwPanels(clip);
   }
 
-  function saturationRampFromControls() {
-    const ramp = neutralSaturationRamp();
+  function bwStrengthLevel() {
+    const strength = document.getElementById("inspector-bw-strength");
+    return clampRampPercent(100 - Number(strength ? strength.value : 100));
+  }
+
+  function saturationRampFromControls(clip) {
+    const stored = clip ? readSaturationRamp(clip) : neutralSaturationRamp();
     const enabled = document.getElementById("inspector-bw-enabled");
+    const partial = document.getElementById("inspector-bw-partial");
+    const partialOn = Boolean(partial && partial.checked);
+    const level = bwStrengthLevel();
+    const ramp = Object.assign({}, stored);
     ramp.enabled = Boolean(enabled && enabled.checked);
-    BW_TIME_FIELDS.forEach(([key, inputId]) => {
-      const input = document.getElementById(inputId);
-      ramp[key] = clampRampTime(input ? input.value : 0);
-    });
-    BW_PERCENT_FIELDS.forEach(([key, inputId, valueId]) => {
-      const input = document.getElementById(inputId);
-      const valueEl = document.getElementById(valueId);
-      const shown = clampRampPercent(input ? input.value : 0);
-      ramp[key] = shown;
-      if (valueEl) valueEl.textContent = String(shown);
-    });
+    ramp.end_saturation = level;
+    ramp.start_saturation = partialOn ? 100 : level;
+    if (!partialOn) {
+      ramp.start_s = 0;
+      ramp.end_s = Math.max(0.1, Math.round(clipDuration(clip) * 10000) / 10000);
+    } else {
+      const start = document.getElementById("inspector-bw-start");
+      const end = document.getElementById("inspector-bw-end");
+      ramp.start_s = clampRampTime(start ? start.value : stored.start_s);
+      ramp.end_s = clampRampTime(end ? end.value : stored.end_s);
+    }
     return ramp;
   }
 
@@ -6949,43 +7925,59 @@
   document.getElementById("inspector-bw-enabled")?.addEventListener("change", () => {
     const clip = selectedVideoClip();
     if (!clip) return;
-    const ramp = saturationRampFromControls();
-    if (ramp.enabled && !(ramp.end_s - ramp.start_s > 0.001)) {
-      ramp.start_s = 0;
-      ramp.end_s = Math.max(0.1, Math.round(clipDuration(clip) * 10000) / 10000);
+    const turningOn = document.getElementById("inspector-bw-enabled")?.checked;
+    if (!turningOn) {
+      const ramp = readSaturationRamp(clip);
+      ramp.enabled = false;
+      commitSaturationRamp(clip, ramp);
+      return;
     }
+    const ramp = saturationRampFromControls(clip);
+    ramp.enabled = true;
     commitSaturationRamp(clip, ramp);
   });
-  BW_TIME_FIELDS.forEach(([, inputId]) => {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    input.addEventListener("input", () => {
-      const clip = selectedVideoClip();
-      if (!clip) return;
-      writeSaturationRamp(clip, saturationRampFromControls());
-      applyPreviewGrades(resolveAt(state.projectTimeS));
-      setSaveState(false);
-    });
-    input.addEventListener("change", () => {
-      const clip = selectedVideoClip();
-      if (!clip) return;
-      commitSaturationRamp(clip, saturationRampFromControls());
-    });
+  document.getElementById("inspector-bw-strength")?.addEventListener("input", () => {
+    const clip = selectedVideoClip();
+    if (!clip) return;
+    writeSaturationRamp(clip, saturationRampFromControls(clip));
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(false);
   });
-  BW_PERCENT_FIELDS.forEach(([, inputId]) => {
+  document.getElementById("inspector-bw-strength")?.addEventListener("change", () => {
+    const clip = selectedVideoClip();
+    if (!clip) return;
+    commitSaturationRamp(clip, saturationRampFromControls(clip));
+  });
+  document.getElementById("inspector-bw-partial")?.addEventListener("change", () => {
+    const clip = selectedVideoClip();
+    if (!clip) return;
+    const partial = document.getElementById("inspector-bw-partial");
+    if (partial && partial.checked) {
+      const duration = Math.max(0.1, clipDuration(clip));
+      const start = document.getElementById("inspector-bw-start");
+      const end = document.getElementById("inspector-bw-end");
+      const startS = clampRampTime(start ? start.value : 0);
+      const endS = clampRampTime(end ? end.value : duration);
+      if (!(startS > 0.05 || endS < duration - 0.05) && end) {
+        end.value = String(Math.max(0.5, Math.round(duration * 0.5 * 10000) / 10000));
+      }
+    }
+    commitSaturationRamp(clip, saturationRampFromControls(clip));
+  });
+  ["inspector-bw-start", "inspector-bw-end"].forEach((inputId) => {
     const input = document.getElementById(inputId);
     if (!input) return;
     input.addEventListener("input", () => {
       const clip = selectedVideoClip();
       if (!clip) return;
-      writeSaturationRamp(clip, saturationRampFromControls());
+      writeSaturationRamp(clip, saturationRampFromControls(clip));
       applyPreviewGrades(resolveAt(state.projectTimeS));
       setSaveState(false);
     });
     input.addEventListener("change", () => {
       const clip = selectedVideoClip();
       if (!clip) return;
-      commitSaturationRamp(clip, saturationRampFromControls());
+      commitSaturationRamp(clip, saturationRampFromControls(clip));
     });
   });
 
@@ -7413,6 +8405,10 @@
 
   function startAnnotationDrag(event, overlayId) {
     if (event.button != null && event.button !== 0) return;
+    if (maskDragging) return;
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-box, .studio-mask-resize")) return;
+    if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+    if (maskCanvasHit(event.clientX, event.clientY)) return;
     const clip = clips().find((item) => String(item.dataset.studioId) === String(state.activeStudioId));
     if (!clip) return;
     event.preventDefault();
@@ -7742,6 +8738,16 @@
   if (previewFrame) {
     previewFrame.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      if (maskDragging) return;
+      if (
+        event.target &&
+        event.target.closest &&
+        event.target.closest(".studio-mask-box, .studio-mask-hit, .studio-mask-resize, .studio-mask-remove, #studio-preview-mask-handles")
+      ) {
+        return;
+      }
+      if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+      if (maskCanvasHit(event.clientX, event.clientY)) return;
       const clip = selectedAdjustableClip();
       if (!clip) return;
       const frame = readFrame(clip);
@@ -7966,7 +8972,8 @@
       });
     });
     timelineCanvasEl?.addEventListener("click", (event) => {
-      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler, #studio-music-track")) return;
+      if (suppressTimelineClick) return;
+      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler, #studio-music-track, .studio-clip-audio-bar")) return;
       const wasPlaying = state.playing;
       pausePlayback();
       seekFromClientX(event.clientX, {
@@ -8121,10 +9128,17 @@
       maxBox: 0.72,
       gapS: 2,
       pad: 0.08,
-      defaultX: 0.68,
-      defaultY: 0.68,
-      defaultW: 0.28,
-      defaultH: 0.28,
+      defaultX: 0.8362,
+      defaultY: 0.74,
+      defaultW: 0.1237,
+      defaultH: 0.22,
+      shortSide: 0.22,
+      margin: 0.04,
+      defaultOpacity: 1,
+      legacyX: 0.68,
+      legacyY: 0.68,
+      legacyW: 0.28,
+      legacyH: 0.28,
       bg: "#14181d",
       route: "#7eb6ff",
       marker: "#ff9f0a",
@@ -8138,28 +9152,143 @@
     }
   }
 
-  function defaultMap() {
-    return {
-      enabled: false,
-      x: Number(mapModel.defaultX) || 0.68,
-      y: Number(mapModel.defaultY) || 0.68,
-      w: Number(mapModel.defaultW) || 0.28,
-      h: Number(mapModel.defaultH) || 0.28,
-    };
+  function round4(value) {
+    return Math.round(value * 10000) / 10000;
+  }
+
+  function clampOpacity(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 1;
+    return Math.round(Math.min(1, Math.max(0, number)) * 100) / 100;
   }
 
   function clampMapBox(map) {
     const minBox = Number(mapModel.minBox) || 0.12;
     const maxBox = Number(mapModel.maxBox) || 0.72;
-    const width = Math.min(maxBox, Math.max(minBox, Number(map.w) || minBox));
-    const height = Math.min(maxBox, Math.max(minBox, Number(map.h) || minBox));
+    const width = round4(Math.min(maxBox, Math.max(minBox, Number(map.w) || minBox)));
+    const height = round4(Math.min(maxBox, Math.max(minBox, Number(map.h) || minBox)));
     return {
       enabled: map.enabled === true,
       w: width,
       h: height,
-      x: Math.min(1 - width, Math.max(0, Number(map.x) || 0)),
-      y: Math.min(1 - height, Math.max(0, Number(map.y) || 0)),
+      x: round4(Math.min(1 - width, Math.max(0, Number(map.x) || 0))),
+      y: round4(Math.min(1 - height, Math.max(0, Number(map.y) || 0))),
+      opacity: clampOpacity(map.opacity),
     };
+  }
+
+  function defaultMapBox(contentW, contentH) {
+    let widthPx = Number(contentW);
+    let heightPx = Number(contentH);
+    if (!Number.isFinite(widthPx) || !Number.isFinite(heightPx) || widthPx <= 0 || heightPx <= 0) {
+      widthPx = 16;
+      heightPx = 9;
+    }
+    const shortSide = Number(mapModel.shortSide) || 0.22;
+    const margin = Number(mapModel.margin);
+    const pad = Number.isFinite(margin) ? margin : 0.04;
+    const minBox = Number(mapModel.minBox) || 0.12;
+    const maxBox = Number(mapModel.maxBox) || 0.72;
+    let side = shortSide * Math.min(widthPx, heightPx);
+    const minSide = minBox * Math.max(widthPx, heightPx);
+    const maxSide = maxBox * Math.min(widthPx, heightPx);
+    side = Math.min(Math.max(side, minSide), Math.max(minSide, maxSide));
+    side = Math.min(side, (1 - pad) * widthPx, (1 - pad) * heightPx);
+    const w = side / widthPx;
+    const h = side / heightPx;
+    return clampMapBox({
+      enabled: false,
+      x: 1 - w - pad,
+      y: 1 - h - pad,
+      w: w,
+      h: h,
+      opacity: 1,
+    });
+  }
+
+  function defaultMap() {
+    const box = defaultMapBox(16, 9);
+    box.enabled = false;
+    box.opacity = 1;
+    return box;
+  }
+
+  function sameMapBox(map, other) {
+    return ["x", "y", "w", "h"].every(
+      (key) => Math.abs(Number(map[key]) - Number(other[key])) < 0.0015
+    );
+  }
+
+  function isUntouchedMapBox(map) {
+    const legacy = {
+      x: Number(mapModel.legacyX),
+      y: Number(mapModel.legacyY),
+      w: Number(mapModel.legacyW),
+      h: Number(mapModel.legacyH),
+    };
+    if (![legacy.x, legacy.y, legacy.w, legacy.h].every((value) => Number.isFinite(value))) {
+      legacy.x = 0.68;
+      legacy.y = 0.68;
+      legacy.w = 0.28;
+      legacy.h = 0.28;
+    }
+    return sameMapBox(map, legacy) || sameMapBox(map, defaultMapBox(16, 9));
+  }
+
+  function sourceSizeForMap(clip) {
+    const media = mediaForAnnotation(clip, false);
+    const width = media ? media.videoWidth || media.naturalWidth || 0 : 0;
+    const height = media ? media.videoHeight || media.naturalHeight || 0 : 0;
+    if (width > 0 && height > 0) return { width: width, height: height };
+    return null;
+  }
+
+  function mapContentPixels(clip) {
+    const media = mediaForAnnotation(clip, false);
+    const box = contentBoxFor(media);
+    if (box.width > 0 && box.height > 0 && sourceSizeForMap(clip)) return box;
+    const size = sourceSizeForMap(clip);
+    if (size) return size;
+    return { width: 16, height: 9 };
+  }
+
+  function placeSquare(start, side, content) {
+    const width = content.width;
+    const height = content.height;
+    if (!width || !height) return clampMapBox(start);
+    const minBox = Number(mapModel.minBox) || 0.12;
+    const maxBox = Number(mapModel.maxBox) || 0.72;
+    const minSide = minBox * Math.max(width, height);
+    const maxSide = maxBox * Math.min(width, height);
+    const fitted = Math.min(Math.max(side, minSide), Math.max(minSide, maxSide));
+    return clampMapBox(
+      Object.assign({}, start, {
+        w: fitted / width,
+        h: fitted / height,
+      })
+    );
+  }
+
+  function adoptSquareMap(clip) {
+    if (!clip) return;
+    const placement = readMap(clip);
+    if (!placement.enabled || !isUntouchedMapBox(placement)) return;
+    const size = sourceSizeForMap(clip);
+    if (!size) return;
+    const box = defaultMapBox(size.width, size.height);
+    if (sameMapBox(placement, box)) return;
+    writeMap(
+      clip,
+      Object.assign({}, placement, {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        enabled: true,
+      })
+    );
+    if (selectedAdjustableClip() === clip) fillMapInspector(clip);
+    queueMapSave(clip);
   }
 
   function readMap(clip) {
@@ -8331,6 +9460,11 @@
     el.style.top = content.top + placement.y * content.height + "px";
     el.style.width = Math.max(1, placement.w * content.width) + "px";
     el.style.height = Math.max(1, placement.h * content.height) + "px";
+    const alpha = String(clampOpacity(placement.opacity));
+    const svg = el.querySelector("svg");
+    const emptyLabel = el.querySelector(".studio-preview-map-empty");
+    if (svg) svg.style.opacity = alpha;
+    if (emptyLabel) emptyLabel.style.opacity = alpha;
     el.setAttribute("aria-label", msgMapLabel);
     const selected =
       interactive &&
@@ -8356,6 +9490,8 @@
       return;
     }
     const overlap = hit.overlapClip && hit.crossfadeProgress != null;
+    adoptSquareMap(hit.clip);
+    if (overlap) adoptSquareMap(hit.overlapClip);
     placeMapElement(previewMap, hit.clip, hit.localS || 0, true);
     if (previewMap) previewMap.style.opacity = overlap ? String(hit.crossfadeProgress) : "";
     if (overlap) {
@@ -8380,17 +9516,13 @@
     setNumber("map-y", Math.round(placement.y * 100));
     setNumber("map-w", Math.round(placement.w * 100));
     setNumber("map-h", Math.round(placement.h * 100));
-  }
-
-  function editorMapPatch(map) {
-    const next = Object.assign({}, map);
-    next.x = numberOr(document.getElementById("map-x"), next.x * 100) / 100;
-    next.y = numberOr(document.getElementById("map-y"), next.y * 100) / 100;
-    next.w = numberOr(document.getElementById("map-w"), next.w * 100) / 100;
-    next.h = numberOr(document.getElementById("map-h"), next.h * 100) / 100;
-    const enabled = document.getElementById("inspector-map-enabled");
-    if (enabled) next.enabled = enabled.checked === true;
-    return clampMapBox(next);
+    const opacity = document.getElementById("map-opacity");
+    const opacityValue = document.getElementById("map-opacity-value");
+    if (opacity && document.activeElement !== opacity) {
+      const percent = Math.round(clampOpacity(placement.opacity) * 100);
+      opacity.value = String(percent);
+      if (opacityValue) opacityValue.textContent = String(percent);
+    }
   }
 
   async function saveMap(studioId) {
@@ -8423,6 +9555,10 @@
 
   function onMapPointerDown(event) {
     if (event.button != null && event.button !== 0) return;
+    if (maskDragging) return;
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-box")) return;
+    if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+    if (maskCanvasHit(event.clientX, event.clientY)) return;
     const hit = resolveAt(state.projectTimeS);
     const clip = hit && hit.clip;
     if (!clip || !previewMap || previewMap.classList.contains("is-locked")) return;
@@ -8438,7 +9574,13 @@
       const dx = (ev.clientX - originX) / content.width;
       const dy = (ev.clientY - originY) / content.height;
       const next = resizing
-        ? clampMapBox(Object.assign({}, start, { w: start.w + dx, h: start.h + dy }))
+        ? placeSquare(
+            start,
+            Math.abs(dy * content.height) > Math.abs(dx * content.width)
+              ? start.h * content.height + dy * content.height
+              : start.w * content.width + dx * content.width,
+            content
+          )
         : clampMapBox(Object.assign({}, start, { x: start.x + dx, y: start.y + dy }));
       writeMap(clip, next);
       placeMapElement(previewMap, clip, hit.localS || 0, true);
@@ -8461,6 +9603,14 @@
     const next = readMap(clip);
     const enabled = document.getElementById("inspector-map-enabled");
     next.enabled = Boolean(enabled && enabled.checked);
+    if (next.enabled && isUntouchedMapBox(next)) {
+      const size = sourceSizeForMap(clip) || { width: 16, height: 9 };
+      const box = defaultMapBox(size.width, size.height);
+      next.x = box.x;
+      next.y = box.y;
+      next.w = box.w;
+      next.h = box.h;
+    }
     writeMap(clip, next);
     fillMapInspector(clip);
     drawFlightMap(resolveAt(state.projectTimeS));
@@ -8472,11 +9622,37 @@
     input.addEventListener("change", () => {
       const clip = selectedAdjustableClip();
       if (!clip) return;
-      writeMap(clip, editorMapPatch(readMap(clip)));
+      const current = readMap(clip);
+      const value = numberOr(input, 0) / 100;
+      if (id === "map-w" || id === "map-h") {
+        const content = mapContentPixels(clip);
+        const side = id === "map-w" ? value * content.width : value * content.height;
+        writeMap(clip, placeSquare(current, side, content));
+      } else {
+        const next = Object.assign({}, current);
+        if (id === "map-x") next.x = value;
+        if (id === "map-y") next.y = value;
+        writeMap(clip, clampMapBox(next));
+      }
       fillMapInspector(clip);
       drawFlightMap(resolveAt(state.projectTimeS));
       queueMapSave(clip);
     });
+  });
+  document.getElementById("map-opacity")?.addEventListener("input", (event) => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const next = readMap(clip);
+    next.opacity = clampOpacity(Number(event.target.value) / 100);
+    const valueEl = document.getElementById("map-opacity-value");
+    if (valueEl) valueEl.textContent = String(Math.round(next.opacity * 100));
+    writeMap(clip, next);
+    drawFlightMap(resolveAt(state.projectTimeS));
+  });
+  document.getElementById("map-opacity")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    queueMapSave(clip);
   });
 
   // Init
@@ -8491,6 +9667,7 @@
   applyTransitionsToDom();
   renderMusic();
   layoutTimeline();
+  ensurePreviewBlit();
   setToggleLabel();
   let cutRestore = null;
   try {

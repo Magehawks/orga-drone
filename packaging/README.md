@@ -15,7 +15,8 @@ writes `orga-drone.log` plus `startup-crash.log`. It does **not** open the syste
 browser (native folder / soundtrack / export dialogs need the desktop window).
 Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 
-First launch with an empty library opens the **Library** page so “Add folder” is obvious.
+First launch with an empty library opens **Home**. The hero is the Orga Drone
+logo, and **Add media** starts the existing folder import.
 
 ## Windows build (PyInstaller)
 
@@ -340,3 +341,5 @@ rollback notes are in [`packaging/itch/README.md`](itch/README.md). The helper
 
 There is no in-app updater. Copies installed from a ZIP do not receive
 itch.io desktop-app updates. User data stays in `%APPDATA%\orga-drone`.
+
+Publishing a GitHub Release can notify Discord that this version is available on the itch.io test channel. The webhook lives in the GitHub Actions secret `DISCORD_RELEASE_WEBHOOK`, not in the repo.

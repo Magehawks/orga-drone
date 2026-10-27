@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Studio') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<section class="studio-gallery">
+  {% if flash_msg == 'studio_need_project' %}
+    <div class="flash studio-flash-inline" role="status">{{ _('Pick or create a Studio project before adding media.') }}</div>
+  {% endif %}
+  <div class="studio-gallery-head">
+    <h1>{{ _('Studio') }}</h1>
+    <form method="post" action="/studio/projects">
+      <button type="submit" class="button">{{ _('New project') }}</button>
+    </form>
+  </div>
+  {% if projects %}
+  <label class="studio-gallery-search" for="studio-gallery-search">
+    <span class="visually-hidden">{{ _('Search projects') }}</span>
+    <input id="studio-gallery-search" type="search" placeholder="{{ _('Search projects') }}"
+           autocomplete="off" aria-label="{{ _('Search projects') }}">
+  </label>
+  <div class="media-grid" id="studio-gallery-grid">
+    {% for project in projects %}
+    <article class="card studio-gallery-card" data-project-title="{{ project.title|e }}">
+      <a class="card-main" href="/studio?project_id={{ project.id }}">
+        <div class="thumb">
+          {% if project.thumb_id %}
+          <img src="/media/{{ project.thumb_id }}/cached-thumb" alt="" loading="lazy" decoding="async">
+          {% else %}
+          <img class="studio-gallery-logo" src="/static/icons/orga-drone.png" alt="" loading="lazy" decoding="async">
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <strong class="title">{{ project.title }}</strong>
+          <div class="meta-line">
+            <span>{{ _('Last edited') }} {{ project.updated_at }}</span>
+          </div>
+          <div class="meta-line muted">
+            <span>{{ _('Duration') }} {{ project.duration_label }}</span>
+          </div>
+        </div>
+      </a>
+      <form method="post" action="/studio/projects/{{ project.id }}/delete" class="card-studio"
+            data-confirm="{{ _('Delete this Studio project? Clips in this project are removed. Your media files are not deleted.')|e }}"
+            onsubmit="return confirm(this.dataset.confirm);">
+        <button type="submit" class="button ghost">{{ _('Delete project') }}</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  <p id="studio-gallery-none" class="hint" hidden>{{ _('No matching projects.') }}</p>
+  <script>
+    (function () {
+      const input = document.getElementById("studio-gallery-search");
+      const cards = document.querySelectorAll(".studio-gallery-card");
+      const none = document.getElementById("studio-gallery-none");
+      if (!input) return;
+      input.addEventListener("input", () => {
+        const query = input.value.trim().toLowerCase();
+        let shown = 0;
+        cards.forEach((card) => {
+          const title = (card.getAttribute("data-project-title") || "").toLowerCase();
+          const match = query === "" || title.indexOf(query) !== -1;
+          card.hidden = !match;
+          if (match) shown += 1;
+        });
+        if (none) none.hidden = shown !== 0;
+      });
+    })();
+  </script>
+  {% else %}
+  <div class="panel empty">
+    <h2>{{ _('No Studio projects yet.') }}</h2>
+    <p>{{ _('Create a project to start a story.') }}</p>
+    <form method="post" action="/studio/projects">
+      <button type="submit" class="button">{{ _('Create your first project') }}</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
