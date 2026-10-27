@@ -25,7 +25,8 @@ preview; local MP4 export with configurable resolution and a Standard / High / B
 stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
 local songs; loop when there is one song) in preview and
-export; Title Cards; basic visual transitions; basic per-clip image
+export; one video section can repeat forward until a soundtrack with a known
+duration ends (hard cuts, a short forward crossfade, or a cinematic blend of 0.5–5.0 s; the soundtrack plays once); Title Cards; basic visual transitions; basic per-clip image
 adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear
 saturation ramp on video clips from that grade toward black and white; read-only soundtrack
 coverage on the Story time canvas).
@@ -145,6 +146,7 @@ professional video-editing knowledge.
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |
 | Video section repeat (in/out range, 1×–8×) | **Available now** (video clips; story duration grows with each play; preview and MP4 include the repeats at the same speed; not slow motion, a seamless loop, or reverse playback) |
+| Forward repeat to soundtrack | **Available now** (one video section repeats forward until a soundtrack with a known once-through duration ends; the soundtrack plays once and does not restart or blend at each join; the last play is trimmed, and a remainder under 0.05 s is omitted; joins are hard cuts, or an optional forward crossfade of 0.5–2.0 s that overlaps the end of one play with the start of the next; a short section clamps that overlap, and a section that cannot hold it stays a hard cut; the crossfade does not match frames and can show a double image; the same loop effect also applies to a manual 1–8 repeat with no soundtrack; cinematic blend is a longer forward overlap of 0.5–5.0 s with a linear or smooth opacity curve and can show doubled objects when the views differ; an experimental local seam search can narrow the repeated range when confident and otherwise keeps the original range as a hard cut without claiming a seamless join; unknown duration is not guessed; not reverse, ping-pong, optical flow, or frame interpolation) |
 | Basic per-clip image adjustment (brightness, contrast, saturation, warmth) | **Available now** (photo and video clips; preview approximates export; not a color grade) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
@@ -339,7 +341,13 @@ See `README.md` for the detailed feature status table. In short:
   of a video clip can use slow motion at 0.5× or 0.25× (1× resets that section;
   source audio on the slowed section is muted; not optical-flow interpolation,
   fast-forward, or reverse). A video section repeat plays an in/out range up to 8
-  times at the same speed (not a seamless or reverse loop).
+  times at the same speed (hard cuts, not reverse). Separately, one video
+  section can repeat forward until a soundtrack with a known duration ends.
+  The soundtrack plays once and does not restart or blend at each join. The last play
+  is trimmed; a remainder under 0.05s is omitted. Joins are hard cuts, or an optional
+  forward crossfade (0.5–2.0 s, shortened when the section is short). That crossfade
+  keeps both plays moving forward. It does not match the frames, and a different
+  start and end can show a double image. Unknown soundtrack duration is not guessed.
 
 ## Studio MVP (local Create → Share)
 

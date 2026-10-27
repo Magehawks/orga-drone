@@ -656,6 +656,25 @@ def _norm_audio_pad(src: str, alias: str) -> str:
     )
 
 
+# Bundled FFmpeg 7.1 xfade custom expr returns a pixel. Measured on a red-to-blue
+# blend: A is the incoming sample and B is the outgoing sample. P*P*(3-2*P) is
+# smoothstep, so the incoming picture eases in, moves through the middle, and
+# settles. transition=fade stays the linear crossfade.
+XFADE_SMOOTH_EXPR = "B*(1-P*P*(3-2*P))+A*(P*P*(3-2*P))"
+
+
+def _xfade_video(left: str, right: str, out: str, overlap: float, offset: float, curve: str) -> str:
+    if curve == "smooth":
+        return (
+            f"[{left}][{right}]xfade=transition=custom:expr={XFADE_SMOOTH_EXPR}:"
+            f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
+        )
+    return (
+        f"[{left}][{right}]xfade=transition=fade:"
+        f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
+    )
+
+
 def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
     """Build concat/xfade filter_complex steps. Audio is hard-cut, never acrossfade."""
     if len(clips) < 2:
@@ -684,8 +703,14 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
             overlap = float(outgoing.transition_s)
             offset = max(0.0, current_dur - overlap)
             filters.append(
-                f"[{left_v}][{right_v}]xfade=transition=fade:"
-                f"duration={overlap:.4f}:offset={offset:.4f}[{v_out}]"
+                _xfade_video(
+                    left_v,
+                    right_v,
+                    v_out,
+                    overlap,
+                    offset,
+                    outgoing.transition_curve,
+                )
             )
             a_keep = max(0.0, current_dur - overlap / 2.0)
             b_start = overlap / 2.0
@@ -1008,13 +1033,79 @@ def _watch_export_cancel(event: threading.Event, proc: subprocess.Popen[str]) ->
             return
 
 
+def _forward_loop_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...]:
+    """One encode per forward play, last play trimmed to the soundtrack.
+
+    The returned clips have ``forward_loop`` cleared so rendering them does
+    not recurse. A single full play is still a new clip object for that reason.
+    A positive ``forward_transition_s`` marks a forward crossfade on every
+    join except the last slice. Fades stay on the first and last play.
+    The story transition on the parent clip is not copied onto those joins.
+    """
+    from orga_drone.studio_forward_loop import plan_forward_loop
+    from orga_drone.studio_speed import coerce_playback_speed
+
+    cycle = float(clip.forward_cycle_s or 0.0)
+    overlap = float(clip.forward_transition_s or 0.0)
+    plan = plan_forward_loop(cycle, float(clip.duration_s), overlap)
+    if plan is None:
+        return (replace(clip, forward_loop=False, section_repeats=1),)
+    speed = coerce_playback_speed(clip.playback_speed)
+    start = max(0.0, float(clip.source_start_s))
+    if clip.source_end_s is not None:
+        source_cycle = max(0.0, float(clip.source_end_s) - start)
+    else:
+        source_cycle = max(0.0, cycle * speed)
+    spans = plan.output_spans()
+    if not spans:
+        return (replace(clip, forward_loop=False, section_repeats=1),)
+    last = len(spans) - 1
+    join = float(plan.overlap_s) if plan.play_count > 1 else 0.0
+    slices: list[StudioExportClip] = []
+    for index, output_s in enumerate(spans):
+        if plan.partial_s > 0 and index == last and cycle > 0:
+            source_span = source_cycle * (float(output_s) / cycle)
+        else:
+            source_span = source_cycle
+        cross = join > 0 and index < last
+        curve = clip.forward_transition_curve if cross else "linear"
+        slices.append(
+            replace(
+                clip,
+                duration_s=float(output_s),
+                source_start_s=start,
+                source_end_s=start + source_span,
+                section_repeats=1,
+                forward_loop=False,
+                forward_cycle_s=0.0,
+                forward_transition_s=0.0,
+                forward_transition_curve="linear",
+                exact_span=True,
+                transition_type="crossfade" if cross else "cut",
+                transition_s=join if cross else 0.0,
+                transition_curve="smooth" if curve == "smooth" else "linear",
+                fade_in_s=clip.fade_in_s if index == 0 else 0.0,
+                fade_out_s=clip.fade_out_s if index == last else 0.0,
+            )
+        )
+    return tuple(slices)
+
+
 def section_repeat_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...]:
     """Expand a video into one encode per play of its in/out range.
 
     One repeat returns the clip unchanged, so ordinary exports stay on the
     existing path. Each extra play is the same source span at the same speed.
-    Fades stay on the first and last play. Joins between plays are cuts.
+    Fades stay on the first and last play. Joins between plays are cuts,
+    or a forward crossfade when the clip carries a loop overlap.
+
+    A forward loop joins those plays with a cut, or with a forward crossfade
+    when the clip carries an overlap. Its last play is shorter when the
+    soundtrack is not an integer multiple of the stepped cycle. The soundtrack
+    is not restarted here; it is mixed once after the picture is joined.
     """
+    if clip.forward_loop:
+        return _forward_loop_slices(clip)
     repeats = int(clip.section_repeats or 1)
     if clip.kind != "video" or repeats <= 1:
         return (clip,)
@@ -1026,16 +1117,30 @@ def section_repeat_slices(clip: StudioExportClip) -> tuple[StudioExportClip, ...
         cycle = max(0.0, float(clip.duration_s) / repeats)
     if cycle <= 0:
         return (clip,)
+    # Story transitions stay on the assembled clip. Joins inside the repeat
+    # follow the loop effect, which is a hard cut when no overlap is set.
+    join = float(clip.forward_transition_s or 0.0) if repeats > 1 else 0.0
+    if join >= cycle:
+        join = 0.0
     slices: list[StudioExportClip] = []
+    last = repeats - 1
     for index in range(repeats):
+        cross = join > 0 and index < last
+        curve = clip.forward_transition_curve if cross else "linear"
         slices.append(
             replace(
                 clip,
                 duration_s=cycle,
                 section_repeats=1,
+                forward_loop=False,
+                forward_transition_s=0.0,
+                forward_transition_curve="linear",
                 exact_span=True,
+                transition_type="crossfade" if cross else "cut",
+                transition_s=join if cross else 0.0,
+                transition_curve="smooth" if curve == "smooth" else "linear",
                 fade_in_s=clip.fade_in_s if index == 0 else 0.0,
-                fade_out_s=clip.fade_out_s if index == repeats - 1 else 0.0,
+                fade_out_s=clip.fade_out_s if index == last else 0.0,
             )
         )
     return tuple(slices)
@@ -1560,11 +1665,23 @@ class FfmpegStudioEncoder:
         clip_total: int,
     ) -> None:
         slices = section_repeat_slices(clip)
-        if len(slices) > 1:
+        if not (len(slices) == 1 and slices[0] is clip):
+            if len(slices) == 1:
+                self._render_video(
+                    ffmpeg,
+                    slices[0],
+                    out,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                return
             parts: list[Path] = []
             for index, slice_clip in enumerate(slices):
                 _raise_if_cancelled()
-                part = out.parent / f"{out.stem}-loop-{index:02d}{out.suffix}"
+                part = out.parent / f"{out.stem}-loop-{index:04d}{out.suffix}"
                 self._render_video(
                     ffmpeg,
                     slice_clip,
@@ -1576,7 +1693,14 @@ class FfmpegStudioEncoder:
                     clip_total=clip_total,
                 )
                 parts.append(part)
-            self._concat(ffmpeg, parts, out)
+            _raise_if_cancelled()
+            if any(
+                part.transition_type == "crossfade" and part.transition_s > 0
+                for part in slices[:-1]
+            ):
+                self._stitch_parts(ffmpeg, parts, out, slices)
+            else:
+                self._concat(ffmpeg, parts, out)
             return
         if _slow_timing(clip) is not None:
             self._render_slow_video(
@@ -1730,6 +1854,26 @@ class FfmpegStudioEncoder:
             return
         self._concat(ffmpeg, segments, out)
 
+    def _stitch_parts(
+        self,
+        ffmpeg: str,
+        segments: list[Path],
+        out: Path,
+        clips: tuple[StudioExportClip, ...] | list[StudioExportClip],
+    ) -> None:
+        """Crossfade forward-loop plays. Source audio stays a hard cut."""
+        self._stitch(
+            ffmpeg,
+            segments,
+            out,
+            StudioExportConfig(
+                output_path=out,
+                width=1,
+                height=1,
+                clips=tuple(clips),
+            ),
+        )
+
     def _stitch(
         self,
         ffmpeg: str,
@@ -1809,7 +1953,12 @@ class FfmpegStudioEncoder:
                 require_readable_music(music.source_path)
             probed.append(duration_s)
         single = tracks[0]
-        use_loop = len(tracks) == 1 and bool(single.loop)
+        # A forward loop already made the picture as long as one soundtrack
+        # pass. Do not restart that audio at the video joins or after it.
+        video_fills_soundtrack = any(clip.forward_loop for clip in config.clips)
+        use_loop = (
+            len(tracks) == 1 and bool(single.loop) and not video_fills_soundtrack
+        )
         cmd: list[str] = [ffmpeg, "-y", "-i", str(concat_path)]
         if use_loop:
             filter_complex = build_music_amix_filter(

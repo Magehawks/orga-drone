@@ -3530,6 +3530,15 @@ class Database:
                     )
                 )
                 volume = float(row["volume"] if row["volume"] is not None else 1.0)
+                from orga_drone.studio_forward_loop import without_loop_to_soundtrack
+
+                original_effects = str(row["effect_settings"] or "{}")
+                copied_settings = without_loop_to_soundtrack(original_effects)
+                if copied_settings != original_effects:
+                    conn.execute(
+                        "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                        (copied_settings, studio_item_id),
+                    )
                 remembered = (
                     float(row["transition_duration_s"])
                     if row["transition_duration_s"] is not None
@@ -3560,7 +3569,7 @@ class Database:
                             volume,
                             row["transition"] if is_last else "cut",
                             remembered,
-                            str(row["effect_settings"] or "{}"),
+                            copied_settings,
                             now,
                         ),
                     )
@@ -3674,6 +3683,190 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_forward_loop(
+        self,
+        studio_item_id: int,
+        enabled: bool,
+        *,
+        transition: str | None = None,
+        transition_s: float | None = None,
+    ) -> StudioClip:
+        """Remember that one video should repeat forward to the soundtrack.
+
+        The play count is not stored. Source files are not modified. A second
+        clip in the same project cannot take the flag. ``transition`` is the
+        join between those plays (``off`` or ``crossfade``). The duration is
+        the request; a short section clamps it when the story is measured.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_forward_loop import (
+            dump_loop_to_soundtrack,
+            dump_loop_transition,
+            loop_transition_choice,
+            loop_transition_requested_s,
+            rejection_reason,
+            soundtrack_once_s,
+        )
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        if not isinstance(enabled, bool):
+            raise ValueError("enabled must be true or false")
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("forward_loop_video_only")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("forward_loop_video_only")
+            blob = dump_loop_to_soundtrack(str(row["effect_settings"] or ""), enabled)
+            if transition is not None or transition_s is not None:
+                choice = (
+                    transition
+                    if transition is not None
+                    else loop_transition_choice(blob)
+                )
+                if choice not in {"off", "crossfade"}:
+                    raise ValueError("loop_transition")
+                duration = (
+                    float(transition_s)
+                    if transition_s is not None
+                    else loop_transition_requested_s(blob)
+                )
+                blob = dump_loop_transition(blob, choice, duration)
+            if enabled:
+                reason = rejection_reason(
+                    self.list_studio_items(project_id),
+                    soundtrack_once_s(self.list_studio_music(project_id)),
+                    studio_item_id,
+                    settings_override=(studio_item_id, blob),
+                )
+                if reason:
+                    raise ValueError(reason)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
+    def set_studio_loop_effect(
+        self,
+        studio_item_id: int,
+        *,
+        transition: str,
+        duration_s: float | None,
+        curve: str | None = None,
+    ) -> StudioClip:
+        """Store the join used between plays of one repeated section.
+
+        Manual repeats and Repeat to soundtrack share this setting. Smart
+        frame matching may store a seam. It does not rewrite the user's
+        in/out or the file on disk.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_forward_loop import (
+            LOOP_TRANSITION_MATCH,
+            dump_loop_transition,
+            loop_transition_requested_s,
+        )
+        from orga_drone.studio_loop_match import (
+            analyze_loop_seam,
+            dump_loop_match,
+            loop_match_key,
+        )
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        if transition not in {"off", "crossfade", "cinematic", LOOP_TRANSITION_MATCH}:
+            raise ValueError("loop_transition")
+        if curve is not None and curve not in {"linear", "smooth"}:
+            raise ValueError("loop_transition_curve")
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings, s.media_path, s.source_start, s.source_end,
+                          m.kind AS live_kind, m.id AS media_id, m.duration_s AS live_duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("loop_effect_video_only")
+            available = row["media_id"] is not None
+            live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind != "video":
+                raise ValueError("loop_effect_video_only")
+            duration = (
+                float(duration_s)
+                if duration_s is not None
+                else loop_transition_requested_s(str(row["effect_settings"] or ""))
+            )
+            blob = dump_loop_transition(
+                str(row["effect_settings"] or ""), transition, duration, curve
+            )
+            if transition == LOOP_TRANSITION_MATCH:
+                media_path = Path(str(row["media_path"])) if row["media_path"] else None
+                start = float(row["source_start"] or 0.0)
+                end = (
+                    float(row["source_end"])
+                    if row["source_end"] is not None
+                    else (
+                        float(row["live_duration_s"])
+                        if row["live_duration_s"] is not None
+                        else start
+                    )
+                )
+                if media_path is None or not media_path.is_file() or end <= start:
+                    from orga_drone.studio_loop_match import SeamChoice
+
+                    choice = SeamChoice(False, start, end, "low", 0.0, 1.0)
+                    key = ""
+                else:
+                    choice = analyze_loop_seam(media_path, start, end)
+                    key = loop_match_key(media_path, start, end) or ""
+                blob = dump_loop_match(blob, choice, key)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def cut_studio_video_item(
         self,
         studio_item_id: int,
@@ -3761,6 +3954,12 @@ class Database:
                 right_base,
                 float(local_cut_s),
             )
+            from orga_drone.studio_forward_loop import without_loop_to_soundtrack
+
+            # A cut makes two sections. The soundtrack loop stays a single
+            # explicit choice, so neither half keeps it.
+            left_settings = without_loop_to_soundtrack(left_settings)
+            right_settings = without_loop_to_soundtrack(right_settings)
             position = int(row["position"])
             project_id = int(row["project_id"])
             conn.execute(

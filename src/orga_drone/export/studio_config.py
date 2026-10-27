@@ -25,6 +25,15 @@ class StudioExportClip:
     playback_speed: float = 1.0
     # Video only. 1 plays the in/out range once. The encoder repeats that range.
     section_repeats: int = 1
+    # Derived at export time from a known soundtrack. Not a stored repeat count.
+    # The soundtrack is mixed once afterwards. Joins are hard cuts unless
+    # ``forward_transition_s`` is the applied crossfade overlap.
+    forward_loop: bool = False
+    forward_cycle_s: float = 0.0
+    forward_transition_s: float = 0.0
+    # ``linear`` uses xfade fade. ``smooth`` is the cinematic ease curve.
+    # Story transitions ignore this and stay on ``transition_type``.
+    forward_transition_curve: str = "linear"
     # Internal: a repeat slice uses its real in/out length, including spans under 0.1s.
     exact_span: bool = False
     title_text: str = ""
@@ -34,6 +43,9 @@ class StudioExportClip:
     label: str = ""
     transition_type: str = "cut"
     transition_s: float = 0.0
+    # Loop joins only. ``smooth`` selects the cinematic ease curve. Story
+    # crossfades leave this at ``linear``.
+    transition_curve: str = "linear"
     fade_in_s: float = 0.0
     fade_out_s: float = 0.0
     image: ImageAdjust = field(default_factory=ImageAdjust)

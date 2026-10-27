@@ -256,6 +256,54 @@
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgStorySummary = root.dataset.storySummary || "{count} items · {duration}";
   const msgSectionFailed = root.dataset.sectionFailed || "Could not save the section.";
+  const msgForwardLoopHint =
+    root.dataset.forwardLoopHint ||
+    "Repeats this section forward until the soundtrack ends. The soundtrack plays once and is not restarted at each join. Joins use the loop effect.";
+  const msgLoopEffectIdle =
+    root.dataset.loopEffectIdle || "Repeat this section more than once to use a loop effect.";
+  const msgLoopMatchLow =
+    root.dataset.loopMatchLow ||
+    "No reliable seam was found. The original range stays, with a hard cut.";
+  const msgLoopMatchOk =
+    root.dataset.loopMatchOk ||
+    "Effective loop: {start}–{end} s. This is not a guaranteed seamless join.";
+  const msgLoopMatchStale =
+    root.dataset.loopMatchStale ||
+    "The section changed. Run smart frame matching again to update the seam.";
+  const msgLoopMatchFade =
+    root.dataset.loopMatchFade ||
+    "A short crossfade was added at the seam. Both pictures keep moving forward.";
+  const msgForwardLoopUnknown =
+    root.dataset.forwardLoopUnknown ||
+    "Soundtrack duration is unknown, so this section is not repeated to it.";
+  const msgForwardLoopFilled =
+    root.dataset.forwardLoopFilled ||
+    "The rest of the story is already as long as the soundtrack, so this section is not extended.";
+  const msgForwardLoopShort =
+    root.dataset.forwardLoopShort ||
+    "This section is too short to repeat through the soundtrack.";
+  const msgForwardLoopOther =
+    root.dataset.forwardLoopOther || "Another clip already repeats to the soundtrack.";
+  const msgForwardLoopFailed =
+    root.dataset.forwardLoopFailed || "Could not save the soundtrack loop.";
+  const msgLoopCrossfade =
+    root.dataset.loopCrossfadeHint ||
+    "Blends the end of each repetition into the start of the next. Both keep moving forward. Where the start and end frames differ, a double image can remain. This does not match those frames automatically. The soundtrack plays once and is not blended.";
+  const msgLoopCinematic =
+    root.dataset.loopCinematicHint ||
+    "Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended.";
+  const msgLoopBlendClamped =
+    root.dataset.loopBlendClamped ||
+    "Blend is shortened to {seconds} s so it fits this section.";
+  const msgLoopTransitionShort =
+    root.dataset.loopTransitionShort ||
+    "This section is too short for a crossfade, so the joins stay hard cuts.";
+  const msgLoopTransitionClamped =
+    root.dataset.loopTransitionClamped ||
+    "Crossfade is shortened to {seconds} s so it fits this section.";
+  const msgLoopTransitionOnce =
+    root.dataset.loopTransitionOnce ||
+    "The soundtrack ends before a second repetition, so there is no join to blend.";
   const MAX_SECTION_REPEATS = 8;
   const labelInspectorStory = root.dataset.inspectorStory || "Story";
   const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
@@ -502,8 +550,99 @@
     }
   }
 
+  function forwardLoopActive(clip) {
+    return !!(clip && clip.dataset.forwardLoopActive === "1");
+  }
+
+  function loopPlayInS(clip) {
+    if (clip && clip.dataset.loopMatchState === "ok") {
+      const n = Number(clip.dataset.loopMatchIn);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    return sourceInS(clip);
+  }
+
+  function loopPlayOutS(clip) {
+    if (clip && clip.dataset.loopMatchState === "ok") {
+      const n = Number(clip.dataset.loopMatchOut);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const rawOut = clip && clip.dataset.sourceOut;
+    if (rawOut !== "" && rawOut != null) {
+      const n = Number(rawOut);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const media = Number(clip && clip.dataset.mediaDuration);
+    if (Number.isFinite(media) && media > 0) return media;
+    return loopPlayInS(clip);
+  }
+
+  function onePlayS(clip) {
+    if (!clip) return 0;
+    const source = Math.max(0, loopPlayOutS(clip) - loopPlayInS(clip));
+    const speed = playbackSpeed(clip);
+    return speed > 0 ? source / speed : source;
+  }
+
+  function loopOverlapS(clip) {
+    const n = Number(clip && clip.dataset.forwardLoopOverlap);
+    if (!(Number.isFinite(n) && n > 0.001)) return 0;
+    if (forwardLoopActive(clip)) return n;
+    const reps = Number(clip && clip.dataset.sectionRepeats);
+    if (Number.isFinite(reps) && Math.round(reps) > 1) return n;
+    return 0;
+  }
+
+  function forwardLoopOverlapS(clip) {
+    if (!forwardLoopActive(clip)) return 0;
+    return loopOverlapS(clip);
+  }
+
+  function manualRepeatSpans(clip) {
+    const cycle = onePlayS(clip);
+    const reps = sectionRepeats(clip);
+    if (!(cycle > 0.001) || reps < 2) return [];
+    const spans = [];
+    for (let i = 0; i < reps; i += 1) spans.push(cycle);
+    return spans;
+  }
+
+  function forwardLoopSpans(clip) {
+    const cycle = onePlayS(clip);
+    const plays = Number(clip.dataset.forwardLoopPlays);
+    const partial = Number(clip.dataset.forwardLoopPartial) || 0;
+    if (!(plays > 0) || !(cycle > 0.001)) return [];
+    const spans = [];
+    const full = partial > 0.001 ? plays - 1 : plays;
+    for (let i = 0; i < full; i += 1) spans.push(cycle);
+    if (partial > 0.001) spans.push(partial);
+    return spans;
+  }
+
+  function forwardLoopStarts(spans, overlap) {
+    const starts = [];
+    let cursor = 0;
+    spans.forEach((span, index) => {
+      starts.push(cursor);
+      cursor += span;
+      if (index < spans.length - 1) cursor -= overlap;
+    });
+    return starts;
+  }
+
   function sectionRepeats(clip) {
     if (!clip) return 1;
+    if (forwardLoopActive(clip)) {
+      if (forwardLoopOverlapS(clip) > 0) {
+        const plays = Number(clip.dataset.forwardLoopPlays);
+        if (plays > 0) return plays;
+      }
+      const cycle = onePlayS(clip);
+      const dur = clipDuration(clip);
+      if (!(cycle > 0.001) || !(dur > 0)) return 1;
+      // 0.001 matches FORWARD_LOOP_TOLERANCE_S and the preview wrap epsilon.
+      return Math.max(1, Math.ceil((dur - 0.001) / cycle));
+    }
     const n = Number(clip.dataset.sectionRepeats);
     if (!Number.isFinite(n)) return 1;
     const rounded = Math.round(n);
@@ -512,6 +651,10 @@
   }
 
   function sectionCycleS(clip) {
+    if (forwardLoopActive(clip) || (clip && clip.dataset.loopMatchState === "ok")) {
+      const story = onePlayS(clip);
+      if (story > 0.001) return story;
+    }
     const source = sourceOutS(clip) - sourceInS(clip);
     const speed = playbackSpeed(clip);
     const story = speed > 0 ? source / speed : source;
@@ -523,6 +666,64 @@
 
   // Same mapping as section_playback_point in studio_cut.py.
   function sectionPoint(clip, localS) {
+    const overlapNow = forwardLoopActive(clip) ? forwardLoopOverlapS(clip) : loopOverlapS(clip);
+    if (overlapNow > 0 && (forwardLoopActive(clip) || sectionRepeats(clip) > 1)) {
+      const spans = forwardLoopActive(clip) ? forwardLoopSpans(clip) : manualRepeatSpans(clip);
+      const overlap = overlapNow;
+      const story = clipDuration(clip);
+      const local = Math.max(0, Number(localS) || 0);
+      if (!spans.length || !(story > 0)) {
+        return { index: 0, offset: local, atEnd: false, blending: false, progress: 0, incomingOffset: 0 };
+      }
+      const starts = forwardLoopStarts(spans, overlap);
+      if (local >= story - 0.001) {
+        const index = spans.length - 1;
+        return {
+          index,
+          offset: spans[index],
+          atEnd: true,
+          blending: false,
+          progress: 0,
+          incomingOffset: 0,
+        };
+      }
+      let clock = spans.length - 1;
+      for (let i = 0; i < spans.length; i += 1) {
+        if (local < starts[i] + spans[i] - 0.0005) {
+          clock = i;
+          break;
+        }
+      }
+      const offset = Math.max(0, local - starts[clock]);
+      const span = spans[clock];
+      const hasNext = clock + 1 < spans.length;
+      const blendStart = span - overlap;
+      const blending = hasNext && offset >= blendStart - 0.0005 && offset < span;
+      const progress = blending ? Math.max(0, Math.min(1, (offset - blendStart) / overlap)) : 0;
+      return {
+        index: clock,
+        offset,
+        atEnd: false,
+        blending,
+        progress,
+        incomingOffset: blending ? Math.max(0, offset - blendStart) : 0,
+      };
+    }
+    if (forwardLoopActive(clip)) {
+      const cycle = sectionCycleS(clip);
+      const dur = clipDuration(clip);
+      const local = Math.max(0, Number(localS) || 0);
+      if (!(cycle > 0) || !(dur > 0)) {
+        return { index: 0, offset: local, atEnd: false };
+      }
+      const reps = sectionRepeats(clip);
+      if (local >= dur - 0.001) {
+        const index = Math.max(0, reps - 1);
+        return { index, offset: Math.max(0, dur - index * cycle), atEnd: true };
+      }
+      const index = Math.min(reps - 1, Math.floor(local / cycle));
+      return { index, offset: local - index * cycle, atEnd: false };
+    }
     const reps = sectionRepeats(clip);
     const cycle = sectionCycleS(clip);
     const local = Math.max(0, Number(localS) || 0);
@@ -1162,33 +1363,48 @@
     const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
     const localS = hit && Number.isFinite(hit.localS) ? hit.localS : 0;
     const overlapLocal = hit && Number.isFinite(hit.overlapLocalS) ? hit.overlapLocalS : 0;
+    // A forward loop restarts each play at the in-point, matching the export
+    // slices. Story time would walk the saturation ramp off the section.
+    const loopPoint =
+      primary && !overlap && (forwardLoopActive(primary) || sectionRepeats(primary) > 1)
+        ? sectionPoint(primary, localS)
+        : null;
+    const primaryLocal =
+      loopPoint && Number.isFinite(loopPoint.offset) ? loopPoint.offset : localS;
+    const loopBlend = Boolean(loopPoint && loopPoint.blending && loopOverlapS(primary) > 0);
+    // The incoming loop copy is the same clip. Grading only the story neighbor
+    // left that layer on the original color while the outgoing layer stayed graded.
+    const incomingClip = loopBlend ? primary : overlap;
+    const incomingLocal = loopBlend
+      ? (Number.isFinite(loopPoint.incomingOffset) ? loopPoint.incomingOffset : 0)
+      : overlapLocal;
     gradePreviewElement(
       previewVideo,
       primary,
       "studio-preview-grade",
       "studio-preview-grade-matrix",
-      localS
+      primaryLocal
     );
     gradePreviewElement(
       previewImage,
       primary,
       "studio-preview-grade",
       "studio-preview-grade-matrix",
-      localS
+      primaryLocal
     );
     gradePreviewElement(
       previewVideoB,
-      overlap,
+      incomingClip,
       "studio-preview-grade-b",
       "studio-preview-grade-matrix-b",
-      overlapLocal
+      incomingLocal
     );
     gradePreviewElement(
       previewImageB,
-      overlap,
+      incomingClip,
       "studio-preview-grade-b",
       "studio-preview-grade-matrix-b",
-      overlapLocal
+      incomingLocal
     );
   }
 
@@ -2127,7 +2343,12 @@
     el.style.transformOrigin = "";
   }
 
-  function framePreviewProgress(clip, localS) {
+  function framePreviewProgress(clip, localS, sampleOverride) {
+    if (sampleOverride != null && Number.isFinite(sampleOverride)) {
+      const duration = sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip);
+      if (!(duration > 0)) return 0;
+      return Math.max(0, Math.min(1, sampleOverride / duration));
+    }
     const selected = selectedAdjustableClip();
     const editing =
       !state.playing &&
@@ -2143,7 +2364,7 @@
     return Math.max(0, Math.min(1, sample / duration));
   }
 
-  function applyFrameToElement(el, clip, localS) {
+  function applyFrameToElement(el, clip, localS, sampleOverride) {
     if (!el) return;
     const kind = clip && clip.dataset.kind;
     if (!clip || el.hidden || (kind !== "photo" && kind !== "video")) {
@@ -2151,7 +2372,7 @@
       return;
     }
     const frame = readFrame(clip);
-    const sample = sampleFrame(frame, framePreviewProgress(clip, localS));
+    const sample = sampleFrame(frame, framePreviewProgress(clip, localS, sampleOverride));
     if (sample.zoom <= 1.001) {
       clearFrameTransform(el);
       return;
@@ -2183,10 +2404,19 @@
     const localS = hit && Number.isFinite(hit.localS) ? hit.localS : 0;
     applyFrameToElement(previewImage, primary, localS);
     applyFrameToElement(previewVideo, primary, localS);
-    const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
-    const overlapLocal = hit && Number.isFinite(hit.overlapLocalS) ? hit.overlapLocalS : 0;
-    applyFrameToElement(previewImageB, overlap, overlapLocal);
-    applyFrameToElement(previewVideoB, overlap, overlapLocal);
+    const loopPoint =
+      primary && !hit.overlapClip && loopOverlapS(primary) > 0
+        ? sectionPoint(primary, localS)
+        : null;
+    if (loopPoint && loopPoint.blending) {
+      applyFrameToElement(previewVideoB, primary, localS, loopPoint.incomingOffset);
+      applyFrameToElement(previewImageB, null, 0);
+    } else {
+      const overlap = hit && hit.overlapClip ? hit.overlapClip : null;
+      const overlapLocal = hit && Number.isFinite(hit.overlapLocalS) ? hit.overlapLocalS : 0;
+      applyFrameToElement(previewImageB, overlap, overlapLocal);
+      applyFrameToElement(previewVideoB, overlap, overlapLocal);
+    }
     const active = selectedAdjustableClip();
     const framing = active ? readFrame(active) : null;
     const zooming = Boolean(
@@ -2338,8 +2568,8 @@
 
   function seekVideoLocal(localS, clip) {
     if (!previewVideo) return;
-    const inS = clip ? sourceInS(clip) : 0;
-    const outS = clip ? sourceOutS(clip) : null;
+    const inS = clip ? loopPlayInS(clip) : 0;
+    const outS = clip ? loopPlayOutS(clip) : null;
     const point = clip
       ? sectionPoint(clip, localS)
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
@@ -2466,7 +2696,7 @@
           previewVideoB.src = src;
           previewVideoB.load();
         }
-        const inS = sourceInS(clip);
+        const inS = loopPlayInS(clip);
         const target = inS + Math.max(0, sectionSampleS(clip, localS)) * playbackSpeed(clip);
         const apply = () => {
           try {
@@ -2488,9 +2718,70 @@
     }
   }
 
+  function cinematicBlendProgress(clip, linear) {
+    const t = Math.max(0, Math.min(1, Number(linear) || 0));
+    if (
+      clip &&
+      clip.dataset.forwardLoopTransition === "cinematic" &&
+      clip.dataset.loopTransitionCurve === "smooth"
+    ) {
+      return t * t * (3 - 2 * t);
+    }
+    return t;
+  }
+
+  function showLoopIncoming(clip, point) {
+    if (!previewVideoB || !clip || !point || !point.blending) return false;
+    const src = videoSrcFor(clip);
+    if (!src || clip.dataset.canPlay !== "1") return false;
+    previewVideoB.hidden = false;
+    previewVideoB.muted = true;
+    previewVideoB.style.opacity = "1";
+    if (previewVideo && !previewVideo.hidden) {
+      const eased = cinematicBlendProgress(clip, point.progress);
+      previewVideo.style.opacity = String(Math.max(0, 1 - eased));
+    }
+    const inS = loopPlayInS(clip);
+    const speed = playbackSpeed(clip);
+    const target = inS + Math.max(0, point.incomingOffset) * speed;
+    if (previewVideoB.getAttribute("src") !== src) {
+      previewVideoB.src = src;
+      previewVideoB.load();
+    }
+    const seek = () => {
+      try {
+        if (previewVideoB.playbackRate !== speed) previewVideoB.playbackRate = speed;
+        const drift = Math.abs((previewVideoB.currentTime || 0) - target);
+        if (drift > 0.12) previewVideoB.currentTime = target;
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    if (previewVideoB.readyState >= 1) seek();
+    else previewVideoB.addEventListener("loadedmetadata", seek, { once: true });
+    if (state.playing && previewVideoB.paused) {
+      previewVideoB.play().catch(() => {
+        /* the outgoing picture still advances */
+      });
+    }
+    if (!state.playing && !previewVideoB.paused) {
+      try {
+        previewVideoB.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    return true;
+  }
+
   function applyTransitionPreview(hit) {
-    const overlap = hit && hit.overlapClip && hit.crossfadeProgress != null;
-    if (!overlap) {
+    const loopPoint =
+      hit && hit.clip && !hit.overlapClip && loopOverlapS(hit.clip) > 0
+        ? sectionPoint(hit.clip, hit.localS)
+        : null;
+    const loopBlend = !!(loopPoint && loopPoint.blending && showLoopIncoming(hit.clip, loopPoint));
+    const overlap = !loopBlend && hit && hit.overlapClip && hit.crossfadeProgress != null;
+    if (!overlap && !loopBlend) {
       if (previewImageB) {
         previewImageB.hidden = true;
         previewImageB.style.opacity = "";
@@ -2511,7 +2802,7 @@
       if (previewImage) previewImage.style.opacity = "";
       if (previewVideo) previewVideo.style.opacity = "";
       if (previewTitlecard) previewTitlecard.style.opacity = "";
-    } else {
+    } else if (overlap) {
       showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
       const progress = hit.crossfadeProgress;
       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
@@ -2742,7 +3033,14 @@
     const mediaTime = previewVideo.currentTime || 0;
     applyClipPlayback(previewVideo, playing);
     const within = Math.max(0, (mediaTime - inS) / speed);
-    const local = reps > 1 ? videoLoopIndex * cycle + within : within;
+    const loopOverlap = forwardLoopOverlapS(playing);
+    const loopSpans = loopOverlap > 0 ? forwardLoopSpans(playing) : [];
+    let local = reps > 1 ? videoLoopIndex * cycle + within : within;
+    if (loopOverlap > 0 && loopSpans.length) {
+      const starts = forwardLoopStarts(loopSpans, loopOverlap);
+      const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
+      local = (starts[index] || 0) + within;
+    }
     const next = clipStartTime(playing) + local;
     if (Math.abs(next - state.projectTimeS) >= 0.01) {
       state.projectTimeS = next;
@@ -2761,6 +3059,51 @@
       beginClockForActiveClip();
       return;
     }
+    // A forward crossfade keeps the outgoing picture on this element and the
+    // incoming picture on the second element. At the end of the outgoing play
+    // the clock continues from the overlap already shown, still moving forward.
+    // Soundtrack time follows projectTimeS and is not restarted here.
+    if (loopOverlap > 0 && loopSpans.length) {
+      const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
+      const span = loopSpans[index] || 0;
+      const endMedia = inS + span * speed;
+      if (index + 1 < loopSpans.length && mediaTime >= endMedia - 0.02) {
+        if (loopSeeking) return;
+        loopSeeking = true;
+        videoLoopIndex = index + 1;
+        suppressVideoClock = true;
+        const starts = forwardLoopStarts(loopSpans, loopOverlap);
+        state.projectTimeS = clipStartTime(playing) + (starts[index + 1] || 0) + loopOverlap;
+        updatePlayheadChrome();
+        applyTransitionPreview(resolveAt(state.projectTimeS));
+        let settled = false;
+        const settle = () => {
+          if (settled) return;
+          settled = true;
+          loopSeeking = false;
+          suppressVideoClock = false;
+        };
+        previewVideo.addEventListener("seeked", settle, { once: true });
+        window.setTimeout(settle, 200);
+        try {
+          previewVideo.currentTime = inS + loopOverlap * speed;
+        } catch (_) {
+          settle();
+        }
+        if (state.playing) {
+          previewVideo.play().catch(() => {
+            pausePlayback();
+          });
+        }
+        return;
+      }
+      if (mediaTime >= endMedia - 0.05) {
+        advanceToNextOrStop(after);
+      }
+      return;
+    }
+    // Section repeat and a hard-cut soundtrack loop seek the picture back to
+    // source in. Soundtrack time follows projectTimeS and is not restarted here.
     if (reps > 1 && outS != null && mediaTime >= outS - 0.01 && videoLoopIndex + 1 < reps) {
       if (loopSeeking) return;
       loopSeeking = true;
@@ -2813,6 +3156,29 @@
       return;
     }
     const reps = sectionRepeats(hit.clip);
+    const endedOverlap = loopOverlapS(hit.clip);
+    if (endedOverlap > 0 && videoLoopIndex + 1 < reps) {
+      const inS = loopPlayInS(hit.clip);
+      const speed = playbackSpeed(hit.clip);
+      videoLoopIndex += 1;
+      const spans = forwardLoopActive(hit.clip)
+        ? forwardLoopSpans(hit.clip)
+        : manualRepeatSpans(hit.clip);
+      const starts = forwardLoopStarts(spans, endedOverlap);
+      state.projectTimeS = clipStartTime(hit.clip) + (starts[videoLoopIndex] || 0) + endedOverlap;
+      updatePlayheadChrome();
+      try {
+        previewVideo.currentTime = inS + endedOverlap * speed;
+      } catch (_) {
+        /* ignore */
+      }
+      if (state.playing) {
+        previewVideo.play().catch(() => {
+          pausePlayback();
+        });
+      }
+      return;
+    }
     if (reps > 1 && videoLoopIndex + 1 < reps) {
       videoLoopIndex += 1;
       const inS = sourceInS(hit.clip);
@@ -3492,8 +3858,11 @@
           if (inEl && document.activeElement !== inEl) inEl.value = sourceInS(clip).toFixed(2);
           if (outEl && document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
           if (repeatEl && document.activeElement !== repeatEl) {
-            repeatEl.value = String(sectionRepeats(clip));
+            repeatEl.value = String(
+              forwardLoopActive(clip) ? Number(clip.dataset.sectionRepeats) || 1 : sectionRepeats(clip)
+            );
           }
+          fillForwardLoop(clip);
           if (hintEl) hintEl.textContent = msgCutHint;
         }
       }
@@ -3827,6 +4196,7 @@
         return;
       }
       applyTracksPayload(savedBody);
+      if (reloadIfForwardLoop()) return;
       const last = state.tracks[state.tracks.length - 1];
       renderMusic();
       if (last) selectMusic(last.id);
@@ -3859,6 +4229,7 @@
         return;
       }
       applyTracksPayload(savedBody);
+      if (reloadIfForwardLoop()) return;
       renderMusic();
       selectMusic(track.id);
       setSaveState(true);
@@ -3920,6 +4291,7 @@
         return;
       }
       applyTracksPayload(data);
+      if (reloadIfForwardLoop()) return;
       state.selected = { type: null, id: null };
       renderMusic();
       showInspector("inspector-empty");
@@ -4009,6 +4381,7 @@
       });
       if (!res.ok) throw new Error("reorder failed");
       await res.json();
+      if (reloadIfForwardLoop()) return;
       refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
@@ -4066,6 +4439,7 @@
           data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
         input.value = Number(shown).toFixed(1);
       }
+      if (reloadIfForwardLoop()) return;
       refreshAppliedTransitions();
       layoutTimeline();
       setProjectTime(state.projectTimeS);
@@ -4074,6 +4448,259 @@
     } catch (_) {
       clip.dataset.photoDuration = prev;
       showFlash(msgDurationFailed);
+    }
+  }
+
+  function soundtrackOnceS() {
+    if (!state.tracks.length) return null;
+    let total = 0;
+    for (const track of state.tracks) {
+      if (!track.available || !(track.durationS > 0)) return null;
+      total += track.durationS;
+    }
+    return total;
+  }
+
+  function loopTransitionChoice(clip) {
+    const value = clip && clip.dataset.forwardLoopTransition;
+    if (value === "crossfade" || value === "cinematic" || value === "match") return value;
+    return "off";
+  }
+
+  function loopEffectReady(clip) {
+    return !!(
+      clip &&
+      clip.dataset.kind === "video" &&
+      (forwardLoopActive(clip) || sectionRepeats(clip) > 1)
+    );
+  }
+
+  function loopEffectNote(clip, ready) {
+    if (!ready || !clip) return "";
+    const choice = loopTransitionChoice(clip);
+    if (choice === "off") return "";
+    if (choice === "match") {
+      const state = clip.dataset.loopMatchState || "low";
+      if (state === "stale") return msgLoopMatchStale;
+      if (state !== "ok") return msgLoopMatchLow;
+      const start = Number(clip.dataset.loopMatchIn);
+      const end = Number(clip.dataset.loopMatchOut);
+      let note = msgLoopMatchOk
+        .replace("{start}", (Number.isFinite(start) ? start : 0).toFixed(2))
+        .replace("{end}", (Number.isFinite(end) ? end : 0).toFixed(2));
+      if (loopOverlapS(clip) > 0) note = `${note} ${msgLoopMatchFade}`;
+      return note;
+    }
+    const overlap = loopOverlapS(clip);
+    if (forwardLoopActive(clip) && (Number(clip.dataset.forwardLoopPlays) || 0) < 2) {
+      return msgLoopTransitionOnce;
+    }
+    if (!(overlap > 0)) return msgLoopTransitionShort;
+    const requested = Number(clip.dataset.forwardLoopTransitionS);
+    if (Number.isFinite(requested) && requested - overlap > 0.05) {
+      const template = choice === "cinematic" ? msgLoopBlendClamped : msgLoopTransitionClamped;
+      return template.replace("{seconds}", overlap.toFixed(1));
+    }
+    return choice === "cinematic" ? msgLoopCinematic : msgLoopCrossfade;
+  }
+
+  function forwardLoopHint(reason, clip) {
+    if (reason === "unknown_duration" || reason === "unavailable") return msgForwardLoopUnknown;
+    if (reason === "story_filled") return msgForwardLoopFilled;
+    if (reason === "too_many_plays" || reason === "section_short") return msgForwardLoopShort;
+    if (reason === "other_clip" || reason === "forward_loop_other_clip") return msgForwardLoopOther;
+    return msgForwardLoopHint;
+  }
+
+  function loopTransitionNote(clip, reason) {
+    if (!clip || reason !== "active" || loopTransitionChoice(clip) !== "crossfade") return "";
+    const overlap = forwardLoopOverlapS(clip);
+    const requested = Number(clip.dataset.forwardLoopTransitionS);
+    if (overlap > 0 && Number.isFinite(requested) && requested - overlap > 0.05) {
+      return msgLoopTransitionClamped.replace("{seconds}", overlap.toFixed(1));
+    }
+    return "";
+  }
+
+  function forwardLoopError(detail) {
+    const known = forwardLoopHint(detail);
+    if (known !== msgForwardLoopHint || detail === "active" || detail === "ready" || detail === "off") {
+      if (
+        detail === "unknown_duration" ||
+        detail === "unavailable" ||
+        detail === "story_filled" ||
+        detail === "too_many_plays" ||
+        detail === "section_short" ||
+        detail === "other_clip" ||
+        detail === "forward_loop_other_clip"
+      ) {
+        return known;
+      }
+    }
+    return msgForwardLoopFailed;
+  }
+
+  function fillForwardLoop(clip) {
+    const box = document.getElementById("inspector-forward-loop");
+    const hint = document.getElementById("inspector-forward-loop-hint");
+    const repeatEl = document.getElementById("inspector-section-repeats");
+    if (!box || !hint || !clip) return;
+    const requested = clip.dataset.forwardLoop === "1";
+    const active = clip.dataset.forwardLoopActive === "1";
+    let reason = clip.dataset.forwardLoopReason || "off";
+    const other = clips().some(
+      (otherClip) => otherClip !== clip && otherClip.dataset.forwardLoop === "1"
+    );
+    if (!requested && other) reason = "other_clip";
+    else if (!requested) reason = soundtrackOnceS() == null ? "unknown_duration" : "ready";
+    else if (!active && (reason === "active" || reason === "ready" || reason === "off")) {
+      reason = "unknown_duration";
+    }
+    box.checked = requested;
+    box.disabled = !requested && (reason === "unknown_duration" || reason === "other_clip");
+    if (repeatEl) repeatEl.disabled = active;
+    hint.textContent = forwardLoopHint(reason, clip);
+    fillLoopEffect(clip);
+  }
+
+  function fillLoopEffect(clip) {
+    const idle = document.getElementById("inspector-loop-effect-idle");
+    const controls = document.getElementById("inspector-loop-effect-controls");
+    const transitionEl = document.getElementById("inspector-loop-transition");
+    const durationWrap = document.getElementById("inspector-loop-transition-duration-wrap");
+    const durationEl = document.getElementById("inspector-loop-transition-duration");
+    const transitionHint = document.getElementById("inspector-loop-transition-hint");
+    const curveWrap = document.getElementById("inspector-loop-transition-curve-wrap");
+    const curveEl = document.getElementById("inspector-loop-transition-curve");
+    const ready = loopEffectReady(clip);
+    if (idle) idle.hidden = ready;
+    if (controls) controls.hidden = !ready;
+    const choice = loopTransitionChoice(clip);
+    if (transitionEl && document.activeElement !== transitionEl) transitionEl.value = choice;
+    if (durationEl && document.activeElement !== durationEl) {
+      const stored = Number(clip && clip.dataset.forwardLoopTransitionS);
+      durationEl.value = (Number.isFinite(stored) && stored > 0 ? stored : 1).toFixed(1);
+    }
+    if (transitionEl) transitionEl.disabled = !ready;
+    if (durationEl) {
+      durationEl.disabled = !ready;
+      durationEl.max = choice === "cinematic" ? "5" : "2";
+    }
+    if (durationWrap) durationWrap.hidden = !ready || choice === "off";
+    if (curveWrap) curveWrap.hidden = !ready || choice !== "cinematic";
+    if (curveEl && document.activeElement !== curveEl) {
+      curveEl.value = clip && clip.dataset.loopTransitionCurve === "linear" ? "linear" : "smooth";
+    }
+    if (transitionHint) {
+      const note = loopEffectNote(clip, ready);
+      transitionHint.hidden = !note;
+      transitionHint.textContent = note;
+    }
+  }
+
+  function reloadIfForwardLoop() {
+    if (clips().some((clip) => clip.dataset.forwardLoop === "1")) {
+      window.location.reload();
+      return true;
+    }
+    return false;
+  }
+
+  function applyForwardLoopClip(clip, data) {
+    if (!clip || !data) return;
+    clip.dataset.forwardLoop = data.enabled ? "1" : "0";
+    clip.dataset.forwardLoopActive = data.active ? "1" : "0";
+    clip.dataset.forwardLoopReason = data.reason || (data.active ? "active" : "off");
+    if (data.transition) clip.dataset.forwardLoopTransition = data.transition;
+    if (data.transition_s != null) clip.dataset.forwardLoopTransitionS = String(data.transition_s);
+    if (data.overlap_s != null) clip.dataset.forwardLoopOverlap = String(data.overlap_s);
+    if (data.plays != null) clip.dataset.forwardLoopPlays = String(data.plays);
+    if (data.partial_s != null) clip.dataset.forwardLoopPartial = String(data.partial_s);
+    if (data.match_state) clip.dataset.loopMatchState = data.match_state;
+    if (data.match_in_s != null) clip.dataset.loopMatchIn = String(data.match_in_s);
+    if (data.match_out_s != null) clip.dataset.loopMatchOut = String(data.match_out_s);
+    if (data.curve) clip.dataset.loopTransitionCurve = data.curve;
+    if (data.section_repeats != null) {
+      clip.dataset.sectionRepeats = String(data.section_repeats);
+    }
+    if (data.effective_duration_s != null) {
+      clip.dataset.effectiveDuration = String(data.effective_duration_s);
+      const flex = Number(data.effective_duration_s);
+      if (Number.isFinite(flex)) clip.style.setProperty("--clip-flex", flex.toFixed(4));
+      const label = clip.querySelector("[data-clip-duration]");
+      if (label) label.textContent = Number.isFinite(flex) ? `${flex.toFixed(1)}s` : "—";
+    }
+    if (data.summary && data.summary.estimated_total_s != null) {
+      root.dataset.totalS = String(data.summary.estimated_total_s);
+      root.dataset.totalLabel =
+        data.summary.estimated_total_label || formatTime(data.summary.estimated_total_s);
+    }
+    const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
+    const dur = clipDuration(clip);
+    if (durationLine) {
+      durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
+    }
+    fillForwardLoop(clip);
+  }
+
+  function loopEffectBody() {
+    const choiceEl = document.getElementById("inspector-loop-transition");
+    const durationEl = document.getElementById("inspector-loop-transition-duration");
+    const choice = choiceEl && choiceEl.value;
+    const cinematic = choice === "cinematic";
+    let duration = Number(durationEl && durationEl.value);
+    if (!Number.isFinite(duration)) duration = 1;
+    duration = Math.max(0.5, Math.min(cinematic ? 5 : 2, duration));
+    const curveEl = document.getElementById("inspector-loop-transition-curve");
+    const body = {
+      transition: choice === "crossfade" || choice === "match" || cinematic ? choice : "off",
+      duration_s: Math.round(duration * 10) / 10,
+    };
+    if (cinematic) body.curve = curveEl && curveEl.value === "linear" ? "linear" : "smooth";
+    return body;
+  }
+
+  async function persistForwardLoop(clip, enabled) {
+    const box = document.getElementById("inspector-forward-loop");
+    const prevLoop = clip.dataset.forwardLoop;
+    const prevActive = clip.dataset.forwardLoopActive;
+    const prevReason = clip.dataset.forwardLoopReason;
+    const prevDuration = clip.dataset.effectiveDuration;
+    const prevTransition = clip.dataset.forwardLoopTransition;
+    const prevTransitionS = clip.dataset.forwardLoopTransitionS;
+    const prevOverlap = clip.dataset.forwardLoopOverlap;
+    const prevPlays = clip.dataset.forwardLoopPlays;
+    const prevPartial = clip.dataset.forwardLoopPartial;
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/${clip.dataset.studioId}/forward-loop`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ enabled: !!enabled }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        throw new Error((data && data.detail) || msgForwardLoopFailed);
+      }
+      applyForwardLoopClip(clip, data);
+      refreshAppliedTransitions();
+      layoutTimeline();
+      setProjectTime(state.projectTimeS);
+      setSaveState(true);
+      showFlash("");
+    } catch (err) {
+      clip.dataset.forwardLoop = prevLoop;
+      clip.dataset.forwardLoopActive = prevActive;
+      clip.dataset.forwardLoopReason = prevReason;
+      clip.dataset.effectiveDuration = prevDuration;
+      clip.dataset.forwardLoopTransition = prevTransition;
+      clip.dataset.forwardLoopTransitionS = prevTransitionS;
+      clip.dataset.forwardLoopOverlap = prevOverlap;
+      clip.dataset.forwardLoopPlays = prevPlays;
+      clip.dataset.forwardLoopPartial = prevPartial;
+      if (box) box.checked = prevLoop === "1";
+      fillForwardLoop(clip);
+      showFlash(forwardLoopError(err && err.message));
     }
   }
 
@@ -4952,6 +5579,7 @@
         root.dataset.totalS = String(body.summary.estimated_total_s);
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
+      if (reloadIfForwardLoop()) return;
       syncPreviewMedia();
       refreshAppliedTransitions();
       layoutTimeline();
@@ -5028,6 +5656,7 @@
         root.dataset.totalS = String(body.summary.estimated_total_s);
         root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
+      if (reloadIfForwardLoop()) return;
       layoutTimeline();
       syncPreviewMedia();
       setSaveState(true);
@@ -6049,6 +6678,89 @@
     patchMusicSettings();
   });
 
+  document.getElementById("inspector-forward-loop")?.addEventListener("change", (event) => {
+    if (state.selected.type !== "clip") return;
+    const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
+    if (!clip || clip.dataset.kind !== "video") return;
+    persistForwardLoop(clip, !!event.target.checked);
+  });
+
+  async function persistSelectedLoopTransition() {
+    if (state.selected.type !== "clip") return;
+    const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
+    if (!clip || clip.dataset.kind !== "video" || !loopEffectReady(clip)) return;
+    const durationWrap = document.getElementById("inspector-loop-transition-duration-wrap");
+    const choice = document.getElementById("inspector-loop-transition");
+    if (durationWrap && choice) durationWrap.hidden = choice.value === "off";
+    const curveWrap = document.getElementById("inspector-loop-transition-curve-wrap");
+    if (curveWrap && choice) curveWrap.hidden = choice.value !== "cinematic";
+    if (choice && choice.value === "cinematic") {
+      const durationEl = document.getElementById("inspector-loop-transition-duration");
+      if (durationEl) durationEl.max = "5";
+    }
+    const prevTransition = clip.dataset.forwardLoopTransition;
+    const prevTransitionS = clip.dataset.forwardLoopTransitionS;
+    const prevOverlap = clip.dataset.forwardLoopOverlap;
+    const prevMatch = clip.dataset.loopMatchState;
+    const prevDuration = clip.dataset.effectiveDuration;
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/${clip.dataset.studioId}/loop-effect`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(loopEffectBody()),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        throw new Error((data && data.detail) || msgForwardLoopFailed);
+      }
+      if (data.transition) clip.dataset.forwardLoopTransition = data.transition;
+      if (data.transition_s != null) clip.dataset.forwardLoopTransitionS = String(data.transition_s);
+      if (data.overlap_s != null) clip.dataset.forwardLoopOverlap = String(data.overlap_s);
+      if (data.effective_duration_s != null) {
+        clip.dataset.effectiveDuration = String(data.effective_duration_s);
+      }
+      if (data.match_state) clip.dataset.loopMatchState = data.match_state;
+      if (data.match_in_s != null) clip.dataset.loopMatchIn = String(data.match_in_s);
+      if (data.match_out_s != null) clip.dataset.loopMatchOut = String(data.match_out_s);
+      if (data.plays != null && clip.dataset.forwardLoopActive === "1") {
+        clip.dataset.forwardLoopPlays = String(data.plays);
+      }
+      if (data.partial_s != null && clip.dataset.forwardLoopActive === "1") {
+        clip.dataset.forwardLoopPartial = String(data.partial_s);
+      }
+      applyForwardLoopClip(clip, {
+        enabled: clip.dataset.forwardLoop === "1",
+        active: clip.dataset.forwardLoopActive === "1",
+        reason: clip.dataset.forwardLoopReason,
+        ...data,
+      });
+      refreshAppliedTransitions();
+      layoutTimeline();
+      setProjectTime(state.projectTimeS);
+      setSaveState(true);
+      showFlash("");
+    } catch (err) {
+      clip.dataset.forwardLoopTransition = prevTransition;
+      clip.dataset.forwardLoopTransitionS = prevTransitionS;
+      clip.dataset.forwardLoopOverlap = prevOverlap;
+      clip.dataset.loopMatchState = prevMatch;
+      clip.dataset.effectiveDuration = prevDuration;
+      fillLoopEffect(clip);
+      showFlash(err && err.message ? err.message : msgForwardLoopFailed);
+    }
+  }
+
+  document.getElementById("inspector-loop-transition")?.addEventListener("change", () => {
+    persistSelectedLoopTransition();
+  });
+  document.getElementById("inspector-loop-transition-duration")?.addEventListener("change", () => {
+    persistSelectedLoopTransition();
+  });
+  document.getElementById("inspector-loop-transition-curve")?.addEventListener("change", () => {
+    persistSelectedLoopTransition();
+  });
+
   ["inspector-source-in", "inspector-source-out", "inspector-section-repeats"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", () => {
       if (state.selected.type !== "clip") return;
@@ -6281,7 +6993,7 @@
 
   function sourceClock(clip, localS) {
     const sample = sectionSampleS(clip, Math.max(0, Number(localS) || 0));
-    return sourceInS(clip) + sample * playbackSpeed(clip);
+    return loopPlayInS(clip) + sample * playbackSpeed(clip);
   }
 
   function mapClock(clip, localS) {
