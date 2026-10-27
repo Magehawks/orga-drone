@@ -4030,6 +4030,56 @@ class Database:
             raise RuntimeError("cut succeeded but items missing from list")
         return left_item, right_item
 
+    def merge_studio_with_previous(self, right_id: int) -> StudioClip:
+        """Join ``right_id`` with the previous Story clip when that is lossless.
+
+        Extends the left row's source end and settings, then deletes the right
+        row. The media file is not modified. Raises ``MergeBlocked`` when the
+        join would drop a setting, a gap, or a different file.
+        """
+        from orga_drone.studio_merge import MergeBlocked, plan_merge
+
+        with self.connect() as conn:
+            located = conn.execute(
+                "SELECT project_id FROM studio_clips WHERE id = ?",
+                (right_id,),
+            ).fetchone()
+        if located is None:
+            raise MergeBlocked("not_found")
+        project_id = int(located["project_id"])
+        plan = plan_merge(self.list_studio_items(project_id), right_id)
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE studio_clips
+                   SET source_end = ?, effect_settings = ?, transition = ?,
+                       transition_duration_s = ?
+                   WHERE id = ? AND project_id = ?""",
+                (
+                    plan.source_end,
+                    plan.effect_settings,
+                    plan.transition if plan.transition is not None else "cut",
+                    plan.transition_duration_s,
+                    plan.left_id,
+                    project_id,
+                ),
+            )
+            conn.execute(
+                "DELETE FROM studio_clips WHERE id = ? AND project_id = ?",
+                (plan.right_id, project_id),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        merged = next(
+            (item for item in self.list_studio_items(project_id) if item.id == plan.left_id),
+            None,
+        )
+        if merged is None:
+            raise RuntimeError("merge succeeded but the clip is missing")
+        return merged
+
     def protected_export_paths(self) -> list[str]:
         """Files an export must never replace.
 

@@ -80,7 +80,7 @@ The application helps users:
 - collect selected media in a **Studio** workspace (non-destructive
   `studio_projects` / `studio_clips`; multiple local edit projects with
   browser/switcher; editable persisted title; manual order and
-  estimated runtime; simple video Cut via source start/end; a trash button beside Cut, the Delete key from the Story track when no dialog is open, and a right-click menu remove the selected Story clip (the file stays; Undo puts it back); video section repeat
+  estimated runtime; simple video Cut via source start/end; a trash button beside Cut, the Delete key from the Story track when no dialog is open, and a right-click menu remove the selected Story clip (the file stays; Undo puts it back); a right-click on the cut boundary or the following clip can remove that cut when the two clips are the same file, meet in forward order, and share compatible settings (otherwise the action stays disabled and explains why; one Undo step splits them again); video section repeat
   (in/out range played 1×–8× at the same speed; story duration, preview, and MP4
   include each play); Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync

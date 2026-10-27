@@ -4153,8 +4153,79 @@
     const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    const item = document.getElementById("studio-clip-menu-remove");
+    const item = visibleClipMenuItems(menu)[0];
     if (item) item.focus();
+  }
+
+  function visibleClipMenuItems(menu) {
+    return Array.from(menu.querySelectorAll("[role='menuitem']")).filter((entry) => !entry.hidden);
+  }
+
+  function setClipMenuReason(text) {
+    const reason = document.getElementById("studio-clip-menu-reason");
+    if (!reason) return;
+    const show = Boolean(text);
+    reason.hidden = !show;
+    reason.textContent = text || "";
+  }
+
+  function mergeItemBlocked(button) {
+    return !button || button.getAttribute("aria-disabled") === "true";
+  }
+
+  async function refreshMergeItem(button, studioId) {
+    if (!button) return;
+    button.setAttribute("aria-disabled", "true");
+    button.removeAttribute("title");
+    setClipMenuReason("");
+    if (!studioId) return;
+    try {
+      const res = await fetch(`/api/studio/${studioId}/merge-previous`, {
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      const menu = document.getElementById("studio-clip-menu");
+      if (!menu || menu.hidden || button.dataset.studioId !== String(studioId)) return;
+      const ok = Boolean(data && data.ok);
+      button.setAttribute("aria-disabled", ok ? "false" : "true");
+      const reason = (data && data.reason) || "";
+      if (!ok) {
+        const text =
+          reason ||
+          root.dataset.mergeCheckFailed ||
+          "Could not check whether these clips can be joined.";
+        button.title = text;
+        setClipMenuReason(text);
+      }
+    } catch (_) {
+      const menu = document.getElementById("studio-clip-menu");
+      if (!menu || menu.hidden) return;
+      const fallback =
+        root.dataset.mergeCheckFailed || "Could not check whether these clips can be joined.";
+      button.setAttribute("aria-disabled", "true");
+      button.title = fallback;
+      setClipMenuReason(fallback);
+    }
+  }
+
+  async function mergeWithPrevious(studioId) {
+    if (!studioId) return;
+    hideClipMenu();
+    if (state.playing) pausePlayback();
+    try {
+      const res = await fetch(`/api/studio/${studioId}/merge-previous`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        showFlash((data && data.detail) || root.dataset.mergeFailed || "Could not remove the cut.");
+        return;
+      }
+      window.location.reload();
+    } catch (_) {
+      showFlash(root.dataset.mergeFailed || "Could not remove the cut.");
+    }
   }
 
   function storyClipDeleteContext(node) {
@@ -4983,16 +5054,65 @@
   document.getElementById("studio-redo")?.addEventListener("click", () => {
     applyStudioHistory("redo");
   });
+  function showStoryContextMenu(event, anchor, mode, mergeId) {
+    const removeItem = document.getElementById("studio-clip-menu-remove");
+    const mergeItem = document.getElementById("studio-clip-menu-merge");
+    const uncutItem = document.getElementById("studio-clip-menu-uncut");
+    if (removeItem) removeItem.hidden = mode !== "clip";
+    if (mergeItem) {
+      mergeItem.hidden = mode !== "clip" || !mergeId;
+      mergeItem.setAttribute("aria-disabled", "true");
+      mergeItem.dataset.studioId = mergeId || "";
+    }
+    if (uncutItem) {
+      uncutItem.hidden = mode !== "boundary";
+      uncutItem.setAttribute("aria-disabled", "true");
+      uncutItem.dataset.studioId = mergeId || "";
+    }
+    setClipMenuReason("");
+    const opener =
+      (anchor.querySelector && anchor.querySelector("[data-select-clip]")) || anchor;
+    showClipMenu(event.clientX, event.clientY, opener);
+    const action = mode === "boundary" ? uncutItem : mergeItem;
+    if (action && !action.hidden && mergeId) refreshMergeItem(action, mergeId);
+  }
   grid.addEventListener("contextmenu", (event) => {
     const clip = event.target.closest && event.target.closest(".studio-clip");
-    if (!clip || !clip.dataset.studioId) return;
+    if (clip && clip.dataset.studioId) {
+      event.preventDefault();
+      selectClip(clip.dataset.studioId, { movePlayhead: false });
+      const previous = clip.previousElementSibling;
+      const hasPrevious = Boolean(
+        previous &&
+          (previous.classList.contains("studio-clip") ||
+            previous.classList.contains("studio-transition"))
+      );
+      showStoryContextMenu(
+        event,
+        clip,
+        "clip",
+        hasPrevious ? clip.dataset.studioId : ""
+      );
+      return;
+    }
+    const transition = event.target.closest && event.target.closest(".studio-transition");
+    if (!transition || !transition.dataset.transitionBefore) return;
     event.preventDefault();
-    selectClip(clip.dataset.studioId, { movePlayhead: false });
-    const opener = clip.querySelector("[data-select-clip]") || clip;
-    showClipMenu(event.clientX, event.clientY, opener);
+    selectTransition(transition);
+    showStoryContextMenu(event, transition, "boundary", transition.dataset.transitionBefore);
   });
   document.getElementById("studio-clip-menu-remove")?.addEventListener("click", () => {
     removeSelectedStoryClip();
+  });
+  document.getElementById("studio-clip-menu-merge")?.addEventListener("click", () => {
+    const button = document.getElementById("studio-clip-menu-merge");
+    if (mergeItemBlocked(button)) return;
+    mergeWithPrevious(button.dataset.studioId);
+  });
+  document.getElementById("studio-clip-menu-uncut")?.addEventListener("click", () => {
+    const button = document.getElementById("studio-clip-menu-uncut");
+    if (mergeItemBlocked(button)) return;
+    mergeWithPrevious(button.dataset.studioId);
   });
   document.getElementById("studio-clip-menu")?.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Tab") {
@@ -5001,14 +5121,24 @@
       return;
     }
     if (
-      event.key === "ArrowDown" ||
-      event.key === "ArrowUp" ||
-      event.key === "Home" ||
-      event.key === "End"
+      event.key !== "ArrowDown" &&
+      event.key !== "ArrowUp" &&
+      event.key !== "Home" &&
+      event.key !== "End"
     ) {
-      event.preventDefault();
-      document.getElementById("studio-clip-menu-remove")?.focus();
+      return;
     }
+    const menu = document.getElementById("studio-clip-menu");
+    const items = menu ? visibleClipMenuItems(menu) : [];
+    if (!items.length) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement);
+    let next = 0;
+    if (event.key === "End") next = items.length - 1;
+    else if (event.key === "ArrowDown") next = current < 0 ? 0 : (current + 1) % items.length;
+    else if (event.key === "Home") next = 0;
+    else next = current < 0 ? items.length - 1 : (current - 1 + items.length) % items.length;
+    items[next].focus();
   });
   document.addEventListener("click", (event) => {
     const menu = document.getElementById("studio-clip-menu");

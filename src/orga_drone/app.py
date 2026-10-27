@@ -69,6 +69,7 @@ from orga_drone.studio_map import (
     route_preview,
 )
 from orga_drone.studio_mask import mask_preview_model, masks_from_effect_settings
+from orga_drone.studio_merge import MERGE_REASONS, MergeBlocked
 from orga_drone.studio_overlay import (
     overlay_preview_model,
     overlays_from_effect_settings,
@@ -2332,6 +2333,64 @@ def create_app() -> FastAPI:
                     ),
                 },
                 "summary": summary.as_dict(),
+            }
+        )
+
+    def _merge_reason(request: Request, code: str) -> str:
+        translate = get_translator(lang_from_request(request))
+        return translate(MERGE_REASONS.get(code, MERGE_REASONS["settings"]))
+
+    @app.get("/api/studio/{studio_item_id}/merge-previous")
+    async def api_studio_merge_previous_status(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail=_merge_reason(request, "not_found"))
+        try:
+            from orga_drone.studio_merge import plan_merge
+
+            plan_merge(db.list_studio_items(project_id), studio_item_id)
+        except MergeBlocked as exc:
+            return JSONResponse(
+                {"ok": False, "reason": _merge_reason(request, exc.code)}
+            )
+        return JSONResponse({"ok": True, "reason": ""})
+
+    @app.post("/api/studio/{studio_item_id}/merge-previous")
+    async def api_studio_merge_previous(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            with story_edit(
+                db, _clip_project_id(studio_item_id), group=_history_group(request)
+            ):
+                merged = db.merge_studio_with_previous(studio_item_id)
+        except MergeBlocked as exc:
+            status = 404 if exc.code == "not_found" else 400
+            raise HTTPException(
+                status_code=status, detail=_merge_reason(request, exc.code)
+            ) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": merged.id,
+                "source_in_s": merged.source_in_s,
+                "source_out_s": merged.source_out_s,
+                "effective_duration_s": effective_seconds(
+                    kind=merged.kind or "unknown",
+                    photo_duration_s=merged.photo_duration_s,
+                    duration_s=merged.duration_s,
+                    available=merged.available,
+                    source_in_s=merged.source_in_s,
+                    source_out_s=merged.source_out_s,
+                    playback_speed=merged.playback_speed,
+                    section_repeats=section_repeats_from_effect_settings(
+                        merged.effect_settings
+                    ),
+                ),
             }
         )
 
