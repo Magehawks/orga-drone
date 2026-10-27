@@ -512,6 +512,23 @@ class AlbumItem:
     media_id: int | None
 
 
+def _place_label(raw: object) -> str:
+    """City and region already stored on the file. Never calls a geocoder."""
+    if not isinstance(raw, str) or not raw.strip():
+        return ""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    parts = [
+        str(data.get("city") or "").strip(),
+        str(data.get("region") or "").strip(),
+    ]
+    return ", ".join(part for part in parts if part)
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -1561,8 +1578,12 @@ class Database:
             params.append(kind)
         if source == "drone":
             where.append("m.source_type = 'drone'")
+        elif source == "camera":
+            where.append("m.source_type = 'camera'")
         elif source == "other":
-            where.append("(m.source_type IS NULL OR m.source_type != 'drone')")
+            where.append(
+                "(m.source_type IS NULL OR m.source_type NOT IN ('drone', 'camera'))"
+            )
         if has_gps is True:
             where.append("m.latitude IS NOT NULL AND m.longitude IS NOT NULL")
         if has_gps is False:
@@ -3109,6 +3130,201 @@ class Database:
                 (now, project_id),
             )
         items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
+    def _video_clip_row(self, studio_item_id: int) -> tuple[sqlite3.Row, int]:
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings, s.source_start, s.source_end,
+                          m.kind AS live_kind, m.id AS media_id, m.duration_s
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("studio item not found")
+        if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+            raise ValueError("audio split only applies to video")
+        available = row["media_id"] is not None
+        live_kind = str(row["live_kind"]) if available and row["live_kind"] else None
+        kind = effective_kind(
+            available=available,
+            live_kind=live_kind,
+            kind_snapshot=str(row["kind_snapshot"] or "photo"),
+        )
+        if kind != "video":
+            raise ValueError("audio split only applies to video")
+        return row, int(row["project_id"])
+
+    def _store_detached(
+        self, studio_item_id: int, project_id: int, blob: str
+    ) -> StudioClip:
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {item.id: item for item in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
+    def split_studio_audio(self, studio_item_id: int) -> StudioClip:
+        """Mute the embedded track by recording a detached range. The file stays.
+
+        The range starts as this clip's current source in/out. Picture columns
+        are not changed.
+        """
+        from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
+
+        row, project_id = self._video_clip_row(studio_item_id)
+        start = float(row["source_start"] or 0.0)
+        if row["source_end"] is not None:
+            end = float(row["source_end"])
+        elif row["duration_s"] is not None:
+            end = float(row["duration_s"])
+        else:
+            end = start
+        if end - start < 0.05:
+            raise ValueError("audio range is too short")
+        audio = DetachedAudio(active=True, source_in_s=round(start, 4), source_out_s=round(end, 4))
+        blob = dump_detached_audio(str(row["effect_settings"] or ""), audio)
+        return self._store_detached(studio_item_id, project_id, blob)
+
+    def trim_studio_audio(
+        self, studio_item_id: int, payload: dict[str, object]
+    ) -> StudioClip:
+        """Change only the detached audio in/out. The picture range stays."""
+        from orga_drone.studio_audio import (
+            DetachedAudio,
+            detached_audio_from_effect_settings,
+            dump_detached_audio,
+            parse_detached_trim,
+        )
+
+        row, project_id = self._video_clip_row(studio_item_id)
+        current = detached_audio_from_effect_settings(str(row["effect_settings"] or ""))
+        if not current.active:
+            raise ValueError("this clip has no split audio")
+        start, end = parse_detached_trim(payload)
+        audio = DetachedAudio(active=True, source_in_s=start, source_out_s=end)
+        blob = dump_detached_audio(str(row["effect_settings"] or ""), audio)
+        return self._store_detached(studio_item_id, project_id, blob)
+
+    def clear_studio_audio(self, studio_item_id: int) -> StudioClip:
+        """Remove the audio bar. The video row stays and its embedded track returns."""
+        from orga_drone.studio_audio import dump_detached_audio
+
+        row, project_id = self._video_clip_row(studio_item_id)
+        blob = dump_detached_audio(str(row["effect_settings"] or ""), None)
+        return self._store_detached(studio_item_id, project_id, blob)
+
+    def update_effect_lane(self, studio_item_id: int, payload: dict[str, object]) -> StudioClip:
+        """Move, trim, or remove one Effekt-lane bar. The media file stays."""
+        from dataclasses import replace
+
+        from orga_drone.studio_effect_lane import (
+            clear_slow,
+            clear_zoom,
+            write_slow_bar,
+            write_zoom_bar,
+        )
+        from orga_drone.studio_mask import dump_masks, masks_from_effect_settings
+
+        row, project_id = self._video_clip_row(studio_item_id)
+        settings = str(row["effect_settings"] or "")
+        origin = float(row["source_start"] or 0.0)
+        if row["source_end"] is not None:
+            limit = float(row["source_end"])
+        elif row["duration_s"] is not None:
+            limit = float(row["duration_s"])
+        else:
+            limit = origin
+        duration = max(0.05, limit - origin)
+
+        def span() -> tuple[float, float]:
+            raw_start = payload.get("start_s", 0)
+            raw_end = payload.get("end_s", duration)
+            if isinstance(raw_start, bool) or not isinstance(raw_start, (int, float, str)):
+                raise ValueError("effect range must be numbers")
+            if isinstance(raw_end, bool) or not isinstance(raw_end, (int, float, str)):
+                raise ValueError("effect range must be numbers")
+            try:
+                start = float(raw_start)
+                end = float(raw_end)
+            except ValueError as exc:
+                raise ValueError("effect range must be numbers") from exc
+            if end < start:
+                start, end = end, start
+            start = min(duration, max(0.0, start))
+            end = min(duration, max(0.0, end))
+            if end - start < 0.05:
+                raise ValueError("effect range is too short")
+            return round(start, 4), round(end, 4)
+
+        kind = str(payload.get("kind") or "")
+        op = str(payload.get("op") or "update")
+        speed_value: float | None = None
+        if kind == "zoom" and op == "delete":
+            blob = clear_zoom(settings)
+        elif kind == "zoom":
+            start_s, end_s = span()
+            blob = write_zoom_bar(settings, start_s, end_s)
+        elif kind == "slow" and op == "delete":
+            blob = clear_slow(settings)
+            speed_value = 1.0
+        elif kind == "slow":
+            start_s, end_s = span()
+            raw_speed = payload.get("speed", 0.5)
+            if isinstance(raw_speed, bool) or not isinstance(raw_speed, (int, float, str)):
+                raise ValueError("speed must be 0.5 or 0.25")
+            blob = write_slow_bar(settings, start_s, end_s, float(raw_speed))
+            speed_value = 1.0
+        elif kind == "mask" and op == "delete":
+            mask_id = str(payload.get("id") or "")
+            kept = [mask for mask in masks_from_effect_settings(settings) if mask.id != mask_id]
+            blob = dump_masks(settings, kept)
+        elif kind == "mask":
+            start_s, end_s = span()
+            mask_id = str(payload.get("id") or "")
+            found = False
+            updated = []
+            for mask in masks_from_effect_settings(settings):
+                if mask.id == mask_id:
+                    updated.append(replace(mask, start_s=start_s, end_s=end_s))
+                    found = True
+                else:
+                    updated.append(mask)
+            if not found:
+                raise ValueError("mask not found")
+            blob = dump_masks(settings, updated)
+        else:
+            raise ValueError("unknown effect")
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            if speed_value is None:
+                conn.execute(
+                    "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                    (blob, studio_item_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE studio_clips SET effect_settings = ?, playback_speed = ? WHERE id = ?",
+                    (blob, speed_value, studio_item_id),
+                )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {item.id: item for item in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
     def set_studio_overlays(
@@ -5014,6 +5230,7 @@ class Database:
         sql = f"""
             SELECT m.id, m.root_id, m.kind, m.filename, m.recorded_at, m.duration_s,
                    m.size_bytes, m.drone_model, m.latitude, m.longitude,
+                   m.source_type, m.place_json,
                    COALESCE(mm.stars, 0) AS stars,
                    COALESCE(mm.favorite, 0) AS favorite
             FROM media m
@@ -5040,9 +5257,26 @@ class Database:
                     "lon": r["longitude"],
                     "stars": int(r["stars"] or 0),
                     "favorite": bool(r["favorite"]),
+                    "source_type": r["source_type"],
+                    "place_label": _place_label(r["place_json"]),
                 }
             )
         return out
+
+    def source_bucket_counts(self) -> dict[str, int]:
+        """Non-empty library buckets: drone, camera, and everything else."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT CASE
+                            WHEN source_type = 'drone' THEN 'drone'
+                            WHEN source_type = 'camera' THEN 'camera'
+                            ELSE 'other'
+                          END AS bucket,
+                          COUNT(*) AS c
+                   FROM media
+                   GROUP BY bucket"""
+            ).fetchall()
+        return {str(row["bucket"]): int(row["c"]) for row in rows if int(row["c"]) > 0}
 
     def stats(self) -> dict[str, int]:
         with self.connect() as conn:

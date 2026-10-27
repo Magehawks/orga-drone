@@ -539,6 +539,17 @@ def test_run_ffmpeg_progress_does_not_pipe_stderr(
         duration_s=2.0,
     )
     assert times and times[0] == 0.5
+    # progress=end completes the real 2s step, so a one-clip concat is not left at 50%.
+    assert times[-1] == 2.0
+    assert (
+        se.export_progress_percent(
+            clip_index=1,
+            clip_total=1,
+            phase="concat",
+            clip_fraction=times[-1] / 2.0,
+        )
+        >= 99
+    )
     assert captured["kwargs"]["stdout"] is se.subprocess.PIPE
     # stderr must be a file object, never PIPE
     assert captured["kwargs"]["stderr"] is not se.subprocess.PIPE

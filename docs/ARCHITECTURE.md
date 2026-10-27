@@ -139,8 +139,9 @@ project title, reorder/duration/cut APIs; `GET /studio` restores the last-opened
 project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4
 export via async job
 `POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
-determinate progress in the export dialog (elapsed time, ETA, current clip
-label; within-clip ffmpeg progress). An export never replaces an existing file.
+determinate progress in the export dialog (one elapsed-time readout, current
+clip label; within-clip ffmpeg progress, then the final concat re-encode, so
+the bar reaches about 100% when that encode ends). An export never replaces an existing file.
 If the requested name is taken, or it is a library source, soundtrack, or project
 asset, the file is written to the next free numbered name (`video.mp4`, then
 `video_1.mp4`, then `video_2.mp4`). That name is claimed exclusively. If it is

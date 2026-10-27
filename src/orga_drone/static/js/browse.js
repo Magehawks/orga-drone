@@ -94,4 +94,17 @@
     });
     syncBulk();
   }
+
+  const FILTER_KEY = "orga-drone:browse-filters";
+  const FILTER_NAMES = ["drone", "kind", "source", "gps", "sessions", "flows", "favorite", "q", "date_from", "date_to", "ask", "tl"];
+  try {
+    if (window.location.pathname === "/browse" || window.location.pathname.startsWith("/media")) {
+      const params = new URLSearchParams(window.location.search);
+      const active = FILTER_NAMES.some((name) => params.get(name));
+      if (active) sessionStorage.setItem(FILTER_KEY, window.location.pathname + window.location.search);
+      else if (window.location.pathname === "/browse") sessionStorage.removeItem(FILTER_KEY);
+    }
+  } catch (_) {
+    /* ignore quota / private mode */
+  }
 })();

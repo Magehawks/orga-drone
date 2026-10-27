@@ -23,6 +23,15 @@
         <input type="checkbox" id="show-noloc" checked>
         {{ _('Show without location') }}
       </label>
+      <label class="worldmap-toggle">
+        <input type="checkbox" id="hide-places">
+        {{ _('Hide place names') }}
+      </label>
+      <div class="seg-control" role="group" aria-label="{{ _('Source') }}">
+        <button type="button" class="seg-item" data-map-origin="drone">{{ _('Drone') }}</button>
+        <button type="button" class="seg-item" data-map-origin="camera">{{ _('Camera') }}</button>
+        <button type="button" class="seg-item active" data-map-origin="both">{{ _('Map both') }}</button>
+      </div>
       <span class="worldmap-count" id="map-count" aria-live="polite"></span>
     </div>
   </div>

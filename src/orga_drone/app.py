@@ -45,6 +45,7 @@ from orga_drone.studio_forward_loop import (
     resolve_forward_loop,
     soundtrack_once_s,
 )
+from orga_drone.studio_effect_lane import stored_lane
 from orga_drone.studio_estimate import (
     DEFAULT_PHOTO_DURATION_S,
     effective_seconds,
@@ -853,6 +854,7 @@ def create_app() -> FastAPI:
             items=items,
             studio_paths=studio_paths,
             drones=db.distinct_drones(),
+            source_buckets=db.source_bucket_counts(),
             view=current_view,
             nav_active="browse",
             browse_detail_qs=browse_detail_qs_from_request(request),
@@ -1354,6 +1356,8 @@ def create_app() -> FastAPI:
                         if it.kind in {"photo", "video"}
                         else [],
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
+                        "zoom_bar": stored_lane(it.effect_settings)["zoom_bar"],
+                        "slow_bar": stored_lane(it.effect_settings)["slow_bar"],
                         "map": map_from_effect_settings(it.effect_settings).as_dict(),
                         "gps": (
                             route_preview(
@@ -1886,6 +1890,55 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "saturation_ramp": ramp.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/effect-lane")
+    async def api_studio_effect_lane(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include an effect bar")
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.update_effect_lane(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        from orga_drone.studio_effect_lane import stored_lane
+
+        stored = stored_lane(item.effect_settings)
+        seconds = effective_seconds(
+            kind=item.kind or "video",
+            photo_duration_s=item.photo_duration_s,
+            duration_s=item.duration_s,
+            available=item.available,
+            source_in_s=item.source_start,
+            source_out_s=item.source_end,
+            playback_speed=item.playback_speed,
+            effect_settings=item.effect_settings,
+        )
+        zoom = stored.get("zoom_bar")
+        slow = stored.get("slow_bar")
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "playback_speed": item.playback_speed,
+                "effective_duration_s": seconds,
+                "frame": frame_from_effect_settings(item.effect_settings).as_dict(),
+                "masks": [
+                    mask.as_dict() for mask in masks_from_effect_settings(item.effect_settings)
+                ],
+                "zoom_bar": zoom if isinstance(zoom, dict) else None,
+                "slow_bar": slow if isinstance(slow, dict) else None,
             }
         )
 
@@ -3405,6 +3458,7 @@ def create_app() -> FastAPI:
             request,
             "library.html",
             roots=db.list_roots(),
+            source_buckets=db.source_bucket_counts(),
             scan_result=None,
             scan_error=scan_error,
             scan_job_id=scan_job,

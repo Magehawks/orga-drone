@@ -94,11 +94,21 @@
     return `${lat.toFixed(decimals)}, ${lon.toFixed(decimals)}`;
   }
 
+  let mapOrigin = "both";
+
+  function passesOrigin(item) {
+    if (mapOrigin === "drone") return item.source_type === "drone";
+    if (mapOrigin === "camera") return item.source_type === "camera";
+    return true;
+  }
+
   function groupItems(items, zoom) {
-    const byDay = zoom >= 10;
+    const hidePlaces = Boolean(document.getElementById("hide-places") && document.getElementById("hide-places").checked);
+    const byDay = hidePlaces || zoom >= 10;
     const groups = new Map();
     for (const item of items) {
-      const key = byDay ? dayKey(item.recorded_at) : placeKey(item, zoom);
+      const named = !byDay && item.place_label ? item.place_label : "";
+      const key = byDay ? dayKey(item.recorded_at) : (named || placeKey(item, zoom));
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(item);
     }
@@ -120,21 +130,23 @@
   function renderList() {
     const bounds = map.getBounds();
     const zoom = map.getZoom();
-    const visible = allPoints.filter((p) => inBounds(p, bounds));
+    const visible = allPoints.filter((p) => passesOrigin(p) && inBounds(p, bounds));
     const showNoloc = !nolocToggle || nolocToggle.checked;
 
     if (countEl) {
       countEl.textContent = `${visible.length} / ${allPoints.length} GPS`;
     }
     if (summaryEl) {
+      const hidePlacesOn = Boolean(document.getElementById("hide-places") && document.getElementById("hide-places").checked);
       const modeLabel =
-        zoom >= 10 ? t("i18nGroupDay", "By day") : t("i18nGroupPlace", "By place");
+        hidePlacesOn || zoom >= 10 ? t("i18nGroupDay", "By day") : t("i18nGroupPlace", "By place");
       summaryEl.textContent = `${t("i18nVisible", "Visible in map")}: ${visible.length} · ${modeLabel}`;
     }
 
     const frag = document.createDocumentFragment();
 
-    if (!visible.length && !(showNoloc && withoutLoc.length)) {
+    const nolocItems = withoutLoc.filter((item) => passesOrigin(item));
+    if (!visible.length && !(showNoloc && nolocItems.length)) {
       const empty = document.createElement("p");
       empty.className = "hint";
       empty.textContent = t("i18nEmpty", "No GPS media in this area");
@@ -157,15 +169,15 @@
       }
     }
 
-    if (showNoloc && withoutLoc.length) {
+    if (showNoloc && nolocItems.length) {
       const section = document.createElement("section");
       section.className = "wm-group wm-group-noloc";
       const h = document.createElement("h2");
-      h.textContent = `${t("i18nNoloc", "Without location")} (${withoutLoc.length})`;
+      h.textContent = `${t("i18nNoloc", "Without location")} (${nolocItems.length})`;
       section.appendChild(h);
       const ul = document.createElement("ul");
       ul.className = "wm-items";
-      for (const item of withoutLoc) {
+      for (const item of nolocItems) {
         ul.appendChild(listItem(item, false));
       }
       section.appendChild(ul);
@@ -277,6 +289,7 @@
 
     const bounds = [];
     for (const item of allPoints) {
+      if (!passesOrigin(item)) continue;
       if (item.lat == null || item.lon == null) continue;
       const m = L.marker([item.lat, item.lon], { icon: markerIcon(), title: item.filename });
       const offlineLabel = item.source_offline
@@ -330,6 +343,18 @@
   if (nolocToggle) {
     nolocToggle.addEventListener("change", renderList);
   }
+  const hidePlaces = document.getElementById("hide-places");
+  if (hidePlaces) hidePlaces.addEventListener("change", renderList);
+  document.querySelectorAll("[data-map-origin]").forEach((button) => {
+    button.addEventListener("click", () => {
+      mapOrigin = button.dataset.mapOrigin || "both";
+      document.querySelectorAll("[data-map-origin]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      buildMarkers({ skipFit: true });
+      renderList();
+    });
+  });
 
   async function load() {
     const returnView = parseReturnView();

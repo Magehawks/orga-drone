@@ -353,7 +353,8 @@ def test_http_saturation_ramp_validation_and_inspector(
     assert 'id="inspector-bw-start"' in page.text
     assert 'id="inspector-bw-end"' in page.text
     assert 'id="inspector-image-saturation"' in page.text
-    assert ("Farbe zu Schwarzweiß" in page.text) or ("Color to black and white" in page.text)
+    assert ("Zu Schwarzweiß" in page.text) or ("To black and white" in page.text)
+    assert 'id="inspector-bw-strength"' in page.text
     assert "data-saturation-ramp=" in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "bwWrap.hidden = !isVideo" in script

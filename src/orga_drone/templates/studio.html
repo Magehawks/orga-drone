@@ -545,7 +545,8 @@
           <div class="studio-timeline-gutter" aria-hidden="true">
             <div class="studio-ruler-gutter"></div>
             <div class="studio-gutter-tracks">
-              <div class="studio-track-label">{{ _('Story') }}</div>
+              <div class="studio-track-label studio-track-label-story">{{ _('Story') }}</div>
+              <div class="studio-track-label studio-track-label-effect" id="studio-effect-label">{{ _('Effect') }}</div>
               <div class="studio-track-label">{{ _('Soundtrack') }}</div>
             </div>
           </div>
@@ -632,6 +633,8 @@
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-frame='{{ row.frame|tojson }}'
+                  data-zoom-bar='{{ row.zoom_bar|tojson }}'
+                  data-slow-bar='{{ row.slow_bar|tojson }}'
                   data-map='{{ row.map|tojson }}'
                   data-gps='{{ row.gps|tojson|replace("'", "\\u0027") }}'
                   data-hud='{{ row.hud|tojson|replace("'", "\\u0027") }}'
@@ -675,12 +678,18 @@
               {% endif %}
                   </ol>
                 </div>
+                <div class="studio-track studio-track-effect" id="studio-effect-lane" hidden
+                     data-label-zoom="{{ _('Zoom') }}"
+                     data-label-blur="{{ _('Lane blur') }}"
+                     data-label-pixelate="{{ _('Pixelate') }}"
+                     data-label-slow="{{ _('Slow motion') }}"></div>
                 <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
                   <div class="studio-music-body" id="studio-music-body">
                     <div class="studio-music-empty" id="studio-music-empty">
                       <span class="visually-hidden">{{ _('No music yet') }}</span>
                     </div>
                     <div class="studio-music-clips" id="studio-music-clips"></div>
+                    <div class="studio-clip-audio" id="studio-clip-audio"></div>
                   </div>
                 </div>
               </div>
@@ -717,7 +726,7 @@
                   aria-selected="false">{{ _('Effects') }}</button>
           <button type="button" class="studio-inspector-tab" role="tab"
                   id="inspector-tab-overlays" data-inspector-tab-button="overlays"
-                  aria-selected="false">{{ _('Overlays') }}</button>
+                  aria-selected="false">{{ _('Overlay') }}</button>
         </div>
         <p class="studio-inspector-kind" data-inspector-tab="clip"><span data-field="kind"></span></p>
         <p data-inspector-tab="clip"><strong data-field="filename"></strong></p>
@@ -841,38 +850,39 @@
           <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
         </div>
         <div id="inspector-saturation-ramp" data-inspector-tab="image" hidden>
-          <p class="studio-inspector-kind">{{ _('Color to black and white') }}</p>
           <label class="studio-inspector-field studio-frame-motion">
             <input type="checkbox" id="inspector-bw-enabled">
-            <span>{{ _('Animate saturation') }}</span>
+            <span>{{ _('To black and white') }}</span>
           </label>
-          <label class="studio-inspector-field">
-            <span>{{ _('Start (s)') }}</span>
-            <input type="number" id="inspector-bw-start" min="-86400" max="86400" step="0.1" value="0"
-                   aria-label="{{ _('Start (s)') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span>{{ _('End (s)') }}</span>
-            <input type="number" id="inspector-bw-end" min="-86400" max="86400" step="0.1" value="0"
-                   aria-label="{{ _('End (s)') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Start saturation') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-bw-start-sat-value">100</span>
-            </span>
-            <input type="range" id="inspector-bw-start-sat" min="0" max="100" step="1" value="100"
-                   aria-label="{{ _('Start saturation') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('End saturation') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-bw-end-sat-value">0</span>
-            </span>
-            <input type="range" id="inspector-bw-end-sat" min="0" max="100" step="1" value="0"
-                   aria-label="{{ _('End saturation') }}">
-          </label>
-          <p class="hint">{{ _('Holds the start saturation until the start time, then moves linearly to the end saturation. 100% keeps the current grade. 0% is black and white. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+          <p class="hint" id="inspector-bw-off">{{ _('Off. The clip stays in color.') }}</p>
+          <div id="inspector-bw-on" hidden>
+            <label class="studio-inspector-field">
+              <span>{{ _('Strength') }}</span>
+              <span class="studio-bw-scale">
+                <span>{{ _('Full color') }}</span>
+                <input type="range" id="inspector-bw-strength" min="0" max="100" step="1" value="100"
+                       aria-label="{{ _('Strength') }}">
+                <span>{{ _('Black and white') }}</span>
+              </span>
+            </label>
+            <label class="studio-inspector-field studio-frame-motion">
+              <input type="checkbox" id="inspector-bw-partial">
+              <span>{{ _('Only part of the clip') }}</span>
+            </label>
+            <div id="inspector-bw-partial-fields" hidden>
+              <label class="studio-inspector-field">
+                <span>{{ _('Color stays until (s)') }}</span>
+                <input type="number" id="inspector-bw-start" min="0" max="86400" step="0.1" value="0"
+                       aria-label="{{ _('Color stays until (s)') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Black and white from (s)') }}</span>
+                <input type="number" id="inspector-bw-end" min="0" max="86400" step="0.1" value="0"
+                       aria-label="{{ _('Black and white from (s)') }}">
+              </label>
+              <p class="hint">{{ _('The picture changes between these times. After that it stays.') }}</p>
+            </div>
+          </div>
         </div>
         <div id="inspector-overlays" data-inspector-tab="overlays" hidden>
           <p class="studio-inspector-kind">{{ _('Overlays') }}</p>
@@ -1044,8 +1054,16 @@
               <span>{{ _('Height') }}</span>
               <input type="number" id="map-h" min="12" max="72" step="1">
             </label>
+            <label class="studio-inspector-field">
+              <span class="studio-image-adjust-label">
+                <span>{{ _('Opacity') }}</span>
+                <span class="studio-image-adjust-value" id="map-opacity-value">100</span>
+              </span>
+              <input type="range" id="map-opacity" min="0" max="100" step="1" value="100"
+                     aria-label="{{ _('Opacity') }}">
+            </label>
           </div>
-          <p class="hint">{{ _('Drag the map inside the picture and resize it from the corner. The route uses GPS already stored for this clip. No online map is downloaded.') }}</p>
+          <p class="hint">{{ _('Drag the map inside the picture and resize it from the corner. The map stays square. The route uses GPS already stored for this clip. No online map is downloaded.') }}</p>
         </div>
         <div id="inspector-hud" data-inspector-tab="effects" hidden>
           <p class="studio-inspector-kind">{{ _('Telemetry HUD') }}</p>

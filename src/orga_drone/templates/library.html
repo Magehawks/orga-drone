@@ -15,6 +15,13 @@
   data-i18n-current="{{ _('Current: {path}') }}"
 >
   <h1>{{ _('Manage libraries') }}</h1>
+  {% if source_buckets|length > 1 %}
+  <p class="library-source-links">
+    {% if source_buckets.drone %}<a href="/browse?source=drone">{{ _('Drone') }}</a>{% endif %}
+    {% if source_buckets.camera %}<a href="/browse?source=camera">{{ _('Camera') }}</a>{% endif %}
+    {% if source_buckets.other %}<a href="/browse?source=other">{{ _('Other') }}</a>{% endif %}
+  </p>
+  {% endif %}
   <p>{{ _('Local only — your videos never leave this computer.') }}</p>
 
   {% if scan_error == 'busy' %}

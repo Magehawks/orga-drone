@@ -292,6 +292,36 @@ def ffmpeg_frame_prefix(
     )
 
 
+def ffmpeg_zoom_window(
+    frame: FrameTransform,
+    start_s: float,
+    end_s: float,
+    *,
+    source_width: int,
+    source_height: int,
+) -> str:
+    """Zoom only between two clip-local seconds. Outside that window zoom is 1.
+
+    ``-ss`` is an input option, so ``time`` starts at the clip in-point.
+    """
+    source_w = int(source_width)
+    source_h = int(source_height)
+    if frame.is_neutral or source_w <= 0 or source_h <= 0:
+        return ""
+    if end_s <= start_s:
+        return ""
+    zoom = f"{max(frame.zoom_start, frame.zoom_end):.4f}"
+    gated = f"if(between(time\\,{start_s:.3f}\\,{end_s:.3f})\\,{zoom}\\,1)"
+    focal_x = f"{frame.x_start:.4f}"
+    focal_y = f"{frame.y_start:.4f}"
+    x_expr = f"max(0\\,min(iw-iw/zoom\\,({focal_x})*iw-iw/(zoom*2)))"
+    y_expr = f"max(0\\,min(ih-ih/zoom\\,({focal_y})*ih-ih/(zoom*2)))"
+    return (
+        f"zoompan=z='{gated}':x='{x_expr}':y='{y_expr}':"
+        f"d=1:s={source_w}x{source_h}:fps=30"
+    )
+
+
 def ffmpeg_frame_suffix(
     frame: FrameTransform,
     *,

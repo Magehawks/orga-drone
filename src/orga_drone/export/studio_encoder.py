@@ -34,7 +34,13 @@ from orga_drone.export.studio_quality import (
 )
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
-from orga_drone.studio_frame import ffmpeg_frame_prefix, ffmpeg_frame_suffix
+from orga_drone.studio_frame import (
+    FrameTransform,
+    ffmpeg_frame_prefix,
+    ffmpeg_frame_suffix,
+    ffmpeg_zoom_window,
+)
+from orga_drone.studio_audio import export_audio_args
 from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
 from orga_drone.studio_speed import (
     coerce_playback_speed,
@@ -113,6 +119,86 @@ def _slow_timing(clip: StudioExportClip) -> tuple[str, str, float, float] | None
     )
 
 
+def _slow_pieces(clip: StudioExportClip) -> list[StudioExportClip]:
+    """Split a partial slow bar into 1× and slowed source ranges.
+
+    A whole-clip slow section stays on the existing playback speed. Repeats
+    and the soundtrack loop keep that path too.
+    """
+    span = clip.slow_span
+    if (
+        span is None
+        or clip.kind != "video"
+        or clip.section_repeats > 1
+        or clip.forward_loop
+    ):
+        return [clip]
+    start, end, speed = span
+    origin = float(clip.source_start_s)
+    if clip.source_end_s is None:
+        return [clip]
+    total = float(clip.source_end_s) - origin
+    if total < 0.05:
+        return [clip]
+    bounds: list[tuple[float, float, float]] = []
+    if start > 0.05:
+        bounds.append((0.0, start, 1.0))
+    bounds.append((max(0.0, start), min(end, total), speed))
+    if end < total - 0.05:
+        bounds.append((end, total, 1.0))
+    pieces: list[StudioExportClip] = []
+    for begin, finish, piece_speed in bounds:
+        if finish - begin < 0.05:
+            continue
+        masks = []
+        for mask in clip.masks:
+            if mask.start_s is None or mask.end_s is None:
+                masks.append(mask)
+                continue
+            overlap_start = max(begin, mask.start_s)
+            overlap_end = min(finish, mask.end_s)
+            if overlap_end - overlap_start < 0.05:
+                continue
+            if overlap_start <= begin + 0.05 and overlap_end >= finish - 0.05:
+                masks.append(replace(mask, start_s=None, end_s=None))
+            else:
+                masks.append(
+                    replace(
+                        mask,
+                        start_s=overlap_start - begin,
+                        end_s=overlap_end - begin,
+                    )
+                )
+        frame = clip.frame
+        zoom_span = None
+        if clip.zoom_span is not None:
+            zoom_start, zoom_end = clip.zoom_span
+            overlap_start = max(begin, zoom_start)
+            overlap_end = min(finish, zoom_end)
+            if overlap_end - overlap_start < 0.05:
+                frame = FrameTransform()
+            elif overlap_start <= begin + 0.05 and overlap_end >= finish - 0.05:
+                zoom_span = None
+            else:
+                zoom_span = (overlap_start - begin, overlap_end - begin)
+        pieces.append(
+            replace(
+                clip,
+                source_start_s=origin + begin,
+                source_end_s=origin + finish,
+                duration_s=(finish - begin) / piece_speed,
+                playback_speed=piece_speed,
+                section_repeats=1,
+                forward_loop=False,
+                slow_span=None,
+                zoom_span=zoom_span,
+                frame=frame,
+                masks=tuple(masks),
+            )
+        )
+    return pieces or [clip]
+
+
 def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
@@ -136,7 +222,20 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     frame_duration = clip.duration_s
     if slow is not None:
         trim, stretch, frame_origin, frame_duration = slow
-    if clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
+    if (
+        clip.kind in {"photo", "video"}
+        and clip.zoom_span is not None
+        and not clip.frame.is_neutral
+    ):
+        source_w, source_h = _source_frame_size(clip)
+        prefix = ffmpeg_zoom_window(
+            clip.frame,
+            clip.zoom_span[0],
+            clip.zoom_span[1],
+            source_width=source_w,
+            source_height=source_h,
+        )
+    elif clip.kind in {"photo", "video"} and not clip.frame.is_neutral:
         source_w, source_h = _source_frame_size(clip)
         prefix = ffmpeg_frame_prefix(
             clip.frame,
@@ -1203,18 +1302,25 @@ def export_progress_percent(
     phase: str,
     clip_fraction: float = 0.0,
 ) -> int:
-    """Determinate percent: clips share steps with one extra concat step.
+    """Map clip encodes and the final concat re-encode onto one bar.
 
-    ``clip_fraction`` is 0..1 progress within the current rendering clip.
+    Each clip is one step. Concat re-encodes the whole story and is one more
+    step of the same weight, so a single clip is half the bar until that
+    second pass reports time. ``clip_fraction`` is 0..1 inside the current
+    step: ffmpeg output time divided by that step's real duration, not twice
+    that duration. ``done`` is 100 when the file is published. Earlier phases
+    stay under 100.
     """
     total_steps = max(1, int(clip_total) + 1)
     if phase == "done":
         return 100
-    if phase == "concat" or phase == "mixing":
-        concat_pct = max(0, min(99, int(round(100 * clip_total / total_steps))))
-        if phase == "mixing":
-            return min(99, concat_pct + 1)
-        return concat_pct
+    if phase == "concat":
+        frac = max(0.0, min(1.0, float(clip_fraction)))
+        value = 100.0 * (float(max(0, int(clip_total))) + frac) / total_steps
+        return max(0, min(99, int(round(value))))
+    if phase == "mixing":
+        # Concat has already filled its step. Mixing copies the picture.
+        return 99
     if phase == "rendering":
         idx = max(1, min(int(clip_index), max(1, int(clip_total))))
         frac = max(0.0, min(1.0, float(clip_fraction)))
@@ -1369,7 +1475,14 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
                 current_label=None,
             )
-            self._concat_or_stitch(ffmpeg, segments, tmp_out, config)
+            self._concat_or_stitch(
+                ffmpeg,
+                segments,
+                tmp_out,
+                config,
+                on_progress=on_progress,
+                clip_total=clip_total,
+            )
             _raise_if_cancelled()
             if config.music_tracks:
                 _emit(
@@ -1450,16 +1563,41 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
             )
         else:
-            self._render_video(
+            pieces = _slow_pieces(clip)
+            if len(pieces) == 1:
+                self._render_video(
+                    ffmpeg,
+                    pieces[0],
+                    out,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                return
+            paths: list[Path] = []
+            for index, piece in enumerate(pieces):
+                piece_out = out.with_name(f"{out.stem}-fx{index}.mp4")
+                self._render_video(
+                    ffmpeg,
+                    piece,
+                    piece_out,
+                    width,
+                    height,
+                    on_progress=on_progress,
+                    clip_index=clip_index,
+                    clip_total=clip_total,
+                )
+                paths.append(piece_out)
+            self._concat(
                 ffmpeg,
-                clip,
+                paths,
                 out,
-                width,
-                height,
-                on_progress=on_progress,
-                clip_index=clip_index,
-                clip_total=clip_total,
+                duration_s=sum(piece.duration_s for piece in pieces),
             )
+            for path in paths:
+                path.unlink(missing_ok=True)
 
     def _render_title_card(
         self,
@@ -1523,16 +1661,18 @@ class FfmpegStudioEncoder:
         clip_index: int,
         clip_total: int,
         duration_s: float,
+        phase: str = "rendering",
     ) -> Callable[[float], None] | None:
         if on_progress is None:
             return None
-        label = _clip_progress_label(clip)
+        label = _clip_progress_label(clip) if phase == "rendering" else None
 
         def _on_time(media_s: float) -> None:
+            # Denominator is this step's real duration (clip or concat output).
             frac = 0.0 if duration_s <= 0 else max(0.0, min(1.0, media_s / duration_s))
             _emit(
                 on_progress,
-                phase="rendering",
+                phase=phase,
                 clip_index=clip_index,
                 clip_total=clip_total,
                 clip_fraction=frac,
@@ -1777,6 +1917,12 @@ class FfmpegStudioEncoder:
             "2",
             "-ar",
             "48000",
+            *export_audio_args(
+                video_start_s=start,
+                video_duration_s=dur,
+                detached=clip.detached_audio,
+                slow=False,
+            ),
         ]
         if uses_graph:
             cmd.extend(["-map", "0:a:0"])
@@ -1820,7 +1966,15 @@ class FfmpegStudioEncoder:
             cmd_silent.append(str(out))
             _run_ffmpeg(cmd_silent, on_time=on_time, duration_s=dur)
 
-    def _concat(self, ffmpeg: str, segments: list[Path], out: Path) -> None:
+    def _concat(
+        self,
+        ffmpeg: str,
+        segments: list[Path],
+        out: Path,
+        *,
+        on_time: Callable[[float], None] | None = None,
+        duration_s: float | None = None,
+    ) -> None:
         """Join segments into one MP4.
 
         Always re-encodes (does not ``-c copy``): photo JPEG full-range and DJI
@@ -1864,7 +2018,7 @@ class FfmpegStudioEncoder:
             "+faststart",
             str(out),
         ]
-        _run_ffmpeg(cmd)
+        _run_ffmpeg(cmd, on_time=on_time, duration_s=duration_s)
 
     def _concat_or_stitch(
         self,
@@ -1872,11 +2026,39 @@ class FfmpegStudioEncoder:
         segments: list[Path],
         out: Path,
         config: StudioExportConfig,
+        *,
+        on_progress: ProgressCallback | None = None,
+        clip_total: int = 0,
     ) -> None:
+        story_s = _export_story_length_s(config.clips)
+        total = clip_total if clip_total > 0 else len(config.clips)
+        on_time: Callable[[float], None] | None = None
+        if story_s > 0 and config.clips and total > 0:
+            on_time = self._progress_cb(
+                on_progress,
+                clip=config.clips[-1],
+                clip_index=total,
+                clip_total=total,
+                duration_s=story_s,
+                phase="concat",
+            )
         if _has_crossfade(config.clips):
-            self._stitch(ffmpeg, segments, out, config)
+            self._stitch(
+                ffmpeg,
+                segments,
+                out,
+                config,
+                on_time=on_time,
+                duration_s=story_s if story_s > 0 else None,
+            )
             return
-        self._concat(ffmpeg, segments, out)
+        self._concat(
+            ffmpeg,
+            segments,
+            out,
+            on_time=on_time,
+            duration_s=story_s if story_s > 0 else None,
+        )
 
     def _stitch_parts(
         self,
@@ -1904,6 +2086,9 @@ class FfmpegStudioEncoder:
         segments: list[Path],
         out: Path,
         config: StudioExportConfig,
+        *,
+        on_time: Callable[[float], None] | None = None,
+        duration_s: float | None = None,
     ) -> None:
         """Join segments with concat and xfade. Source audio hard-cuts only."""
         clips = config.clips
@@ -1911,6 +2096,8 @@ class FfmpegStudioEncoder:
             raise StudioExportError("Export stitch mismatch.")
         if len(segments) == 1:
             shutil.copyfile(segments[0], out)
+            if on_time is not None and duration_s is not None and duration_s > 0:
+                on_time(duration_s)
             return
         filters = build_stitch_filters(clips)
         last = len(clips) - 2
@@ -1938,7 +2125,7 @@ class FfmpegStudioEncoder:
             ]
         )
         try:
-            _run_ffmpeg(cmd)
+            _run_ffmpeg(cmd, on_time=on_time, duration_s=duration_s)
         except StudioExportError as exc:
             # Only remap a missing xfade filter — not timebase / configure errors
             # whose messages also mention "xfade".
@@ -2219,7 +2406,15 @@ def _run_ffmpeg(
                         continue
                     media_s = parse_ffmpeg_out_time_seconds(line)
                     if media_s is None:
-                        if "=" in line and line.strip().startswith(
+                        stripped = line.strip()
+                        # progress=end means this encode finished. Snap to the
+                        # real step duration so the bar is not left on a short
+                        # last out_time (half the story, then a jump to done).
+                        if duration_s is not None and stripped.startswith("progress=end"):
+                            last_emit = duration_s
+                            on_time(duration_s)
+                            continue
+                        if "=" in line and stripped.startswith(
                             (
                                 "frame=",
                                 "fps=",

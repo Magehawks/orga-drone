@@ -48,9 +48,12 @@ class Mask:
     y: float
     w: float
     h: float
+    # Source seconds from the clip in-point. None covers the whole clip.
+    start_s: float | None = None
+    end_s: float | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        body: dict[str, object] = {
             "id": self.id,
             "effect": self.effect,
             "strength": self.strength,
@@ -59,6 +62,10 @@ class Mask:
             "w": self.w,
             "h": self.h,
         }
+        if self.start_s is not None and self.end_s is not None:
+            body["start_s"] = self.start_s
+            body["end_s"] = self.end_s
+        return body
 
 
 @dataclass(frozen=True)
@@ -72,6 +79,8 @@ class MaskWindow:
     h: int
     radius: int
     block: int
+    start_s: float | None = None
+    end_s: float | None = None
 
 
 def mask_preview_model() -> dict[str, object]:
@@ -108,6 +117,18 @@ def _fraction(value: object, key: str) -> float:
     return round(_finite(value, key), 4)
 
 
+def _optional_time(value: object) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = _finite(value, "time")
+    except ValueError:
+        return None
+    if number < 0 or number > 86_400:
+        return None
+    return round(number, 4)
+
+
 def _clamp_box(x: float, y: float, w: float, h: float) -> tuple[float, float, float, float]:
     width = min(1.0, max(MIN_BOX, w))
     height = min(1.0, max(MIN_BOX, h))
@@ -142,6 +163,13 @@ def _mask_from_mapping(raw: Mapping[str, object], used: set[str]) -> Mask:
         _fraction(raw.get("w", 0.28), "w"),
         _fraction(raw.get("h", 0.22), "h"),
     )
+    start_s = _optional_time(raw.get("start_s"))
+    end_s = _optional_time(raw.get("end_s"))
+    if start_s is None or end_s is None or abs(end_s - start_s) < 0.05:
+        start_s = None
+        end_s = None
+    elif end_s < start_s:
+        start_s, end_s = end_s, start_s
     return Mask(
         id=mask_id,
         effect=str(effect),
@@ -150,6 +178,8 @@ def _mask_from_mapping(raw: Mapping[str, object], used: set[str]) -> Mask:
         y=top,
         w=width,
         h=height,
+        start_s=start_s,
+        end_s=end_s,
     )
 
 
@@ -384,6 +414,8 @@ def mask_windows(
                 h=height,
                 radius=blur_radius_px(mask.strength, content_w, content_h, width, height),
                 block=pixel_block_px(mask.strength, content_w, content_h, width, height),
+                start_s=mask.start_s,
+                end_s=mask.end_s,
             )
         )
     return tuple(windows)
@@ -422,7 +454,18 @@ def ffmpeg_mask_graph(
         steps.append(
             f"[mc{index}]crop={window.w}:{window.h}:{window.x}:{window.y},{effect}[mm{index}]"
         )
-        steps.append(f"[mb{index}][mm{index}]overlay={window.x}:{window.y}[{nxt}]")
+        enable = ""
+        if (
+            window.start_s is not None
+            and window.end_s is not None
+            and window.end_s > window.start_s
+        ):
+            enable = (
+                f":enable='between(t\\,{window.start_s:.3f}\\,{window.end_s:.3f})'"
+            )
+        steps.append(
+            f"[mb{index}][mm{index}]overlay={window.x}:{window.y}{enable}[{nxt}]"
+        )
     if not include_tail:
         return ";".join(steps)
     tail_parts = [part for part in fades if part]

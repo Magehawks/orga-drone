@@ -23,6 +23,9 @@ from orga_drone.studio_map import (
     MapPlacement,
     axis_expr,
     box_pixels,
+    default_map_box,
+    dump_map,
+    flight_map_overlay,
     gps_from_stored,
     map_from_effect_settings,
     marker_xy,
@@ -142,7 +145,8 @@ def test_missing_gps_is_empty_and_a_still_fix_is_centered() -> None:
 def test_placement_stays_inside_the_fitted_picture() -> None:
     parked = map_from_effect_settings(None)
     assert parked.enabled is False
-    assert parked.x == pytest.approx(0.68)
+    assert parked.x == pytest.approx(default_map_box(16, 9)[0])
+    assert parked.opacity == pytest.approx(1)
     pushed = parse_map_payload({"enabled": True, "x": 2, "y": -1, "w": 0.99, "h": 0.01})
     assert pushed.w == pytest.approx(0.72)
     assert pushed.h == pytest.approx(0.12)
@@ -167,6 +171,61 @@ def test_placement_stays_inside_the_fitted_picture() -> None:
     assert edge[0] >= 0 and edge[1] >= 0
     assert edge[0] + edge[2] <= 320
     assert edge[1] + edge[3] <= 180
+
+
+def test_default_map_box_is_square_and_opacity_is_one_overlay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The old 0.28×0.28 fractions stretch a square map on a 16:9 frame."""
+    monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
+    wide_x, wide_y, wide_w, wide_h = default_map_box(1920, 1080)
+    assert wide_w * 1920 == pytest.approx(wide_h * 1080, rel=0.02)
+    assert wide_w * wide_h < 0.28 * 0.28
+    assert wide_h == pytest.approx(0.22, abs=0.01)
+    assert wide_x + wide_w <= 1
+    assert wide_y + wide_h <= 1
+    assert wide_x > 0.5 and wide_y > 0.5
+    tall_x, _tall_y, tall_w, tall_h = default_map_box(1080, 1920)
+    assert tall_w * 1080 == pytest.approx(tall_h * 1920, rel=0.02)
+    assert tall_x + tall_w <= 1
+
+    missing = map_from_effect_settings(
+        '{"map":{"enabled":true,"h":0.28,"w":0.28,"x":0.68,"y":0.68}}'
+    )
+    assert missing.opacity == pytest.approx(1)
+    stored = dump_map(
+        '{"image":{"exposure":1}}',
+        MapPlacement(enabled=True, x=wide_x, y=wide_y, w=wide_w, h=wide_h, opacity=0),
+    )
+    restored = map_from_effect_settings(stored)
+    assert restored.opacity == pytest.approx(0)
+    assert json.loads(stored)["image"]["exposure"] == 1
+    with pytest.raises(ValueError, match="opacity"):
+        parse_map_payload(
+            {"enabled": True, "x": 0.2, "y": 0.2, "w": 0.2, "h": 0.2, "opacity": "half"}
+        )
+
+    _args, graph, label = flight_map_overlay(
+        placement=MapPlacement(
+            enabled=True, x=0.68, y=0.68, w=0.28, h=0.28, opacity=0.5
+        ),
+        track=_track(),
+        media_duration_s=4.0,
+        frame_width=1920,
+        frame_height=1080,
+        source_width=1920,
+        source_height=1080,
+        dest_dir=tmp_path,
+        first_input=1,
+        picture_label="pic",
+        fps=30,
+    )
+    with Image.open(tmp_path / "flight-map-route.png") as panel:
+        assert abs(panel.width - panel.height) <= 1
+        assert panel.width < int(0.28 * 1920)
+    assert graph.count("colorchannelmixer=aa=0.50") == 1
+    assert label == "mapout"
+    assert "mapjoined" in graph
 
 
 def _colors(image: Image.Image) -> set[tuple[int, ...]]:
@@ -455,6 +514,7 @@ def test_map_persists_with_other_settings_and_http(
     page = client.get("/studio")
     assert page.status_code == 200
     assert 'id="inspector-map"' in page.text
+    assert 'id="map-opacity"' in page.text
     assert 'id="studio-preview-map"' in page.text
     assert ("Flugkarte" in page.text) or ("Flight map" in page.text)
     assert ("Für diesen Clip ist kein GPS vorhanden." in page.text) or (
@@ -482,12 +542,13 @@ def test_map_persists_with_other_settings_and_http(
     assert rejected.status_code == 400
     saved = client.patch(
         f"/api/studio/{video_id}/map",
-        json={"enabled": True, "x": 0.2, "y": 0.3, "w": 0.3, "h": 0.24},
+        json={"enabled": True, "x": 0.2, "y": 0.3, "w": 0.3, "h": 0.24, "opacity": 0.5},
     )
     assert saved.status_code == 200
     body = saved.json()
     assert body["map"]["enabled"] is True
     assert body["map"]["x"] == pytest.approx(0.2)
+    assert body["map"]["opacity"] == pytest.approx(0.5)
     graded = db.set_studio_image_adjust(video_id, {"exposure": 12})
     assert map_from_effect_settings(graded.effect_settings).enabled is True
     assert image_adjust_from_effect_settings(graded.effect_settings).exposure == 12
