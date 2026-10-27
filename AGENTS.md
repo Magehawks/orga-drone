@@ -4,7 +4,7 @@
 
 Orga Drone is an **open-source, local-first drone media library** with flight
 metadata, telemetry, map exploration, and a **Studio** memory-editor UI
-(manual order + estimated runtime + simple video Cut + slow motion on a selected video section + a forward repeat of one video section until a known soundtrack ends (hard cuts, or an optional forward crossfade; the soundtrack plays once) + persisted project title;
+(manual order + estimated runtime + simple video Cut by number or by dragging a video clip's left and right edges on the Story timeline + slow motion on a selected video section + a forward repeat of one video section until a known soundtrack ends (hard cuts, or an optional forward crossfade; the soundtrack plays once) + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution and a Standard / High / Best quality choice (CRF 23 / 20 / 17; Best uses the slow x264 preset and takes longer; suggested filename includes that resolution; an existing file is never replaced, a taken name is saved as the next free numbered file, and that name is shown after export; Cancel export stops the running encode); after export, Open video / Show in folder on
 Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
@@ -80,7 +80,7 @@ The application helps users:
 - collect selected media in a **Studio** workspace (non-destructive
   `studio_projects` / `studio_clips`; multiple local edit projects with
   browser/switcher; editable persisted title; manual order and
-  estimated runtime; simple video Cut via source start/end; a trash button beside Cut, the Delete key from the Story track when no dialog is open, and a right-click menu remove the selected Story clip (the file stays; Undo puts it back); a right-click on the cut boundary or the following clip can remove that cut when the two clips are the same file, meet in forward order, and share compatible settings (otherwise the action stays disabled and explains why; one Undo step splits them again); a cut or trimmed video keeps an Original entry in the Story browser for that file (it stays after those clips are removed and after a restart; opening it marks a range on the existing preview, and dragging it onto the Story or Add scene inserts a new clip with empty effects; a right-click on a video clip can still add another scene immediately after that clip; the file is not copied; one Undo step removes the added clip); video section repeat
+  estimated runtime; simple video Cut via source start/end, including dragging the left edge (Source in) and right edge (Source out) of a video clip on the Story timeline, staying inside the file, with one drag as one Undo step; a trash button beside Cut, the Delete key from the Story track when no dialog is open, and a right-click menu remove the selected Story clip (the file stays; Undo puts it back); a right-click on the cut boundary or the following clip can remove that cut when the two clips are the same file, meet in forward order, and share compatible settings (otherwise the action stays disabled and explains why; one Undo step splits them again); a cut or trimmed video keeps an Original entry in the Story browser for that file (it stays after those clips are removed and after a restart; opening it marks a range on the existing preview, and dragging it onto the Story or Add scene inserts a new clip with empty effects; a right-click on a video clip can still add another scene immediately after that clip; the file is not copied; one Undo step removes the added clip); video section repeat
   (in/out range played 1×–8× at the same speed; story duration, preview, and MP4
   include each play); Creator Studio UI
   with preview/Story track/inspector; Story preview plays photos/videos in sync
@@ -156,7 +156,7 @@ The application helps users:
   remainder under 0.05s is omitted. Joins are hard cuts, or an optional forward
   crossfade of 0.5–2.0 s (short sections are clamped; both plays keep moving
   forward; not frame matching, optical flow, or interpolation). Not reverse or
-  ping-pong. Unknown soundtrack duration is not guessed. Studio undo is kept only for the running session. Not a professional effects editor, color grade, or NLE.
+  ping-pong. Unknown soundtrack duration is not guessed. Dragging a Story video's left or right edge changes that clip's source range and stays inside the file. It does not snap, and it does not change a neighbor's source range or effects. Photos, title cards, and videos with an unknown duration have no edge handles. Studio undo is kept only for the running session. Not a professional effects editor, color grade, or NLE.
 
 ## Product principles
 

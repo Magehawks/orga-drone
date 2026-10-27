@@ -218,6 +218,11 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "position: relative" not in pending_css
     narrow_css = css.split(".studio-music-select.is-narrow {", 1)[1].split("}", 1)[0]
     assert "overflow: visible" in narrow_css
+    clip_narrow = css.split(".studio-clip.is-narrow {", 1)[1].split("}", 1)[0]
+    assert "overflow: hidden" in clip_narrow
+    fit_scroll = css.split(".studio-timeline-scroll.is-fit {", 1)[1].split("}", 1)[0]
+    assert "overflow-x: hidden" in fit_scroll
+    assert 'classList.toggle(\n        "is-fit"' in js or 'classList.toggle("is-fit"' in js
 
 
 def test_crossfade_occupancy_shrinks_html_not_fade_black(

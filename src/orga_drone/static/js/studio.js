@@ -5,6 +5,7 @@
  * Music is a persisted per-project soundtrack mixed into MP4 export.
  * The soundtrack lane is a read-only coverage span on the Story time canvas.
  * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
+ * A video clip's left and right edges drag Source in and Source out.
  * Photo and video image adjustments persist per clip and approximate the export grade.
  * Project browser/switcher (Issue #19) runs even when no Story grid is present.
  */
@@ -896,6 +897,12 @@
         ? Math.max(view, 1)
         : Math.max(view, total * pps);
     timelineCanvasEl.style.width = `${width}px`;
+    if (timelineScrollEl) {
+      timelineScrollEl.classList.toggle(
+        "is-fit",
+        state.timelineMode === "fit" || total <= 0
+      );
+    }
     let x = 0;
     const list = clips();
     list.forEach((clip, index) => {
@@ -4962,14 +4969,14 @@
     }
   }
 
-  async function persistSection(clip) {
+  async function persistSection(clip, preset) {
     if (reuseDraft) return;
     const inEl = document.getElementById("inspector-source-in");
     const outEl = document.getElementById("inspector-source-out");
     const repeatEl = document.getElementById("inspector-section-repeats");
     if (!inEl || !outEl || !repeatEl) return;
-    const sourceIn = Number(inEl.value);
-    const sourceOut = Number(outEl.value);
+    const sourceIn = preset ? Number(preset.sourceIn) : Number(inEl.value);
+    const sourceOut = preset ? Number(preset.sourceOut) : Number(outEl.value);
     let repeats = Math.round(Number(repeatEl.value));
     if (!Number.isFinite(repeats)) repeats = 1;
     repeats = Math.max(1, Math.min(MAX_SECTION_REPEATS, repeats));
@@ -4978,10 +4985,14 @@
       showFlash(msgSectionFailed);
       return;
     }
-    const prevIn = clip.dataset.sourceIn;
-    const prevOut = clip.dataset.sourceOut;
+    if (preset) {
+      inEl.value = sourceIn.toFixed(2);
+      outEl.value = sourceOut.toFixed(2);
+    }
+    const prevIn = preset ? preset.prevIn : clip.dataset.sourceIn;
+    const prevOut = preset ? preset.prevOut : clip.dataset.sourceOut;
     const prevRepeats = clip.dataset.sectionRepeats;
-    const prevDuration = clip.dataset.effectiveDuration;
+    const prevDuration = preset ? preset.prevDuration : clip.dataset.effectiveDuration;
     setSaveState(false);
     try {
       const res = await fetch(`/api/studio/${clip.dataset.studioId}/section`, {
@@ -5036,8 +5047,250 @@
       clip.dataset.sourceOut = prevOut;
       clip.dataset.sectionRepeats = prevRepeats;
       clip.dataset.effectiveDuration = prevDuration;
+      if (document.activeElement !== inEl) inEl.value = sourceInS(clip).toFixed(2);
+      if (document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
+      layoutTimeline();
       showFlash((err && err.message) || msgSectionFailed);
     }
+  }
+
+  // Same steps as edge_source_after_drag in studio_cut.py, then 0.01 s so the
+  // inspector fields and the drag cannot disagree. No snap.
+  function edgeSourceAfterDrag(edge, sourceIn, sourceOut, deltaStory, speed, repeats, catalog) {
+    const limit = Number(catalog);
+    if (!(limit > MIN_CUT_SEGMENT_S)) {
+      return { inS: 0, outS: Math.max(0, limit) };
+    }
+    const rate = speed === 0.5 || speed === 0.25 ? speed : 1;
+    const count = Math.max(1, Math.min(MAX_SECTION_REPEATS, Math.round(Number(repeats) || 1)));
+    const delta = deltaStory * (rate / count);
+    let start = Number(sourceIn);
+    let end = Number(sourceOut);
+    if (edge === "in") start += delta;
+    else end += delta;
+    start = Math.min(Math.max(0, start), limit);
+    end = Math.min(Math.max(0, end), limit);
+    if (end - start < MIN_CUT_SEGMENT_S) {
+      if (edge === "in") start = end - MIN_CUT_SEGMENT_S;
+      else end = start + MIN_CUT_SEGMENT_S;
+      start = Math.min(Math.max(0, start), limit);
+      end = Math.min(Math.max(0, end), limit);
+      if (end - start < MIN_CUT_SEGMENT_S) {
+        if (edge === "in") end = Math.min(limit, start + MIN_CUT_SEGMENT_S);
+        else start = Math.max(0, end - MIN_CUT_SEGMENT_S);
+      }
+    }
+    start = Number(start.toFixed(2));
+    end = Number(end.toFixed(2));
+    start = Math.min(Math.max(0, start), limit);
+    end = Math.min(Math.max(0, end), limit);
+    if (end - start < MIN_CUT_SEGMENT_S) {
+      if (edge === "in") start = Math.max(0, Number((end - MIN_CUT_SEGMENT_S).toFixed(2)));
+      else end = Math.min(limit, Number((start + MIN_CUT_SEGMENT_S).toFixed(2)));
+    }
+    return { inS: start, outS: end };
+  }
+
+  function storedSectionRepeats(clip) {
+    const n = Number(clip && clip.dataset.sectionRepeats);
+    if (!Number.isFinite(n)) return 1;
+    return Math.max(1, Math.min(MAX_SECTION_REPEATS, Math.round(n)));
+  }
+
+  function previewEdgeDuration(clip, inS, outS) {
+    const speed = playbackSpeed(clip);
+    const span = Math.max(0, outS - inS);
+    const cycle = speed > 0 ? span / speed : span;
+    const reps = storedSectionRepeats(clip);
+    let duration = cycle * reps;
+    const overlap = loopOverlapS(clip);
+    if (overlap > 0 && reps > 1) duration -= overlap * (reps - 1);
+    return Math.max(MIN_CUT_SEGMENT_S, duration);
+  }
+
+  let edgeDrag = null;
+  const edgeReadout = document.createElement("div");
+  edgeReadout.className = "studio-edge-readout";
+  edgeReadout.hidden = true;
+  document.body.appendChild(edgeReadout);
+
+  function paintEdgePreview(clip, inS, outS) {
+    clip.dataset.sourceIn = String(inS);
+    clip.dataset.sourceOut = String(outS);
+    if (!forwardLoopActive(clip)) {
+      const dur = previewEdgeDuration(clip, inS, outS);
+      clip.dataset.effectiveDuration = String(dur);
+      clip.style.setProperty("--clip-flex", dur.toFixed(4));
+      const label = clip.querySelector("[data-clip-duration]");
+      if (label) label.textContent = Number.isFinite(dur) ? `${dur.toFixed(1)}s` : "—";
+    }
+    if (
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId)
+    ) {
+      const inEl = document.getElementById("inspector-source-in");
+      const outEl = document.getElementById("inspector-source-out");
+      if (inEl && document.activeElement !== inEl) inEl.value = inS.toFixed(2);
+      if (outEl && document.activeElement !== outEl) outEl.value = outS.toFixed(2);
+      const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
+      const dur = clipDuration(clip);
+      if (durationLine) {
+        durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
+      }
+    }
+    layoutTimeline();
+    setProjectTime(Math.min(state.projectTimeS, totalDuration()));
+  }
+
+  function restoreEdgeSnapshot(drag) {
+    const clip = drag.clip;
+    clip.dataset.sourceIn = drag.prevIn;
+    clip.dataset.sourceOut = drag.prevOut;
+    clip.dataset.effectiveDuration = drag.prevDuration;
+    if (drag.prevFlex) clip.style.setProperty("--clip-flex", drag.prevFlex);
+    else clip.style.removeProperty("--clip-flex");
+    const label = clip.querySelector("[data-clip-duration]");
+    if (label) label.textContent = drag.prevLabel;
+    if (
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId)
+    ) {
+      const inEl = document.getElementById("inspector-source-in");
+      const outEl = document.getElementById("inspector-source-out");
+      if (inEl) inEl.value = sourceInS(clip).toFixed(2);
+      if (outEl) outEl.value = sourceOutS(clip).toFixed(2);
+    }
+    layoutTimeline();
+    setProjectTime(Math.min(state.projectTimeS, totalDuration()));
+  }
+
+  function showEdgeReadout(edge, value, clientX, clientY) {
+    const name =
+      edge === "in"
+        ? root.dataset.sourceIn || "Source in"
+        : root.dataset.sourceOut || "Source out";
+    edgeReadout.textContent = `${name} ${Number(value).toFixed(2)} s`;
+    edgeReadout.hidden = false;
+    edgeReadout.style.left = `${clientX + 12}px`;
+    edgeReadout.style.top = `${clientY + 16}px`;
+  }
+
+  function onEdgePointerMove(event) {
+    if (!edgeDrag || event.pointerId !== edgeDrag.pointerId) return;
+    const deltaStory = (event.clientX - edgeDrag.originX) / edgeDrag.pps;
+    const next = edgeSourceAfterDrag(
+      edgeDrag.edge,
+      edgeDrag.startIn,
+      edgeDrag.startOut,
+      deltaStory,
+      edgeDrag.speed,
+      edgeDrag.repeats,
+      edgeDrag.catalog
+    );
+    edgeDrag.currentIn = next.inS;
+    edgeDrag.currentOut = next.outS;
+    paintEdgePreview(edgeDrag.clip, next.inS, next.outS);
+    const shown = edgeDrag.edge === "in" ? next.inS : next.outS;
+    showEdgeReadout(edgeDrag.edge, shown, event.clientX, event.clientY);
+  }
+
+  function finishEdgeDrag(commit) {
+    const drag = edgeDrag;
+    if (!drag) return;
+    edgeDrag = null;
+    window.removeEventListener("pointermove", onEdgePointerMove);
+    window.removeEventListener("pointerup", onEdgePointerUp);
+    window.removeEventListener("pointercancel", onEdgePointerCancel);
+    document.removeEventListener("keydown", onEdgeKeyDown, true);
+    document.documentElement.classList.remove("is-edge-drag");
+    edgeReadout.hidden = true;
+    drag.clip.classList.remove("is-edge-target");
+    const changed =
+      Math.abs(drag.currentIn - drag.startIn) > 0.0005 ||
+      Math.abs(drag.currentOut - drag.startOut) > 0.0005;
+    if (!commit || !changed || reuseDraft) {
+      restoreEdgeSnapshot(drag);
+      return;
+    }
+    persistSection(drag.clip, {
+      sourceIn: drag.currentIn,
+      sourceOut: drag.currentOut,
+      prevIn: drag.prevIn,
+      prevOut: drag.prevOut,
+      prevDuration: drag.prevDuration,
+    });
+  }
+
+  function onEdgePointerUp(event) {
+    if (!edgeDrag || event.pointerId !== edgeDrag.pointerId) return;
+    finishEdgeDrag(true);
+  }
+
+  function onEdgePointerCancel(event) {
+    if (!edgeDrag || event.pointerId !== edgeDrag.pointerId) return;
+    finishEdgeDrag(false);
+  }
+
+  function onEdgeKeyDown(event) {
+    if (!edgeDrag) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      finishEdgeDrag(false);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && (event.key === "z" || event.key === "y")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  function beginEdgeDrag(handle, event) {
+    if (reuseDraft || event.button !== 0) return;
+    const clip = handle.closest && handle.closest(".studio-clip");
+    if (!clip || clip.dataset.kind !== "video") return;
+    const catalog = catalogDurationS(clip);
+    if (catalog == null) return;
+    const pps = timelinePxPerSecond();
+    if (!(pps > 0)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    pausePlayback();
+    selectClip(clip.dataset.studioId, { movePlayhead: false });
+    const startIn = sourceInS(clip);
+    const startOut = sourceOutS(clip);
+    edgeDrag = {
+      pointerId: event.pointerId,
+      edge: handle.getAttribute("data-edge") === "in" ? "in" : "out",
+      clip,
+      originX: event.clientX,
+      pps,
+      catalog,
+      speed: playbackSpeed(clip),
+      repeats: storedSectionRepeats(clip),
+      startIn,
+      startOut,
+      currentIn: startIn,
+      currentOut: startOut,
+      prevIn: clip.dataset.sourceIn,
+      prevOut: clip.dataset.sourceOut,
+      prevDuration: clip.dataset.effectiveDuration,
+      prevFlex: clip.style.getPropertyValue("--clip-flex"),
+      prevLabel: (clip.querySelector("[data-clip-duration]") || {}).textContent || "",
+    };
+    clip.classList.add("is-edge-target");
+    document.documentElement.classList.add("is-edge-drag");
+    handle.setPointerCapture?.(event.pointerId);
+    window.addEventListener("pointermove", onEdgePointerMove);
+    window.addEventListener("pointerup", onEdgePointerUp);
+    window.addEventListener("pointercancel", onEdgePointerCancel);
+    document.addEventListener("keydown", onEdgeKeyDown, true);
+    showEdgeReadout(
+      edgeDrag.edge,
+      edgeDrag.edge === "in" ? startIn : startOut,
+      event.clientX,
+      event.clientY
+    );
   }
 
   function seekFromClientX(clientX, { resumeAfter = false } = {}) {
@@ -7711,6 +7964,11 @@
     clearOriginalDropMark();
   });
 
+  grid.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest && event.target.closest("[data-edge]");
+    if (!handle || !grid.contains(handle)) return;
+    beginEdgeDrag(handle, event);
+  });
   grid.addEventListener("dragstart", (event) => {
     const handle = event.target.closest && event.target.closest(".studio-drag-handle");
     if (!handle) {

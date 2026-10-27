@@ -256,7 +256,7 @@ See `README.md` for the detailed feature status table. In short:
   UI state, not project data). Selected Story objects are distinct from the
   playhead-active clip; transition chips show Cut / Fade / Crossfade and name
   neighbors in the Inspector. Persisted today: editable project title;
-  order; estimated runtime; optional video source start/end after Cut. A video
+  order; estimated runtime; optional video source start/end after Cut. Dragging the left or right edge of a video clip on the Story timeline changes that same source start or end and stays inside the file. A video
   clip can play that in/out range again, up to 8 times, at the same speed;
   the Story length, preview, and MP4 include each play. Story
   preview plays photos/videos/Title Cards in sync with the playhead. Local MP4

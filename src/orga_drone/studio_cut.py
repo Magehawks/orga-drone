@@ -64,6 +64,60 @@ def resolve_source_range(
     return SourceRange(source_in_s=start, source_out_s=end)
 
 
+def edge_source_after_drag(
+    *,
+    edge: str,
+    source_in_s: float,
+    source_out_s: float,
+    delta_story_s: float,
+    playback_speed: float = 1.0,
+    repeats: int = 1,
+    media_duration_s: float,
+    min_segment_s: float = MIN_SEGMENT_S,
+) -> tuple[float, float]:
+    """Move one trimmed edge by a story-time drag.
+
+    ``edge`` is ``in`` (left handle, source in) or ``out`` (right handle,
+    source out). Story seconds convert to source seconds by
+    ``playback_speed / repeats``, so the story length changes by about the
+    drag distance. The result stays inside ``0 .. media_duration_s`` and at
+    least ``min_segment_s`` long. The Story page uses the same steps in
+    ``edgeSourceAfterDrag`` and then rounds to 0.01 s for the inspector.
+    """
+    if edge not in {"in", "out"}:
+        raise ValueError("edge must be in or out")
+    catalog = float(media_duration_s)
+    floor = float(min_segment_s)
+    if catalog <= floor:
+        return 0.0, max(0.0, catalog)
+    speed = float(playback_speed)
+    if speed not in {0.25, 0.5, 1.0}:
+        speed = 1.0
+    count = max(1, min(MAX_SECTION_REPEATS, int(repeats)))
+    delta = float(delta_story_s) * (speed / count)
+    start = float(source_in_s)
+    end = float(source_out_s)
+    if edge == "in":
+        start += delta
+    else:
+        end += delta
+    start = min(max(0.0, start), catalog)
+    end = min(max(0.0, end), catalog)
+    if end - start < floor:
+        if edge == "in":
+            start = end - floor
+        else:
+            end = start + floor
+        start = min(max(0.0, start), catalog)
+        end = min(max(0.0, end), catalog)
+        if end - start < floor:
+            if edge == "in":
+                end = min(catalog, start + floor)
+            else:
+                start = max(0.0, end - floor)
+    return start, end
+
+
 def split_source_range(
     rang: SourceRange,
     local_cut_s: float,

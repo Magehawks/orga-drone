@@ -93,6 +93,8 @@ Removing a cut joins the clip with the one before it through `POST /api/studio/{
 
 Another scene from the same original is `POST /api/studio/{id}/reuse-source`. It inserts one new `studio_clips` row immediately after the clicked video, in story order, and shifts only the clips that follow. The new row copies the media path, identity, and library id, stores the chosen source range (NULL, NULL when it covers the whole file), and starts with empty effects, speed 1, and a hard cut out. The clicked row is not updated. The preview seek during the draft is client-side and does not write. Cancel writes nothing. A refusal is not an Undo step. A successful add is one Undo step; Undo removes the new row and restores the later positions.
 
+Dragging a video clip's left or right edge on the Story timeline changes that clip's source start or source end through the existing section PATCH. The drag stays inside the file duration and at least 0.05 s. One completed drag is one Undo step. Neighboring clips keep their source ranges and effects; their story positions move only because this clip's length changed. There is no snap. Photos, title cards, and videos with an unknown duration have no edge handles. The original file is not modified.
+
 A cut or a trimmed video also stores one `studio_originals` row for that project and file. Removing the Story clips does not remove it, and it is still there after a restart. `POST /api/studio/media/{media_id}/reuse-source` inserts one new clip from that row, at the end or before `before_id`, in one Undo step. The Original row is not part of the session snapshot, so Undo of the new scene leaves the Original in the Story browser.
 
 ## Scan / index pipeline

@@ -41,7 +41,9 @@ keeps those rows non-destructive.
 - Negative / trade-offs: While the draft is open, the preview is not the Story
   clock. The clicked clip's outgoing transition plays into the new clip.
 - Out of scope: dragging clip edges, scene detection, multicam, and copying
-  the existing grade onto the new moment.
+  the existing grade onto the new moment. Dragging clip edges later shipped
+  as its own slice: the Story timeline handles call the existing section save.
+  That slice does not add slip, slide, or a ripple of other clips' source ranges.
 - A later slice keeps one Original row per cut video in the Story browser.
   The same preview opens that full recording. Dragging it onto the Story, or
   Add scene, inserts one clip. That row stays after the Story clips are

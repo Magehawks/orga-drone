@@ -2026,7 +2026,8 @@ img.studio-preview-media,
   box-sizing: border-box;
   padding: 0.7rem 0.75rem 0.85rem;
   background: color-mix(in srgb, var(--panel) 70%, var(--surface-deep));
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .studio-timeline-toolbar {
   display: flex;
@@ -2080,6 +2081,9 @@ img.studio-preview-media,
   overflow-x: auto;
   overflow-y: hidden;
 }
+.studio-timeline-scroll.is-fit {
+  overflow-x: hidden;
+}
 .studio-timeline-canvas {
   position: relative;
   min-width: 100%;
@@ -2092,6 +2096,7 @@ img.studio-preview-media,
   font-family: var(--mono);
   font-size: 0.65rem;
   color: var(--muted);
+  overflow: hidden;
 }
 .studio-ruler-mark {
   position: absolute;
@@ -2168,7 +2173,7 @@ img.studio-preview-media,
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  overflow: visible;
+  overflow: hidden;
 }
 .studio-story-empty-track {
   position: absolute;
@@ -2196,13 +2201,13 @@ img.studio-preview-media,
   margin: 0;
   box-sizing: border-box;
 }
-/* Hit pad for very short Fit-mode tiles; occupancy/width stay truthful. */
+/* Short tiles keep their true width. Content stays inside so it cannot cover the next clip. */
 .studio-clip.is-narrow {
-  overflow: visible;
+  overflow: hidden;
   z-index: 2;
 }
 .studio-clip.is-narrow .studio-clip-body {
-  min-width: 12px;
+  min-width: 0;
 }
 .studio-clip.is-photo {
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));
@@ -2264,6 +2269,65 @@ img.studio-preview-media,
   touch-action: none;
 }
 .studio-drag-handle:active { cursor: grabbing; }
+button.studio-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  min-width: 0;
+  min-height: 0;
+  z-index: 5;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  cursor: ew-resize;
+  touch-action: none;
+  appearance: none;
+}
+button.studio-edge:hover,
+button.studio-edge:active {
+  background: transparent;
+  transform: none;
+  color: inherit;
+}
+button.studio-edge::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.35;
+}
+button.studio-edge-in { left: 0; }
+button.studio-edge-in::after { left: 0; }
+button.studio-edge-out { right: 0; }
+button.studio-edge-out::after { right: 0; }
+button.studio-edge:hover::after,
+.studio-clip.is-selected button.studio-edge::after,
+.studio-clip.is-edge-target button.studio-edge::after {
+  width: 3px;
+  opacity: 1;
+}
+html.is-edge-drag,
+html.is-edge-drag * {
+  cursor: ew-resize !important;
+}
+.studio-edge-readout {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
 .studio-clip-body {
   flex: 1;
   min-width: 0;
@@ -2368,7 +2432,7 @@ img.studio-preview-media,
   background: color-mix(in srgb, var(--muted) 6%, var(--panel));
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  overflow: visible;
+  overflow: hidden;
   cursor: pointer;
 }
 .studio-music-empty {
