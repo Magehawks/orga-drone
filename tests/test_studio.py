@@ -335,7 +335,7 @@ def test_studio_browser_layout_containment_css() -> None:
 
     assert "@media (min-width: 801px)" in css
     assert ".studio-creator:has(.studio-workspace)" in css
-    assert "max-height: calc(100vh - 4.5rem)" in css
+    assert "max-height: 100%" in css
 
     # Desktop browser: flex column shell + independently scrolling panel.
     desktop_idx = css.index("@media (min-width: 801px)")
@@ -389,6 +389,8 @@ def test_http_studio_creator_shell_with_items(
     assert "studio-preview" in html
     assert 'id="studio-preview-video"' in html
     assert 'id="studio-preview-image"' in html
+    assert 'id="studio-preview-loading"' in html
+    assert "/static/icons/orga-drone.png" in html
     assert "studio-transport" in html
     assert 'data-transport="toggle"' in html
     assert 'href="#lucide-play"' in html or "lucide-play" in html

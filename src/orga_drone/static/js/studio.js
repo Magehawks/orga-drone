@@ -269,6 +269,7 @@
   const musicAudio = document.getElementById("studio-music-audio");
   const musicAudioNext = document.getElementById("studio-music-audio-next");
   const previewPlaceholder = document.getElementById("studio-preview-placeholder");
+  const previewLoading = document.getElementById("studio-preview-loading");
   const transportTime = document.getElementById("studio-transport-time");
   const playheadEl = document.getElementById("studio-playhead");
   const tracksEl = document.getElementById("studio-tracks");
@@ -1147,6 +1148,23 @@
       }
     }
     previewVideo.hidden = true;
+    previewVideo.classList.remove("is-pending");
+  }
+
+  let imageLoadToken = 0;
+
+  function setPreviewLoading(on) {
+    if (previewLoading) previewLoading.hidden = !on;
+  }
+
+  function revealPreviewMedia(el) {
+    if (el) el.classList.remove("is-pending");
+    setPreviewLoading(false);
+  }
+
+  function holdPreviewMedia(el) {
+    if (el) el.classList.add("is-pending");
+    setPreviewLoading(true);
   }
 
   function hideOverlayLayers() {
@@ -2637,6 +2655,8 @@
     clearFrameTransform(previewImageB);
     clearFrameTransform(previewVideoB);
     if (previewFrame) previewFrame.classList.remove("is-framing", "is-panning");
+    if (previewImage) previewImage.classList.remove("is-pending");
+    setPreviewLoading(false);
   }
 
   function showImage(src) {
@@ -2648,12 +2668,23 @@
     if (!src) {
       loadedImageSrc = "";
       previewImage.removeAttribute("src");
+      revealPreviewMedia(previewImage);
       return;
     }
-    if (loadedImageSrc !== src) {
-      loadedImageSrc = src;
-      previewImage.src = src;
+    if (loadedImageSrc === src && previewImage.complete && previewImage.naturalWidth > 0) {
+      revealPreviewMedia(previewImage);
+      return;
     }
+    loadedImageSrc = src;
+    holdPreviewMedia(previewImage);
+    const token = ++imageLoadToken;
+    const finish = () => {
+      if (token !== imageLoadToken) return;
+      revealPreviewMedia(previewImage);
+    };
+    previewImage.addEventListener("load", finish, { once: true });
+    previewImage.addEventListener("error", finish, { once: true });
+    previewImage.src = src;
   }
 
   function seekVideoLocal(localS, clip) {
@@ -2696,9 +2727,16 @@
     if (needLoad) {
       loadedVideoSrc = src || "";
       suppressVideoClock = true;
+      holdPreviewMedia(previewVideo);
       previewVideo.src = src || "";
       previewVideo.load();
       const token = ++syncToken;
+      const reveal = () => {
+        if (token !== syncToken) return;
+        revealPreviewMedia(previewVideo);
+      };
+      previewVideo.addEventListener("loadeddata", reveal, { once: true });
+      previewVideo.addEventListener("error", reveal, { once: true });
       previewVideo.addEventListener(
         "loadedmetadata",
         () => {
@@ -2713,8 +2751,10 @@
         },
         { once: true }
       );
+      if (previewVideo.readyState >= 2) reveal();
       return;
     }
+    revealPreviewMedia(previewVideo);
     suppressVideoClock = true;
     seekVideoLocal(localS, clip);
     // Allow clock after seek settles.
@@ -2733,6 +2773,7 @@
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
+    setPreviewLoading(false);
     const bg = clip.dataset.background || "dark";
     previewTitlecard.hidden = false;
     previewTitlecard.setAttribute("data-bg", bg);

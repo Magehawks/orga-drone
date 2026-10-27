@@ -18,6 +18,12 @@ from fastapi.templating import Jinja2Templates
 from orga_drone import __version__
 from orga_drone.app_prefs import get_check_updates, set_check_updates
 from orga_drone.config import settings
+from orga_drone.home_hero import cached_thumbnail, pick_home_media_id
+from orga_drone.local_cache import (
+    cache_sizes,
+    clear_regenerable_cache,
+    format_bytes as format_cache_bytes,
+)
 from orga_drone.local_http import LoopbackOriginMiddleware
 from orga_drone.updates import OFFICIAL_DOWNLOAD_URL, UpdateChecker, installed_version
 from orga_drone.browse_timeline import (
@@ -642,20 +648,58 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> HTMLResponse:
-        """Welcome hub — stats, CTAs, recent/favorites shortcuts."""
-        recent = db.list_media(sort="recorded_at", order="desc")[:8]
-        favorites = db.list_media(sort="recorded_at", order="desc", favorite=True)[:8]
+        """Home — entry actions and a hero from an already cached thumbnail."""
+        recent = db.list_media(sort="recorded_at", order="desc", limit=8)
+        favorites = db.list_media(sort="recorded_at", order="desc", favorite=True, limit=8)
+        hero_pool = db.list_media(sort="recorded_at", order="desc", limit=24)
+        hero_media_id = pick_home_media_id(
+            hero_pool,
+            settings.data_dir,
+            file_ready=lambda item: resolve_media_file(db, item),
+        )
+        cached_ids = [
+            item.id
+            for item in [*recent, *favorites]
+            if resolve_media_file(db, item) is not None
+            and cached_thumbnail(settings.data_dir, item.id) is not None
+        ]
         return render(
             request,
             "dashboard.html",
             recent=recent,
             favorites=favorites,
+            hero_media_id=hero_media_id,
+            cached_media_ids=cached_ids,
+            continue_project=db.get_open_studio_project(),
             nav_active="dashboard",
         )
 
     @app.get("/dashboard")
     async def dashboard_alias() -> RedirectResponse:
         return RedirectResponse(url="/", status_code=303)
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page(request: Request) -> HTMLResponse:
+        sizes = cache_sizes(settings.data_dir)
+        return render(
+            request,
+            "settings.html",
+            data_dir=settings.data_dir,
+            db_path=settings.db_path,
+            thumbs_dir=settings.data_dir / "thumbs",
+            tiles_dir=settings.data_dir / "osm-tiles",
+            cache_total=format_cache_bytes(sizes["total"]),
+            cache_thumbs=format_cache_bytes(sizes["thumbs"]),
+            cache_tiles=format_cache_bytes(sizes["osm-tiles"]),
+            library_roots=db.list_roots(),
+            cache_cleared=request.query_params.get("cache") == "cleared",
+            nav_active="settings",
+        )
+
+    @app.post("/settings/cache/clear")
+    async def clear_cache() -> RedirectResponse:
+        clear_regenerable_cache(settings.data_dir)
+        return RedirectResponse(url="/settings?cache=cleared", status_code=303)
 
     @app.get("/browse", response_class=HTMLResponse)
     @app.get("/media", response_class=HTMLResponse)
@@ -3021,6 +3065,19 @@ def create_app() -> FastAPI:
             },
         )
 
+    @app.get("/media/{media_id}/cached-thumb")
+    async def media_cached_thumb(media_id: int) -> FileResponse:
+        """Serve a thumbnail that already exists. Never creates one."""
+        path = cached_thumbnail(settings.data_dir, media_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail="No cached thumbnail")
+        return FileResponse(
+            path,
+            media_type="image/jpeg",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, max-age=3600"},
+        )
+
     @app.get("/media/{media_id}/thumb")
     async def media_thumb(media_id: int) -> FileResponse:
         item = db.get_media(media_id)
@@ -3414,9 +3471,9 @@ def create_app() -> FastAPI:
         return RedirectResponse(url="/library", status_code=303)
 
     @app.get("/lang/{code}")
-    async def set_lang(code: str) -> RedirectResponse:
+    async def set_lang(request: Request, code: str) -> RedirectResponse:
         lang = normalize_lang(code, settings.default_lang)
-        response = RedirectResponse(url="/", status_code=303)
+        response = RedirectResponse(url=safe_back_url(request), status_code=303)
         response.set_cookie("lang", lang, max_age=365 * 24 * 3600)
         return response
 

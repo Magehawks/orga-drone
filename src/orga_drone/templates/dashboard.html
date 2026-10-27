@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Dashboard') }} · {{ _('orga-drone') }}{% endblock %}
+{% block title %}{{ _('Home') }} · {{ _('orga-drone') }}{% endblock %}
 {% block stats %}
   <section class="stats">
     <div><strong>{{ stats.videos }}</strong> {{ _('Videos') }}</div>
@@ -10,88 +10,96 @@
   </section>
 {% endblock %}
 {% block content %}
-{% if stats.roots == 0 %}
-  <section class="library-hero">
-    <h1>{{ _('Welcome to orga-drone') }}</h1>
-    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
-    <a class="button cta" href="/library">{{ _('Add folder') }}</a>
-  </section>
-{% else %}
-  <section class="dash-hero">
-    <div class="dash-hero-copy">
+{% set empty = stats.videos + stats.photos == 0 %}
+<section class="home-hero {% if hero_media_id %}has-photo{% else %}has-logo{% endif %}"
+         {% if hero_media_id %}style="background-image: url('/media/{{ hero_media_id }}/cached-thumb')"{% endif %}>
+  <div class="home-hero-scrim">
+    {% if not hero_media_id %}
+    <img class="home-logo" src="/static/icons/orga-drone.png" alt="{{ _('orga-drone') }}">
+    {% endif %}
+    <div class="home-hero-copy">
       <h1>{{ _('Welcome to orga-drone') }}</h1>
+      {% if empty %}
+      <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+      {% else %}
       <p>{{ _('Your local drone media hub — browse the library or explore the world map.') }}</p>
+      {% endif %}
     </div>
-    <div class="dash-cta-row">
-      <a class="dash-cta" href="/browse">
-        <span class="dash-cta-icon" aria-hidden="true">▣</span>
-        <span class="dash-cta-label">{{ _('Browse media') }}</span>
-        <span class="dash-cta-hint">{{ _('Grid, list & filters') }}</span>
-      </a>
-      <a class="dash-cta" href="/map">
-        <span class="dash-cta-icon" aria-hidden="true">◎</span>
-        <span class="dash-cta-label">{{ _('World map') }}</span>
-        <span class="dash-cta-hint">{{ _('Photos & videos with GPS') }}</span>
-      </a>
-    </div>
-  </section>
+  </div>
+</section>
 
-  {% if favorites %}
-  <section class="dash-section">
-    <div class="dash-section-head">
-      <h2>{{ _('Favorites') }}</h2>
-      <a href="/browse?favorite=yes">{{ _('Show all') }}</a>
-    </div>
-    <div class="dash-rail">
-      {% for item in favorites %}
-      <a class="dash-rail-item" href="/media/{{ item.id }}">
-        {% if item.root_id in offline_root_ids %}
-          <span class="dash-rail-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') }}"></span>
-        {% else %}
-          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
-        {% endif %}
-        <span class="dash-rail-title">{{ item.filename }}</span>
-        {% if item.root_id in offline_root_ids %}
-          <span class="badge unavailable">{{ _('Offline') }}</span>
-        {% endif %}
-      </a>
-      {% endfor %}
-    </div>
-  </section>
+<section class="home-actions" aria-label="{{ _('Main navigation') }}">
+  {% if empty %}
+  <a class="home-action is-primary" href="/library">
+    <span class="home-action-label">{{ _('Add media') }}</span>
+    <span class="home-action-hint">{{ _('Choose a folder and scan it') }}</span>
+  </a>
   {% endif %}
-
-  {% if recent %}
-  <section class="dash-section">
-    <div class="dash-section-head">
-      <h2>{{ _('Recent') }}</h2>
-      <a href="/browse">{{ _('Show all') }}</a>
-    </div>
-    <div class="dash-rail">
-      {% for item in recent %}
-      <a class="dash-rail-item" href="/media/{{ item.id }}">
-        {% if item.root_id in offline_root_ids %}
-          <span class="dash-rail-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') }}"></span>
-        {% else %}
-          <img src="/media/{{ item.id }}/thumb" alt="" loading="lazy" decoding="async">
-        {% endif %}
-        <span class="dash-rail-title">{{ item.filename }}</span>
-        {% if item.root_id in offline_root_ids %}
-          <span class="badge unavailable">{{ _('Offline') }}</span>
-        {% endif %}
-      </a>
-      {% endfor %}
-    </div>
-  </section>
-  {% elif stats.videos + stats.photos == 0 %}
-  <section class="library-hero">
-    <h1>{{ _('No media yet') }}</h1>
-    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
-    <a class="button" href="/library">{{ _('Add folder') }}</a>
-  </section>
+  <a class="home-action {% if not empty %}is-primary{% endif %}" href="/browse">
+    <span class="home-action-label">{{ _('Open library') }}</span>
+    <span class="home-action-hint">{{ _('Grid, list & filters') }}</span>
+  </a>
+  <a class="home-action" href="/studio">
+    <span class="home-action-label">{{ _('Edit a film') }}</span>
+    <span class="home-action-hint">{{ _('Studio') }}</span>
+  </a>
+  <a class="home-action" href="/map">
+    <span class="home-action-label">{{ _('Explore flights') }}</span>
+    <span class="home-action-hint">{{ _('Photos & videos with GPS') }}</span>
+  </a>
+  {% if not empty %}
+  <a class="home-action" href="/library">
+    <span class="home-action-label">{{ _('Add media') }}</span>
+    <span class="home-action-hint">{{ _('Choose a folder and scan it') }}</span>
+  </a>
   {% endif %}
+  {% if continue_project %}
+  <a class="home-action" href="/studio">
+    <span class="home-action-label">{{ _('Continue last project') }}</span>
+    <span class="home-action-hint">{{ continue_project.title }}</span>
+  </a>
+  {% endif %}
+</section>
 
-  <p class="dash-folder-link">
-    <a href="/library">{{ _('Manage library folders') }}</a>
-  </p>
+{% if favorites %}
+<section class="dash-section">
+  <div class="dash-section-head">
+    <h2>{{ _('Favorites') }}</h2>
+    <a href="/browse?favorite=yes">{{ _('Show all') }}</a>
+  </div>
+  <div class="dash-rail">
+    {% for item in favorites %}
+    <a class="dash-rail-item" href="/media/{{ item.id }}">
+      {% if item.id in cached_media_ids and item.root_id not in offline_root_ids %}
+        <img src="/media/{{ item.id }}/cached-thumb" alt="" loading="lazy" decoding="async">
+      {% else %}
+        <span class="dash-rail-thumb thumb-placeholder" role="img" aria-label="{{ _('Offline') if item.root_id in offline_root_ids else item.filename }}"></span>
+      {% endif %}
+      <span class="dash-rail-title">{{ item.filename }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if recent %}
+<section class="dash-section">
+  <div class="dash-section-head">
+    <h2>{{ _('Recent') }}</h2>
+    <a href="/browse">{{ _('Show all') }}</a>
+  </div>
+  <div class="dash-rail">
+    {% for item in recent %}
+    <a class="dash-rail-item" href="/media/{{ item.id }}">
+      {% if item.id in cached_media_ids and item.root_id not in offline_root_ids %}
+        <img src="/media/{{ item.id }}/cached-thumb" alt="" loading="lazy" decoding="async">
+      {% else %}
+        <span class="dash-rail-thumb thumb-placeholder" role="img"></span>
+      {% endif %}
+      <span class="dash-rail-title">{{ item.filename }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 {% endblock %}

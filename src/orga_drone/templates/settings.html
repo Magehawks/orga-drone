@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Settings') }} · {{ _('orga-drone') }}{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>{{ _('Settings') }}</h1>
+</header>
+
+<section class="settings-section">
+  <h2>{{ _('Appearance') }}</h2>
+  <p class="hint">{{ _('Dark and light use the built-in colors. Custom keeps the colors you pick here.') }}</p>
+  <div class="seg-control theme-switch" role="group" aria-label="{{ _('Theme') }}">
+    <a href="/theme/dark" class="seg-item {% if theme == 'dark' %}active{% endif %}">{{ _('Dark') }}</a>
+    <a href="/theme/light" class="seg-item {% if theme == 'light' %}active{% endif %}">{{ _('Light') }}</a>
+    <a href="/theme/custom" class="seg-item {% if theme == 'custom' %}active{% endif %}">{{ _('Custom') }}</a>
+  </div>
+  {% if theme == 'custom' %}
+  <form class="theme-custom" method="post" action="/theme/custom">
+    <label>{{ _('Accent') }}
+      <input type="color" name="accent" value="{{ theme_accent }}" title="{{ _('Accent') }}">
+    </label>
+    <label>{{ _('Background') }}
+      <input type="color" name="background" value="{{ theme_bg }}" title="{{ _('Background') }}">
+    </label>
+    <label>{{ _('Panel') }}
+      <input type="color" name="panel" value="{{ theme_panel }}" title="{{ _('Panel') }}">
+    </label>
+    <button type="submit">{{ _('Apply') }}</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="settings-section">
+  <h2>{{ _('Language') }}</h2>
+  <div class="seg-control lang" role="group" aria-label="{{ _('Language') }}">
+    <a href="/lang/de" class="seg-item {% if lang == 'de' %}active{% endif %}">{{ _('German') }}</a>
+    <a href="/lang/en" class="seg-item {% if lang == 'en' %}active{% endif %}">{{ _('English') }}</a>
+  </div>
+</section>
+
+<section class="settings-section">
+  <h2>{{ _('Data and storage') }}</h2>
+  <p class="hint">{{ _('Original photos and videos stay in the folders you added. Exports stay where you saved them. This page does not delete those files.') }}</p>
+  <dl class="settings-paths">
+    <div>
+      <dt>{{ _('App data') }}</dt>
+      <dd class="mono">{{ data_dir }}</dd>
+    </div>
+    <div>
+      <dt>{{ _('Library database') }}</dt>
+      <dd class="mono">{{ db_path }}</dd>
+    </div>
+    <div>
+      <dt>{{ _('Thumbnail cache') }}</dt>
+      <dd class="mono">{{ thumbs_dir }} · {{ cache_thumbs }}</dd>
+    </div>
+    <div>
+      <dt>{{ _('Map tile cache') }}</dt>
+      <dd class="mono">{{ tiles_dir }} · {{ cache_tiles }}</dd>
+    </div>
+  </dl>
+  {% if library_roots %}
+  <h3>{{ _('Library folders') }}</h3>
+  <ul class="settings-roots">
+    {% for root in library_roots %}
+    <li class="mono">{{ root['path'] }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">{{ _('No library folder yet.') }}</p>
+  {% endif %}
+  <p class="hint">{{ _('Cached thumbnails and map tiles can be built again. Clearing them does not remove projects, favorites, tags, or original files.') }}</p>
+  <p>{{ _('Cache size') }}: <strong>{{ cache_total }}</strong></p>
+  {% if cache_cleared %}
+  <p class="hint" role="status">{{ _('Cache cleared.') }}</p>
+  {% endif %}
+  <form method="post" action="/settings/cache/clear"
+        data-confirm="{{ _('Clear cached thumbnails and map tiles? Original files, projects, and exports stay.')|e }}"
+        onsubmit="return confirm(this.dataset.confirm);">
+    <button type="submit" class="button ghost">{{ _('Clear cache') }}</button>
+  </form>
+</section>
+{% endblock %}

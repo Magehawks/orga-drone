@@ -20,6 +20,7 @@ See `README.md` → “Current feature status” and `docs/PRODUCT_VISION.md`.
 
 Highlights:
 
+- Home screen with the app logo or one already cached local thumbnail, plus a shared sidebar (library, Studio, flight map, Settings). Settings keeps the dark/light/custom theme and German/English, and can clear thumbnail and map-tile caches only
 - Local folder library + SQLite index + browse, including a chronological Timeline (recording-date groups; not the Studio story timeline)
 - DJI-oriented parsing (strongest path) + thinner generic media support
 - Flows, heuristic sessions, maps, rule-based Ask the library
