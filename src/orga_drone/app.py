@@ -44,6 +44,13 @@ from orga_drone.studio_estimate import (
     effective_seconds,
     summarize_studio_items,
 )
+from orga_drone.studio_history import (
+    clear_studio_history,
+    history_flags,
+    redo_story,
+    story_edit,
+    undo_story,
+)
 from orga_drone.studio_frame import (
     frame_from_effect_settings,
     frame_preview_model,
@@ -258,11 +265,43 @@ def browse_filter_query(filters: dict[str, Any], *, page: int | None = None) -> 
 
 def create_app() -> FastAPI:
     settings.ensure_dirs()
+    clear_studio_history()
     db = Database(settings.db_path)
 
     app = FastAPI(title="orga-drone", version=__version__)
     app.add_middleware(LoopbackOriginMiddleware)
     app.state.db = db
+
+    @app.middleware("http")
+    async def attach_story_history_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        path = request.url.path
+        if request.method in {"GET", "HEAD", "OPTIONS"}:
+            return response
+        if not (path.startswith("/api/studio") or path.startswith("/studio/")):
+            return response
+        project = db.resolve_studio_page_project()
+        flags = history_flags(project.id if project is not None else None)
+        response.headers["X-Studio-Can-Undo"] = "1" if flags["can_undo"] else "0"
+        response.headers["X-Studio-Can-Redo"] = "1" if flags["can_redo"] else "0"
+        return response
+
+    def _history_group(request: Request) -> str | None:
+        raw = request.headers.get("x-studio-history-group", "").strip()
+        if not raw:
+            return None
+        return raw[:64]
+
+    def _clip_project_id(studio_item_id: int) -> int | None:
+        with db.connect() as conn:
+            row = conn.execute(
+                "SELECT project_id FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return int(row["project_id"])
+
     app.state.scan_jobs = ScanJobStore()
     app.state.export_jobs = ExportJobStore()
     app.state.update_checker = UpdateChecker()
@@ -1244,6 +1283,7 @@ def create_app() -> FastAPI:
             if project is not None
             else {"tracks": []}
         )
+        story_history = history_flags(project.id if project is not None else None)
         return render(
             request,
             "studio.html",
@@ -1261,6 +1301,8 @@ def create_app() -> FastAPI:
             map_model=map_preview_model(),
             favorite_media=favorite_media,
             music_payload=music_payload,
+            can_undo=story_history["can_undo"],
+            can_redo=story_history["can_redo"],
             flash_msg=msg,
             nav_active="studio",
             select_id=select,
@@ -1496,13 +1538,14 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=400, detail="ordered_ids must be a list of integers"
             )
+        open_project = db.resolve_studio_page_project()
+        if open_project is None:
+            raise HTTPException(status_code=400, detail="no studio project open")
         try:
-            open_project = db.resolve_studio_page_project()
-            if open_project is None:
-                raise HTTPException(status_code=400, detail="no studio project open")
-            ordered = db.reorder_studio_items(
-                [int(x) for x in raw_ids], project_id=open_project.id
-            )
+            with story_edit(db, open_project.id, group=_history_group(request)):
+                ordered = db.reorder_studio_items(
+                    [int(x) for x in raw_ids], project_id=open_project.id
+                )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         items = db.list_studio_items(open_project.id)
@@ -1570,7 +1613,8 @@ def create_app() -> FastAPI:
         if not kwargs:
             raise HTTPException(status_code=400, detail="no title card fields to update")
         try:
-            clip = db.update_studio_title_card(studio_item_id, **kwargs)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                clip = db.update_studio_title_card(studio_item_id, **kwargs)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1614,7 +1658,8 @@ def create_app() -> FastAPI:
             )
         duration_s: float | None = None if raw is None else float(raw)
         try:
-            item = db.set_studio_photo_duration(studio_item_id, duration_s)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_photo_duration(studio_item_id, duration_s)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1655,7 +1700,8 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include an image adjustment"
             )
         try:
-            item = db.set_studio_image_adjust(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_image_adjust(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1684,7 +1730,8 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include a saturation ramp"
             )
         try:
-            item = db.set_studio_saturation_ramp(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_saturation_ramp(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1711,7 +1758,8 @@ def create_app() -> FastAPI:
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="JSON body must include overlays")
         try:
-            item, clamped = db.set_studio_overlays(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item, clamped = db.set_studio_overlays(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1776,7 +1824,8 @@ def create_app() -> FastAPI:
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="JSON body must include masks")
         try:
-            item = db.set_studio_masks(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_masks(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1805,7 +1854,8 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include frame"
             )
         try:
-            item = db.set_studio_frame(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_frame(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1914,12 +1964,13 @@ def create_app() -> FastAPI:
                 status_code=400, detail="repeat count must be a whole number from 1 to 8"
             )
         try:
-            item = db.set_studio_section(
-                studio_item_id,
-                source_in_s=float(raw_in),
-                source_out_s=float(raw_out),
-                repeats=raw_repeats,
-            )
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_section(
+                    studio_item_id,
+                    source_in_s=float(raw_in),
+                    source_out_s=float(raw_out),
+                    repeats=raw_repeats,
+                )
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1974,12 +2025,13 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=400, detail="duration_s must be a number")
             transition_s = float(raw_duration)
         try:
-            item = db.set_studio_forward_loop(
-                studio_item_id,
-                enabled,
-                transition=transition,
-                transition_s=transition_s,
-            )
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_forward_loop(
+                    studio_item_id,
+                    enabled,
+                    transition=transition,
+                    transition_s=transition_s,
+                )
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2045,12 +2097,13 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=400, detail="curve must be linear or smooth")
             curve = str(raw_curve)
         try:
-            item = db.set_studio_loop_effect(
-                studio_item_id,
-                transition=str(raw_transition),
-                duration_s=transition_s,
-                curve=curve,
-            )
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_loop_effect(
+                    studio_item_id,
+                    transition=str(raw_transition),
+                    duration_s=transition_s,
+                    curve=curve,
+                )
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2109,9 +2162,10 @@ def create_app() -> FastAPI:
         else:
             duration_s = None if raw_dur is None else float(raw_dur)
         try:
-            item = db.set_studio_transition(
-                studio_item_id, raw_type, duration_s
-            )
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_transition(
+                    studio_item_id, raw_type, duration_s
+                )
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2171,12 +2225,13 @@ def create_app() -> FastAPI:
             range_in = float(raw_in)
             range_out = float(raw_out)
         try:
-            changed, selected_id = db.set_studio_playback_speed(
-                studio_item_id,
-                float(raw_speed),
-                range_in_s=range_in,
-                range_out_s=range_out,
-            )
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                changed, selected_id = db.set_studio_playback_speed(
+                    studio_item_id,
+                    float(raw_speed),
+                    range_in_s=range_in,
+                    range_out_s=range_out,
+                )
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2228,7 +2283,8 @@ def create_app() -> FastAPI:
         if not isinstance(raw, (int, float)) or isinstance(raw, bool):
             raise HTTPException(status_code=400, detail="local_s must be a number")
         try:
-            left, right = db.cut_studio_video_item(studio_item_id, float(raw))
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                left, right = db.cut_studio_video_item(studio_item_id, float(raw))
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2648,9 +2704,27 @@ def create_app() -> FastAPI:
         )
         return RedirectResponse(url=dest, status_code=303)
 
+    @app.post("/api/studio/history/{direction}")
+    async def api_studio_history(direction: str) -> JSONResponse:
+        if direction not in {"undo", "redo"}:
+            raise HTTPException(status_code=404, detail="unknown history direction")
+        project = db.resolve_studio_page_project()
+        if project is None:
+            raise HTTPException(status_code=400, detail="no studio project open")
+        changed = (
+            undo_story(db, project.id)
+            if direction == "undo"
+            else redo_story(db, project.id)
+        )
+        flags = history_flags(project.id)
+        if not changed:
+            return JSONResponse({"ok": False, **flags}, status_code=409)
+        return JSONResponse({"ok": True, **flags})
+
     @app.post("/studio/{studio_item_id}/remove")
-    async def studio_remove(studio_item_id: int) -> RedirectResponse:
-        db.remove_studio_item(studio_item_id)
+    async def studio_remove(studio_item_id: int, request: Request) -> RedirectResponse:
+        with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+            db.remove_studio_item(studio_item_id)
         return RedirectResponse(url="/studio?msg=studio_removed", status_code=303)
 
     @app.post("/studio/clear")

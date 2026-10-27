@@ -311,6 +311,8 @@
   "Volume": "Lautstärke",
   "Fullscreen": "Vollbild",
   "Cut clip": "Schneiden",
+  "Undo": "Rückgängig",
+  "Redo": "Wiederholen",
   "Could not cut clip.": "Clip konnte nicht geschnitten werden.",
   "Could not save project title.": "Projekttitel konnte nicht gespeichert werden.",
   "Projects": "Projekte",
