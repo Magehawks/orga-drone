@@ -897,6 +897,12 @@
         ? Math.max(view, 1)
         : Math.max(view, total * pps);
     timelineCanvasEl.style.width = `${width}px`;
+    if (timelineScrollEl) {
+      timelineScrollEl.classList.toggle(
+        "is-fit",
+        state.timelineMode === "fit" || total <= 0
+      );
+    }
     let x = 0;
     const list = clips();
     list.forEach((clip, index) => {
