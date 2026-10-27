@@ -140,6 +140,30 @@ def test_parse_clamps_and_rejects_bad_values() -> None:
     assert hostile[0].effect == "pixelate"
 
 
+def test_move_and_resize_change_the_export_box() -> None:
+    """A dragged or resized mask keeps the new rectangle in the export window."""
+    frame = (320, 180)
+    rect = content_rect(*frame, 320, 180)
+    original = _mask(x=0.2, y=0.2, w=0.28, h=0.22)
+    moved = _mask(x=0.45, y=0.35, w=0.28, h=0.22)
+    resized = _mask(x=0.2, y=0.2, w=0.55, h=0.4)
+    origin = mask_box_pixels(original, rect, frame_width=frame[0], frame_height=frame[1])
+    shifted = mask_box_pixels(moved, rect, frame_width=frame[0], frame_height=frame[1])
+    larger = mask_box_pixels(resized, rect, frame_width=frame[0], frame_height=frame[1])
+    assert shifted[0] > origin[0]
+    assert shifted[1] > origin[1]
+    assert larger[2] > origin[2]
+    assert larger[3] > origin[3]
+    graph = ffmpeg_mask_graph(
+        base_chain=_segment_vf(320, 180),
+        fades=[],
+        windows=mask_windows((moved, resized), frame_width=320, frame_height=180, source_width=320, source_height=180),
+    )
+    assert "boxblur=" in graph
+    assert f"crop={shifted[2]}:{shifted[3]}:{shifted[0]}:{shifted[1]}" in graph
+    assert f"crop={larger[2]}:{larger[3]}:{larger[0]}:{larger[1]}" in graph
+
+
 def test_letterbox_box_scales_between_resolutions() -> None:
     mask = _mask(x=0.0, y=0.1, w=0.2, h=0.3)
     portrait = (1080, 1920)
@@ -299,6 +323,62 @@ def test_http_masks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert [mask.id for mask in export_clip.masks] == [kept_id]
     missing = client.patch("/api/studio/99999/masks", json={"masks": []})
     assert missing.status_code == 404
+
+
+def test_moved_pixelate_keeps_its_position(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db = app.state.db
+    media_id = _seed_media(db, tmp_path / "lib", filename="cloud.MP4", kind="video")
+    clip_id = _add(db, media_id)
+    client = TestClient(app)
+    placed = {
+        "id": "mpix000001",
+        "effect": "pixelate",
+        "strength": 60,
+        "x": 0.2,
+        "y": 0.2,
+        "w": 0.28,
+        "h": 0.22,
+        "start_s": 0.4,
+        "end_s": 1.6,
+    }
+    created = client.patch(f"/api/studio/{clip_id}/masks", json={"masks": [placed]})
+    assert created.status_code == 200
+    moved = dict(placed, x=0.55, y=0.33, w=0.4, h=0.36)
+    saved = client.patch(f"/api/studio/{clip_id}/masks", json={"masks": [moved]})
+    assert saved.status_code == 200
+    assert saved.headers["x-studio-can-undo"] == "1"
+    body = saved.json()["masks"]
+    assert len(body) == 1
+    assert body[0]["effect"] == "pixelate"
+    assert body[0]["x"] == pytest.approx(0.55)
+    assert body[0]["y"] == pytest.approx(0.33)
+    assert body[0]["w"] == pytest.approx(0.4)
+    assert body[0]["h"] == pytest.approx(0.36)
+    assert body[0]["start_s"] == pytest.approx(0.4)
+    assert body[0]["end_s"] == pytest.approx(1.6)
+    project = db.get_open_studio_project()
+    assert project is not None
+    item = next(row for row in db.list_studio_items(project.id) if row.id == clip_id)
+    stored = masks_from_effect_settings(item.effect_settings)
+    assert stored[0].effect == "pixelate"
+    assert stored[0].x == pytest.approx(0.55)
+    assert stored[0].y == pytest.approx(0.33)
+    export_clip = _clip_to_export_clip(db, item)
+    assert export_clip is not None
+    assert export_clip.masks[0].effect == "pixelate"
+    assert export_clip.masks[0].x == pytest.approx(0.55)
+    assert export_clip.masks[0].y == pytest.approx(0.33)
+    undo = client.post("/api/studio/history/undo")
+    assert undo.status_code == 200
+    item = next(row for row in db.list_studio_items(project.id) if row.id == clip_id)
+    restored = masks_from_effect_settings(item.effect_settings)
+    assert restored[0].effect == "pixelate"
+    assert restored[0].x == pytest.approx(0.2)
+    assert restored[0].y == pytest.approx(0.2)
 
 
 def test_zoomed_mask_uses_the_visible_window() -> None:

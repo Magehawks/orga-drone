@@ -38,6 +38,7 @@ from orga_drone.dupes import (
     find_duplicate_groups,
     media_row_to_fingerprint,
 )
+from orga_drone.studio_audio import detached_audio_from_effect_settings
 from orga_drone.studio_cut import section_repeats_from_effect_settings
 from orga_drone.studio_forward_loop import (
     clip_forward_loop_view,
@@ -1358,6 +1359,9 @@ def create_app() -> FastAPI:
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
                         "zoom_bar": stored_lane(it.effect_settings)["zoom_bar"],
                         "slow_bar": stored_lane(it.effect_settings)["slow_bar"],
+                        "clip_audio": detached_audio_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "map": map_from_effect_settings(it.effect_settings).as_dict(),
                         "gps": (
                             route_preview(
@@ -1939,6 +1943,36 @@ def create_app() -> FastAPI:
                 ],
                 "zoom_bar": zoom if isinstance(zoom, dict) else None,
                 "slow_bar": slow if isinstance(slow, dict) else None,
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/clip-audio")
+    async def api_studio_clip_audio(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must include an audio range")
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_clip_audio(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        audio = detached_audio_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "source_in_s": item.source_start,
+                "source_out_s": item.source_end,
+                "audio": audio.as_dict(),
             }
         )
 

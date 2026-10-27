@@ -258,6 +258,12 @@ def test_about_shows_installed_version(
     assert "About Orga Drone" in html or "Über Orga Drone" in html
     assert f">v{__version__}</span>" in html
     assert OFFICIAL_DOWNLOAD_URL in html
+    assert (
+        'href="https://discord.gg/8Qa4FZYZq" target="_blank" rel="noopener noreferrer"'
+        in html
+    )
+    assert "utm_source" not in html
+    assert "chatgpt.com" not in html
     script = Path("src/orga_drone/static/js/updates.js").read_text(encoding="utf-8")
     assert 'dataset.updateCheck === "1"' in script
     assert "sessionStorage" in script

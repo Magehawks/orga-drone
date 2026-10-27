@@ -4,6 +4,8 @@
 
 Open source. Runs on your machine. No cloud account required. Built first for **DJI Avata 2**, usable on Windows (primary), macOS, and Linux via Python; Windows also ships as a downloadable desktop build.
 
+**Community:** [Discord](https://discord.gg/8Qa4FZYZq)
+
 **Vision:** help people organize, rediscover, create and share the memories behind their adventures — without becoming a professional video editor. See [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
 
 **Windows:** [Download latest exe (zip)](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip) · [All releases](https://github.com/Magehawks/orga-drone/releases)

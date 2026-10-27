@@ -235,6 +235,41 @@ def test_export_chain_ramps_after_the_grade_and_respects_trim() -> None:
     assert "saturation=" not in stitch
 
 
+def test_full_strength_ramp_is_desaturated() -> None:
+    """Strength all the way to black and white is a flat hue of 0, not a color fade."""
+    ramp = SaturationRamp(
+        enabled=True, start_s=0.0, end_s=4.0, start_saturation=0, end_saturation=0
+    )
+    chain = ffmpeg_saturation_ramp(ramp, origin_s=0.0)
+    assert chain == "hue=s=0.0000"
+    vf = _segment_vf_for_clip(
+        1280,
+        720,
+        StudioExportClip(
+            source_path=Path("clip.mp4"),
+            kind="video",
+            duration_s=4.0,
+            saturation_ramp=ramp,
+        ),
+    )
+    assert "hue=s=0.0000" in vf
+    off = SaturationRamp(
+        enabled=False, start_s=0.0, end_s=4.0, start_saturation=0, end_saturation=0
+    )
+    assert ffmpeg_saturation_ramp(off, origin_s=0.0) == ""
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    controls = script.split("function saturationRampFromControls", 1)[1].split(
+        "function queueSaturationRampSave", 1
+    )[0]
+    assert "partialOn ? 100 : level" in controls
+    assert "ramp.end_saturation = level" in controls
+    preview = script.split("function cssFilterFor", 1)[1].split("function setGradeMatrix", 1)[0]
+    assert "saturate(" in preview
+    blit = script.split("function drawPreviewLayer", 1)[1].split("function ensurePreviewBlit", 1)[0]
+    assert "previewGradeSource" in blit
+    assert "ctx.filter = filter" in blit
+
+
 def test_ffmpeg_ramps_a_red_frame_toward_gray() -> None:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:

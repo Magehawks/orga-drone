@@ -546,6 +546,7 @@
             <div class="studio-ruler-gutter"></div>
             <div class="studio-gutter-tracks">
               <div class="studio-track-label studio-track-label-story">{{ _('Story') }}</div>
+              <div class="studio-track-label studio-track-label-audio" id="studio-audio-label">{{ _('Audio') }}</div>
               <div class="studio-track-label studio-track-label-effect" id="studio-effect-label">{{ _('Effect') }}</div>
               <div class="studio-track-label">{{ _('Soundtrack') }}</div>
             </div>
@@ -635,6 +636,7 @@
                   data-frame='{{ row.frame|tojson }}'
                   data-zoom-bar='{{ row.zoom_bar|tojson }}'
                   data-slow-bar='{{ row.slow_bar|tojson }}'
+                  data-clip-audio='{{ row.clip_audio|tojson|replace("'", "\\u0027") }}'
                   data-map='{{ row.map|tojson }}'
                   data-gps='{{ row.gps|tojson|replace("'", "\\u0027") }}'
                   data-hud='{{ row.hud|tojson|replace("'", "\\u0027") }}'
@@ -678,6 +680,9 @@
               {% endif %}
                   </ol>
                 </div>
+                <div class="studio-track studio-track-audio" id="studio-clip-audio-lane" hidden>
+                  <div class="studio-clip-audio" id="studio-clip-audio"></div>
+                </div>
                 <div class="studio-track studio-track-effect" id="studio-effect-lane" hidden
                      data-label-zoom="{{ _('Zoom') }}"
                      data-label-blur="{{ _('Lane blur') }}"
@@ -689,7 +694,6 @@
                       <span class="visually-hidden">{{ _('No music yet') }}</span>
                     </div>
                     <div class="studio-music-clips" id="studio-music-clips"></div>
-                    <div class="studio-clip-audio" id="studio-clip-audio"></div>
                   </div>
                 </div>
               </div>

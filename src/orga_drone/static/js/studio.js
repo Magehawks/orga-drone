@@ -695,9 +695,34 @@
     const slow = speedAtSource(clip, offset) < 0.999;
     const stream = clip.dataset.streamUrl || "";
     const proxy = clip.dataset.hasProxy === "1";
+    const range = audioPlacement(clip);
     if (slow) {
       audio.pause();
       video.muted = true;
+      return;
+    }
+    if (range.custom) {
+      video.muted = true;
+      const speed = playbackSpeed(clip) || 1;
+      const story = slowBarOf(clip) && playbackSpeed(clip) >= 0.999
+        ? sourceToStory(clip, offset)
+        : offset / speed;
+      const into = story - range.place;
+      if (!stream || into < -0.03 || into > range.story + 0.03) {
+        audio.pause();
+        return;
+      }
+      if (audio.dataset.src !== stream) {
+        audio.src = stream;
+        audio.dataset.src = stream;
+      }
+      const target = range.sourceIn + Math.max(0, into) * speed;
+      if (Math.abs((audio.currentTime || 0) - target) > 0.35) {
+        try { audio.currentTime = target; } catch (_) { /* seek while loading */ }
+      }
+      audio.volume = state.volume;
+      if (video.paused) audio.pause();
+      else audio.play().catch(() => {});
       return;
     }
     if (!stream) {
@@ -1017,12 +1042,18 @@
     const videos = clips().filter((clip) => clip.dataset.kind === "video");
     const show = videos.length > 0;
     lane.hidden = !show;
-    if (label) label.hidden = !show;
+    if (label) {
+      label.hidden = !show;
+      if (!show) label.style.minHeight = "";
+    }
     if (!show) {
       lane.replaceChildren();
+      lane.style.minHeight = "";
       return;
     }
     const pps = timelinePxPerSecond();
+    const effectBarPx = 32;
+    const effectBarGapPx = 4;
     lane.replaceChildren();
     let stack = 1;
     videos.forEach((clip) => {
@@ -1044,9 +1075,11 @@
         const el = document.createElement("button");
         el.type = "button";
         el.className = "studio-effect-bar";
+        const step = effectBarPx + effectBarGapPx;
         el.style.left = `${left + storyStart * pps}px`;
         el.style.width = `${Math.max(12, (storyEnd - storyStart) * pps)}px`;
-        el.style.top = `${4 + index * 22}px`;
+        el.style.top = `${effectBarGapPx + index * step}px`;
+        el.style.height = `${effectBarPx}px`;
         el.dataset.kind = bar.kind === "blur" || bar.kind === "pixelate" ? "mask" : bar.kind;
         el.dataset.effect = bar.kind;
         el.dataset.maskId = bar.id;
@@ -1066,33 +1099,225 @@
         stack = Math.max(stack, index + 1);
       });
     });
-    lane.style.minHeight = `${Math.max(38, stack * 22 + 8)}px`;
+    const step = effectBarPx + effectBarGapPx;
+    lane.style.minHeight = `${effectBarGapPx + stack * step}px`;
+    if (label) label.style.minHeight = lane.style.minHeight;
+  }
+
+  let suppressTimelineClick = false;
+
+  function readClipAudio(clip) {
+    if (!clip) return null;
+    try {
+      const parsed = JSON.parse(clip.dataset.clipAudio || "null");
+      if (!parsed || parsed.active !== true) return null;
+      const sourceIn = Number(parsed.source_in_s);
+      const sourceOut = Number(parsed.source_out_s);
+      const place = Number(parsed.place_s);
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut - sourceIn < 0.05) return null;
+      return { sourceIn, sourceOut, place: Number.isFinite(place) ? place : 0 };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function audioPlacement(clip) {
+    const speed = playbackSpeed(clip) || 1;
+    const stored = readClipAudio(clip);
+    if (!stored) {
+      const sourceIn = sourceInS(clip);
+      const sourceOut = Math.max(sourceIn + 0.05, sourceOutS(clip));
+      return {
+        sourceIn,
+        sourceOut,
+        place: 0,
+        custom: false,
+        story: Math.max(0.05, (sourceOut - sourceIn) / speed),
+      };
+    }
+    return {
+      sourceIn: stored.sourceIn,
+      sourceOut: stored.sourceOut,
+      place: stored.place,
+      custom: true,
+      story: Math.max(0.05, (stored.sourceOut - stored.sourceIn) / speed),
+    };
+  }
+
+  function makeAudioBar(clip, left, width) {
+    const bar = document.createElement("button");
+    bar.type = "button";
+    bar.className = "studio-clip-audio-bar";
+    bar.style.left = `${left}px`;
+    bar.style.width = `${Math.max(8, width)}px`;
+    bar.dataset.studioId = clip.dataset.studioId || "";
+    bar.setAttribute("aria-label", clip.dataset.filename || "Audio");
+    bar.textContent = clip.dataset.filename || "";
+    const edgeIn = document.createElement("span");
+    edgeIn.className = "studio-clip-audio-edge studio-clip-audio-edge-in";
+    const edgeOut = document.createElement("span");
+    edgeOut.className = "studio-clip-audio-edge studio-clip-audio-edge-out";
+    bar.append(edgeIn, edgeOut);
+    bar.addEventListener("pointerdown", (event) => onAudioPointerDown(event, bar, clip));
+    bar.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    return bar;
   }
 
   function layoutClipAudio() {
     const host = document.getElementById("studio-clip-audio");
+    const lane = document.getElementById("studio-clip-audio-lane");
+    const label = document.getElementById("studio-audio-label");
     if (!host) return;
     host.replaceChildren();
-    const pps = timelinePxPerSecond();
-    clips().forEach((clip) => {
-      if (clip.dataset.kind !== "video") return;
-      const left = Number.parseFloat(clip.style.left) || 0;
-      const width = Number.parseFloat(clip.style.width) || 0;
-      if (width < 8) return;
-      const bar = document.createElement("span");
-      bar.className = "studio-clip-audio-bar";
-      bar.style.left = `${left}px`;
-      bar.style.width = `${width}px`;
-      bar.textContent = clip.dataset.filename || "";
-      host.appendChild(bar);
+    const videos = clips().filter((clip) => clip.dataset.kind === "video");
+    const show = videos.length > 0;
+    if (lane) lane.hidden = !show;
+    if (label) label.hidden = !show;
+    if (!show) return;
+    const pps = timelinePxPerSecond() || 1;
+    videos.forEach((clip) => {
+      const clipLeft = Number.parseFloat(clip.style.left) || 0;
+      const clipWidth = Number.parseFloat(clip.style.width) || 0;
+      const range = audioPlacement(clip);
+      if (!range.custom) {
+        if (clipWidth < 4) return;
+        host.appendChild(makeAudioBar(clip, clipLeft, clipWidth));
+        return;
+      }
+      const reps = Math.max(1, sectionRepeats(clip));
+      const cycle = sectionCycleS(clip);
+      const width = Math.max(8, range.story * pps);
+      if (reps > 1 && cycle > 0.05) {
+        for (let i = 0; i < reps; i += 1) {
+          host.appendChild(makeAudioBar(clip, clipLeft + (i * cycle + range.place) * pps, width));
+        }
+        return;
+      }
+      host.appendChild(makeAudioBar(clip, clipLeft + range.place * pps, width));
     });
-    void pps;
+  }
+
+  function onAudioPointerDown(event, el, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressTimelineClick = true;
+    const edge = event.target.closest ? event.target.closest(".studio-clip-audio-edge") : null;
+    const mode = edge && edge.classList.contains("studio-clip-audio-edge-in")
+      ? "start"
+      : edge && edge.classList.contains("studio-clip-audio-edge-out")
+        ? "end"
+        : "move";
+    const origin = audioPlacement(clip);
+    const originLeft = Number.parseFloat(el.style.left) || 0;
+    const startX = event.clientX;
+    const pps = timelinePxPerSecond() || 1;
+    const speed = playbackSpeed(clip) || 1;
+    const group = "audio" + String(event.pointerId || Date.now());
+    pausePlayback();
+    selectClip(clip.dataset.studioId, { movePlayhead: false });
+    const move = (ev) => {
+      const deltaStory = (ev.clientX - startX) / pps;
+      let sourceIn = origin.sourceIn;
+      let sourceOut = origin.sourceOut;
+      let place = origin.place;
+      if (mode === "move") {
+        const span = origin.story;
+        const limit = Math.max(span, sectionCycleS(clip) || clipDuration(clip) || span);
+        place = origin.place + deltaStory;
+        place = Math.max(Math.min(0, 0.05 - span), Math.min(Math.max(0, limit - 0.05), place));
+      } else if (mode === "start") {
+        const next = Math.max(origin.sourceIn, Math.min(origin.sourceOut - 0.05, origin.sourceIn + deltaStory * speed));
+        place = origin.place + (next - origin.sourceIn) / speed;
+        sourceIn = next;
+      } else {
+        sourceOut = Math.max(origin.sourceIn + 0.05, Math.min(origin.sourceOut, origin.sourceOut + deltaStory * speed));
+      }
+      const story = Math.max(0.05, (sourceOut - sourceIn) / speed);
+      el.style.left = `${originLeft + (place - origin.place) * pps}px`;
+      el.style.width = `${Math.max(8, story * pps)}px`;
+      el.dataset.draftIn = String(sourceIn);
+      el.dataset.draftOut = String(sourceOut);
+      el.dataset.draftPlace = String(place);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.setTimeout(() => {
+        suppressTimelineClick = false;
+      }, 0);
+      const sourceIn = Number(el.dataset.draftIn);
+      const sourceOut = Number(el.dataset.draftOut);
+      const place = Number(el.dataset.draftPlace);
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || !Number.isFinite(place)) return;
+      if (
+        Math.abs(sourceIn - origin.sourceIn) < 0.001 &&
+        Math.abs(sourceOut - origin.sourceOut) < 0.001 &&
+        Math.abs(place - origin.place) < 0.001
+      ) {
+        return;
+      }
+      historyGesture = group;
+      void saveClipAudio(clip, {
+        source_in_s: sourceIn,
+        source_out_s: sourceOut,
+        place_s: place,
+      });
+      historyGesture = "";
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  async function saveClipAudio(clip, body) {
+    let res;
+    try {
+      res = await fetch(`/api/studio/${clip.dataset.studioId}/clip-audio`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (_) {
+      showFlash("Could not update the audio.");
+      layoutClipAudio();
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.ok) {
+      showFlash((data && data.detail) || "Could not update the audio.");
+      layoutClipAudio();
+      return;
+    }
+    clip.dataset.clipAudio = JSON.stringify(data.audio || {});
+    layoutClipAudio();
+    applyClipPlayback(previewVideo, clip);
   }
 
   function onEffectPointerDown(event, el, clip) {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    if (el.dataset.kind === "mask" && el.dataset.maskId) {
+      selectedMaskId = el.dataset.maskId;
+      const already =
+        state.selected &&
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(clip.dataset.studioId);
+      if (!already) selectClip(clip.dataset.studioId, { movePlayhead: false });
+      else {
+        try {
+          fillMaskInspector(clip);
+        } catch (_) {
+          /* The preview frame still follows the selected mask. */
+        }
+        drawPrivacyMasks();
+      }
+    }
     selectedEffectBar = {
       studioId: el.dataset.studioId,
       kind: el.dataset.kind,
@@ -1984,7 +2209,7 @@
 
   function writeMasks(clip, masks) {
     clip.dataset.masks = JSON.stringify(masks.map((item) => clampMaskBox(item)));
-    layoutEffectBars();
+    if (!maskDragging) layoutEffectBars();
   }
 
   function maskEffectLabel(effect) {
@@ -2025,8 +2250,36 @@
     return Math.max(1, amount);
   }
 
+  function visibleContentBox(media) {
+    if (!media || media.hidden) return null;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    const frameW = previewFrame ? previewFrame.clientWidth : 0;
+    const frameH = previewFrame ? previewFrame.clientHeight : 0;
+    if (!srcW || !srcH || frameW < 2 || frameH < 2) return null;
+    const fit = contentRect(frameW, frameH, srcW, srcH);
+    if (!fit || fit.w < 2 || fit.h < 2) return null;
+    return { left: fit.x, top: fit.y, width: fit.w, height: fit.h };
+  }
+
+  function boxMatchingCanvas(canvas, media) {
+    const fitted = media ? visibleContentBox(media) : null;
+    if (!canvas || canvas.hidden || !previewFrame || !fitted) return fitted;
+    const painted = canvas.getBoundingClientRect();
+    const frame = previewFrame.getBoundingClientRect();
+    if (painted.width < 2 || painted.height < 2) return fitted;
+    return {
+      left: painted.left - frame.left - previewFrame.clientLeft,
+      top: painted.top - frame.top - previewFrame.clientTop,
+      width: painted.width,
+      height: painted.height,
+    };
+  }
+
   function sourceWindowForMask(media, srcW, srcH) {
-    const frameRect = media.getBoundingClientRect();
+    const laidOut = media.getBoundingClientRect();
+    const frameW = previewFrame && previewFrame.clientWidth > 2 ? previewFrame.clientWidth : laidOut.width;
+    const frameH = previewFrame && previewFrame.clientHeight > 2 ? previewFrame.clientHeight : laidOut.height;
     const clip = clipForPreviewMedia(media);
     const frame = clip ? readFrame(clip) : { zoom_start: 1, zoom_end: 1, x_start: 0.5, y_start: 0.5, x_end: 0.5, y_end: 0.5 };
     const hit = resolveAt(state.projectTimeS);
@@ -2040,7 +2293,7 @@
     if (sample.zoom <= 1.001) {
       return { x: 0, y: 0, w: srcW, h: srcH };
     }
-    const win = windowFor(sample.zoom, sample.x, sample.y, frameRect.width, frameRect.height, srcW, srcH);
+    const win = windowFor(sample.zoom, sample.x, sample.y, frameW, frameH, srcW, srcH);
     const scale = srcW / win.content.w;
     return {
       x: (win.x - win.content.x) * scale,
@@ -2126,7 +2379,7 @@
       canvas.hidden = true;
       return;
     }
-    const box = mediaContentBox(media);
+    const box = visibleContentBox(media);
     const srcW = media.videoWidth || media.naturalWidth || 0;
     const srcH = media.videoHeight || media.naturalHeight || 0;
     if (!box || !srcW || !srcH) {
@@ -2174,15 +2427,18 @@
   function renderMaskHandles(clip, box) {
     const layer = previewMaskHandles;
     if (!layer) return;
-    const selected =
+    if (maskDragging) return;
+    const hit = resolveAt(state.projectTimeS);
+    const onPlayhead =
       clip &&
-      state.selected &&
-      state.selected.type === "clip" &&
-      String(state.selected.id) === String(clip.dataset.studioId);
-    const masks = selected ? readMasks(clip) : [];
-    if (!selected || !box || !masks.length) {
+      hit &&
+      hit.clip &&
+      String(hit.clip.dataset.studioId) === String(clip.dataset.studioId);
+    const masks = onPlayhead ? masksAt(clip, hit.localS) : [];
+    if (!onPlayhead || !box || !masks.length) {
+      if (maskDragging) return;
       layer.hidden = true;
-      if (!maskDragging) layer.replaceChildren();
+      layer.replaceChildren();
       return;
     }
     layer.hidden = false;
@@ -2197,6 +2453,7 @@
       boxEl.className = "studio-mask-box";
       if (mask.id === selectedMaskId) boxEl.classList.add("is-selected");
       boxEl.dataset.maskId = mask.id;
+      boxEl.dataset.studioId = clip.dataset.studioId || "";
       boxEl.style.left = `${mask.x * 100}%`;
       boxEl.style.top = `${mask.y * 100}%`;
       boxEl.style.width = `${mask.w * 100}%`;
@@ -2204,6 +2461,10 @@
       boxEl.setAttribute("role", "button");
       boxEl.tabIndex = 0;
       boxEl.setAttribute("aria-label", maskEffectLabel(mask.effect));
+      const hitPad = document.createElement("span");
+      hitPad.className = "studio-mask-hit";
+      hitPad.setAttribute("aria-hidden", "true");
+      boxEl.appendChild(hitPad);
       const handle = document.createElement("span");
       handle.className = "studio-mask-resize";
       handle.dataset.resize = "1";
@@ -2227,41 +2488,168 @@
         });
         boxEl.appendChild(close);
       }
-      boxEl.addEventListener("pointerdown", (event) => onMaskPointerDown(event, clip, mask.id));
+      boxEl.addEventListener("pointerdown", (event) => {
+        if (maskDragging) return;
+        beginMaskDrag(event, boxEl);
+      });
       layer.appendChild(boxEl);
     });
   }
 
-  function onMaskPointerDown(event, clip, maskId) {
-    if (event.button != null && event.button !== 0) return;
-    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
-    event.preventDefault();
-    event.stopPropagation();
+  function maskBoxAtPoint(clientX, clientY) {
     const layer = previewMaskHandles;
-    if (!layer) return;
-    selectedMaskId = maskId;
-    fillMaskInspector(clip);
-    if (event.currentTarget && event.currentTarget.focus) event.currentTarget.focus();
-    const masks = readMasks(clip);
-    const startMask = masks.find((item) => item.id === maskId);
-    if (!startMask) return;
-    const resizing = Boolean(event.target && event.target.dataset && event.target.dataset.resize);
-    const bounds = layer.getBoundingClientRect();
-    if (bounds.width < 2 || bounds.height < 2) return;
-    maskDragging = true;
-    const originX = event.clientX;
-    const originY = event.clientY;
-    const pointerId = event.pointerId;
-    const box = event.currentTarget;
-    if (box && box.classList) box.classList.add("is-dragging");
-    if (box && box.setPointerCapture) {
-      try {
-        box.setPointerCapture(pointerId);
-      } catch (_) {
-        /* ignore */
+    if (!layer || layer.hidden) return null;
+    const nodes = layer.querySelectorAll(".studio-mask-box, .studio-mask-resize");
+    for (let i = 0; i < nodes.length; i += 1) {
+      const node = nodes[i];
+      const rect = node.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        return node.closest(".studio-mask-box");
       }
     }
+    return null;
+  }
+
+  function maskCanvasHit(clientX, clientY) {
+    const hit = resolveAt(state.projectTimeS);
+    if (!hit || !hit.clip) return null;
+    const layers = [{ canvas: previewMasks, clip: hit.clip, localS: hit.localS }];
+    if (hit.overlapClip && hit.crossfadeProgress != null) {
+      layers.unshift({
+        canvas: previewMasksB,
+        clip: hit.overlapClip,
+        localS: hit.overlapLocalS,
+      });
+    }
+    let found = null;
+    for (let layerIndex = 0; layerIndex < layers.length; layerIndex += 1) {
+      const layer = layers[layerIndex];
+      const canvas = layer.canvas;
+      if (!canvas || canvas.hidden || !layer.clip) continue;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) continue;
+      const masks = masksAt(layer.clip, layer.localS);
+      for (let i = 0; i < masks.length; i += 1) {
+        const mask = masks[i];
+        const left = rect.left + mask.x * rect.width;
+        const top = rect.top + mask.y * rect.height;
+        const right = left + Math.max(1, mask.w * rect.width);
+        const bottom = top + Math.max(1, mask.h * rect.height);
+        const onResize =
+          clientX >= right - 18 &&
+          clientX <= right + 12 &&
+          clientY >= bottom - 18 &&
+          clientY <= bottom + 12;
+        const inside =
+          clientX >= left && clientX <= right && clientY >= top && clientY <= bottom;
+        if (onResize || inside) {
+          found = { mask, clip: layer.clip, resizing: onResize, rect };
+        }
+      }
+    }
+    return found;
+  }
+
+  function maskBoxForId(maskId) {
+    const layer = previewMaskHandles;
+    if (!layer) return null;
+    const nodes = layer.querySelectorAll(".studio-mask-box");
+    for (let i = 0; i < nodes.length; i += 1) {
+      if (nodes[i].dataset.maskId === maskId) return nodes[i];
+    }
+    return null;
+  }
+
+  function maskDragBounds(layer, box, startMask, geomRect) {
+    if (geomRect && geomRect.width >= 2 && geomRect.height >= 2) return geomRect;
+    if (layer) {
+      const layerRect = layer.getBoundingClientRect();
+      if (layerRect.width >= 2 && layerRect.height >= 2) return layerRect;
+    }
+    if (!box) {
+      return {
+        width: Math.max(2, geomRect ? geomRect.width : 2),
+        height: Math.max(2, geomRect ? geomRect.height : 2),
+      };
+    }
+    const boxRect = box.getBoundingClientRect();
+    const w = Math.max(0.04, Number(startMask.w) || 0.04);
+    const h = Math.max(0.04, Number(startMask.h) || 0.04);
+    return {
+      width: Math.max(2, boxRect.width / w),
+      height: Math.max(2, boxRect.height / h),
+    };
+  }
+
+  function beginMaskDrag(event, box, geom) {
+    if (maskDragging) return false;
+    if (event.button != null && event.button !== 0) return false;
+    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return false;
+    const layer = previewMaskHandles;
+    if (!layer) return false;
+    const maskId = (box && box.dataset.maskId) || (geom && geom.mask && geom.mask.id) || "";
+    const studioId =
+      (box && box.dataset.studioId) ||
+      (geom && geom.clip && geom.clip.dataset.studioId) ||
+      "";
+    const clip =
+      (geom && geom.clip) ||
+      clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip || !maskId) return false;
+    const startMask = readMasks(clip).find((item) => item.id === maskId);
+    if (!startMask) return false;
+    let resizing = Boolean(geom && geom.resizing);
+    if (
+      event.target &&
+      event.target.closest &&
+      event.target.closest(".studio-mask-box [data-resize]")
+    ) {
+      resizing = true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    selectedMaskId = maskId;
+    if (
+      !state.selected ||
+      state.selected.type !== "clip" ||
+      String(state.selected.id) !== String(clip.dataset.studioId)
+    ) {
+      selectClip(clip.dataset.studioId, { movePlayhead: false });
+    }
+    renderMaskHandles(clip, boxMatchingCanvas(previewMasks, visiblePrimaryMedia()));
+    if (!box || !box.isConnected) box = maskBoxForId(maskId);
+    maskDragging = true;
+    if (box) box.classList.add("is-dragging", "is-selected");
+    const pointerId = event.pointerId;
+    const captureEl = previewFrame || box;
+    try {
+      if (captureEl) captureEl.setPointerCapture(pointerId);
+    } catch (_) {
+      /* Window listeners still follow the pointer. */
+    }
+    try {
+      fillMaskInspector(clip);
+    } catch (_) {
+      /* The drag still updates the mask if the inspector cannot refresh. */
+    }
+    const bounds = maskDragBounds(layer, box, startMask, geom && geom.rect);
+    const originX = event.clientX;
+    const originY = event.clientY;
+    let ended = false;
+    let acceptCancel = false;
+    window.setTimeout(() => {
+      acceptCancel = true;
+    }, 0);
     const move = (ev) => {
+      if (ended) return;
+      if (ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      ev.preventDefault();
+      ev.stopPropagation();
       const dx = (ev.clientX - originX) / bounds.width;
       const dy = (ev.clientY - originY) / bounds.height;
       const next = readMasks(clip).map((item) => {
@@ -2273,26 +2661,51 @@
       });
       writeMasks(clip, next);
       const current = next.find((item) => item.id === maskId);
-      const el = layer.querySelector(`[data-mask-id="${CSS.escape(maskId)}"]`);
-      if (el && current) {
-        el.style.left = `${current.x * 100}%`;
-        el.style.top = `${current.y * 100}%`;
-        el.style.width = `${current.w * 100}%`;
-        el.style.height = `${current.h * 100}%`;
+      if (current && box) {
+        box.style.left = `${current.x * 100}%`;
+        box.style.top = `${current.y * 100}%`;
+        box.style.width = `${current.w * 100}%`;
+        box.style.height = `${current.h * 100}%`;
       }
       drawPrivacyMasks();
     };
-    const up = () => {
+    const up = (ev) => {
+      if (ended) return;
+      if (ev && ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      if (ev && ev.type === "pointercancel" && !acceptCancel) return;
+      ended = true;
       maskDragging = false;
-      if (box && box.classList) box.classList.remove("is-dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
+      if (box) box.classList.remove("is-dragging");
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+      try {
+        if (captureEl) captureEl.releasePointerCapture(pointerId);
+      } catch (_) {
+        /* already released */
+      }
+      layoutEffectBars();
       queueMaskSave(clip);
       drawPrivacyMasks();
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
+    return true;
   }
+
+  function onDocumentMaskPointerDown(event) {
+    if (event.button != null && event.button !== 0) return;
+    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
+    const geom = maskCanvasHit(event.clientX, event.clientY);
+    const direct = event.target && event.target.closest && event.target.closest(".studio-mask-box");
+    const box = direct || maskBoxAtPoint(event.clientX, event.clientY);
+    if (!box && !geom) return;
+    if (box && previewFrame && !previewFrame.contains(box) && !geom) return;
+    if (beginMaskDrag(event, box, geom)) event.stopPropagation();
+  }
+
+  document.addEventListener("pointerdown", onDocumentMaskPointerDown, true);
 
   function drawPrivacyMasks() {
     const hit = resolveAt(state.projectTimeS);
@@ -2311,7 +2724,7 @@
       overlap ? masksAt(hit.overlapClip, hit.overlapLocalS) : [],
       secondary ? secondary.style.opacity : "1"
     );
-    renderMaskHandles(hit.clip, primary ? mediaContentBox(primary) : null);
+    renderMaskHandles(hit.clip, primary ? boxMatchingCanvas(previewMasks, primary) : null);
   }
 
   function fillMaskInspector(clip) {
@@ -3350,6 +3763,26 @@
     return srcW > 0 && srcH > 0;
   }
 
+  let previewGradeScratch = null;
+
+  function previewGradeSource(media, filter) {
+    if (!filter || filter === "none") return media;
+    const srcW = media.videoWidth || media.naturalWidth || 0;
+    const srcH = media.videoHeight || media.naturalHeight || 0;
+    if (!srcW || !srcH) return media;
+    if (!previewGradeScratch) previewGradeScratch = document.createElement("canvas");
+    if (previewGradeScratch.width !== srcW || previewGradeScratch.height !== srcH) {
+      previewGradeScratch.width = srcW;
+      previewGradeScratch.height = srcH;
+    }
+    const scratch = previewGradeScratch.getContext("2d");
+    if (!scratch) return media;
+    scratch.filter = "none";
+    scratch.clearRect(0, 0, srcW, srcH);
+    scratch.drawImage(media, 0, 0, srcW, srcH);
+    return previewGradeScratch;
+  }
+
   function drawPreviewLayer(ctx, media, frameW, frameH) {
     if (!previewLayerReady(media)) return false;
     const srcW = media.videoWidth || media.naturalWidth || 0;
@@ -3359,15 +3792,17 @@
     const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
+    const filter = canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;
-      ctx.filter = canvasFilterFrom(media.style.filter);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.translate(xform.tx, xform.ty);
       ctx.scale(xform.scale, xform.scale);
-      ctx.drawImage(media, fit.x, fit.y, fit.w, fit.h);
+      const source = previewGradeSource(media, filter);
+      ctx.filter = filter || "none";
+      ctx.drawImage(source, fit.x, fit.y, fit.w, fit.h);
       return true;
     } catch (_) {
       try {
@@ -7418,23 +7853,29 @@
     syncBwPanels(clip);
   }
 
+  function bwStrengthLevel() {
+    const strength = document.getElementById("inspector-bw-strength");
+    return clampRampPercent(100 - Number(strength ? strength.value : 100));
+  }
+
   function saturationRampFromControls(clip) {
     const stored = clip ? readSaturationRamp(clip) : neutralSaturationRamp();
     const enabled = document.getElementById("inspector-bw-enabled");
+    const partial = document.getElementById("inspector-bw-partial");
+    const partialOn = Boolean(partial && partial.checked);
+    const level = bwStrengthLevel();
     const ramp = Object.assign({}, stored);
     ramp.enabled = Boolean(enabled && enabled.checked);
-    ramp.start_saturation = 100;
-    const strength = document.getElementById("inspector-bw-strength");
-    ramp.end_saturation = clampRampPercent(100 - Number(strength ? strength.value : 100));
-    const partial = document.getElementById("inspector-bw-partial");
-    if (!partial || !partial.checked) {
+    ramp.end_saturation = level;
+    ramp.start_saturation = partialOn ? 100 : level;
+    if (!partialOn) {
       ramp.start_s = 0;
       ramp.end_s = Math.max(0.1, Math.round(clipDuration(clip) * 10000) / 10000);
     } else {
       const start = document.getElementById("inspector-bw-start");
       const end = document.getElementById("inspector-bw-end");
-      ramp.start_s = clampRampTime(start ? start.value : 0);
-      ramp.end_s = clampRampTime(end ? end.value : ramp.end_s);
+      ramp.start_s = clampRampTime(start ? start.value : stored.start_s);
+      ramp.end_s = clampRampTime(end ? end.value : stored.end_s);
     }
     return ramp;
   }
@@ -7493,10 +7934,6 @@
     }
     const ramp = saturationRampFromControls(clip);
     ramp.enabled = true;
-    ramp.start_saturation = 100;
-    ramp.end_saturation = 0;
-    ramp.start_s = 0;
-    ramp.end_s = Math.max(0.1, Math.round(clipDuration(clip) * 10000) / 10000);
     commitSaturationRamp(clip, ramp);
   });
   document.getElementById("inspector-bw-strength")?.addEventListener("input", () => {
@@ -7514,6 +7951,17 @@
   document.getElementById("inspector-bw-partial")?.addEventListener("change", () => {
     const clip = selectedVideoClip();
     if (!clip) return;
+    const partial = document.getElementById("inspector-bw-partial");
+    if (partial && partial.checked) {
+      const duration = Math.max(0.1, clipDuration(clip));
+      const start = document.getElementById("inspector-bw-start");
+      const end = document.getElementById("inspector-bw-end");
+      const startS = clampRampTime(start ? start.value : 0);
+      const endS = clampRampTime(end ? end.value : duration);
+      if (!(startS > 0.05 || endS < duration - 0.05) && end) {
+        end.value = String(Math.max(0.5, Math.round(duration * 0.5 * 10000) / 10000));
+      }
+    }
     commitSaturationRamp(clip, saturationRampFromControls(clip));
   });
   ["inspector-bw-start", "inspector-bw-end"].forEach((inputId) => {
@@ -7957,6 +8405,10 @@
 
   function startAnnotationDrag(event, overlayId) {
     if (event.button != null && event.button !== 0) return;
+    if (maskDragging) return;
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-box, .studio-mask-resize")) return;
+    if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+    if (maskCanvasHit(event.clientX, event.clientY)) return;
     const clip = clips().find((item) => String(item.dataset.studioId) === String(state.activeStudioId));
     if (!clip) return;
     event.preventDefault();
@@ -8286,9 +8738,16 @@
   if (previewFrame) {
     previewFrame.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
-      if (event.target && event.target.closest && event.target.closest(".studio-mask-box, #studio-preview-mask-handles")) {
+      if (maskDragging) return;
+      if (
+        event.target &&
+        event.target.closest &&
+        event.target.closest(".studio-mask-box, .studio-mask-hit, .studio-mask-resize, .studio-mask-remove, #studio-preview-mask-handles")
+      ) {
         return;
       }
+      if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+      if (maskCanvasHit(event.clientX, event.clientY)) return;
       const clip = selectedAdjustableClip();
       if (!clip) return;
       const frame = readFrame(clip);
@@ -8513,7 +8972,8 @@
       });
     });
     timelineCanvasEl?.addEventListener("click", (event) => {
-      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler, #studio-music-track")) return;
+      if (suppressTimelineClick) return;
+      if (event.target.closest(".studio-clip, .studio-transition, .studio-playhead, .studio-ruler, #studio-music-track, .studio-clip-audio-bar")) return;
       const wasPlaying = state.playing;
       pausePlayback();
       seekFromClientX(event.clientX, {
@@ -9095,6 +9555,10 @@
 
   function onMapPointerDown(event) {
     if (event.button != null && event.button !== 0) return;
+    if (maskDragging) return;
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-box")) return;
+    if (maskBoxAtPoint(event.clientX, event.clientY)) return;
+    if (maskCanvasHit(event.clientX, event.clientY)) return;
     const hit = resolveAt(state.projectTimeS);
     const clip = hit && hit.clip;
     if (!clip || !previewMap || previewMap.classList.contains("is-locked")) return;

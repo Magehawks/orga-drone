@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from orga_drone.studio_effect_lane import (
@@ -142,3 +144,71 @@ def test_normal_speed_preview_uses_the_original_audio() -> None:
     assert "id=\"studio-effect-lane\"" in page
     encoder = Path("src/orga_drone/export/studio_encoder.py").read_text(encoding="utf-8")
     assert '"-map", "0:a:0"' in encoder or "'-map', '0:a:0'" in encoder
+
+
+def _css_block(css: str, selector: str) -> str:
+    return css.split(selector, 1)[1].split("}", 1)[0]
+
+
+def test_story_audio_and_effect_lanes_are_separate_rows() -> None:
+    page = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    css = Path("src/orga_drone/static/css/app.css").read_text(encoding="utf-8")
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    story = page.index('class="studio-track studio-track-story"')
+    audio = page.index('id="studio-clip-audio-lane"')
+    effect = page.index('id="studio-effect-lane"')
+    music = page.index('id="studio-music-track"')
+    assert story < audio < effect < music
+    assert page.index('id="studio-clip-audio"') < effect
+    audio_css = _css_block(css, ".studio-clip-audio {")
+    assert "inset" not in audio_css
+    assert "position: absolute" not in audio_css
+    audio_lane = _css_block(css, ".studio-track-audio {")
+    assert "overflow: hidden" in audio_lane
+    assert "position: relative" in audio_lane
+    effect_lane = _css_block(css, ".studio-track-effect {")
+    assert "overflow: hidden" in effect_lane
+    assert "position: relative" in effect_lane
+    layout = script.split("function layoutEffectBars", 1)[1].split("function layoutClipAudio", 1)[0]
+    assert "const step = effectBarPx + effectBarGapPx" in layout
+    assert "el.style.height = `${effectBarPx}px`" in layout
+    assert "id=\"studio-audio-label\"" in page
+    for lang in ("en", "de"):
+        catalog = json.loads(
+            Path(f"src/orga_drone/locales/{lang}/LC_MESSAGES/messages.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert catalog["Audio"]
+
+
+def test_preview_mask_drag_keeps_the_pointer() -> None:
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    css = Path("src/orga_drone/static/css/app.css").read_text(encoding="utf-8")
+    drag = script.split("function beginMaskDrag", 1)[1].split(
+        "function onDocumentMaskPointerDown", 1
+    )[0]
+    assert "setPointerCapture" in drag
+    assert "previewFrame || box" in drag
+    assert "stopPropagation" in drag
+    assert "startMask.x + dx" in drag
+    assert "startMask.w + dx" in drag
+    assert 'addEventListener("pointermove", move, true)' in drag
+    hit = script.split("function maskCanvasHit", 1)[1].split("function maskBoxForId", 1)[0]
+    assert "previewMasks" in hit
+    assert "getBoundingClientRect" in hit
+    assert 'addEventListener("pointerdown", onDocumentMaskPointerDown, true)' in script
+    write = script.split("function writeMasks", 1)[1].split("function maskEffectLabel", 1)[0]
+    assert "if (!maskDragging) layoutEffectBars();" in write
+    handles = _css_block(css, ".studio-preview-mask-handles {")
+    notes = _css_block(css, ".studio-preview-annotations {")
+    handle_z = int(re.search(r"z-index:\s*(\d+)", handles).group(1))
+    note_z = int(re.search(r"z-index:\s*(\d+)", notes).group(1))
+    assert handle_z > note_z
+    assert "pointer-events: auto" in _css_block(css, ".studio-mask-box {")
+    frame = script.split('previewFrame.addEventListener("pointerdown"', 1)[1].split(
+        "const clip = selectedAdjustableClip()", 1
+    )[0]
+    assert "maskBoxAtPoint" in frame
+    assert "maskCanvasHit" in frame
+    assert "setPointerCapture" not in frame

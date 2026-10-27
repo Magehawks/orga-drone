@@ -579,8 +579,65 @@ main { padding: 1rem 1.5rem 3rem; }
   gap: 1rem;
   align-items: start;
 }
+.browse-layout > .filters,
+.browse-main {
+  min-width: 0;
+  max-width: 100%;
+}
+/* One filter group per row. A span-2 item would open a second track and
+   place the other groups beside it inside this narrow column. */
 .browse-layout .filter-grid {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.browse-layout .filter-grid > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.browse-layout .filter-span-2 {
+  grid-column: auto;
+}
+.browse-layout .filters label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.browse-layout .filter-grid input,
+.browse-layout .filter-grid select,
+.browse-layout .browse-page-size select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.browse-layout .actions {
+  flex-wrap: wrap;
+}
+.browse-layout .view-toggle {
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+.browse-layout .view-toggle .seg-control {
+  display: flex;
+  width: 100%;
+  margin-left: 0;
+}
+.browse-layout .view-toggle .seg-item {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+}
+.browse-layout .browse-page-size {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin-left: 0;
+  min-width: 0;
 }
 .filter-grid {
   display: grid;
@@ -1878,7 +1935,8 @@ video.studio-preview-media.studio-preview-layer-b {
 }
 .studio-preview-mask-handles {
   position: absolute;
-  z-index: 6;
+  z-index: 12;
+  pointer-events: none;
 }
 .studio-mask-box {
   position: absolute;
@@ -1886,9 +1944,19 @@ video.studio-preview-media.studio-preview-layer-b {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
   cursor: grab;
   touch-action: none;
+  pointer-events: auto;
   background: transparent;
 }
-.studio-mask-box.is-dragging {
+.studio-mask-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: auto;
+  cursor: grab;
+  background: rgba(255, 255, 255, 0.01);
+}
+.studio-mask-box.is-dragging,
+.studio-mask-box.is-dragging .studio-mask-hit {
   cursor: grabbing;
 }
 .studio-mask-box.is-selected {
@@ -1910,6 +1978,7 @@ video.studio-preview-media.studio-preview-layer-b {
   text-align: center;
   padding: 0;
   cursor: pointer;
+  pointer-events: auto;
   z-index: 2;
 }
 .studio-mask-list {
@@ -1934,12 +2003,14 @@ video.studio-preview-media.studio-preview-layer-b {
   position: absolute;
   right: -6px;
   bottom: -6px;
+  z-index: 3;
   width: 12px;
   height: 12px;
   border: 1px solid #111;
   background: #fff;
   cursor: nwse-resize;
   touch-action: none;
+  pointer-events: auto;
 }
 .studio-mask-actions,
 .studio-mask-list {
@@ -2332,8 +2403,14 @@ img.studio-preview-media,
 .studio-gutter-tracks .studio-track-label-story {
   min-height: 4.5rem;
 }
+.studio-gutter-tracks .studio-track-label-audio {
+  min-height: 1.85rem;
+}
 .studio-gutter-tracks .studio-track-label-effect {
   min-height: 2.35rem;
+}
+.studio-track-label[hidden] {
+  display: none !important;
 }
 .studio-gutter-tracks .studio-track-label:last-child {
   min-height: 2.35rem;
@@ -2409,15 +2486,34 @@ img.studio-preview-media,
   gap: 0.35rem;
   align-items: stretch;
   min-height: 4.25rem;
+  flex: 0 0 auto;
 }
 .studio-track-story {
   display: block;
+  position: relative;
   min-height: 4.5rem;
+  overflow: hidden;
+}
+.studio-track-audio {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  min-height: 1.85rem;
+  height: 1.85rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 6%, var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.studio-track-audio[hidden] {
+  display: none !important;
 }
 .studio-track-effect {
   position: relative;
   display: block;
+  flex: 0 0 auto;
   min-height: 2.35rem;
+  overflow: hidden;
 }
 .studio-track-effect[hidden] {
   display: none !important;
@@ -2455,23 +2551,50 @@ img.studio-preview-media,
   align-items: center;
 }
 .studio-clip-audio {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+  position: relative;
+  display: block;
+  height: 100%;
 }
 .studio-clip-audio-bar {
   position: absolute;
-  bottom: 0.12rem;
-  height: 0.35rem;
+  top: 0.12rem;
+  height: calc(100% - 0.24rem);
+  border: 0;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 28%, transparent);
   color: var(--text);
+  font: inherit;
   font-size: 0.68rem;
+  text-align: left;
   display: flex;
   align-items: center;
-  padding: 0 0.4rem;
+  padding: 0 0.45rem;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: grab;
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
 }
+.studio-clip-audio-bar:hover,
+.studio-clip-audio-bar:active {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text);
+  transform: none;
+  cursor: grabbing;
+}
+.studio-clip-audio-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.studio-clip-audio-edge-in { left: 0; }
+.studio-clip-audio-edge-out { right: 0; }
 .studio-track-label {
   font-size: 0.72rem;
   font-weight: 600;

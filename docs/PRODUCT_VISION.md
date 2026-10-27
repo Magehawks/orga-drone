@@ -351,7 +351,7 @@ See `README.md` for the detailed feature status table. In short:
   goggles display or tracking; not a professional grade or NLE). A selected section
   of a video clip can use slow motion at 0.5× or 0.25× inside its Effekt-lane bar (removing the bar returns that range to 1×;
   source audio on the slowed bar is muted; not optical-flow interpolation,
-  fast-forward, or reverse). A video clip's embedded audio plays in preview and in the MP4 at 1× and is shown on the story audio lane. A video section repeat plays an in/out range up to 8
+  fast-forward, or reverse). A video clip's embedded audio plays in preview and in the MP4 at 1× and is shown on its own story audio lane. That bar can be dragged in time, and its edges shorten only the sound; the picture's edge handles still trim the picture. The source file is not modified. A video section repeat plays an in/out range up to 8
   times at the same speed (hard cuts, not reverse). Separately, one video
   section can repeat forward until a soundtrack with a known duration ends.
   The soundtrack plays once and does not restart or blend at each join. The last play

@@ -3199,25 +3199,46 @@ class Database:
         blob = dump_detached_audio(str(row["effect_settings"] or ""), audio)
         return self._store_detached(studio_item_id, project_id, blob)
 
-    def trim_studio_audio(
+    def set_studio_clip_audio(
         self, studio_item_id: int, payload: dict[str, object]
     ) -> StudioClip:
-        """Change only the detached audio in/out. The picture range stays."""
+        """Store the audio bar range. Picture in/out and the source file stay."""
         from orga_drone.studio_audio import (
             DetachedAudio,
             detached_audio_from_effect_settings,
             dump_detached_audio,
-            parse_detached_trim,
+            parse_detached_edit,
         )
 
         row, project_id = self._video_clip_row(studio_item_id)
+        start, end, place = parse_detached_edit(payload)
+        if row["duration_s"] is not None:
+            limit = float(row["duration_s"])
+            start = min(start, limit)
+            end = min(end, limit)
+        if end - start < 0.05:
+            raise ValueError("audio range is too short")
         current = detached_audio_from_effect_settings(str(row["effect_settings"] or ""))
-        if not current.active:
-            raise ValueError("this clip has no split audio")
-        start, end = parse_detached_trim(payload)
-        audio = DetachedAudio(active=True, source_in_s=start, source_out_s=end)
+        if place is None:
+            if current.active:
+                place = current.place_s
+            else:
+                video_start = float(row["source_start"] or 0.0)
+                place = round(max(0.0, start - video_start), 4)
+        audio = DetachedAudio(
+            active=True,
+            source_in_s=round(start, 4),
+            source_out_s=round(end, 4),
+            place_s=place,
+        )
         blob = dump_detached_audio(str(row["effect_settings"] or ""), audio)
         return self._store_detached(studio_item_id, project_id, blob)
+
+    def trim_studio_audio(
+        self, studio_item_id: int, payload: dict[str, object]
+    ) -> StudioClip:
+        """Change only the audio in/out. The picture range stays."""
+        return self.set_studio_clip_audio(studio_item_id, payload)
 
     def clear_studio_audio(self, studio_item_id: int) -> StudioClip:
         """Remove the audio bar. The video row stays and its embedded track returns."""
