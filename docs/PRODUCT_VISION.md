@@ -41,8 +41,9 @@ The app opens on Home: the Orga Drone logo when the library is empty or no
 saved preview is available, otherwise one already cached local thumbnail.
 The same sidebar reaches the library, Studio, the flight map, and Settings
 (dark, light, or custom theme; German or English; thumbnail and map-tile
-cache only). Original files, projects, and exports are not deleted from
-Settings.
+cache only). Studio opens a project gallery. Choosing a project or creating
+one opens the editor. Original files, projects, and exports are not deleted
+from Settings.
 
 Treat everything labeled Later as **planned** unless the codebase already
 implements it. The Studio MVP local journey (import → arrange → optional music

@@ -306,13 +306,15 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 
 def test_http_studio_empty_and_nav(client: TestClient) -> None:
-    r = client.get("/studio")
-    assert r.status_code == 200
-    body = r.text
-    assert 'href="/studio"' in body
-    assert 'data-studio-mode="browser"' in body
+    r = client.get("/studio", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/studio/projects"
+    page = client.get("/studio/projects")
+    assert page.status_code == 200
+    body = page.text
+    assert 'href="/studio/projects"' in body
     assert "No Studio projects yet" in body or "Noch keine Studio-Projekte" in body
-    assert "studio-creator" in body
+    assert "studio-app" not in body.split("<body", 1)[1].split(">", 1)[0]
     assert 'class="bottom-nav"' in body
     bottom = body.split('class="bottom-nav"', 1)[1].split("</nav>", 1)[0]
     assert "/studio" in bottom

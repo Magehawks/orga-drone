@@ -254,13 +254,10 @@ def test_delete_project_leaves_media_and_shows_browser(
     assert keep.id in remaining
     assert doomed.id not in remaining
 
-    page = c.get("/studio")
+    page = c.get("/studio/projects")
     assert page.status_code == 200
-    assert 'data-studio-mode="browser"' in page.text
     assert "Keep" in page.text
-    assert "Switch, create, or manage Studio projects" in page.text or (
-        "Wechsle, erstelle oder verwalte Studio-Projekte" in page.text
-    )
+    assert "Doomed" not in page.text
 
 
 def test_delete_last_project_does_not_recreate_default(
@@ -276,10 +273,12 @@ def test_delete_last_project_does_not_recreate_default(
     db.set_open_studio_project_id(only.id)
     assert c.delete(f"/api/studio/projects/{only.id}").status_code == 200
 
-    page = c.get("/studio")
-    assert page.status_code == 200
-    assert 'data-studio-mode="browser"' in page.text
-    assert "No Studio projects yet" in page.text or "Noch keine Studio-Projekte" in page.text
+    page = c.get("/studio", follow_redirects=False)
+    assert page.status_code == 303
+    assert page.headers["location"] == "/studio/projects"
+    gallery = c.get("/studio/projects")
+    assert gallery.status_code == 200
+    assert "No Studio projects yet" in gallery.text or "Noch keine Studio-Projekte" in gallery.text
     assert db.list_studio_projects() == []
     assert db.get_media(mid) is not None
     assert path.is_file()
@@ -319,14 +318,14 @@ def test_http_project_api_list_create_open_update_delete(
     assert page.status_code == 200
     assert f'data-project-id="{second_id}"' in page.text
     assert 'data-studio-mode="editor"' in page.text
-    assert 'id="studio-projects-open"' in page.text
+    assert 'id="studio-projects-back"' in page.text
+    assert 'href="/studio/projects"' in page.text
     after_creator = page.text.split('class="studio-creator"', 1)[1]
-    assert 'id="studio-projects-dialog"' in after_creator
-    assert 'data-project-open="' in after_creator
+    assert 'id="studio-projects-dialog"' not in after_creator
     title_cluster = after_creator.split("studio-topbar-title", 1)[1].split(
         "studio-topbar-actions", 1
     )[0]
-    assert 'id="studio-projects-open"' in title_cluster
+    assert 'id="studio-projects-back"' in title_cluster
     assert 'id="studio-project-title"' in title_cluster
     assert "studio-project-identity-label" in title_cluster
     actions = after_creator.split("studio-topbar-actions", 1)[1].split(
@@ -334,7 +333,7 @@ def test_http_project_api_list_create_open_update_delete(
     )[0]
     assert 'id="studio-export-open"' in actions
     assert "studio-clear-form" not in actions
-    assert 'id="studio-projects-open"' not in actions
+    assert 'id="studio-projects-back"' not in actions
     toolbar = after_creator.split("studio-timeline-toolbar", 1)[1].split(
         "studio-timeline-row", 1
     )[0]
@@ -343,10 +342,7 @@ def test_http_project_api_list_create_open_update_delete(
     assert "Remove all clips from this Story" in after_creator or (
         "Alle Clips aus dieser Story" in after_creator
     )
-    assert "studio-project-current-badge" in after_creator
-    assert "Switch, create, or manage Studio projects" in after_creator or (
-        "Wechsle, erstelle oder verwalte Studio-Projekte" in after_creator
-    )
+    assert "Back to projects" in after_creator or "Zurück zu Projekten" in after_creator
     js = (
         Path(__file__).resolve().parents[1]
         / "src"
@@ -467,6 +463,121 @@ def test_project_lists_scroll_inside_a_short_window() -> None:
     )[0]
     assert "overflow: auto" in project_list
     assert "calc(100vh - 14rem)" in project_list
+
+
+def test_gallery_create_does_not_reuse_the_open_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    c, db = _client(tmp_path, monkeypatch)
+    mid = _seed_media(db, tmp_path / "lib")
+    older = db.create_studio_project("Older film")
+    _add_clip(db, mid, older.id)
+    db.set_open_studio_project_id(older.id)
+
+    created = c.post("/studio/projects", follow_redirects=False)
+    assert created.status_code == 303
+    assert created.headers["location"] == "/studio"
+    editor = c.get("/studio")
+    assert editor.status_code == 200
+    assert 'data-studio-mode="editor"' in editor.text
+    opened = db.get_open_studio_project()
+    assert opened is not None
+    assert opened.id != older.id
+    assert db.list_studio_items(opened.id) == []
+    assert len(db.list_studio_items(older.id)) == 1
+    gallery = c.get("/studio/projects")
+    assert "Older film" in gallery.text
+    assert opened.title in gallery.text
+
+
+def test_gallery_opens_the_saved_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    c, db = _client(tmp_path, monkeypatch)
+    mid = _seed_media(db, tmp_path / "lib")
+    project = db.create_studio_project("Saved flight")
+    clip_id = _add_clip(db, mid, project.id)
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE studio_clips SET source_start = ?, effect_settings = ? WHERE id = ?",
+            (1.25, '{"brightness": 1.1}', clip_id),
+        )
+    gallery = c.get("/studio/projects")
+    assert gallery.status_code == 200
+    assert f'href="/studio?project_id={project.id}"' in gallery.text
+    opened = c.get(f"/studio?project_id={project.id}", follow_redirects=False)
+    assert opened.status_code == 303
+    assert opened.headers["location"] == "/studio"
+    editor = c.get("/studio")
+    assert "Saved flight" in editor.text
+    saved = db.list_studio_items(project.id)
+    assert len(saved) == 1
+    assert saved[0].source_start == 1.25
+    assert saved[0].effect_settings == '{"brightness": 1.1}'
+
+
+def test_gallery_lists_fifty_projects_without_the_locked_studio_shell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    c, db = _client(tmp_path, monkeypatch)
+    created = [
+        db.create_studio_project(f"Story {index:02d}") for index in range(50)
+    ]
+    with db.connect() as conn:
+        for index, project in enumerate(created):
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (f"2024-01-01T00:00:{index:02d}", project.id),
+            )
+    page = c.get("/studio/projects")
+    assert page.status_code == 200
+    body = page.text.split("<body", 1)[1].split(">", 1)[0]
+    assert "studio-app" not in body
+    for index in range(50):
+        assert f"Story {index:02d}" in page.text
+    assert page.text.index("Story 49") < page.text.index("Story 00")
+
+
+def test_gallery_search_markup_and_languages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    c, db = _client(tmp_path, monkeypatch)
+    db.create_studio_project("Harbor")
+    english = c.get("/studio/projects", cookies={"lang": "en", "theme": "light"})
+    assert 'data-theme="light"' in english.text
+    assert 'id="studio-gallery-search"' in english.text
+    assert 'data-project-title="Harbor"' in english.text
+    assert "Search projects" in english.text
+    german = c.get("/studio/projects", cookies={"lang": "de", "theme": "custom"})
+    assert 'data-theme="custom"' in german.text
+    assert "Projekte suchen" in german.text
+    assert "Neues Projekt" in german.text
+    editor = c.get("/studio", cookies={"lang": "en"})
+    assert "Back to projects" in editor.text
+
+
+def test_gallery_uses_a_cached_thumb_and_survives_a_missing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    c, db = _client(tmp_path, monkeypatch)
+    present = _seed_media(db, tmp_path / "lib", filename="DJI_0001.MP4")
+    missing = _seed_media(db, tmp_path / "lib", filename="DJI_0002.MP4")
+    with_thumb = db.create_studio_project("With thumb")
+    offline = db.create_studio_project("Offline")
+    _add_clip(db, present, with_thumb.id)
+    _add_clip(db, missing, offline.id)
+    (tmp_path / "data" / "thumbs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data" / "thumbs" / f"{present}_cached.jpg").write_bytes(b"jpeg")
+    missing_item = db.get_media(missing)
+    assert missing_item is not None
+    Path(missing_item.path).unlink()
+
+    page = c.get("/studio/projects")
+    assert page.status_code == 200
+    assert f"/media/{present}/cached-thumb" in page.text
+    assert f"/media/{missing}/cached-thumb" not in page.text
+    assert "studio-gallery-logo" in page.text
+    assert 'loading="lazy"' in page.text
 
 
 def test_export_options_without_open_project_is_400(

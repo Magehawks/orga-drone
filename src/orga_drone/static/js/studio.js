@@ -3789,6 +3789,25 @@
     titleSaveTimer = 0;
     persistProjectTitle();
   };
+  document.addEventListener("click", (event) => {
+    const raw = event.target;
+    const link = raw && raw.closest ? raw.closest("a[href]") : null;
+    if (!link || !titleSaveTimer) return;
+    let path = "";
+    try {
+      path = new URL(link.href, window.location.href).pathname;
+    } catch (_) {
+      return;
+    }
+    if (path !== "/studio/projects") return;
+    event.preventDefault();
+    const href = link.href;
+    window.clearTimeout(titleSaveTimer);
+    titleSaveTimer = 0;
+    Promise.resolve(persistProjectTitle()).finally(() => {
+      window.location.assign(href);
+    });
+  });
 
   function applyTransitionsToDom() {
     grid.querySelectorAll(".studio-transition").forEach((el) => {

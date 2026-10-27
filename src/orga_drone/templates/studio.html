@@ -209,10 +209,7 @@
         {{ lucide('save') }}
         <span class="studio-save-state-text">{{ _('Saved') }}</span>
       </span>
-      <button type="button" class="button ghost studio-icon-button" id="studio-projects-open"
-              title="{{ _('Projects') }}" aria-label="{{ _('Projects') }}">
-        <span class="studio-btn-label">{{ _('Projects') }}</span>
-      </button>
+      <a class="button ghost studio-icon-button" id="studio-projects-back" href="/studio/projects">{{ _('Back to projects') }}</a>
     </div>
     <div class="studio-topbar-actions">
       <button type="button" class="button studio-icon-button" id="studio-export-open"
@@ -1227,21 +1224,6 @@
   </form>
 </dialog>
 
-<dialog class="studio-export-dialog studio-projects-dialog" id="studio-projects-dialog">
-  <div class="studio-export-form">
-    <h2>{{ _('Projects') }}</h2>
-    <p class="hint">{{ _('Switch, create, or manage Studio projects. Source media files stay unchanged.') }}</p>
-    {{ studio_project_create_form('studio-new-title-dialog') }}
-    {% if projects %}
-      {{ studio_project_list(projects, project.id if project else none) }}
-    {% else %}
-      <p class="studio-browser-empty">{{ _('No Studio projects yet.') }}</p>
-    {% endif %}
-    <div class="studio-export-actions">
-      <button type="button" class="button ghost" id="studio-projects-close">{{ _('Close') }}</button>
-    </div>
-  </div>
-</dialog>
 </section>
 {% endblock %}
 {% block scripts %}

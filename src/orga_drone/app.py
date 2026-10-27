@@ -1122,6 +1122,61 @@ def create_app() -> FastAPI:
             albums_available=albums_available,
         )
 
+    def studio_gallery_cards() -> list[dict[str, Any]]:
+        """Gallery rows in last-edited order. Thumbs are existing files only."""
+        cards: list[dict[str, Any]] = []
+        for project in db.list_studio_projects():
+            items = db.list_studio_items(project.id)
+            summary = summarize_studio_items(items)
+            thumb_id: int | None = None
+            for item in items:
+                if item.item_kind == "title_card" or item.source_media_id is None:
+                    continue
+                media = db.get_media(item.source_media_id)
+                if media is None or resolve_media_file(db, media) is None:
+                    continue
+                if cached_thumbnail(settings.data_dir, media.id) is None:
+                    continue
+                thumb_id = media.id
+                break
+            cards.append(
+                {
+                    "id": project.id,
+                    "title": project.title,
+                    "updated_at": project.updated_at.replace("T", " "),
+                    "duration_label": summary.estimated_total_label,
+                    "thumb_id": thumb_id,
+                }
+            )
+        return cards
+
+    @app.get("/studio/projects", response_class=HTMLResponse)
+    async def studio_projects_page(
+        request: Request, msg: str | None = None
+    ) -> HTMLResponse:
+        return render(
+            request,
+            "studio_projects.html",
+            projects=studio_gallery_cards(),
+            nav_active="studio",
+            flash_msg=msg,
+        )
+
+    @app.post("/studio/projects")
+    async def studio_project_create(request: Request) -> RedirectResponse:
+        """Create an empty project and open it. Never reuses another project."""
+        title = get_translator(lang_from_request(request))("Your story")
+        project = db.create_studio_project(title)
+        db.set_open_studio_project_id(project.id)
+        return RedirectResponse(url="/studio", status_code=303)
+
+    @app.post("/studio/projects/{project_id}/delete")
+    async def studio_project_delete(project_id: int) -> RedirectResponse:
+        deleted = db.delete_studio_project(project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="studio project not found")
+        return RedirectResponse(url="/studio/projects", status_code=303)
+
     @app.get("/studio", response_class=HTMLResponse)
     async def studio_page(
         request: Request,
@@ -1139,8 +1194,13 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=f"/studio{suffix}", status_code=303)
 
         project = db.resolve_studio_page_project()
+        if project is None:
+            gallery_url = "/studio/projects"
+            if msg:
+                gallery_url = f"{gallery_url}?msg={msg}"
+            return RedirectResponse(url=gallery_url, status_code=303)
         projects = db.list_studio_projects()
-        studio_mode = "editor" if project is not None else "browser"
+        studio_mode = "editor"
         items = db.list_studio_items(project.id) if project is not None else []
         for it in items:
             if (it.kind or "") != "video" or it.duration_s is not None:

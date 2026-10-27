@@ -1322,6 +1322,34 @@ button.cta, .button.cta {
   font-size: 1.15rem;
   font-weight: 700;
 }
+.studio-gallery-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.studio-gallery-head h1 { margin: 0; }
+.studio-gallery-search {
+  display: block;
+  margin: 0 0 1rem;
+}
+.studio-gallery-search input {
+  width: min(24rem, 100%);
+  font: inherit;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--text);
+}
+.studio-gallery-card[hidden] { display: none !important; }
+.studio-gallery-logo {
+  object-fit: contain;
+  padding: 1.4rem;
+  background: var(--surface-deep);
+}
 .studio-project-landing {
   flex: 1 1 auto;
   min-height: 0;
