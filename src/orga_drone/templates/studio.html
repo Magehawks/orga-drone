@@ -109,6 +109,8 @@
          data-transition-fallback="{{ _('This transition was skipped because a neighboring clip is too short.')|e }}"
          data-transition-clamped="{{ _('Duration was shortened to fit the neighboring clips.')|e }}"
          data-transition-failed="{{ _('Could not save the transition.')|e }}"
+         data-merge-failed="{{ _('Could not remove the cut.')|e }}"
+         data-merge-check-failed="{{ _('Could not check whether these clips can be joined.')|e }}"
          data-music-empty="{{ _('No music yet')|e }}"
          data-music-loop-badge="{{ _('Loop · repeats to Story end')|e }}"
          data-music-silence-badge="{{ _('then silence')|e }}"
@@ -445,6 +447,9 @@
       </div>
       <div id="studio-clip-menu" class="studio-clip-menu" role="menu" hidden>
         <button type="button" role="menuitem" id="studio-clip-menu-remove">{{ _('Remove from story') }}</button>
+        <button type="button" role="menuitem" id="studio-clip-menu-merge" hidden>{{ _('Merge with previous') }}</button>
+        <button type="button" role="menuitem" id="studio-clip-menu-uncut" hidden>{{ _('Remove cut') }}</button>
+        <p id="studio-clip-menu-reason" class="studio-clip-menu-reason" hidden></p>
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">

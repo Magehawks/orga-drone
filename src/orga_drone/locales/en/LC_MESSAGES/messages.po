@@ -261,6 +261,78 @@ msgstr "Source offline. This catalog entry is kept. Connect the drive to open it
 msgid "Remove from story (Delete)"
 msgstr "Remove from story (Delete)"
 
+msgid "Merge with previous"
+msgstr "Merge with previous"
+
+msgid "Remove cut"
+msgstr "Remove cut"
+
+msgid "Could not remove the cut."
+msgstr "Could not remove the cut."
+
+msgid "Could not check whether these clips can be joined."
+msgstr "Could not check whether these clips can be joined."
+
+msgid "That Story clip is no longer there."
+msgstr "That Story clip is no longer there."
+
+msgid "This clip has no previous clip to join."
+msgstr "This clip has no previous clip to join."
+
+msgid "Only two video clips can be joined."
+msgstr "Only two video clips can be joined."
+
+msgid "These clips come from different files."
+msgstr "These clips come from different files."
+
+msgid "The source range is unknown."
+msgstr "The source range is unknown."
+
+msgid "The source ranges are in reverse order."
+msgstr "The source ranges are in reverse order."
+
+msgid "The source ranges do not meet."
+msgstr "The source ranges do not meet."
+
+msgid "Playback speed does not match."
+msgstr "Playback speed does not match."
+
+msgid "Volume does not match."
+msgstr "Volume does not match."
+
+msgid "The transition between these clips is not a cut."
+msgstr "The transition between these clips is not a cut."
+
+msgid "A repeat is set on one of these clips."
+msgstr "A repeat is set on one of these clips."
+
+msgid "A soundtrack loop is set on one of these clips."
+msgstr "A soundtrack loop is set on one of these clips."
+
+msgid "Image adjustment does not match."
+msgstr "Image adjustment does not match."
+
+msgid "Privacy masks do not match."
+msgstr "Privacy masks do not match."
+
+msgid "Zoom does not match."
+msgstr "Zoom does not match."
+
+msgid "The flight map does not match."
+msgstr "The flight map does not match."
+
+msgid "The telemetry display does not match."
+msgstr "The telemetry display does not match."
+
+msgid "Overlays cannot be combined without dropping one."
+msgstr "Overlays cannot be combined without dropping one."
+
+msgid "The color change does not match."
+msgstr "The color change does not match."
+
+msgid "Clip settings do not match."
+msgstr "Clip settings do not match."
+
 msgid "Undo"
 msgstr "Undo"
 

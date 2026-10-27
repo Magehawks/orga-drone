@@ -1941,6 +1941,17 @@ img.studio-preview-media,
 .studio-clip-menu button:hover,
 .studio-clip-menu button:focus,
 .studio-clip-menu button:focus-visible { background: var(--surface-deep); }
+.studio-clip-menu button:disabled,
+.studio-clip-menu button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.studio-clip-menu-reason {
+  margin: 0.15rem 0.2rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
 .studio-transport-play { min-width: 2.5rem; }
 .studio-transport-icon[hidden] { display: none !important; }
 .studio-icon {

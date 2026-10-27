@@ -89,6 +89,8 @@ Studio Undo/Redo keeps up to 50 snapshots of one project's `studio_clips` rows i
 
 The transport trash button, the Delete key, and the Story clip context menu remove one selected clip through the existing `/studio/{id}/remove` route. That drops the Story row only. The media file stays. Delete applies when focus is on the Story track or the playhead and no dialog is open. Backspace is not a remove shortcut. Opening the clip menu focuses its item and closing it returns focus to the control that was active before.
 
+Removing a cut joins the clip with the one before it through `POST /api/studio/{id}/merge-previous`. The left row keeps its id and grows to the right row's source end. The right row is deleted. Settings are copied only when they match, including masks and grade. Overlay times shift back onto one timeline. A saturation ramp is kept when the right-hand times are the left-hand ramp shifted by the left source duration. Source ends must meet within 0.001 s. A repeat, a soundtrack loop, a different speed, or a transition other than a cut between the two clips is refused. The refusal does not become an Undo step. A successful join is one Undo step in the existing story history.
+
 ## Scan / index pipeline
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
