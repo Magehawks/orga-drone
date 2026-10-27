@@ -429,6 +429,9 @@
         <button type="button" class="studio-transport-btn" data-transport="cut" disabled
                 title="{{ _('Cut clip') }}"
                 aria-label="{{ _('Cut clip') }}">{{ lucide('scissors') }}</button>
+        <button type="button" class="studio-transport-btn" id="studio-remove" data-transport="remove" disabled
+                title="{{ _('Remove from story (Delete)') }}"
+                aria-label="{{ _('Remove from story (Delete)') }}">{{ lucide('trash-2') }}</button>
         <span class="studio-transport-time" id="studio-transport-time" aria-live="polite">00:00:00 / {{ summary.estimated_total_label }}</span>
         <label class="studio-transport-volume">
           <span class="studio-transport-volume-icon" aria-hidden="true">{{ lucide('volume-2') }}</span>
@@ -439,6 +442,9 @@
         <button type="button" class="studio-transport-btn" data-transport="fullscreen"
                 title="{{ _('Fullscreen') }}" aria-label="{{ _('Fullscreen') }}"
                 {% if not items %}disabled{% endif %}>{{ lucide('fullscreen') }}</button>
+      </div>
+      <div id="studio-clip-menu" class="studio-clip-menu" role="menu" hidden>
+        <button type="button" role="menuitem" id="studio-clip-menu-remove">{{ _('Remove from story') }}</button>
       </div>
 
       <section class="studio-story-area" aria-label="{{ _('Story') }}">

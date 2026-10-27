@@ -258,6 +258,9 @@ msgstr "Quelle offline. Katalogeinträge bleiben, bis dieser Ordner wieder verbu
 msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
 msgstr "Quelle offline. Dieser Katalogeintrag bleibt erhalten. Schließe das Laufwerk an, um die Datei wieder zu öffnen."
 
+msgid "Remove from story (Delete)"
+msgstr "Aus der Geschichte entfernen (Entf)"
+
 msgid "Undo"
 msgstr "Rückgängig"
 
