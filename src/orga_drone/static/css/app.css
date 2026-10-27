@@ -1939,6 +1939,7 @@ img.studio-preview-media,
   cursor: pointer;
 }
 .studio-clip-menu button:hover,
+.studio-clip-menu button:focus,
 .studio-clip-menu button:focus-visible { background: var(--surface-deep); }
 .studio-transport-play { min-width: 2.5rem; }
 .studio-transport-icon[hidden] { display: none !important; }

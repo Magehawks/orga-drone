@@ -4113,14 +4113,38 @@
     removeBtn.disabled = !selectedStoryClip();
   }
 
+  let clipMenuReturnFocus = null;
+
   function hideClipMenu() {
     const menu = document.getElementById("studio-clip-menu");
-    if (menu) menu.hidden = true;
+    const restore = clipMenuReturnFocus;
+    clipMenuReturnFocus = null;
+    if (!menu || menu.hidden) return;
+    const focusInside = Boolean(menu.contains(document.activeElement));
+    menu.hidden = true;
+    if (focusInside && restore && restore.isConnected && typeof restore.focus === "function") {
+      restore.focus();
+    }
   }
 
-  function showClipMenu(x, y) {
+  function showClipMenu(x, y, returnTarget) {
     const menu = document.getElementById("studio-clip-menu");
     if (!menu) return;
+    const active = document.activeElement;
+    if (!active || !menu.contains(active)) {
+      if (
+        active &&
+        active !== document.body &&
+        active !== document.documentElement &&
+        typeof active.focus === "function"
+      ) {
+        clipMenuReturnFocus = active;
+      } else if (returnTarget && typeof returnTarget.focus === "function") {
+        clipMenuReturnFocus = returnTarget;
+      } else {
+        clipMenuReturnFocus = null;
+      }
+    }
     menu.hidden = false;
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
@@ -4129,6 +4153,15 @@
     const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
+    const item = document.getElementById("studio-clip-menu-remove");
+    if (item) item.focus();
+  }
+
+  function storyClipDeleteContext(node) {
+    if (document.querySelector("dialog[open]")) return false;
+    if (!node || typeof node.closest !== "function") return false;
+    if (node.closest("dialog")) return false;
+    return Boolean(node.closest("#studio-grid, #studio-playhead"));
   }
 
   function removeSelectedStoryClip() {
@@ -4955,10 +4988,27 @@
     if (!clip || !clip.dataset.studioId) return;
     event.preventDefault();
     selectClip(clip.dataset.studioId, { movePlayhead: false });
-    showClipMenu(event.clientX, event.clientY);
+    const opener = clip.querySelector("[data-select-clip]") || clip;
+    showClipMenu(event.clientX, event.clientY, opener);
   });
   document.getElementById("studio-clip-menu-remove")?.addEventListener("click", () => {
     removeSelectedStoryClip();
+  });
+  document.getElementById("studio-clip-menu")?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" || event.key === "Tab") {
+      event.preventDefault();
+      hideClipMenu();
+      return;
+    }
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "ArrowUp" ||
+      event.key === "Home" ||
+      event.key === "End"
+    ) {
+      event.preventDefault();
+      document.getElementById("studio-clip-menu-remove")?.focus();
+    }
   });
   document.addEventListener("click", (event) => {
     const menu = document.getElementById("studio-clip-menu");
@@ -4967,10 +5017,11 @@
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") hideClipMenu();
-    if (event.key !== "Delete" && event.key !== "Backspace") return;
+    if (event.key !== "Delete") return;
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (isTextEditingTarget(document.activeElement)) return;
     if (privacyMaskDeleteActive()) return;
+    if (!storyClipDeleteContext(document.activeElement)) return;
     if (!selectedStoryClip()) return;
     event.preventDefault();
     removeSelectedStoryClip();

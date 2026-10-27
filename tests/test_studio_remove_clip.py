@@ -33,8 +33,18 @@ def test_trash_button_and_menu_are_labeled(tmp_path: Path, monkeypatch: pytest.M
     assert 'grid.addEventListener("contextmenu"' in script
     assert "function privacyMaskDeleteActive" in script
     assert "function removeSelectedStoryClip" in script
-    assert 'if (isTextEditingTarget(document.activeElement)) return;' in script
-    assert 'if (privacyMaskDeleteActive()) return;' in script
+    assert "function storyClipDeleteContext" in script
+    assert 'document.querySelector("dialog[open]")' in script
+    assert 'node.closest("#studio-grid, #studio-playhead")' in script
+    assert "clipMenuReturnFocus" in script
+    assert 'item.focus()' in script
+    handler = script.split('if (event.key === "Escape") hideClipMenu();', 1)[1]
+    handler = handler.split("window.addEventListener", 1)[0]
+    assert 'event.key !== "Delete"' in handler
+    assert "Backspace" not in handler
+    assert "storyClipDeleteContext(document.activeElement)" in handler
+    assert 'if (isTextEditingTarget(document.activeElement)) return;' in handler
+    assert 'if (privacyMaskDeleteActive()) return;' in handler
 
 
 def test_remove_keeps_the_file_and_undo_restores_it(
