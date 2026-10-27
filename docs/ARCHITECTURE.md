@@ -85,6 +85,8 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
 | `geocode_cache` | Offline place cache |
 
+Studio Undo/Redo keeps up to 50 snapshots of one project's `studio_clips` rows in process memory (`studio_history`). It is not a table. Restarting the app drops the stack. Restoring a snapshot rewrites only that project's clip rows.
+
 ## Scan / index pipeline
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.

@@ -22,6 +22,82 @@
     "Delete this Studio project? Clips in this project are removed. Your media files are not deleted.";
   const msgRenamePrompt = root.dataset.renamePrompt || "New project title";
   const defaultProjectTitle = root.dataset.defaultTitle || "Your story";
+  let historyGesture = "";
+  const nativeFetch = window.fetch.bind(window);
+
+  function syncHistoryButtons(undoEnabled, redoEnabled) {
+    const undo = document.getElementById("studio-undo");
+    const redo = document.getElementById("studio-redo");
+    if (undo) undo.disabled = !undoEnabled;
+    if (redo) redo.disabled = !redoEnabled;
+  }
+
+  window.fetch = function (input, init) {
+    const method = String((init && init.method) || "GET").toUpperCase();
+    if (historyGesture && method !== "GET" && method !== "HEAD") {
+      const headers = new Headers((init && init.headers) || {});
+      if (!headers.has("X-Studio-History-Group")) {
+        headers.set("X-Studio-History-Group", historyGesture);
+      }
+      init = Object.assign({}, init || {}, { headers: headers });
+    }
+    const response = nativeFetch(input, init);
+    if (method !== "GET" && method !== "HEAD") {
+      response.then((res) => {
+        const canUndo = res.headers.get("X-Studio-Can-Undo");
+        if (canUndo == null) return;
+        syncHistoryButtons(canUndo === "1", res.headers.get("X-Studio-Can-Redo") === "1");
+      }, () => {});
+    }
+    return response;
+  };
+
+  function beginHistoryGesture(event) {
+    const target = event.target;
+    if (!target || !target.matches || !target.matches("input[type='range']")) return;
+    const id = target.id || "";
+    if (id === "studio-volume" || id.indexOf("music") !== -1) return;
+    historyGesture = "g" + String(event.pointerId || Date.now());
+  }
+
+  function endHistoryGesture() {
+    historyGesture = "";
+  }
+
+  document.addEventListener("pointerdown", beginHistoryGesture, true);
+  document.addEventListener("pointerup", endHistoryGesture, true);
+  document.addEventListener("pointercancel", endHistoryGesture, true);
+
+  function isTextEditingTarget(node) {
+    if (!node) return false;
+    const tag = node.tagName;
+    if (tag === "TEXTAREA" || tag === "SELECT" || node.isContentEditable === true) return true;
+    if (tag !== "INPUT") return false;
+    const type = String(node.type || "text").toLowerCase();
+    return (
+      type !== "range" &&
+      type !== "checkbox" &&
+      type !== "radio" &&
+      type !== "button" &&
+      type !== "submit" &&
+      type !== "file" &&
+      type !== "color"
+    );
+  }
+
+  async function applyStudioHistory(direction) {
+    const button = document.getElementById(
+      direction === "undo" ? "studio-undo" : "studio-redo"
+    );
+    if (!button || button.disabled) return;
+    const res = await nativeFetch("/api/studio/history/" + direction, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) return;
+    window.location.reload();
+  }
 
   function showRootFlash(message) {
     const el = document.getElementById("studio-flash");
@@ -4810,6 +4886,22 @@
         panel.hidden = !on;
       });
     });
+  });
+
+  document.getElementById("studio-undo")?.addEventListener("click", () => {
+    applyStudioHistory("undo");
+  });
+  document.getElementById("studio-redo")?.addEventListener("click", () => {
+    applyStudioHistory("redo");
+  });
+  document.addEventListener("keydown", (event) => {
+    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+    const key = event.key.toLowerCase();
+    if (key !== "z" && key !== "y") return;
+    if (isTextEditingTarget(document.activeElement)) return;
+    event.preventDefault();
+    if (key === "z") applyStudioHistory("undo");
+    else applyStudioHistory("redo");
   });
 
   root.addEventListener("click", (event) => {

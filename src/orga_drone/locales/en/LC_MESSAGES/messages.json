@@ -311,6 +311,8 @@
   "Volume": "Volume",
   "Fullscreen": "Fullscreen",
   "Cut clip": "Cut clip",
+  "Undo": "Undo",
+  "Redo": "Redo",
   "Could not cut clip.": "Could not cut clip.",
   "Could not save project title.": "Could not save project title.",
   "Projects": "Projects",

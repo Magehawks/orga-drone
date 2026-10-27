@@ -402,6 +402,12 @@
       </div>
 
       <div class="studio-transport" role="group" aria-label="{{ _('Playback controls') }}">
+        <button type="button" class="studio-transport-btn" id="studio-undo" data-history="undo"
+                title="{{ _('Undo') }} (Ctrl+Z)" aria-label="{{ _('Undo') }}"
+                {% if not can_undo %}disabled{% endif %}>{{ lucide('undo-2') }}</button>
+        <button type="button" class="studio-transport-btn" id="studio-redo" data-history="redo"
+                title="{{ _('Redo') }} (Ctrl+Y)" aria-label="{{ _('Redo') }}"
+                {% if not can_redo %}disabled{% endif %}>{{ lucide('redo-2') }}</button>
         <button type="button" class="studio-transport-btn" data-transport="start"
                 title="{{ _('Jump to start') }}" aria-label="{{ _('Jump to start') }}"
                 {% if not items %}disabled{% endif %}>{{ lucide('chevrons-left') }}</button>

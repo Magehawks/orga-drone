@@ -258,3 +258,9 @@ msgstr "Source offline. Catalog entries stay until this folder is connected agai
 msgid "Source offline. This catalog entry is kept. Connect the drive to open it again."
 msgstr "Source offline. This catalog entry is kept. Connect the drive to open it again."
 
+msgid "Undo"
+msgstr "Undo"
+
+msgid "Redo"
+msgstr "Redo"
+
