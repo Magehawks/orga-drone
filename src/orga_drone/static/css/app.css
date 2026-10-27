@@ -1916,6 +1916,30 @@ img.studio-preview-media,
   cursor: pointer;
 }
 .studio-transport-btn:disabled { opacity: 0.45; cursor: default; }
+.studio-clip-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 12rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.studio-clip-menu button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.studio-clip-menu button:hover,
+.studio-clip-menu button:focus-visible { background: var(--surface-deep); }
 .studio-transport-play { min-width: 2.5rem; }
 .studio-transport-icon[hidden] { display: none !important; }
 .studio-icon {

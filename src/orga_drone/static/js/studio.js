@@ -2230,21 +2230,26 @@
       ) {
         return;
       }
-      const clipPanel = document.getElementById("inspector-clip");
-      const masksPanel = document.getElementById("inspector-masks");
-      if (!clipPanel || clipPanel.hidden || !masksPanel || masksPanel.hidden || !selectedMaskId) {
-        return;
-      }
-      const inMaskUi =
-        active &&
-        active.closest &&
-        (active.closest("#studio-preview-mask-handles") ||
-          active.closest("#inspector-masks") ||
-          active.closest("#mask-list"));
-      if (clipPanel.dataset.tab !== "effects" && !inMaskUi) return;
+      if (!privacyMaskDeleteActive()) return;
       event.preventDefault();
       removeSelectedMask();
     });
+  }
+
+  function privacyMaskDeleteActive() {
+    if (!selectedMaskId) return false;
+    const clipPanel = document.getElementById("inspector-clip");
+    const masksPanel = document.getElementById("inspector-masks");
+    if (!clipPanel || clipPanel.hidden || !masksPanel || masksPanel.hidden) return false;
+    const active = document.activeElement;
+    const inMaskUi = Boolean(
+      active &&
+        active.closest &&
+        (active.closest("#studio-preview-mask-handles") ||
+          active.closest("#inspector-masks") ||
+          active.closest("#mask-list"))
+    );
+    return clipPanel.dataset.tab === "effects" || inMaskUi;
   }
 
   function removeSelectedMask() {
@@ -3876,7 +3881,10 @@
   function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
     state.selected = { type: "clip", id: String(id) };
     const clip = clips().find((c) => String(c.dataset.studioId) === String(id));
-    if (!clip) return;
+    if (!clip) {
+      updateRemoveEnabled();
+      return;
+    }
     clips().forEach((c) => {
       c.classList.toggle("is-selected", c === clip);
       if (c === clip) c.setAttribute("aria-selected", "true");
@@ -3992,6 +4000,7 @@
       // Keep selection from stealing the playhead, but still sync preview/active chrome.
       syncPreviewMedia({ seek: true });
     }
+    updateRemoveEnabled();
   }
 
   function fillSpeedInspector(clip, isVideo) {
@@ -4090,6 +4099,49 @@
     cutBtn.disabled = !ok;
   }
 
+  const removeBtn = document.getElementById("studio-remove");
+
+  function selectedStoryClip() {
+    if (!state.selected || state.selected.type !== "clip") return null;
+    return (
+      clips().find((item) => String(item.dataset.studioId) === String(state.selected.id)) || null
+    );
+  }
+
+  function updateRemoveEnabled() {
+    if (!removeBtn) return;
+    removeBtn.disabled = !selectedStoryClip();
+  }
+
+  function hideClipMenu() {
+    const menu = document.getElementById("studio-clip-menu");
+    if (menu) menu.hidden = true;
+  }
+
+  function showClipMenu(x, y) {
+    const menu = document.getElementById("studio-clip-menu");
+    if (!menu) return;
+    menu.hidden = false;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  function removeSelectedStoryClip() {
+    const clip = selectedStoryClip();
+    if (!clip) return;
+    hideClipMenu();
+    const form = document.getElementById("inspector-remove-form");
+    if (!form) return;
+    setClipRemoveAction(form, clip.dataset.studioId);
+    if (state.playing) pausePlayback();
+    form.requestSubmit();
+  }
+
   async function cutSelectedAtPlayhead() {
     const hit = resolveAt(state.projectTimeS);
     if (!canCutAtHit(hit)) return;
@@ -4172,6 +4224,7 @@
       }
     }
     updateCutEnabled();
+    updateRemoveEnabled();
   }
 
   function musicErrorDetail(body) {
@@ -4185,6 +4238,7 @@
     const track = state.tracks.find((item) => String(item.id) === String(trackId));
     if (!track) return;
     state.selected = { type: "music", id: String(track.id) };
+    updateRemoveEnabled();
     clips().forEach((c) => {
       c.classList.remove("is-selected");
       c.removeAttribute("aria-selected");
@@ -4224,6 +4278,7 @@
   function renderMusic() {
     if (state.selected.type === "music" && !selectedMusicTrack()) {
       state.selected = { type: null, id: null };
+      updateRemoveEnabled();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
     }
@@ -4369,6 +4424,7 @@
       applyTracksPayload(data);
       if (reloadIfForwardLoop()) return;
       state.selected = { type: null, id: null };
+      updateRemoveEnabled();
       renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
@@ -4894,6 +4950,33 @@
   document.getElementById("studio-redo")?.addEventListener("click", () => {
     applyStudioHistory("redo");
   });
+  grid.addEventListener("contextmenu", (event) => {
+    const clip = event.target.closest && event.target.closest(".studio-clip");
+    if (!clip || !clip.dataset.studioId) return;
+    event.preventDefault();
+    selectClip(clip.dataset.studioId, { movePlayhead: false });
+    showClipMenu(event.clientX, event.clientY);
+  });
+  document.getElementById("studio-clip-menu-remove")?.addEventListener("click", () => {
+    removeSelectedStoryClip();
+  });
+  document.addEventListener("click", (event) => {
+    const menu = document.getElementById("studio-clip-menu");
+    if (menu && menu.contains(event.target)) return;
+    hideClipMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideClipMenu();
+    if (event.key !== "Delete" && event.key !== "Backspace") return;
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (isTextEditingTarget(document.activeElement)) return;
+    if (privacyMaskDeleteActive()) return;
+    if (!selectedStoryClip()) return;
+    event.preventDefault();
+    removeSelectedStoryClip();
+  });
+  window.addEventListener("scroll", hideClipMenu, true);
+
   document.addEventListener("keydown", (event) => {
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
     const key = event.key.toLowerCase();
@@ -4957,6 +5040,9 @@
         else setProjectTime(totalDuration());
       } else if (action === "cut") {
         cutSelectedAtPlayhead();
+        return;
+      } else if (action === "remove") {
+        removeSelectedStoryClip();
         return;
       }
       if (wasPlaying && state.projectTimeS < totalDuration() - 0.001) startPlayback();

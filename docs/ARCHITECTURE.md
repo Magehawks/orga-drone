@@ -87,6 +87,8 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 
 Studio Undo/Redo keeps up to 50 snapshots of one project's `studio_clips` rows in process memory (`studio_history`). It is not a table. Restarting the app drops the stack. Restoring a snapshot rewrites only that project's clip rows.
 
+The transport trash button, the Delete key, and the Story clip context menu remove one selected clip through the existing `/studio/{id}/remove` route. That drops the Story row only. The media file stays.
+
 ## Scan / index pipeline
 
 Core: `scan_root()` / `scan_all_roots()` in `src/orga_drone/scan/__init__.py`.
