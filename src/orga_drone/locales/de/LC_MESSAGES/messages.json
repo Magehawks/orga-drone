@@ -713,5 +713,11 @@
   "File": "Datei",
   "Re-encodes this still with the adjustments.": "Speichert dieses Foto mit den Anpassungen neu.",
   "Changes this export only. The library file stays unchanged. Preview approximates the exported picture.": "Gilt nur für diesen Export. Die Bibliotheksdatei bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
-  "Brightness, contrast, saturation, and warmth must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung und Wärme müssen zwischen -100 und 100 liegen."
+  "Brightness, contrast, saturation, and warmth must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung und Wärme müssen zwischen -100 und 100 liegen.",
+  "Photo adjustments are only for a photo.": "Bildkorrekturen gibt es nur für ein Foto.",
+  "Choose JPEG or PNG.": "Wähle JPEG oder PNG.",
+  "Reset adjustments": "Anpassungen zurücksetzen",
+  "Still format": "Bildformat",
+  "Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.": "Wird nur für dieses Foto gespeichert. Die Bibliotheksdatei bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
+  "Saves a PNG of this still. The library file stays unchanged.": "Speichert dieses Foto als PNG. Die Bibliotheksdatei bleibt unverändert."
 }

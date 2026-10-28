@@ -943,15 +943,18 @@ def prepare_media_export(
     output_path: Path,
     overwrite: bool = False,
     image: ImageAdjust | None = None,
+    still_format: str | None = None,
 ) -> MediaExportPlan:
     """Validate one photo or video export. Does not render.
 
-    ``image`` grades a photo before the preset. A video ignores it.
+    ``image`` grades a photo before the preset. None uses the saved grade.
+    A video ignores both the grade and ``still_format``.
     """
     key = normalize_share_preset(preset)
     media, path = _require_export_media(db, media_id)
     if media.kind == "photo":
-        spec = inspect_photo_preset(path, key, image=image)
+        adjust = image if image is not None else db.get_image_adjust(path)
+        spec = inspect_photo_preset(path, key, image=adjust, still_format=still_format)
         dest, identities, protected = _snapshot_export_destination(
             db,
             output_path,
@@ -994,18 +997,28 @@ def run_media_export(
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
     image: ImageAdjust | None = None,
+    still_format: str | None = None,
 ) -> Path:
     """Export one library photo as a still, or one video through the Studio encoder.
 
-    ``image`` grades a photo before the preset. A video ignores it.
+    ``image`` grades a photo before the preset. None uses the saved grade.
+    A video ignores both the grade and ``still_format``.
     """
+    media, path = _require_export_media(db, media_id)
+    adjust = image
+    fmt = None
+    if media.kind == "photo":
+        if adjust is None:
+            adjust = db.get_image_adjust(path)
+        fmt = still_format
     plan = prepare_media_export(
         db,
         media_id,
         preset=preset,
         output_path=output_path,
         overwrite=overwrite,
-        image=image,
+        image=adjust,
+        still_format=fmt,
     )
     if plan.kind == "photo":
         if on_progress is not None:
@@ -1026,7 +1039,8 @@ def run_media_export(
                 protected=plan.protected_paths,
                 protected_identities=plan.protected_identities,
                 cancel_event=cancel_event,
-                image=image,
+                image=adjust,
+                still_format=fmt,
             )
         except ExportCancelled:
             append_export_log(

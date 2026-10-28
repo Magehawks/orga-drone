@@ -190,9 +190,28 @@
     return presetById(id);
   }
 
+  function selectedStillFormat() {
+    const select = document.getElementById("detail-export-format");
+    const preset = selectedPreset();
+    if (!select || kind !== "photo" || !preset || preset.id !== "best") return null;
+    return select.value === "png" ? "png" : "jpeg";
+  }
+
+  function syncFormatVisibility() {
+    const wrap = document.getElementById("detail-export-format-wrap");
+    if (!wrap) return;
+    const preset = selectedPreset();
+    wrap.hidden = !(kind === "photo" && preset && preset.id === "best");
+  }
+
   function suggestionFor(preset) {
-    if (preset && preset.suggested_filename) return String(preset.suggested_filename);
-    return kind === "video" ? "export.mp4" : "export.jpg";
+    const base = preset && preset.suggested_filename
+      ? String(preset.suggested_filename)
+      : (kind === "video" ? "export.mp4" : "export.jpg");
+    if (kind === "photo" && preset && preset.id === "best" && selectedStillFormat() === "png") {
+      return base.replace(/\.[^.]+$/, ".png");
+    }
+    return base;
   }
 
   function fill(template, preset) {
@@ -204,6 +223,7 @@
   function presetDetail(preset) {
     if (!preset) return "";
     if (kind === "photo" && preset.id === "best") {
+      if (selectedStillFormat() === "png") return root.dataset.gradePng || "";
       if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
       return preset.copied ? root.dataset.photoBest || "" : root.dataset.photoBestJpeg || "";
     }
@@ -292,6 +312,10 @@
     adjustInputs.forEach((row) => {
       if (row.input) row.input.disabled = running;
     });
+    const formatSelect = document.getElementById("detail-export-format");
+    const resetBtn = document.getElementById("detail-adjust-reset");
+    if (formatSelect) formatSelect.disabled = running;
+    if (resetBtn) resetBtn.disabled = running;
     if (exportCancelBtn && !cancelRequested) exportCancelBtn.disabled = false;
   }
 
@@ -526,6 +550,7 @@
         });
       }
       syncFilename(selectedPreset(), { reset: true });
+      syncFormatVisibility();
       if (exportRunBtn) exportRunBtn.disabled = false;
     } catch (_) {
       setStatus(msgFailed, { error: true });
@@ -575,11 +600,7 @@
       const res = await fetch(`/api/media/${encodeURIComponent(mediaId)}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(
-          kind === "photo"
-            ? { preset: preset.id, output_path: pickedPath, ...readAdjust() }
-            : { preset: preset.id, output_path: pickedPath }
-        ),
+        body: JSON.stringify(exportBody(preset, pickedPath)),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok || !data.job_id) {
@@ -639,16 +660,80 @@
   document.getElementById("detail-export-success-dismiss")?.addEventListener("click", () => {
     hideSuccess();
   });
+  function exportBody(preset, pickedPath) {
+    const body = { preset: preset.id, output_path: pickedPath };
+    if (kind !== "photo") return body;
+    Object.assign(body, readAdjust());
+    const fmt = selectedStillFormat();
+    if (fmt) body.still_format = fmt;
+    return body;
+  }
+
+  function loadSavedAdjust() {
+    if (kind !== "photo") return;
+    let saved = null;
+    try {
+      saved = JSON.parse(root.dataset.imageAdjust || "");
+    } catch (_) {
+      saved = null;
+    }
+    if (!saved || typeof saved !== "object") return;
+    adjustInputs.forEach((row) => {
+      if (!row.input || saved[row.key] == null) return;
+      row.input.value = String(clampSlider(saved[row.key]));
+    });
+  }
+
+  async function saveAdjust() {
+    if (kind !== "photo" || !mediaId) return;
+    try {
+      await fetch(`/api/media/${encodeURIComponent(mediaId)}/image-adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(readAdjust()),
+        keepalive: true,
+      });
+    } catch (_) {
+      /* the next visit still has the last successful save */
+    }
+  }
+
+  function resetAdjust() {
+    adjustInputs.forEach((row) => {
+      if (row.input) row.input.value = "0";
+    });
+    applyGradePreview();
+    refreshHint();
+    saveAdjust();
+  }
+
   presetSelect?.addEventListener("change", () => {
+    syncFormatVisibility();
     syncFilename(selectedPreset());
+  });
+  document.getElementById("detail-export-format")?.addEventListener("change", () => {
+    syncFilename(selectedPreset());
+    refreshHint();
+  });
+  document.getElementById("detail-adjust-reset")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    resetAdjust();
   });
   adjustInputs.forEach((row) => {
     row.input?.addEventListener("input", () => {
       applyGradePreview();
       refreshHint();
     });
+    row.input?.addEventListener("change", () => {
+      saveAdjust();
+    });
   });
+  window.addEventListener("pagehide", () => {
+    saveAdjust();
+  });
+  loadSavedAdjust();
   applyGradePreview();
+  syncFormatVisibility();
   exportFilename?.addEventListener("input", () => {
     refreshHint();
   });

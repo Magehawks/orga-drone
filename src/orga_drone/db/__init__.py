@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS media_meta (
     favorite INTEGER NOT NULL DEFAULT 0,
     tags_json TEXT NOT NULL DEFAULT '[]',
     notes TEXT NOT NULL DEFAULT '',
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    image_adjust_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_recorded ON media(recorded_at);
@@ -557,6 +558,9 @@ class Database:
     @staticmethod
     def _migrate(conn: sqlite3.Connection) -> None:
         """Add columns/tables introduced after the initial schema."""
+        meta_cols = {row[1] for row in conn.execute("PRAGMA table_info(media_meta)").fetchall()}
+        if meta_cols and "image_adjust_json" not in meta_cols:
+            conn.execute("ALTER TABLE media_meta ADD COLUMN image_adjust_json TEXT")
         media_cols = {row[1] for row in conn.execute("PRAGMA table_info(media)").fetchall()}
         if "session_id" not in media_cols:
             conn.execute("ALTER TABLE media ADD COLUMN session_id INTEGER")
@@ -1997,6 +2001,54 @@ class Database:
                     "UPDATE media_meta SET media_path = ?, updated_at = ? WHERE id = ?",
                     (media_path, now, orphan["id"]),
                 )
+
+    def get_image_adjust(self, media_path: str | Path):
+        """Saved photo grade. Missing or corrupt JSON is neutral."""
+        from orga_drone.studio_image import image_adjust_from_stored
+
+        media_path = str(media_path)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT image_adjust_json FROM media_meta WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+        if row is None:
+            return image_adjust_from_stored(None)
+        return image_adjust_from_stored(row["image_adjust_json"])
+
+    def set_image_adjust(
+        self,
+        media_path: str | Path,
+        image,
+        *,
+        identity_key: str | None = None,
+    ) -> None:
+        """Store a photo grade on the user-meta row. Does not change other fields or the file."""
+        media_path = str(media_path)
+        raw = json.dumps(image.as_dict(), separators=(",", ":"), sort_keys=True)
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM media_meta WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE media_meta
+                       SET image_adjust_json = ?,
+                           identity_key = COALESCE(?, identity_key),
+                           updated_at = ?
+                       WHERE media_path = ?""",
+                    (raw, identity_key, now, media_path),
+                )
+                return
+            conn.execute(
+                """INSERT INTO media_meta(
+                     media_path, identity_key, stars, favorite, tags_json, notes,
+                     updated_at, image_adjust_json
+                   ) VALUES (?, ?, 0, 0, '[]', '', ?, ?)""",
+                (media_path, identity_key, now, raw),
+            )
 
     def ensure_default_studio_project(self, *, title: str = "Your story") -> StudioProject:
         """Return the first Studio project, creating one if the table is empty."""

@@ -158,8 +158,10 @@ A photo is a local still (best quality copies
 a readable image when the grade is neutral; WhatsApp, Instagram, and TikTok
 are JPEG presets, not uploads). Brightness, contrast, saturation, and warmth
 use the Studio ffmpeg grade before that preset. Neutral omits the grade.
-The library file is not modified. Preview uses the same CSS approximation
-as Studio. A video is one clip on the Studio encoder (best quality uses the
+The library file is not modified. The grade is stored on ``media_meta``
+(``image_adjust_json``), the same path and identity key as stars and notes, so a
+rescan can attach it again. Reset stores neutral. Best quality accepts JPEG or
+PNG; PNG is a re-encode. Preview uses the same CSS approximation as Studio. A video is one clip on the Studio encoder (best quality uses the
 highest existing resolution; those three presets are a 1080×1920 frame with
 the picture fitted inside it). Desktop save dialog. Optional project soundtrack
 playlist (`studio_audio_clips`, up to 8 songs) is previewed and mixed into the

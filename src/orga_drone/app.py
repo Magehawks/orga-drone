@@ -65,6 +65,7 @@ from orga_drone.studio_frame import (
 )
 from orga_drone.studio_hud import empty_hud_state, hud_client_state
 from orga_drone.studio_image import (
+    export_payload_sets_adjust,
     image_adjust_from_effect_settings,
     image_adjust_from_export_payload,
     image_adjust_preview_model,
@@ -1123,6 +1124,9 @@ def create_app() -> FastAPI:
             in_studio=in_studio,
             item_exportable=item_exportable,
             image_adjust_model=image_adjust_preview_model(),
+            photo_adjust=(
+                db.get_image_adjust(item.path).as_dict() if item.kind == "photo" else None
+            ),
             media_albums=media_albums,
             albums_available=albums_available,
         )
@@ -2864,6 +2868,43 @@ def create_app() -> FastAPI:
             raise _media_export_error(exc, translate) from exc
         return JSONResponse({"ok": True, **payload})
 
+    @app.post("/api/media/{media_id}/image-adjust")
+    async def api_media_image_adjust(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        translate = get_translator(lang_from_request(request))
+        row = db.get_media(media_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=translate("Media not found."))
+        if row.kind != "photo":
+            raise HTTPException(
+                status_code=400,
+                detail=translate("Photo adjustments are only for a photo."),
+            )
+        try:
+            image = image_adjust_from_export_payload(payload)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=translate(
+                    "Brightness, contrast, saturation, and warmth must be from -100 to 100."
+                ),
+            ) from exc
+        if not export_payload_sets_adjust(payload):
+            image = image_adjust_from_export_payload({"exposure": 0})
+        db.set_image_adjust(
+            row.path,
+            image,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse({"ok": True, "image": image.as_dict()})
+
     @app.post("/api/media/{media_id}/export")
     async def api_media_export(media_id: int, request: Request) -> JSONResponse:
         from orga_drone.export.studio_encoder import StudioExportError
@@ -2885,9 +2926,14 @@ def create_app() -> FastAPI:
         translate = get_translator(lang_from_request(request))
         row = db.get_media(media_id)
         image = None
+        still_format = None
         if row is not None and row.kind == "photo":
+            from orga_drone.export.still_export import normalize_still_format
+
             try:
-                image = image_adjust_from_export_payload(payload)
+                if export_payload_sets_adjust(payload):
+                    image = image_adjust_from_export_payload(payload)
+                still_format = normalize_still_format(payload.get("still_format"))
             except ValueError as exc:
                 raise HTTPException(
                     status_code=400,
@@ -2895,6 +2941,8 @@ def create_app() -> FastAPI:
                         "Brightness, contrast, saturation, and warmth must be from -100 to 100."
                     ),
                 ) from exc
+            except StudioExportError as exc:
+                raise _media_export_error(exc, translate) from exc
         try:
             await asyncio.to_thread(
                 prepare_media_export,
@@ -2904,6 +2952,7 @@ def create_app() -> FastAPI:
                 output_path=Path(output_path),
                 overwrite=overwrite,
                 image=image,
+                still_format=still_format,
             )
         except StudioExportError as exc:
             raise _media_export_error(exc, translate) from exc
@@ -2921,6 +2970,7 @@ def create_app() -> FastAPI:
                 on_progress=on_progress,
                 cancel_event=cancel_event,
                 image=image,
+                still_format=still_format,
             )
 
         return _begin_export_job(_work, translate)
