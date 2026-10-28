@@ -71,54 +71,22 @@
   </div>
   {% endif %}
 
-  {% if show_view_tabs %}
-  <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
-    <a role="tab"
-       class="view-tab {% if active_tab == 'clip' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=clip{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
-       aria-selected="{{ 'true' if active_tab == 'clip' else 'false' }}"
-       id="tab-clip">{{ _('Single clip') }}</a>
-    <a role="tab"
-       class="view-tab {% if active_tab == 'flight' %}active{% endif %}"
-       href="/media/{{ item.id }}?tab=flight{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
-       aria-selected="{{ 'true' if active_tab == 'flight' else 'false' }}"
-       id="tab-flight">{{ _('Complete flight') }}</a>
-  </nav>
-  {% endif %}
-
-  <dl class="meta">
-    <div><dt>{{ _('Date') }}</dt><dd>{{ item.recorded_at or '—' }}</dd></div>
-    <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
-    <div><dt>{{ _('Camera') }}</dt><dd>{{ item.camera_model or '—' }}</dd></div>
-    <div><dt>{{ _('Size') }}</dt><dd>
-      {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
-        {{ item.session_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
-      {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
-        {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
-      {% else %}
-        {{ item.size_bytes|filesize }}
-      {% endif %}
-    </dd></div>
-    <div><dt>{{ _('Duration') }}</dt><dd>
-      {% if active_tab == 'flight' and map_duration is not none %}
-        {{ map_duration|duration }}
-      {% elif item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
-        {{ item.session_total_duration|duration }}
-      {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
-        {{ item.flow_total_duration|duration }}
-      {% else %}
-        {{ item.duration_s|duration }}
-      {% endif %}
-    </dd></div>
-    <div><dt>{{ _('Sequence') }}</dt><dd>{{ item.sequence if item.sequence is not none else '—' }}</dd></div>
-    <div><dt>{{ _('Has SRT') }}</dt><dd>{{ _('Yes') if item.has_srt else _('No') }}</dd></div>
-    <div><dt>{{ _('Has LRF') }}</dt><dd>{{ _('Yes') if item.has_lrf else _('No') }}</dd></div>
-    <div><dt>{{ _('Altitude') }}</dt><dd>{% if item.abs_alt is not none %}{{ '%.1f'|format(item.abs_alt) }} m{% else %}—{% endif %}</dd></div>
-    <div class="wide"><dt>{{ _('Path') }}</dt><dd class="mono">{{ item.path }}</dd></div>
-  </dl>
-
-  <div class="detail-split {% if not show_map %}single{% endif %}">
+  <div class="detail-split">
     <div class="detail-media">
+      {% if show_view_tabs %}
+      <nav class="view-tabs" role="tablist" aria-label="{{ _('View mode') }}">
+        <a role="tab"
+           class="view-tab {% if active_tab == 'clip' %}active{% endif %}"
+           href="/media/{{ item.id }}?tab=clip{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
+           aria-selected="{{ 'true' if active_tab == 'clip' else 'false' }}"
+           id="tab-clip">{{ _('Single clip') }}</a>
+        <a role="tab"
+           class="view-tab {% if active_tab == 'flight' %}active{% endif %}"
+           href="/media/{{ item.id }}?tab=flight{% if return_qs %}&amp;{{ return_qs }}{% endif %}"
+           aria-selected="{{ 'true' if active_tab == 'flight' else 'false' }}"
+           id="tab-flight">{{ _('Complete flight') }}</a>
+      </nav>
+      {% endif %}
       {% if item.root_id in offline_root_ids %}
         <p class="hint" role="status">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
       {% elif can_play %}
@@ -186,30 +154,6 @@
         <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
       {% endif %}
     </div>
-
-    {% if show_map %}
-    <div class="detail-map map-block">
-      <h2>{{ _('Location') }}</h2>
-      <p>
-        {{ '%.6f'|format(map_lat) }}, {{ '%.6f'|format(map_lon) }}
-        · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
-      </p>
-      <p class="spot-export-row">
-        <a class="button" href="/media/{{ item.id }}/export/spot.geojson"
-           download>{{ _('Export spot') }}</a>
-      </p>
-      <p class="hint">{{ _('Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.') }}</p>
-      {% if track and track|length > 1 and (item.kind == 'video' or active_tab == 'flight') and can_play %}
-      <p class="hint track-seek-hint">{{ _('Click track to seek') }}</p>
-      {% endif %}
-      <div id="map" class="map"
-           data-lat="{{ map_lat }}"
-           data-lon="{{ map_lon }}"
-           data-duration="{{ map_duration if map_duration is not none else '' }}"
-           data-track='{{ track|tojson }}'></div>
-    </div>
-    {% endif %}
-  </div>
 
   {% if active_tab == 'flight' and flight_items %}
   <div class="flight-playlist panel-inset" id="flight-playlist-ui"
@@ -288,18 +232,60 @@
   <div class="detail-actions" id="detail-actions">
     <div class="detail-actions-tabs" role="tablist" aria-label="{{ _('Detail actions') }}">
       <button type="button" class="detail-actions-tab is-active" role="tab"
-              id="detail-tab-organize" data-detail-tab-button="organize"
-              aria-selected="true" aria-controls="detail-panel-organize" tabindex="0">{{ _('Organize') }}</button>
+              id="detail-tab-info" data-detail-tab-button="info"
+              aria-selected="true" aria-controls="detail-panel-info" tabindex="0">{{ _('Info') }}</button>
+      {% if show_map %}
+      <button type="button" class="detail-actions-tab" role="tab"
+              id="detail-tab-location" data-detail-tab-button="location"
+              aria-selected="false" aria-controls="detail-panel-location" tabindex="-1">{{ _('Location') }}</button>
+      {% endif %}
       <button type="button" class="detail-actions-tab" role="tab"
               id="detail-tab-share" data-detail-tab-button="share"
               aria-selected="false" aria-controls="detail-panel-share" tabindex="-1">{{ _('Share') }}</button>
+      {% if item.kind == 'photo' and item_exportable %}
       <button type="button" class="detail-actions-tab" role="tab"
-              id="detail-tab-file" data-detail-tab-button="file"
-              aria-selected="false" aria-controls="detail-panel-file" tabindex="-1">{{ _('File') }}</button>
+              id="detail-tab-image" data-detail-tab-button="image"
+              aria-selected="false" aria-controls="detail-panel-image" tabindex="-1">{{ _('Image') }}</button>
+      {% endif %}
+      {% if item.kind == 'photo' or item.kind == 'video' %}
+      <button type="button" class="detail-actions-tab" role="tab"
+              id="detail-tab-export" data-detail-tab-button="export"
+              aria-selected="false" aria-controls="detail-panel-export" tabindex="-1">{{ _('Export') }}</button>
+      {% endif %}
     </div>
 
-    <div class="detail-actions-panel" id="detail-panel-organize" role="tabpanel"
-         data-detail-tab-panel="organize" aria-labelledby="detail-tab-organize">
+    <div class="detail-actions-panel" id="detail-panel-info" role="tabpanel"
+         data-detail-tab-panel="info" aria-labelledby="detail-tab-info">
+    <dl class="meta">
+      <div><dt>{{ _('Date') }}</dt><dd>{{ item.recorded_at or '—' }}</dd></div>
+      <div><dt>{{ _('Drone') }}</dt><dd>{{ item.drone_model or '—' }}</dd></div>
+      <div><dt>{{ _('Camera') }}</dt><dd>{{ item.camera_model or '—' }}</dd></div>
+      <div><dt>{{ _('Size') }}</dt><dd>
+        {% if item.session_video_count and item.session_video_count > 1 and item.session_total_size %}
+          {{ item.session_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
+        {% elif item.clip_count and item.clip_count > 1 and item.flow_total_size %}
+          {{ item.flow_total_size|filesize }} ({{ item.size_bytes|filesize }} {{ _('this clip') }})
+        {% else %}
+          {{ item.size_bytes|filesize }}
+        {% endif %}
+      </dd></div>
+      <div><dt>{{ _('Duration') }}</dt><dd>
+        {% if active_tab == 'flight' and map_duration is not none %}
+          {{ map_duration|duration }}
+        {% elif item.session_video_count and item.session_video_count > 1 and item.session_total_duration %}
+          {{ item.session_total_duration|duration }}
+        {% elif item.clip_count and item.clip_count > 1 and item.flow_total_duration %}
+          {{ item.flow_total_duration|duration }}
+        {% else %}
+          {{ item.duration_s|duration }}
+        {% endif %}
+      </dd></div>
+      <div><dt>{{ _('Sequence') }}</dt><dd>{{ item.sequence if item.sequence is not none else '—' }}</dd></div>
+      <div><dt>{{ _('Has SRT') }}</dt><dd>{{ _('Yes') if item.has_srt else _('No') }}</dd></div>
+      <div><dt>{{ _('Has LRF') }}</dt><dd>{{ _('Yes') if item.has_lrf else _('No') }}</dd></div>
+      <div><dt>{{ _('Altitude') }}</dt><dd>{% if item.abs_alt is not none %}{{ '%.1f'|format(item.abs_alt) }} m{% else %}—{% endif %}</dd></div>
+      <div class="wide"><dt>{{ _('Path') }}</dt><dd class="mono">{{ item.path }}</dd></div>
+    </dl>
     {% if item.auto_tags or item.place %}
     <div class="action-form auto-meta-readonly">
       <h2>{{ _('Auto tags') }}</h2>
@@ -392,6 +378,34 @@
         <button type="submit">{{ _('Create album and add') }}</button>
       </form>
     </div>
+
+    <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
+      <h2>{{ _('Rename') }}</h2>
+      <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>
+      <label>
+        {{ _('New name (without extension)') }}
+        <input type="text" name="new_name" value="{{ rename_stem }}" required>
+      </label>
+      <button type="submit">{{ _('Rename') }}</button>
+    </form>
+
+    {% if can_merge %}
+    <form method="post" action="/media/{{ item.id }}/merge" class="action-form"
+          onsubmit="return confirm('{{ _('Merge all clips in this flow into one MP4? Originals are kept.')|e }}');">
+      <h2>{{ _('Auto-merge flow') }}</h2>
+      {% if ffmpeg_ok %}
+        <p class="hint">{{ _('Joins all split clips into one file (fast stream copy).') }}</p>
+        <label>
+          {{ _('Output filename') }}
+          <input type="text" name="output_name" value="{{ merge_default_name }}">
+        </label>
+        <button type="submit">{{ _('Merge clips') }}</button>
+      {% else %}
+        <p class="hint">{{ _('Install ffmpeg or: pip install imageio-ffmpeg') }}</p>
+        <button type="submit" disabled>{{ _('Merge clips') }}</button>
+      {% endif %}
+    </form>
+    {% endif %}
     </div>
 
     <div class="detail-actions-panel" id="detail-panel-share" role="tabpanel"
@@ -409,8 +423,58 @@
         </form>
       {% endif %}
     </div>
+    </div>
+
+    {% if item.kind == 'photo' and item_exportable %}
+    <div class="detail-actions-panel" id="detail-panel-image" role="tabpanel"
+         data-detail-tab-panel="image" aria-labelledby="detail-tab-image" hidden>
+      <div class="action-form" id="detail-image-adjust">
+        {% if photo_src %}
+        <img id="detail-export-grade-preview" class="detail-export-grade-preview"
+             src="{{ photo_src }}" alt="">
+        {% endif %}
+        <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Brightness') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-exposure-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-exposure" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Brightness') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Contrast') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-contrast-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-contrast" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Contrast') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Saturation') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-saturation-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-saturation" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Saturation') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Warmth') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-warmth-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Warmth') }}">
+        </label>
+        <button type="button" class="button ghost" id="detail-adjust-reset">{{ _('Reset adjustments') }}</button>
+        <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
+      </div>
+    </div>
+    {% endif %}
 
     {% if item.kind == 'photo' or item.kind == 'video' %}
+    <div class="detail-actions-panel" id="detail-panel-export" role="tabpanel"
+         data-detail-tab-panel="export" aria-labelledby="detail-tab-export" hidden>
     <div class="action-form" id="detail-export"
          data-media-id="{{ item.id }}"
          data-kind="{{ item.kind }}"
@@ -456,7 +520,39 @@
       <h2>{{ _('Export file') }}</h2>
       {% if item_exportable %}
         <p class="hint">{{ _('Saves a local file for this photo or video. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
-        <button type="button" class="button" id="detail-export-open">{{ _('Export file') }}</button>
+        {% if item.kind == 'photo' %}
+        <label class="studio-inspector-field" id="detail-export-format-wrap" for="detail-export-format" hidden>
+          <span>{{ _('Still format') }}</span>
+          <select id="detail-export-format" aria-label="{{ _('Still format') }}">
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+          </select>
+        </label>
+        {% endif %}
+        <label class="studio-inspector-field" for="detail-export-preset">
+          <span>{{ _('Output') }}</span>
+          <select id="detail-export-preset" aria-label="{{ _('Output') }}"></select>
+        </label>
+        <label class="studio-inspector-field" for="detail-export-filename">
+          <span>{{ _('Filename') }}</span>
+          <input id="detail-export-filename" type="text" autocomplete="off" spellcheck="false"
+                 aria-label="{{ _('Filename') }}">
+        </label>
+        <p class="meta-line" id="detail-export-status" hidden></p>
+        <div class="studio-export-progress" id="detail-export-progress" hidden>
+          <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"
+               id="detail-export-progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+               aria-label="{{ _('Export progress') }}">
+            <div class="busy-progress-bar" id="detail-export-progress-bar" style="width: 0%"></div>
+          </div>
+          <p class="studio-export-progress-primary" id="detail-export-progress-label"></p>
+          <p class="hint studio-export-progress-meta" id="detail-export-progress-meta"></p>
+        </div>
+        <p class="hint" id="detail-export-hint"></p>
+        <div class="studio-export-actions">
+          <button type="button" class="button ghost" id="detail-export-cancel" disabled>{{ _('Cancel export') }}</button>
+          <button type="button" class="button" id="detail-export-run" disabled>{{ _('Export file') }}</button>
+        </div>
       {% elif item.root_id in offline_root_ids %}
         <p class="hint">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
         <button type="button" class="button" disabled>{{ _('Export file') }}</button>
@@ -465,130 +561,44 @@
         <button type="button" class="button" disabled>{{ _('Export file') }}</button>
       {% endif %}
     </div>
-    {% endif %}
     </div>
-
-    <div class="detail-actions-panel" id="detail-panel-file" role="tabpanel"
-         data-detail-tab-panel="file" aria-labelledby="detail-tab-file" hidden>
-    <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
-      <h2>{{ _('Rename') }}</h2>
-      <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>
-      <label>
-        {{ _('New name (without extension)') }}
-        <input type="text" name="new_name" value="{{ rename_stem }}" required>
-      </label>
-      <button type="submit">{{ _('Rename') }}</button>
-    </form>
-
-    {% if can_merge %}
-    <form method="post" action="/media/{{ item.id }}/merge" class="action-form"
-          onsubmit="return confirm('{{ _('Merge all clips in this flow into one MP4? Originals are kept.')|e }}');">
-      <h2>{{ _('Auto-merge flow') }}</h2>
-      {% if ffmpeg_ok %}
-        <p class="hint">{{ _('Joins all split clips into one file (fast stream copy).') }}</p>
-        <label>
-          {{ _('Output filename') }}
-          <input type="text" name="output_name" value="{{ merge_default_name }}">
-        </label>
-        <button type="submit">{{ _('Merge clips') }}</button>
-      {% else %}
-        <p class="hint">{{ _('Install ffmpeg or: pip install imageio-ffmpeg') }}</p>
-        <button type="submit" disabled>{{ _('Merge clips') }}</button>
-      {% endif %}
-    </form>
     {% endif %}
+
+    {% if show_map %}
+    <div class="detail-actions-panel" id="detail-panel-location" role="tabpanel"
+         data-detail-tab-panel="location" aria-labelledby="detail-tab-location" hidden>
+      <div class="detail-map map-block">
+        <h2>{{ _('Location') }}</h2>
+        <p>
+          {{ '%.6f'|format(map_lat) }}, {{ '%.6f'|format(map_lon) }}
+          · <a href="{{ osm_url }}" target="_blank" rel="noopener">{{ _('Open in OpenStreetMap') }}</a>
+        </p>
+        <p class="spot-export-row">
+          <a class="button" href="/media/{{ item.id }}/export/spot.geojson"
+             download>{{ _('Export spot') }}</a>
+        </p>
+        <p class="hint">{{ _('Downloads a local GeoJSON file (.orga-spot.json). Coordinates are rounded for privacy. Nothing is uploaded.') }}</p>
+        {% if track and track|length > 1 and (item.kind == 'video' or active_tab == 'flight') and can_play %}
+        <p class="hint track-seek-hint">{{ _('Click track to seek') }}</p>
+        {% endif %}
+        <div id="map" class="map"
+             data-lat="{{ map_lat }}"
+             data-lon="{{ map_lon }}"
+             data-duration="{{ map_duration if map_duration is not none else '' }}"
+             data-track='{{ track|tojson }}'></div>
+      </div>
     </div>
+    {% endif %}
+  </div>
   </div>
 
-  {% if item_exportable %}
-  <dialog class="studio-export-dialog" id="detail-export-dialog">
-    <form method="dialog" class="studio-export-form" id="detail-export-form">
-      <h2>{{ _('Export this file') }}</h2>
-      <p class="meta-line mono">{{ item.filename }}</p>
-      <p class="hint">{{ _('Best quality, WhatsApp, Instagram, and TikTok save a file on this computer. Nothing is uploaded or posted.') }}</p>
-      {% if item.kind == 'photo' %}
-      <svg class="studio-preview-filters" aria-hidden="true" focusable="false">
-        <filter id="detail-export-grade" color-interpolation-filters="sRGB">
-          <feColorMatrix id="detail-export-grade-matrix" type="matrix"
-                         values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
-        </filter>
-      </svg>
-      <div id="detail-export-adjust">
-        {% if photo_src %}
-        <img id="detail-export-grade-preview" class="detail-export-grade-preview"
-             src="{{ photo_src }}" alt="">
-        {% endif %}
-        <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Brightness') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-exposure-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-exposure" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Brightness') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Contrast') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-contrast-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-contrast" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Contrast') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Saturation') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-saturation-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-saturation" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Saturation') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Warmth') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-warmth-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Warmth') }}">
-        </label>
-        <button type="button" class="button ghost" id="detail-adjust-reset">{{ _('Reset adjustments') }}</button>
-        <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
-        <label class="studio-inspector-field" id="detail-export-format-wrap" for="detail-export-format">
-          <span>{{ _('Still format') }}</span>
-          <select id="detail-export-format" aria-label="{{ _('Still format') }}">
-            <option value="jpeg">JPEG</option>
-            <option value="png">PNG</option>
-          </select>
-        </label>
-      </div>
-      {% endif %}
-      <label class="studio-inspector-field" for="detail-export-preset">
-        <span>{{ _('Output') }}</span>
-        <select id="detail-export-preset" aria-label="{{ _('Output') }}"></select>
-      </label>
-      <label class="studio-inspector-field" for="detail-export-filename">
-        <span>{{ _('Filename') }}</span>
-        <input id="detail-export-filename" type="text" autocomplete="off" spellcheck="false"
-               aria-label="{{ _('Filename') }}">
-      </label>
-      <p class="meta-line" id="detail-export-status" hidden></p>
-      <div class="studio-export-progress" id="detail-export-progress" hidden>
-        <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"
-             id="detail-export-progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-             aria-label="{{ _('Export progress') }}">
-          <div class="busy-progress-bar" id="detail-export-progress-bar" style="width: 0%"></div>
-        </div>
-        <p class="studio-export-progress-primary" id="detail-export-progress-label"></p>
-        <p class="hint studio-export-progress-meta" id="detail-export-progress-meta"></p>
-        <p class="hint">{{ _('Keep this dialog open while exporting.') }}</p>
-      </div>
-      <p class="hint" id="detail-export-hint"></p>
-      <div class="studio-export-actions">
-        <button type="button" class="button ghost" id="detail-export-cancel">{{ _('Cancel export') }}</button>
-        <button type="button" class="button" id="detail-export-run">{{ _('Export file') }}</button>
-      </div>
-    </form>
-  </dialog>
+  {% if item.kind == 'photo' and item_exportable %}
+  <svg class="studio-preview-filters" aria-hidden="true" focusable="false">
+    <filter id="detail-export-grade" color-interpolation-filters="sRGB">
+      <feColorMatrix id="detail-export-grade-matrix" type="matrix"
+                     values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+    </filter>
+  </svg>
   {% endif %}
 </section>
 {% endblock %}

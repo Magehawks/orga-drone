@@ -1,4 +1,4 @@
-"""Detail page groups existing actions into Organize, Share, and File tabs."""
+"""Detail page groups actions into Info, Location, Share, Image, and Export."""
 
 from __future__ import annotations
 
@@ -72,43 +72,89 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     text = page.text
     assert 'id="detail-actions"' in text
     assert 'role="tablist"' in text
-    assert ">Organize<" in text
+    assert ">Info<" in text
     assert ">Share<" in text
-    assert ">File<" in text
+    assert ">Image<" in text
+    assert ">Export<" in text
+    assert ">Location<" in text
+    assert ">File<" not in text
+    assert ">Organize<" not in text
+    assert 'data-detail-tab-button="file"' not in text
     assert "/static/js/detail-actions.js" in text
-    assert text.index('class="meta"') < text.index("photo-preview")
+    tab_order = [
+        text.index('data-detail-tab-button="info"'),
+        text.index('data-detail-tab-button="location"'),
+        text.index('data-detail-tab-button="share"'),
+        text.index('data-detail-tab-button="image"'),
+        text.index('data-detail-tab-button="export"'),
+    ]
+    assert tab_order == sorted(tab_order)
     assert text.index("photo-preview") < text.index('id="detail-actions"')
-    assert text.index(">Location<") < text.index('id="detail-actions"')
+    assert text.index('class="meta"') > text.index("photo-preview")
+    assert text.count('class="meta"') == 1
     assert "view-tabs" not in text
 
-    organize_open = text.split('id="detail-panel-organize"', 1)[1].split(">", 1)[0]
+    info_open = text.split('id="detail-panel-info"', 1)[1].split(">", 1)[0]
     share_open = text.split('id="detail-panel-share"', 1)[1].split(">", 1)[0]
-    file_open = text.split('id="detail-panel-file"', 1)[1].split(">", 1)[0]
-    assert "hidden" not in organize_open
+    image_open = text.split('id="detail-panel-image"', 1)[1].split(">", 1)[0]
+    export_open = text.split('id="detail-panel-export"', 1)[1].split(">", 1)[0]
+    location_open = text.split('id="detail-panel-location"', 1)[1].split(">", 1)[0]
+    assert "hidden" not in info_open
     assert "hidden" in share_open
-    assert "hidden" in file_open
+    assert "hidden" in image_open
+    assert "hidden" in export_open
+    assert "hidden" in location_open
 
-    organize = _panel(text, "detail-panel-organize", "detail-panel-share")
-    share = _panel(text, "detail-panel-share", "detail-panel-file")
-    file_panel = _panel(text, "detail-panel-file", "detail-export-dialog")
-    assert "/meta" in organize
-    assert 'name="stars"' in organize
-    assert "/albums/add" in organize
+    info = _panel(text, "detail-panel-info", "detail-panel-share")
+    share = _panel(text, "detail-panel-share", "detail-panel-image")
+    image = _panel(text, "detail-panel-image", "detail-panel-export")
+    export = _panel(text, "detail-panel-export", "detail-panel-location")
+    location = _panel(text, "detail-panel-location", "detail-export-grade")
+    assert 'class="meta"' in info
+    assert ">Date<" in info
+    assert ">Drone<" in info
+    assert ">Camera<" in info
+    assert ">Path<" in info
+    assert "/meta" in info
+    assert 'name="stars"' in info
+    assert "/albums/add" in info
+    assert "/rename" in info
     assert "/studio/add" in share
-    assert 'id="detail-export"' in share
-    assert "/rename" in file_panel
+    assert 'id="detail-export"' not in share
+    assert "detail-adjust-exposure" not in share
+    assert 'id="detail-adjust-exposure"' in image
+    assert 'id="detail-adjust-contrast"' in image
+    assert 'id="detail-adjust-saturation"' in image
+    assert 'id="detail-adjust-warmth"' in image
+    assert 'id="detail-adjust-reset"' in image
+    assert 'id="detail-export-run"' not in image
+    assert 'id="detail-export-format"' not in image
+    assert 'id="detail-export-preset"' not in image
+    assert 'id="detail-export"' in export
+    assert 'id="detail-export-preset"' in export
+    assert 'id="detail-export-format"' in export
+    assert 'id="detail-export-run"' in export
+    assert "detail-adjust-exposure" not in export
+    assert "detail-adjust-reset" not in export
+    assert 'id="map"' in location
+    assert "Open in OpenStreetMap" in location
+    assert "detail-adjust-exposure" not in location
+    assert 'id="detail-export-run"' not in location
     assert "/merge" not in text
     assert "Auto-merge flow" not in text
+    assert "detail-panel-file" not in text
+    assert "detail-export-dialog" not in text
 
     german = client.get(f"/media/{mid}", cookies={"lang": "de"})
-    assert ">Organisieren<" in german.text
+    assert ">Info<" in german.text
+    assert ">Organisieren<" not in german.text
     assert ">Teilen<" in german.text
-    assert ">Datei<" in german.text
+    assert ">Bild<" in german.text
+    assert ">Exportieren<" in german.text
+    assert ">Ort<" in german.text
+    assert ">Datei<" not in german.text
+    assert ">Umbenennen<" in german.text
     assert 'aria-label="Detailaktionen"' in german.text
-    assert 'id="detail-adjust-exposure"' in text
-    assert 'id="detail-adjust-contrast"' in text
-    assert 'id="detail-adjust-saturation"' in text
-    assert 'id="detail-adjust-warmth"' in text
     assert 'min="-100"' in text
     assert 'max="100"' in text
     assert ">Helligkeit<" in german.text
@@ -152,19 +198,48 @@ def test_flow_video_keeps_flight_switch_outside_tabs_and_merge_in_file(
     page = client.get(f"/media/{first}", cookies={"lang": "en"})
     assert page.status_code == 200
     text = page.text
+    assert text.index('class="view-tabs"') < text.index('id="media-player"')
     assert text.index('class="view-tabs"') < text.index('id="detail-actions"')
     assert text.index("Complete flight") < text.index('id="detail-actions"')
     assert text.index('id="media-player"') < text.index('id="detail-actions"')
-    file_panel = _panel(text, "detail-panel-file", "detail-export-dialog")
-    assert "/merge" in file_panel
-    assert "/rename" in file_panel
-    share = _panel(text, "detail-panel-share", "detail-panel-file")
-    assert 'id="detail-export"' in share
+    tab_order = [
+        text.index('data-detail-tab-button="info"'),
+        text.index('data-detail-tab-button="location"'),
+        text.index('data-detail-tab-button="share"'),
+        text.index('data-detail-tab-button="export"'),
+    ]
+    assert tab_order == sorted(tab_order)
+    info = _panel(text, "detail-panel-info", "detail-panel-share")
+    assert 'class="meta"' in info
+    assert "/merge" in info
+    assert "/rename" in info
+    assert "detail-panel-file" not in text
+    share = _panel(text, "detail-panel-share", "detail-panel-export")
+    export = _panel(text, "detail-panel-export", "detail-panel-location")
+    location = _panel(text, "detail-panel-location", "detail-actions.js")
+    assert 'id="detail-export"' not in share
+    assert "/studio/add" in share
     assert 'name="stars"' not in share
+    assert 'id="detail-export"' in export
+    assert 'id="detail-export-run"' in export
+    assert 'id="detail-export-format"' not in export
+    assert 'id="map"' in location
+    assert "detail-adjust-exposure" not in location
     assert "detail-adjust-exposure" not in text
+    assert 'data-detail-tab-button="image"' not in text
+    assert 'id="detail-panel-image"' not in text
 
     script = client.get("/static/js/detail-actions.js")
     assert script.status_code == 200
     assert "orga-drone.detail.actionsTab" in script.text
+    assert 'bubbles: true' in script.text
+    assert 'select(initial || "info", false)' in script.text
+    map_js = client.get("/static/js/map.js")
+    assert map_js.status_code == 200
+    assert "ResizeObserver" in map_js.text
+    assert "invalidateSize" in map_js.text
     css = client.get("/static/css/app.css")
     assert ".detail-actions-panel[hidden]" in css.text
+    assert "minmax(0, 1.15fr) minmax(17rem, 0.9fr)" in css.text
+    assert "grid-column: 1" in css.text
+    assert "grid-column: 2" in css.text

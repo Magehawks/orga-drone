@@ -1,6 +1,6 @@
 /**
  * Detail-page action tabs. One panel is visible. The choice lasts for this
- * browser session; the first open is Organize.
+ * browser session; the first open is Info.
  */
 (function () {
   const root = document.getElementById("detail-actions");
@@ -29,6 +29,9 @@
     } catch (_) {
       /* private mode */
     }
+    root.dispatchEvent(
+      new CustomEvent("orga-detail-tab", { bubbles: true, detail: { tab: tab } })
+    );
   }
 
   buttons.forEach((button, index) => {
@@ -59,5 +62,6 @@
   } catch (_) {
     stored = null;
   }
-  select(stored || "organize", false);
+  const initial = stored === "organize" || stored === "file" ? "info" : stored;
+  select(initial || "info", false);
 })();

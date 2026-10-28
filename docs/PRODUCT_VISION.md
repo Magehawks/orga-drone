@@ -249,14 +249,21 @@ See `README.md` for the detailed feature status table. In short:
   more than one album. Membership survives a rescan and stays listed when
   the file is offline. Albums do not modify files and are not Studio projects.
   No shared albums, cloud sync, or automatic albums.
-- **Detail page:** preview, metadata, and location stay visible. Rating, tags,
-  notes, albums, Studio, export, rename, and flow merge sit in Organize, Share,
-  and File tabs (one panel at a time). Single clip / Complete flight stays
-  outside those tabs.
+- **Detail page:** the picture stays on the left. On a desktop window the tabs
+  stay on the right, so the picture and the open tab are on one screen. A very
+  narrow window may stack them. Single clip / Complete flight stays with the
+  picture. Info holds the date, drone, and the other file facts together with
+  rating, tags, notes, albums, rename, and flow merge. Studio sits in Share.
+  Photo brightness, contrast, saturation, and warmth sit in Image (sliders, grade
+  preview, and reset). Export sits in its own tab (preset, JPEG or PNG, and the
+  export action). The map, coordinates, and spot download sit in Location when
+  GPS exists; without GPS that tab stays hidden. One panel at a time. A video
+  has no Image tab. Tab order is Info, Location, Share, Image, Export.
 - **Detail-page export:** one photo or one video as a local file (best quality, or a
   WhatsApp, Instagram, or TikTok preset). Nothing is uploaded or posted. A photo
-  stays an image and can set brightness, contrast, saturation, and warmth
-  (−100…100, neutral 0) with the Studio adjustment math. Neutral keeps today's
+  stays an image. Brightness, contrast, saturation, and warmth
+  (−100…100, neutral 0) are set on the Image tab with the Studio adjustment math
+  and applied by the Export tab. Neutral keeps today's
   file, including a best-quality copy of the original bytes when that is the
   current result. A moved slider grades the pixels and then applies the preset.
   The library file is not modified. Preview approximates the exported picture

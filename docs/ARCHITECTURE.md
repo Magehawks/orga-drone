@@ -151,9 +151,12 @@ shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
 successful output only). The media detail page exports that one photo or
 video through the same job, cancel, and open/reveal routes
-(`POST /api/media/{id}/export`). Rating, tags, notes, albums, Studio, export,
-rename, and flow merge are Organize / Share / File tabs on that page; preview,
-metadata, location, and Single clip / Complete flight stay outside the tabs.
+(`POST /api/media/{id}/export`). Info holds date, drone, and the other file
+facts with rating, tags, notes, albums, rename, and flow merge. Studio is
+Share; photo image adjustment is Image; the file export is Export; the map and
+GPS are Location when coordinates exist. A video has no Image tab. On a desktop
+window the picture stays on the left and these tabs stay on the right. Single
+clip / Complete flight stays with the picture.
 A photo is a local still (best quality copies
 a readable image when the grade is neutral; WhatsApp, Instagram, and TikTok
 are JPEG presets, not uploads). Brightness, contrast, saturation, and warmth

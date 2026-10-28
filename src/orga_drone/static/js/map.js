@@ -2,6 +2,25 @@
   const el = document.getElementById("map");
   if (!el || typeof L === "undefined" || typeof OrgaTrack === "undefined") return;
 
+  let map = null;
+
+  function locationVisible() {
+    const panel = document.getElementById("detail-panel-location");
+    if (!panel) return true;
+    if (panel.hidden) return false;
+    return getComputedStyle(panel).display !== "none";
+  }
+
+  function mount() {
+    if (!locationVisible()) return;
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    if (width < 20 || height < 20) return;
+    if (map) {
+      map.invalidateSize({ animate: false, pan: false });
+      return;
+    }
+
   const lat = parseFloat(el.dataset.lat);
   const lon = parseFloat(el.dataset.lon);
   if (Number.isNaN(lat) || Number.isNaN(lon)) return;
@@ -17,7 +36,11 @@
   const points = OrgaTrack.normalizePoints(track);
   const latlngs = points.map((p) => [p.lat, p.lon]);
 
-  const map = L.map(el).setView([lat, lon], 15);
+  const mapInstance = L.map(el).setView([lat, lon], 15);
+  map = mapInstance;
+  window.requestAnimationFrame(() => {
+    if (map && locationVisible()) map.invalidateSize({ animate: false, pan: false });
+  });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap",
@@ -155,4 +178,26 @@
     // Quality switch (player.js) keeps the same <video> element — listeners stay valid.
     sync();
   }
+  }
+
+  function scheduleMount() {
+    window.requestAnimationFrame(() => {
+      mount();
+      window.setTimeout(mount, 60);
+      window.setTimeout(mount, 250);
+    });
+  }
+
+  const actions = document.getElementById("detail-actions");
+  if (actions) {
+    actions.addEventListener("orga-detail-tab", (event) => {
+      const tab = event.detail && event.detail.tab;
+      if (!tab || tab === "location") scheduleMount();
+    });
+  }
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(() => mount());
+    observer.observe(el);
+  }
+  scheduleMount();
 })();

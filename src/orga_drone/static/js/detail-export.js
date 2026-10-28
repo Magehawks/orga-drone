@@ -6,7 +6,7 @@
 (function () {
   const root = document.getElementById("detail-export");
   const exportDialog = document.getElementById("detail-export-dialog");
-  if (!root || !exportDialog) return;
+  if (!root) return;
 
   const mediaId = root.dataset.mediaId || "";
   const kind = root.dataset.kind || "";
@@ -316,7 +316,7 @@
     const resetBtn = document.getElementById("detail-adjust-reset");
     if (formatSelect) formatSelect.disabled = running;
     if (resetBtn) resetBtn.disabled = running;
-    if (exportCancelBtn && !cancelRequested) exportCancelBtn.disabled = false;
+    if (exportCancelBtn && !cancelRequested) exportCancelBtn.disabled = !running;
   }
 
   function refreshHint() {
@@ -480,7 +480,7 @@
           cancelRequested = false;
           if (exportProgress) exportProgress.classList.remove("is-working");
           setRunningUi(false);
-          if (typeof exportDialog.close === "function") exportDialog.close();
+          if (exportDialog && typeof exportDialog.close === "function") exportDialog.close();
           showSuccess(data);
           if (optionsCache) {
             optionsCache.default_directory = data.directory || optionsCache.default_directory;
@@ -523,7 +523,7 @@
     if (presetSelect) presetSelect.innerHTML = "";
     filenameAuto = "";
     if (exportFilename) exportFilename.value = "";
-    exportDialog.showModal();
+    if (exportDialog && typeof exportDialog.showModal === "function") exportDialog.showModal();
     try {
       const res = await fetch(`/api/media/${encodeURIComponent(mediaId)}/export/options`, {
         headers: { Accept: "application/json" },
@@ -748,11 +748,12 @@
       return;
     }
     stopPoll();
-    if (typeof exportDialog.close === "function") exportDialog.close();
+    if (exportDialog && typeof exportDialog.close === "function") exportDialog.close();
   });
-  exportDialog.addEventListener("cancel", (event) => {
+  exportDialog?.addEventListener("cancel", (event) => {
     if (!activeJobId) return;
     event.preventDefault();
     requestCancel();
   });
+  openDialog();
 })();

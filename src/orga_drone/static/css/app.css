@@ -3486,14 +3486,43 @@ html.is-edge-drag * {
   letter-spacing: -0.02em;
 }
 .detail .meta { margin: 0 0 1.25rem; }
+.detail-actions-panel > .meta {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.detail-actions-panel > .detail-map {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.detail-actions-panel .map {
+  width: 100%;
+  height: min(52vh, 420px);
+  min-height: 280px;
+}
 .detail-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.9fr);
   gap: 1.25rem;
   align-items: start;
   margin-bottom: 1.25rem;
 }
-.detail-split.single { grid-template-columns: 1fr; }
+.detail-split > .detail-media {
+  position: sticky;
+  top: 0.75rem;
+  grid-column: 1;
+  grid-row: 1;
+}
+.detail-split > .detail-actions {
+  margin-top: 0;
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.detail-split > .session-block,
+.detail-split > .flow-block,
+.detail-split > .flight-playlist {
+  grid-column: 1 / -1;
+}
 .detail-media h2,
 .detail-map h2 {
   margin: 0 0 0.6rem;
@@ -3647,8 +3676,8 @@ html.is-edge-drag * {
   margin: 1.25rem 0 0;
 }
 .detail-actions-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   margin: 0 0 0.75rem;
 }
@@ -3663,6 +3692,7 @@ html.is-edge-drag * {
   font-weight: 600;
   line-height: 1.15;
   cursor: pointer;
+  flex: 1 1 6.5rem;
   min-width: 0;
   white-space: normal;
 }
@@ -3691,7 +3721,7 @@ html.is-edge-drag * {
   background: #000;
   border-radius: var(--radius-sm);
 }
-#detail-export-adjust {
+#detail-image-adjust {
   display: grid;
   gap: 0.45rem;
 }
@@ -4261,6 +4291,15 @@ footer {
   .add-form { grid-template-columns: 1fr; }
   .media-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; }
   .detail-split { grid-template-columns: 1fr; }
+  .detail-split > .detail-media,
+  .detail-split > .detail-actions,
+  .detail-split > .session-block,
+  .detail-split > .flow-block,
+  .detail-split > .flight-playlist {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+  }
   .top-controls { width: 100%; }
   .theme-custom {
     width: 100%;
