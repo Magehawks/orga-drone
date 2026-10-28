@@ -10,7 +10,7 @@ Organize your footage, rediscover where you flew, and create videos from your fa
 
 **Open source · No account required · Your original media stays on your disk**
 
-[**Current Version – Buy via itch.io**](https://magehawks.itch.io/orga-drone) · [**Legacy Downloads (GitHub)**](https://github.com/Magehawks/orga-drone/releases) · [**Explore the source**](https://github.com/Magehawks/orga-drone) · [**Join Discord**](https://discord.gg/8Qa4FZYZq)
+[**Current Version – Buy via itch.io**](https://magehawks.itch.io/orga-drone) · [**Explore the source**](https://github.com/Magehawks/orga-drone) · [**Join Discord**](https://discord.gg/8Qa4FZYZq)
 
 </div>
 
@@ -49,14 +49,14 @@ Use the built-in Studio to arrange clips and photos, trim footage, add titles, t
 
 ## Get started on Windows
 
-1. [Get the current Windows version on itch.io](https://magehawks.itch.io/orga-drone), or browse [legacy GitHub releases](https://github.com/Magehawks/orga-drone/releases).
+1. [Get the current Windows version on itch.io](https://magehawks.itch.io/orga-drone).
 2. Extract the ZIP and start `orga-drone.exe` from the extracted folder (keep `_internal` alongside it).
 3. Add a folder containing your photos and videos.
 4. Open the library, explore the map or create your first Studio project.
 
 **Other platforms:** macOS and Linux can run the Python application from source; packaged desktop downloads are currently Windows-focused.
 
-[Installation and developer instructions](docs/PRODUCT_VISION.md) · [All releases](https://github.com/Magehawks/orga-drone/releases)
+[Installation and developer instructions](docs/PRODUCT_VISION.md)
 
 ## Help shape Orga Drone
 
@@ -73,7 +73,7 @@ Orga Drone is developed in the open. DJI Avata 2 has been the primary developmen
 - [Product vision](docs/PRODUCT_VISION.md)
 - [Technical documentation and setup](docs/PRODUCT_VISION.md)
 - [Issues and feature requests](https://github.com/Magehawks/orga-drone/issues)
-- [Releases](https://github.com/Magehawks/orga-drone/releases)
+- [Get the Windows app on itch.io](https://magehawks.itch.io/orga-drone)
 
 ---
 
