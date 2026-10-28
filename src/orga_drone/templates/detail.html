@@ -445,7 +445,9 @@
          data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
          {% if item.kind == 'photo' %}
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
+         data-image-adjust='{{ photo_adjust|tojson }}'
          data-grade-reencode="{{ _('Re-encodes this still with the adjustments.')|e }}"
+         data-grade-png="{{ _('Saves a PNG of this still. The library file stays unchanged.')|e }}"
          {% endif %}
          data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
          data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
@@ -549,7 +551,15 @@
           <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
                  aria-label="{{ _('Warmth') }}">
         </label>
-        <p class="hint">{{ _('Changes this export only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
+        <button type="button" class="button ghost" id="detail-adjust-reset">{{ _('Reset adjustments') }}</button>
+        <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
+        <label class="studio-inspector-field" id="detail-export-format-wrap" for="detail-export-format">
+          <span>{{ _('Still format') }}</span>
+          <select id="detail-export-format" aria-label="{{ _('Still format') }}">
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+          </select>
+        </label>
       </div>
       {% endif %}
       <label class="studio-inspector-field" for="detail-export-preset">

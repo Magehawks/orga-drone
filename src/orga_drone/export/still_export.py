@@ -70,6 +70,25 @@ def normalize_share_preset(preset: str) -> str:
     return key
 
 
+def normalize_still_format(value: object) -> str | None:
+    """``jpeg``, ``png``, or None when the caller left the format alone.
+
+    PNG is a re-encode of the still. Share presets stay JPEG.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise StudioExportError("Choose JPEG or PNG.")
+    key = value.strip().lower()
+    if not key:
+        return None
+    if key in {"jpg", "jpeg"}:
+        return "jpeg"
+    if key == "png":
+        return "png"
+    raise StudioExportError("Choose JPEG or PNG.")
+
+
 def _is_graded(image: ImageAdjust | None) -> bool:
     return image is not None and not image.is_neutral
 
@@ -88,12 +107,18 @@ def inspect_photo_preset(
     preset: str,
     *,
     image: ImageAdjust | None = None,
+    still_format: str | None = None,
 ) -> PhotoPresetSpec:
     """Pixel size and suffix for one photo preset. Does not write a file."""
     key = normalize_share_preset(preset)
     graded = _is_graded(image)
+    as_png = key == PRESET_BEST and normalize_still_format(still_format) == "png"
     img = _load_still(source)
     try:
+        if key == PRESET_BEST and as_png:
+            rgb = _oriented_rgb(img)
+            width, height = rgb.size
+            return PhotoPresetSpec(suffix=".png", width=width, height=height, copied=False)
         if key == PRESET_BEST:
             suffix, copied = _best_suffix(
                 _copy_suffix(source, img.format or ""),
@@ -126,6 +151,7 @@ def export_photo_file(
     protected_identities: Iterable[tuple[int, int]] = (),
     cancel_event: threading.Event | None = None,
     image: ImageAdjust | None = None,
+    still_format: str | None = None,
 ) -> Path:
     """Write one photo preset and publish it without replacing an existing file."""
     if cancel_event is not None and cancel_event.is_set():
@@ -136,7 +162,14 @@ def export_photo_file(
     tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
     partial = tmp_dir / "still.bin"
     try:
-        _write_preset(source, partial, key, image=image, cancel_event=cancel_event)
+        _write_preset(
+            source,
+            partial,
+            key,
+            image=image,
+            cancel_event=cancel_event,
+            still_format=still_format,
+        )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportCancelled()
         if not partial.is_file() or partial.stat().st_size <= 0:
@@ -158,11 +191,19 @@ def _write_preset(
     *,
     image: ImageAdjust | None = None,
     cancel_event: threading.Event | None = None,
+    still_format: str | None = None,
 ) -> None:
     graded = _is_graded(image)
+    as_png = preset == PRESET_BEST and normalize_still_format(still_format) == "png"
     img = _load_still(source)
     try:
         copy_suffix = _copy_suffix(source, img.format or "")
+        if as_png:
+            rgb = _oriented_rgb(img)
+            if graded:
+                rgb = _grade_rgb(rgb, image, cancel_event=cancel_event)
+            _save_image(rgb, dest, "PNG")
+            return
         if preset == PRESET_BEST and not graded and copy_suffix is not None:
             shutil.copyfile(source, dest)
             return

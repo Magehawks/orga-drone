@@ -260,8 +260,12 @@ See `README.md` for the detailed feature status table. In short:
   file, including a best-quality copy of the original bytes when that is the
   current result. A moved slider grades the pixels and then applies the preset.
   The library file is not modified. Preview approximates the exported picture
-  the same way Studio preview does. A video stays an MP4 from the Studio encoder
-  and does not get these sliders.
+  the same way Studio preview does. The grade is saved on that photo and stays
+  after leaving the page, restarting, and a rescan that can match the same file.
+  Reset returns it to neutral. Best quality can be saved as JPEG or PNG. A
+  neutral JPEG best-quality export still copies the original bytes when that is
+  today's result. PNG and a moved slider re-encode. A video stays an MP4 from
+  the Studio encoder and does not get these sliders.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,

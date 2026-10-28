@@ -15,6 +15,7 @@ from orga_drone.studio_export import (
     prepare_media_export,
     run_media_export,
 )
+from orga_drone.db import make_identity_key
 from orga_drone.studio_image import ImageAdjust, image_adjust_from_export_payload
 
 
@@ -302,6 +303,161 @@ def test_export_payload_sliders_default_neutral_and_reject_out_of_range() -> Non
     assert adjust.exposure == 0
     with pytest.raises(ValueError):
         image_adjust_from_export_payload({"contrast": 140})
+
+
+def test_saved_grade_survives_reopen_reset_and_identity_relink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db_path = tmp_path / "t.sqlite3"
+    db = Database(db_path)
+    mid = _add_photo(db, tmp_path / "lib", "gray.jpg", size=(80, 60))
+    row = db.get_media(mid)
+    assert row is not None
+    source = Path(row.path)
+    original = source.read_bytes()
+    db.upsert_media_meta(row.path, stars=4, notes="keep", identity_key="old")
+    identity = make_identity_key(row.filename, row.size_bytes, row.recorded_at)
+    db.set_image_adjust(row.path, ImageAdjust(exposure=35, warmth=-10), identity_key=identity)
+    again = Database(db_path)
+    kept = again.get_media(mid)
+    assert kept is not None
+    assert kept.stars == 4
+    assert kept.notes == "keep"
+    assert again.get_image_adjust(row.path) == ImageAdjust(exposure=35, warmth=-10)
+    assert source.read_bytes() == original
+
+    again.set_image_adjust(row.path, ImageAdjust(), identity_key=identity)
+    assert again.get_image_adjust(row.path).is_neutral
+    assert again.get_media(mid).stars == 4
+
+    again.set_image_adjust(row.path, ImageAdjust(contrast=20), identity_key=identity)
+    with again.connect() as conn:
+        conn.execute("DELETE FROM media WHERE id = ?", (mid,))
+    moved = tmp_path / "relink" / "gray.jpg"
+    moved.parent.mkdir()
+    moved.write_bytes(original)
+    new_id = again.upsert_media(
+        {
+            "root_id": row.root_id,
+            "primary_asset_id": None,
+            "kind": "photo",
+            "filename": "gray.jpg",
+            "path": str(moved.resolve()),
+            "size_bytes": moved.stat().st_size,
+            "duration_s": None,
+            "recorded_at": row.recorded_at,
+            "sequence": None,
+            "mode": None,
+            "drone_model": "Avata 2",
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+    again.link_media_meta_for_path(
+        str(moved.resolve()),
+        filename="gray.jpg",
+        size_bytes=moved.stat().st_size,
+        recorded_at=row.recorded_at,
+    )
+    assert again.get_image_adjust(str(moved.resolve())).contrast == 20
+    assert again.get_media(new_id).stars == 4
+    assert source.read_bytes() == original
+
+
+def test_saved_grade_exports_without_repeating_the_sliders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "gray.jpg", size=(160, 120))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    db.set_image_adjust(str(source), ImageAdjust(exposure=100))
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(db, mid, preset="best", output_path=out / "gray_best.jpg")
+    assert source.read_bytes() == original
+    assert result.read_bytes() != original
+    with Image.open(source) as src, Image.open(result) as graded:
+        src_px = src.convert("RGB").getpixel((4, 4))
+        out_px = graded.convert("RGB").getpixel((4, 4))
+    assert sum(out_px[:3]) > sum(src_px[:3]) + 40
+
+
+def test_neutral_png_is_a_still_and_jpeg_best_stays_a_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "flat.jpg", size=(120, 80))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    png = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "flat_best.jpg",
+        still_format="png",
+    )
+    jpeg = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "flat_best.jpg",
+        image=ImageAdjust(),
+    )
+    assert png.suffix.lower() == ".png"
+    assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    with Image.open(png) as img:
+        assert img.format == "PNG"
+        assert img.size == (120, 80)
+    assert jpeg.read_bytes() == original
+    assert source.read_bytes() == original
+    assert not png.read_bytes().startswith(b"\x00\x00\x00")
+
+
+def test_detail_page_reloads_the_saved_grade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from orga_drone.app import create_app
+    from orga_drone.config import Settings
+    from orga_drone.i18n import clear_catalog_cache
+
+    clear_catalog_cache()
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    app = create_app()
+    db = app.state.db
+    mid = _add_photo(db, tmp_path / "lib", "page.jpg", size=(40, 30))
+    client = TestClient(app)
+    saved = client.post(
+        f"/api/media/{mid}/image-adjust",
+        json={"exposure": 12, "contrast": 0, "saturation": 0, "warmth": -4},
+    )
+    assert saved.status_code == 200
+    page = client.get(f"/media/{mid}", cookies={"lang": "en"})
+    assert page.status_code == 200
+    assert '"exposure": 12' in page.text
+    assert '"warmth": -4' in page.text
+    assert "Reset adjustments" in page.text
+    assert 'id="detail-export-format"' in page.text
+    video = _add_video(db, tmp_path / "vid", "clip.mp4", height=1080, duration_s=1.0)
+    denied = client.post(
+        f"/api/media/{video}/image-adjust",
+        json={"exposure": 10, "contrast": 0, "saturation": 0, "warmth": 0},
+    )
+    assert denied.status_code == 400
+    video_page = client.get(f"/media/{video}", cookies={"lang": "en"})
+    assert "detail-adjust-exposure" not in video_page.text
 
 
 def test_video_presets_use_encoder_frame_without_rendering(

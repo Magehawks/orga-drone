@@ -171,6 +171,35 @@ def image_adjust_from_export_payload(payload: Mapping[str, object] | None) -> Im
     return ImageAdjust(**values)
 
 
+def export_payload_sets_adjust(payload: Mapping[str, object] | None) -> bool:
+    """True when the export body includes at least one slider."""
+    if not isinstance(payload, Mapping):
+        return False
+    nested = payload.get("image")
+    source: Mapping[str, object] = nested if isinstance(nested, Mapping) else payload
+    return any(key in source for key in IMAGE_KEYS)
+
+
+def image_adjust_from_stored(raw: str | None) -> ImageAdjust:
+    """Read a saved photo grade. Missing or corrupt JSON is neutral."""
+    if raw is None or not str(raw).strip():
+        return ImageAdjust()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return ImageAdjust()
+    if not isinstance(data, dict):
+        return ImageAdjust()
+    nested = data.get("image")
+    source = nested if isinstance(nested, dict) else data
+    return ImageAdjust(
+        exposure=_read_stored_slider(source.get("exposure")),
+        contrast=_read_stored_slider(source.get("contrast")),
+        saturation=_read_stored_slider(source.get("saturation")),
+        warmth=_read_stored_slider(source.get("warmth")),
+    )
+
+
 def dump_effect_settings(existing: str | None, image: ImageAdjust) -> str:
     """Write the image object and keep unrelated effect_settings keys."""
     data: dict[str, object]
