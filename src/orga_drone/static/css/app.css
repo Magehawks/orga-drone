@@ -3643,12 +3643,46 @@ html.is-edge-drag * {
   display: inline-block;
 }
 
-.actions-panel {
+.detail-actions {
+  margin: 1.25rem 0 0;
+}
+.detail-actions-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin: 0 0 0.75rem;
+}
+.detail-actions-tab {
+  border: 1px solid var(--border);
+  background: var(--surface-deep);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  min-width: 0;
+  white-space: normal;
+}
+.detail-actions-tab:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-deep));
+}
+.detail-actions-tab.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+.detail-actions-tab:active { transform: none; }
+.detail-actions-panel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
-  margin: 0 0 1.25rem;
 }
+.detail-actions-panel[hidden] { display: none; }
 .action-form {
   background: var(--input-bg);
   border: 1px solid var(--border);

@@ -706,5 +706,9 @@
   "No exportable resolution for this file.": "No exportable resolution for this file.",
   "Could not read this photo.": "Could not read this photo.",
   "Media not found.": "Media not found.",
-  "Choose a share preset.": "Choose a share preset."
+  "Choose a share preset.": "Choose a share preset.",
+  "Detail actions": "Detail actions",
+  "Organize": "Organize",
+  "Share": "Share",
+  "File": "File"
 }

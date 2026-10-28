@@ -117,233 +117,6 @@
     <div class="wide"><dt>{{ _('Path') }}</dt><dd class="mono">{{ item.path }}</dd></div>
   </dl>
 
-  <div class="actions-panel">
-    {% if item.auto_tags or item.place %}
-    <div class="action-form auto-meta-readonly">
-      <h2>{{ _('Auto tags') }}</h2>
-      {% if item.place %}
-      <p class="auto-place-line">
-        <span class="auto-place-label">{{ _('Place') }}:</span>
-        {{ item.place|place_label or '—' }}
-      </p>
-      {% endif %}
-      {% if item.auto_tags %}
-      <div class="tag-line">
-        {% for tag in item.auto_tags %}
-          <span class="tag-chip auto">{{ tag }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <p class="hint">{{ _('Set automatically during scan from date and GPS. Not editable here.') }}</p>
-    </div>
-    {% endif %}
-
-    <form method="post" action="/media/{{ item.id }}/meta" class="action-form meta-form">
-      <h2>{{ _('Tags & notes') }}</h2>
-      <fieldset class="stars-field">
-        <legend>{{ _('Rating') }}</legend>
-        <div class="stars" role="radiogroup" aria-label="{{ _('Rating') }}">
-          <label class="star-option">
-            <input type="radio" name="stars" value="0" {% if not item.stars %}checked{% endif %}>
-            <span>{{ _('None') }}</span>
-          </label>
-          {% for n in range(1, 6) %}
-          <label class="star-option">
-            <input type="radio" name="stars" value="{{ n }}" {% if item.stars == n %}checked{% endif %}>
-            <span aria-hidden="true">{% for _ in range(n) %}★{% endfor %}</span>
-            <span class="sr-only">{{ n }}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </fieldset>
-      <label class="check-row">
-        <input type="checkbox" name="favorite" value="1" {% if item.favorite %}checked{% endif %}>
-        {{ _('Favorite') }}
-      </label>
-      <label>
-        {{ _('Tags') }}
-        <input type="text" name="tags" value="{{ item.tags|join(', ') }}"
-               placeholder="{{ _('Comma-separated tags') }}">
-      </label>
-      <label>
-        {{ _('Notes') }}
-        <textarea name="notes" rows="4" placeholder="{{ _('Free-text notes…') }}">{{ item.notes }}</textarea>
-      </label>
-      <button type="submit">{{ _('Save') }}</button>
-    </form>
-
-    <div class="action-form album-form">
-      <h2>{{ _('Albums') }}</h2>
-      <p class="hint">{{ _('Albums collect media across flights, dates, and folders. They do not change your files and stay separate from Studio projects.') }}</p>
-      {% if media_albums %}
-        <ul class="album-membership">
-          {% for album in media_albums %}
-          <li>
-            <a href="/albums/{{ album.id }}">{{ album.title }}</a>
-            <form method="post" action="/media/{{ item.id }}/albums/{{ album.id }}/remove">
-              <button type="submit" class="ghost">{{ _('Remove from album') }}</button>
-            </form>
-          </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="hint">{{ _('Not in any album yet.') }}</p>
-      {% endif %}
-      {% if albums_available %}
-      <form method="post" action="/media/{{ item.id }}/albums/add">
-        <label>
-          {{ _('Album') }}
-          <select name="album_id" required>
-            {% for album in albums_available %}
-            <option value="{{ album.id }}">{{ album.title }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <button type="submit">{{ _('Add to album') }}</button>
-      </form>
-      {% endif %}
-      <form method="post" action="/media/{{ item.id }}/albums/add">
-        <label>
-          {{ _('New album') }}
-          <input type="text" name="title" maxlength="80" required placeholder="{{ _('e.g. Malta vacation') }}">
-        </label>
-        <button type="submit">{{ _('Create album and add') }}</button>
-      </form>
-    </div>
-
-    <div class="action-form studio-form">
-      <h2>{{ _('Studio') }}</h2>
-      <p class="hint">{{ _('Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.') }}</p>
-      {% if in_studio %}
-        <p class="studio-status">{{ _('In Studio') }}</p>
-        <p class="hint"><a href="/studio">{{ _('Open Studio') }}</a></p>
-      {% else %}
-        <form method="post" action="/media/{{ item.id }}/studio/add">
-          <input type="hidden" name="return_to" value="detail">
-          <button type="submit">{{ _('Add to Studio') }}</button>
-        </form>
-      {% endif %}
-    </div>
-
-    {% if item.kind == 'photo' or item.kind == 'video' %}
-    <div class="action-form" id="detail-export"
-         data-media-id="{{ item.id }}"
-         data-kind="{{ item.kind }}"
-         {% if item_exportable %}
-         data-export-failed="{{ _('Export failed.')|e }}"
-         data-export-cancelled="{{ _('Export cancelled.')|e }}"
-         data-export-cancelling="{{ _('Cancelling export…')|e }}"
-         data-export-running="{{ _('Exporting…')|e }}"
-         data-export-done="{{ _('Export finished.')|e }}"
-         data-export-preparing="{{ _('Preparing export…')|e }}"
-         data-export-clip="{{ _('Clip {current} of {total}')|e }}"
-         data-export-running-hint="{{ _('Export is running…')|e }}"
-         data-export-elapsed="{{ _('Elapsed {time}')|e }}"
-         data-export-eta="{{ _('About {time} left')|e }}"
-         data-export-estimating="{{ _('Estimating…')|e }}"
-         data-export-done-in="{{ _('Done in {time}')|e }}"
-         data-export-success="{{ _('Exported {filename}.')|e }}"
-         data-export-file-missing="{{ _('The exported file is no longer available.')|e }}"
-         data-export-open-unavailable="{{ _('Opening the exported video is not available on this device.')|e }}"
-         data-export-reveal-unavailable="{{ _('Showing the file in its folder is not available on this device.')|e }}"
-         data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
-         data-open-video="{{ _('Open video')|e }}"
-         data-open-image="{{ _('Open image')|e }}"
-         data-preset-best="{{ _('Best quality')|e }}"
-         data-preset-whatsapp="{{ _('WhatsApp')|e }}"
-         data-preset-instagram="{{ _('Instagram')|e }}"
-         data-preset-tiktok="{{ _('TikTok')|e }}"
-         data-photo-best="{{ _('Copies this still unchanged.')|e }}"
-         data-photo-best-jpeg="{{ _('JPEG at the original pixel size.')|e }}"
-         data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching.')|e }}"
-         data-photo-instagram="{{ _('JPEG 1080×1350, cropped from the center.')|e }}"
-         data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
-         data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
-         data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
-         data-no-preset="{{ _('No exportable resolution for this file.')|e }}"
-         {% endif %}>
-      <h2>{{ _('Export file') }}</h2>
-      {% if item_exportable %}
-        <p class="hint">{{ _('Saves a local file for this photo or video. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
-        <button type="button" class="button" id="detail-export-open">{{ _('Export file') }}</button>
-      {% elif item.root_id in offline_root_ids %}
-        <p class="hint">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
-        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
-      {% else %}
-        <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
-        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
-      <h2>{{ _('Rename') }}</h2>
-      <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>
-      <label>
-        {{ _('New name (without extension)') }}
-        <input type="text" name="new_name" value="{{ rename_stem }}" required>
-      </label>
-      <button type="submit">{{ _('Rename') }}</button>
-    </form>
-
-    {% if can_merge %}
-    <form method="post" action="/media/{{ item.id }}/merge" class="action-form"
-          onsubmit="return confirm('{{ _('Merge all clips in this flow into one MP4? Originals are kept.')|e }}');">
-      <h2>{{ _('Auto-merge flow') }}</h2>
-      {% if ffmpeg_ok %}
-        <p class="hint">{{ _('Joins all split clips into one file (fast stream copy).') }}</p>
-        <label>
-          {{ _('Output filename') }}
-          <input type="text" name="output_name" value="{{ merge_default_name }}">
-        </label>
-        <button type="submit">{{ _('Merge clips') }}</button>
-      {% else %}
-        <p class="hint">{{ _('Install ffmpeg or: pip install imageio-ffmpeg') }}</p>
-        <button type="submit" disabled>{{ _('Merge clips') }}</button>
-      {% endif %}
-    </form>
-    {% endif %}
-  </div>
-
-  {% if active_tab == 'flight' and flight_items %}
-  <div class="flight-playlist panel-inset" id="flight-playlist-ui"
-       data-start-index="{{ play_start_index }}">
-    <h2>{% if flight_source == 'session' %}{{ _('Clips in this flight session') }}{% else %}{{ _('Clips in this flow') }}{% endif %}
-      ({{ flight_items|length }})</h2>
-    {% if flight_source == 'session' %}
-    <p class="hint">{{ _('A session groups recordings from takeoff to landing. Split flow parts stay together.') }}</p>
-    {% endif %}
-    <p class="hint">{{ _('Videos play one after another. Click a clip to jump.') }}</p>
-    <ol class="flight-clip-list">
-      {% for clip in flight_items %}
-      {% set pidx = playlist_index_by_id.get(clip.id) %}
-      <li class="flight-clip {% if clip.id == play_id %}current{% endif %}"
-          data-media-id="{{ clip.id }}"
-          {% if pidx is not none %}data-playlist-index="{{ pidx }}"{% endif %}>
-        <a class="flight-clip-thumb" href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}" title="{{ clip.filename }}">
-          <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy" decoding="async">
-        </a>
-        <div class="flight-clip-meta">
-          <a href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}">{{ clip.filename }}</a>
-          <span class="kind">{% if clip.kind == 'video' %}{{ _('Video') }}{% elif clip.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ clip.kind }}{% endif %}</span>
-          — {{ clip.size_bytes|filesize }}
-          {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
-          {% if clip.clip_count and clip.clip_count > 1 %}
-            · <span class="flow-mark">{{ _('Flow') }} {{ clip.clip_count }} {{ _('parts') }}</span>
-          {% endif %}
-        </div>
-        {% if pidx is not none %}
-        <button type="button" class="ghost flight-play-btn" data-play-index="{{ pidx }}">
-          {{ _('Play') }}
-        </button>
-        {% endif %}
-      </li>
-      {% endfor %}
-    </ol>
-  </div>
-  <script type="application/json" id="flight-playlist-data">{{ flight_playlist_json|safe }}</script>
-  {% endif %}
-
   <div class="detail-split {% if not show_map %}single{% endif %}">
     <div class="detail-media">
       {% if item.root_id in offline_root_ids %}
@@ -438,6 +211,45 @@
     {% endif %}
   </div>
 
+  {% if active_tab == 'flight' and flight_items %}
+  <div class="flight-playlist panel-inset" id="flight-playlist-ui"
+       data-start-index="{{ play_start_index }}">
+    <h2>{% if flight_source == 'session' %}{{ _('Clips in this flight session') }}{% else %}{{ _('Clips in this flow') }}{% endif %}
+      ({{ flight_items|length }})</h2>
+    {% if flight_source == 'session' %}
+    <p class="hint">{{ _('A session groups recordings from takeoff to landing. Split flow parts stay together.') }}</p>
+    {% endif %}
+    <p class="hint">{{ _('Videos play one after another. Click a clip to jump.') }}</p>
+    <ol class="flight-clip-list">
+      {% for clip in flight_items %}
+      {% set pidx = playlist_index_by_id.get(clip.id) %}
+      <li class="flight-clip {% if clip.id == play_id %}current{% endif %}"
+          data-media-id="{{ clip.id }}"
+          {% if pidx is not none %}data-playlist-index="{{ pidx }}"{% endif %}>
+        <a class="flight-clip-thumb" href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}" title="{{ clip.filename }}">
+          <img src="/media/{{ clip.id }}/thumb" alt="" loading="lazy" decoding="async">
+        </a>
+        <div class="flight-clip-meta">
+          <a href="/media/{{ clip.id }}{% if clip.kind == 'photo' %}?tab=clip{% else %}?tab=flight{% endif %}">{{ clip.filename }}</a>
+          <span class="kind">{% if clip.kind == 'video' %}{{ _('Video') }}{% elif clip.kind == 'photo' %}{{ _('Photo') }}{% else %}{{ clip.kind }}{% endif %}</span>
+          — {{ clip.size_bytes|filesize }}
+          {% if clip.duration_s %}· {{ clip.duration_s|duration }}{% endif %}
+          {% if clip.clip_count and clip.clip_count > 1 %}
+            · <span class="flow-mark">{{ _('Flow') }} {{ clip.clip_count }} {{ _('parts') }}</span>
+          {% endif %}
+        </div>
+        {% if pidx is not none %}
+        <button type="button" class="ghost flight-play-btn" data-play-index="{{ pidx }}">
+          {{ _('Play') }}
+        </button>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  <script type="application/json" id="flight-playlist-data">{{ flight_playlist_json|safe }}</script>
+  {% endif %}
+
   {% if active_tab == 'clip' and session_clips and session_clips|length > 1 %}
   <div class="session-block">
     <h2>{{ _('Clips in this flight session') }} ({{ session_clips|length }})</h2>
@@ -472,6 +284,216 @@
     </ol>
   </div>
   {% endif %}
+
+  <div class="detail-actions" id="detail-actions">
+    <div class="detail-actions-tabs" role="tablist" aria-label="{{ _('Detail actions') }}">
+      <button type="button" class="detail-actions-tab is-active" role="tab"
+              id="detail-tab-organize" data-detail-tab-button="organize"
+              aria-selected="true" aria-controls="detail-panel-organize" tabindex="0">{{ _('Organize') }}</button>
+      <button type="button" class="detail-actions-tab" role="tab"
+              id="detail-tab-share" data-detail-tab-button="share"
+              aria-selected="false" aria-controls="detail-panel-share" tabindex="-1">{{ _('Share') }}</button>
+      <button type="button" class="detail-actions-tab" role="tab"
+              id="detail-tab-file" data-detail-tab-button="file"
+              aria-selected="false" aria-controls="detail-panel-file" tabindex="-1">{{ _('File') }}</button>
+    </div>
+
+    <div class="detail-actions-panel" id="detail-panel-organize" role="tabpanel"
+         data-detail-tab-panel="organize" aria-labelledby="detail-tab-organize">
+    {% if item.auto_tags or item.place %}
+    <div class="action-form auto-meta-readonly">
+      <h2>{{ _('Auto tags') }}</h2>
+      {% if item.place %}
+      <p class="auto-place-line">
+        <span class="auto-place-label">{{ _('Place') }}:</span>
+        {{ item.place|place_label or '—' }}
+      </p>
+      {% endif %}
+      {% if item.auto_tags %}
+      <div class="tag-line">
+        {% for tag in item.auto_tags %}
+          <span class="tag-chip auto">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <p class="hint">{{ _('Set automatically during scan from date and GPS. Not editable here.') }}</p>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/media/{{ item.id }}/meta" class="action-form meta-form">
+      <h2>{{ _('Tags & notes') }}</h2>
+      <fieldset class="stars-field">
+        <legend>{{ _('Rating') }}</legend>
+        <div class="stars" role="radiogroup" aria-label="{{ _('Rating') }}">
+          <label class="star-option">
+            <input type="radio" name="stars" value="0" {% if not item.stars %}checked{% endif %}>
+            <span>{{ _('None') }}</span>
+          </label>
+          {% for n in range(1, 6) %}
+          <label class="star-option">
+            <input type="radio" name="stars" value="{{ n }}" {% if item.stars == n %}checked{% endif %}>
+            <span aria-hidden="true">{% for _ in range(n) %}★{% endfor %}</span>
+            <span class="sr-only">{{ n }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <label class="check-row">
+        <input type="checkbox" name="favorite" value="1" {% if item.favorite %}checked{% endif %}>
+        {{ _('Favorite') }}
+      </label>
+      <label>
+        {{ _('Tags') }}
+        <input type="text" name="tags" value="{{ item.tags|join(', ') }}"
+               placeholder="{{ _('Comma-separated tags') }}">
+      </label>
+      <label>
+        {{ _('Notes') }}
+        <textarea name="notes" rows="4" placeholder="{{ _('Free-text notes…') }}">{{ item.notes }}</textarea>
+      </label>
+      <button type="submit">{{ _('Save') }}</button>
+    </form>
+
+    <div class="action-form album-form">
+      <h2>{{ _('Albums') }}</h2>
+      <p class="hint">{{ _('Albums collect media across flights, dates, and folders. They do not change your files and stay separate from Studio projects.') }}</p>
+      {% if media_albums %}
+        <ul class="album-membership">
+          {% for album in media_albums %}
+          <li>
+            <a href="/albums/{{ album.id }}">{{ album.title }}</a>
+            <form method="post" action="/media/{{ item.id }}/albums/{{ album.id }}/remove">
+              <button type="submit" class="ghost">{{ _('Remove from album') }}</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="hint">{{ _('Not in any album yet.') }}</p>
+      {% endif %}
+      {% if albums_available %}
+      <form method="post" action="/media/{{ item.id }}/albums/add">
+        <label>
+          {{ _('Album') }}
+          <select name="album_id" required>
+            {% for album in albums_available %}
+            <option value="{{ album.id }}">{{ album.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">{{ _('Add to album') }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/media/{{ item.id }}/albums/add">
+        <label>
+          {{ _('New album') }}
+          <input type="text" name="title" maxlength="80" required placeholder="{{ _('e.g. Malta vacation') }}">
+        </label>
+        <button type="submit">{{ _('Create album and add') }}</button>
+      </form>
+    </div>
+    </div>
+
+    <div class="detail-actions-panel" id="detail-panel-share" role="tabpanel"
+         data-detail-tab-panel="share" aria-labelledby="detail-tab-share" hidden>
+    <div class="action-form studio-form">
+      <h2>{{ _('Studio') }}</h2>
+      <p class="hint">{{ _('Studio is a lightweight workspace for preparing a selection. It is separate from Favorites and does not change your files.') }}</p>
+      {% if in_studio %}
+        <p class="studio-status">{{ _('In Studio') }}</p>
+        <p class="hint"><a href="/studio">{{ _('Open Studio') }}</a></p>
+      {% else %}
+        <form method="post" action="/media/{{ item.id }}/studio/add">
+          <input type="hidden" name="return_to" value="detail">
+          <button type="submit">{{ _('Add to Studio') }}</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if item.kind == 'photo' or item.kind == 'video' %}
+    <div class="action-form" id="detail-export"
+         data-media-id="{{ item.id }}"
+         data-kind="{{ item.kind }}"
+         {% if item_exportable %}
+         data-export-failed="{{ _('Export failed.')|e }}"
+         data-export-cancelled="{{ _('Export cancelled.')|e }}"
+         data-export-cancelling="{{ _('Cancelling export…')|e }}"
+         data-export-running="{{ _('Exporting…')|e }}"
+         data-export-done="{{ _('Export finished.')|e }}"
+         data-export-preparing="{{ _('Preparing export…')|e }}"
+         data-export-clip="{{ _('Clip {current} of {total}')|e }}"
+         data-export-running-hint="{{ _('Export is running…')|e }}"
+         data-export-elapsed="{{ _('Elapsed {time}')|e }}"
+         data-export-eta="{{ _('About {time} left')|e }}"
+         data-export-estimating="{{ _('Estimating…')|e }}"
+         data-export-done-in="{{ _('Done in {time}')|e }}"
+         data-export-success="{{ _('Exported {filename}.')|e }}"
+         data-export-file-missing="{{ _('The exported file is no longer available.')|e }}"
+         data-export-open-unavailable="{{ _('Opening the exported video is not available on this device.')|e }}"
+         data-export-reveal-unavailable="{{ _('Showing the file in its folder is not available on this device.')|e }}"
+         data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
+         data-open-video="{{ _('Open video')|e }}"
+         data-open-image="{{ _('Open image')|e }}"
+         data-preset-best="{{ _('Best quality')|e }}"
+         data-preset-whatsapp="{{ _('WhatsApp')|e }}"
+         data-preset-instagram="{{ _('Instagram')|e }}"
+         data-preset-tiktok="{{ _('TikTok')|e }}"
+         data-photo-best="{{ _('Copies this still unchanged.')|e }}"
+         data-photo-best-jpeg="{{ _('JPEG at the original pixel size.')|e }}"
+         data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching.')|e }}"
+         data-photo-instagram="{{ _('JPEG 1080×1350, cropped from the center.')|e }}"
+         data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
+         data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
+         data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
+         data-no-preset="{{ _('No exportable resolution for this file.')|e }}"
+         {% endif %}>
+      <h2>{{ _('Export file') }}</h2>
+      {% if item_exportable %}
+        <p class="hint">{{ _('Saves a local file for this photo or video. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
+        <button type="button" class="button" id="detail-export-open">{{ _('Export file') }}</button>
+      {% elif item.root_id in offline_root_ids %}
+        <p class="hint">{{ _('Source offline. This catalog entry is kept. Connect the drive to open it again.') }}</p>
+        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
+      {% else %}
+        <p class="hint">{{ _('File not found on disk — check that the library folder is connected.') }}</p>
+        <button type="button" class="button" disabled>{{ _('Export file') }}</button>
+      {% endif %}
+    </div>
+    {% endif %}
+    </div>
+
+    <div class="detail-actions-panel" id="detail-panel-file" role="tabpanel"
+         data-detail-tab-panel="file" aria-labelledby="detail-tab-file" hidden>
+    <form method="post" action="/media/{{ item.id }}/rename" class="action-form">
+      <h2>{{ _('Rename') }}</h2>
+      <p class="hint">{{ _('Renames this file and matching siblings (LRF, SRT, …) in the same folder.') }}</p>
+      <label>
+        {{ _('New name (without extension)') }}
+        <input type="text" name="new_name" value="{{ rename_stem }}" required>
+      </label>
+      <button type="submit">{{ _('Rename') }}</button>
+    </form>
+
+    {% if can_merge %}
+    <form method="post" action="/media/{{ item.id }}/merge" class="action-form"
+          onsubmit="return confirm('{{ _('Merge all clips in this flow into one MP4? Originals are kept.')|e }}');">
+      <h2>{{ _('Auto-merge flow') }}</h2>
+      {% if ffmpeg_ok %}
+        <p class="hint">{{ _('Joins all split clips into one file (fast stream copy).') }}</p>
+        <label>
+          {{ _('Output filename') }}
+          <input type="text" name="output_name" value="{{ merge_default_name }}">
+        </label>
+        <button type="submit">{{ _('Merge clips') }}</button>
+      {% else %}
+        <p class="hint">{{ _('Install ffmpeg or: pip install imageio-ffmpeg') }}</p>
+        <button type="submit" disabled>{{ _('Merge clips') }}</button>
+      {% endif %}
+    </form>
+    {% endif %}
+    </div>
+  </div>
+
   {% if item_exportable %}
   <dialog class="studio-export-dialog" id="detail-export-dialog">
     <form method="dialog" class="studio-export-form" id="detail-export-form">
@@ -509,6 +531,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
+  <script src="/static/js/detail-actions.js"></script>
   {% if item_exportable %}
   <script src="/static/js/detail-export.js"></script>
   {% endif %}

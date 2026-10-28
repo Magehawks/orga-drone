@@ -151,7 +151,10 @@ shows a dismissible banner with Open video / Show in folder
 (`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
 successful output only). The media detail page exports that one photo or
 video through the same job, cancel, and open/reveal routes
-(`POST /api/media/{id}/export`). A photo is a local still (best quality copies
+(`POST /api/media/{id}/export`). Rating, tags, notes, albums, Studio, export,
+rename, and flow merge are Organize / Share / File tabs on that page; preview,
+metadata, location, and Single clip / Complete flight stay outside the tabs.
+A photo is a local still (best quality copies
 a readable image; WhatsApp, Instagram, and TikTok are JPEG presets, not
 uploads). A video is one clip on the Studio encoder (best quality uses the
 highest existing resolution; those three presets are a 1080×1920 frame with

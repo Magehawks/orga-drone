@@ -706,5 +706,9 @@
   "No exportable resolution for this file.": "Für diese Datei gibt es keine exportierbare Auflösung.",
   "Could not read this photo.": "Dieses Foto konnte nicht gelesen werden.",
   "Media not found.": "Medium nicht gefunden.",
-  "Choose a share preset.": "Wähle eine Ausgabe."
+  "Choose a share preset.": "Wähle eine Ausgabe.",
+  "Detail actions": "Detailaktionen",
+  "Organize": "Organisieren",
+  "Share": "Teilen",
+  "File": "Datei"
 }

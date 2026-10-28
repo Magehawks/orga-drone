@@ -249,6 +249,10 @@ See `README.md` for the detailed feature status table. In short:
   more than one album. Membership survives a rescan and stays listed when
   the file is offline. Albums do not modify files and are not Studio projects.
   No shared albums, cloud sync, or automatic albums.
+- **Detail page:** preview, metadata, and location stay visible. Rating, tags,
+  notes, albums, Studio, export, rename, and flow merge sit in Organize, Share,
+  and File tabs (one panel at a time). Single clip / Complete flight stays
+  outside those tabs.
 - **Detail-page export:** one photo or one video as a local file (best quality, or a
   WhatsApp, Instagram, or TikTok preset). Nothing is uploaded or posted. A photo
   stays an image. A video stays an MP4 from the Studio encoder.

@@ -24,7 +24,7 @@ Highlights:
 - Local folder library + SQLite index + browse, including a chronological Timeline (recording-date groups; not the Studio story timeline)
 - DJI-oriented parsing (strongest path) + thinner generic media support
 - Flows, heuristic sessions, maps, rule-based Ask the library
-- User meta (stars/favorites/tags/notes), library albums, rename/merge, spot GeoJSON
+- User meta (stars/favorites/tags/notes), library albums, rename/merge, and spot GeoJSON on the detail page (Organize / Share / File tabs; preview, metadata, and location stay visible)
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
 - Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
   `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
