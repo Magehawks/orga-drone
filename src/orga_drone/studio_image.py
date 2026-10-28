@@ -150,6 +150,27 @@ def parse_image_adjust_patch(
     return replace(current, **updates)
 
 
+def image_adjust_from_export_payload(payload: Mapping[str, object] | None) -> ImageAdjust:
+    """Sliders for one photo export. Omitted keys stay at 0.
+
+    A missing adjustment is neutral, so older clients keep today's file.
+    A present key that is not a number from -100 to 100 raises ValueError.
+    """
+    if not isinstance(payload, Mapping):
+        return ImageAdjust()
+    nested = payload.get("image")
+    source: Mapping[str, object] = nested if isinstance(nested, Mapping) else payload
+    if not any(key in source for key in IMAGE_KEYS):
+        return ImageAdjust()
+    values: dict[str, int] = {}
+    for key in IMAGE_KEYS:
+        if key not in source:
+            values[key] = 0
+            continue
+        values[key] = _parse_slider(source[key], key)
+    return ImageAdjust(**values)
+
+
 def dump_effect_settings(existing: str | None, image: ImageAdjust) -> str:
     """Write the image object and keep unrelated effect_settings keys."""
     data: dict[str, object]

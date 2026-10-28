@@ -2,11 +2,17 @@
 
 Best quality copies a readable still (JPEG, PNG, and similar). Share presets
 write a new JPEG. Nothing is uploaded.
+
+A non-neutral grade uses the Studio ffmpeg filter chain
+(``ffmpeg_grade_chain``) and then the same preset. Neutral leaves that chain
+out, so a best-quality copy stays the original bytes. The library file is
+never written.
 """
 
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 import threading
 from dataclasses import dataclass
@@ -18,6 +24,7 @@ from orga_drone.export.studio_encoder import (
     StudioExportError,
     _publish_export_file,
 )
+from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 
 PRESET_BEST = "best"
 PRESET_WHATSAPP = "whatsapp"
@@ -42,6 +49,9 @@ BEST_JPEG_QUALITY = 95
 SOCIAL_VIDEO_WIDTH = 1080
 SOCIAL_VIDEO_HEIGHT = 1920
 
+# Formats Pillow can write back after a grade. HEIC and similar become JPEG.
+_REENCODE_SUFFIXES = {".jpg", ".png", ".webp", ".gif", ".tif", ".bmp"}
+
 
 @dataclass(frozen=True)
 class PhotoPresetSpec:
@@ -60,18 +70,40 @@ def normalize_share_preset(preset: str) -> str:
     return key
 
 
-def inspect_photo_preset(source: Path, preset: str) -> PhotoPresetSpec:
+def _is_graded(image: ImageAdjust | None) -> bool:
+    return image is not None and not image.is_neutral
+
+
+def _best_suffix(copy_suffix: str | None, *, graded: bool) -> tuple[str, bool]:
+    """Return ``(suffix, copied)`` for best quality."""
+    if copy_suffix is not None and not graded:
+        return copy_suffix, True
+    if graded and copy_suffix in _REENCODE_SUFFIXES:
+        return copy_suffix, False
+    return ".jpg", False
+
+
+def inspect_photo_preset(
+    source: Path,
+    preset: str,
+    *,
+    image: ImageAdjust | None = None,
+) -> PhotoPresetSpec:
     """Pixel size and suffix for one photo preset. Does not write a file."""
     key = normalize_share_preset(preset)
+    graded = _is_graded(image)
     img = _load_still(source)
     try:
         if key == PRESET_BEST:
-            suffix = _copy_suffix(source, img.format or "")
-            if suffix is not None:
+            suffix, copied = _best_suffix(
+                _copy_suffix(source, img.format or ""),
+                graded=graded,
+            )
+            if copied:
                 return PhotoPresetSpec(suffix=suffix, width=None, height=None, copied=True)
             rgb = _oriented_rgb(img)
             width, height = rgb.size
-            return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+            return PhotoPresetSpec(suffix=suffix, width=width, height=height, copied=False)
         if key == PRESET_WHATSAPP:
             fitted = _fit_longest(_oriented_rgb(img), WHATSAPP_LONGEST)
             width, height = fitted.size
@@ -93,6 +125,7 @@ def export_photo_file(
     protected: Iterable[Path | str] = (),
     protected_identities: Iterable[tuple[int, int]] = (),
     cancel_event: threading.Event | None = None,
+    image: ImageAdjust | None = None,
 ) -> Path:
     """Write one photo preset and publish it without replacing an existing file."""
     if cancel_event is not None and cancel_event.is_set():
@@ -103,7 +136,7 @@ def export_photo_file(
     tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
     partial = tmp_dir / "still.bin"
     try:
-        _write_preset(source, partial, key)
+        _write_preset(source, partial, key, image=image, cancel_event=cancel_event)
         if cancel_event is not None and cancel_event.is_set():
             raise ExportCancelled()
         if not partial.is_file() or partial.stat().st_size <= 0:
@@ -118,25 +151,119 @@ def export_photo_file(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _write_preset(source: Path, dest: Path, preset: str) -> None:
+def _write_preset(
+    source: Path,
+    dest: Path,
+    preset: str,
+    *,
+    image: ImageAdjust | None = None,
+    cancel_event: threading.Event | None = None,
+) -> None:
+    graded = _is_graded(image)
     img = _load_still(source)
     try:
-        if preset == PRESET_BEST and _copy_suffix(source, img.format or "") is not None:
+        copy_suffix = _copy_suffix(source, img.format or "")
+        if preset == PRESET_BEST and not graded and copy_suffix is not None:
             shutil.copyfile(source, dest)
             return
+        rgb = _oriented_rgb(img)
+        if graded:
+            rgb = _grade_rgb(rgb, image, cancel_event=cancel_event)
         if preset == PRESET_BEST:
-            image = _oriented_rgb(img)
-            _save_jpeg(image, dest, BEST_JPEG_QUALITY)
+            _save_best(rgb, dest, copy_suffix if graded else None)
             return
         if preset == PRESET_WHATSAPP:
-            image = _fit_longest(_oriented_rgb(img), WHATSAPP_LONGEST)
-            _save_jpeg(image, dest, WHATSAPP_QUALITY)
+            fitted = _fit_longest(rgb, WHATSAPP_LONGEST)
+            _save_jpeg(fitted, dest, WHATSAPP_QUALITY)
             return
         target = INSTAGRAM_SIZE if preset == PRESET_INSTAGRAM else TIKTOK_SIZE
-        image = _cover_crop(_oriented_rgb(img), target[0], target[1])
-        _save_jpeg(image, dest, SOCIAL_JPEG_QUALITY)
+        framed = _cover_crop(rgb, target[0], target[1])
+        _save_jpeg(framed, dest, SOCIAL_JPEG_QUALITY)
     finally:
         img.close()
+
+
+def _grade_rgb(rgb, image: ImageAdjust | None, *, cancel_event: threading.Event | None):
+    """Run the Studio grade on one still. The source file is not an ffmpeg input."""
+    if image is None or image.is_neutral:
+        return rgb
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportCancelled()
+    chain = ffmpeg_grade_chain(image)
+    if not chain:
+        return rgb
+    from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise StudioExportError("Install ffmpeg or: pip install imageio-ffmpeg")
+    tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-grade-"))
+    src = tmp_dir / "in.png"
+    dst = tmp_dir / "out.png"
+    try:
+        rgb.save(src, format="PNG")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(src),
+            "-vf",
+            f"{chain},format=rgb24",
+            "-frames:v",
+            "1",
+            str(dst),
+        ]
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **subprocess_no_window_kwargs(),
+        )
+        while proc.poll() is None:
+            if cancel_event is not None and cancel_event.is_set():
+                proc.kill()
+                proc.wait(timeout=5)
+                raise ExportCancelled()
+            try:
+                proc.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                continue
+        if proc.returncode != 0 or not dst.is_file():
+            raise StudioExportError("Could not read this photo.")
+        from PIL import Image
+
+        graded = Image.open(dst)
+        try:
+            graded.load()
+            return graded.convert("RGB").copy()
+        finally:
+            graded.close()
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _save_best(img, dest: Path, copy_suffix: str | None) -> None:
+    suffix, _copied = _best_suffix(copy_suffix, graded=True)
+    if suffix == ".png":
+        _save_image(img, dest, "PNG")
+        return
+    if suffix == ".webp":
+        _save_image(img, dest, "WEBP", quality=BEST_JPEG_QUALITY)
+        return
+    if suffix == ".gif":
+        _save_image(img, dest, "GIF")
+        return
+    if suffix == ".tif":
+        _save_image(img, dest, "TIFF")
+        return
+    if suffix == ".bmp":
+        _save_image(img, dest, "BMP")
+        return
+    _save_jpeg(img, dest, BEST_JPEG_QUALITY)
 
 
 def _copy_suffix(source: Path, image_format: str) -> str | None:
@@ -224,5 +351,12 @@ def _lanczos():
 def _save_jpeg(img, dest: Path, quality: int) -> None:
     try:
         img.save(dest, format="JPEG", quality=int(quality), optimize=True)
+    except OSError as exc:
+        raise StudioExportError("Could not read this photo.") from exc
+
+
+def _save_image(img, dest: Path, fmt: str, **kwargs: object) -> None:
+    try:
+        img.save(dest, format=fmt, **kwargs)
     except OSError as exc:
         raise StudioExportError("Could not read this photo.") from exc

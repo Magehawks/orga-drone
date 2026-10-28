@@ -66,6 +66,7 @@ from orga_drone.studio_frame import (
 from orga_drone.studio_hud import empty_hud_state, hud_client_state
 from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
+    image_adjust_from_export_payload,
     image_adjust_preview_model,
     saturation_ramp_from_effect_settings,
 )
@@ -1121,6 +1122,7 @@ def create_app() -> FastAPI:
             return_qs=return_qs,
             in_studio=in_studio,
             item_exportable=item_exportable,
+            image_adjust_model=image_adjust_preview_model(),
             media_albums=media_albums,
             albums_available=albums_available,
         )
@@ -2881,6 +2883,18 @@ def create_app() -> FastAPI:
         if not isinstance(output_path, str) or not output_path.strip():
             raise HTTPException(status_code=400, detail="output_path is required")
         translate = get_translator(lang_from_request(request))
+        row = db.get_media(media_id)
+        image = None
+        if row is not None and row.kind == "photo":
+            try:
+                image = image_adjust_from_export_payload(payload)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail=translate(
+                        "Brightness, contrast, saturation, and warmth must be from -100 to 100."
+                    ),
+                ) from exc
         try:
             await asyncio.to_thread(
                 prepare_media_export,
@@ -2889,6 +2903,7 @@ def create_app() -> FastAPI:
                 preset=preset,
                 output_path=Path(output_path),
                 overwrite=overwrite,
+                image=image,
             )
         except StudioExportError as exc:
             raise _media_export_error(exc, translate) from exc
@@ -2905,6 +2920,7 @@ def create_app() -> FastAPI:
                 overwrite=overwrite,
                 on_progress=on_progress,
                 cancel_event=cancel_event,
+                image=image,
             )
 
         return _begin_export_job(_work, translate)

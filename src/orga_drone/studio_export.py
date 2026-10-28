@@ -942,12 +942,16 @@ def prepare_media_export(
     preset: str,
     output_path: Path,
     overwrite: bool = False,
+    image: ImageAdjust | None = None,
 ) -> MediaExportPlan:
-    """Validate one photo or video export. Does not render."""
+    """Validate one photo or video export. Does not render.
+
+    ``image`` grades a photo before the preset. A video ignores it.
+    """
     key = normalize_share_preset(preset)
     media, path = _require_export_media(db, media_id)
     if media.kind == "photo":
-        spec = inspect_photo_preset(path, key)
+        spec = inspect_photo_preset(path, key, image=image)
         dest, identities, protected = _snapshot_export_destination(
             db,
             output_path,
@@ -989,14 +993,19 @@ def run_media_export(
     encoder: StudioVideoEncoder | None = None,
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
+    image: ImageAdjust | None = None,
 ) -> Path:
-    """Export one library photo as a still, or one video through the Studio encoder."""
+    """Export one library photo as a still, or one video through the Studio encoder.
+
+    ``image`` grades a photo before the preset. A video ignores it.
+    """
     plan = prepare_media_export(
         db,
         media_id,
         preset=preset,
         output_path=output_path,
         overwrite=overwrite,
+        image=image,
     )
     if plan.kind == "photo":
         if on_progress is not None:
@@ -1017,6 +1026,7 @@ def run_media_export(
                 protected=plan.protected_paths,
                 protected_identities=plan.protected_identities,
                 cancel_event=cancel_event,
+                image=image,
             )
         except ExportCancelled:
             append_export_log(

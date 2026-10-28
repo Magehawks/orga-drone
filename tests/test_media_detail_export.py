@@ -15,6 +15,7 @@ from orga_drone.studio_export import (
     prepare_media_export,
     run_media_export,
 )
+from orga_drone.studio_image import ImageAdjust, image_adjust_from_export_payload
 
 
 def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -199,6 +200,108 @@ def test_missing_photo_file_is_refused(
             preset="best",
             output_path=tmp_path / "out" / "gone_best.jpg",
         )
+
+
+def test_neutral_adjustment_keeps_best_quality_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "flat.jpg", size=(320, 200))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "flat_best.jpg",
+        image=ImageAdjust(),
+    )
+    assert result.read_bytes() == original
+    assert source.read_bytes() == original
+
+
+def test_brightness_grades_the_export_and_leaves_the_library_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "gray.jpg", size=(160, 120))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "gray_best.jpg",
+        image=ImageAdjust(exposure=100),
+    )
+    assert source.read_bytes() == original
+    assert result.read_bytes() != original
+    with Image.open(source) as src, Image.open(result) as graded:
+        assert graded.size == src.size
+        assert graded.format == "JPEG"
+        src_px = src.convert("RGB").getpixel((8, 8))
+        out_px = graded.convert("RGB").getpixel((8, 8))
+    assert isinstance(src_px, tuple) and isinstance(out_px, tuple)
+    assert sum(out_px[:3]) > sum(src_px[:3]) + 40
+
+
+def test_graded_whatsapp_keeps_the_preset_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "wide.jpg", size=(2000, 1000))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(
+        db,
+        mid,
+        preset="whatsapp",
+        output_path=out / "wide_whatsapp.jpg",
+        image=ImageAdjust(saturation=-100),
+    )
+    assert source.read_bytes() == original
+    with Image.open(result) as img:
+        assert img.size == (1600, 800)
+        assert img.format == "JPEG"
+
+
+def test_video_export_ignores_photo_adjustments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_video(db, tmp_path / "lib", "clip.mp4", height=1080, duration_s=2.0)
+    out = tmp_path / "out"
+    out.mkdir()
+    plan = prepare_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "clip_best.mp4",
+        image=ImageAdjust(exposure=80, warmth=40),
+    )
+    assert plan.config is not None
+    assert plan.config.clips[0].image.is_neutral
+    assert plan.config.clips[0].kind == "video"
+
+
+def test_export_payload_sliders_default_neutral_and_reject_out_of_range() -> None:
+    assert image_adjust_from_export_payload(None).is_neutral
+    assert image_adjust_from_export_payload({"preset": "best"}).is_neutral
+    adjust = image_adjust_from_export_payload({"warmth": 25, "exposure": 0})
+    assert adjust.warmth == 25
+    assert adjust.exposure == 0
+    with pytest.raises(ValueError):
+        image_adjust_from_export_payload({"contrast": 140})
 
 
 def test_video_presets_use_encoder_frame_without_rendering(

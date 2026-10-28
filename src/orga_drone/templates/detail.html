@@ -443,6 +443,10 @@
          data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching.')|e }}"
          data-photo-instagram="{{ _('JPEG 1080×1350, cropped from the center.')|e }}"
          data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
+         {% if item.kind == 'photo' %}
+         data-image-adjust-model='{{ image_adjust_model|tojson }}'
+         data-grade-reencode="{{ _('Re-encodes this still with the adjustments.')|e }}"
+         {% endif %}
          data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
          data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
          data-no-preset="{{ _('No exportable resolution for this file.')|e }}"
@@ -500,6 +504,54 @@
       <h2>{{ _('Export this file') }}</h2>
       <p class="meta-line mono">{{ item.filename }}</p>
       <p class="hint">{{ _('Best quality, WhatsApp, Instagram, and TikTok save a file on this computer. Nothing is uploaded or posted.') }}</p>
+      {% if item.kind == 'photo' %}
+      <svg class="studio-preview-filters" aria-hidden="true" focusable="false">
+        <filter id="detail-export-grade" color-interpolation-filters="sRGB">
+          <feColorMatrix id="detail-export-grade-matrix" type="matrix"
+                         values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+        </filter>
+      </svg>
+      <div id="detail-export-adjust">
+        {% if photo_src %}
+        <img id="detail-export-grade-preview" class="detail-export-grade-preview"
+             src="{{ photo_src }}" alt="">
+        {% endif %}
+        <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Brightness') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-exposure-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-exposure" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Brightness') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Contrast') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-contrast-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-contrast" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Contrast') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Saturation') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-saturation-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-saturation" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Saturation') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span class="studio-image-adjust-label">
+            <span>{{ _('Warmth') }}</span>
+            <span class="studio-image-adjust-value" id="detail-adjust-warmth-value">0</span>
+          </span>
+          <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
+                 aria-label="{{ _('Warmth') }}">
+        </label>
+        <p class="hint">{{ _('Changes this export only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
+      </div>
+      {% endif %}
       <label class="studio-inspector-field" for="detail-export-preset">
         <span>{{ _('Output') }}</span>
         <select id="detail-export-preset" aria-label="{{ _('Output') }}"></select>

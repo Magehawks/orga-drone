@@ -105,6 +105,13 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     assert ">Teilen<" in german.text
     assert ">Datei<" in german.text
     assert 'aria-label="Detailaktionen"' in german.text
+    assert 'id="detail-adjust-exposure"' in text
+    assert 'id="detail-adjust-contrast"' in text
+    assert 'id="detail-adjust-saturation"' in text
+    assert 'id="detail-adjust-warmth"' in text
+    assert 'min="-100"' in text
+    assert 'max="100"' in text
+    assert ">Helligkeit<" in german.text
 
 
 def test_flow_video_keeps_flight_switch_outside_tabs_and_merge_in_file(
@@ -154,6 +161,7 @@ def test_flow_video_keeps_flight_switch_outside_tabs_and_merge_in_file(
     share = _panel(text, "detail-panel-share", "detail-panel-file")
     assert 'id="detail-export"' in share
     assert 'name="stars"' not in share
+    assert "detail-adjust-exposure" not in text
 
     script = client.get("/static/js/detail-actions.js")
     assert script.status_code == 200
