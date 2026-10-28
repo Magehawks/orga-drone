@@ -1,346 +1,80 @@
+<div align="center">
+
 # Orga Drone
 
-**A local-first drone media library with flight metadata, telemetry, map exploration, and a Studio memory-editor UI.**
-
-Open source. Runs on your machine. No cloud account required. Built first for **DJI Avata 2**, usable on Windows (primary), macOS, and Linux via Python; Windows also ships as a downloadable desktop build.
-
-**Community:** [Discord](https://discord.gg/8Qa4FZYZq)
-
-**Vision:** help people organize, rediscover, create and share the memories behind their adventures — without becoming a professional video editor. See [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
-
-**Windows:** [Download latest exe (zip)](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip) · [All releases](https://github.com/Magehawks/orga-drone/releases)
-
-## Scan Progress
-
-![Scan Progress](media/scan-progress.gif)
-
-## Screenshots
-
-Home / overview (German UI):
-
-![Home — library overview with filters and media grid](media/home_orga_drone.jpg)
-
-Library folders:
-
-![Library — indexed folders and add-folder controls](media/libary_orga_drone.jpg)
-
-Clip detail with map and telemetry:
-
-![Detail — video preview, map, and metadata](media/details_orga_drone.jpg)
-
-Map marker follows video playback:
-
-![Detail — OSM map marker synced to video playback](media/detail_map_telemetry.gif)
-
-## The problem
-
-People fly drones for experiences, not for managing files. Footage piles up across SD cards, backups, and vacation folders. Editing tools, generic photo managers, and basic flight logs each solve a slice of the problem. Orga Drone focuses on **organizing local media**, **reading drone-oriented metadata**, **grouping clips into flights**, **exploring where you flew**, and **preparing a light Studio story** — without uploading your library or requiring a pro editor.
-
-## What Orga Drone currently provides
-
-- Index one or more local folders into a single library (SQLite index; media files stay on disk)
-- Browse videos and photos by date, size, duration, drone/camera label, GPS, flow, and session (page size 50/100/200; add the current page to Studio; Timeline groups the same index by recording date)
-- Index DJI media plus everyday vacation/hobby photos and videos (phones, cameras, action cams — no `DJI_` filename required)
-- Extract GPS and related metadata from DJI `.SRT` telemetry, photo EXIF, and best-effort video container tags
-- Group FAT32 **split clips** into a **flow**, and heuristically group a logical **flight session** (takeoff → landing)
-- Explore locations on an embedded OpenStreetMap map (detail + world map) and follow the track while a clip plays
-- Filter by date range; use **Ask the library** for short DE/EN phrases parsed by **deterministic rules** (not an LLM)
-- Auto-tags on scan (year/month from recording time; offline place names from GPS when available)
-- Manual favorites, stars, tags, and notes that survive a library rescan
-- **Library albums:** named collections across flights, cameras, and folders (add/remove media; one file can be in several albums; references survive a rescan and stay listed when the file is offline; files are not modified; separate from Studio)
-- **Studio:** collect media, arrange order, estimate runtime; editable project
-  title; simple video Cut (source start/end); Creator Studio UI with synced
-  Story preview; time-based Story canvas (Fit to story / zoom); Title Cards as generated Story items; Cut / Fade through black /
-  Crossfade between Story items; basic per-clip image adjustment for photos and videos
-  (brightness, contrast, saturation, warmth); a linear saturation ramp on video clips
-  from that grade toward black and white; timed text, shape, and image overlays
-  with Fade in, Fade out, and Slide in; rectangular blur and pixelate privacy
-  masks (up to 8 per photo or video clip, fixed for the whole clip); per-clip zoom and pan
-  (1×–3×, optional start/end motion); local MP4 export with
-  configurable resolution (desktop), including photo-only stories at 720/1080; after a successful export, Open video /
-  Show in folder on Windows; optional sequential soundtrack playlist (up to 8
-  local songs) in preview and MP4 export
-- Rename files (and matching LRF/SRT siblings), merge split flow clips with ffmpeg (originals kept)
-- Export a local spot GeoJSON download when GPS is available
-- Detect **likely** duplicates across folders (heuristics only; never auto-deletes)
-- UI in German and English; Dark / Light / Custom themes
-
-It is **not** a video editor, mission planner, airspace tool, or cloud sync service. Social share destinations are **planned** (see vision / roadmap). Local MP4 export with resolution choice, optional soundtrack playlist, and Open video / Show in folder after success is Available on Windows desktop.
-
-### Flows vs sessions
-
-| | **Flow** | **Session** |
-|---|----------|-------------|
-| Meaning | One continuous recording split by the camera/filesystem (FAT32 ≈4 GB parts) | One logical flight from takeoff to landing |
-| Detection | Near-limit file size + sequence/time gaps | Time gaps + optional SRT altitude/GPS (near ground ≈ landing) |
-| UI | Badge “N parts”; filter for multi-clip flows | Badge “N clips”; filter for multi-clip sessions |
-
-After each library scan, flows are rebuilt first, then sessions. Split parts of the same recording share one session.
+### Your flights. Your footage. Your stories.
 
-## Current feature status
-
-| Area | Status | Notes |
-|------|--------|--------|
-| Home and shared navigation | Available | Home shows the app logo, or one already cached local thumbnail when that file is still on disk. The sidebar reaches the library, Studio, the flight map, and Settings. Narrow windows use the bottom bar. Settings keeps dark/light/custom and German/English, and can clear thumbnail and map-tile caches only |
-| Folder library + browse/list | Available | Rescan per root; unchanged files skip metadata extraction (size + mtime, not a content hash); live scan progress in Library UI; Browse page size 50/100/200; add the current page to Studio; Timeline groups photos and videos by recording date |
-| DJI naming, Avata 2 model map, SRT tracks | Available | Strongest path; SRT tracks are sampled for storage |
-| Generic photos/videos + source filter | Available | Thinner than DJI; many phone videos have no GPS |
-| iPhone Live Photo stills | Available | Same-stem HEIC/JPG + MOV → still shown, MOV sidecar hidden |
-| Flows / sessions | Available | Heuristic; quality depends on timestamps and SRT |
-| Maps + playback-synced telemetry overlay | Available | OSM tiles need network; overlay when a track exists |
-| Ask the library + `POST /api/search` | Available | **Rule-based** DE/EN parser → structured filters |
-| Auto-tags + offline reverse geocode | Available | `ORGA_DRONE_GEOCODE=offline` (default) or `off` |
-| User meta (stars, favorite, tags, notes) | Available | Stored separately from auto-tags; survives rescan |
-| Rename / flow merge | Available | Path confined under library roots; merge keeps originals |
-| Duplicate detection | Available | Stem/size/date/duration heuristics — not content hash |
-| Spot GeoJSON export | Available | Local download; coordinates rounded (~11 m) |
-| Windows desktop EXE + pywebview | Available | macOS/Linux via Python today |
-| itch.io app updates | Not available | Butler process for a future Draft/Restricted Windows test channel (`packaging/itch/`). No in-app updater. ZIP installs do not auto-update. Not a public paid launch |
-| Studio workspace | Available | Creator Studio UI with synced Story preview; time-based Story canvas (Fit/zoom); labeled transitions; Inspector names the selected object; multiple local edit projects (Projects switcher beside the open project title; Clear Studio is Story-scoped); persisted project title + order + estimated runtime + video Cut offsets; Title Cards; Cut / Fade through black / Crossfade; local MP4 export with resolution choice; optional sequential soundtrack playlist (up to 8 songs; time-proportional coverage) |
-| Studio Title Cards | Available | Generated Story items (title, optional subtitle, 1–10s, dark/light/accent); preview + MP4; not library media |
-| Studio transitions | Available | Boundary chips: Cut, Fade through black, Crossfade (0.1–2.0 s); preview + MP4; not a effects editor |
-| Studio image adjustment | Available | Per photo or video clip: brightness, contrast, saturation, warmth; preview approximates export; source files stay unchanged |
-| Studio saturation ramp | Available | Per video clip: linear saturation from the current grade toward black and white between a start and end time; preview approximates export; source files stay unchanged |
-| Studio overlays | Available | Up to 8 text, arrow, circle, rectangle, or PNG/JPG overlays per photo or video clip; clip-relative timing; Fade in, Fade out, or Slide in; preview approximates export |
-| Studio privacy masks | Available | Up to 8 rectangular blur or pixelate masks per photo or video clip; fixed for the whole clip; preview approximates export; source files stay unchanged |
-| Studio framing | Available | Per photo or video clip: zoom 1×–3× and pan; optional start/end motion across the clip; preview matches the exported frame; source files stay unchanged |
-| Studio MP4 export | Available | Configurable resolution up to source max; suggested filename includes that resolution (`_1080p`, `_4k`, …) and can be edited; photo-only stories at 720/1080; desktop save dialog; optional soundtrack mix; sources never modified; Cancel export stops the running encode and keeps existing files; after success, Open video / Show in folder on Windows |
-| Detail-page export | Available | One photo or one video. Best quality, or a local WhatsApp, Instagram, or TikTok file (nothing is uploaded or posted). A photo stays an image (best quality copies a readable still). A video stays an MP4 from the Studio encoder: best quality is the highest existing resolution; the three presets are 1080×1920 with the picture fitted inside the frame. Existing files are not replaced |
-| Studio music-in-export | Available | Sequential local playlist per project (up to 8 songs; volume, fades; loop when N=1); preview + MP4 mix; desktop picker |
-| Library albums | Available | Local named albums (`albums` / `album_items`); create, rename, delete; add/remove media; one file in several albums; membership survives rescan and stays listed when the file is offline; separate from Studio; no shared, cloud, or automatic albums |
-| Plugin API | Not available | Possible future work |
-| Semantic / LLM search | Not available | Not planned as product identity |
-| Social share integrations | Not available | Later; local file / future MP4 first |
-| CI-built multi-OS installers | Not available | Windows onefolder zip is built in GitHub Actions (draft release; maintainer publishes after the MOTW smoke test). No MSIX, macOS, or Linux installer. |
-| Update notice | Available | About shows the installed version. Check for updates is off by default. A manual or opt-in startup check reads the published GitHub Release only and links to that page. No download, no install, no background polling. |
+**A local-first drone media library with flight metadata, telemetry and map exploration.**
 
-## Installation and first start
+Organize your footage, rediscover where you flew, and create videos from your favorite moments — on your own computer.
 
-### Requirements
+**Open source · No account required · Your original media stays on your disk**
 
-- Python **3.11+** (for the Python application)
-- Dependencies from `requirements.txt` (includes `reverse-geocoder` for offline place auto-tags)
-- Optional: network access for OSM map tiles (the library index itself works offline)
+[**Download for Windows**](https://github.com/Magehawks/orga-drone/releases/latest) · [**Explore the source**](https://github.com/Magehawks/orga-drone) · [**Join Discord**](https://discord.gg/8Qa4FZYZq)
 
-### Windows exe (end users)
+</div>
 
-**[Download latest Windows build](https://github.com/Magehawks/orga-drone/releases/latest/download/orga-drone-windows-x64.zip)** (`orga-drone-windows-x64.zip`)
+![Orga Drone Studio with video preview and editing timeline](media/readme/studio.webp)
 
-1. Download the zip (or pick a version from [Releases](https://github.com/Magehawks/orga-drone/releases))
-2. Unzip
-3. **Double-click `orga-drone.exe`** — a desktop window opens; add a library folder when prompted
+## Made for the moments behind your flights
 
-See [`packaging/README.md`](packaging/README.md) for build notes and the
-**mandatory** Windows pre-release smoke test (browser-downloaded MOTW zip +
-Explorer extract). Prebuilt binaries ship **only the application**, never your videos or database.
+Drone footage is easy to capture and surprisingly hard to find again. Orga Drone brings your local photos, videos and available flight metadata together in one place. Browse your adventures, explore GPS locations and put together a story without moving your library into the cloud.
 
-The source in this repository is **free (MIT)**. GitHub Release zips are a
-convenience package of that same app. An itch.io page, if one is published
-later, would be another convenience copy — not a different license and not a
-public launch in this tree. The process is [`packaging/itch/README.md`](packaging/itch/README.md).
+## Organize your footage
 
-- Installing with the **itch.io desktop app** on the Windows channel is the
-  path that can receive later builds from that app.
-- Installing by **unzipping a ZIP** (GitHub, the itch.io website, or any
-  other download) does not enroll that folder. The itch.io app will not
-  update it.
-- There is no updater inside Orga Drone. The library, Studio projects, and
-  settings stay in `%APPDATA%\orga-drone`. Photos and videos stay in the
-  folders you added.
+Add your existing media folders and browse photos and videos in a single library. Filter by date, camera, GPS availability and more; keep favorites, tags, notes and albums.
 
-### Python application
+![Orga Drone media library with filters and thumbnail grid](media/readme/library.webp)
 
-```bash
-git clone https://github.com/Magehawks/orga-drone.git
-cd orga-drone
-python -m venv .venv
+## Explore where you flew
 
-# Windows
-.venv\Scripts\activate
+Discover GPS-tagged media on an interactive map. Where telemetry is available, Orga Drone can also show flight tracks alongside video playback.
 
-# macOS / Linux
-source .venv/bin/activate
+![Orga Drone flight map showing locations of drone footage](media/readme/map.webp)
 
-pip install -r requirements.txt
-pip install -e .
-```
+*Map and telemetry features depend on GPS data in your media. Map tiles may require an internet connection.*
 
-Optional environment file:
+## Turn moments into stories
 
-```bash
-cp .env.example .env
-```
+Use the built-in Studio to arrange clips and photos, trim footage, add titles, transitions, overlays, music and image adjustments, then export a local MP4. Orga Drone is designed for personal flight stories — not to replace a professional video editor.
 
-Do **not** put passwords or API keys in the repo. The app does not need them for local use.
+![Orga Drone Studio showing a story preview, image adjustments and timeline](media/readme/studio.webp)
 
-Run:
+## Your media stays yours
 
-```bash
-python -m orga_drone
-```
+- **Local-first:** your photos and videos remain in the folders you choose.
+- **No cloud account:** browse and edit without signing in.
+- **Non-destructive workflow:** editing and exporting do not overwrite your original media.
+- **Open source:** inspect the code, report issues or contribute under the [MIT license](LICENSE).
 
-Or:
+## Get started on Windows
 
-```bash
-orga-drone
-```
+1. [Download the latest Windows release](https://github.com/Magehawks/orga-drone/releases/latest).
+2. Extract the ZIP and start `orga-drone.exe` from the extracted folder (keep `_internal` alongside it).
+3. Add a folder containing your photos and videos.
+4. Open the library, explore the map or create your first Studio project.
 
-By default this opens a **native desktop window** (pywebview / Edge WebView2 on Windows). The FastAPI UI listens on `127.0.0.1` (port `8765`, or another free port if busy).
+**Other platforms:** macOS and Linux can run the Python application from source; packaged desktop downloads are currently Windows-focused.
 
-| Goal | How |
-|------|-----|
-| System browser instead of desktop window | Set `ORGA_DRONE_BROWSER=1` |
-| pywebview not installed | Opens the system browser automatically |
-| Open manually | Visit `http://127.0.0.1:8765/` |
+[Installation and developer instructions](docs/PRODUCT_VISION.md) · [All releases](https://github.com/Magehawks/orga-drone/releases)
 
-Development extras:
+## Help shape Orga Drone
 
-```bash
-pip install -e ".[dev]"
-python -m orga_drone
-```
+I'm looking for **10 drone pilots to try Orga Drone for free** and share honest feedback using their own footage. DJI, FPV and action-camera users are welcome.
 
-### Add your media
+Interested? [Join the Discord](https://discord.gg/8Qa4FZYZq) and mention that you'd like to test Orga Drone,.
 
-1. Open **Library**
-2. Paste a folder path (examples only — use your own path):
-   - Windows: `D:\DroneMedia`
-   - macOS/Linux: `/media/user/drone`
-3. Click **Add folder** (scans immediately)
-4. Use **Browse**, date filters, **Ask the library**, detail pages, and **Map**
+Found a bug or have an idea? [Open an issue](https://github.com/Magehawks/orga-drone/issues).
 
-### Browse, Ask the library, and search API
+## Project and documentation
 
-On **Browse**, use **From** / **To** (`date_from`, `date_to`) to narrow by recorded date. **Timeline** (next to Grid and List) groups the same filtered photos and videos by recording year, month, and day. Dates that are missing or not a calendar day appear under **Date unknown**. It does not edit a story; Studio keeps its own story timeline.
+Orga Drone is developed in the open. DJI Avata 2 has been the primary development reference; compatibility and telemetry coverage can vary by camera and file format.
 
-**Ask the library** accepts short German or English phrases. The server parses them with **fixed rules** (kind, month/year, place keywords, favorites, and similar) and combines the result with explicit filters. It is **not** an LLM and does not perform semantic embedding search.
+- [Product vision](docs/PRODUCT_VISION.md)
+- [Technical documentation and setup](docs/PRODUCT_VISION.md)
+- [Issues and feature requests](https://github.com/Magehawks/orga-drone/issues)
+- [Releases](https://github.com/Magehawks/orga-drone/releases)
 
-Examples: `videos from Malta`, `photos November 2025`, `favoriten 2024`.
+---
 
-Same filter logic over HTTP:
-
-```bash
-curl -s -X POST http://127.0.0.1:8765/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"ask": "photos November 2025"}'
-```
-
-Body fields: `ask` (or `query`), plus optional `kind`, `date_from`, `date_to`, `q`, `place`, `tags`, `favorite`, `limit`. Explicit fields override fields inferred from `ask` when both are set.
-
-### Tags and places
-
-Each scan can compute **auto tags**: calendar year/month from `recorded_at`, plus city/region/country from GPS when available (offline reverse geocoding, cached in SQLite). Auto tags are read-only on the detail page. **User tags** remain fully manual.
-
-- `ORGA_DRONE_GEOCODE=offline` — default; bundled reverse geocoder
-- `ORGA_DRONE_GEOCODE=off` — skip place lookup (time tags still apply)
-
-### Supported media (summary)
-
-| Type | Formats | Date | GPS / map |
-|------|---------|------|-----------|
-| Photos | JPG/JPEG, PNG, WebP, HEIC/HEIF (`pillow-heif`), DNG | EXIF `DateTimeOriginal`, else mtime | EXIF GPS when present |
-| Videos | MP4, MOV, M4V, MKV | Container / ffprobe when available, else mtime | Best-effort; many phone videos have no GPS |
-
-**iPhone Live Photos:** same-stem still (`.HEIC`/`.JPG`) + companion `.MOV` → still indexed as a photo; companion MOV treated as a sidecar (not a standalone library video). A lone `.MOV` remains a normal video.
-
-Non-DJI items typically get label **Camera** and `source_type` phone/camera/unknown. DJI paths (SRT, flows, sessions) stay as described above.
-
-Typical Avata 2 sidecars:
-
-```text
-DJI_YYYYMMDDHHMMSS_NNNN_D.MP4
-DJI_YYYYMMDDHHMMSS_NNNN_D.LRF   # proxy
-DJI_YYYYMMDDHHMMSS_NNNN_D.SRT   # telemetry
-DJI_YYYYMMDDHHMMSS_NNNN_D.JPG
-```
-
-### Themes, spot export, duplicates
-
-- **Themes:** Dark / Light / Custom in the header; preference in cookie + `theme.json` under the app-data folder.
-- **Spot export:** On a detail page with GPS, download `.orga-spot.json` (also `GET /media/{id}/export/spot.geojson`). Local only; coordinates rounded to 4 decimal places; optional simplified track LineString when SRT exists.
-- **Duplicates:** After indexing folders that may overlap, open **Duplicates** and scan. Matching uses DJI stem and/or filename + exact size with tight date/duration tolerances. Detection and navigation only — **no automatic deletion**.
-
-### Where app data lives
-
-SQLite index and thumbs live in the OS app-data folder, for example:
-
-- Windows: `%APPDATA%\orga-drone\`
-- macOS: `~/Library/Application Support/orga-drone/`
-- Linux: `~/.local/share/orga-drone/`
-
-Override with `ORGA_DRONE_DATA_DIR` in `.env`.
-
-Leaflet + MarkerCluster are vendored under `/static/vendor/` (no CDN required for those assets). OSM **tiles** still need network. Studio transport/editing icons use **Lucide** SVGs vendored under `/static/vendor/lucide/` (ISC; see that folder’s README).
-
-## Technology and architecture
-
-| Layer | Choice |
-|-------|--------|
-| UI | Local FastAPI app, Jinja templates, static JS/CSS |
-| Desktop shell | pywebview (Edge WebView2 on Windows); browser fallback |
-| Index | SQLite in the app-data directory |
-| Media | Streamed from configured library folders (not embedded in the binary) |
-| Thumbnails / merge | Pillow / pillow-heif; `imageio-ffmpeg` or system `ffmpeg` |
-| Maps | Leaflet (vendored) + OpenStreetMap tiles |
-| Packaging | PyInstaller onefolder Windows zip (see `packaging/`) |
-
-High-level flow: add folder → full scan/parse → SQLite index → browse/map/detail → optional rename, merge, export. Domain code lives under `src/orga_drone/` (`parse`, `scan`, `group`, `search`, `geocode`, `dupes`, `export`, `ops`, …).
-
-Deeper project docs: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), and agent context in [`AGENTS.md`](AGENTS.md).
-
-## Roadmap
-
-**Vision:** organize, rediscover, create and share adventure memories — without becoming a pro NLE. Details: [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
-
-**Possible next steps** (not available now):
-
-- Incremental or cheaper library rescans
-- Broader multi-brand parsers beyond the current DJI-first depth
-- Optional opt-in community sharing of flight spots (builds on local GeoJSON)
-- Online geocoding providers (place auto-tags are offline today)
-- Plugin / extension hooks for parsers and exports
-- Installers and multi-OS release builds (Windows MSIX, macOS, Linux). The Windows onefolder zip can be built in GitHub Actions; publishing stays manual after the MOTW smoke test.
-- Optional intelligent features only when they solve a concrete memory/library problem
-
-Full prioritization language: [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Contributing
-
-Bug reports, user needs, features, docs, and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). A user-need issue records a concrete problem; it is not a roadmap promise ([`docs/USER_NEEDS.md`](docs/USER_NEEDS.md)). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue privately, see [SECURITY.md](SECURITY.md).
-
-```bash
-pip install -e ".[dev]"
-ruff check .
-mypy src packaging/itch_channel.py
-pytest
-```
-
-## Project status and limitations
-
-Orga Drone is a **usable open-source application** with a Windows release channel and an active Python codebase. It is still early as a multi-brand “platform”: expect DJI-oriented strengths, heuristic flight grouping, and full folder rescans.
-
-Known limitations:
-
-- Full rescan per library root (user metadata is preserved; indexed media rows are rebuilt)
-- Session and duplicate results are best-effort heuristics
-- Library albums are local references only (no shared albums, cloud sync, or automatic albums). No plugin API, no content-hash duplicate
-detection (Studio supports multiple local edit projects)
-- Ask the library is rule-based phrase parsing, not generative AI
-- CI on pull requests covers Ruff, MyPy, pytest, and an **App journey smoke** check (synthetic photo through the local HTTP app; `docs/PR_E2E.md`). A separate Windows release workflow builds `orga-drone-windows-x64.zip` on manual dispatch or a matching `vX.Y.Z` tag and opens a draft GitHub Release; publishing waits for the MOTW smoke test (`packaging/README.md`). There is no MSIX or multi-OS installer.
-- No in-app updater. itch.io desktop-app updates apply only to copies that
-  app installed; ZIP installs stay as they are until you replace them
-  (`packaging/itch/README.md`)
-- Telemetry **burn-in** into exported video is not included
-
-If video browsing feels heavy under Windows Defender, exclude the unzipped `orga-drone` folder (see [`packaging/README.md`](packaging/README.md)).
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-**DRAFT — not in effect.** A future licensing model for official Windows
-builds is proposed in
-[ADR 0024](docs/decisions/0024-licensing-model-proposal.md) and is not
-adopted. This note is not a license. The MIT License still governs this
-repository. Published tags `v1.1.0` through `v2.0.0`, including the source
-at `v2.0.0` and the public `v1.9.0` Windows zip, stay MIT.
+<div align="center"><sub>Built for real flights, real footage and the stories worth keeping.</sub></div>
