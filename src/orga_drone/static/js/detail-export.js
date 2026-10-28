@@ -37,6 +37,15 @@
     tiktok: root.dataset.presetTiktok || "TikTok",
   };
 
+  const gradePreview = document.getElementById("detail-export-grade-preview");
+  const pagePreview = document.querySelector(".photo-preview");
+  const adjustInputs = ["exposure", "contrast", "saturation", "warmth"].map((key) => ({
+    key,
+    input: document.getElementById(`detail-adjust-${key}`),
+    value: document.getElementById(`detail-adjust-${key}-value`),
+  }));
+  const imageAdjustModel = readImageAdjustModel();
+
   const presetSelect = document.getElementById("detail-export-preset");
   const exportFilename = document.getElementById("detail-export-filename");
   const exportStatus = document.getElementById("detail-export-status");
@@ -57,6 +66,119 @@
   let lastJob = null;
   let activeJobId = null;
   let cancelRequested = false;
+
+  function readImageAdjustModel() {
+    const fallback = {
+      exposureEvAtFull: 1,
+      contrastDeltaAtFull: 0.5,
+      saturationDeltaAtFull: 1,
+      warmthMiredAtFull: 60,
+      neutralKelvin: 6500,
+    };
+    try {
+      const parsed = JSON.parse(root.dataset.imageAdjustModel || "");
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return Object.assign(fallback, parsed);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function clampSlider(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-100, Math.min(100, Math.round(number)));
+  }
+
+  function readAdjust() {
+    const adjust = { exposure: 0, contrast: 0, saturation: 0, warmth: 0 };
+    adjustInputs.forEach((row) => {
+      adjust[row.key] = clampSlider(row.input ? row.input.value : 0);
+    });
+    return adjust;
+  }
+
+  function imageAdjustIsNeutral(adjust) {
+    return !adjust.exposure && !adjust.contrast && !adjust.saturation && !adjust.warmth;
+  }
+
+  // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
+  // studio_image.blackbody_channel_gains and studio.js.
+  function blackbodyGains(kelvin) {
+    const temp = kelvin / 100;
+    let red;
+    let green;
+    let blue;
+    if (temp <= 66) {
+      red = 255;
+      green = 99.4708025861 * Math.log(temp) - 161.1195681661;
+      blue = temp <= 19 ? 0 : 138.5177312231 * Math.log(temp - 10) - 305.0447927307;
+    } else {
+      red = 329.698727446 * (temp - 60) ** -0.1332047592;
+      green = 288.1221695283 * (temp - 60) ** -0.0755148492;
+      blue = 255;
+    }
+    const channels = [red, green, blue].map((channel) => Math.max(0, Math.min(255, channel)));
+    const peak = Math.max(...channels) || 1;
+    return channels.map((channel) => channel / peak);
+  }
+
+  function kelvinForWarmth(warmth) {
+    const neutralMired = 1000000 / imageAdjustModel.neutralKelvin;
+    const mired = neutralMired + (warmth / 100) * imageAdjustModel.warmthMiredAtFull;
+    const kelvin = 1000000 / mired;
+    return Math.round(Math.min(40000, Math.max(1000, kelvin)));
+  }
+
+  function cssFilterFor(adjust) {
+    const parts = [];
+    if (adjust.saturation) {
+      const factor = 1 + (adjust.saturation / 100) * imageAdjustModel.saturationDeltaAtFull;
+      parts.push(`saturate(${factor.toFixed(4)})`);
+    }
+    if (adjust.contrast) {
+      const factor = 1 + (adjust.contrast / 100) * imageAdjustModel.contrastDeltaAtFull;
+      parts.push(`contrast(${factor.toFixed(4)})`);
+    }
+    if (adjust.exposure) {
+      const ev = (adjust.exposure / 100) * imageAdjustModel.exposureEvAtFull;
+      parts.push(`brightness(${Math.pow(2, ev).toFixed(4)})`);
+    }
+    return parts.join(" ");
+  }
+
+  function applyGradePreview() {
+    if (kind !== "photo") return;
+    const adjust = readAdjust();
+    adjustInputs.forEach((row) => {
+      if (row.value) row.value.textContent = String(adjust[row.key]);
+    });
+    const targets = [gradePreview, pagePreview].filter(Boolean);
+    if (imageAdjustIsNeutral(adjust)) {
+      targets.forEach((el) => {
+        el.style.filter = "";
+      });
+      return;
+    }
+    const css = cssFilterFor(adjust);
+    if (adjust.warmth) {
+      const matrix = document.getElementById("detail-export-grade-matrix");
+      const [red, green, blue] = blackbodyGains(kelvinForWarmth(adjust.warmth));
+      if (matrix) {
+        matrix.setAttribute(
+          "values",
+          `${red.toFixed(6)} 0 0 0 0 0 ${green.toFixed(6)} 0 0 0 0 0 ${blue.toFixed(6)} 0 0 0 0 0 1 0`
+        );
+      }
+      targets.forEach((el) => {
+        el.style.filter = `${css} url(#detail-export-grade)`.trim();
+      });
+      return;
+    }
+    targets.forEach((el) => {
+      el.style.filter = css;
+    });
+  }
 
   function presetById(id) {
     const presets = optionsCache && Array.isArray(optionsCache.presets) ? optionsCache.presets : [];
@@ -82,6 +204,7 @@
   function presetDetail(preset) {
     if (!preset) return "";
     if (kind === "photo" && preset.id === "best") {
+      if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
       return preset.copied ? root.dataset.photoBest || "" : root.dataset.photoBestJpeg || "";
     }
     if (kind === "photo" && preset.id === "whatsapp") return root.dataset.photoWhatsapp || "";
@@ -166,6 +289,9 @@
     if (exportRunBtn) exportRunBtn.disabled = running;
     if (presetSelect) presetSelect.disabled = running;
     if (exportFilename) exportFilename.disabled = running;
+    adjustInputs.forEach((row) => {
+      if (row.input) row.input.disabled = running;
+    });
     if (exportCancelBtn && !cancelRequested) exportCancelBtn.disabled = false;
   }
 
@@ -449,7 +575,11 @@
       const res = await fetch(`/api/media/${encodeURIComponent(mediaId)}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ preset: preset.id, output_path: pickedPath }),
+        body: JSON.stringify(
+          kind === "photo"
+            ? { preset: preset.id, output_path: pickedPath, ...readAdjust() }
+            : { preset: preset.id, output_path: pickedPath }
+        ),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok || !data.job_id) {
@@ -512,6 +642,13 @@
   presetSelect?.addEventListener("change", () => {
     syncFilename(selectedPreset());
   });
+  adjustInputs.forEach((row) => {
+    row.input?.addEventListener("input", () => {
+      applyGradePreview();
+      refreshHint();
+    });
+  });
+  applyGradePreview();
   exportFilename?.addEventListener("input", () => {
     refreshHint();
   });

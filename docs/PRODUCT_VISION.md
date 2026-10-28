@@ -255,7 +255,13 @@ See `README.md` for the detailed feature status table. In short:
   outside those tabs.
 - **Detail-page export:** one photo or one video as a local file (best quality, or a
   WhatsApp, Instagram, or TikTok preset). Nothing is uploaded or posted. A photo
-  stays an image. A video stays an MP4 from the Studio encoder.
+  stays an image and can set brightness, contrast, saturation, and warmth
+  (−100…100, neutral 0) with the Studio adjustment math. Neutral keeps today's
+  file, including a best-quality copy of the original bytes when that is the
+  current result. A moved slider grades the pixels and then applies the preset.
+  The library file is not modified. Preview approximates the exported picture
+  the same way Studio preview does. A video stays an MP4 from the Studio encoder
+  and does not get these sliders.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,

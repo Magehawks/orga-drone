@@ -3683,6 +3683,18 @@ html.is-edge-drag * {
   gap: 1rem;
 }
 .detail-actions-panel[hidden] { display: none; }
+.detail-export-grade-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+#detail-export-adjust {
+  display: grid;
+  gap: 0.45rem;
+}
 .action-form {
   background: var(--input-bg);
   border: 1px solid var(--border);
