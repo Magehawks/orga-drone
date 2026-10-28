@@ -396,7 +396,7 @@ def _imageio_license(bundle: Path) -> tuple[Path, bool]:
     found = [
         path
         for path in bundle.rglob("LICENSE")
-        if path.is_file() and "imageio_ffmpeg" in path.parent.name
+        if path.is_file() and any("imageio_ffmpeg" in part for part in path.parts)
     ]
     if len(found) == 1:
         return found[0], True

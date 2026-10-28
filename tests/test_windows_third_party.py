@@ -260,6 +260,18 @@ def test_write_notices_from_the_inspected_binary_stays_no_go(tmp_path: Path) -> 
     assert "GPLv3 has been satisfied" not in verdict
 
 
+def test_imageio_license_under_dist_info_licenses_counts_as_bundled(tmp_path: Path) -> None:
+    dist_info = tmp_path / "imageio_ffmpeg-0.7.0.dist-info" / "licenses"
+    dist_info.mkdir(parents=True)
+    license_path = dist_info / "LICENSE"
+    license_path.write_text("BSD 2-Clause License\n", encoding="utf-8")
+
+    found, bundled = notices._imageio_license(tmp_path)
+
+    assert bundled is True
+    assert found == license_path
+
+
 def _windows_ffmpeg() -> Path | None:
     try:
         import imageio_ffmpeg
