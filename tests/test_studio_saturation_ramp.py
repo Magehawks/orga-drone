@@ -325,6 +325,9 @@ def test_settings_persist_reload_seek_and_survive_cut(tmp_path: Path) -> None:
         "contrast": 0,
         "saturation": 20,
         "warmth": -6,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
     }
     stored = saturation_ramp_from_effect_settings(saved.effect_settings)
     assert stored.enabled is True
@@ -393,7 +396,7 @@ def test_http_saturation_ramp_validation_and_inspector(
     assert 'id="inspector-bw-strength"' in page.text
     assert "data-saturation-ramp=" in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
-    assert "advancedSection.hidden = !isVideo" in script
+    assert "bwRamp.hidden = !isVideo" in script
     assert "saturationRampMultiplier" in script
 
     rejected = client.patch(
@@ -436,6 +439,9 @@ def test_http_saturation_ramp_validation_and_inspector(
         "contrast": 12,
         "saturation": 0,
         "warmth": 4,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
     }
     off = client.patch(
         f"/api/studio/{video_id}/saturation-ramp",
