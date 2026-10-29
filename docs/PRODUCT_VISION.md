@@ -163,6 +163,7 @@ professional video-editing knowledge.
 | Local `.cube` LUT + confirmed D-Log M conversion | **Available now** (user-supplied LUT only; never auto from SRT; preview approximates grade, LUT on export) |
 | Quick Looks + before/after compare | **Available now** (named presets replace basic sliders; before/after is preview-only) |
 | Advanced tonal (highlights / shadows / blacks) | **Available now** (restrained; does not recover clipped data; preview approximates) |
+| Local sharpen + denoise | **Available now** (default off; restrained FFmpeg filters; preview approximates) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8; rectangular, not tracking; on a video clip each mask is a timed bar on the one Effekt lane and is off outside that bar; photos have no Effekt lane; preview matches the MP4) |

@@ -179,6 +179,8 @@
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-color-look-model='{{ color_look_model|tojson }}'
          data-quick-looks-model='{{ quick_looks_model|tojson }}'
+         data-detail-model='{{ detail_model|tojson }}'
+         data-detail-failed="{{ _('Could not save sharpen or denoise.')|e }}"
          data-look-failed="{{ _('Could not apply that look.')|e }}"
          data-look-custom="{{ _('Custom')|e }}"
          data-look-natural="{{ _('Natural')|e }}"
@@ -664,6 +666,7 @@
                   data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-color-look='{{ row.color_look|tojson }}'
                   data-quick-look="{{ row.quick_look|e }}"
+                  data-detail='{{ row.detail|tojson }}'
                   data-color-profile="{{ row.color_profile_hint|e }}"
                   data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
@@ -966,6 +969,24 @@
                        aria-label="{{ _('Blacks') }}">
               </label>
               <p class="hint">{{ _('Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.') }}</p>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Sharpen') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-detail-sharpen-value">0</span>
+                </span>
+                <input type="range" id="inspector-detail-sharpen" min="0" max="100" step="1" value="0"
+                       aria-label="{{ _('Sharpen') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Denoise') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-detail-denoise-value">0</span>
+                </span>
+                <input type="range" id="inspector-detail-denoise" min="0" max="100" step="1" value="0"
+                       aria-label="{{ _('Denoise') }}">
+              </label>
+              <button type="button" class="button ghost" id="inspector-detail-reset">{{ _('Reset sharpen and denoise') }}</button>
+              <p class="hint">{{ _('Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.') }}</p>
             </div>
             <div id="inspector-saturation-ramp">
               <label class="studio-inspector-field studio-frame-motion">

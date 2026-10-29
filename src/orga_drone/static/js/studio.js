@@ -401,6 +401,7 @@
     "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.";
   const labelColorLut = root.dataset.colorLutLabel || "LUT file";
   const msgLookFailed = root.dataset.lookFailed || "Could not apply that look.";
+  const msgDetailFailed = root.dataset.detailFailed || "Could not save sharpen or denoise.";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   let compareBeforeAfter = false;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
@@ -2352,10 +2353,88 @@
     if (strengthValue) strengthValue.textContent = String(look.creative_strength);
   }
 
+  function neutralDetail() {
+    return { sharpen: 0, denoise: 0 };
+  }
+
+  function clampDetailSlider(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(100, Math.round(number)));
+  }
+
+  function readDetail(clip) {
+    const neutral = neutralDetail();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.detail || "");
+      if (!parsed || typeof parsed !== "object") return neutral;
+      return {
+        sharpen: clampDetailSlider(parsed.sharpen),
+        denoise: clampDetailSlider(parsed.denoise),
+      };
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function writeDetail(clip, detail) {
+    if (!clip) return;
+    clip.dataset.detail = JSON.stringify(detail || neutralDetail());
+  }
+
+  function fillDetail(clip) {
+    const detail = readDetail(clip);
+    const sharpen = document.getElementById("inspector-detail-sharpen");
+    const denoise = document.getElementById("inspector-detail-denoise");
+    const sharpenValue = document.getElementById("inspector-detail-sharpen-value");
+    const denoiseValue = document.getElementById("inspector-detail-denoise-value");
+    if (sharpen) sharpen.value = String(detail.sharpen);
+    if (denoise) denoise.value = String(detail.denoise);
+    if (sharpenValue) sharpenValue.textContent = String(detail.sharpen);
+    if (denoiseValue) denoiseValue.textContent = String(detail.denoise);
+  }
+
+  let detailSaveChain = Promise.resolve();
+
+  function queueDetailSave(clip) {
+    const studioId = clip.dataset.studioId;
+    detailSaveChain = detailSaveChain
+      .then(() => saveDetail(studioId))
+      .catch((err) => {
+        showFlash((err && err.message) || msgDetailFailed);
+      });
+  }
+
+  async function saveDetail(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const detail = readDetail(clip);
+    const res = await fetch(`/api/studio/${studioId}/detail`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(detail),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgDetailFailed);
+    }
+    writeDetail(clip, body.detail || detail);
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillDetail(clip);
+    }
+    setSaveState(true);
+  }
+
   function fillImageInspectorSections(clip, isVideo) {
     const profileSection = document.getElementById("inspector-image-section-profile");
     if (profileSection) profileSection.hidden = false;
     fillColorLook(clip);
+    fillDetail(clip);
     const advancedSection = document.getElementById("inspector-image-section-advanced");
     if (advancedSection) advancedSection.hidden = false;
     const bwRamp = document.getElementById("inspector-saturation-ramp");
@@ -8375,6 +8454,38 @@
   document.getElementById("inspector-look-compare")?.addEventListener("change", (event) => {
     compareBeforeAfter = Boolean(event.target.checked);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+  });
+
+  ["inspector-detail-sharpen", "inspector-detail-denoise"].forEach((inputId) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      const sharpen = document.getElementById("inspector-detail-sharpen");
+      const denoise = document.getElementById("inspector-detail-denoise");
+      const detail = {
+        sharpen: clampDetailSlider(sharpen && sharpen.value),
+        denoise: clampDetailSlider(denoise && denoise.value),
+      };
+      writeDetail(clip, detail);
+      fillDetail(clip);
+      setSaveState(false);
+    });
+    input.addEventListener("change", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      queueDetailSave(clip);
+    });
+  });
+
+  document.getElementById("inspector-detail-reset")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    writeDetail(clip, neutralDetail());
+    fillDetail(clip);
+    setSaveState(false);
+    queueDetailSave(clip);
   });
 
   document.getElementById("mask-add-blur")?.addEventListener("click", () => addPrivacyMask("blur"));

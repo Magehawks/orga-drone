@@ -44,6 +44,7 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_detail import detail_from_effect_settings
 from orga_drone.studio_lut import color_look_from_effect_settings
 from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
@@ -415,6 +416,11 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else color_look_from_effect_settings(None)
     )
+    detail = (
+        detail_from_effect_settings(clip.effect_settings)
+        if kind in {"photo", "video"}
+        else detail_from_effect_settings(None)
+    )
     overlay_span = one_play if kind == "video" and one_play else seconds
     saturation_ramp = (
         saturation_ramp_from_effect_settings(clip.effect_settings)
@@ -523,6 +529,7 @@ def _clip_to_export_clip(
         ),
         image=image,
         color_look=color_look,
+        detail=detail,
         saturation_ramp=saturation_ramp,
         frame=frame,
         masks=masks,
