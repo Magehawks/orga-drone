@@ -105,6 +105,9 @@ def test_missing_settings_are_neutral() -> None:
         "contrast": 0,
         "saturation": 0,
         "warmth": -15,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
     }
 
 
@@ -142,6 +145,11 @@ def test_ffmpeg_and_preview_mapping() -> None:
         "exposure=exposure=1.0000,"
         "eq=contrast=1.5000:saturation=2.0000"
     )
+    tonal = ffmpeg_grade_chain(ImageAdjust(highlights=50, shadows=40, blacks=20))
+    assert "colorlevels=" in tonal
+    assert "rimin=" in tonal
+    assert "rimax=" in tonal
+    assert ";" not in tonal
     assert ";" not in chain
     assert "[" not in chain
     assert preview_css_functions(ImageAdjust(exposure=100)) == "brightness(2.0000)"
@@ -259,6 +267,9 @@ def test_settings_persist_per_clip_and_survive_cut(tmp_path: Path) -> None:
         "contrast": 0,
         "saturation": 0,
         "warmth": -10,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
     }
     assert image_adjust_from_effect_settings(by_id[second].effect_settings).contrast == -20
     assert normalize_type(by_id[first].transition) == "fade_black"
@@ -357,6 +368,9 @@ def test_http_image_adjust_validation_and_inspector(
         "contrast": 0,
         "saturation": 6,
         "warmth": -8,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
     }
     reset = client.patch(
         f"/api/studio/{video_id}/image",

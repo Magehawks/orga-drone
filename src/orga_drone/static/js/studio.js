@@ -1939,7 +1939,15 @@
   }
 
   function neutralImageAdjust() {
-    return { exposure: 0, contrast: 0, saturation: 0, warmth: 0 };
+    return {
+      exposure: 0,
+      contrast: 0,
+      saturation: 0,
+      warmth: 0,
+      highlights: 0,
+      shadows: 0,
+      blacks: 0,
+    };
   }
 
   function readImageAdjust(clip) {
@@ -1953,6 +1961,9 @@
         contrast: clampImageSlider(parsed.contrast),
         saturation: clampImageSlider(parsed.saturation),
         warmth: clampImageSlider(parsed.warmth),
+        highlights: clampImageSlider(parsed.highlights),
+        shadows: clampImageSlider(parsed.shadows),
+        blacks: clampImageSlider(parsed.blacks),
       };
     } catch (_) {
       return neutral;
@@ -2010,13 +2021,21 @@
       const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
       parts.push(`saturate(${factor.toFixed(4)})`);
     }
-    if (adjust.contrast) {
-      const factor = 1 + (adjust.contrast / 100) * model.contrastDeltaAtFull;
-      parts.push(`contrast(${factor.toFixed(4)})`);
+    let contrast = 1 + ((adjust.contrast || 0) / 100) * model.contrastDeltaAtFull;
+    contrast += ((adjust.highlights || 0) / 100) * 0.08;
+    contrast -= ((adjust.shadows || 0) / 100) * 0.05;
+    contrast -= ((adjust.blacks || 0) / 100) * 0.04;
+    contrast = Math.max(0.4, Math.min(1.6, contrast));
+    if (Math.abs(contrast - 1) > 0.0005) {
+      parts.push(`contrast(${contrast.toFixed(4)})`);
     }
-    if (adjust.exposure) {
-      const ev = (adjust.exposure / 100) * model.exposureEvAtFull;
-      parts.push(`brightness(${Math.pow(2, ev).toFixed(4)})`);
+    let brightness = Math.pow(2, ((adjust.exposure || 0) / 100) * model.exposureEvAtFull);
+    brightness += ((adjust.shadows || 0) / 100) * 0.06;
+    brightness += ((adjust.blacks || 0) / 100) * 0.04;
+    brightness -= ((adjust.highlights || 0) / 100) * 0.05;
+    brightness = Math.max(0.5, Math.min(2.2, brightness));
+    if (Math.abs(brightness - 1) > 0.0005) {
+      parts.push(`brightness(${brightness.toFixed(4)})`);
     }
     const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
     if (mult < 0.9995) {
@@ -2182,6 +2201,9 @@
     ["contrast", "inspector-image-contrast", "inspector-image-contrast-value"],
     ["saturation", "inspector-image-saturation", "inspector-image-saturation-value"],
     ["warmth", "inspector-image-warmth", "inspector-image-warmth-value"],
+    ["highlights", "inspector-image-highlights", "inspector-image-highlights-value"],
+    ["shadows", "inspector-image-shadows", "inspector-image-shadows-value"],
+    ["blacks", "inspector-image-blacks", "inspector-image-blacks-value"],
   ];
 
   function selectedAdjustableClip() {
@@ -2335,7 +2357,9 @@
     if (profileSection) profileSection.hidden = false;
     fillColorLook(clip);
     const advancedSection = document.getElementById("inspector-image-section-advanced");
-    if (advancedSection) advancedSection.hidden = !isVideo;
+    if (advancedSection) advancedSection.hidden = false;
+    const bwRamp = document.getElementById("inspector-saturation-ramp");
+    if (bwRamp) bwRamp.hidden = !isVideo;
   }
 
   let colorSaveChain = Promise.resolve();

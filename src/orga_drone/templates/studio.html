@@ -940,6 +940,33 @@
           </details>
           <details id="inspector-image-section-advanced" class="studio-image-section" hidden>
             <summary>{{ _('Advanced') }}</summary>
+            <div id="inspector-image-tonal">
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Highlights') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-highlights-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-highlights" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Highlights') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Shadows') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-shadows-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-shadows" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Shadows') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Blacks') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-blacks-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-blacks" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Blacks') }}">
+              </label>
+              <p class="hint">{{ _('Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.') }}</p>
+            </div>
             <div id="inspector-saturation-ramp">
               <label class="studio-inspector-field studio-frame-motion">
                 <input type="checkbox" id="inspector-bw-enabled">
