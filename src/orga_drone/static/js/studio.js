@@ -9111,6 +9111,27 @@
       else if (action === "out") zoomTimeline(-1);
     });
   });
+  (function bindCompactTracks() {
+    const stage = document.querySelector(".studio-stage");
+    const btn = document.getElementById("studio-tracks-compact");
+    if (!stage || !btn) return;
+    const key = "orga-drone.studio.compactTracks";
+    function applyCompact(on) {
+      stage.classList.toggle("is-compact-tracks", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.classList.toggle("is-active", on);
+    }
+    applyCompact(localStorage.getItem(key) === "1");
+    btn.addEventListener("click", () => {
+      const on = !stage.classList.contains("is-compact-tracks");
+      applyCompact(on);
+      try {
+        localStorage.setItem(key, on ? "1" : "0");
+      } catch (_err) {
+        /* ignore quota / private mode */
+      }
+    });
+  })();
   if (timelineScrollEl && typeof ResizeObserver === "function") {
     const ro = new ResizeObserver(() => {
       if (state.timelineMode === "fit") layoutTimeline();

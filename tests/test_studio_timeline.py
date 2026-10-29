@@ -119,6 +119,8 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'data-timeline-zoom="in"' in html
     assert 'data-timeline-zoom="out"' in html
     assert "Fit to story" in html or "An Story anpassen" in html
+    assert 'id="studio-tracks-compact"' in html
+    assert "Compact tracks" in html or "Kompakte Spuren" in html
     assert 'id="studio-playhead"' in html
     assert 'role="slider"' in html
     assert "studio-music-track" in html

@@ -525,6 +525,9 @@
                   data-timeline-zoom="in"
                   title="{{ _('Zoom in') }}" aria-label="{{ _('Zoom in') }}"
                   {% if not items %}disabled{% endif %}>+</button>
+          <button type="button" class="studio-transport-btn" id="studio-tracks-compact"
+                  aria-pressed="false"
+                  title="{{ _('Compact tracks') }}" aria-label="{{ _('Compact tracks') }}">{{ _('Compact tracks') }}</button>
           <button type="button" class="studio-transport-btn studio-icon-button" id="studio-music-add"
                   title="{{ _('Add soundtrack') }}" aria-label="{{ _('Add soundtrack') }}">
             {{ lucide('plus') }}
