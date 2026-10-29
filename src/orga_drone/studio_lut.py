@@ -286,8 +286,11 @@ def dump_color_look(existing: str | None, look: ColorLook) -> str:
 
 def escape_ffmpeg_lut_path(path: Path) -> str:
     """Make a filesystem path safe inside an FFmpeg filter option value."""
-    text = path.resolve().as_posix()
-    return text.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+    text = str(path.resolve()).replace("\\", "/")
+    # Windows drive letters must keep a single escaped colon for FFmpeg.
+    if len(text) >= 2 and text[1] == ":":
+        text = f"{text[0]}\\:{text[2:]}"
+    return text.replace("'", "\\'")
 
 
 def write_strength_blended_cube(

@@ -125,7 +125,10 @@ def test_ffmpeg_lut_chain_applies_conversion_and_strength(
     assert size == 2
     # Midpoint of identity stays identity when strength-blended with identity.
     assert triples[0] == pytest.approx((0.0, 0.0, 0.0))
-    assert escape_ffmpeg_lut_path(Path("C:/luts/a.cube")).startswith("C\\:/luts/")
+    escaped = escape_ffmpeg_lut_path(require_lut_asset(data_dir, conversion))
+    assert "lut3d=file=" in f"lut3d=file={escaped}"
+    assert "\\" not in escaped.replace("\\:", "")
+    assert "'" not in escaped
 
 
 def test_color_api_requires_confirm_and_persists(
