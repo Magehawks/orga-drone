@@ -70,6 +70,8 @@ Found a bug or have an idea? [Open an issue](https://github.com/Magehawks/orga-d
 
 Orga Drone is developed in the open. DJI Avata 2 has been the primary development reference; compatibility and telemetry coverage can vary by camera and file format.
 
+- [Short user help](docs/user/README.md)
+- [UX writing standard](docs/UX_WRITING.md)
 - [Product vision](docs/PRODUCT_VISION.md)
 - [Technical documentation and setup](docs/PRODUCT_VISION.md)
 - [Issues and feature requests](https://github.com/Magehawks/orga-drone/issues)
