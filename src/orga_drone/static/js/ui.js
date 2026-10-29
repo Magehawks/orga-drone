@@ -10,6 +10,43 @@
   } catch (_) {
     /* ignore quota / private mode */
   }
+
+  (function initSidebarCollapse() {
+    const sidebar = document.getElementById("app-sidebar");
+    const toggle = document.getElementById("sidebar-collapse-toggle");
+    if (!sidebar || !toggle) return;
+    const storageKey = "orga-drone:sidebar-collapsed";
+    const collapseLabel =
+      toggle.getAttribute("data-label-collapse") || "Collapse navigation";
+    const expandLabel =
+      toggle.getAttribute("data-label-expand") || "Expand navigation";
+
+    function applyCollapsed(collapsed) {
+      sidebar.classList.toggle("is-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      const label = collapsed ? expandLabel : collapseLabel;
+      toggle.setAttribute("title", label);
+      toggle.setAttribute("aria-label", label);
+    }
+
+    let collapsed = false;
+    try {
+      collapsed = window.localStorage.getItem(storageKey) === "1";
+    } catch (_) {
+      collapsed = false;
+    }
+    applyCollapsed(collapsed);
+
+    toggle.addEventListener("click", () => {
+      collapsed = !sidebar.classList.contains("is-collapsed");
+      applyCollapsed(collapsed);
+      try {
+        window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
+      } catch (_) {
+        /* ignore quota / private mode */
+      }
+    });
+  })();
   // Loading overlay + button state on scan / long-running form submits
   function isLongRunningForm(form) {
     const action = (form.getAttribute("action") || "").toLowerCase();
