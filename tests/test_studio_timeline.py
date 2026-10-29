@@ -230,6 +230,8 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "overflow: hidden" in clip_narrow
     fit_scroll = css.split(".studio-timeline-scroll.is-fit {", 1)[1].split("}", 1)[0]
     assert "overflow-x: hidden" in fit_scroll
+    scroll_css = css.split(".studio-timeline-scroll {", 1)[1].split("}", 1)[0]
+    assert "padding-bottom: 10px" in scroll_css
     assert 'classList.toggle(\n        "is-fit"' in js or 'classList.toggle("is-fit"' in js
 
 
