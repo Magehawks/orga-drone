@@ -417,6 +417,8 @@
   "About 1 second": "About 1 second",
   "10 s": "10 s",
   "1 s": "1 s",
+  "Not enough clip length for this transition": "Not enough clip length for this transition",
+  "Up to {max}s with these clips": "Up to {max}s with these clips",
   "Transition": "Transition",
   "Cut": "Cut",
   "Fade through black": "Fade through black",

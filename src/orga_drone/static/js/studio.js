@@ -330,6 +330,10 @@
   };
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
+  const msgTransitionNoRoom =
+    root.dataset.transitionNoRoom || "Not enough clip length for this transition";
+  const msgTransitionLimit =
+    root.dataset.transitionLimit || "Up to {max}s with these clips";
   const msgStorySummary = root.dataset.storySummary || "{count} items · {duration}";
   const msgSectionFailed = root.dataset.sectionFailed || "Could not save the section.";
   const msgForwardLoopHint =
@@ -533,9 +537,30 @@
     const b = clipDisplayName(before);
     const label = formatTemplate(msgTransitionAria, { type: typeLabel, a, b });
     const dur = Number(el.dataset.appliedDuration) || 0;
-    el.setAttribute("aria-label", type !== "cut" && dur > 0 ? `${label}, ${dur.toFixed(1)}s` : label);
+    const maxHint = (() => {
+      if (!after || !before || type === "cut") return "";
+      const maxD = Math.min(clipDuration(after), clipDuration(before)) - 0.1;
+      if (!Number.isFinite(maxD) || maxD < 0.1) {
+        return msgTransitionNoRoom || "Not enough clip length for this transition";
+      }
+      return formatTemplate(msgTransitionLimit || "Up to {max}s with these clips", {
+        max: Math.max(0.1, Math.min(2, maxD)).toFixed(1),
+      });
+    })();
+    el.setAttribute(
+      "aria-label",
+      type !== "cut" && dur > 0
+        ? `${label}, ${dur.toFixed(1)}s${maxHint ? `. ${maxHint}` : ""}`
+        : label
+    );
+    el.title = maxHint || label;
     const chip = el.querySelector("[data-transition-label]");
     if (chip) chip.textContent = typeLabel;
+    const span = el.querySelector("[data-transition-span]");
+    if (span) {
+      span.hidden = type === "cut" || dur <= 0;
+      if (!span.hidden) span.textContent = `${dur.toFixed(1)}s`;
+    }
   }
 
   function showFlash(message) {
@@ -1464,10 +1489,24 @@
       const afterId = el.dataset.transitionAfter;
       const prev = clips().find((c) => String(c.dataset.studioId) === String(afterId));
       if (!prev) return;
-      const left = Number.parseFloat(prev.style.left) || 0;
-      const w = Number.parseFloat(prev.style.width) || 0;
-      el.style.left = `${left + w}px`;
+      const boundary = (Number.parseFloat(prev.style.left) || 0) + (Number.parseFloat(prev.style.width) || 0);
+      const type = el.dataset.appliedType || el.dataset.transitionType || "cut";
+      const dur = Number(el.dataset.appliedDuration) || 0;
+      const regionW =
+        type === "cut" || dur <= 0
+          ? Math.max(14, TIMELINE_HIT_MIN_PX)
+          : Math.max(24, dur * pps);
+      el.style.width = `${regionW}px`;
+      el.style.left = `${Math.max(0, boundary - regionW / 2)}px`;
+      el.classList.toggle("is-cut", type === "cut" || dur <= 0);
+      el.classList.toggle("is-fade", type === "fade_black");
+      el.classList.toggle("is-crossfade", type === "crossfade");
       el.style.display = dragCard ? "none" : "";
+      const span = el.querySelector("[data-transition-span]");
+      if (span) {
+        span.hidden = type === "cut" || dur <= 0;
+        if (!span.hidden) span.textContent = `${dur.toFixed(1)}s`;
+      }
     });
     buildRuler();
     updatePlayheadChrome();
@@ -4899,6 +4938,11 @@
       chip.className = "studio-transition-chip";
       chip.dataset.transitionLabel = "";
       li.appendChild(chip);
+      const span = document.createElement("span");
+      span.className = "studio-transition-span";
+      span.dataset.transitionSpan = "";
+      span.hidden = true;
+      li.appendChild(span);
       refreshTransitionChrome(li);
       grid.insertBefore(li, next);
     }
@@ -5434,6 +5478,24 @@
       } else if (el.dataset.clamped === "1") {
         hint.hidden = false;
         hint.textContent = msgTransitionClamped;
+      } else if (!isCut) {
+        const { after, before } = transitionNeighbors(el);
+        const maxD =
+          after && before
+            ? Math.min(clipDuration(after), clipDuration(before)) - 0.1
+            : 0;
+        if (!Number.isFinite(maxD) || maxD < 0.1) {
+          hint.hidden = false;
+          hint.textContent = msgTransitionNoRoom;
+        } else {
+          hint.hidden = false;
+          hint.textContent = formatTemplate(msgTransitionLimit, {
+            max: Math.max(0.1, Math.min(2, maxD)).toFixed(1),
+          });
+        }
+        if (durInput) {
+          durInput.max = String(Math.max(0.1, Math.min(2, maxD)));
+        }
       } else {
         hint.hidden = true;
         hint.textContent = "";

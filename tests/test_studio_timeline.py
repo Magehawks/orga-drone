@@ -257,6 +257,12 @@ def test_crossfade_occupancy_shrinks_html_not_fade_black(
     )[0]
     assert 'data-occupancy-s="12.0000"' in block_fade
     assert "studio-transition" in html_fade
+    js = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    css = Path("src/orga_drone/static/css/app.css").read_text(encoding="utf-8")
+    assert "studio-transition-span" in js
+    assert "boundary - regionW / 2" in js
+    assert ".studio-transition.is-crossfade" in css
+    assert ".studio-transition.is-fade" in css
     assert story_length_s([12.0, 12.0], [
         AppliedTransition(
             type=TYPE_FADE_BLACK,
