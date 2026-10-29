@@ -2450,6 +2450,9 @@ img.studio-preview-media,
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  /* Keep the bottom soundtrack clear of the horizontal scrollbar. */
+  padding-bottom: 10px;
+  box-sizing: border-box;
 }
 .studio-timeline-scroll.is-fit {
   overflow-x: hidden;
@@ -2457,6 +2460,7 @@ img.studio-preview-media,
 .studio-timeline-canvas {
   position: relative;
   min-width: 100%;
+  padding-bottom: 2px;
 }
 .studio-ruler {
   position: relative;
