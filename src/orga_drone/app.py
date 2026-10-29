@@ -72,6 +72,10 @@ from orga_drone.studio_image import (
     image_adjust_preview_model,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_looks import (
+    look_id_from_effect_settings,
+    quick_looks_preview_model,
+)
 from orga_drone.studio_lut import (
     LutInvalidError,
     LutMissingError,
@@ -1359,6 +1363,7 @@ def create_app() -> FastAPI:
                         "color_look": color_look_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "quick_look": look_id_from_effect_settings(it.effect_settings),
                         "color_profile_hint": color_profile_hint,
                         "saturation_ramp": saturation_ramp_from_effect_settings(
                             it.effect_settings
@@ -1473,6 +1478,7 @@ def create_app() -> FastAPI:
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
             color_look_model=color_look_preview_model(),
+            quick_looks_model=quick_looks_preview_model(),
             frame_model=frame_preview_model(),
             mask_model=mask_preview_model(),
             overlay_model=overlay_preview_model(),
@@ -1948,6 +1954,36 @@ def create_app() -> FastAPI:
         except LutMissingError as exc:
             raise HTTPException(status_code=500, detail="LUT storage failed") from exc
         return JSONResponse({"ok": True, "asset_name": asset_name})
+
+    @app.patch("/api/studio/{studio_item_id}/look")
+    async def api_studio_quick_look(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include a quick look id"
+            )
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_quick_look(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "quick_look": look_id_from_effect_settings(item.effect_settings),
+                "image": image_adjust_from_effect_settings(item.effect_settings).as_dict(),
+            }
+        )
 
     @app.patch("/api/studio/{studio_item_id}/color")
     async def api_studio_color_look(

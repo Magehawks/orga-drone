@@ -400,7 +400,9 @@
     root.dataset.colorDlogConfirm ||
     "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.";
   const labelColorLut = root.dataset.colorLutLabel || "LUT file";
+  const msgLookFailed = root.dataset.lookFailed || "Could not apply that look.";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
+  let compareBeforeAfter = false;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -2102,8 +2104,10 @@
       el.style.filter = "";
       return;
     }
-    const adjust = readImageAdjust(clip);
-    const mult = saturationRampMultiplier(readSaturationRamp(clip), localS);
+    const adjust = compareBeforeAfter ? neutralImageAdjust() : readImageAdjust(clip);
+    const mult = compareBeforeAfter
+      ? 1
+      : saturationRampMultiplier(readSaturationRamp(clip), localS);
     if (imageAdjustIsNeutral(adjust) && mult >= 0.9995) {
       el.style.filter = "";
       return;
@@ -2196,6 +2200,41 @@
       if (input) input.value = String(shown);
       if (valueEl) valueEl.textContent = String(shown);
     });
+    const lookSelect = document.getElementById("inspector-quick-look");
+    if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
+    const compare = document.getElementById("inspector-look-compare");
+    if (compare) compare.checked = compareBeforeAfter;
+  }
+
+  async function applyQuickLook(clip, lookId) {
+    const studioId = clip.dataset.studioId;
+    const res = await fetch(`/api/studio/${studioId}/look`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ id: lookId || "" }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgLookFailed);
+    }
+    if (body.image) writeImageAdjust(clip, body.image);
+    clip.dataset.quickLook = body.quick_look || "";
+    fillImageAdjust(clip);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
+  function clearQuickLookLabel(clip) {
+    if (!clip) return;
+    if (!clip.dataset.quickLook) return;
+    clip.dataset.quickLook = "";
+    const lookSelect = document.getElementById("inspector-quick-look");
+    if (lookSelect) lookSelect.value = "";
+    fetch(`/api/studio/${clip.dataset.studioId}/look`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ id: "" }),
+    }).catch(() => {});
   }
 
   function colorProfileDisplayLabel(token) {
@@ -8284,6 +8323,7 @@
     input.addEventListener("input", () => {
       const clip = selectedAdjustableClip();
       if (!clip) return;
+      clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
       applyPreviewGrades(resolveAt(state.projectTimeS));
       setSaveState(false);
@@ -8291,9 +8331,26 @@
     input.addEventListener("change", () => {
       const clip = selectedAdjustableClip();
       if (!clip) return;
+      clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
       queueImageAdjustSave(clip);
     });
+  });
+
+  document.getElementById("inspector-quick-look")?.addEventListener("change", async (event) => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    try {
+      await applyQuickLook(clip, event.target.value || "");
+    } catch (err) {
+      showFlash((err && err.message) || msgLookFailed);
+      fillImageAdjust(clip);
+    }
+  });
+
+  document.getElementById("inspector-look-compare")?.addEventListener("change", (event) => {
+    compareBeforeAfter = Boolean(event.target.checked);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
   });
 
   document.getElementById("mask-add-blur")?.addEventListener("click", () => addPrivacyMask("blur"));
