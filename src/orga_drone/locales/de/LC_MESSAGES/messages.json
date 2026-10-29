@@ -749,5 +749,9 @@
   "Black & White": "Schwarzweiß",
   "Before / after": "Vorher / nachher",
   "Look": "Look",
-  "A look replaces the four sliders below. It does not change LUTs or the file on disk. Before/after only affects the preview.": "Ein Look ersetzt die vier Regler darunter. LUTs und die Datei auf der Festplatte bleiben unverändert. Vorher/nachher betrifft nur die Vorschau."
+  "A look replaces the four sliders below. It does not change LUTs or the file on disk. Before/after only affects the preview.": "Ein Look ersetzt die vier Regler darunter. LUTs und die Datei auf der Festplatte bleiben unverändert. Vorher/nachher betrifft nur die Vorschau.",
+  "Highlights": "Lichter",
+  "Shadows": "Schatten",
+  "Blacks": "Schwarz",
+  "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.": "Tonale Regler formen das Mittelfeld. Abgeschnittene Lichter oder tiefe Schwarztöne werden nicht wiederhergestellt. Wärme bleibt die Weißabgleich-Regelung oben. Die Vorschau nähert den Export an."
 }

@@ -54,7 +54,20 @@ SATURATION_DELTA_AT_FULL = 1.0
 WARMTH_MIRED_AT_FULL = 60.0
 NEUTRAL_KELVIN = 6500.0
 
-IMAGE_KEYS = ("exposure", "contrast", "saturation", "warmth")
+IMAGE_KEYS = (
+    "exposure",
+    "contrast",
+    "saturation",
+    "warmth",
+    "highlights",
+    "shadows",
+    "blacks",
+)
+
+# Restrained colorlevels travel at full slider (±100). Does not recover clipped data.
+HIGHLIGHTS_MAX_DELTA = 0.12
+SHADOWS_MIN_DELTA = 0.10
+BLACKS_MIN_DELTA = 0.08
 
 
 @dataclass(frozen=True)
@@ -65,6 +78,9 @@ class ImageAdjust:
     contrast: int = 0
     saturation: int = 0
     warmth: int = 0
+    highlights: int = 0
+    shadows: int = 0
+    blacks: int = 0
 
     @property
     def is_neutral(self) -> bool:
@@ -73,6 +89,9 @@ class ImageAdjust:
             and self.contrast == 0
             and self.saturation == 0
             and self.warmth == 0
+            and self.highlights == 0
+            and self.shadows == 0
+            and self.blacks == 0
         )
 
     def as_dict(self) -> dict[str, int]:
@@ -81,6 +100,9 @@ class ImageAdjust:
             "contrast": self.contrast,
             "saturation": self.saturation,
             "warmth": self.warmth,
+            "highlights": self.highlights,
+            "shadows": self.shadows,
+            "blacks": self.blacks,
         }
 
 
@@ -138,6 +160,9 @@ def image_adjust_from_effect_settings(raw: str | None) -> ImageAdjust:
         contrast=_read_stored_slider(image.get("contrast")),
         saturation=_read_stored_slider(image.get("saturation")),
         warmth=_read_stored_slider(image.get("warmth")),
+        highlights=_read_stored_slider(image.get("highlights")),
+        shadows=_read_stored_slider(image.get("shadows")),
+        blacks=_read_stored_slider(image.get("blacks")),
     )
 
 
@@ -203,6 +228,9 @@ def image_adjust_from_stored(raw: str | None) -> ImageAdjust:
         contrast=_read_stored_slider(source.get("contrast")),
         saturation=_read_stored_slider(source.get("saturation")),
         warmth=_read_stored_slider(source.get("warmth")),
+        highlights=_read_stored_slider(source.get("highlights")),
+        shadows=_read_stored_slider(source.get("shadows")),
+        blacks=_read_stored_slider(source.get("blacks")),
     )
 
 
@@ -269,10 +297,36 @@ def saturation_factor(image: ImageAdjust) -> float:
     return 1.0 + (image.saturation / 100.0) * SATURATION_DELTA_AT_FULL
 
 
+def _colorlevels_chain(image: ImageAdjust) -> str:
+    """Restrained shadows / highlights / blacks via ``colorlevels``.
+
+    Positive highlights lower the upper bound (compress bright areas). Positive
+    shadows raise the lower bound (lift dark areas). Positive blacks raise the
+    floor further. Negative values move in the opposite direction. Values stay
+    inside a safe range so clipped data is not claimed to be recovered.
+    """
+    if image.highlights == 0 and image.shadows == 0 and image.blacks == 0:
+        return ""
+    # Lower input bound: shadows + blacks contribute; clamp away from collapse.
+    imin = 0.0
+    imin += (image.shadows / 100.0) * SHADOWS_MIN_DELTA
+    imin += (image.blacks / 100.0) * BLACKS_MIN_DELTA
+    imin = min(0.35, max(0.0, imin))
+    # Upper input bound: positive highlights pull max down.
+    imax = 1.0 - (image.highlights / 100.0) * HIGHLIGHTS_MAX_DELTA
+    imax = min(1.0, max(imin + 0.2, imax))
+    level = (
+        f"rimin={_fmt(imin)}:gimin={_fmt(imin)}:bimin={_fmt(imin)}:"
+        f"rimax={_fmt(imax)}:gimax={_fmt(imax)}:bimax={_fmt(imax)}"
+    )
+    return f"colorlevels={level}"
+
+
 def ffmpeg_grade_chain(image: ImageAdjust) -> str:
     """ffmpeg filter fragment, or an empty string when the clip stays ungraded.
 
     Only formatted numbers from the validated sliders are interpolated.
+    Order: warmth → exposure → eq contrast/saturation → colorlevels tonal.
     """
     if image.is_neutral:
         return ""
@@ -288,6 +342,9 @@ def ffmpeg_grade_chain(image: ImageAdjust) -> str:
         eq_bits.append(f"saturation={_fmt(saturation_factor(image))}")
     if eq_bits:
         parts.append("eq=" + ":".join(eq_bits))
+    tonal = _colorlevels_chain(image)
+    if tonal:
+        parts.append(tonal)
     return ",".join(parts)
 
 
@@ -296,16 +353,29 @@ def preview_css_functions(image: ImageAdjust) -> str:
 
     Order is right-to-left in the browser: brightness, then contrast, then
     saturation. Callers append ``url(#...)`` last so warmth is applied first.
+    Highlights / shadows / blacks are a coarse brightness+contrast approx of
+    the export ``colorlevels`` stage — not pixel-identical.
     """
     if image.is_neutral:
         return ""
     parts: list[str] = []
     if image.saturation != 0:
         parts.append(f"saturate({_fmt(saturation_factor(image))})")
-    if image.contrast != 0:
-        parts.append(f"contrast({_fmt(contrast_factor(image))})")
-    if image.exposure != 0:
-        parts.append(f"brightness({_fmt(2.0 ** exposure_ev(image))})")
+    contrast = contrast_factor(image)
+    # Lifted shadows / blacks read slightly softer; crushed highlights slightly harder.
+    contrast += (image.highlights / 100.0) * 0.08
+    contrast -= (image.shadows / 100.0) * 0.05
+    contrast -= (image.blacks / 100.0) * 0.04
+    contrast = min(1.6, max(0.4, contrast))
+    if abs(contrast - 1.0) > 0.0005:
+        parts.append(f"contrast({_fmt(contrast)})")
+    brightness = 2.0 ** exposure_ev(image)
+    brightness += (image.shadows / 100.0) * 0.06
+    brightness += (image.blacks / 100.0) * 0.04
+    brightness -= (image.highlights / 100.0) * 0.05
+    brightness = min(2.2, max(0.5, brightness))
+    if abs(brightness - 1.0) > 0.0005:
+        parts.append(f"brightness({_fmt(brightness)})")
     return " ".join(parts)
 
 
