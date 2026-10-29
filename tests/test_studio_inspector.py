@@ -96,7 +96,7 @@ def test_studio_inspector_selection_markup(
     )
     chip = css.split(".studio-transition-chip {", 1)[1].split("}", 1)[0]
     assert "font-size: 0;" not in chip
-        assert "font-size: 0.68rem" in chip
+    assert "font-size: 0.68rem" in chip
     assert ".studio-clip.is-selected" in css
     assert ".studio-clip.is-active" in css
     assert ".studio-clip.is-selected,\n.studio-clip.is-active" not in css
