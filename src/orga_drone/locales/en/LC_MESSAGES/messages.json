@@ -726,5 +726,18 @@
   "Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.": "Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.",
   "Saves a PNG of this still. The library file stays unchanged.": "Saves a PNG of this still. The library file stays unchanged.",
   "Collapse navigation": "Collapse navigation",
-  "Expand navigation": "Expand navigation"
+  "Expand navigation": "Expand navigation",
+  "D-Log M detected in recording metadata. Conversion is optional and never automatic.": "D-Log M detected in recording metadata. Conversion is optional and never automatic.",
+  "Convert D-Log M…": "Convert D-Log M…",
+  "Clear conversion": "Clear conversion",
+  "Creative LUT (.cube)": "Creative LUT (.cube)",
+  "Choose LUT…": "Choose LUT…",
+  "LUT strength": "LUT strength",
+  "Clear creative LUT": "Clear creative LUT",
+  "Technical conversion and creative looks stay separate. Orga Drone does not ship camera-vendor LUTs — choose a local .cube. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.": "Technical conversion and creative looks stay separate. Orga Drone does not ship camera-vendor LUTs — choose a local .cube. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.",
+  "Could not save the color look.": "Could not save the color look.",
+  "Could not import that .cube LUT.": "Could not import that .cube LUT.",
+  "A LUT file is missing. Choose the .cube again, or clear the look.": "A LUT file is missing. Choose the .cube again, or clear the look.",
+  "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.",
+  "LUT file": "LUT file"
 }

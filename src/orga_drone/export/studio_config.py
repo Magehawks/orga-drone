@@ -9,6 +9,7 @@ from orga_drone.studio_audio import DetachedAudio
 from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_hud import HudInterval
 from orga_drone.studio_image import ImageAdjust, SaturationRamp
+from orga_drone.studio_lut import ColorLook
 from orga_drone.studio_map import GpsSample, MapPlacement
 from orga_drone.studio_mask import Mask
 from orga_drone.studio_overlay import Overlay
@@ -50,6 +51,7 @@ class StudioExportClip:
     fade_in_s: float = 0.0
     fade_out_s: float = 0.0
     image: ImageAdjust = field(default_factory=ImageAdjust)
+    color_look: ColorLook = field(default_factory=ColorLook)
     saturation_ramp: SaturationRamp = field(default_factory=SaturationRamp)
     frame: FrameTransform = field(default_factory=FrameTransform)
     masks: tuple[Mask, ...] = ()

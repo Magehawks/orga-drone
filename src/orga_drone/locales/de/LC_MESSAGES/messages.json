@@ -726,5 +726,18 @@
   "Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.": "Wird nur für dieses Foto gespeichert. Die Bibliotheksdatei bleibt unverändert. Die Vorschau nähert das exportierte Bild an.",
   "Saves a PNG of this still. The library file stays unchanged.": "Speichert dieses Foto als PNG. Die Bibliotheksdatei bleibt unverändert.",
   "Collapse navigation": "Navigation einklappen",
-  "Expand navigation": "Navigation ausklappen"
+  "Expand navigation": "Navigation ausklappen",
+  "D-Log M detected in recording metadata. Conversion is optional and never automatic.": "D-Log M in den Aufnahme-Metadaten erkannt. Die Umwandlung ist optional und nie automatisch.",
+  "Convert D-Log M…": "D-Log M umwandeln…",
+  "Clear conversion": "Umwandlung entfernen",
+  "Creative LUT (.cube)": "Kreatives LUT (.cube)",
+  "Choose LUT…": "LUT wählen…",
+  "LUT strength": "LUT-Stärke",
+  "Clear creative LUT": "Kreatives LUT entfernen",
+  "Technical conversion and creative looks stay separate. Orga Drone does not ship camera-vendor LUTs — choose a local .cube. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.": "Technische Umwandlung und kreative Looks bleiben getrennt. Orga Drone liefert keine Hersteller-LUTs — wählen Sie eine lokale .cube. Die Vorschau nähert die Grundkorrektur an; LUTs gelten beim Export. Quelldateien bleiben unverändert.",
+  "Could not save the color look.": "Farblook konnte nicht gespeichert werden.",
+  "Could not import that .cube LUT.": "Diese .cube-LUT konnte nicht importiert werden.",
+  "A LUT file is missing. Choose the .cube again, or clear the look.": "Eine LUT-Datei fehlt. Wählen Sie die .cube erneut oder entfernen Sie den Look.",
+  "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.": "D-Log-M-Umwandlung mit Ihrer .cube-LUT anwenden? Die Vorschau nähert weiterhin die Grundkorrektur an; die LUT gilt beim Export. Quelldateien bleiben unverändert.",
+  "LUT file": "LUT-Datei"
 }
