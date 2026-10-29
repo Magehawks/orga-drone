@@ -1779,6 +1779,7 @@ button.cta, .button.cta {
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+  touch-action: none;
 }
 .studio-preview-frame:fullscreen {
   width: 100%;

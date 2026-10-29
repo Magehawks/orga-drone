@@ -199,6 +199,16 @@ def test_preview_mask_drag_keeps_the_pointer() -> None:
     assert "renderMaskHandles(clip" not in drag.split("maskDragging = true", 1)[0]
     assert 'historyGesture = "g"' in drag
     assert 'historyGesture = ""' in drag
+    # WebView2: do not rebuild the inspector under an active pointerdown.
+    before_finish = drag.split("const finish =", 1)[0]
+    assert "fillMaskInspector(clip)" not in before_finish
+    assert "lostpointercapture" in drag
+    assert "pointercancel" in drag
+    assert "finish(false)" in drag
+    window_src = script.split("function sourceWindowForMask", 1)[1].split(
+        "function clipForPreviewMedia", 1
+    )[0]
+    assert "zoomBarOf(clip)" in window_src
     hit = script.split("function maskCanvasHit", 1)[1].split("function maskBoxForId", 1)[0]
     assert "previewMasks" in hit
     assert "getBoundingClientRect" in hit
@@ -211,6 +221,7 @@ def test_preview_mask_drag_keeps_the_pointer() -> None:
     note_z = int(re.search(r"z-index:\s*(\d+)", notes).group(1))
     assert handle_z > note_z
     assert "pointer-events: auto" in _css_block(css, ".studio-mask-box {")
+    assert "touch-action: none" in _css_block(css, ".studio-preview-frame {")
     frame = script.split('previewFrame.addEventListener("pointerdown"', 1)[1].split(
         "const clip = selectedAdjustableClip()", 1
     )[0]
