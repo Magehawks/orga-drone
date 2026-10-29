@@ -210,3 +210,27 @@ def test_sidebar_stays_on_library_studio_and_map(
         assert 'class="app-sidebar"' in page.text
         assert 'href="/"' in page.text
         assert 'href="/settings"' in page.text
+
+
+def test_sidebar_collapse_toggle_is_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    page = client.get("/", cookies={"lang": "en"})
+    assert page.status_code == 200
+    assert 'id="app-sidebar"' in page.text
+    assert 'id="sidebar-collapse-toggle"' in page.text
+    assert 'data-label-collapse="Collapse navigation"' in page.text
+    assert 'data-label-expand="Expand navigation"' in page.text
+    assert 'class="nav-link-icon"' in page.text
+    assert 'class="nav-link-label"' in page.text
+    js = client.get("/static/js/ui.js")
+    assert js.status_code == 200
+    assert "orga-drone:sidebar-collapsed" in js.text
+    assert "initSidebarCollapse" in js.text or "sidebar-collapse-toggle" in js.text
+    css = client.get("/static/css/app.css")
+    assert css.status_code == 200
+    assert ".app-sidebar.is-collapsed" in css.text
+    german = client.get("/", cookies={"lang": "de"})
+    assert 'data-label-collapse="Navigation einklappen"' in german.text
+    assert 'data-label-expand="Navigation ausklappen"' in german.text
