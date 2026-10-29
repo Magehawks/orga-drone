@@ -118,6 +118,8 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'data-timeline-zoom="fit"' in html
     assert 'data-timeline-zoom="in"' in html
     assert 'data-timeline-zoom="out"' in html
+    assert 'data-timeline-zoom="window-10"' in html
+    assert 'data-timeline-zoom="window-1"' in html
     assert "Fit to story" in html or "An Story anpassen" in html
     assert 'id="studio-tracks-compact"' in html
     assert "Compact tracks" in html or "Kompakte Spuren" in html
@@ -174,7 +176,11 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert 'event.key === "ArrowLeft"' in js
     assert 'event.key === "Home"' in js
     assert "TIMELINE_HIT_MIN_PX" in js
-    assert "addEventListener(\"wheel\"" not in js
+    assert 'addEventListener(\n      "wheel"' in js or 'addEventListener("wheel"' in js
+    assert "event.ctrlKey" in js
+    assert "function zoomToWindowSeconds" in js
+    assert "function keepTimeUnderClientX" in js
+    assert "is-minor" in js
     assert "timeline: {" in js
     assert "projectId" in js
     occupancy_src = js.split("function clipOccupancyS", 1)[1].split(
@@ -184,7 +190,7 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
     assert "crossfade" in occupancy_src
     assert "function nextZoomIndexAbove" in js
     assert "function updateZoomControls" in js
-    assert "if (next < 0) return;" in js
+    assert "if (next < 0) return false;" in js
     layout_src = js.split("function layoutTimeline", 1)[1].split(
         "function centerPlayheadInView", 1
     )[0]

@@ -2449,6 +2449,15 @@ img.studio-preview-media,
   transform: translateX(-50%);
   white-space: nowrap;
 }
+.studio-ruler-mark.is-minor {
+  top: 0.55rem;
+  width: 1px;
+  height: 0.45rem;
+  background: var(--border);
+  color: transparent;
+  font-size: 0;
+  overflow: hidden;
+}
 .studio-tracks {
   position: relative;
   display: flex;

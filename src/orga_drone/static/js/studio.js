@@ -970,8 +970,9 @@
     return Math.max(0, total);
   }
 
-  const TIMELINE_ZOOM_PX_S = [20, 40, 80, 160, 320];
+  const TIMELINE_ZOOM_PX_S = [20, 40, 80, 160, 320, 640, 1280];
   const TIMELINE_HIT_MIN_PX = 12;
+  const TIMELINE_EXPORT_FPS = 30;
 
   function clipOccupancyS(clip, index, listLength) {
     // Same last-clip rule as totalDuration(): only a non-last Crossfade shrinks occupancy.
@@ -1486,6 +1487,16 @@
     timelineScrollEl.scrollLeft = Math.max(0, x - view / 2);
   }
 
+  function keepTimeUnderClientX(timeS, clientX) {
+    if (!timelineScrollEl || state.timelineMode === "fit") {
+      if (timelineScrollEl) timelineScrollEl.scrollLeft = 0;
+      return;
+    }
+    const rect = timelineScrollEl.getBoundingClientRect();
+    const offset = clientX - rect.left;
+    timelineScrollEl.scrollLeft = Math.max(0, timeToX(timeS) - offset);
+  }
+
   function fitTimeline() {
     state.timelineMode = "fit";
     persistUiState();
@@ -1493,14 +1504,48 @@
     if (timelineScrollEl) timelineScrollEl.scrollLeft = 0;
   }
 
+  function zoomIndexForPxPerSecond(targetPps) {
+    let best = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < TIMELINE_ZOOM_PX_S.length; i += 1) {
+      const dist = Math.abs(TIMELINE_ZOOM_PX_S[i] - targetPps);
+      if (dist < bestDist) {
+        best = i;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  function zoomToWindowSeconds(windowS) {
+    const view = timelineViewportPx();
+    const total = totalDuration();
+    if (view <= 0 || windowS <= 0 || total <= 0) return;
+    const targetPps = view / windowS;
+    const fitPps = timelineFitPxPerSecond();
+    if (targetPps <= fitPps + 0.5) {
+      fitTimeline();
+      return;
+    }
+    state.timelineMode = "zoom";
+    state.zoomIndex = zoomIndexForPxPerSecond(targetPps);
+    persistUiState();
+    layoutTimeline();
+    centerPlayheadInView();
+  }
+
   function updateZoomControls() {
     const empty = clips().length === 0;
     const fitBtn = document.getElementById("studio-timeline-fit");
     const inBtn = document.getElementById("studio-timeline-zoom-in");
     const outBtn = document.getElementById("studio-timeline-zoom-out");
+    const win10 = document.getElementById("studio-timeline-window-10");
+    const win1 = document.getElementById("studio-timeline-window-1");
     const denser = nextZoomIndexAbove(timelineFitPxPerSecond());
     if (fitBtn) fitBtn.disabled = empty || state.timelineMode === "fit";
     if (outBtn) outBtn.disabled = empty || state.timelineMode === "fit";
+    if (win10) win10.disabled = empty;
+    if (win1) win1.disabled = empty;
     if (inBtn) {
       const atMaxZoom =
         state.timelineMode === "zoom" &&
@@ -1509,19 +1554,20 @@
     }
   }
 
-  function zoomTimeline(direction) {
+  function applyZoomStep(direction) {
     const fitPps = timelineFitPxPerSecond();
     if (direction > 0) {
       if (state.timelineMode === "fit") {
         const next = nextZoomIndexAbove(fitPps);
-        if (next < 0) return;
+        if (next < 0) return false;
         state.timelineMode = "zoom";
         state.zoomIndex = next;
       } else {
+        if (state.zoomIndex >= TIMELINE_ZOOM_PX_S.length - 1) return false;
         state.zoomIndex = Math.min(TIMELINE_ZOOM_PX_S.length - 1, state.zoomIndex + 1);
       }
     } else if (state.timelineMode === "fit") {
-      return;
+      return false;
     } else {
       const nextIndex = state.zoomIndex - 1;
       if (nextIndex < 0 || TIMELINE_ZOOM_PX_S[nextIndex] <= fitPps + 0.01) {
@@ -1530,9 +1576,24 @@
         state.zoomIndex = nextIndex;
       }
     }
+    return true;
+  }
+
+  function zoomTimeline(direction, anchorClientX) {
+    const beforeScroll = timelineScrollEl ? timelineScrollEl.scrollLeft : 0;
+    let anchorTime = state.projectTimeS;
+    if (typeof anchorClientX === "number" && timelineScrollEl) {
+      const rect = timelineScrollEl.getBoundingClientRect();
+      anchorTime = xToTime(beforeScroll + (anchorClientX - rect.left));
+    }
+    if (!applyZoomStep(direction)) return;
     persistUiState();
     layoutTimeline();
-    centerPlayheadInView();
+    if (typeof anchorClientX === "number") {
+      keepTimeUnderClientX(anchorTime, anchorClientX);
+    } else {
+      centerPlayheadInView();
+    }
   }
 
   function clipStartTime(clip) {
@@ -4849,16 +4910,38 @@
     rulerEl.innerHTML = "";
     if (total <= 0) return;
     const pps = timelinePxPerSecond();
-    let step = 30;
-    if (pps >= 80) step = 1;
-    else if (pps >= 40) step = 5;
-    else if (pps >= 20) step = 10;
-    for (let s = 0; s <= total + 0.0001; s += step) {
+    let major = 30;
+    let minor = 0;
+    if (pps >= 640) {
+      major = 1;
+      minor = 1 / TIMELINE_EXPORT_FPS;
+    } else if (pps >= 320) {
+      major = 1;
+      minor = 0.2;
+    } else if (pps >= 80) {
+      major = 1;
+    } else if (pps >= 40) {
+      major = 5;
+    } else if (pps >= 20) {
+      major = 10;
+    }
+    const pushMark = (s, kind, label) => {
       const mark = document.createElement("span");
-      mark.className = "studio-ruler-mark";
+      mark.className =
+        kind === "minor" ? "studio-ruler-mark is-minor" : "studio-ruler-mark";
       mark.style.left = `${timeToX(s)}px`;
-      mark.textContent = formatTime(s).replace(/^00:/, "");
+      if (label) mark.textContent = label;
       rulerEl.appendChild(mark);
+    };
+    for (let s = 0; s <= total + 0.0001; s += major) {
+      pushMark(s, "major", formatTime(s).replace(/^00:/, ""));
+      if (minor > 0) {
+        for (let m = s + minor; m < s + major - minor / 2 && m <= total + 0.0001; m += minor) {
+          const nearMajor = Math.abs(m - Math.round(m / major) * major) < minor / 2;
+          if (nearMajor) continue;
+          pushMark(m, "minor", "");
+        }
+      }
     }
   }
 
@@ -9109,8 +9192,23 @@
       if (action === "fit") fitTimeline();
       else if (action === "in") zoomTimeline(1);
       else if (action === "out") zoomTimeline(-1);
+      else if (action === "window-10") zoomToWindowSeconds(10);
+      else if (action === "window-1") zoomToWindowSeconds(1);
     });
   });
+  if (timelineScrollEl) {
+    timelineScrollEl.addEventListener(
+      "wheel",
+      (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        if (clips().length === 0) return;
+        event.preventDefault();
+        const direction = event.deltaY < 0 ? 1 : -1;
+        zoomTimeline(direction, event.clientX);
+      },
+      { passive: false }
+    );
+  }
   (function bindCompactTracks() {
     const stage = document.querySelector(".studio-stage");
     const btn = document.getElementById("studio-tracks-compact");
