@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+import subprocess
+from array import array
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -19,6 +22,7 @@ from orga_drone.export.music_mix import (
     playlist_span_durations,
     scaled_fades,
 )
+from orga_drone.ffmpeg_bin import find_ffmpeg
 
 
 def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, Database]:
@@ -103,6 +107,91 @@ def test_amix_filter_contains_volume_and_fades() -> None:
     assert "volume=" in graph
 
 
+def test_amix_filters_delay_and_shorten_music_bed() -> None:
+    single = build_music_amix_filter(
+        volume=0.8,
+        fade_in_s=0.0,
+        fade_out_s=1.0,
+        story_s=10.0,
+        music_s=20.0,
+        loop=False,
+        start_s=2.5,
+    )
+    assert "atrim=0:7.5" in single
+    assert "adelay=2500:all=1" in single
+
+    playlist = build_playlist_amix_filter(
+        story_s=10.0,
+        start_s=2.5,
+        tracks=[
+            {"volume": 0.8, "fade_in_s": 0.0, "fade_out_s": 0.0, "music_s": 4.0},
+            {"volume": 0.8, "fade_in_s": 0.0, "fade_out_s": 0.0, "music_s": 8.0},
+        ],
+    )
+    assert "concat=n=2:v=0:a=1" in playlist
+    assert "atrim=0:7.5" in playlist
+    assert "adelay=2500:all=1" in playlist
+
+    muted = build_playlist_amix_filter(
+        story_s=10.0,
+        tracks=[
+            {"volume": 0.0, "fade_in_s": 0.0, "fade_out_s": 0.0, "music_s": 4.0}
+        ],
+    )
+    assert "volume=0,atrim" in muted
+    assert "volume=0.8" not in muted
+
+
+def test_ffmpeg_music_delay_is_silent_before_start(tmp_path: Path) -> None:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+    graph = build_music_amix_filter(
+        volume=0.8,
+        fade_in_s=0.0,
+        fade_out_s=0.0,
+        story_s=2.0,
+        music_s=2.0,
+        loop=False,
+        start_s=0.75,
+    )
+    raw = tmp_path / "delayed.pcm"
+    completed = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=48000:cl=stereo:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=1000:sample_rate=48000:duration=2",
+            "-filter_complex",
+            graph,
+            "-map",
+            "[a]",
+            "-t",
+            "2",
+            "-f",
+            "s16le",
+            str(raw),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    samples = array("h")
+    samples.frombytes(raw.read_bytes())
+    channels = 2
+    before = samples[: int(0.6 * 48000 * channels)]
+    after = samples[int(0.9 * 48000 * channels) : int(1.1 * 48000 * channels)]
+    assert max((abs(sample) for sample in before), default=0) == 0
+    assert max((abs(sample) for sample in after), default=0) > 100
+
+
 def test_playlist_amix_concatenates_segments() -> None:
     graph = build_playlist_amix_filter(
         story_s=10.0,
@@ -145,6 +234,32 @@ def test_persist_reopen_and_isolation(tmp_path: Path) -> None:
     assert music_b.volume == 0.8
     assert music_b.loop is False
     assert song_a.read_bytes() == bytes_a
+
+
+def test_project_music_start_defaults_and_migrates(tmp_path: Path) -> None:
+    fresh = Database(tmp_path / "fresh.sqlite3")
+    project = fresh.create_studio_project("Story")
+    assert project.music_start_s == 0.0
+    assert fresh.set_studio_music_start_s(project.id, -4).music_start_s == 0.0
+    assert fresh.set_studio_music_start_s(project.id, 23).music_start_s == 23.0
+
+    legacy_path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(legacy_path) as conn:
+        conn.execute(
+            """CREATE TABLE studio_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO studio_projects(title, created_at, updated_at) VALUES ('Old', 'a', 'b')"
+        )
+    migrated = Database(legacy_path)
+    old = migrated.get_studio_project(1)
+    assert old is not None
+    assert old.music_start_s == 0.0
 
 
 def test_music_survives_real_app_restart(
@@ -332,6 +447,60 @@ def test_http_music_crud_hides_path(
     assert db.get_studio_music(project.id) is None
     assert song.is_file()
     assert other.is_file()
+
+
+def test_http_music_start_patch_bootstrap_and_undo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.create_studio_project("Story")
+    db.set_open_studio_project_id(project.id)
+
+    patched = client.patch(
+        f"/api/studio/projects/{project.id}/music-start",
+        json={"start_s": 23},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["music_start_s"] == 23.0
+    assert db.get_studio_project(project.id).music_start_s == 23.0  # type: ignore[union-attr]
+
+    page = client.get("/studio")
+    assert page.status_code == 200
+    boot = _boot_music_payload(page.text)
+    assert boot is not None
+    assert boot["music_start_s"] == 23.0
+    assert 'data-music-start-s="23.0"' in page.text
+
+    undone = client.post("/api/studio/history/undo")
+    assert undone.status_code == 200
+    assert db.get_studio_project(project.id).music_start_s == 0.0  # type: ignore[union-attr]
+
+    clamped = client.patch(
+        f"/api/studio/projects/{project.id}/music-start",
+        json={"start_s": -2},
+    )
+    assert clamped.status_code == 200
+    assert clamped.json()["music_start_s"] == 0.0
+
+
+def test_studio_js_offsets_playlist_hit_and_layout() -> None:
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    hit = script.split("function playlistHit", 1)[1].split(
+        "function musicClipEls", 1
+    )[0]
+    layout = script.split("function layoutMusicSpans", 1)[1].split(
+        "function scaledMusicFades", 1
+    )[0]
+    assert "if (t < musicStartS) return null" in hit
+    assert "let cursor = musicStartS" in hit
+    assert "state.musicStartS" in layout
+    assert "let cursor = Math.max(0, Math.min(story, state.musicStartS))" in layout
+    drag = script.split("function beginMusicStartDrag", 1)[1].split(
+        "async function clearMusic", 1
+    )[0]
+    assert "const storedStartS = state.musicStartS" in drag
+    assert "Math.min(totalDuration(), storedStartS)" in drag
+    assert "persistMusicStart(storedStartS)" in drag
 
 
 def test_http_music_playlist_reorder_cap_and_loop(

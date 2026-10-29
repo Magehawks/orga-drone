@@ -38,14 +38,14 @@ Highlights:
   source start/end, including dragging a video clip's left and right edges on the Story timeline; trash button beside Cut, Delete from the Story track when no dialog is open, and a right-click menu remove the selected Story clip; Remove cut joins two adjacent clips of the same file when the source ranges meet and the settings match; a cut or trimmed video keeps an Original entry in the Story browser that stays after its clips are removed; dragging that Original onto the Story or Add scene inserts a new clip, and a video clip can still add another scene from its original file immediately after it; video section repeat (in/out range, 1×–8×, same speed); forward repeat of one video section until a soundtrack with a known duration ends (hard cuts, or an optional forward crossfade of 0.5–2.0 s; soundtrack plays once; last play trimmed; the same loop effect also applies to a manual 1–8 repeat, including a cinematic blend of 0.5–5.0 s and an experimental local seam search that keeps the original range when it is not confident); session Undo/Redo for Story edits (not kept after restart); Projects switcher beside the open project title; Clear Studio
   on the Story toolbar (clips only); synced Story preview playback; local MP4 export (Cancel stops a running encode) with
   configurable resolution (suggested filename includes that resolution), including photo-only stories at 720/1080; after success, Open video / Show in folder on
-  Windows; optional sequential soundtrack playlist (up to 8 local songs; loop
-  when there is one song) in preview and export; Title Cards
+  Windows; optional sequential soundtrack playlist (up to 8 local songs; one
+  project-level lead-in; loop when there is one song) in preview and export; Title Cards
   as generated Story items; basic rendered visual transitions; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
   for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); optional flight map (stored GPS route and synced marker on OpenStreetMap tiles when online, otherwise a plain panel; tiles are cached locally and are not bundled); optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed time and relative altitude); time-based
-  Story canvas with Fit to story / zoom; time-proportional soundtrack coverage on
-  that canvas)
+  Story canvas with Fit to story / zoom; time-proportional soundtrack coverage
+  with one draggable project-level start on that canvas)
 
 ## Next (possible near-term)
 
@@ -70,7 +70,8 @@ open/reveal of the finished file already exist on Windows desktop.
 
 ## Later (vision)
 
-- Studio: light editing, extra transition types, music-lane time mapping
+- Studio: light editing, extra transition types, independent per-song music
+  placement, trimming, or waveforms
   — not a professional NLE
 - Plugin / extension hooks for parsers and exports
 - Optional opt-in community sharing of flight spots

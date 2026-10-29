@@ -111,20 +111,28 @@ def build_music_amix_filter(
     story_s: float,
     music_s: float,
     loop: bool,
+    start_s: float = 0.0,
 ) -> str:
     """ffmpeg ``-filter_complex`` mixing concat audio [0:a] with music [1:a]."""
-    bed = music_bed_duration_s(story_s=story_s, music_s=music_s, loop=loop)
+    story = max(0.0, float(story_s))
+    start = max(0.0, min(story, float(start_s)))
+    audible_story = max(0.0, story - start)
+    bed = music_bed_duration_s(
+        story_s=audible_story, music_s=music_s, loop=loop
+    )
     fade_in, fade_out = scaled_fades(fade_in_s, fade_out_s, bed)
     fo_start = fade_out_start_s(bed, fade_out)
     parts = [
         f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={_fmt(volume)}",
-        f"atrim=0:{_fmt(story_s)}",
+        f"atrim=0:{_fmt(audible_story)}",
         "asetpts=PTS-STARTPTS",
     ]
     if fade_in > 0:
         parts.append(f"afade=t=in:st=0:d={_fmt(fade_in)}")
     if fade_out > 0:
         parts.append(f"afade=t=out:st={_fmt(fo_start)}:d={_fmt(fade_out)}")
+    if start > 0:
+        parts.append(f"adelay={round(start * 1000)}:all=1")
     music_chain = ",".join(parts) + "[mus]"
     return (
         f"{music_chain};"
@@ -137,10 +145,13 @@ def build_playlist_amix_filter(
     *,
     story_s: float,
     tracks: list[dict[str, float]],
+    start_s: float = 0.0,
 ) -> str:
     """Mix concat audio [0:a] with N sequential music inputs [1:a]..[N:a]."""
     story = max(0.0, float(story_s))
-    remaining = story
+    start = max(0.0, min(story, float(start_s)))
+    audible_story = max(0.0, story - start)
+    remaining = audible_story
     chains: list[str] = []
     labels: list[str] = []
     for index, track in enumerate(tracks):
@@ -154,7 +165,10 @@ def build_playlist_amix_filter(
             float(track.get("fade_out_s") or 0.0),
             audible,
         )
-        volume = clamp_music_volume(float(track.get("volume") or DEFAULT_MUSIC_VOLUME))
+        raw_volume = track.get("volume")
+        volume = clamp_music_volume(
+            DEFAULT_MUSIC_VOLUME if raw_volume is None else float(raw_volume)
+        )
         parts = [
             f"[{index + 1}:a]aformat=sample_rates=48000:channel_layouts=stereo,"
             f"volume={_fmt(volume)}",
@@ -175,7 +189,9 @@ def build_playlist_amix_filter(
         return "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
     concat = (
         f"{''.join(labels)}concat=n={len(labels)}:v=0:a=1,"
-        f"atrim=0:{_fmt(story)},asetpts=PTS-STARTPTS[mus]"
+        f"atrim=0:{_fmt(audible_story)},asetpts=PTS-STARTPTS"
+        + (f",adelay={round(start * 1000)}:all=1" if start > 0 else "")
+        + "[mus]"
     )
     return (
         f"{';'.join(chains)};{concat};"

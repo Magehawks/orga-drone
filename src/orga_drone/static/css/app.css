@@ -2995,6 +2995,25 @@ html.is-edge-drag * {
   outline: 2px dashed var(--accent);
   z-index: 3;
 }
+.studio-music-start-handle {
+  flex: 0 0 0.55rem;
+  width: 0.55rem;
+  min-width: 0.55rem;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.studio-music-start-handle:hover,
+.studio-music-start-handle:focus-visible,
+.studio-music-start-handle.is-dragging {
+  background: color-mix(in srgb, var(--accent) 52%, transparent);
+}
+.studio-music-start-handle[hidden] {
+  display: none;
+}
 .studio-music-select.is-narrow {
   overflow: visible;
   z-index: 2;

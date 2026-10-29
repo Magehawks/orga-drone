@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -135,6 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_media_meta_favorite ON media_meta(favorite);
 CREATE TABLE IF NOT EXISTS studio_projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
+    music_start_s REAL NOT NULL DEFAULT 0.0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -378,6 +380,7 @@ class MediaRow:
 STUDIO_LAST_OPENED_KEY = "studio_last_opened_project_id"
 STUDIO_MUSIC_MAX_TRACKS = 8
 STUDIO_MUSIC_LANE = "music"
+STUDIO_MUSIC_START_MAX_S = 86400.0
 
 
 @dataclass
@@ -406,6 +409,7 @@ class StudioProject:
     title: str
     created_at: str
     updated_at: str
+    music_start_s: float = 0.0
     clip_count: int = 0
 
 
@@ -637,6 +641,7 @@ class Database:
             """CREATE TABLE IF NOT EXISTS studio_projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                music_start_s REAL NOT NULL DEFAULT 0.0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )"""
@@ -757,10 +762,19 @@ class Database:
             """CREATE TABLE IF NOT EXISTS studio_projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                music_start_s REAL NOT NULL DEFAULT 0.0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )"""
         )
+        project_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_projects)").fetchall()
+        }
+        if "music_start_s" not in project_cols:
+            conn.execute(
+                "ALTER TABLE studio_projects "
+                "ADD COLUMN music_start_s REAL NOT NULL DEFAULT 0.0"
+            )
         conn.execute(
             """CREATE TABLE IF NOT EXISTS studio_clips (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2054,7 +2068,7 @@ class Database:
         """Return the first Studio project, creating one if the table is empty."""
         with self.connect() as conn:
             row = conn.execute(
-                """SELECT id, title, created_at, updated_at
+                """SELECT id, title, music_start_s, created_at, updated_at
                    FROM studio_projects ORDER BY id ASC LIMIT 1"""
             ).fetchone()
             if row is not None:
@@ -2063,6 +2077,7 @@ class Database:
                     title=str(row["title"]),
                     created_at=str(row["created_at"]),
                     updated_at=str(row["updated_at"]),
+                    music_start_s=float(row["music_start_s"] or 0.0),
                 )
             now = datetime.now().isoformat(timespec="seconds")
             cur = conn.execute(
@@ -2097,7 +2112,7 @@ class Database:
     def get_studio_project(self, project_id: int) -> StudioProject | None:
         with self.connect() as conn:
             row = conn.execute(
-                """SELECT id, title, created_at, updated_at
+                """SELECT id, title, music_start_s, created_at, updated_at
                    FROM studio_projects WHERE id = ?""",
                 (project_id,),
             ).fetchone()
@@ -2108,6 +2123,7 @@ class Database:
             title=str(row["title"]),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
+            music_start_s=float(row["music_start_s"] or 0.0),
         )
 
     def get_app_state(self, key: str) -> str | None:
@@ -2165,7 +2181,7 @@ class Database:
     def list_studio_projects(self) -> list[StudioProject]:
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT p.id, p.title, p.created_at, p.updated_at,
+                """SELECT p.id, p.title, p.music_start_s, p.created_at, p.updated_at,
                           COUNT(c.id) AS clip_count
                    FROM studio_projects p
                    LEFT JOIN studio_clips c ON c.project_id = p.id
@@ -2178,6 +2194,7 @@ class Database:
                 title=str(r["title"]),
                 created_at=str(r["created_at"]),
                 updated_at=str(r["updated_at"]),
+                music_start_s=float(r["music_start_s"] or 0.0),
                 clip_count=int(r["clip_count"] or 0),
             )
             for r in rows
@@ -2197,6 +2214,28 @@ class Database:
                    SET title = ?, updated_at = ?
                    WHERE id = ?""",
                 (clean, now, project_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("studio project not found")
+        project = self.get_studio_project(project_id)
+        assert project is not None
+        return project
+
+    def set_studio_music_start_s(
+        self, project_id: int, value: float
+    ) -> StudioProject:
+        """Persist the sequential soundtrack bed's project-time start."""
+        raw = float(value)
+        if not math.isfinite(raw):
+            raise ValueError("music start must be a finite number")
+        start_s = max(0.0, min(STUDIO_MUSIC_START_MAX_S, raw))
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """UPDATE studio_projects
+                   SET music_start_s = ?, updated_at = ?
+                   WHERE id = ?""",
+                (start_s, now, project_id),
             )
             if cur.rowcount == 0:
                 raise ValueError("studio project not found")

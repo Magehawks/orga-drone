@@ -2179,6 +2179,7 @@ class FfmpegStudioEncoder:
                 story_s=story_s,
                 music_s=probed[0],
                 loop=True,
+                start_s=config.music_start_s,
             )
             cmd.extend(["-stream_loop", "-1", "-i", str(single.source_path)])
         else:
@@ -2193,6 +2194,7 @@ class FfmpegStudioEncoder:
                     }
                     for music, duration_s in zip(tracks, probed, strict=True)
                 ],
+                start_s=config.music_start_s,
             )
             for music in tracks:
                 cmd.extend(["-i", str(music.source_path)])

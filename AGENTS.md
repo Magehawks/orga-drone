@@ -7,14 +7,15 @@ metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 (manual order + estimated runtime + simple video Cut by number or by dragging a video clip's left and right edges on the Story timeline + slow motion on a selected video section + a forward repeat of one video section until a known soundtrack ends (hard cuts, or an optional forward crossfade; the soundtrack plays once) + persisted project title;
 multiple local Studio projects; synced Story preview playback; local MP4 export
 with configurable resolution and a Standard / High / Best quality choice (CRF 23 / 20 / 17; Best uses the slow x264 preset and takes longer; suggested filename includes that resolution; an existing file is never replaced, a taken name is saved as the next free numbered file, and that name is shown after export; Cancel export stops the running encode); after export, Open video / Show in folder on
-Windows desktop; optional sequential soundtrack playlist (up to 8 local songs)
-in preview and MP4 export; Title Cards as generated Story items; basic rendered
+Windows desktop; optional sequential soundtrack playlist (up to 8 local songs;
+project-level silent lead-in) in preview and MP4 export; Title Cards as generated Story items; basic rendered
 visual transitions with labeled boundary overlays; basic per-clip image
 adjustment for photos and videos (brightness, contrast, saturation, warmth; preview approximates
 export); a linear saturation ramp on video clips (start and end time, from the current grade
 toward black and white); Inspector headings that
 distinguish selection from the playhead-active clip; time-based Story canvas
-with Fit to story / zoom; read-only soundtrack coverage on that canvas).
+with Fit to story / zoom; soundtrack coverage with one draggable project-level
+start on that canvas).
 
 The app opens on a Home screen. An empty library shows the Orga Drone logo and
 starts in the existing folder import. When a recent file already has a local
@@ -122,7 +123,8 @@ The application helps users:
   resolution and a Standard / High / Best quality choice on desktop (suggested filename includes that resolution, e.g. `_1080p` or `_4k`), including photo-only stories at 720/1080; an existing file is never replaced, and a taken name is saved as the next free numbered file (`name_1`, `name_2`, …) which the success banner shows; Cancel export stops the running encode; after a successful export, Open video / Show in folder
   on Windows; an optional sequential soundtrack playlist of up to 8 local songs
   in preview and export, shown as time-proportional coverage spans on the Story time
-  canvas; loop still repeats a single song to Story end). One video section can instead repeat forward until that soundtrack’s once-through duration ends: the soundtrack plays once and is not restarted at each video join, the last play is trimmed (a remainder under 0.05s is omitted), and the joins are hard cuts, or an optional forward crossfade (0.5–2.0 s, clamped on a short section) that does not match frames. The same loop effect also applies to a manual 1–8 repeat with no soundtrack. Cinematic blend is a longer forward overlap (0.5–5.0 s, linear or smooth opacity) and can show doubled objects when the views differ. An experimental local seam search can narrow that repeated range when it is confident; otherwise the original range stays a hard cut, and the search does not claim a seamless join. If the soundtrack duration cannot be determined, that repeat is not applied. Undo and Redo (curved arrows, Ctrl+Z / Ctrl+Y) restore the last Story edit in this session; restarting the app clears that history and opens the last saved Story. Source files are not modified. The open project is
+  canvas; the whole bed can start later after a silent lead-in; loop still repeats
+  a single song to Story end). One video section can instead repeat forward until that soundtrack’s once-through duration ends: the soundtrack plays once and is not restarted at each video join, the last play is trimmed (a remainder under 0.05s is omitted), and the joins are hard cuts, or an optional forward crossfade (0.5–2.0 s, clamped on a short section) that does not match frames. The same loop effect also applies to a manual 1–8 repeat with no soundtrack. Cinematic blend is a longer forward overlap (0.5–5.0 s, linear or smooth opacity) and can show doubled objects when the views differ. An experimental local seam search can narrow that repeated range when it is confident; otherwise the original range stays a hard cut, and the search does not claim a seamless join. If the soundtrack duration cannot be determined, that repeat is not applied. Undo and Redo (curved arrows, Ctrl+Z / Ctrl+Y) restore the last Story edit in this session; restarting the app clears that history and opens the last saved Story. Source files are not modified. The open project is
   named in the Studio header; **Studio** in the sidebar opens the project gallery, and **Back to projects** returns there;
   **Clear Studio** lives on the Story toolbar and empties clips only.
 - keep ownership of data through local SQLite indexing (media files stay on disk)

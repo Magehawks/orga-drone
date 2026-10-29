@@ -90,6 +90,7 @@ class StudioExportConfig:
     project_title: str = "Your story"
     music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
     music: StudioExportMusic | None = None
+    music_start_s: float = 0.0
     # Identities of protected originals, captured before encoding starts.
     protected_identities: tuple[tuple[int, int], ...] = ()
     # Catalog paths an export must not create or replace, even when the file is absent.
@@ -110,4 +111,5 @@ class StudioExportConfig:
             "project_title": self.project_title,
             "clip_count": len(self.clips),
             "has_music": bool(self.music_tracks),
+            "music_start_s": self.music_start_s,
         }

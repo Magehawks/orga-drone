@@ -4,6 +4,9 @@
 - **Date:** 2026-08-16
 - **Deciders:** Issues #25 / #38; CTO Engineering Gate on PR #40
 
+ADR 0026 amends this decision with one project-level lead-in offset. The
+playlist remains sequential and is not independently placeable per song.
+
 ## Context
 
 Studio MVP required local music in preview and MP4 export. The first shipping
@@ -33,7 +36,8 @@ Story t=0, not a DAW. Existing one-song projects must keep working.
    (and in tests). Add/replace/remove/reorder are playlist operations; Add
    lives outside the time lane (timeline toolbar).
 4. Coverage uses the same Story time source as clips/ruler/playhead (`timeToX`,
-   Fit/zoom). Render **N sequential spans** from t=0. Loop still stretches one
+   Fit/zoom). Render **N sequential spans** from the project soundtrack start
+   (t=0 before ADR 0026). Loop still stretches one
    song to Story end **only when N=1**. When N≠1, hide Loop in the Inspector
    and reject PATCH `loop` (`400 loop_single_only`); stored loop bits are
    ignored in preview, coverage, and export. Playlist-loop is Later.
@@ -64,6 +68,6 @@ Story t=0, not a DAW. Existing one-song projects must keep working.
 - Negative / trade-offs: Off-root read of user-chosen audio files; loud source
   audio mixed with music is not ducked; browser-only cannot pick a file;
   ping-pong preview may leave a residual tens-of-ms gap at song boundaries.
-- Explicit non-scope: overlapping tracks, arbitrary start times, waveforms,
+- Explicit non-scope: overlapping tracks, independent per-song start times, waveforms,
   trim/slip, audio crossfades, mixer/ducking, per-song loop, playlist-loop,
   voice-over.
