@@ -44,6 +44,7 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_lut import color_look_from_effect_settings
 from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
@@ -409,6 +410,11 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else ImageAdjust()
     )
+    color_look = (
+        color_look_from_effect_settings(clip.effect_settings)
+        if kind in {"photo", "video"}
+        else color_look_from_effect_settings(None)
+    )
     overlay_span = one_play if kind == "video" and one_play else seconds
     saturation_ramp = (
         saturation_ramp_from_effect_settings(clip.effect_settings)
@@ -516,6 +522,7 @@ def _clip_to_export_clip(
             loop_transition_curve(clip.effect_settings) if kind == "video" else "linear"
         ),
         image=image,
+        color_look=color_look,
         saturation_ramp=saturation_ramp,
         frame=frame,
         masks=masks,
@@ -532,9 +539,12 @@ def _protected_export_paths(db: Database) -> list[Path]:
     """Indexed sources, soundtrack files, overlay assets, and the database."""
     paths = [Path(item) for item in db.protected_export_paths()]
     overlay_root = settings.data_dir / "overlay-assets"
+    lut_root = settings.data_dir / "luts"
     try:
         if overlay_root.is_dir():
             paths.extend(path for path in overlay_root.iterdir() if path.is_file())
+        if lut_root.is_dir():
+            paths.extend(path for path in lut_root.iterdir() if path.is_file())
     except OSError:
         return paths
     return paths

@@ -72,6 +72,15 @@ from orga_drone.studio_image import (
     image_adjust_preview_model,
     saturation_ramp_from_effect_settings,
 )
+from orga_drone.studio_lut import (
+    LutInvalidError,
+    LutMissingError,
+    color_look_from_effect_settings,
+    color_look_preview_model,
+    import_lut_from_path,
+    require_lut_asset,
+    store_lut_asset,
+)
 from orga_drone.studio_map import (
     cached_osm_tile,
     gps_from_stored,
@@ -1347,6 +1356,9 @@ def create_app() -> FastAPI:
                         "image_adjust": image_adjust_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "color_look": color_look_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "color_profile_hint": color_profile_hint,
                         "saturation_ramp": saturation_ramp_from_effect_settings(
                             it.effect_settings
@@ -1460,6 +1472,7 @@ def create_app() -> FastAPI:
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
+            color_look_model=color_look_preview_model(),
             frame_model=frame_preview_model(),
             mask_model=mask_preview_model(),
             overlay_model=overlay_preview_model(),
@@ -1899,6 +1912,83 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "image": image.as_dict(),
+            }
+        )
+
+    @app.post("/api/studio/luts")
+    async def api_studio_lut_import(request: Request) -> JSONResponse:
+        """Copy a validated local ``.cube`` into the app data directory."""
+        content_type = (request.headers.get("content-type") or "").lower()
+        try:
+            if "multipart/form-data" in content_type:
+                form = await request.form()
+                upload = form.get("file")
+                if upload is None or not hasattr(upload, "read"):
+                    raise HTTPException(status_code=400, detail="LUT file is required")
+                data = await upload.read()
+                asset_name = store_lut_asset(settings.data_dir, data)
+            else:
+                payload = await request.json()
+                if not isinstance(payload, dict):
+                    raise HTTPException(status_code=400, detail="JSON body must include a path")
+                path_value = payload.get("path")
+                if not isinstance(path_value, str) or not path_value.strip():
+                    raise HTTPException(status_code=400, detail="LUT path is required")
+                asset_name = import_lut_from_path(settings.data_dir, Path(path_value))
+        except LutInvalidError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail="LUT file could not be imported"
+            ) from exc
+        try:
+            require_lut_asset(settings.data_dir, asset_name)
+        except LutMissingError as exc:
+            raise HTTPException(status_code=500, detail="LUT storage failed") from exc
+        return JSONResponse({"ok": True, "asset_name": asset_name})
+
+    @app.patch("/api/studio/{studio_item_id}/color")
+    async def api_studio_color_look(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include a color look"
+            )
+        conversion = payload.get("conversion_lut")
+        creative = payload.get("creative_lut")
+        for name in (conversion, creative):
+            if isinstance(name, str) and name:
+                try:
+                    require_lut_asset(settings.data_dir, name)
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                except LutMissingError as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="A LUT file is missing. Choose the .cube again.",
+                    ) from exc
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_color_look(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        look = color_look_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "color_look": look.as_dict(),
             }
         )
 
@@ -3663,8 +3753,19 @@ def create_app() -> FastAPI:
         if not isinstance(payload, dict):
             payload = {}
         directory = payload.get("directory") if isinstance(payload.get("directory"), str) else ""
+        file_types_raw = payload.get("file_types")
+        file_types: tuple[str, ...] | None = None
+        if isinstance(file_types_raw, list) and file_types_raw:
+            cleaned = tuple(
+                str(item) for item in file_types_raw if isinstance(item, str) and item.strip()
+            )
+            if cleaned:
+                file_types = cleaned
         try:
-            path = pick_open_file(directory=directory or "")
+            if file_types is None:
+                path = pick_open_file(directory=directory or "")
+            else:
+                path = pick_open_file(directory=directory or "", file_types=file_types)
         except OpenFilePickerError:
             return JSONResponse(
                 {

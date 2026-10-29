@@ -42,6 +42,7 @@ from orga_drone.studio_frame import (
 )
 from orga_drone.studio_audio import export_audio_args
 from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
+from orga_drone.studio_lut import LutMissingError, ffmpeg_lut_chain
 from orga_drone.studio_speed import (
     coerce_playback_speed,
     ffmpeg_slow_prefix,
@@ -208,6 +209,21 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     """
     base = _segment_vf(width, height)
     grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    lut = ""
+    if clip.kind in {"photo", "video"} and not clip.color_look.is_neutral:
+        from orga_drone.config import settings
+
+        try:
+            lut = ffmpeg_lut_chain(
+                clip.color_look,
+                data_dir=settings.data_dir,
+                work_dir=settings.data_dir / "export-work" / "luts",
+            )
+        except LutMissingError as exc:
+            raise StudioExportError(
+                "A LUT file is missing. Choose the .cube again in Bild, or clear the look.",
+                code="lut_missing",
+            ) from exc
     ramp = (
         ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=0.0)
         if clip.kind == "video"
@@ -256,7 +272,9 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             duration_s=frame_duration,
         )
     return ",".join(
-        part for part in (trim, grade, ramp, prefix, base, suffix, stretch) if part
+        part
+        for part in (trim, grade, lut, ramp, prefix, base, suffix, stretch)
+        if part
     )
 
 

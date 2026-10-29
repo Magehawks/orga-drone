@@ -393,6 +393,13 @@
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
   const msgSpeedFailed = root.dataset.speedFailed || "Could not change speed.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
+  const msgColorFailed = root.dataset.colorFailed || "Could not save the color look.";
+  const msgColorLutFailed = root.dataset.colorLutFailed || "Could not import that .cube LUT.";
+  const msgColorLutMissing = root.dataset.colorLutMissing || "A LUT file is missing. Choose the .cube again, or clear the look.";
+  const msgColorDlogConfirm =
+    root.dataset.colorDlogConfirm ||
+    "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.";
+  const labelColorLut = root.dataset.colorLutLabel || "LUT file";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
@@ -2199,17 +2206,206 @@
     return raw;
   }
 
+  function neutralColorLook() {
+    return {
+      input_profile: "rec709",
+      conversion_lut: "",
+      creative_lut: "",
+      creative_strength: 100,
+      conversion_confirmed: false,
+    };
+  }
+
+  function readColorLook(clip) {
+    const neutral = neutralColorLook();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.colorLook || "");
+      if (!parsed || typeof parsed !== "object") return neutral;
+      return {
+        input_profile: String(parsed.input_profile || "rec709"),
+        conversion_lut: String(parsed.conversion_lut || ""),
+        creative_lut: String(parsed.creative_lut || ""),
+        creative_strength: Math.max(
+          0,
+          Math.min(100, Math.round(Number(parsed.creative_strength) || 100))
+        ),
+        conversion_confirmed: Boolean(parsed.conversion_confirmed),
+      };
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function writeColorLook(clip, look) {
+    if (!clip) return;
+    clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
+  }
+
+  function shortLutLabel(assetName) {
+    const name = String(assetName || "");
+    if (!name) return root.dataset.noneLabel || "None";
+    return name.slice(0, 8) + "…";
+  }
+
+  function fillColorLook(clip) {
+    const look = readColorLook(clip);
+    const token = (clip && clip.dataset.colorProfile) || "";
+    const profileValue = document.getElementById("inspector-color-profile-value");
+    const suggest = document.getElementById("inspector-color-dlog-suggest");
+    const conversionStatus = document.getElementById("inspector-color-conversion-status");
+    const conversionClear = document.getElementById("inspector-color-conversion-clear");
+    const creativeName = document.getElementById("inspector-color-creative-name");
+    const creativeClear = document.getElementById("inspector-color-creative-clear");
+    const strengthField = document.getElementById("inspector-color-strength-field");
+    const strengthInput = document.getElementById("inspector-color-strength");
+    const strengthValue = document.getElementById("inspector-color-strength-value");
+    const hintKey = String(token || "").trim().toLowerCase().replace(/-/g, "_");
+    const isDlogHint = hintKey === "dlog_m";
+    const conversionOn = Boolean(look.conversion_lut && look.conversion_confirmed);
+    if (profileValue) {
+      if (token.trim()) {
+        profileValue.hidden = false;
+        profileValue.textContent = colorProfileDisplayLabel(token);
+      } else {
+        profileValue.hidden = true;
+        profileValue.textContent = "";
+      }
+    }
+    if (suggest) suggest.hidden = !(isDlogHint && !conversionOn);
+    if (conversionStatus) {
+      conversionStatus.hidden = !conversionOn;
+      conversionStatus.textContent = conversionOn
+        ? (root.dataset.colorProfileDlogM || "D-Log M") + " → Rec.709"
+        : "";
+    }
+    if (conversionClear) conversionClear.hidden = !conversionOn;
+    if (creativeName) {
+      creativeName.textContent = look.creative_lut
+        ? shortLutLabel(look.creative_lut)
+        : (root.dataset.noneLabel || "None");
+    }
+    if (creativeClear) creativeClear.hidden = !look.creative_lut;
+    if (strengthField) strengthField.hidden = !look.creative_lut;
+    if (strengthInput) strengthInput.value = String(look.creative_strength);
+    if (strengthValue) strengthValue.textContent = String(look.creative_strength);
+  }
+
   function fillImageInspectorSections(clip, isVideo) {
     const profileSection = document.getElementById("inspector-image-section-profile");
-    const profileValue = document.getElementById("inspector-color-profile-value");
-    const token = clip.dataset.colorProfile || "";
-    const showProfile = Boolean(token.trim());
-    if (profileSection) profileSection.hidden = !showProfile;
-    if (profileValue && showProfile) {
-      profileValue.textContent = colorProfileDisplayLabel(token);
-    }
+    if (profileSection) profileSection.hidden = false;
+    fillColorLook(clip);
     const advancedSection = document.getElementById("inspector-image-section-advanced");
     if (advancedSection) advancedSection.hidden = !isVideo;
+  }
+
+  let colorSaveChain = Promise.resolve();
+
+  function queueColorLookSave(clip) {
+    const studioId = clip.dataset.studioId;
+    colorSaveChain = colorSaveChain
+      .then(() => saveColorLook(studioId))
+      .catch((err) => {
+        showFlash((err && err.message) || msgColorFailed);
+      });
+  }
+
+  async function saveColorLook(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const look = readColorLook(clip);
+    const res = await fetch(`/api/studio/${studioId}/color`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(look),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      const detail = body && body.detail;
+      if (detail && String(detail).toLowerCase().includes("missing")) {
+        throw new Error(msgColorLutMissing);
+      }
+      throw new Error(detail || msgColorFailed);
+    }
+    writeColorLook(clip, body.color_look || look);
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillColorLook(clip);
+    }
+    setSaveState(true);
+  }
+
+  async function importCubeLut(fileOrPath) {
+    if (typeof fileOrPath === "string") {
+      const res = await fetch("/api/studio/luts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ path: fileOrPath }),
+      });
+      const body = await readJson(res);
+      if (!res.ok || !body || !body.ok || !body.asset_name) {
+        throw new Error((body && body.detail) || msgColorLutFailed);
+      }
+      return body.asset_name;
+    }
+    const form = new FormData();
+    form.append("file", fileOrPath, fileOrPath.name || "look.cube");
+    const res = await fetch("/api/studio/luts", {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: form,
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok || !body.asset_name) {
+      throw new Error((body && body.detail) || msgColorLutFailed);
+    }
+    return body.asset_name;
+  }
+
+  async function pickCubePath() {
+    const res = await fetch("/api/desktop/pick-open-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        file_types: ["3D LUT (*.cube)", "All files (*.*)"],
+      }),
+    });
+    const body = await readJson(res);
+    if (res.status === 503 || (body && body.status === "unavailable")) {
+      return null;
+    }
+    if (!res.ok || !body || body.status === "cancelled" || !body.path) {
+      return null;
+    }
+    return body.path;
+  }
+
+  async function chooseCubeAsset() {
+    const path = await pickCubePath();
+    if (path) return importCubeLut(path);
+    const input = document.getElementById("inspector-color-file-input");
+    if (!input) throw new Error(msgColorLutFailed);
+    return new Promise((resolve, reject) => {
+      const onChange = async () => {
+        input.removeEventListener("change", onChange);
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (!file) {
+          reject(new Error("cancelled"));
+          return;
+        }
+        try {
+          resolve(await importCubeLut(file));
+        } catch (err) {
+          reject(err);
+        }
+      };
+      input.addEventListener("change", onChange);
+      input.click();
+    });
   }
 
   function imageAdjustFromControls() {
@@ -8141,6 +8337,87 @@
     applyPreviewGrades(resolveAt(state.projectTimeS));
     setSaveState(false);
     queueImageAdjustSave(clip);
+  });
+
+  document.getElementById("inspector-color-dlog-apply")?.addEventListener("click", async () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    if (!window.confirm(msgColorDlogConfirm)) return;
+    try {
+      const asset = await chooseCubeAsset();
+      const look = readColorLook(clip);
+      look.input_profile = "dlog_m";
+      look.conversion_lut = asset;
+      look.conversion_confirmed = true;
+      writeColorLook(clip, look);
+      fillColorLook(clip);
+      setSaveState(false);
+      queueColorLookSave(clip);
+    } catch (err) {
+      if (err && err.message === "cancelled") return;
+      showFlash((err && err.message) || msgColorLutFailed);
+    }
+  });
+
+  document.getElementById("inspector-color-conversion-clear")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const look = readColorLook(clip);
+    look.input_profile = "rec709";
+    look.conversion_lut = "";
+    look.conversion_confirmed = false;
+    writeColorLook(clip, look);
+    fillColorLook(clip);
+    setSaveState(false);
+    queueColorLookSave(clip);
+  });
+
+  document.getElementById("inspector-color-creative-pick")?.addEventListener("click", async () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    try {
+      const asset = await chooseCubeAsset();
+      const look = readColorLook(clip);
+      look.creative_lut = asset;
+      if (!look.creative_strength) look.creative_strength = 100;
+      writeColorLook(clip, look);
+      fillColorLook(clip);
+      setSaveState(false);
+      queueColorLookSave(clip);
+    } catch (err) {
+      if (err && err.message === "cancelled") return;
+      showFlash((err && err.message) || msgColorLutFailed);
+    }
+  });
+
+  document.getElementById("inspector-color-creative-clear")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const look = readColorLook(clip);
+    look.creative_lut = "";
+    look.creative_strength = 100;
+    writeColorLook(clip, look);
+    fillColorLook(clip);
+    setSaveState(false);
+    queueColorLookSave(clip);
+  });
+
+  document.getElementById("inspector-color-strength")?.addEventListener("input", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const input = document.getElementById("inspector-color-strength");
+    const valueEl = document.getElementById("inspector-color-strength-value");
+    const look = readColorLook(clip);
+    look.creative_strength = Math.max(0, Math.min(100, Math.round(Number(input && input.value) || 0)));
+    if (valueEl) valueEl.textContent = String(look.creative_strength);
+    writeColorLook(clip, look);
+    setSaveState(false);
+  });
+
+  document.getElementById("inspector-color-strength")?.addEventListener("change", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    queueColorLookSave(clip);
   });
 
   function selectedVideoClip() {

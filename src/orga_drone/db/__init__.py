@@ -3166,6 +3166,62 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_color_look(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Store per-clip LUT / input-profile look. Raises ``ValueError`` on bad input.
+
+        Photos and videos accept a look. Settings are clip instance data in
+        ``effect_settings`` and do not change the source file. D-Log M
+        conversion is never inferred; confirmation must be present in the
+        payload when a conversion LUT is set.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_lut import dump_color_look, parse_color_look_payload
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("color look only applies to photos and videos")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind not in {"photo", "video"}:
+                raise ValueError("color look only applies to photos and videos")
+            look = parse_color_look_payload(payload)
+            blob = dump_color_look(str(row["effect_settings"] or ""), look)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_saturation_ramp(
         self,
         studio_item_id: int,

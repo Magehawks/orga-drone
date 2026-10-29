@@ -171,7 +171,13 @@
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
          data-bw-failed="{{ _('Could not save the color change.')|e }}"
          data-color-profile-dlog-m="{{ _('D-Log M')|e }}"
+         data-color-failed="{{ _('Could not save the color look.')|e }}"
+         data-color-lut-failed="{{ _('Could not import that .cube LUT.')|e }}"
+         data-color-lut-missing="{{ _('A LUT file is missing. Choose the .cube again, or clear the look.')|e }}"
+         data-color-dlog-confirm="{{ _('Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.')|e }}"
+         data-color-lut-label="{{ _('LUT file')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
+         data-color-look-model='{{ color_look_model|tojson }}'
          data-overlay-model='{{ overlay_model|tojson }}'
          data-overlay-failed="{{ _('Could not save overlays.')|e }}"
          data-overlay-missing="{{ _('Overlay image is missing.')|e }}"
@@ -646,6 +652,7 @@
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
+                  data-color-look='{{ row.color_look|tojson }}'
                   data-color-profile="{{ row.color_profile_hint|e }}"
                   data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
@@ -834,10 +841,35 @@
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
         <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" hidden>
-          <details id="inspector-image-section-profile" class="studio-image-section" hidden>
+          <details id="inspector-image-section-profile" class="studio-image-section" open>
             <summary>{{ _('Color profile') }}</summary>
-            <p class="meta-line" id="inspector-color-profile-value"></p>
-            <p class="hint">{{ _('From the recording metadata. Orga Drone does not convert log footage automatically.') }}</p>
+            <p class="meta-line" id="inspector-color-profile-value" hidden></p>
+            <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
+              <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
+              <button type="button" class="button" id="inspector-color-dlog-apply">{{ _('Convert D-Log M…') }}</button>
+            </div>
+            <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
+            <div class="studio-color-actions">
+              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _('Clear conversion') }}</button>
+            </div>
+            <label class="studio-inspector-field">
+              <span>{{ _('Creative LUT (.cube)') }}</span>
+              <span class="studio-color-file-row">
+                <button type="button" class="button ghost" id="inspector-color-creative-pick">{{ _('Choose LUT…') }}</button>
+                <span class="meta-line" id="inspector-color-creative-name">{{ _('None') }}</span>
+              </span>
+            </label>
+            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden>
+              <span class="studio-image-adjust-label">
+                <span>{{ _('LUT strength') }}</span>
+                <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
+              </span>
+              <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
+                     aria-label="{{ _('LUT strength') }}">
+            </label>
+            <button type="button" class="button ghost" id="inspector-color-creative-clear" hidden>{{ _('Clear creative LUT') }}</button>
+            <p class="hint">{{ _('Technical conversion and creative looks stay separate. Orga Drone does not ship camera-vendor LUTs — choose a local .cube. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.') }}</p>
+            <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Basic correction') }}</summary>
