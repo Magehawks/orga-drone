@@ -2414,6 +2414,16 @@
         : hit && hit.clip === clip
           ? hit.localS
           : 0;
+    // Match applyFrameToElement: outside a video zoom bar, framing is off.
+    if (clip && clip.dataset.kind === "video") {
+      const bar = zoomBarOf(clip);
+      if (bar) {
+        const offset = storyToSource(clip, localS);
+        if (offset < bar.start - 0.001 || offset > bar.end + 0.001) {
+          return { x: 0, y: 0, w: srcW, h: srcH };
+        }
+      }
+    }
     const sample = sampleFrame(frame, clip ? framePreviewProgress(clip, localS) : 0);
     if (sample.zoom <= 1.001) {
       return { x: 0, y: 0, w: srcW, h: srcH };
@@ -2739,42 +2749,75 @@
     event.preventDefault();
     event.stopPropagation();
     selectedMaskId = maskId;
-    // Mark the gesture before any select/redraw so renderMaskHandles does not
-    // replaceChildren() under the active pointer (Issue #179).
+    // Flag before any redraw so renderMaskHandles does not rebuild under the pointer.
+    // Do not call selectClip / fillMaskInspector here — WebView2 often cancels the
+    // pointer when the inspector DOM is replaced mid-gesture (Issue #179).
     maskDragging = true;
     historyGesture = "g" + String(event.pointerId || Date.now());
-    if (
+    const needsSelect =
       !state.selected ||
       state.selected.type !== "clip" ||
-      String(state.selected.id) !== String(clip.dataset.studioId)
-    ) {
-      selectClip(clip.dataset.studioId, { movePlayhead: false });
-    }
+      String(state.selected.id) !== String(clip.dataset.studioId);
     if (!box || !box.isConnected) box = maskBoxForId(maskId);
     if (box) box.classList.add("is-dragging", "is-selected");
     const pointerId = event.pointerId;
     const captureEl = previewFrame || box;
     try {
-      if (captureEl) captureEl.setPointerCapture(pointerId);
+      if (captureEl && pointerId != null) captureEl.setPointerCapture(pointerId);
     } catch (_) {
       /* Window listeners still follow the pointer. */
-    }
-    try {
-      fillMaskInspector(clip);
-    } catch (_) {
-      /* The drag still updates the mask if the inspector cannot refresh. */
     }
     const bounds = maskDragBounds(layer, box, startMask, geom && geom.rect);
     const originX = event.clientX;
     const originY = event.clientY;
     let ended = false;
-    let acceptCancel = false;
-    window.setTimeout(() => {
-      acceptCancel = true;
-    }, 0);
+    let moved = false;
+    let earlyCancelTimer = 0;
+    const finish = (save) => {
+      if (ended) return;
+      ended = true;
+      if (earlyCancelTimer) {
+        window.clearTimeout(earlyCancelTimer);
+        earlyCancelTimer = 0;
+      }
+      maskDragging = false;
+      if (box) box.classList.remove("is-dragging");
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+      if (captureEl) {
+        captureEl.removeEventListener("lostpointercapture", onLostCapture);
+        try {
+          if (pointerId != null) captureEl.releasePointerCapture(pointerId);
+        } catch (_) {
+          /* already released */
+        }
+      }
+      if (needsSelect) {
+        try {
+          selectClip(clip.dataset.studioId, { movePlayhead: false });
+        } catch (_) {
+          /* selection can wait until after the gesture */
+        }
+      }
+      layoutEffectBars();
+      if (save) queueMaskSave(clip);
+      drawPrivacyMasks();
+      historyGesture = "";
+      try {
+        fillMaskInspector(clip);
+      } catch (_) {
+        /* ignore */
+      }
+    };
     const move = (ev) => {
       if (ended) return;
       if (ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      moved = true;
+      if (earlyCancelTimer) {
+        window.clearTimeout(earlyCancelTimer);
+        earlyCancelTimer = 0;
+      }
       ev.preventDefault();
       ev.stopPropagation();
       const dx = (ev.clientX - originX) / bounds.width;
@@ -2788,7 +2831,7 @@
       });
       writeMasks(clip, next);
       const current = next.find((item) => item.id === maskId);
-      if (current && box) {
+      if (current && box && box.isConnected) {
         box.style.left = `${current.x * 100}%`;
         box.style.top = `${current.y * 100}%`;
         box.style.width = `${current.w * 100}%`;
@@ -2799,31 +2842,29 @@
     const up = (ev) => {
       if (ended) return;
       if (ev && ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
-      if (ev && ev.type === "pointercancel" && !acceptCancel) return;
-      ended = true;
-      maskDragging = false;
-      if (box) box.classList.remove("is-dragging");
-      window.removeEventListener("pointermove", move, true);
-      window.removeEventListener("pointerup", up, true);
-      window.removeEventListener("pointercancel", up, true);
-      try {
-        if (captureEl) captureEl.releasePointerCapture(pointerId);
-      } catch (_) {
-        /* already released */
+      // WebView2 may fire a spurious pointercancel immediately after pointerdown.
+      // Abort cleanly after a short delay if no move/up follows, so maskDragging
+      // never stays stuck true.
+      if (ev && ev.type === "pointercancel" && !moved) {
+        if (!earlyCancelTimer) {
+          earlyCancelTimer = window.setTimeout(() => {
+            earlyCancelTimer = 0;
+            finish(false);
+          }, 80);
+        }
+        return;
       }
-      layoutEffectBars();
-      queueMaskSave(clip);
-      drawPrivacyMasks();
-      historyGesture = "";
-      try {
-        fillMaskInspector(clip);
-      } catch (_) {
-        /* ignore */
-      }
+      finish(true);
+    };
+    const onLostCapture = (ev) => {
+      if (ended) return;
+      if (ev && ev.pointerId != null && pointerId != null && ev.pointerId !== pointerId) return;
+      finish(moved);
     };
     window.addEventListener("pointermove", move, true);
     window.addEventListener("pointerup", up, true);
     window.addEventListener("pointercancel", up, true);
+    if (captureEl) captureEl.addEventListener("lostpointercapture", onLostCapture);
     return true;
   }
 
