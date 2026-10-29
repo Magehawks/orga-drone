@@ -330,3 +330,6 @@ def test_handles_are_video_only_and_labeled(
     assert "studio-edge-readout" in js
     assert ".studio-edge-in" in css
     assert ".studio-edge-out" in css
+    assert "button.studio-edge::before" in css
+    assert "--studio-edge-hit" in css
+    assert "--studio-story-track-height" in css

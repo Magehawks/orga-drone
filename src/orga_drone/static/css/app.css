@@ -1746,12 +1746,18 @@ button.cta, .button.cta {
 .studio-add-media { width: 100%; text-align: center; }
 
 .studio-stage {
-  --studio-story-height: 15.5rem;
+  --studio-story-height: 16rem;
+  /* Story track body ~64px; compact mode drops to ~56px without changing timing. */
+  --studio-story-track-height: 4rem;
+  --studio-edge-hit: 20px;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   background: var(--surface-deep);
+}
+.studio-stage.is-compact-tracks {
+  --studio-story-track-height: 3.5rem;
 }
 .studio-preview {
   flex: 1 1 auto;
@@ -2401,7 +2407,7 @@ img.studio-preview-media,
   flex: 0 0 auto;
 }
 .studio-gutter-tracks .studio-track-label-story {
-  min-height: 4.5rem;
+  min-height: var(--studio-story-track-height);
 }
 .studio-gutter-tracks .studio-track-label-audio {
   min-height: 1.85rem;
@@ -2491,7 +2497,7 @@ img.studio-preview-media,
 .studio-track-story {
   display: block;
   position: relative;
-  min-height: 4.5rem;
+  min-height: var(--studio-story-track-height);
   overflow: hidden;
 }
 .studio-track-audio {
@@ -2539,7 +2545,7 @@ img.studio-preview-media,
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px;
   cursor: ew-resize;
 }
 .studio-effect-edge-in { left: 0; }
@@ -2588,7 +2594,7 @@ img.studio-preview-media,
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px;
   z-index: 2;
   cursor: ew-resize;
   touch-action: none;
@@ -2612,7 +2618,7 @@ img.studio-preview-media,
   position: relative;
   align-items: stretch;
   gap: 0;
-  min-height: 4.5rem;
+  min-height: var(--studio-story-track-height);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2707,7 +2713,8 @@ img.studio-preview-media,
   background: color-mix(in srgb, var(--panel) 88%, var(--surface-deep));
   color: var(--text);
   cursor: grab;
-  padding: 0 0.2rem;
+  padding: 0 0.45rem;
+  min-width: 1.25rem;
   font: inherit;
   touch-action: none;
 }
@@ -2716,7 +2723,7 @@ button.studio-edge {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px;
   min-width: 0;
   min-height: 0;
   z-index: 5;
@@ -2736,6 +2743,16 @@ button.studio-edge:active {
   transform: none;
   color: inherit;
 }
+/* Invisible wider grab; visual line stays in ::after (same idea as playhead). */
+button.studio-edge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--studio-edge-hit);
+}
+button.studio-edge-in::before { left: calc(var(--studio-edge-hit) / -2 + 6px); }
+button.studio-edge-out::before { right: calc(var(--studio-edge-hit) / -2 + 6px); }
 button.studio-edge::after {
   content: "";
   position: absolute;
@@ -2786,8 +2803,9 @@ html.is-edge-drag * {
   cursor: pointer;
 }
 .studio-clip-thumb {
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.75rem;
+  height: calc(var(--studio-story-track-height) - 0.75rem);
+  max-height: 3.25rem;
   border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
@@ -2823,8 +2841,8 @@ html.is-edge-drag * {
   top: 50%;
   transform: translate(-50%, -50%);
   width: auto;
-  min-width: 1.35rem;
-  height: 1.45rem;
+  min-width: 1.6rem;
+  height: 1.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2837,13 +2855,13 @@ html.is-edge-drag * {
   align-items: center;
   justify-content: center;
   width: auto;
-  min-width: 1.35rem;
-  height: 1.25rem;
-  padding: 0 0.4rem;
+  min-width: 1.5rem;
+  height: 1.45rem;
+  padding: 0 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
