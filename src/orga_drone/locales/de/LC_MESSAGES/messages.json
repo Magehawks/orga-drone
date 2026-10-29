@@ -739,5 +739,15 @@
   "Could not import that .cube LUT.": "Diese .cube-LUT konnte nicht importiert werden.",
   "A LUT file is missing. Choose the .cube again, or clear the look.": "Eine LUT-Datei fehlt. Wählen Sie die .cube erneut oder entfernen Sie den Look.",
   "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.": "D-Log-M-Umwandlung mit Ihrer .cube-LUT anwenden? Die Vorschau nähert weiterhin die Grundkorrektur an; die LUT gilt beim Export. Quelldateien bleiben unverändert.",
-  "LUT file": "LUT-Datei"
+  "LUT file": "LUT-Datei",
+  "Could not apply that look.": "Dieser Look konnte nicht angewendet werden.",
+  "Natural": "Natürlich",
+  "Cinematic": "Filmisch",
+  "Golden Hour": "Goldene Stunde",
+  "Vibrant": "Kräftig",
+  "Cool": "Kühl",
+  "Black & White": "Schwarzweiß",
+  "Before / after": "Vorher / nachher",
+  "Look": "Look",
+  "A look replaces the four sliders below. It does not change LUTs or the file on disk. Before/after only affects the preview.": "Ein Look ersetzt die vier Regler darunter. LUTs und die Datei auf der Festplatte bleiben unverändert. Vorher/nachher betrifft nur die Vorschau."
 }

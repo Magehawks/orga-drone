@@ -178,6 +178,16 @@
          data-color-lut-label="{{ _('LUT file')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-color-look-model='{{ color_look_model|tojson }}'
+         data-quick-looks-model='{{ quick_looks_model|tojson }}'
+         data-look-failed="{{ _('Could not apply that look.')|e }}"
+         data-look-custom="{{ _('Custom')|e }}"
+         data-look-natural="{{ _('Natural')|e }}"
+         data-look-cinematic="{{ _('Cinematic')|e }}"
+         data-look-golden-hour="{{ _('Golden Hour')|e }}"
+         data-look-vibrant="{{ _('Vibrant')|e }}"
+         data-look-cool="{{ _('Cool')|e }}"
+         data-look-black-and-white="{{ _('Black & White')|e }}"
+         data-look-before-after="{{ _('Before / after')|e }}"
          data-overlay-model='{{ overlay_model|tojson }}'
          data-overlay-failed="{{ _('Could not save overlays.')|e }}"
          data-overlay-missing="{{ _('Overlay image is missing.')|e }}"
@@ -653,6 +663,7 @@
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-color-look='{{ row.color_look|tojson }}'
+                  data-quick-look="{{ row.quick_look|e }}"
                   data-color-profile="{{ row.color_profile_hint|e }}"
                   data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
@@ -874,6 +885,23 @@
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Basic correction') }}</summary>
             <div id="inspector-image-adjust">
+              <label class="studio-inspector-field" for="inspector-quick-look">
+                <span>{{ _('Look') }}</span>
+                <select id="inspector-quick-look" aria-label="{{ _('Look') }}">
+                  <option value="">{{ _('Custom') }}</option>
+                  <option value="natural">{{ _('Natural') }}</option>
+                  <option value="cinematic">{{ _('Cinematic') }}</option>
+                  <option value="golden_hour">{{ _('Golden Hour') }}</option>
+                  <option value="vibrant">{{ _('Vibrant') }}</option>
+                  <option value="cool">{{ _('Cool') }}</option>
+                  <option value="black_and_white">{{ _('Black & White') }}</option>
+                </select>
+              </label>
+              <label class="studio-inspector-field studio-frame-motion">
+                <input type="checkbox" id="inspector-look-compare">
+                <span>{{ _('Before / after') }}</span>
+              </label>
+              <p class="hint">{{ _('A look replaces the four sliders below. It does not change LUTs or the file on disk. Before/after only affects the preview.') }}</p>
               <label class="studio-inspector-field">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Brightness') }}</span>

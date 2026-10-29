@@ -3166,6 +3166,68 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_quick_look(
+        self,
+        studio_item_id: int,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Apply a named Quick Look by replacing basic image sliders.
+
+        An empty look id clears the look label and leaves the current sliders.
+        Photos and videos only. Source files are never modified.
+        """
+        from orga_drone.studio_estimate import effective_kind
+        from orga_drone.studio_image import dump_effect_settings
+        from orga_drone.studio_looks import (
+            dump_look_id,
+            look_image_adjust,
+            parse_look_payload,
+        )
+        from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
+
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
+                          s.effect_settings,
+                          m.kind AS live_kind, m.id AS media_id
+                   FROM studio_clips s
+                   LEFT JOIN media m ON m.path = s.media_path
+                   WHERE s.id = ?""",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            if str(row["item_kind"] or "media") == ITEM_KIND_TITLE_CARD:
+                raise ValueError("quick looks only apply to photos and videos")
+            available = row["media_id"] is not None
+            live_kind = (
+                str(row["live_kind"]) if available and row["live_kind"] else None
+            )
+            kind = effective_kind(
+                available=available,
+                live_kind=live_kind,
+                kind_snapshot=str(row["kind_snapshot"] or "photo"),
+            )
+            if kind not in {"photo", "video"}:
+                raise ValueError("quick looks only apply to photos and videos")
+            look_id = parse_look_payload(payload)
+            blob = str(row["effect_settings"] or "")
+            if look_id:
+                blob = dump_effect_settings(blob, look_image_adjust(look_id))
+            blob = dump_look_id(blob, look_id)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_color_look(
         self,
         studio_item_id: int,
