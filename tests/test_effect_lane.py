@@ -194,6 +194,11 @@ def test_preview_mask_drag_keeps_the_pointer() -> None:
     assert "startMask.x + dx" in drag
     assert "startMask.w + dx" in drag
     assert 'addEventListener("pointermove", move, true)' in drag
+    # Flag the gesture before any redraw so handles are not rebuilt under the pointer.
+    assert drag.index("maskDragging = true") < drag.index("selectClip(")
+    assert "renderMaskHandles(clip" not in drag.split("maskDragging = true", 1)[0]
+    assert 'historyGesture = "g"' in drag
+    assert 'historyGesture = ""' in drag
     hit = script.split("function maskCanvasHit", 1)[1].split("function maskBoxForId", 1)[0]
     assert "previewMasks" in hit
     assert "getBoundingClientRect" in hit
