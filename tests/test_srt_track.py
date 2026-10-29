@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from orga_drone.parse import parse_srt
 
 
@@ -42,3 +44,26 @@ def test_parse_srt_empty(tmp_path: Path) -> None:
     assert start is None
     assert track == []
     assert duration == 1.0
+
+
+def test_parse_srt_camera_fields_fixture_documents_current_coverage() -> None:
+    """Issue #188: anonymized DJI-shaped cues; camera tokens stay unparsed today."""
+    srt = Path("tests/fixtures/dji_srt_camera_fields_sample.srt")
+    start, track, duration = parse_srt(srt)
+    assert start is not None
+    assert start.lat == pytest.approx(10.000100)
+    assert start.lon == pytest.approx(20.000100)
+    assert start.rel_alt == pytest.approx(5.0)
+    assert start.abs_alt == pytest.approx(105.0)
+    assert duration == pytest.approx(2.033)
+    assert len(track) == 4
+    assert track[0].t == pytest.approx(0.0)
+    assert track[1].rel_alt == pytest.approx(5.5)
+    # Cue 3 has GPS but no altitude tokens.
+    assert track[2].rel_alt is None
+    assert track[2].abs_alt is None
+    # Cue 4 uses separate [rel_alt] / [abs_alt] brackets — not parsed yet.
+    assert track[3].rel_alt is None
+    assert track[3].abs_alt is None
+    # Camera / color_md tokens are not on GpsPoint today.
+    assert not hasattr(track[0], "color_md")

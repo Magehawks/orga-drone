@@ -1,0 +1,24 @@
+1
+00:00:00,000 --> 00:00:00,033
+<font size="28">FrameCnt: 1, DiffTime: 33ms
+2024-01-15 10:00:00.000
+[iso: 100] [shutter: 1/640.0] [fnum: 2.8] [ev: 0] [ct: 5200] [color_md: dlog_m] [ae_meter_md: 1] [latitude: 10.000100] [longitude: 20.000100] [rel_alt: 5.000 abs_alt: 105.000] </font>
+
+2
+00:00:00,033 --> 00:00:00,066
+<font size="28">FrameCnt: 2, DiffTime: 33ms
+2024-01-15 10:00:00.033
+[iso: 100] [shutter: 1/640.0] [fnum: 2.8] [ev: 0] [ct: 5205] [color_md: dlog_m] [ae_meter_md: 1] [latitude: 10.000200] [longitude: 20.000200] [rel_alt: 5.500 abs_alt: 105.500] </font>
+
+3
+00:00:01,000 --> 00:00:01,033
+<font size="28">FrameCnt: 30, DiffTime: 33ms
+2024-01-15 10:00:01.000
+[iso: 200] [shutter: 1/500.0] [fnum: 2.8] [ev: -0.3] [ct: 5300] [color_md: dlog_m] [ae_meter_md: 1] [latitude: 10.001000] [longitude: 20.001000]
+[note: gps without altitude for gap testing. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]</font>
+
+4
+00:00:02,000 --> 00:00:02,033
+<font size="28">FrameCnt: 60, DiffTime: 33ms
+2024-01-15 10:00:02.000
+[iso: 100] [shutter: 1/640.0] [fnum: 2.8] [ev: 0] [ct: 5250] [color_md: dlog_m] [ae_meter_md: 1] [latitude: 10.002000] [longitude: 20.002000] [rel_alt: 12.000] [abs_alt: 112.000]</font>
