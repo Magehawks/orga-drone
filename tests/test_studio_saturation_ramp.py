@@ -383,7 +383,8 @@ def test_http_saturation_ramp_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-saturation-ramp" data-inspector-tab="image" hidden' in page.text
+    assert 'id="inspector-saturation-ramp"' in page.text
+    assert 'id="inspector-image-section-advanced"' in page.text
     assert 'id="inspector-bw-enabled"' in page.text
     assert 'id="inspector-bw-start"' in page.text
     assert 'id="inspector-bw-end"' in page.text
@@ -392,7 +393,7 @@ def test_http_saturation_ramp_validation_and_inspector(
     assert 'id="inspector-bw-strength"' in page.text
     assert "data-saturation-ramp=" in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
-    assert "bwWrap.hidden = !isVideo" in script
+    assert "advancedSection.hidden = !isVideo" in script
     assert "saturationRampMultiplier" in script
 
     rejected = client.patch(

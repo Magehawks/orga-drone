@@ -65,6 +65,7 @@ from orga_drone.studio_frame import (
 )
 from orga_drone.studio_hud import empty_hud_state, hud_client_state
 from orga_drone.studio_image import (
+    color_profile_hint_from_srt,
     export_payload_sets_adjust,
     image_adjust_from_effect_settings,
     image_adjust_from_export_payload,
@@ -1272,6 +1273,8 @@ def create_app() -> FastAPI:
                 display_title = ""
                 display_subtitle = ""
                 media_row = None
+                media_path = None
+                color_profile_hint = ""
                 hud_state = empty_hud_state()
                 if it.kind == TITLE_CARD_KIND:
                     display_title, display_subtitle = display_lines(
@@ -1290,6 +1293,9 @@ def create_app() -> FastAPI:
                                 else media_row.kind
                             )
                             if kind == "video":
+                                hint = color_profile_hint_from_srt(media_path)
+                                if hint:
+                                    color_profile_hint = hint
                                 proxy_path = resolve_proxy_file(db, media_row)
                                 has_proxy = proxy_path is not None
                                 if has_proxy:
@@ -1341,6 +1347,7 @@ def create_app() -> FastAPI:
                         "image_adjust": image_adjust_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "color_profile_hint": color_profile_hint,
                         "saturation_ramp": saturation_ramp_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),

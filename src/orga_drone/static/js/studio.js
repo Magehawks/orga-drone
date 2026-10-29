@@ -2191,6 +2191,27 @@
     });
   }
 
+  function colorProfileDisplayLabel(token) {
+    const raw = String(token || "").trim();
+    if (!raw) return "";
+    const key = raw.toLowerCase().replace(/-/g, "_");
+    if (key === "dlog_m") return root.dataset.colorProfileDlogM || "D-Log M";
+    return raw;
+  }
+
+  function fillImageInspectorSections(clip, isVideo) {
+    const profileSection = document.getElementById("inspector-image-section-profile");
+    const profileValue = document.getElementById("inspector-color-profile-value");
+    const token = clip.dataset.colorProfile || "";
+    const showProfile = Boolean(token.trim());
+    if (profileSection) profileSection.hidden = !showProfile;
+    if (profileValue && showProfile) {
+      profileValue.textContent = colorProfileDisplayLabel(token);
+    }
+    const advancedSection = document.getElementById("inspector-image-section-advanced");
+    if (advancedSection) advancedSection.hidden = !isVideo;
+  }
+
   function imageAdjustFromControls() {
     const adjust = neutralImageAdjust();
     IMAGE_ADJUST_FIELDS.forEach(([key, inputId, valueId]) => {
@@ -5134,11 +5155,13 @@
         }
       }
       fillSpeedInspector(clip, isVideo);
-      const imageWrap = document.getElementById("inspector-image-adjust");
-      if (imageWrap) imageWrap.hidden = !(isPhoto || isVideo);
-      if (isPhoto || isVideo) fillImageAdjust(clip);
-      const bwWrap = document.getElementById("inspector-saturation-ramp");
-      if (bwWrap) bwWrap.hidden = !isVideo;
+      const canImage = isPhoto || isVideo;
+      const imagePanel = document.getElementById("inspector-image-panel");
+      if (imagePanel) imagePanel.hidden = !canImage;
+      if (canImage) {
+        fillImageAdjust(clip);
+        fillImageInspectorSections(clip, isVideo);
+      }
       if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
@@ -5146,8 +5169,8 @@
       else selectedOverlayId = null;
       fillMaskInspector(clip);
       const frameWrap = document.getElementById("inspector-frame");
-      if (frameWrap) frameWrap.hidden = !(isPhoto || isVideo);
-      if (isPhoto || isVideo) {
+      if (frameWrap) frameWrap.hidden = !canImage;
+      if (canImage) {
         frameMotionArmed = frameMotionOn(readFrame(clip));
         frameEditTarget = "start";
         fillFrame(clip);
