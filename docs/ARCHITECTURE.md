@@ -79,7 +79,7 @@ Schema lives in `src/orga_drone/db/__init__.py` (`SCHEMA` + `_migrate`).
 | `media_meta` | User stars/favorites/tags/notes (survives rescan) |
 | `albums` | User-named library albums (independent of `studio_projects`) |
 | `album_items` | Non-destructive media references (`media_path` + `identity_key` + optional `source_media_id`); one file may appear in several albums; survives rescan; listed as offline when the file is not on disk |
-| `studio_projects` | Studio projects (`title`, timestamps); deleting a project never deletes `media` |
+| `studio_projects` | Studio projects (`title`, timestamps, project-level `music_start_s` lead-in for the sequential soundtrack); deleting a project never deletes `media` |
 | `studio_clips` | Story clips per project: media refs (`item_kind='media'`, path + identity + optional `source_media_id`) or generated Title Cards (`item_kind='title_card'`, NULL path, title/subtitle/duration/background); start/end, speed, volume, outgoing `transition` + `transition_duration_s`, `effect_settings` JSON (photo and video image sliders under `image`; video saturation ramp under `saturation_ramp`; timed overlays under `overlays`; privacy masks under `masks`; zoom and pan under `frame`; optional flight-map box under `map`, drawn from stored GPS over cached OpenStreetMap tiles when a tile can be fetched, otherwise a plain panel; optional video telemetry HUD under `hud`; optional `loop_to_soundtrack` boolean that repeats one video section forward to a known soundtrack duration at preview and export time, without storing that duration; optional `loop_transition` (`crossfade`, `cinematic`, or experimental `match`), `loop_transition_s` (0.5–2.0, or 0.5–5.0 for cinematic), and `loop_transition_curve` (`linear` or `smooth`, cinematic only) on the same JSON, used for a soundtrack-length repeat and for a manual 1–8 repeat, applied as an overlap that shortens each extra play, clamped when the section is shorter, and omitted when off; `match` stores a local seam under `loop_match` and keeps the user's range when that seam is not confident); survives rescan |
 | `studio_audio_clips` | Optional sequential soundtrack playlist (up to 8 songs; `duration_s`; volume/fades; loop when N=1; read-only path outside library roots allowed; not library media) |
 | `app_state` | Small key/value app pointers (currently last-opened Studio project id) |
@@ -168,12 +168,13 @@ PNG; PNG is a re-encode. Preview uses the same CSS approximation as Studio. A vi
 highest existing resolution; those three presets are a 1080×1920 frame with
 the picture fitted inside it). Desktop save dialog. Optional project soundtrack
 playlist (`studio_audio_clips`, up to 8 songs) is previewed and mixed into the
-MP4; Title Cards are
+MP4; one project-level offset can delay the whole bed while keeping the songs
+sequential; Title Cards are
 generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
 visual transitions Cut / Fade through black / Crossfade persist on the outgoing
 clip and render in preview + MP4). The Story timeline is a shared time canvas
-(`px/s` Fit/zoom; ruler, clips, playhead and the read-only soundtrack coverage
-spans share one mapping; soundtrack tile width follows each song’s effective
+(`px/s` Fit/zoom; ruler, clips, playhead and the soundtrack coverage spans share
+one mapping; one project-level start moves the full bed; soundtrack tile width follows each song’s effective
 duration; transitions are labeled boundary overlays). Selected vs
 playhead-active clips use distinct chrome; the Inspector names the selected
 object. The open project title sits with a labeled **Projects** switcher;

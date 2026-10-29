@@ -93,6 +93,7 @@
          data-export-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}"
          data-playback-note="{{ _('Preview plays Story media in order. Export writes a local MP4 and includes project music when set.')|e }}"
          data-music-payload='{{ music_payload|tojson }}'
+         data-music-start-s="{{ project.music_start_s if project else 0 }}"
          data-music-failed="{{ _('Could not save music settings.')|e }}"
          data-music-picker-unavailable="{{ _('Choosing music needs the desktop app.')|e }}"
          data-music-missing="{{ _('The selected music file is no longer available.')|e }}"
@@ -132,6 +133,7 @@
          data-music-limit="{{ _('This story already has 8 soundtrack songs.')|e }}"
          data-music-song-of="{{ _('Song {current} of {total}')|e }}"
          data-drag-reorder="{{ _('Drag to reorder')|e }}"
+         data-drag-music-start="{{ _('Drag to set when the soundtrack starts')|e }}"
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
          data-kind-title-card="{{ _('Title card')|e }}"
@@ -1137,6 +1139,10 @@
         <p class="meta-line" id="inspector-music-index" hidden></p>
         <p><strong data-field="music-name"></strong></p>
         <label class="studio-inspector-field">
+          <span>{{ _('Soundtrack start (s)') }}</span>
+          <input type="number" id="inspector-music-start" min="0" step="0.1" value="0">
+        </label>
+        <label class="studio-inspector-field">
           <span>{{ _('Volume') }}</span>
           <input type="range" id="inspector-music-volume" min="0" max="100" value="80">
         </label>
@@ -1165,7 +1171,7 @@
           {{ lucide('trash-2') }}
           <span class="studio-btn-label">{{ _('Remove') }}</span>
         </button>
-        <p class="hint">{{ _('Soundtrack songs play one after another from the start of the story. Adjacent songs meet with a cut. Fade and Crossfade stay on the Story track. Music is mixed into the exported MP4. Source video audio is kept when present.') }}</p>
+        <p class="hint">{{ _('Drag the left edge of the first song to place the whole sequential soundtrack later. Songs still play one after another, and source files stay unchanged.') }}</p>
       </div>
 
       <div class="studio-inspector-panel" id="inspector-titlecard" hidden>

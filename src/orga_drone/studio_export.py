@@ -670,6 +670,7 @@ def prepare_studio_export(
         clips=tuple(export_clips),
         project_title=project.title,
         music_tracks=tuple(music_tracks),
+        music_start_s=project.music_start_s,
         protected_identities=protected_identities,
         protected_paths=protected_path_strs,
     )

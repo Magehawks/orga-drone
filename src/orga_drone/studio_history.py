@@ -1,9 +1,9 @@
 """In-memory Undo/Redo for the open Studio story.
 
-The stack keeps snapshots of ``studio_clips`` for one project. It is not
-written to SQLite and is empty when the process starts. Undo restores the
-previous clip rows. It does not touch media files, library rows, albums, or
-other projects.
+The stack keeps snapshots of ``studio_clips`` plus the project-level soundtrack
+start for one project. It is not written to SQLite and is empty when the process
+starts. Undo restores those Story values. It does not touch media files,
+library rows, albums, or other projects.
 
 A slider gesture sends the same ``X-Studio-History-Group`` on each save.
 Those saves share one step, taken from the state before the gesture. A later
@@ -49,7 +49,13 @@ _CLIP_COLUMNS: tuple[str, ...] = (
     "added_at",
 )
 
-Snapshot = tuple[tuple[Any, ...], ...]
+ClipSnapshot = tuple[tuple[Any, ...], ...]
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    clips: ClipSnapshot
+    music_start_s: float
 
 _lock = threading.Lock()
 
@@ -90,13 +96,22 @@ def capture_story(db: Database, project_id: int) -> Snapshot:
                 ORDER BY position ASC, id ASC""",
             (project_id,),
         ).fetchall()
-    return tuple(tuple(row[name] for name in _CLIP_COLUMNS) for row in rows)
+        project = conn.execute(
+            "SELECT music_start_s FROM studio_projects WHERE id = ?",
+            (project_id,),
+        ).fetchone()
+    return Snapshot(
+        clips=tuple(tuple(row[name] for name in _CLIP_COLUMNS) for row in rows),
+        music_start_s=(
+            float(project["music_start_s"] or 0.0) if project is not None else 0.0
+        ),
+    )
 
 
 def restore_story(db: Database, project_id: int, snapshot: Snapshot) -> None:
     """Replace one project's clip rows. Media files and other tables stay."""
     now = datetime.now().isoformat(timespec="seconds")
-    keep_ids = [int(row[0]) for row in snapshot]
+    keep_ids = [int(row[0]) for row in snapshot.clips]
     with db.connect() as conn:
         if keep_ids:
             placeholders = ",".join("?" for _ in keep_ids)
@@ -122,7 +137,7 @@ def restore_story(db: Database, project_id: int, snapshot: Snapshot) -> None:
         )
         insert_columns = ", ".join(_CLIP_COLUMNS)
         insert_values = ", ".join("?" for _ in _CLIP_COLUMNS)
-        for row in snapshot:
+        for row in snapshot.clips:
             if int(row[0]) in existing:
                 conn.execute(
                     f"""UPDATE studio_clips
@@ -137,8 +152,10 @@ def restore_story(db: Database, project_id: int, snapshot: Snapshot) -> None:
                     row,
                 )
         conn.execute(
-            "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
-            (now, project_id),
+            """UPDATE studio_projects
+               SET music_start_s = ?, updated_at = ?
+               WHERE id = ?""",
+            (snapshot.music_start_s, now, project_id),
         )
 
 

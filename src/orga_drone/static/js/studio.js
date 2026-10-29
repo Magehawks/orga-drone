@@ -3,7 +3,7 @@
  * Persistence: reorder, photo duration, Title Cards, music, and transitions via APIs.
  * Playback: one project-time SoT; preview + playhead + active clip stay in sync.
  * Music is a persisted per-project soundtrack mixed into MP4 export.
- * The soundtrack lane is a read-only coverage span on the Story time canvas.
+ * The sequential soundtrack bed can be moved later on the Story time canvas.
  * Visual transitions (Cut / Fade through black / Crossfade) persist in SQLite.
  * A video clip's left and right edges drag Source in and Source out.
  * Photo and video image adjustments persist per clip and approximate the export grade.
@@ -292,6 +292,8 @@
   const msgMusicLimit = root.dataset.musicLimit || "This story already has 8 soundtrack songs.";
   const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
   const msgDragReorder = root.dataset.dragReorder || "Drag to reorder";
+  const msgDragMusicStart =
+    root.dataset.dragMusicStart || "Drag to set when the soundtrack starts";
   const msgExportCancelled = root.dataset.exportCancelled || "Export cancelled.";
   const msgExportCancelling = root.dataset.exportCancelling || "Cancelling export…";
   const msgExportNoRes = root.dataset.exportNoResolution || "No exportable video resolution in this project.";
@@ -421,12 +423,14 @@
   /** @type {{
    *  selected: {type: 'clip'|'transition'|'music'|null, id: string|null},
    *  projectTimeS: number,
+   *  musicStartS: number,
    *  tracks: Array<{id: number, name: string, volume: number, fadeIn: number, fadeOut: number, loop: boolean, available: boolean, streamUrl: string|null, durationS: number}>,
    *  activeStudioId: string|null
    * }} */
   const state = {
     selected: { type: null, id: null },
     projectTimeS: 0,
+    musicStartS: Math.max(0, Number(root.dataset.musicStartS) || 0),
     playing: false,
     volume: 0.8,
     title: titleInput ? titleInput.value : "Your story",
@@ -4462,6 +4466,8 @@
 
   function applyTracksPayload(payload) {
     const list = payload && Array.isArray(payload.tracks) ? payload.tracks : [];
+    const startS = Number(payload && payload.music_start_s);
+    if (Number.isFinite(startS)) state.musicStartS = Math.max(0, startS);
     state.tracks = list.map(musicFromPayload).filter(Boolean);
   }
 
@@ -4510,13 +4516,21 @@
   function playlistHit(t) {
     const story = totalDuration();
     if (!(story > 0) || t < 0 || t >= story || !state.tracks.length) return null;
+    const musicStartS = Math.max(0, Math.min(story, state.musicStartS));
+    if (t < musicStartS) return null;
     if (musicLoopEnabled()) {
       const track = state.tracks[0];
       const mus = trackDurationS(track);
       if (!(mus > 0) || !track.available) return null;
-      return { track, index: 0, offset: t % mus, startS: 0, spanS: story };
+      return {
+        track,
+        index: 0,
+        offset: (t - musicStartS) % mus,
+        startS: musicStartS,
+        spanS: story - musicStartS,
+      };
     }
-    let cursor = 0;
+    let cursor = musicStartS;
     for (let i = 0; i < state.tracks.length; i += 1) {
       const track = state.tracks[i];
       const mus = trackDurationS(track);
@@ -4551,6 +4565,12 @@
     const card = document.createElement("div");
     card.className = "studio-music-select";
     card.dataset.musicId = String(track.id);
+    const startHandle = document.createElement("button");
+    startHandle.type = "button";
+    startHandle.className = "studio-music-start-handle";
+    startHandle.setAttribute("aria-label", msgDragMusicStart);
+    startHandle.title = msgDragMusicStart;
+    startHandle.setAttribute("aria-hidden", "true");
     const handle = document.createElement("button");
     handle.type = "button";
     handle.className = "studio-drag-handle";
@@ -4579,7 +4599,7 @@
     fadeOutEl.hidden = true;
     fadeOutEl.setAttribute("aria-hidden", "true");
     body.append(nameEl, meta, badge, fadeInEl, fadeOutEl);
-    card.append(handle, body);
+    card.append(startHandle, handle, body);
     return card;
   }
 
@@ -4610,7 +4630,7 @@
     const msgPending = root.dataset.musicPending || "Duration unknown";
     const msgCoverage = root.dataset.musicCoverage || "{music} of {story}";
     const cards = musicClipEls();
-    let cursor = 0;
+    let cursor = Math.max(0, Math.min(story, state.musicStartS));
     cards.forEach((card, index) => {
       const track = state.tracks.find((item) => String(item.id) === String(card.dataset.musicId));
       if (!track) return;
@@ -4620,6 +4640,11 @@
       const fadeInEl = card.querySelector(".studio-music-fade-in");
       const fadeOutEl = card.querySelector(".studio-music-fade-out");
       const body = card.querySelector(".studio-music-clip-body");
+      const startHandle = card.querySelector(".studio-music-start-handle");
+      if (startHandle) {
+        startHandle.hidden = index !== 0;
+        startHandle.setAttribute("aria-hidden", index === 0 ? "false" : "true");
+      }
       card.classList.remove("is-pending", "is-missing", "is-selected");
       if (nameEl) nameEl.textContent = track.name;
       if (body) body.setAttribute("aria-label", track.name);
@@ -4657,7 +4682,7 @@
         }
       }
       if (loop) {
-        spanS = musicBedDuration(story, musDur, true);
+        spanS = musicBedDuration(remaining, musDur, true);
       } else if (musDur > 0 && remaining > 0) {
         spanS = Math.min(musDur, remaining);
       }
@@ -5549,11 +5574,17 @@
     const vol = document.getElementById("inspector-music-volume");
     const fadeIn = document.getElementById("inspector-music-fade-in");
     const fadeOut = document.getElementById("inspector-music-fade-out");
+    const start = document.getElementById("inspector-music-start");
     const loopEl = document.getElementById("inspector-music-loop");
     const loopWrap = document.getElementById("inspector-music-loop-wrap");
     if (vol) vol.value = String(Math.round(track.volume * 100));
     if (fadeIn) fadeIn.value = String(track.fadeIn);
     if (fadeOut) fadeOut.value = String(track.fadeOut);
+    if (start) {
+      const storyS = Math.max(0, totalDuration());
+      start.value = String(Number(Math.min(storyS, state.musicStartS).toFixed(3)));
+      start.max = String(storyS);
+    }
     if (loopWrap) loopWrap.hidden = state.tracks.length !== 1;
     if (loopEl) loopEl.checked = !!track.loop && state.tracks.length === 1;
     const upBtn = document.getElementById("inspector-music-move-up");
@@ -5685,6 +5716,81 @@
     } catch (_) {
       showFlash(msgMusicFailed);
     }
+  }
+
+  async function persistMusicStart(previousStartS) {
+    if (!projectId) return;
+    const requested = Math.max(0, Math.min(totalDuration(), state.musicStartS));
+    state.musicStartS = requested;
+    setSaveState(false);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music-start`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ start_s: requested }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        state.musicStartS = previousStartS;
+        layoutTimeline();
+        showFlash(musicErrorDetail(data));
+        return;
+      }
+      state.musicStartS = Math.max(0, Number(data.music_start_s) || 0);
+      renderMusic();
+      setSaveState(true);
+      showFlash("");
+    } catch (_) {
+      state.musicStartS = previousStartS;
+      layoutTimeline();
+      showFlash(msgMusicFailed);
+    }
+  }
+
+  function beginMusicStartDrag(event, handle) {
+    if (event.button != null && event.button !== 0) return;
+    const first = musicClipEls()[0];
+    if (!first || !first.contains(handle)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    const originX = event.clientX;
+    const storedStartS = state.musicStartS;
+    const originStartS = Math.max(0, Math.min(totalDuration(), storedStartS));
+    state.musicStartS = originStartS;
+    const pps = timelinePxPerSecond() || 1;
+    handle.setPointerCapture?.(pointerId);
+    handle.classList.add("is-dragging");
+    const move = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      const next = originStartS + (ev.clientX - originX) / pps;
+      state.musicStartS = Math.max(0, Math.min(totalDuration(), next));
+      layoutMusicSpans();
+      syncMusicAudio();
+      const input = document.getElementById("inspector-music-start");
+      if (input) input.value = String(Number(state.musicStartS.toFixed(2)));
+    };
+    const finish = (commit) => {
+      handle.classList.remove("is-dragging");
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", cancel);
+      if (commit && Math.abs(state.musicStartS - originStartS) >= 0.001) {
+        persistMusicStart(storedStartS);
+      } else {
+        state.musicStartS = storedStartS;
+        layoutMusicSpans();
+      }
+    };
+    const up = (ev) => {
+      if (ev.pointerId === pointerId) finish(true);
+    };
+    const cancel = (ev) => {
+      if (ev.pointerId === pointerId) finish(false);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", cancel);
   }
 
   async function clearMusic() {
@@ -7673,11 +7779,16 @@
   });
   const musicClipsEl = document.getElementById("studio-music-clips");
   musicClipsEl?.addEventListener("click", (event) => {
-    if (event.target.closest(".studio-drag-handle")) return;
+    if (event.target.closest(".studio-drag-handle, .studio-music-start-handle")) return;
     const card = event.target.closest(".studio-music-select");
     if (!card) return;
     event.stopPropagation();
     selectMusic(card.dataset.musicId);
+  });
+  musicClipsEl?.addEventListener("pointerdown", (event) => {
+    const handle =
+      event.target.closest && event.target.closest(".studio-music-start-handle");
+    if (handle) beginMusicStartDrag(event, handle);
   });
   musicClipsEl?.addEventListener("dragstart", (event) => {
     const handle = event.target.closest && event.target.closest(".studio-drag-handle");
@@ -8957,6 +9068,16 @@
       });
     }
   );
+  document.getElementById("inspector-music-start")?.addEventListener("change", (event) => {
+    const previous = state.musicStartS;
+    const raw = Number(event.target.value);
+    state.musicStartS = Number.isFinite(raw)
+      ? Math.max(0, Math.min(totalDuration(), raw))
+      : previous;
+    layoutMusicSpans();
+    syncMusicAudio();
+    persistMusicStart(previous);
+  });
   document.getElementById("inspector-music-loop")?.addEventListener("change", (event) => {
     const track = selectedMusicTrack();
     if (!track) return;

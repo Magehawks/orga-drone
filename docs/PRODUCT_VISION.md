@@ -24,12 +24,12 @@ metadata, telemetry, map exploration, and a **Studio** memory-editor UI
 preview; local MP4 export with configurable resolution and a Standard / High / Best quality choice, including photo-only
 stories at 720/1080; after export, open
 or reveal the MP4 on desktop; optional sequential soundtrack playlist (up to 8
-local songs; loop when there is one song) in preview and
+local songs; project-level lead-in; loop when there is one song) in preview and
 export; one video section can repeat forward until a soundtrack with a known
 duration ends (hard cuts, a short forward crossfade, or a cinematic blend of 0.5–5.0 s; the soundtrack plays once); Title Cards; basic visual transitions; basic per-clip image
 adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear
-saturation ramp on video clips from that grade toward black and white; read-only soundtrack
-coverage on the Story time canvas).
+saturation ramp on video clips from that grade toward black and white; soundtrack
+coverage with one draggable project-level start on the Story time canvas).
 
 It is **not** a professional video editor, mission planner, airspace tool, cloud
 sync service, or generic drone administration suite.
@@ -170,11 +170,11 @@ professional video-editing knowledge.
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the inspector, the media browser, and the Story tracks can be dragged and the size is kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
-| Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; read-only coverage spans on the Story time canvas) |
+| Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; project-level lead-in; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; the whole bed can start later with silence before it; coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; Standard / High / Best quality next to resolution, High by default; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Further light editing (curves, freeform masks, keyframes, tracking), extra transition types | **Later** |
-| Music-lane time mapping | **Later** |
+| Independent per-song placement, trimming, or waveforms | **Later** |
 
 ### 4. Share
 
@@ -293,7 +293,8 @@ See `README.md` for the detailed feature status table. In short:
   720/1080. Title Cards persist as generated
   `studio_clips` (not media files). An optional sequential soundtrack playlist
   (up to 8 local songs) persists with the project, plays in preview, and is mixed
-  into export. Coverage is shown as read-only, time-proportional spans on the
+  into export. The whole sequential bed can start later after a project-level
+  silent lead-in. Coverage is shown as time-proportional spans on the
   Story time canvas (same Fit/zoom mapping; not trim/slip/waveform editing). Loop still applies
   only to a one-song playlist. Visual transitions (Cut, Fade through black,
   Crossfade) persist per outgoing clip
@@ -361,7 +362,7 @@ See `README.md` for the detailed feature status table. In short:
   edit projects, Title Cards, an optional sequential soundtrack playlist
   (up to 8 local songs; loop for a one-song playlist), a time-based Story
   canvas with Fit/zoom, labeled transition overlays, Inspector selection
-  headings, read-only time-proportional soundtrack coverage on that canvas,
+  headings, time-proportional soundtrack coverage with one project-level start on that canvas,
   basic rendered visual transitions, basic per-clip image adjustment, a linear
   video saturation ramp (not a keyframe editor), timed text,
   shape, and image overlays. Zoom, blur, pixelate, and slow motion are timed bars on one Effekt lane (1×–3× zoom, rectangular masks up to 8, slow motion only at 0.5× or 0.25×; off outside the bar; photos have no lane; not tracking or a keyframe editor),
@@ -412,7 +413,7 @@ Future development should remain focused on storytelling. Possible areas
 (**Later** unless shipped):
 
 - Better Studio (light editing, extra transition types)
-- Music-lane time mapping
+- Independent per-song music placement, trimming, or waveforms
 - AI-assisted storytelling **only if** justified by a real user problem
 - Plugins
 - Sharing destinations beyond local files

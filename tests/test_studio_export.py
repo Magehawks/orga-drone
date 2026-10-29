@@ -872,6 +872,7 @@ def test_fake_encoder_receives_music_config(
     song.write_bytes(b"ID3music")
     project = db.ensure_default_studio_project()
     db.set_studio_music(project.id, str(song.resolve()))
+    db.set_studio_music_start_s(project.id, 1.5)
     monkeypatch.setattr(
         "orga_drone.export.music_mix.require_readable_music",
         lambda path: 4.0,
@@ -895,6 +896,7 @@ def test_fake_encoder_receives_music_config(
     assert fake.configs[0].music_tracks
     assert fake.configs[0].music.source_path == song.resolve()
     assert fake.configs[0].music.volume == 0.8
+    assert fake.configs[0].music_start_s == 1.5
     assert Path(item.path).read_bytes() == source_bytes
     assert song.read_bytes() == b"ID3music"
 

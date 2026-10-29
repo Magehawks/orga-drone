@@ -46,6 +46,15 @@ msgstr "Open project"
 msgid "Delete project"
 msgstr "Delete project"
 
+msgid "Drag to set when the soundtrack starts"
+msgstr "Drag to set when the soundtrack starts"
+
+msgid "Soundtrack start (s)"
+msgstr "Soundtrack start (s)"
+
+msgid "Drag the left edge of the first song to place the whole sequential soundtrack later. Songs still play one after another, and source files stay unchanged."
+msgstr "Drag the left edge of the first song to place the whole sequential soundtrack later. Songs still play one after another, and source files stay unchanged."
+
 msgid "No Studio projects yet."
 msgstr "No Studio projects yet."
 

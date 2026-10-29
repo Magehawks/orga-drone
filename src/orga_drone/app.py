@@ -612,7 +612,9 @@ def create_app() -> FastAPI:
         }
 
     def _music_tracks_client_payload(project_id: int) -> dict[str, Any]:
+        project = db.get_studio_project(project_id)
         return {
+            "music_start_s": project.music_start_s if project is not None else 0.0,
             "tracks": [
                 _music_track_client_payload(project_id, clip)
                 for clip in db.list_studio_music(project_id)
@@ -1472,6 +1474,7 @@ def create_app() -> FastAPI:
             "title": project.title,
             "created_at": project.created_at,
             "updated_at": project.updated_at,
+            "music_start_s": project.music_start_s,
             "clip_count": getattr(project, "clip_count", 0),
         }
 
@@ -1507,6 +1510,25 @@ def create_app() -> FastAPI:
     async def api_studio_music_get(project_id: int) -> JSONResponse:
         _require_studio_project(project_id)
         return JSONResponse({"ok": True, **_music_tracks_client_payload(project_id)})
+
+    @app.patch("/api/studio/projects/{project_id}/music-start")
+    async def api_studio_music_start_patch(
+        project_id: int, request: Request
+    ) -> JSONResponse:
+        _require_studio_project(project_id)
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        raw = payload.get("start_s") if isinstance(payload, dict) else None
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+            raise HTTPException(status_code=400, detail="start_s must be a number")
+        try:
+            with story_edit(db, project_id, group=_history_group(request)):
+                project = db.set_studio_music_start_s(project_id, float(raw))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse({"ok": True, "music_start_s": project.music_start_s})
 
     @app.post("/api/studio/projects/{project_id}/music")
     async def api_studio_music_post(project_id: int, request: Request) -> JSONResponse:
