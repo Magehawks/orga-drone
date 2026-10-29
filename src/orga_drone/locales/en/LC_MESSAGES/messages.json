@@ -753,5 +753,10 @@
   "Highlights": "Highlights",
   "Shadows": "Shadows",
   "Blacks": "Blacks",
-  "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.": "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export."
+  "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.": "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.",
+  "Could not save sharpen or denoise.": "Could not save sharpen or denoise.",
+  "Sharpen": "Sharpen",
+  "Denoise": "Denoise",
+  "Reset sharpen and denoise": "Reset sharpen and denoise",
+  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged."
 }

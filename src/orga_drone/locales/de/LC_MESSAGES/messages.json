@@ -753,5 +753,10 @@
   "Highlights": "Lichter",
   "Shadows": "Schatten",
   "Blacks": "Schwarz",
-  "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.": "Tonale Regler formen das Mittelfeld. Abgeschnittene Lichter oder tiefe Schwarztöne werden nicht wiederhergestellt. Wärme bleibt die Weißabgleich-Regelung oben. Die Vorschau nähert den Export an."
+  "Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.": "Tonale Regler formen das Mittelfeld. Abgeschnittene Lichter oder tiefe Schwarztöne werden nicht wiederhergestellt. Wärme bleibt die Weißabgleich-Regelung oben. Die Vorschau nähert den Export an.",
+  "Could not save sharpen or denoise.": "Schärfen oder Entrauschen konnte nicht gespeichert werden.",
+  "Sharpen": "Schärfen",
+  "Denoise": "Entrauschen",
+  "Reset sharpen and denoise": "Schärfen und Entrauschen zurücksetzen",
+  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Beide starten aus. Schärfen und Entrauschen nutzen zurückhaltende lokale Filter beim Export. Die Vorschau nähert sie an. Quelldateien bleiben unverändert."
 }
