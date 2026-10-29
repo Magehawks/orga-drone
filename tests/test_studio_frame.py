@@ -453,13 +453,14 @@ def test_http_frame_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-frame" data-inspector-tab="image" hidden' in page.text
+    assert 'id="inspector-frame" hidden' in page.text
+    assert 'id="inspector-image-panel"' in page.text
     assert 'id="inspector-frame-zoom"' in page.text
     assert 'id="inspector-frame-motion"' in page.text
     assert ("Bildausschnitt" in page.text) or ("Framing" in page.text)
     assert "data-frame=" in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
-    assert "frameWrap.hidden = !(isPhoto || isVideo)" in script
+    assert "frameWrap.hidden = !canImage" in script
 
     rejected = client.patch(
         f"/api/studio/{video_id}/frame",

@@ -22,6 +22,7 @@ from orga_drone.studio_export import _clip_to_export_clip
 from orga_drone.studio_image import (
     ImageAdjust,
     blackbody_channel_gains,
+    color_profile_hint_from_srt,
     dump_effect_settings,
     ffmpeg_grade_chain,
     image_adjust_from_effect_settings,
@@ -306,15 +307,23 @@ def test_http_image_adjust_validation_and_inspector(
     client = TestClient(app)
     page = client.get("/studio")
     assert page.status_code == 200
-    assert 'id="inspector-image-adjust" data-inspector-tab="image" hidden' in page.text
+    assert 'id="inspector-image-panel"' in page.text
+    assert 'data-inspector-tab="image"' in page.text
+    assert 'id="inspector-image-section-basic"' in page.text
+    assert 'id="inspector-image-section-profile"' in page.text
+    assert 'id="inspector-image-section-advanced"' in page.text
+    assert 'id="inspector-image-adjust"' in page.text
     assert 'id="inspector-image-exposure"' in page.text
     assert 'id="inspector-image-contrast"' in page.text
     assert 'id="inspector-image-saturation"' in page.text
     assert 'id="inspector-image-warmth"' in page.text
-    assert ("Bild optimieren" in page.text) or ("Adjust image" in page.text)
+    assert ("Grundkorrektur" in page.text) or ("Basic correction" in page.text)
+    assert ("Farbprofil" in page.text) or ("Color profile" in page.text)
     assert 'data-image-adjust=' in page.text
+    assert 'data-color-profile=' in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
-    assert "imageWrap.hidden = !(isPhoto || isVideo)" in script
+    assert "imagePanel.hidden = !canImage" in script
+    assert "fillImageInspectorSections" in script
 
     rejected = client.patch(
         f"/api/studio/{video_id}/image",
@@ -355,3 +364,14 @@ def test_http_image_adjust_validation_and_inspector(
     )
     assert reset.status_code == 200
     assert reset.json()["image"]["exposure"] == 0
+
+
+def test_color_profile_hint_reads_sibling_srt(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/dji_srt_camera_fields_sample.srt").read_text(
+        encoding="utf-8"
+    )
+    video = tmp_path / "clip.MP4"
+    video.write_bytes(b"fake")
+    (tmp_path / "clip.SRT").write_text(fixture, encoding="utf-8")
+    assert color_profile_hint_from_srt(video) == "dlog_m"
+    assert color_profile_hint_from_srt(tmp_path / "missing.MP4") is None

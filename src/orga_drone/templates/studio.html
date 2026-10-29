@@ -170,6 +170,7 @@
          data-speed-failed="{{ _('Could not change speed.')|e }}"
          data-image-failed="{{ _('Could not save image adjustments.')|e }}"
          data-bw-failed="{{ _('Could not save the color change.')|e }}"
+         data-color-profile-dlog-m="{{ _('D-Log M')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-overlay-model='{{ overlay_model|tojson }}'
          data-overlay-failed="{{ _('Could not save overlays.')|e }}"
@@ -645,6 +646,7 @@
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
+                  data-color-profile="{{ row.color_profile_hint|e }}"
                   data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
@@ -831,76 +833,119 @@
           </label>
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
-        <div id="inspector-image-adjust" data-inspector-tab="image" hidden>
-          <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Brightness') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-image-exposure-value">0</span>
-            </span>
-            <input type="range" id="inspector-image-exposure" min="-100" max="100" step="1" value="0"
-                   aria-label="{{ _('Brightness') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Contrast') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-image-contrast-value">0</span>
-            </span>
-            <input type="range" id="inspector-image-contrast" min="-100" max="100" step="1" value="0"
-                   aria-label="{{ _('Contrast') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Saturation') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-image-saturation-value">0</span>
-            </span>
-            <input type="range" id="inspector-image-saturation" min="-100" max="100" step="1" value="0"
-                   aria-label="{{ _('Saturation') }}">
-          </label>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Warmth') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-image-warmth-value">0</span>
-            </span>
-            <input type="range" id="inspector-image-warmth" min="-100" max="100" step="1" value="0"
-                   aria-label="{{ _('Warmth') }}">
-          </label>
-          <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
-          <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
-        </div>
-        <div id="inspector-saturation-ramp" data-inspector-tab="image" hidden>
-          <label class="studio-inspector-field studio-frame-motion">
-            <input type="checkbox" id="inspector-bw-enabled">
-            <span>{{ _('To black and white') }}</span>
-          </label>
-          <p class="hint" id="inspector-bw-off">{{ _('Off. The clip stays in color.') }}</p>
-          <div id="inspector-bw-on" hidden>
+        <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" hidden>
+          <details id="inspector-image-section-profile" class="studio-image-section" hidden>
+            <summary>{{ _('Color profile') }}</summary>
+            <p class="meta-line" id="inspector-color-profile-value"></p>
+            <p class="hint">{{ _('From the recording metadata. Orga Drone does not convert log footage automatically.') }}</p>
+          </details>
+          <details id="inspector-image-section-basic" class="studio-image-section" open>
+            <summary>{{ _('Basic correction') }}</summary>
+            <div id="inspector-image-adjust">
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Brightness') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-exposure-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-exposure" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Brightness') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Contrast') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-contrast-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-contrast" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Contrast') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Saturation') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-saturation-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-saturation" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Saturation') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Warmth') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-image-warmth-value">0</span>
+                </span>
+                <input type="range" id="inspector-image-warmth" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Warmth') }}">
+              </label>
+              <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
+              <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+            </div>
+          </details>
+          <details id="inspector-image-section-advanced" class="studio-image-section" hidden>
+            <summary>{{ _('Advanced') }}</summary>
+            <div id="inspector-saturation-ramp">
+              <label class="studio-inspector-field studio-frame-motion">
+                <input type="checkbox" id="inspector-bw-enabled">
+                <span>{{ _('To black and white') }}</span>
+              </label>
+              <p class="hint" id="inspector-bw-off">{{ _('Off. The clip stays in color.') }}</p>
+              <div id="inspector-bw-on" hidden>
+                <label class="studio-inspector-field">
+                  <span>{{ _('Strength') }}</span>
+                  <span class="studio-bw-scale">
+                    <span>{{ _('Full color') }}</span>
+                    <input type="range" id="inspector-bw-strength" min="0" max="100" step="1" value="100"
+                           aria-label="{{ _('Strength') }}">
+                    <span>{{ _('Black and white') }}</span>
+                  </span>
+                </label>
+                <label class="studio-inspector-field studio-frame-motion">
+                  <input type="checkbox" id="inspector-bw-partial">
+                  <span>{{ _('Only part of the clip') }}</span>
+                </label>
+                <div id="inspector-bw-partial-fields" hidden>
+                  <label class="studio-inspector-field">
+                    <span>{{ _('Color stays until (s)') }}</span>
+                    <input type="number" id="inspector-bw-start" min="0" max="86400" step="0.1" value="0"
+                           aria-label="{{ _('Color stays until (s)') }}">
+                  </label>
+                  <label class="studio-inspector-field">
+                    <span>{{ _('Black and white from (s)') }}</span>
+                    <input type="number" id="inspector-bw-end" min="0" max="86400" step="0.1" value="0"
+                           aria-label="{{ _('Black and white from (s)') }}">
+                  </label>
+                  <p class="hint">{{ _('The picture changes between these times. After that it stays.') }}</p>
+                </div>
+              </div>
+            </div>
+          </details>
+          <div id="inspector-frame" hidden>
+            <p class="studio-inspector-kind">{{ _('Framing') }}</p>
             <label class="studio-inspector-field">
-              <span>{{ _('Strength') }}</span>
-              <span class="studio-bw-scale">
-                <span>{{ _('Full color') }}</span>
-                <input type="range" id="inspector-bw-strength" min="0" max="100" step="1" value="100"
-                       aria-label="{{ _('Strength') }}">
-                <span>{{ _('Black and white') }}</span>
+              <span class="studio-image-adjust-label">
+                <span>{{ _('Zoom') }}</span>
+                <span class="studio-image-adjust-value" id="inspector-frame-zoom-value">1.00×</span>
               </span>
+              <input type="range" id="inspector-frame-zoom" min="1" max="3" step="0.05" value="1"
+                     aria-label="{{ _('Zoom') }}">
             </label>
             <label class="studio-inspector-field studio-frame-motion">
-              <input type="checkbox" id="inspector-bw-partial">
-              <span>{{ _('Only part of the clip') }}</span>
+              <input type="checkbox" id="inspector-frame-motion">
+              <span>{{ _('Motion') }}</span>
             </label>
-            <div id="inspector-bw-partial-fields" hidden>
+            <div id="inspector-frame-motion-fields" hidden>
               <label class="studio-inspector-field">
-                <span>{{ _('Color stays until (s)') }}</span>
-                <input type="number" id="inspector-bw-start" min="0" max="86400" step="0.1" value="0"
-                       aria-label="{{ _('Color stays until (s)') }}">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('End zoom') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-frame-zoom-end-value">1.00×</span>
+                </span>
+                <input type="range" id="inspector-frame-zoom-end" min="1" max="3" step="0.05" value="1"
+                       aria-label="{{ _('End zoom') }}">
               </label>
-              <label class="studio-inspector-field">
-                <span>{{ _('Black and white from (s)') }}</span>
-                <input type="number" id="inspector-bw-end" min="0" max="86400" step="0.1" value="0"
-                       aria-label="{{ _('Black and white from (s)') }}">
-              </label>
-              <p class="hint">{{ _('The picture changes between these times. After that it stays.') }}</p>
+              <div class="studio-frame-target" role="group" aria-label="{{ _('Framing') }}">
+                <button type="button" class="button ghost is-active" id="inspector-frame-target-start">{{ _('Start') }}</button>
+                <button type="button" class="button ghost" id="inspector-frame-target-end">{{ _('End') }}</button>
+              </div>
             </div>
+            <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
+            <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
           </div>
         </div>
         <div id="inspector-overlays" data-inspector-tab="overlays" hidden>
@@ -1017,37 +1062,6 @@
             <button type="button" class="button ghost" id="mask-remove">{{ _('Remove mask') }}</button>
           </div>
           <p class="hint">{{ _('Covers this Story clip for its whole duration. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
-        </div>
-        <div id="inspector-frame" data-inspector-tab="image" hidden>
-          <p class="studio-inspector-kind">{{ _('Framing') }}</p>
-          <label class="studio-inspector-field">
-            <span class="studio-image-adjust-label">
-              <span>{{ _('Zoom') }}</span>
-              <span class="studio-image-adjust-value" id="inspector-frame-zoom-value">1.00×</span>
-            </span>
-            <input type="range" id="inspector-frame-zoom" min="1" max="3" step="0.05" value="1"
-                   aria-label="{{ _('Zoom') }}">
-          </label>
-          <label class="studio-inspector-field studio-frame-motion">
-            <input type="checkbox" id="inspector-frame-motion">
-            <span>{{ _('Motion') }}</span>
-          </label>
-          <div id="inspector-frame-motion-fields" hidden>
-            <label class="studio-inspector-field">
-              <span class="studio-image-adjust-label">
-                <span>{{ _('End zoom') }}</span>
-                <span class="studio-image-adjust-value" id="inspector-frame-zoom-end-value">1.00×</span>
-              </span>
-              <input type="range" id="inspector-frame-zoom-end" min="1" max="3" step="0.05" value="1"
-                     aria-label="{{ _('End zoom') }}">
-            </label>
-            <div class="studio-frame-target" role="group" aria-label="{{ _('Framing') }}">
-              <button type="button" class="button ghost is-active" id="inspector-frame-target-start">{{ _('Start') }}</button>
-              <button type="button" class="button ghost" id="inspector-frame-target-end">{{ _('End') }}</button>
-            </div>
-          </div>
-          <button type="button" class="button ghost" id="inspector-frame-reset">{{ _('Reset') }}</button>
-          <p class="hint">{{ _('Drag the preview to move the frame. The file on disk stays unchanged. Preview matches the exported picture.') }}</p>
         </div>
         <div id="inspector-map" data-inspector-tab="overlays" hidden>
           <p class="studio-inspector-kind">{{ _('Flight map') }}</p>

@@ -35,8 +35,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Mapping
+
+from orga_drone.studio_hud import sibling_srt
+
+_COLOR_MD_RE = re.compile(r"\[color_md:\s*([^\]]+)\]", re.IGNORECASE)
 
 SLIDER_MIN = -100
 SLIDER_MAX = 100
@@ -513,3 +519,21 @@ def ffmpeg_saturation_ramp(ramp: SaturationRamp, *, origin_s: float) -> str:
         f"{_fmt(start_m)}+({delta})*({local}-{start_s})/{span}))"
     )
     return f"hue=s='{expr}'"
+
+
+def color_profile_hint_from_srt(media_path: Path | None) -> str | None:
+    """Read ``color_md`` from a sibling DJI SRT when present. Hint only — no grade."""
+    if media_path is None:
+        return None
+    srt = sibling_srt(media_path)
+    if srt is None:
+        return None
+    try:
+        sample = srt.read_text(encoding="utf-8", errors="ignore")[:8192]
+    except OSError:
+        return None
+    match = _COLOR_MD_RE.search(sample)
+    if not match:
+        return None
+    token = match.group(1).strip()
+    return token or None
