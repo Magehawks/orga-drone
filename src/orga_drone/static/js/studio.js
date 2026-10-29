@@ -2714,6 +2714,10 @@
     event.preventDefault();
     event.stopPropagation();
     selectedMaskId = maskId;
+    // Mark the gesture before any select/redraw so renderMaskHandles does not
+    // replaceChildren() under the active pointer (Issue #179).
+    maskDragging = true;
+    historyGesture = "g" + String(event.pointerId || Date.now());
     if (
       !state.selected ||
       state.selected.type !== "clip" ||
@@ -2721,9 +2725,7 @@
     ) {
       selectClip(clip.dataset.studioId, { movePlayhead: false });
     }
-    renderMaskHandles(clip, boxMatchingCanvas(previewMasks, visiblePrimaryMedia()));
     if (!box || !box.isConnected) box = maskBoxForId(maskId);
-    maskDragging = true;
     if (box) box.classList.add("is-dragging", "is-selected");
     const pointerId = event.pointerId;
     const captureEl = previewFrame || box;
@@ -2787,6 +2789,12 @@
       layoutEffectBars();
       queueMaskSave(clip);
       drawPrivacyMasks();
+      historyGesture = "";
+      try {
+        fillMaskInspector(clip);
+      } catch (_) {
+        /* ignore */
+      }
     };
     window.addEventListener("pointermove", move, true);
     window.addEventListener("pointerup", up, true);
