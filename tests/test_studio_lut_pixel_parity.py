@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 from pathlib import Path
 
@@ -64,18 +65,19 @@ def test_lut_strength_pixels_match_mp4(
                 video, "video", 0.3 + local, grade, look, max_edge=320,
             ), data_dir=data)
             extracted = tmp_path / f"frame-{strength}-{local}.png"
-            _run(ffmpeg, "-ss", str(local), "-i", str(output), "-frames:v", "1", str(extracted))
+            _run(ffmpeg, "-ss", str(local), "-i", str(output), "-frames:v", "1",
+                 "-vf", "scale=in_color_matrix=bt709:in_range=tv,format=rgb24", str(extracted))
             with Image.open(still) as a, Image.open(extracted) as b:
                 # JPEG + H264 chroma/scaling tolerances; dramatic LUT shifts fail.
                 difference = ImageStat.Stat(ImageChops.difference(a.convert("RGB"), b.convert("RGB")))
-                assert max(difference.mean) < 8, {
+                assert max(difference.mean) < 8, json.dumps({
                     "strength": strength, "conversion": conversion, "time": local,
                     "error": difference.mean,
                     "preview_rgb": ImageStat.Stat(a.convert("RGB")).mean,
                     "export_rgb": ImageStat.Stat(b.convert("RGB")).mean,
                     "ffmpeg": subprocess.run([ffmpeg, "-version"], capture_output=True,
                                              text=True, check=True).stdout.splitlines()[0],
-                }
+                })
                 if local == 0.2:
                     means.append(ImageStat.Stat(a.convert("RGB")).mean)
     assert max(abs(means[0][i] - means[2][i]) for i in range(3)) > 10
