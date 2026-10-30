@@ -416,7 +416,8 @@
   const msgMaskLimit = root.dataset.maskLimit || "A clip can have up to 8 privacy masks.";
   const labelMaskBlur = root.dataset.maskBlur || "Blur";
   const labelMaskPixelate = root.dataset.maskPixelate || "Pixelate";
-  const msgMaskRemove = root.dataset.maskRemove || "Delete privacy mask";
+  const msgMaskRemove =
+    root.dataset.maskRemoveLabel || root.dataset.maskRemove || "Delete privacy mask";
   const msgFrameFailed = root.dataset.frameFailed || "Could not save framing.";
   const msgHudFailed = root.dataset.hudFailed || "Could not save the telemetry HUD.";
   const msgHudReady = root.dataset.hudReady || "Telemetry is available for this clip.";
@@ -1978,11 +1979,22 @@
       contrast: clampImageSlider(adjust.contrast),
       saturation: clampImageSlider(adjust.saturation),
       warmth: clampImageSlider(adjust.warmth),
+      highlights: clampImageSlider(adjust.highlights),
+      shadows: clampImageSlider(adjust.shadows),
+      blacks: clampImageSlider(adjust.blacks),
     });
   }
 
   function imageAdjustIsNeutral(adjust) {
-    return !adjust.exposure && !adjust.contrast && !adjust.saturation && !adjust.warmth;
+    return (
+      !adjust.exposure &&
+      !adjust.contrast &&
+      !adjust.saturation &&
+      !adjust.warmth &&
+      !adjust.highlights &&
+      !adjust.shadows &&
+      !adjust.blacks
+    );
   }
 
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
@@ -3062,7 +3074,10 @@
   function beginMaskDrag(event, box, geom) {
     if (maskDragging) return false;
     if (event.button != null && event.button !== 0) return false;
-    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return false;
+    // Only the on-preview × control — not #studio-root[data-mask-remove-label].
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-remove")) {
+      return false;
+    }
     const layer = previewMaskHandles;
     if (!layer) return false;
     const maskId = (box && box.dataset.maskId) || (geom && geom.mask && geom.mask.id) || "";
@@ -3208,7 +3223,7 @@
 
   function onDocumentMaskPointerDown(event) {
     if (event.button != null && event.button !== 0) return;
-    if (event.target && event.target.closest && event.target.closest("[data-mask-remove]")) return;
+    if (event.target && event.target.closest && event.target.closest(".studio-mask-remove")) return;
     const geom = maskCanvasHit(event.clientX, event.clientY);
     const direct = event.target && event.target.closest && event.target.closest(".studio-mask-box");
     const box = direct || maskBoxAtPoint(event.clientX, event.clientY);
