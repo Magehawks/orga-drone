@@ -264,7 +264,7 @@ def render_preview_frame(
         jpeg_cmd = [
             ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
             "-i", str(work / "frame.nut"), "-frames:v", "1",
-            "-vf", JPEG_COLOR_CHAIN, "-q:v", str(PREVIEW_JPEG_Q), str(dest),
+            "-vf", JPEG_COLOR_CHAIN, "-q:v", str(PREVIEW_JPEG_Q), str(work / "frame.jpg"),
         ]
         try:
             for command in (cmd, jpeg_cmd):
@@ -296,17 +296,14 @@ def render_preview_frame(
                 PREVIEW_COLD_LATENCY_WARN_S,
                 media.name,
             )
-        if proc.returncode != 0 or not dest.is_file() or dest.stat().st_size <= 0:
-            if dest.exists():
-                try:
-                    dest.unlink()
-                except OSError:
-                    pass
+        completed = work / "frame.jpg"
+        if proc.returncode != 0 or not completed.is_file() or completed.stat().st_size <= 0:
             detail = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
             raise PreviewFrameError(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
+        completed.replace(dest)
         _evict_if_needed(folder)
         return dest
     finally:
