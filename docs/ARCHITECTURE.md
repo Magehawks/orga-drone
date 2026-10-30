@@ -170,9 +170,10 @@ window the picture stays on the left and these tabs stay on the right. Single
 clip / Complete flight stays with the picture.
 A photo is a local still (best quality copies
 a readable image when the grade is neutral; WhatsApp, Instagram, and TikTok
-are JPEG presets, not uploads). Brightness, contrast, saturation, and warmth
-use the Studio ffmpeg grade before that preset. Neutral omits the grade.
-The library file is not modified. The grade is stored on ``media_meta``
+are JPEG presets, not uploads). Studio Quick Looks plus brightness, contrast,
+saturation, warmth, and fine-tune tonals use the Studio ffmpeg grade before
+that preset. Neutral omits the grade. The library file is not modified. The
+grade (and optional look id) is stored on ``media_meta``
 (``image_adjust_json``), the same path and identity key as stars and notes, so a
 rescan can attach it again. Reset stores neutral. Best quality accepts JPEG or
 PNG; PNG is a re-encode. Preview uses the same CSS approximation as Studio. A video is one clip on the Studio encoder (best quality uses the
