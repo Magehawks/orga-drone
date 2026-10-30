@@ -21,7 +21,7 @@ from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
-from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain
+from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, require_lut_asset
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ class PreviewFrameRequest:
     look: ColorLook
     detail: bool = False
     max_edge: int = PREVIEW_MAX_EDGE
+    saturation: float = 1.0
 
 
 class PreviewFrameError(Exception):
@@ -89,6 +90,7 @@ def preview_filter_chain(
     data_dir: Path,
     work_dir: Path,
     max_edge: int = PREVIEW_MAX_EDGE,
+    saturation: float = 1.0,
 ) -> str:
     """Same grade→LUT order as export; scale for preview; detail omitted."""
     parts: list[str] = []
@@ -99,10 +101,17 @@ def preview_filter_chain(
         lut = ffmpeg_lut_chain(look, data_dir=data_dir, work_dir=work_dir)
         if lut:
             parts.append(lut)
+    if saturation != 1.0:
+        parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge = max(64, min(2160, int(max_edge)))
     # Same scale pattern as export framing: no filter quotes (Windows argv-safe).
     parts.append(
         f"scale={edge}:{edge}:force_original_aspect_ratio=decrease,"
+        # Match export's limited-range BT.709 output before converting to the
+        # full-range JPEG/BT.601 representation decoded by the browser.
+        "format=yuv420p,"
+        "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,"
+        "scale=in_color_matrix=bt709:out_color_matrix=bt601:in_range=tv:out_range=pc,"
         "format=yuvj420p"
     )
     return ",".join(parts)
@@ -124,7 +133,8 @@ def cache_key_for(
         "look": req.look.as_dict(),
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
-        "v": 1,
+        "saturation": req.saturation,
+        "v": 2,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -173,6 +183,11 @@ def render_preview_frame(
 
     folder = cache_dir if cache_dir is not None else preview_stills_dir(data_dir)
     folder.mkdir(parents=True, exist_ok=True)
+    # A cached JPEG must not conceal a LUT removed since it was rendered.
+    if req.look.conversion_lut and req.look.conversion_confirmed:
+        require_lut_asset(data_dir, req.look.conversion_lut)
+    if req.look.creative_lut and req.look.creative_strength > 0:
+        require_lut_asset(data_dir, req.look.creative_lut)
     key = cache_key_for(req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
     dest = folder / f"{key}.jpg"
     if dest.is_file() and dest.stat().st_size > 0:
@@ -211,6 +226,7 @@ def render_preview_frame(
                 data_dir=data_dir,
                 work_dir=work,
                 max_edge=req.max_edge,
+                saturation=req.saturation,
             )
         except LutMissingError:
             raise

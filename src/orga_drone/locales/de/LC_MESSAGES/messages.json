@@ -825,5 +825,7 @@
   "Also resets Fine-tune tonals (highlights, shadows, blacks).": "Setzt auch die Feinabstimmung (Lichter, Schatten, Tiefen) zurück.",
   "Replaces the four sliders below. Does not change the file on disk.": "Ersetzt die vier Schieberegler darunter. Die Datei auf dem Datenträger bleibt unverändert.",
   "Unknown look.": "Unbekannter Look.",
-  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung, Wärme und Feinabstimmung müssen zwischen −100 und 100 liegen."
+  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung, Wärme und Feinabstimmung müssen zwischen −100 und 100 liegen.",
+  "Color preview unavailable; try pausing or seeking again": "Farbvorschau nicht verfügbar; erneut pausieren oder eine andere Stelle wählen",
+  "Color still; transition colors approximate": "Farbstandbild; Übergangsfarben angenähert"
 }

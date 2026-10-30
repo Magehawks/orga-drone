@@ -185,8 +185,9 @@ def test_draft_notes_script_writes_unindented_markdown(
     monkeypatch.setenv("TAG", "v1.2.3")
     exec(compile(script, "draft_notes.py", "exec"), {})
     notes = (tmp_path / "DRAFT_RELEASE_NOTES.md").read_text(encoding="utf-8")
-    assert notes.startswith("## Draft — not a public release\n")
+    assert notes.startswith("## Draft — notes only (no Windows zip on GitHub)\n")
     assert "| Version | 1.2.3 |" in notes
     assert "| Commit | abc123 |" in notes
     assert "deadbeef  orga-drone-windows-x64.zip" in notes
-    assert "gh release download" in notes
+    assert "Actions artifact `orga-drone-windows-x64`" in notes
+    assert "without** uploading `orga-drone-windows-x64.zip`" in notes

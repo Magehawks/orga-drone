@@ -255,6 +255,7 @@ def test_preview_frame_api_and_cache_clear(
     assert still.status_code == 200
     assert still.headers["content-type"].startswith("image/jpeg")
     assert still.headers.get("x-orga-preview-still") == "1"
+    assert still.headers["cache-control"] == "no-store"
     assert len(still.content) > 100
     cached = list((data_dir / PREVIEW_STILLS_DIR).glob("*.jpg"))
     assert cached
