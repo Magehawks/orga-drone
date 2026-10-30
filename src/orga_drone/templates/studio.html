@@ -189,7 +189,7 @@
          data-look-vibrant="{{ _('Vibrant')|e }}"
          data-look-cool="{{ _('Cool')|e }}"
          data-look-black-and-white="{{ _('Black & White')|e }}"
-         data-look-before-after="{{ _('Before / after')|e }}"
+         data-look-before-after="{{ _('Show original for comparison')|e }}"
          data-overlay-model='{{ overlay_model|tojson }}'
          data-overlay-failed="{{ _('Could not save overlays.')|e }}"
          data-overlay-missing="{{ _('Overlay image is missing.')|e }}"
@@ -855,42 +855,13 @@
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
         <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" hidden>
-          <details id="inspector-image-section-profile" class="studio-image-section" open>
-            <summary>{{ _('Color profile') }}</summary>
-            <p class="meta-line" id="inspector-color-profile-value" hidden></p>
-            <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
-              <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
-              <button type="button" class="button" id="inspector-color-dlog-apply">{{ _('Convert D-Log M…') }}</button>
-            </div>
-            <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
-            <div class="studio-color-actions">
-              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _('Clear conversion') }}</button>
-            </div>
-            <label class="studio-inspector-field">
-              <span>{{ _('Creative LUT (.cube)') }}</span>
-              <span class="studio-color-file-row">
-                <button type="button" class="button ghost" id="inspector-color-creative-pick">{{ _('Choose LUT…') }}</button>
-                <span class="meta-line" id="inspector-color-creative-name">{{ _('None') }}</span>
-              </span>
-            </label>
-            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden>
-              <span class="studio-image-adjust-label">
-                <span>{{ _('LUT strength') }}</span>
-                <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
-              </span>
-              <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
-                     aria-label="{{ _('LUT strength') }}">
-            </label>
-            <button type="button" class="button ghost" id="inspector-color-creative-clear" hidden>{{ _('Clear creative LUT') }}</button>
-            <p class="hint">{{ _('Technical conversion and creative looks stay separate. Orga Drone does not ship camera-vendor LUTs — choose a local .cube. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.') }}</p>
-            <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
-          </details>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
-            <summary>{{ _('Basic correction') }}</summary>
+            <summary>{{ _('Look & color') }}</summary>
             <div id="inspector-image-adjust">
               <label class="studio-inspector-field" for="inspector-quick-look">
                 <span>{{ _('Look') }}</span>
-                <select id="inspector-quick-look" aria-label="{{ _('Look') }}">
+                <select id="inspector-quick-look" aria-label="{{ _('Look') }}"
+                        title="{{ _('Replaces the four sliders below. Does not change LUTs or the file on disk.') }}">
                   <option value="">{{ _('Custom') }}</option>
                   <option value="natural">{{ _('Natural') }}</option>
                   <option value="cinematic">{{ _('Cinematic') }}</option>
@@ -900,11 +871,11 @@
                   <option value="black_and_white">{{ _('Black & White') }}</option>
                 </select>
               </label>
-              <label class="studio-inspector-field studio-frame-motion">
+              <label class="studio-inspector-field studio-frame-motion"
+                     title="{{ _('Preview only. Export keeps the graded picture.') }}">
                 <input type="checkbox" id="inspector-look-compare">
-                <span>{{ _('Before / after') }}</span>
+                <span>{{ _('Show original for comparison') }}</span>
               </label>
-              <p class="hint">{{ _('A look replaces the four sliders below. It does not change LUTs or the file on disk. Before/after only affects the preview.') }}</p>
               <label class="studio-inspector-field">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Brightness') }}</span>
@@ -937,14 +908,15 @@
                 <input type="range" id="inspector-image-warmth" min="-100" max="100" step="1" value="0"
                        aria-label="{{ _('Warmth') }}">
               </label>
-              <button type="button" class="button ghost" id="inspector-image-reset">{{ _('Reset') }}</button>
-              <p class="hint">{{ _('Adjusts this Story clip only. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+              <button type="button" class="button ghost" id="inspector-image-reset"
+                      title="{{ _('Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.') }}">{{ _('Reset adjustments') }}</button>
             </div>
           </details>
-          <details id="inspector-image-section-advanced" class="studio-image-section" hidden>
-            <summary>{{ _('Advanced') }}</summary>
+          <details id="inspector-image-section-advanced" class="studio-image-section">
+            <summary>{{ _('Fine-tune') }}</summary>
             <div id="inspector-image-tonal">
-              <label class="studio-inspector-field">
+              <label class="studio-inspector-field"
+                     title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Highlights') }}</span>
                   <span class="studio-image-adjust-value" id="inspector-image-highlights-value">0</span>
@@ -952,7 +924,8 @@
                 <input type="range" id="inspector-image-highlights" min="-100" max="100" step="1" value="0"
                        aria-label="{{ _('Highlights') }}">
               </label>
-              <label class="studio-inspector-field">
+              <label class="studio-inspector-field"
+                     title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Shadows') }}</span>
                   <span class="studio-image-adjust-value" id="inspector-image-shadows-value">0</span>
@@ -960,7 +933,8 @@
                 <input type="range" id="inspector-image-shadows" min="-100" max="100" step="1" value="0"
                        aria-label="{{ _('Shadows') }}">
               </label>
-              <label class="studio-inspector-field">
+              <label class="studio-inspector-field"
+                     title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Blacks') }}</span>
                   <span class="studio-image-adjust-value" id="inspector-image-blacks-value">0</span>
@@ -968,8 +942,8 @@
                 <input type="range" id="inspector-image-blacks" min="-100" max="100" step="1" value="0"
                        aria-label="{{ _('Blacks') }}">
               </label>
-              <p class="hint">{{ _('Tonal controls reshape midrange light. They do not recover clipped highlights or deep blacks. Warmth stays the white-balance control above. Preview approximates export.') }}</p>
-              <label class="studio-inspector-field">
+              <label class="studio-inspector-field"
+                     title="{{ _('Off by default. Restrained local filter on export; preview approximates it.') }}">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Sharpen') }}</span>
                   <span class="studio-image-adjust-value" id="inspector-detail-sharpen-value">0</span>
@@ -977,7 +951,8 @@
                 <input type="range" id="inspector-detail-sharpen" min="0" max="100" step="1" value="0"
                        aria-label="{{ _('Sharpen') }}">
               </label>
-              <label class="studio-inspector-field">
+              <label class="studio-inspector-field"
+                     title="{{ _('Off by default. Restrained local filter on export; preview approximates it.') }}">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Denoise') }}</span>
                   <span class="studio-image-adjust-value" id="inspector-detail-denoise-value">0</span>
@@ -986,7 +961,6 @@
                        aria-label="{{ _('Denoise') }}">
               </label>
               <button type="button" class="button ghost" id="inspector-detail-reset">{{ _('Reset sharpen and denoise') }}</button>
-              <p class="hint">{{ _('Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.') }}</p>
             </div>
             <div id="inspector-saturation-ramp">
               <label class="studio-inspector-field studio-frame-motion">
@@ -1023,6 +997,36 @@
                 </div>
               </div>
             </div>
+          </details>
+          <details id="inspector-image-section-profile" class="studio-image-section">
+            <summary>{{ _('Color profiles & LUTs') }}</summary>
+            <p class="meta-line" id="inspector-color-profile-value" hidden></p>
+            <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
+              <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
+              <button type="button" class="button" id="inspector-color-dlog-apply">{{ _('Convert D-Log M…') }}</button>
+            </div>
+            <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
+            <div class="studio-color-actions">
+              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _('Clear conversion') }}</button>
+            </div>
+            <label class="studio-inspector-field">
+              <span>{{ _('Your color file (.cube)') }}</span>
+              <span class="studio-color-file-row">
+                <button type="button" class="button ghost" id="inspector-color-creative-pick"
+                        title="{{ _('Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.') }}">{{ _('Choose your color file (.cube)') }}</button>
+                <span class="meta-line" id="inspector-color-creative-name">{{ _('None') }}</span>
+              </span>
+            </label>
+            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden>
+              <span class="studio-image-adjust-label">
+                <span>{{ _('LUT strength') }}</span>
+                <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
+              </span>
+              <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
+                     aria-label="{{ _('LUT strength') }}">
+            </label>
+            <button type="button" class="button ghost" id="inspector-color-creative-clear" hidden>{{ _('Clear creative LUT') }}</button>
+            <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
           <div id="inspector-frame" hidden>
             <p class="studio-inspector-kind">{{ _('Framing') }}</p>

@@ -758,5 +758,17 @@
   "Sharpen": "Sharpen",
   "Denoise": "Denoise",
   "Reset sharpen and denoise": "Reset sharpen and denoise",
-  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged."
+  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.",
+  "Look & color": "Look & color",
+  "Fine-tune": "Fine-tune",
+  "Color profiles & LUTs": "Color profiles & LUTs",
+  "Show original for comparison": "Show original for comparison",
+  "Preview only. Export keeps the graded picture.": "Preview only. Export keeps the graded picture.",
+  "Replaces the four sliders below. Does not change LUTs or the file on disk.": "Replaces the four sliders below. Does not change LUTs or the file on disk.",
+  "Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.": "Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.",
+  "Reshape midrange light. Does not recover clipped highlights or deep blacks.": "Reshape midrange light. Does not recover clipped highlights or deep blacks.",
+  "Off by default. Restrained local filter on export; preview approximates it.": "Off by default. Restrained local filter on export; preview approximates it.",
+  "Your color file (.cube)": "Your color file (.cube)",
+  "Choose your color file (.cube)": "Choose your color file (.cube)",
+  "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.": "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged."
 }

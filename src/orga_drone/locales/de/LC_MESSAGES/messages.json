@@ -758,5 +758,17 @@
   "Sharpen": "Schärfen",
   "Denoise": "Entrauschen",
   "Reset sharpen and denoise": "Schärfen und Entrauschen zurücksetzen",
-  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Beide starten aus. Schärfen und Entrauschen nutzen zurückhaltende lokale Filter beim Export. Die Vorschau nähert sie an. Quelldateien bleiben unverändert."
+  "Both start off. Sharpen and denoise use restrained local filters on export. Preview approximates them. Source files stay unchanged.": "Beide starten aus. Schärfen und Entrauschen nutzen zurückhaltende lokale Filter beim Export. Die Vorschau nähert sie an. Quelldateien bleiben unverändert.",
+  "Look & color": "Look & Farben",
+  "Fine-tune": "Feinabstimmung",
+  "Color profiles & LUTs": "Farbprofile & LUTs",
+  "Show original for comparison": "Original zum Vergleichen anzeigen",
+  "Preview only. Export keeps the graded picture.": "Nur in der Vorschau. Der Export behält das bearbeitete Bild.",
+  "Replaces the four sliders below. Does not change LUTs or the file on disk.": "Ersetzt die vier Regler darunter. Ändert weder LUTs noch die Datei auf der Festplatte.",
+  "Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.": "Setzt auch Lichter, Schatten und Schwarz in der Feinabstimmung zurück. Schärfen und Entrauschen bleiben.",
+  "Reshape midrange light. Does not recover clipped highlights or deep blacks.": "Formt das Mittelfeld. Abgeschnittene Lichter oder tiefe Schwarztöne werden nicht wiederhergestellt.",
+  "Off by default. Restrained local filter on export; preview approximates it.": "Standardmäßig aus. Zurückhaltender lokaler Filter beim Export; die Vorschau nähert ihn an.",
+  "Your color file (.cube)": "Eigene Farbdatei (.cube)",
+  "Choose your color file (.cube)": "Eigene Farbdatei (.cube) auswählen",
+  "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.": "Nur lokale .cube. Orga Drone liefert keine Hersteller-LUTs. Die Vorschau nähert die Grundkorrektur an; LUTs gelten beim Export. Quelldateien bleiben unverändert."
 }
