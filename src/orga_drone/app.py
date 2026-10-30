@@ -2141,7 +2141,11 @@ def create_app() -> FastAPI:
         t_s: float = Query(0.0),
         detail: int = Query(0),
     ) -> Response:
-        """JPEG still using the same grade+LUT builders as export (ADR 0028)."""
+        """JPEG still using the same grade+LUT builders as export (ADR 0028).
+
+        ``t_s`` is the source offset from the clip in-point (after slow-motion /
+        speed mapping on the client), not Story time.
+        """
         project_id = _clip_project_id(studio_item_id)
         if project_id is None:
             raise HTTPException(status_code=404, detail="Studio item not found")

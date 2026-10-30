@@ -2015,7 +2015,8 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-preview-lut-still {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  /* Above the graded video, below masks / HUD / annotations / map. */
+  z-index: 2;
   width: 100%;
   height: 100%;
   object-fit: contain;

@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import shutil
 import subprocess
 import threading
 import time
@@ -64,8 +65,12 @@ def preview_stills_dir(data_dir: Path) -> Path:
 
 
 def look_needs_preview_still(look: ColorLook) -> bool:
-    """True when CSS alone cannot show the export look."""
-    return not look.is_neutral
+    """True when a ``.cube`` is in the export graph (CSS cannot show it)."""
+    if look.conversion_lut and look.conversion_confirmed:
+        return True
+    if look.creative_lut and look.creative_strength > 0:
+        return True
+    return False
 
 
 def quantize_preview_time(t_s: float, *, step: float = PREVIEW_QUANTIZE_S) -> float:
@@ -268,6 +273,11 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
+        # Drop temporary strength-blend cubes for this key.
+        try:
+            shutil.rmtree(work, ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            pass
         _evict_if_needed(folder)
         return dest
     finally:

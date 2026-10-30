@@ -108,7 +108,24 @@ def test_quantize_and_look_gate() -> None:
     assert quantize_preview_time(1.24) == pytest.approx(1.2)
     assert look_needs_preview_still(ColorLook()) is False
     assert look_needs_preview_still(
+        ColorLook(input_profile="custom")
+    ) is False
+    assert look_needs_preview_still(
+        ColorLook(
+            input_profile="dlog_m",
+            conversion_lut="a" * 32 + ".cube",
+            conversion_confirmed=False,
+        )
+    ) is False
+    assert look_needs_preview_still(
         ColorLook(creative_lut="a" * 32 + ".cube", creative_strength=50)
+    )
+    assert look_needs_preview_still(
+        ColorLook(
+            input_profile="dlog_m",
+            conversion_lut="a" * 32 + ".cube",
+            conversion_confirmed=True,
+        )
     )
 
 
