@@ -434,3 +434,90 @@ msgstr "Eigene Farbdatei (.cube) auswählen"
 
 msgid "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged."
 msgstr "Nur lokale .cube. Orga Drone liefert keine Hersteller-LUTs. Die Vorschau nähert die Grundkorrektur an; LUTs gelten beim Export. Quelldateien bleiben unverändert."
+
+msgid "Add file…"
+msgstr "Datei hinzufügen…"
+
+msgid "Open folder"
+msgstr "Ordner öffnen"
+
+msgid "Orga Drone manages the files in this folder. Rename them here, not in Explorer."
+msgstr "Die Dateien in diesem Ordner verwaltet Orga Drone. Benennen Sie sie hier um, nicht im Explorer."
+
+msgid "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy."
+msgstr "Hier landen Farbdateien, die Sie schon haben (z. B. vom Drohnenhersteller). Orga Drone liefert keine mit. Ihre Originaldatei bleibt unverändert; die App legt eine Kopie ab."
+
+msgid "The preview does not show this file. It is applied when you export."
+msgstr "Die Vorschau zeigt diese Datei nicht. Sie wird beim Export angewendet."
+
+msgid "Conversion file"
+msgstr "Umwandlungsdatei"
+
+msgid "Please choose"
+msgstr "Bitte wählen"
+
+msgid "This file converts D-Log M to Rec.709. Orga Drone cannot check this."
+msgstr "Diese Datei wandelt D-Log M in Rec.709 um. Orga Drone kann das nicht prüfen."
+
+msgid "Apply conversion"
+msgstr "Umwandlung anwenden"
+
+msgid "Change file"
+msgstr "Datei ändern"
+
+msgid "Don't use"
+msgstr "Nicht verwenden"
+
+msgid "Color file (.cube)"
+msgstr "Farbdatei (.cube)"
+
+msgid "Manage color files"
+msgstr "Farbdateien verwalten"
+
+msgid "How strongly the file changes the picture. 0% = no effect."
+msgstr "Wie stark die Datei das Bild verändert. 0 % = keine Wirkung."
+
+msgid "This file is already in your library as \"{name}\"."
+msgstr "Diese Datei ist schon in der Bibliothek, als „{name}“."
+
+msgid "The color file was restored in your library as \"{name}\"."
+msgstr "Die Farbdatei wurde in der Bibliothek wiederhergestellt als „{name}“."
+
+msgid "Unknown color file (missing)"
+msgstr "Unbekannte Farbdatei (fehlt)"
+
+msgid "(file missing)"
+msgstr "(Datei fehlt)"
+
+msgid "Could not rename that color file."
+msgstr "Farbdatei konnte nicht umbenannt werden."
+
+msgid "Could not remove that color file."
+msgstr "Farbdatei konnte nicht entfernt werden."
+
+msgid "Cannot remove: used in {n} clips in {m} projects ({names}). Choose Don’t use there first."
+msgstr "Kann nicht entfernt werden: wird in {n} Clips in {m} Projekten verwendet ({names}). Wählen Sie dort zuerst „Nicht verwenden“."
+
+msgid "Remove {name} from the library? The copy inside Orga Drone is deleted. Your original .cube stays where it is."
+msgstr "„{name}“ aus der Bibliothek entfernen? Die Kopie in Orga Drone wird gelöscht. Ihre ursprüngliche .cube bleibt, wo sie ist."
+
+msgid "Used in {n} clips"
+msgstr "Verwendet in {n} Clips"
+
+msgid "Not used"
+msgstr "Nicht verwendet"
+
+msgid "Added {date}"
+msgstr "Hinzugefügt {date}"
+
+msgid "File missing"
+msgstr "Datei fehlt"
+
+msgid "Add the original .cube again to restore it, or stop using it in your clips first."
+msgstr "Fügen Sie die ursprüngliche .cube erneut hinzu, um sie wiederherzustellen, oder verwenden Sie sie in den Clips nicht mehr."
+
+msgid "Remove from library"
+msgstr "Aus Bibliothek entfernen"
+
+msgid "Rename"
+msgstr "Umbenennen"

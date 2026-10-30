@@ -174,10 +174,17 @@
          data-color-failed="{{ _('Could not save the color look.')|e }}"
          data-color-lut-failed="{{ _('Could not import that .cube LUT.')|e }}"
          data-color-lut-missing="{{ _('A LUT file is missing. Choose the .cube again, or clear the look.')|e }}"
+         data-color-lut-already="{{ _('This file is already in your library as \"{name}\".')|e }}"
+         data-color-lut-restored="{{ _('The color file was restored in your library as \"{name}\".')|e }}"
+         data-color-lut-missing-option="{{ _('Unknown color file (missing)')|e }}"
+         data-color-file-missing-suffix="{{ _('(file missing)')|e }}"
+         data-please-choose="{{ _('Please choose')|e }}"
+         data-none-label="{{ _('None')|e }}"
          data-color-dlog-confirm="{{ _('Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.')|e }}"
          data-color-lut-label="{{ _('LUT file')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-color-look-model='{{ color_look_model|tojson }}'
+         data-lut-catalog='{{ lut_catalog|tojson }}'
          data-quick-looks-model='{{ quick_looks_model|tojson }}'
          data-detail-model='{{ detail_model|tojson }}'
          data-detail-failed="{{ _('Could not save sharpen or denoise.')|e }}"
@@ -1003,29 +1010,47 @@
             <p class="meta-line" id="inspector-color-profile-value" hidden></p>
             <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
               <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
-              <button type="button" class="button" id="inspector-color-dlog-apply">{{ _('Convert D-Log M…') }}</button>
+              <label class="studio-inspector-field" for="inspector-color-conversion-select">
+                <span>{{ _('Conversion file') }}</span>
+                <span class="studio-color-file-row">
+                  <select id="inspector-color-conversion-select" aria-label="{{ _('Conversion file') }}">
+                    <option value="">{{ _('Please choose') }}</option>
+                  </select>
+                  <button type="button" class="button ghost" id="inspector-color-conversion-add">{{ _('Add file…') }}</button>
+                </span>
+              </label>
+              <label class="studio-inspector-field studio-frame-motion">
+                <input type="checkbox" id="inspector-color-conversion-confirm">
+                <span>{{ _('This file converts D-Log M to Rec.709. Orga Drone cannot check this.') }}</span>
+              </label>
+              <button type="button" class="button" id="inspector-color-dlog-apply" disabled>{{ _('Apply conversion') }}</button>
             </div>
             <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
             <div class="studio-color-actions">
-              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _('Clear conversion') }}</button>
+              <button type="button" class="button ghost" id="inspector-color-conversion-change" hidden>{{ _('Change file') }}</button>
+              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _("Don't use") }}</button>
             </div>
-            <label class="studio-inspector-field">
-              <span>{{ _('Your color file (.cube)') }}</span>
+            <label class="studio-inspector-field" for="inspector-color-creative-select">
+              <span>{{ _('Color file (.cube)') }}</span>
               <span class="studio-color-file-row">
-                <button type="button" class="button ghost" id="inspector-color-creative-pick"
-                        title="{{ _('Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged.') }}">{{ _('Choose your color file (.cube)') }}</button>
-                <span class="meta-line" id="inspector-color-creative-name">{{ _('None') }}</span>
+                <select id="inspector-color-creative-select" aria-label="{{ _('Color file (.cube)') }}">
+                  <option value="">{{ _('None') }}</option>
+                </select>
+                <button type="button" class="button ghost" id="inspector-color-creative-pick">{{ _('Add file…') }}</button>
               </span>
             </label>
-            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden>
+            <p class="hint" id="inspector-color-export-honesty">{{ _('The preview does not show this file. It is applied when you export.') }}</p>
+            <p class="hint" id="inspector-color-creative-missing" hidden role="alert"></p>
+            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden
+                   title="{{ _('How strongly the file changes the picture. 0% = no effect.') }}">
               <span class="studio-image-adjust-label">
-                <span>{{ _('LUT strength') }}</span>
+                <span>{{ _('Strength') }}</span>
                 <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
               </span>
               <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
-                     aria-label="{{ _('LUT strength') }}">
+                     aria-label="{{ _('Strength') }}">
             </label>
-            <button type="button" class="button ghost" id="inspector-color-creative-clear" hidden>{{ _('Clear creative LUT') }}</button>
+            <p class="hint"><a href="/settings#settings-luts">{{ _('Manage color files') }}</a></p>
             <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
           <div id="inspector-frame" hidden>

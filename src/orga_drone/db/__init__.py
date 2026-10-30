@@ -229,6 +229,15 @@ CREATE TABLE IF NOT EXISTS albums (
     updated_at TEXT NOT NULL
 );
 
+-- Central local LUT catalog (files remain under data_dir/luts/{asset_name}).
+CREATE TABLE IF NOT EXISTS lut_assets (
+    asset_name TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL UNIQUE,
+    imported_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lut_assets_sha ON lut_assets(content_sha256);
+
 CREATE TABLE IF NOT EXISTS album_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
@@ -502,6 +511,16 @@ class Album:
 
 
 @dataclass
+class LutAssetRow:
+    """Catalog metadata for a local ``.cube`` under ``data_dir/luts/``."""
+
+    asset_name: str
+    display_name: str
+    content_sha256: str
+    imported_at: str
+
+
+@dataclass
 class AlbumItem:
     """One media reference inside an album (path + identity, not a file copy)."""
 
@@ -693,6 +712,7 @@ class Database:
         Database._migrate_studio_audio_clips(conn)
         Database._migrate_albums(conn)
         Database._migrate_studio_originals(conn)
+        Database._migrate_lut_assets(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
@@ -1069,6 +1089,21 @@ class Database:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_album_items_source ON album_items(source_media_id)"
+        )
+
+    @staticmethod
+    def _migrate_lut_assets(conn: sqlite3.Connection) -> None:
+        """Catalog for reusable local ``.cube`` LUT files (Issue LUT library)."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS lut_assets (
+                asset_name TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL UNIQUE,
+                imported_at TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lut_assets_sha ON lut_assets(content_sha256)"
         )
 
     @staticmethod
@@ -3338,6 +3373,124 @@ class Database:
             )
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
+
+    def list_lut_assets(self) -> list[LutAssetRow]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT asset_name, display_name, content_sha256, imported_at
+                   FROM lut_assets
+                   ORDER BY display_name COLLATE NOCASE ASC"""
+            ).fetchall()
+        return [
+            LutAssetRow(
+                asset_name=str(row["asset_name"]),
+                display_name=str(row["display_name"]),
+                content_sha256=str(row["content_sha256"]),
+                imported_at=str(row["imported_at"]),
+            )
+            for row in rows
+        ]
+
+    def list_lut_display_names(self) -> list[tuple[str, str]]:
+        """Return ``(display_name, asset_name)`` pairs for uniqueness checks."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT display_name, asset_name FROM lut_assets"
+            ).fetchall()
+        return [(str(row["display_name"]), str(row["asset_name"])) for row in rows]
+
+    def get_lut_asset(self, asset_name: str) -> LutAssetRow | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT asset_name, display_name, content_sha256, imported_at
+                   FROM lut_assets WHERE asset_name = ?""",
+                (asset_name,),
+            ).fetchone()
+        if row is None:
+            return None
+        return LutAssetRow(
+            asset_name=str(row["asset_name"]),
+            display_name=str(row["display_name"]),
+            content_sha256=str(row["content_sha256"]),
+            imported_at=str(row["imported_at"]),
+        )
+
+    def get_lut_asset_by_sha(self, content_sha256: str) -> LutAssetRow | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT asset_name, display_name, content_sha256, imported_at
+                   FROM lut_assets WHERE content_sha256 = ?""",
+                (content_sha256,),
+            ).fetchone()
+        if row is None:
+            return None
+        return LutAssetRow(
+            asset_name=str(row["asset_name"]),
+            display_name=str(row["display_name"]),
+            content_sha256=str(row["content_sha256"]),
+            imported_at=str(row["imported_at"]),
+        )
+
+    def upsert_lut_asset(
+        self,
+        *,
+        asset_name: str,
+        display_name: str,
+        content_sha256: str,
+        imported_at: str,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO lut_assets(asset_name, display_name, content_sha256, imported_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(asset_name) DO UPDATE SET
+                     display_name = excluded.display_name,
+                     content_sha256 = excluded.content_sha256,
+                     imported_at = excluded.imported_at""",
+                (asset_name, display_name, content_sha256, imported_at),
+            )
+
+    def rename_lut_asset(self, asset_name: str, display_name: str) -> None:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE lut_assets SET display_name = ? WHERE asset_name = ?",
+                (display_name, asset_name),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("LUT catalog entry not found")
+
+    def delete_lut_asset(self, asset_name: str) -> None:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM lut_assets WHERE asset_name = ?",
+                (asset_name,),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("LUT catalog entry not found")
+
+    def iter_studio_clips_with_cube_hint(
+        self,
+    ) -> list[tuple[int, int, str, str]]:
+        """Clips whose ``effect_settings`` mention ``.cube`` (usage scan candidates).
+
+        Returns ``(clip_id, project_id, project_title, effect_settings)``.
+        """
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT c.id, c.project_id, c.effect_settings, p.title
+                   FROM studio_clips c
+                   JOIN studio_projects p ON p.id = c.project_id
+                   WHERE c.effect_settings LIKE '%.cube%'"""
+            ).fetchall()
+        return [
+            (
+                int(row["id"]),
+                int(row["project_id"]),
+                str(row["title"] or ""),
+                str(row["effect_settings"] or ""),
+            )
+            for row in rows
+        ]
 
     def set_studio_saturation_ramp(
         self,

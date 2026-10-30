@@ -26,6 +26,16 @@ second pixel engine.
 7. Preview continues to approximate grade sliders only; LUT application is
    export-truth until a shared still path exists. UI copy states this honestly.
 
+## Addendum: central LUT catalog
+
+Accepted with the LUT library slice. Files keep `{32hex}.cube` names under
+`luts/`. SQLite `lut_assets` stores display name, content SHA-256, and import
+time. Clip references stay `effect_settings.color.*_lut` asset names. Shared
+HTTP surface is `/api/luts` (Studio import alias `/api/studio/luts` remains).
+Delete is refused while any Studio clip references the asset. The catalog does
+not classify conversion vs creative; that role is chosen only when applying a
+LUT in Studio.
+
 ## Consequences
 
 - Missing LUT references fail export with an actionable error.

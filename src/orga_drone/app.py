@@ -80,14 +80,21 @@ from orga_drone.studio_looks import (
     look_id_from_effect_settings,
     quick_looks_preview_model,
 )
+from orga_drone.lut_library import (
+    LutInUseError,
+    delete_lut,
+    import_lut_bytes,
+    import_lut_path,
+    list_catalog,
+    rename_lut,
+)
 from orga_drone.studio_lut import (
     LutInvalidError,
     LutMissingError,
     color_look_from_effect_settings,
     color_look_preview_model,
-    import_lut_from_path,
+    lut_asset_dir,
     require_lut_asset,
-    store_lut_asset,
 )
 from orga_drone.studio_map import (
     cached_osm_tile,
@@ -704,7 +711,10 @@ def create_app() -> FastAPI:
 
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_page(request: Request) -> HTMLResponse:
+        from orga_drone.desktop import can_reveal_local_file
+
         sizes = cache_sizes(settings.data_dir)
+        lut_entries = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
         return render(
             request,
             "settings.html",
@@ -712,11 +722,14 @@ def create_app() -> FastAPI:
             db_path=settings.db_path,
             thumbs_dir=settings.data_dir / "thumbs",
             tiles_dir=settings.data_dir / "osm-tiles",
+            luts_dir=lut_asset_dir(settings.data_dir),
             cache_total=format_cache_bytes(sizes["total"]),
             cache_thumbs=format_cache_bytes(sizes["thumbs"]),
             cache_tiles=format_cache_bytes(sizes["osm-tiles"]),
             library_roots=db.list_roots(),
             cache_cleared=request.query_params.get("cache") == "cleared",
+            lut_catalog=lut_entries,
+            lut_folder_reveal=can_reveal_local_file(),
             nav_active="settings",
         )
 
@@ -1471,6 +1484,7 @@ def create_app() -> FastAPI:
                     }
                 )
         story_history = history_flags(project.id if project is not None else None)
+        lut_catalog = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
         return render(
             request,
             "studio.html",
@@ -1483,6 +1497,7 @@ def create_app() -> FastAPI:
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
             color_look_model=color_look_preview_model(),
+            lut_catalog=lut_catalog,
             quick_looks_model=quick_looks_preview_model(),
             detail_model=detail_preview_model(),
             frame_model=frame_preview_model(),
@@ -1927,9 +1942,8 @@ def create_app() -> FastAPI:
             }
         )
 
-    @app.post("/api/studio/luts")
-    async def api_studio_lut_import(request: Request) -> JSONResponse:
-        """Copy a validated local ``.cube`` into the app data directory."""
+    async def _import_lut_from_request(request: Request) -> JSONResponse:
+        """Shared import for ``/api/luts`` and the Studio alias."""
         content_type = (request.headers.get("content-type") or "").lower()
         try:
             if "multipart/form-data" in content_type:
@@ -1938,15 +1952,20 @@ def create_app() -> FastAPI:
                 if upload is None or not hasattr(upload, "read"):
                     raise HTTPException(status_code=400, detail="LUT file is required")
                 data = await upload.read()
-                asset_name = store_lut_asset(settings.data_dir, data)
+                filename = getattr(upload, "filename", None) or "look.cube"
+                result = import_lut_bytes(
+                    db, settings.data_dir, data, source_label=str(filename)
+                )
             else:
                 payload = await request.json()
                 if not isinstance(payload, dict):
-                    raise HTTPException(status_code=400, detail="JSON body must include a path")
+                    raise HTTPException(
+                        status_code=400, detail="JSON body must include a path"
+                    )
                 path_value = payload.get("path")
                 if not isinstance(path_value, str) or not path_value.strip():
                     raise HTTPException(status_code=400, detail="LUT path is required")
-                asset_name = import_lut_from_path(settings.data_dir, Path(path_value))
+                result = import_lut_path(db, settings.data_dir, Path(path_value))
         except LutInvalidError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except HTTPException:
@@ -1956,10 +1975,102 @@ def create_app() -> FastAPI:
                 status_code=400, detail="LUT file could not be imported"
             ) from exc
         try:
-            require_lut_asset(settings.data_dir, asset_name)
+            require_lut_asset(settings.data_dir, result.entry.asset_name)
         except LutMissingError as exc:
             raise HTTPException(status_code=500, detail="LUT storage failed") from exc
-        return JSONResponse({"ok": True, "asset_name": asset_name})
+        return JSONResponse(result.as_dict())
+
+    @app.get("/api/luts")
+    async def api_luts_list() -> JSONResponse:
+        entries = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
+        return JSONResponse({"ok": True, "luts": entries})
+
+    @app.post("/api/luts")
+    async def api_luts_import(request: Request) -> JSONResponse:
+        return await _import_lut_from_request(request)
+
+    @app.patch("/api/luts/{asset_name}")
+    async def api_luts_rename(asset_name: str, request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include display_name"
+            )
+        name = payload.get("display_name")
+        if not isinstance(name, str):
+            raise HTTPException(status_code=400, detail="display_name is required")
+        try:
+            entry = rename_lut(db, settings.data_dir, asset_name, name)
+        except LutMissingError as exc:
+            raise HTTPException(status_code=404, detail="LUT not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse({"ok": True, **entry.as_dict()})
+
+    @app.delete("/api/luts/{asset_name}")
+    async def api_luts_delete(asset_name: str) -> JSONResponse:
+        try:
+            delete_lut(db, settings.data_dir, asset_name)
+        except LutMissingError as exc:
+            raise HTTPException(status_code=404, detail="LUT not found") from exc
+        except LutInUseError as exc:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "in_use": True,
+                    "clip_count": exc.usage.clip_count,
+                    "project_count": exc.usage.project_count,
+                    "project_titles": list(exc.usage.project_titles),
+                    "detail": "LUT is in use",
+                },
+                status_code=409,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except LutInvalidError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse({"ok": True})
+
+    @app.post("/api/luts/open-folder")
+    async def api_luts_open_folder() -> JSONResponse:
+        from orga_drone.desktop import (
+            DesktopActionUnavailable,
+            can_reveal_local_file,
+            reveal_local_file,
+        )
+
+        if not can_reveal_local_file():
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "status": "unavailable",
+                    "detail": "Opening the LUT folder is not available on this platform.",
+                },
+                status_code=503,
+            )
+        folder = lut_asset_dir(settings.data_dir)
+        try:
+            # Reveal a file inside the folder when possible so Explorer opens here.
+            sample = next((p for p in folder.iterdir() if p.is_file()), None)
+            reveal_local_file(sample if sample is not None else folder)
+        except DesktopActionUnavailable as exc:
+            return JSONResponse(
+                {"ok": False, "status": "unavailable", "detail": str(exc)},
+                status_code=503,
+            )
+        except OSError as exc:
+            raise HTTPException(
+                status_code=400, detail="Could not open the LUT folder"
+            ) from exc
+        return JSONResponse({"ok": True, "path": str(folder)})
+
+    @app.post("/api/studio/luts")
+    async def api_studio_lut_import(request: Request) -> JSONResponse:
+        """Thin alias for ``POST /api/luts`` (existing Studio clients)."""
+        return await _import_lut_from_request(request)
 
     @app.patch("/api/studio/{studio_item_id}/detail")
     async def api_studio_detail(

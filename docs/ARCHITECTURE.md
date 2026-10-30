@@ -40,7 +40,8 @@ Override: `ORGA_DRONE_DATA_DIR` (unchanged; relative values resolve against the 
 | `{data_dir}/orga-drone.sqlite3` | Library index |
 | `{data_dir}/thumbs/` | Generated thumbnails/previews |
 | `{data_dir}/theme.json` | Theme preference |
-| `{data_dir}/luts/` | User-imported Studio `.cube` LUT assets |
+| `{data_dir}/luts/` | User-imported `.cube` LUT files (`{32hex}.cube`); catalog metadata in SQLite `lut_assets` (display name, SHA-256, imported_at) |
+| `/api/luts` | Shared LUT library API (list/import/rename/delete/open-folder); Studio keeps a thin `/api/studio/luts` import alias |
 | `{data_dir}/logs/studio-export.log` | Short Studio export job lines |
 | `{data_dir}/logs/studio-export-ffmpeg.log` | Full ffmpeg command + stderr on export failure |
 
