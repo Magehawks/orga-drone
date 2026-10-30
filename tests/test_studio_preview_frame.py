@@ -165,6 +165,7 @@ def test_render_preview_frame_caches_jpeg(tmp_path: Path) -> None:
     assert first.suffix == ".jpg"
     assert first.stat().st_size > 100
     assert (data_dir / PREVIEW_STILLS_DIR).is_dir()
+    assert not list((data_dir / PREVIEW_STILLS_DIR / "work").glob("*/*"))
 
 
 def test_cache_key_stable_for_same_inputs(tmp_path: Path) -> None:

@@ -32,6 +32,10 @@ PREVIEW_JPEG_Q = 5
 PREVIEW_CACHE_MAX_BYTES = 400 * 1024 * 1024
 PREVIEW_FFMPEG_TIMEOUT_S = 45.0
 PREVIEW_COLD_LATENCY_WARN_S = 1.0
+JPEG_COLOR_CHAIN = (
+    "scale=in_color_matrix=bt709:out_color_matrix=bt601:in_range=tv:out_range=pc,"
+    "format=yuvj420p,setparams=colorspace=bt470bg:range=pc"
+)
 
 _lock = threading.Lock()
 _inflight: dict[str, threading.Event] = {}
@@ -91,6 +95,7 @@ def preview_filter_chain(
     work_dir: Path,
     max_edge: int = PREVIEW_MAX_EDGE,
     saturation: float = 1.0,
+    output_jpeg: bool = True,
 ) -> str:
     """Same grade→LUT order as export; scale for preview; detail omitted."""
     parts: list[str] = []
@@ -111,10 +116,10 @@ def preview_filter_chain(
         # Match export's limited-range BT.709 output before converting to the
         # full-range JPEG/BT.601 representation decoded by the browser.
         "format=yuv420p,"
-        "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,"
-        "scale=in_color_matrix=bt709:out_color_matrix=bt601:in_range=tv:out_range=pc,"
-        "format=yuvj420p,setparams=colorspace=bt470bg:range=pc"
+        "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
     )
+    if output_jpeg:
+        parts.append(JPEG_COLOR_CHAIN)
     return ",".join(parts)
 
 
@@ -135,7 +140,7 @@ def cache_key_for(
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "v": 3,
+        "v": 4,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -209,6 +214,7 @@ def render_preview_frame(
             return dest
         raise PreviewFrameError("Could not build the preview still.", code="preview_failed")
 
+    work: Path | None = None
     try:
         if dest.is_file() and dest.stat().st_size > 0:
             return dest
@@ -228,6 +234,7 @@ def render_preview_frame(
                 work_dir=work,
                 max_edge=req.max_edge,
                 saturation=req.saturation,
+                output_jpeg=False,
             )
         except LutMissingError:
             raise
@@ -246,21 +253,31 @@ def render_preview_frame(
                 "1",
                 "-vf",
                 vf,
-                "-q:v",
-                str(PREVIEW_JPEG_Q),
-                str(dest),
+                "-c:v", "rawvideo", "-pix_fmt", "yuv420p", "-f", "nut",
+                str(work / "frame.nut"),
             ]
         )
         started = time.perf_counter()
+        # A raw single-frame boundary prevents the JPEG encoder negotiating an
+        # earlier RGB/YUV format differently from export on another FFmpeg build.
+        # NUT carries dimensions; no extra decode of the source or lossy encode.
+        jpeg_cmd = [
+            ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(work / "frame.nut"), "-frames:v", "1",
+            "-vf", JPEG_COLOR_CHAIN, "-q:v", str(PREVIEW_JPEG_Q), str(dest),
+        ]
         try:
-            proc = subprocess.run(
-                cmd,
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                timeout=PREVIEW_FFMPEG_TIMEOUT_S,
-                **subprocess_no_window_kwargs(),
-            )
+            for command in (cmd, jpeg_cmd):
+                proc = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    timeout=max(0.1, PREVIEW_FFMPEG_TIMEOUT_S - (time.perf_counter() - started)),
+                    **subprocess_no_window_kwargs(),
+                )
+                if proc.returncode != 0:
+                    break
         except subprocess.TimeoutExpired as exc:
             raise PreviewFrameError(
                 "Building the preview still took too long.",
@@ -290,14 +307,11 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
-        # Drop temporary strength-blend cubes for this key.
-        try:
-            shutil.rmtree(work, ignore_errors=True)
-        except Exception:  # noqa: BLE001
-            pass
         _evict_if_needed(folder)
         return dest
     finally:
+        if work is not None:
+            shutil.rmtree(work, ignore_errors=True)
         with _lock:
             event = _inflight.pop(key, None)
             if event is not None:

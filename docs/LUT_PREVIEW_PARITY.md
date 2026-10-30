@@ -19,8 +19,12 @@ saturation ramp. Quick Looks continue to replace the basic sliders. Technical
 conversion is independent of creative strength and never enabled automatically.
 Both output scalers explicitly convert to limited-range BT.709, instead of
 tagging pixels whose conversion matrix depended on FFmpeg graph negotiation.
-The still then converts to full-range BT.601 JPEG with matching metadata.
-Cache version 3 invalidates earlier stills.
+The still passes through one lossless raw YUV frame in a temporary NUT container
+before conversion to full-range BT.601 JPEG with matching metadata. This boundary
+prevents the JPEG encoder changing earlier pixel-format negotiation on different
+FFmpeg builds. It adds one small local FFmpeg invocation, without decoding the
+source twice. Temporary frames are removed on success or failure.
+Cache version 4 invalidates earlier stills.
 Source media and stored LUT references are unchanged.
 An assigned creative LUT at 0% still uses the FFmpeg output color path (with
 the LUT filter skipped), avoiding a switch to browser-specific source decoding.

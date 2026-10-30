@@ -68,7 +68,14 @@ def test_lut_strength_pixels_match_mp4(
             with Image.open(still) as a, Image.open(extracted) as b:
                 # JPEG + H264 chroma/scaling tolerances; dramatic LUT shifts fail.
                 difference = ImageStat.Stat(ImageChops.difference(a.convert("RGB"), b.convert("RGB")))
-                assert max(difference.mean) < 8, difference.mean
+                assert max(difference.mean) < 8, {
+                    "strength": strength, "conversion": conversion, "time": local,
+                    "error": difference.mean,
+                    "preview_rgb": ImageStat.Stat(a.convert("RGB")).mean,
+                    "export_rgb": ImageStat.Stat(b.convert("RGB")).mean,
+                    "ffmpeg": subprocess.run([ffmpeg, "-version"], capture_output=True,
+                                             text=True, check=True).stdout.splitlines()[0],
+                }
                 if local == 0.2:
                     means.append(ImageStat.Stat(a.convert("RGB")).mean)
     assert max(abs(means[0][i] - means[2][i]) for i in range(3)) > 10
