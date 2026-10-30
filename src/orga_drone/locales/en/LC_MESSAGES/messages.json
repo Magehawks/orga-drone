@@ -818,5 +818,7 @@
   "At most 8 points.": "At most 8 points.",
   "Custom": "Custom",
   "Custom points": "Custom points",
-  "Keep at least two points.": "Keep at least two points."
+  "Keep at least two points.": "Keep at least two points.",
+  "Color file strength": "Color file strength",
+  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip."
 }

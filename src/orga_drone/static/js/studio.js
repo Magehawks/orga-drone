@@ -2258,11 +2258,20 @@
   let lutStillToken = 0;
   let lutStillObjectUrl = "";
 
-  function colorLookNeedsStill(look) {
+  function colorLookNeedsStill(look, clip) {
     if (!look) return false;
-    // Match server look_needs_preview_still: only when a .cube is in the graph.
+    // Conversion or any creative .cube can appear in the export graph. Strength
+    // may be animated via color points even when the static slider is 0.
     if (look.conversion_lut && look.conversion_confirmed) return true;
-    if (look.creative_lut && Number(look.creative_strength) > 0) return true;
+    if (look.creative_lut) {
+      if (Number(look.creative_strength) > 0) return true;
+      const anim = clip ? readColorAnimation(clip) : null;
+      if (anim && Array.isArray(anim.keys)) {
+        return anim.keys.some(
+          (key) => key && key.lut_strength != null && Number(key.lut_strength) > 0
+        );
+      }
+    }
     return false;
   }
 
@@ -2323,12 +2332,12 @@
     const look = readColorLook(clip);
     const anim = readColorAnimation(clip);
     const animActive = Boolean(anim && Array.isArray(anim.keys) && anim.keys.length >= 2);
-    if (!colorLookNeedsStill(look) && !animActive) {
+    if (!colorLookNeedsStill(look, clip) && !animActive) {
       clearLutPreviewStill();
       return;
     }
     // Color-animation-only stills wait for a color file; CSS covers grade keys.
-    if (!colorLookNeedsStill(look)) {
+    if (!colorLookNeedsStill(look, clip)) {
       clearLutPreviewStill();
       return;
     }
@@ -2555,13 +2564,14 @@
     return lang.startsWith("de") ? (hit.label_de || hit.label_en || id) : (hit.label_en || id);
   }
 
-  function keyedColorAt(anim, localS) {
+  function keyedColorAt(anim, localS, staticLutStrength) {
     if (!anim || !Array.isArray(anim.keys) || anim.keys.length < 2) return null;
     const start = Number(anim.bar && anim.bar.start_s);
     const end = Number(anim.bar && anim.bar.end_s);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 0.05) return null;
     const t = Number(localS) || 0;
     if (t < start - 0.001 || t > end + 0.001) return null;
+    const staticStrength = Number.isFinite(staticLutStrength) ? staticLutStrength : 100;
     const keys = anim.keys
       .map((key) => ({
         t: Number(key.t),
@@ -2569,10 +2579,20 @@
         contrast: Number(key.contrast) || 0,
         saturation: Number(key.saturation) || 0,
         warmth: Number(key.warmth) || 0,
+        lut_strength:
+          key.lut_strength == null || key.lut_strength === ""
+            ? null
+            : Math.max(0, Math.min(100, Math.round(Number(key.lut_strength)))),
       }))
       .filter((key) => Number.isFinite(key.t))
       .sort((a, b) => a.t - b.t);
     if (!keys.length) return null;
+    const resolveStrength = (left, right, u) => {
+      if (left == null && right == null) return null;
+      const a = left == null ? staticStrength : left;
+      const b = right == null ? staticStrength : right;
+      return Math.round(a + (b - a) * u);
+    };
     if (t <= keys[0].t) return keys[0];
     if (t >= keys[keys.length - 1].t) return keys[keys.length - 1];
     for (let i = 0; i < keys.length - 1; i += 1) {
@@ -2588,6 +2608,7 @@
         contrast: Math.round(lerp(left.contrast, right.contrast)),
         saturation: Math.round(lerp(left.saturation, right.saturation)),
         warmth: Math.round(lerp(left.warmth, right.warmth)),
+        lut_strength: resolveStrength(left.lut_strength, right.lut_strength, u),
       };
     }
     return keys[keys.length - 1];
@@ -2694,6 +2715,17 @@
       setPair("color-anim-contrast", "color-anim-contrast-value", key.contrast || 0);
       setPair("color-anim-saturation", "color-anim-saturation-value", key.saturation || 0);
       setPair("color-anim-warmth", "color-anim-warmth-value", key.warmth || 0);
+      const look = readColorLook(clip);
+      const hasLut = !!(look && look.creative_lut);
+      const lutWrap = document.getElementById("color-anim-lut-strength-wrap");
+      if (lutWrap) lutWrap.hidden = !hasLut;
+      if (hasLut) {
+        const strength =
+          key.lut_strength == null
+            ? Math.max(0, Math.min(100, Math.round(Number(look.creative_strength) || 100)))
+            : Math.max(0, Math.min(100, Math.round(Number(key.lut_strength) || 0)));
+        setPair("color-anim-lut-strength", "color-anim-lut-strength-value", strength);
+      }
     }
   }
 
@@ -2713,6 +2745,11 @@
     current.contrast = readSlider("color-anim-contrast");
     current.saturation = readSlider("color-anim-saturation");
     current.warmth = readSlider("color-anim-warmth");
+    const look = readColorLook(clip);
+    const lutWrap = document.getElementById("color-anim-lut-strength-wrap");
+    if (look && look.creative_lut && lutWrap && !lutWrap.hidden) {
+      current.lut_strength = Math.max(0, Math.min(100, readSlider("color-anim-lut-strength")));
+    }
     keys.sort((a, b) => Number(a.t) - Number(b.t));
     selectedColorPointIndex = keys.findIndex((key) => key === current);
     await saveColorAnimation(clip, {
@@ -2788,7 +2825,13 @@
         }
       });
     }
-    ["color-anim-exposure", "color-anim-contrast", "color-anim-saturation", "color-anim-warmth"].forEach((id) => {
+    [
+      "color-anim-exposure",
+      "color-anim-contrast",
+      "color-anim-saturation",
+      "color-anim-warmth",
+      "color-anim-lut-strength",
+    ].forEach((id) => {
       const input = document.getElementById(id);
       if (!input) return;
       input.addEventListener("input", () => {
@@ -2862,16 +2905,27 @@
         if (keys.some((key) => Math.abs(Number(key.t) - local) < 0.1)) {
           return;
         }
-        const keyed = keyedColorAt({ bar: { start_s: barStart, end_s: barEnd }, keys }, local) || {
-          exposure: 0, contrast: 0, saturation: 0, warmth: 0,
+        const look = readColorLook(clip);
+        const staticStrength = look ? Math.max(0, Math.min(100, Math.round(Number(look.creative_strength) || 100))) : 100;
+        const keyed = keyedColorAt(
+          { bar: { start_s: barStart, end_s: barEnd }, keys },
+          local,
+          staticStrength
+        ) || {
+          exposure: 0, contrast: 0, saturation: 0, warmth: 0, lut_strength: null,
         };
-        keys.push({
+        const point = {
           t: Math.round(local * 10) / 10,
           exposure: keyed.exposure,
           contrast: keyed.contrast,
           saturation: keyed.saturation,
           warmth: keyed.warmth,
-        });
+        };
+        if (keyed.lut_strength != null || (look && look.creative_lut)) {
+          point.lut_strength =
+            keyed.lut_strength != null ? keyed.lut_strength : staticStrength;
+        }
+        keys.push(point);
         keys.sort((a, b) => Number(a.t) - Number(b.t));
         try {
           await saveColorAnimation(clip, {

@@ -20,6 +20,7 @@ from orga_drone.studio_image import (
     ImageAdjust,
     image_adjust_from_effect_settings,
 )
+from orga_drone.studio_lut import ColorLook
 
 COLOR_ANIM_KEY = "color_animation"
 COLOR_BAR_KIND = "color"
@@ -35,9 +36,12 @@ PRESET_IDS = (
     "calm_down",
     "brighten",
     "dim",
+    "lut_fade_in",
+    "lut_fade_out",
 )
 
-# Absolute end values for presets (start is always 0 on all four).
+# Absolute end values for grade presets (start is always 0 on all four).
+# LUT fade presets animate creative strength only (``lut_strength`` 0…100).
 _PRESET_ENDS: dict[str, dict[str, int]] = {
     "warm_up": {"exposure": 8, "contrast": 0, "saturation": 0, "warmth": 35},
     "cool_down": {"exposure": 0, "contrast": 0, "saturation": 0, "warmth": -35},
@@ -45,6 +49,11 @@ _PRESET_ENDS: dict[str, dict[str, int]] = {
     "calm_down": {"exposure": 0, "contrast": 0, "saturation": -25, "warmth": 0},
     "brighten": {"exposure": 25, "contrast": 0, "saturation": 0, "warmth": 0},
     "dim": {"exposure": -25, "contrast": 10, "saturation": 0, "warmth": 0},
+}
+
+_LUT_STRENGTH_PRESETS: dict[str, tuple[int, int]] = {
+    "lut_fade_in": (0, 100),
+    "lut_fade_out": (100, 0),
 }
 
 
@@ -55,15 +64,20 @@ class ColorKey:
     contrast: int = 0
     saturation: int = 0
     warmth: int = 0
+    # None = keep the clip's static creative LUT strength (compat / grade-only).
+    lut_strength: int | None = None
 
-    def as_dict(self) -> dict[str, float | int]:
-        return {
+    def as_dict(self) -> dict[str, float | int | None]:
+        payload: dict[str, float | int | None] = {
             "t": self.t,
             "exposure": self.exposure,
             "contrast": self.contrast,
             "saturation": self.saturation,
             "warmth": self.warmth,
         }
+        if self.lut_strength is not None:
+            payload["lut_strength"] = self.lut_strength
+        return payload
 
 
 @dataclass(frozen=True)
@@ -118,6 +132,22 @@ def _read_time(value: object, default: float = 0.0) -> float:
     return round(number, 4)
 
 
+def _clamp_strength(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+def _read_strength_optional(value: object) -> int | None:
+    """Missing → None (do not override static look). Present → 0…100."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if not math.isfinite(number):
+        return None
+    return _clamp_strength(round(number))
+
+
 def _parse_key(raw: object) -> ColorKey | None:
     if not isinstance(raw, dict):
         return None
@@ -127,6 +157,7 @@ def _parse_key(raw: object) -> ColorKey | None:
         contrast=_read_slider(raw.get("contrast", 0)),
         saturation=_read_slider(raw.get("saturation", 0)),
         warmth=_read_slider(raw.get("warmth", 0)),
+        lut_strength=_read_strength_optional(raw.get("lut_strength")),
     )
 
 
@@ -201,7 +232,7 @@ def build_preset(
     bar_end_s: float,
 ) -> ColorAnimation:
     """Deterministic two-point preset. Not AI."""
-    if preset_id not in _PRESET_ENDS:
+    if preset_id not in PRESET_IDS:
         raise ValueError("unknown color preset")
     start = round(float(bar_start_s), 4)
     end = round(float(bar_end_s), 4)
@@ -209,17 +240,24 @@ def build_preset(
         start, end = end, start
     if end - start < MIN_BAR_SPAN_S:
         raise ValueError("color change needs a longer range")
-    ends = _PRESET_ENDS[preset_id]
-    keys = (
-        ColorKey(t=start),
-        ColorKey(
-            t=end,
-            exposure=ends["exposure"],
-            contrast=ends["contrast"],
-            saturation=ends["saturation"],
-            warmth=ends["warmth"],
-        ),
-    )
+    if preset_id in _LUT_STRENGTH_PRESETS:
+        begin_s, finish_s = _LUT_STRENGTH_PRESETS[preset_id]
+        keys = (
+            ColorKey(t=start, lut_strength=begin_s),
+            ColorKey(t=end, lut_strength=finish_s),
+        )
+    else:
+        ends = _PRESET_ENDS[preset_id]
+        keys = (
+            ColorKey(t=start),
+            ColorKey(
+                t=end,
+                exposure=ends["exposure"],
+                contrast=ends["contrast"],
+                saturation=ends["saturation"],
+                warmth=ends["warmth"],
+            ),
+        )
     return ColorAnimation(
         mode="preset",
         preset_id=preset_id,
@@ -306,7 +344,24 @@ def _ease(u: float, interp: str) -> float:
     return t
 
 
-def _interp_key(a: ColorKey, b: ColorKey, u: float, interp: str) -> ColorKey:
+def _interp_lut_strength(
+    a: int | None, b: int | None, u: float, *, static: int
+) -> int | None:
+    if a is None and b is None:
+        return None
+    left = static if a is None else a
+    right = static if b is None else b
+    return _clamp_strength(round(_lerp(left, right, u)))
+
+
+def _interp_key(
+    a: ColorKey,
+    b: ColorKey,
+    u: float,
+    interp: str,
+    *,
+    static_lut_strength: int = 100,
+) -> ColorKey:
     w = _ease(u, interp)
     return ColorKey(
         t=_lerp(a.t, b.t, w),
@@ -314,11 +369,19 @@ def _interp_key(a: ColorKey, b: ColorKey, u: float, interp: str) -> ColorKey:
         contrast=_clamp_slider(round(_lerp(a.contrast, b.contrast, w))),
         saturation=_clamp_slider(round(_lerp(a.saturation, b.saturation, w))),
         warmth=_clamp_slider(round(_lerp(a.warmth, b.warmth, w))),
+        lut_strength=_interp_lut_strength(
+            a.lut_strength, b.lut_strength, w, static=static_lut_strength
+        ),
     )
 
 
-def keyed_sliders_at(anim: ColorAnimation, local_s: float) -> ColorKey | None:
-    """Absolute four-slider values inside the bar, else None (use static image)."""
+def keyed_sliders_at(
+    anim: ColorAnimation,
+    local_s: float,
+    *,
+    static_lut_strength: int = 100,
+) -> ColorKey | None:
+    """Absolute slider values inside the bar, else None (use static image/look)."""
     if not anim.is_active:
         return None
     t = float(local_s)
@@ -335,7 +398,13 @@ def keyed_sliders_at(anim: ColorAnimation, local_s: float) -> ColorKey | None:
             if span <= 1e-9:
                 return right
             u = (t - left.t) / span
-            return _interp_key(left, right, u, anim.interp)
+            return _interp_key(
+                left,
+                right,
+                u,
+                anim.interp,
+                static_lut_strength=static_lut_strength,
+            )
     return keys[-1]
 
 
@@ -409,6 +478,16 @@ def color_animation_preview_model() -> dict[str, object]:
             {"id": "calm_down", "label_en": "Calm down", "label_de": "Beruhigen"},
             {"id": "brighten", "label_en": "Brighten", "label_de": "Aufhellen"},
             {"id": "dim", "label_en": "Dim", "label_de": "Abdunkeln"},
+            {
+                "id": "lut_fade_in",
+                "label_en": "Color file fade in",
+                "label_de": "Farbdatei einblenden",
+            },
+            {
+                "id": "lut_fade_out",
+                "label_en": "Color file fade out",
+                "label_de": "Farbdatei ausblenden",
+            },
         ],
     }
 
@@ -427,6 +506,22 @@ def apply_keyed_image(base: ImageAdjust, anim: ColorAnimation | None, local_s: f
         saturation=keyed.saturation,
         warmth=keyed.warmth,
     )
+
+
+def apply_keyed_look(
+    base: ColorLook,
+    anim: ColorAnimation | None,
+    local_s: float,
+) -> ColorLook:
+    """Static look with keyed creative LUT strength inside the color bar."""
+    if anim is None or not anim.is_active:
+        return base
+    keyed = keyed_sliders_at(
+        anim, local_s, static_lut_strength=int(base.creative_strength)
+    )
+    if keyed is None or keyed.lut_strength is None:
+        return base
+    return replace(base, creative_strength=_clamp_strength(keyed.lut_strength))
 
 
 def expand_export_clip_for_color(clip: object) -> list[object]:
@@ -488,6 +583,7 @@ def expand_export_clip_for_color(clip: object) -> list[object]:
             continue
         sample_t = local_origin + (begin + finish) * 0.5
         image = apply_keyed_image(clip.image, anim, sample_t)
+        look = apply_keyed_look(clip.color_look, anim, sample_t)
         pieces.append(
             replace(
                 clip,
@@ -495,6 +591,7 @@ def expand_export_clip_for_color(clip: object) -> list[object]:
                 source_end_s=piece_origin + finish,
                 duration_s=(finish - begin) / speed,
                 image=image,
+                color_look=look,
                 color_animation=None,
             )
         )

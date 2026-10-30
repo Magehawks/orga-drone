@@ -1240,9 +1240,16 @@
                 </span>
                 <input type="range" id="color-anim-warmth" min="-100" max="100" step="1" value="0">
               </label>
+              <label class="studio-inspector-field" id="color-anim-lut-strength-wrap" hidden>
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Color file strength') }}</span>
+                  <span class="studio-image-adjust-value" id="color-anim-lut-strength-value">100</span>
+                </span>
+                <input type="range" id="color-anim-lut-strength" min="0" max="100" step="1" value="100">
+              </label>
               <button type="button" class="button ghost" id="color-anim-delete-point">{{ _('Delete point') }}</button>
             </div>
-            <p class="hint">{{ _('Between the points the picture changes evenly. Values replace Look & color for that range.') }}</p>
+            <p class="hint">{{ _('Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.') }}</p>
           </div>
           <button type="button" class="button ghost" id="color-anim-remove" hidden>{{ _('Remove color change') }}</button>
         </div>

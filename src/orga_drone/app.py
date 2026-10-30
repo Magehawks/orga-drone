@@ -2174,14 +2174,26 @@ def create_app() -> FastAPI:
         media_path = Path(clip.media_path)
         if not media_path.is_file():
             raise HTTPException(status_code=409, detail="This media file is missing.")
-        image = image_adjust_from_effect_settings(clip.effect_settings)
-        look = color_look_from_effect_settings(clip.effect_settings)
+        local = quantize_preview_time(float(t_s) if t_s == t_s else 0.0)
+        from orga_drone.studio_color_animation import (
+            apply_keyed_look,
+            color_animation_from_effect_settings,
+            image_adjust_at,
+        )
+
+        base_look = color_look_from_effect_settings(clip.effect_settings)
+        anim = color_animation_from_effect_settings(clip.effect_settings)
+        if clip.kind == "video":
+            image = image_adjust_at(clip.effect_settings, local)
+            look = apply_keyed_look(base_look, anim, local)
+        else:
+            image = image_adjust_from_effect_settings(clip.effect_settings)
+            look = base_look
         if not look_needs_preview_still(look):
             raise HTTPException(
                 status_code=422,
                 detail="No color file is active on this clip.",
             )
-        local = quantize_preview_time(float(t_s) if t_s == t_s else 0.0)
         origin = float(clip.source_start or 0.0)
         abs_t = origin + local
         if clip.source_end is not None:
