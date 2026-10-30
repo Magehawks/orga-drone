@@ -1168,8 +1168,12 @@ def create_app() -> FastAPI:
             in_studio=in_studio,
             item_exportable=item_exportable,
             image_adjust_model=image_adjust_preview_model(),
+            quick_looks_model=quick_looks_preview_model(),
             photo_adjust=(
                 db.get_image_adjust(item.path).as_dict() if item.kind == "photo" else None
+            ),
+            photo_look=(
+                db.get_photo_look_id(item.path) if item.kind == "photo" else ""
             ),
             media_albums=media_albums,
             albums_available=albums_available,
@@ -3320,23 +3324,45 @@ def create_app() -> FastAPI:
                 status_code=400,
                 detail=translate("Photo adjustments are only for a photo."),
             )
+        from orga_drone.studio_looks import look_image_adjust, parse_look_payload
+
         try:
-            image = image_adjust_from_export_payload(payload)
+            look_id = parse_look_payload(payload)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=translate("Unknown look."),
+            ) from exc
+        try:
+            if look_id and not export_payload_sets_adjust(payload):
+                image = look_image_adjust(look_id)
+            else:
+                image = image_adjust_from_export_payload(payload)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail=translate(
-                    "Brightness, contrast, saturation, and warmth must be from -100 to 100."
+                    "Brightness, contrast, saturation, warmth, and fine-tune "
+                    "sliders must be from -100 to 100."
                 ),
             ) from exc
-        if not export_payload_sets_adjust(payload):
+        if not export_payload_sets_adjust(payload) and not look_id:
             image = image_adjust_from_export_payload({"exposure": 0})
+            look_id = ""
+        # Moving a slider without look_id clears the named look (Custom).
+        if "look_id" not in payload and "id" not in payload and export_payload_sets_adjust(
+            payload
+        ):
+            look_id = ""
         db.set_image_adjust(
             row.path,
             image,
             identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+            look_id=look_id,
         )
-        return JSONResponse({"ok": True, "image": image.as_dict()})
+        return JSONResponse(
+            {"ok": True, "image": image.as_dict(), "look_id": look_id or ""}
+        )
 
     @app.post("/api/media/{media_id}/export")
     async def api_media_export(media_id: int, request: Request) -> JSONResponse:

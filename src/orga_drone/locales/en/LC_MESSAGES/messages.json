@@ -820,5 +820,10 @@
   "Custom points": "Custom points",
   "Keep at least two points.": "Keep at least two points.",
   "Color file strength": "Color file strength",
-  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip."
+  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.",
+  "Sharpen, denoise, and color files stay in Studio for Story clips.": "Sharpen, denoise, and color files stay in Studio for Story clips.",
+  "Also resets Fine-tune tonals (highlights, shadows, blacks).": "Also resets Fine-tune tonals (highlights, shadows, blacks).",
+  "Replaces the four sliders below. Does not change the file on disk.": "Replaces the four sliders below. Does not change the file on disk.",
+  "Unknown look.": "Unknown look.",
+  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100."
 }

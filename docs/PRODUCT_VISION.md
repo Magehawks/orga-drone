@@ -261,9 +261,9 @@ See `README.md` for the detailed feature status table. In short:
   narrow window may stack them. Single clip / Complete flight stays with the
   picture. Info holds the date, drone, and the other file facts together with
   rating, tags, notes, albums, rename, and flow merge. Studio sits in Share.
-  Photo brightness, contrast, saturation, and warmth sit in Image (sliders, grade
-  preview, and reset). Export sits in its own tab (preset, JPEG or PNG, and the
-  export action). The map, coordinates, and spot download sit in Location when
+  Photo Look & color (Studio Quick Looks, four basic sliders, show-original
+  compare) and Fine-tune tonals sit in Image with the Studio grade math. Export
+  sits in its own tab (preset, JPEG or PNG, and the export action). The map, coordinates, and spot download sit in Location when
   GPS exists; without GPS that tab stays hidden. One panel at a time. A video
   has no Image tab. Tab order is Info, Location, Share, Image, Export.
 - **Detail-page export:** one photo or one video as a local file (best quality, or a

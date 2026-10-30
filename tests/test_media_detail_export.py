@@ -450,6 +450,7 @@ def test_detail_page_reloads_the_saved_grade(
     assert '"warmth": -4' in page.text
     assert "Reset adjustments" in page.text
     assert 'id="detail-export-format"' in page.text
+    assert 'id="detail-quick-look"' in page.text
     video = _add_video(db, tmp_path / "vid", "clip.mp4", height=1080, duration_s=1.0)
     denied = client.post(
         f"/api/media/{video}/image-adjust",
@@ -458,6 +459,70 @@ def test_detail_page_reloads_the_saved_grade(
     assert denied.status_code == 400
     video_page = client.get(f"/media/{video}", cookies={"lang": "en"})
     assert "detail-adjust-exposure" not in video_page.text
+
+
+def test_photo_quick_look_persists_and_exports_pixels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from orga_drone.app import create_app
+    from orga_drone.config import Settings
+    from orga_drone.i18n import clear_catalog_cache
+    from orga_drone.studio_looks import look_image_adjust
+
+    clear_catalog_cache()
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    _isolate(monkeypatch, tmp_path)
+    app = create_app()
+    db = app.state.db
+    mid = _add_photo(db, tmp_path / "lib", "look.jpg", size=(120, 80))
+    # Soft teal so a vibrant look measurably boosts chroma.
+    path = Path(db.get_media(mid).path)
+    Image.new("RGB", (120, 80), (60, 140, 150)).save(path, format="JPEG", quality=95)
+    client = TestClient(app)
+    applied = client.post(
+        f"/api/media/{mid}/image-adjust",
+        json={"look_id": "vibrant"},
+    )
+    assert applied.status_code == 200, applied.text
+    body = applied.json()
+    assert body["look_id"] == "vibrant"
+    assert body["image"]["saturation"] == look_image_adjust("vibrant").saturation
+    page = client.get(f"/media/{mid}", cookies={"lang": "en"})
+    assert 'data-photo-look="vibrant"' in page.text
+    assert db.get_photo_look_id(path) == "vibrant"
+    out = tmp_path / "out"
+    out.mkdir()
+    graded = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "look_best.jpg",
+        image=db.get_image_adjust(path),
+    )
+    neutral = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "look_neutral.jpg",
+        image=ImageAdjust(),
+    )
+    assert graded.read_bytes() != neutral.read_bytes()
+    with Image.open(graded) as gimg, Image.open(neutral) as nimg:
+        g = gimg.convert("RGB").getpixel((60, 40))
+        n = nimg.convert("RGB").getpixel((60, 40))
+    assert isinstance(g, tuple) and isinstance(n, tuple)
+    # Vibrant raises saturation — channels should diverge from neutral gray.
+    assert max(g) - min(g) > max(n) - min(n)
+    # Slider edit clears the named look.
+    custom = client.post(
+        f"/api/media/{mid}/image-adjust",
+        json={"exposure": 5, "contrast": 0, "saturation": 10, "warmth": 0, "look_id": ""},
+    )
+    assert custom.status_code == 200
+    assert custom.json()["look_id"] == ""
+    assert db.get_photo_look_id(path) == ""
 
 
 def test_video_presets_use_encoder_frame_without_rendering(
