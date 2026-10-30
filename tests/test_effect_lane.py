@@ -213,6 +213,16 @@ def test_preview_mask_drag_keeps_the_pointer() -> None:
     assert "previewMasks" in hit
     assert "getBoundingClientRect" in hit
     assert 'addEventListener("pointerdown", onDocumentMaskPointerDown, true)' in script
+    # Root stores the remove aria string as data-mask-remove-label; the drag guard
+    # must not use [data-mask-remove] or every preview click is treated as ×.
+    assert 'closest(".studio-mask-remove")' in drag
+    assert 'closest("[data-mask-remove]")' not in drag
+    assert 'closest("[data-mask-remove]")' not in script.split(
+        "function onDocumentMaskPointerDown", 1
+    )[1].split("function drawPrivacyMasks", 1)[0]
+    html = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    assert "data-mask-remove-label=" in html
+    assert 'data-mask-remove="{{' not in html
     write = script.split("function writeMasks", 1)[1].split("function maskEffectLabel", 1)[0]
     assert "if (!maskDragging) layoutEffectBars();" in write
     handles = _css_block(css, ".studio-preview-mask-handles {")

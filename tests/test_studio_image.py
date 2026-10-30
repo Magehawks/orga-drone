@@ -335,6 +335,18 @@ def test_http_image_adjust_validation_and_inspector(
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "imagePanel.hidden = !canImage" in script
     assert "fillImageInspectorSections" in script
+    write_fn = script.split("function writeImageAdjust", 1)[1].split(
+        "function imageAdjustIsNeutral", 1
+    )[0]
+    assert "highlights:" in write_fn
+    assert "shadows:" in write_fn
+    assert "blacks:" in write_fn
+    neutral_fn = script.split("function imageAdjustIsNeutral", 1)[1].split(
+        "function blackbodyGains", 1
+    )[0]
+    assert "adjust.shadows" in neutral_fn
+    assert "adjust.highlights" in neutral_fn
+    assert "adjust.blacks" in neutral_fn
 
     rejected = client.patch(
         f"/api/studio/{video_id}/image",
