@@ -447,13 +447,18 @@ def expand_export_clip_for_color(clip: object) -> list[object]:
         anim is None
         or not anim.is_active
         or clip.kind != "video"
-        or clip.source_end_s is None
         or clip.section_repeats > 1
         or clip.forward_loop
     ):
         return [clip]
-    piece_origin = float(clip.source_start_s)
-    piece_end = float(clip.source_end_s)
+    piece_origin = float(clip.source_start_s or 0.0)
+    speed = float(clip.playback_speed) or 1.0
+    if clip.source_end_s is not None:
+        piece_end = float(clip.source_end_s)
+    else:
+        # Untrimmed clips often leave source_end_s unset; recover source span
+        # from wall-clock duration at the piece playback speed.
+        piece_end = piece_origin + float(clip.duration_s) * speed
     piece_len = piece_end - piece_origin
     if piece_len < MIN_BAR_SPAN_S:
         return [clip]
@@ -478,7 +483,6 @@ def expand_export_clip_for_color(clip: object) -> list[object]:
     refined.append(piece_len)
     cuts = sorted({round(value, 4) for value in refined if 0.0 <= value <= piece_len})
     pieces: list[StudioExportClip] = []
-    speed = float(clip.playback_speed) or 1.0
     for begin, finish in zip(cuts, cuts[1:]):
         if finish - begin < 0.05:
             continue

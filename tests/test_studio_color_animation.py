@@ -103,6 +103,27 @@ def test_expand_export_clip_splits_grade() -> None:
     assert all(piece.color_animation is None for piece in pieces)
 
 
+def test_expand_untrimmed_clip_without_source_end() -> None:
+    """Untrimmed Studio clips often leave source_end_s unset."""
+    from orga_drone.export.studio_config import StudioExportClip
+
+    anim = build_preset("warm_up", bar_start_s=0.0, bar_end_s=4.0)
+    clip = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=4.0,
+        source_start_s=0.0,
+        source_end_s=None,
+        image=ImageAdjust(),
+        color_animation=anim,
+    )
+    pieces = expand_export_clip_for_color(clip)
+    assert len(pieces) >= 2
+    assert pieces[0].image.warmth < pieces[-1].image.warmth
+    assert pieces[-1].image.warmth >= 20
+    assert pieces[-1].source_end_s == pytest.approx(4.0)
+
+
 def test_apply_keyed_image_passthrough() -> None:
     base = ImageAdjust(exposure=5, highlights=10)
     anim = ColorAnimation(
