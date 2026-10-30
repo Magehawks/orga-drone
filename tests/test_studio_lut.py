@@ -135,6 +135,15 @@ def test_ffmpeg_lut_chain_applies_conversion_and_strength(
         assert "\\" not in escaped.replace("\\:", "")
 
 
+def test_escape_ffmpeg_lut_path_windows_drive() -> None:
+    class _DrivePath:
+        def resolve(self) -> Path:
+            return Path("C:/Users/example/luts/ab.cube")
+
+    escaped = escape_ffmpeg_lut_path(_DrivePath())  # type: ignore[arg-type]
+    assert escaped == "C\\\\:/Users/example/luts/ab.cube"
+
+
 def test_color_api_requires_confirm_and_persists(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

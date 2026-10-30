@@ -2229,9 +2229,18 @@
 
   function colorLookNeedsStill(look) {
     if (!look) return false;
+    // Match server look_needs_preview_still: only when a .cube is in the graph.
     if (look.conversion_lut && look.conversion_confirmed) return true;
-    if (look.creative_lut && look.creative_strength > 0) return true;
+    if (look.creative_lut && Number(look.creative_strength) > 0) return true;
     return false;
+  }
+
+  function lutStillSourceOffset(clip, localS) {
+    if (!clip || clip.dataset.kind !== "video") return 0;
+    const offset = Math.max(0, Number(localS) || 0);
+    const speed = playbackSpeed(clip);
+    if (slowBarOf(clip) && speed >= 0.999) return storyToSource(clip, offset);
+    return offset * speed;
   }
 
   function setLutPreviewChip(text) {
@@ -2307,7 +2316,9 @@
       clearLutPreviewStill();
       return;
     }
-    const quant = Math.round((Number(localS) || 0) * 10) / 10;
+    // t_s is source offset from the clip in-point (same mapping as seekVideoLocal).
+    const sourceOff = lutStillSourceOffset(clip, localS);
+    const quant = Math.round(sourceOff * 10) / 10;
     if (lutStillTimer) window.clearTimeout(lutStillTimer);
     setLutPreviewChip(msgLutChipUpdating);
     lutStillTimer = window.setTimeout(() => {
