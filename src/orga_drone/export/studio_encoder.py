@@ -1585,7 +1585,11 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
             )
         else:
-            pieces = _slow_pieces(clip)
+            from orga_drone.studio_color_animation import expand_export_clip_for_color
+
+            pieces: list[StudioExportClip] = []
+            for slow_piece in _slow_pieces(clip):
+                pieces.extend(expand_export_clip_for_color(slow_piece))  # type: ignore[arg-type]
             if len(pieces) == 1:
                 self._render_video(
                     ffmpeg,

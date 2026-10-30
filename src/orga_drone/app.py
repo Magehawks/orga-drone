@@ -96,6 +96,10 @@ from orga_drone.studio_lut import (
     lut_asset_dir,
     require_lut_asset,
 )
+from orga_drone.studio_color_animation import (
+    color_animation_from_effect_settings,
+    color_animation_preview_model,
+)
 from orga_drone.studio_preview_frame import (
     PreviewFrameError,
     PreviewFrameRequest,
@@ -1353,6 +1357,7 @@ def create_app() -> FastAPI:
                                     preview_url = f"/media/{it.media_id}/preview"
                                 if not preview_url:
                                     preview_url = f"/media/{it.media_id}/thumb"
+                color_anim_row = color_animation_from_effect_settings(it.effect_settings)
                 item_display.append(
                     {
                         "item": it,
@@ -1393,6 +1398,9 @@ def create_app() -> FastAPI:
                         "saturation_ramp": saturation_ramp_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "color_animation": (
+                            color_anim_row.as_dict() if color_anim_row.is_active else None
+                        ),
                         "overlays": [
                             item.as_dict()
                             for item in overlays_from_effect_settings(
@@ -1504,6 +1512,7 @@ def create_app() -> FastAPI:
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
             color_look_model=color_look_preview_model(),
+            color_animation_model=color_animation_preview_model(),
             lut_catalog=lut_catalog,
             quick_looks_model=quick_looks_preview_model(),
             detail_model=detail_preview_model(),
@@ -2250,6 +2259,37 @@ def create_app() -> FastAPI:
                 "ok": True,
                 "id": item.id,
                 "color_look": look.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/color-animation")
+    async def api_studio_color_animation(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include a color animation"
+            )
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_color_animation(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        anim = color_animation_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "color_animation": anim.as_dict() if anim.keys or anim.is_active else None,
+                "effect_lane": stored_lane(item.effect_settings),
             }
         )
 

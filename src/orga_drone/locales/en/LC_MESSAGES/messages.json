@@ -803,5 +803,18 @@
   "Still frame with color file": "Still frame with color file",
   "Playing without color file": "Playing without color file",
   "Color file missing": "Color file missing",
-  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged."
+  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.",
+  "Color change": "Color change",
+  "Presets": "Presets",
+  "Manual": "Manual",
+  "Preset": "Preset",
+  "Apply preset": "Apply preset",
+  "Presets create color points on the effect lane. They do not analyze the clip.": "Presets create color points on the effect lane. They do not analyze the clip.",
+  "Add point at playhead": "Add point at playhead",
+  "Time (s)": "Time (s)",
+  "Delete point": "Delete point",
+  "Between the points the picture changes evenly. Values replace Look & color for that range.": "Between the points the picture changes evenly. Values replace Look & color for that range.",
+  "Remove color change": "Remove color change",
+  "Set the playhead inside the color bar.": "Set the playhead inside the color bar.",
+  "At most 8 points.": "At most 8 points."
 }

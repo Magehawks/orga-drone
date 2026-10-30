@@ -1082,6 +1082,7 @@
     const lane = document.getElementById("studio-effect-lane");
     if (!lane) return kind;
     if (kind === "zoom") return lane.dataset.labelZoom || "Zoom";
+    if (kind === "color") return lane.dataset.labelColor || "Color";
     if (kind === "blur") return lane.dataset.labelBlur || "Blur";
     if (kind === "pixelate") return lane.dataset.labelPixelate || "Pixelate";
     return lane.dataset.labelSlow || "Slow motion";
@@ -1121,6 +1122,23 @@
       });
       const slow = slowBarOf(clip);
       if (slow) bars.push({ kind: "slow", id: "", start: slow.start, end: slow.end, speed: slow.speed, label: `${effectLabel("slow")} ${slow.speed}×` });
+      const colorAnim = readColorAnimation(clip);
+      if (colorAnim && colorAnim.keys && colorAnim.keys.length >= 2) {
+        const start = Number(colorAnim.bar && colorAnim.bar.start_s);
+        const end = Number(colorAnim.bar && colorAnim.bar.end_s);
+        if (Number.isFinite(start) && Number.isFinite(end) && end - start >= 0.05) {
+          const presetName = colorAnim.preset_id
+            ? colorAnimPresetLabel(colorAnim.preset_id)
+            : (root.dataset.colorAnimCustom || "Custom");
+          bars.push({
+            kind: "color",
+            id: "",
+            start,
+            end,
+            label: `${effectLabel("color")} · ${presetName}`,
+          });
+        }
+      }
       bars.forEach((bar, index) => {
         const storyStart = sourceToStory(clip, bar.start);
         const storyEnd = sourceToStory(clip, bar.end);
@@ -2147,7 +2165,9 @@
       el.style.filter = "";
       return;
     }
-    const adjust = compareBeforeAfter ? neutralImageAdjust() : readImageAdjust(clip);
+    const adjust = compareBeforeAfter
+      ? neutralImageAdjust()
+      : readImageAdjustAt(clip, localS);
     const mult = compareBeforeAfter
       ? 1
       : saturationRampMultiplier(readSaturationRamp(clip), localS);
@@ -2290,6 +2310,13 @@
       return;
     }
     const look = readColorLook(clip);
+    const anim = readColorAnimation(clip);
+    const animActive = Boolean(anim && Array.isArray(anim.keys) && anim.keys.length >= 2);
+    if (!colorLookNeedsStill(look) && !animActive) {
+      clearLutPreviewStill();
+      return;
+    }
+    // Color-animation-only stills wait for a color file; CSS covers grade keys.
     if (!colorLookNeedsStill(look)) {
       clearLutPreviewStill();
       return;
@@ -2407,6 +2434,7 @@
     if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
     const compare = document.getElementById("inspector-look-compare");
     if (compare) compare.checked = compareBeforeAfter;
+    fillColorAnimationInspector(clip);
   }
 
   async function applyQuickLook(clip, lookId) {
@@ -2483,6 +2511,254 @@
     if (!clip) return;
     clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
   }
+
+  let colorAnimationModel = { maxKeys: 8, minKeyGapS: 0.1, presets: [] };
+  try {
+    colorAnimationModel = JSON.parse(root.dataset.colorAnimationModel || "{}") || colorAnimationModel;
+  } catch (_) {
+    /* keep defaults */
+  }
+  const msgColorAnimFailed = root.dataset.colorAnimFailed || "Could not save the color change.";
+
+  function readColorAnimation(clip) {
+    if (!clip) return null;
+    try {
+      const parsed = JSON.parse(clip.dataset.colorAnimation || "null");
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.keys)) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeColorAnimation(clip, anim) {
+    if (!clip) return;
+    clip.dataset.colorAnimation = anim ? JSON.stringify(anim) : "null";
+  }
+
+  function colorAnimPresetLabel(id) {
+    const list = (colorAnimationModel && colorAnimationModel.presets) || [];
+    const hit = list.find((item) => item && item.id === id);
+    if (!hit) return id;
+    const lang = (document.documentElement.lang || "en").toLowerCase();
+    return lang.startsWith("de") ? (hit.label_de || hit.label_en || id) : (hit.label_en || id);
+  }
+
+  function keyedColorAt(anim, localS) {
+    if (!anim || !Array.isArray(anim.keys) || anim.keys.length < 2) return null;
+    const start = Number(anim.bar && anim.bar.start_s);
+    const end = Number(anim.bar && anim.bar.end_s);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 0.05) return null;
+    const t = Number(localS) || 0;
+    if (t < start - 0.001 || t > end + 0.001) return null;
+    const keys = anim.keys
+      .map((key) => ({
+        t: Number(key.t),
+        exposure: Number(key.exposure) || 0,
+        contrast: Number(key.contrast) || 0,
+        saturation: Number(key.saturation) || 0,
+        warmth: Number(key.warmth) || 0,
+      }))
+      .filter((key) => Number.isFinite(key.t))
+      .sort((a, b) => a.t - b.t);
+    if (!keys.length) return null;
+    if (t <= keys[0].t) return keys[0];
+    if (t >= keys[keys.length - 1].t) return keys[keys.length - 1];
+    for (let i = 0; i < keys.length - 1; i += 1) {
+      const left = keys[i];
+      const right = keys[i + 1];
+      if (t < left.t || t > right.t) continue;
+      const span = right.t - left.t;
+      const u = span > 1e-9 ? (t - left.t) / span : 1;
+      const lerp = (a, b) => a + (b - a) * u;
+      return {
+        t,
+        exposure: Math.round(lerp(left.exposure, right.exposure)),
+        contrast: Math.round(lerp(left.contrast, right.contrast)),
+        saturation: Math.round(lerp(left.saturation, right.saturation)),
+        warmth: Math.round(lerp(left.warmth, right.warmth)),
+      };
+    }
+    return keys[keys.length - 1];
+  }
+
+  function readImageAdjustAt(clip, localS) {
+    const base = readImageAdjust(clip);
+    const keyed = keyedColorAt(readColorAnimation(clip), localS);
+    if (!keyed) return base;
+    return {
+      ...base,
+      exposure: keyed.exposure,
+      contrast: keyed.contrast,
+      saturation: keyed.saturation,
+      warmth: keyed.warmth,
+    };
+  }
+
+  async function saveColorAnimation(clip, payload) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    const res = await fetch(`/api/studio/${studioId}/color-animation`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgColorAnimFailed);
+    }
+    writeColorAnimation(clip, body.color_animation || null);
+    layoutEffectBars();
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+    fillColorAnimationInspector(clip);
+  }
+
+  function fillColorAnimationInspector(clip) {
+    const section = document.getElementById("inspector-color-animation");
+    if (!section) return;
+    const video = clip && clip.dataset.kind === "video";
+    section.hidden = !video;
+    if (!video) return;
+    const select = document.getElementById("color-anim-preset");
+    if (select && !select.dataset.filled) {
+      ((colorAnimationModel && colorAnimationModel.presets) || []).forEach((preset) => {
+        const opt = document.createElement("option");
+        opt.value = preset.id;
+        opt.textContent = colorAnimPresetLabel(preset.id);
+        select.appendChild(opt);
+      });
+      select.dataset.filled = "1";
+    }
+    const anim = readColorAnimation(clip);
+    const removeBtn = document.getElementById("color-anim-remove");
+    if (removeBtn) removeBtn.hidden = !anim;
+    if (select) select.value = (anim && anim.preset_id) || "";
+    const applyBtn = document.getElementById("color-anim-apply-preset");
+    if (applyBtn) applyBtn.disabled = !select || !select.value;
+    const count = document.getElementById("color-anim-points-count");
+    if (count) {
+      const n = anim && Array.isArray(anim.keys) ? anim.keys.length : 0;
+      count.textContent = n ? `${n}/8` : "";
+    }
+  }
+
+  function initColorAnimationUi() {
+    const select = document.getElementById("color-anim-preset");
+    const applyBtn = document.getElementById("color-anim-apply-preset");
+    const removeBtn = document.getElementById("color-anim-remove");
+    const modePreset = document.getElementById("color-anim-mode-presets");
+    const modeManual = document.getElementById("color-anim-mode-manual");
+    const presetsPanel = document.getElementById("color-anim-presets-panel");
+    const manualPanel = document.getElementById("color-anim-manual-panel");
+    if (select) {
+      select.addEventListener("change", () => {
+        if (applyBtn) applyBtn.disabled = !select.value;
+      });
+    }
+    if (applyBtn) {
+      applyBtn.addEventListener("click", async () => {
+        const clip = selectedAdjustableClip();
+        if (!clip || clip.dataset.kind !== "video" || !select || !select.value) return;
+        const dur = Math.max(0.05, sourceDurationS(clip));
+        const hit = resolveAt(state.projectTimeS);
+        const local = hit && hit.clip === clip ? hit.localS : 0;
+        const start = Math.max(0, Math.min(dur - 0.05, local));
+        try {
+          await saveColorAnimation(clip, {
+            preset_id: select.value,
+            bar: { start_s: start, end_s: dur },
+          });
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener("click", async () => {
+        const clip = selectedAdjustableClip();
+        if (!clip) return;
+        try {
+          await saveColorAnimation(clip, { clear: true });
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+    function setMode(mode) {
+      if (modePreset) modePreset.classList.toggle("is-active", mode === "preset");
+      if (modeManual) modeManual.classList.toggle("is-active", mode === "manual");
+      if (presetsPanel) presetsPanel.hidden = mode !== "preset";
+      if (manualPanel) manualPanel.hidden = mode !== "manual";
+    }
+    if (modePreset) modePreset.addEventListener("click", () => setMode("preset"));
+    if (modeManual) {
+      modeManual.addEventListener("click", async () => {
+        setMode("manual");
+        const clip = selectedAdjustableClip();
+        const anim = clip && readColorAnimation(clip);
+        if (!clip || !anim || anim.mode === "manual") return;
+        try {
+          await saveColorAnimation(clip, {
+            mode: "manual",
+            bar: anim.bar,
+            keys: anim.keys,
+          });
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+    const addPointBtn = document.getElementById("color-anim-add-point");
+    if (addPointBtn) {
+      addPointBtn.addEventListener("click", async () => {
+        const clip = selectedAdjustableClip();
+        if (!clip || clip.dataset.kind !== "video") return;
+        const anim = readColorAnimation(clip);
+        const dur = Math.max(0.05, sourceDurationS(clip));
+        const hit = resolveAt(state.projectTimeS);
+        const local = hit && hit.clip === clip ? Math.max(0, hit.localS) : 0;
+        const barStart = anim && anim.bar ? Number(anim.bar.start_s) : local;
+        const barEnd = anim && anim.bar ? Number(anim.bar.end_s) : dur;
+        if (!(local >= barStart - 0.001 && local <= barEnd + 0.001)) {
+          showFlash(root.dataset.colorAnimPlayhead || "Set the playhead inside the color bar.");
+          return;
+        }
+        const keys = anim && Array.isArray(anim.keys) ? anim.keys.map((key) => ({ ...key })) : [
+          { t: barStart, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
+          { t: barEnd, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
+        ];
+        if (keys.length >= 8) {
+          showFlash(root.dataset.colorAnimMax || "At most 8 points.");
+          return;
+        }
+        if (keys.some((key) => Math.abs(Number(key.t) - local) < 0.1)) {
+          return;
+        }
+        const keyed = keyedColorAt({ bar: { start_s: barStart, end_s: barEnd }, keys }, local) || {
+          exposure: 0, contrast: 0, saturation: 0, warmth: 0,
+        };
+        keys.push({
+          t: Math.round(local * 10) / 10,
+          exposure: keyed.exposure,
+          contrast: keyed.contrast,
+          saturation: keyed.saturation,
+          warmth: keyed.warmth,
+        });
+        keys.sort((a, b) => Number(a.t) - Number(b.t));
+        try {
+          await saveColorAnimation(clip, {
+            mode: "manual",
+            bar: { start_s: barStart, end_s: barEnd },
+            keys,
+          });
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+  }
+  initColorAnimationUi();
 
   function lutDisplayName(assetName) {
     const name = String(assetName || "");
