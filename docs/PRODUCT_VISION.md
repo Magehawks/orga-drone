@@ -179,7 +179,7 @@ professional video-editing knowledge.
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; project-level lead-in; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; the whole bed can start later with silence before it; coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; Standard / High / Best quality next to resolution, High by default; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
-| Limited color points on the Studio effect lane (presets + manual, up to 8 linear points for exposure/contrast/saturation/warmth; #211) | **Available now** (pause/scrub LUT stills; color bar + Vorlagen/Manuell; not a general NLE keyframe editor) |
+| Limited color points on the Studio effect lane (presets + manual, up to 8 linear points for exposure/contrast/saturation/warmth and creative LUT strength; #211) | **Available now** (pause/scrub LUT stills; color bar + Vorlagen/Manuell including color-file fade; not a general NLE keyframe editor) |
 | Further light editing (curves, freeform masks, general keyframes, tracking), extra transition types | **Later** |
 | Independent per-song placement, trimming, or waveforms | **Later** |
 

@@ -818,5 +818,7 @@
   "At most 8 points.": "Maximal 8 Punkte.",
   "Custom": "Benutzerdefiniert",
   "Custom points": "Eigene Punkte",
-  "Keep at least two points.": "Mindestens zwei Punkte behalten."
+  "Keep at least two points.": "Mindestens zwei Punkte behalten.",
+  "Color file strength": "Farbdatei-Stärke",
+  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Zwischen den Punkten ändert sich das Bild gleichmäßig. Die Werte ersetzen Look & Farben in diesem Bereich. Die Farbdatei-Stärke braucht eine kreative .cube auf dem Clip."
 }

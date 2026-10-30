@@ -144,6 +144,50 @@ def test_expand_two_key_preset_is_dense_and_monotonic() -> None:
     assert warmths[0] < warmths[-1]
 
 
+def test_lut_fade_in_preset_and_keyed_look() -> None:
+    from orga_drone.studio_lut import ColorLook
+
+    anim = build_preset("lut_fade_in", bar_start_s=0.0, bar_end_s=4.0)
+    assert anim.preset_id == "lut_fade_in"
+    assert anim.keys[0].lut_strength == 0
+    assert anim.keys[-1].lut_strength == 100
+    base = ColorLook(creative_lut="aabbccdd.cube", creative_strength=100)
+    from orga_drone.studio_color_animation import apply_keyed_look
+
+    early = apply_keyed_look(base, anim, 0.0)
+    mid = apply_keyed_look(base, anim, 2.0)
+    late = apply_keyed_look(base, anim, 4.0)
+    assert early.creative_strength == 0
+    assert 40 <= mid.creative_strength <= 60
+    assert late.creative_strength == 100
+    # Grade-only warm_up must not wipe static strength.
+    grade = build_preset("warm_up", bar_start_s=0.0, bar_end_s=4.0)
+    kept = apply_keyed_look(base, grade, 2.0)
+    assert kept.creative_strength == 100
+
+
+def test_expand_applies_keyed_lut_strength() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+    from orga_drone.studio_lut import ColorLook
+
+    anim = build_preset("lut_fade_out", bar_start_s=0.0, bar_end_s=2.0)
+    clip = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=2.0,
+        source_start_s=0.0,
+        source_end_s=2.0,
+        image=ImageAdjust(),
+        color_look=ColorLook(creative_lut="aabbccdd.cube", creative_strength=100),
+        color_animation=anim,
+    )
+    pieces = expand_export_clip_for_color(clip)
+    assert len(pieces) >= 2
+    strengths = [piece.color_look.creative_strength for piece in pieces]
+    assert strengths[0] > strengths[-1]
+    assert strengths[-1] <= 20
+
+
 def test_expand_honors_color_local_origin_for_slow_piece() -> None:
     from orga_drone.export.studio_config import StudioExportClip
 
