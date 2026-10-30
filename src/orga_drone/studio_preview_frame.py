@@ -106,13 +106,14 @@ def preview_filter_chain(
     edge = max(64, min(2160, int(max_edge)))
     # Same scale pattern as export framing: no filter quotes (Windows argv-safe).
     parts.append(
-        f"scale={edge}:{edge}:force_original_aspect_ratio=decrease,"
+        f"scale={edge}:{edge}:force_original_aspect_ratio=decrease:"
+        "out_color_matrix=bt709:out_range=tv,"
         # Match export's limited-range BT.709 output before converting to the
         # full-range JPEG/BT.601 representation decoded by the browser.
         "format=yuv420p,"
         "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,"
         "scale=in_color_matrix=bt709:out_color_matrix=bt601:in_range=tv:out_range=pc,"
-        "format=yuvj420p"
+        "format=yuvj420p,setparams=colorspace=bt470bg:range=pc"
     )
     return ",".join(parts)
 
