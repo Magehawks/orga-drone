@@ -66,10 +66,10 @@ def preview_stills_dir(data_dir: Path) -> Path:
 
 
 def look_needs_preview_still(look: ColorLook) -> bool:
-    """True when a ``.cube`` is in the export graph (CSS cannot show it)."""
+    """Keep an assigned look on the export color path, including 0% strength."""
     if look.conversion_lut and look.conversion_confirmed:
         return True
-    if look.creative_lut and look.creative_strength > 0:
+    if look.creative_lut:
         return True
     return False
 

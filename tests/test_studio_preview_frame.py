@@ -121,6 +121,9 @@ def test_quantize_and_look_gate() -> None:
         ColorLook(creative_lut="a" * 32 + ".cube", creative_strength=50)
     )
     assert look_needs_preview_still(
+        ColorLook(creative_lut="a" * 32 + ".cube", creative_strength=0)
+    )
+    assert look_needs_preview_still(
         ColorLook(
             input_profile="dlog_m",
             conversion_lut="a" * 32 + ".cube",
@@ -257,6 +260,20 @@ def test_preview_frame_api_and_cache_clear(
     assert still.headers.get("x-orga-preview-still") == "1"
     assert still.headers["cache-control"] == "no-store"
     assert len(still.content) > 100
+    # The same mutable URL must return each persisted strength, including 0%.
+    frames = {}
+    for strength in (50, 0, 100):
+        changed = client.patch(
+            f"/api/studio/{clip_id}/color",
+            json={"creative_lut": asset, "creative_strength": strength},
+        )
+        assert changed.status_code == 200
+        frame = client.get(f"/api/studio/{clip_id}/preview-frame?t_s=0.25")
+        assert frame.status_code == 200
+        assert frame.headers["cache-control"] == "no-store"
+        frames[strength] = frame.content
+    assert frames[0] != frames[100]
+    assert frames[100] == still.content
     cached = list((data_dir / PREVIEW_STILLS_DIR).glob("*.jpg"))
     assert cached
     page = client.get("/studio")

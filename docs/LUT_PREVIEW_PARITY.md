@@ -20,6 +20,8 @@ conversion is independent of creative strength and never enabled automatically.
 The JPEG path reproduces export's limited-range BT.709 output interpretation
 before conversion to full-range JPEG. Cache version 2 invalidates earlier stills.
 Source media and stored LUT references are unchanged.
+An assigned creative LUT at 0% still uses the FFmpeg output color path (with
+the LUT filter skipped), avoiding a switch to browser-specific source decoding.
 
 ## Boundaries
 

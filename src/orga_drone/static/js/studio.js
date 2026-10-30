@@ -2267,18 +2267,11 @@
 
   function colorLookNeedsStill(look, clip) {
     if (!look) return false;
-    // Conversion or any creative .cube can appear in the export graph. Strength
-    // may be animated via color points even when the static slider is 0.
+    // Keep 0% on the same output color path as 50/100%, even though the LUT
+    // filter itself is skipped. Browser decoding may interpret untagged video
+    // differently from export's BT.709 output.
     if (look.conversion_lut && look.conversion_confirmed) return true;
-    if (look.creative_lut) {
-      if (Number(look.creative_strength) > 0) return true;
-      const anim = clip ? readColorAnimation(clip) : null;
-      if (anim && Array.isArray(anim.keys)) {
-        return anim.keys.some(
-          (key) => key && key.lut_strength != null && Number(key.lut_strength) > 0
-        );
-      }
-    }
+    if (look.creative_lut) return true;
     return false;
   }
 
