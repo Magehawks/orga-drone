@@ -20,17 +20,58 @@ def is_packaged() -> bool:
     return flag in {"1", "true", "yes", "on"}
 
 
-def _default_data_dir() -> Path:
+def _is_absolute_data_path(value: str) -> bool:
+    """Return True for absolute POSIX or Windows path strings.
+
+    Used for ``XDG_DATA_HOME`` validation so relative values are rejected
+    even when tests inject a foreign ``os.name`` into pathlib.
+    """
+    if not value:
+        return False
+    if value.startswith(("/", "\\")):
+        return True
+    # Windows drive paths: ``C:\data`` or ``C:/data``
+    if len(value) >= 3 and value[0].isalpha() and value[1] == ":" and value[2] in "/\\":
+        return True
+    return False
+
+
+def _xdg_data_home() -> Path:
+    """Resolve XDG data home for Linux and other non-Windows, non-macOS hosts.
+
+    Per the XDG Base Directory Spec, ``XDG_DATA_HOME`` must be absolute.
+    Relative or empty values are ignored and ``~/.local/share`` is used.
+    """
+    raw = os.environ.get("XDG_DATA_HOME", "").strip()
+    if raw:
+        expanded = str(Path(raw).expanduser())
+        if _is_absolute_data_path(expanded):
+            return Path(expanded)
+    return Path.home() / ".local" / "share"
+
+
+def _default_data_dir(
+    *,
+    os_name: str | None = None,
+    platform: str | None = None,
+) -> Path:
+    """Resolve the default app data directory for the current (or injected) OS.
+
+    ``os_name`` / ``platform`` are for tests only; production callers omit them.
+    """
     override = os.getenv("ORGA_DRONE_DATA_DIR")
     if override:
         return Path(override).expanduser().resolve()
 
-    if os.name == "nt":
+    name = os.name if os_name is None else os_name
+    plat = sys.platform if platform is None else platform
+
+    if name == "nt":
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    elif (Path.home() / "Library" / "Application Support").exists():
+    elif plat == "darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+        base = _xdg_data_home()
 
     return (base / "orga-drone").resolve()
 

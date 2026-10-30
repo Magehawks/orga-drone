@@ -25,14 +25,22 @@ Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 
 ## Runtime data (outside the repo)
 
-Default data dir examples: `%APPDATA%\orga-drone\` (Windows).
-Override: `ORGA_DRONE_DATA_DIR`.
+Default data dir (platform detection via `os.name` / `sys.platform`):
+
+| Platform | Path |
+|----------|------|
+| Windows | `%APPDATA%\orga-drone\` (fallback `%USERPROFILE%\AppData\Roaming\orga-drone`) |
+| macOS | `~/Library/Application Support/orga-drone` |
+| Linux / other | `$XDG_DATA_HOME/orga-drone` when absolute; else `~/.local/share/orga-drone` |
+
+Override: `ORGA_DRONE_DATA_DIR` (unchanged; relative values resolve against the process cwd). Relative `XDG_DATA_HOME` is ignored per the XDG Base Directory Spec. No migration between these locations.
 
 | Path | Content |
 |------|---------|
 | `{data_dir}/orga-drone.sqlite3` | Library index |
 | `{data_dir}/thumbs/` | Generated thumbnails/previews |
 | `{data_dir}/theme.json` | Theme preference |
+| `{data_dir}/luts/` | User-imported Studio `.cube` LUT assets |
 | `{data_dir}/logs/studio-export.log` | Short Studio export job lines |
 | `{data_dir}/logs/studio-export-ffmpeg.log` | Full ffmpeg command + stderr on export failure |
 
