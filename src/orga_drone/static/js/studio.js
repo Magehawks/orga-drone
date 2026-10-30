@@ -2443,12 +2443,10 @@
   }
 
   function fillImageInspectorSections(clip, isVideo) {
-    const profileSection = document.getElementById("inspector-image-section-profile");
-    if (profileSection) profileSection.hidden = false;
+    // Accordion open/closed is owned by the HTML defaults and the user.
+    // Do not write section.open or section.hidden here.
     fillColorLook(clip);
     fillDetail(clip);
-    const advancedSection = document.getElementById("inspector-image-section-advanced");
-    if (advancedSection) advancedSection.hidden = false;
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
   }

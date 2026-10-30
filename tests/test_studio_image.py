@@ -328,13 +328,45 @@ def test_http_image_adjust_validation_and_inspector(
     assert 'id="inspector-image-contrast"' in page.text
     assert 'id="inspector-image-saturation"' in page.text
     assert 'id="inspector-image-warmth"' in page.text
-    assert ("Grundkorrektur" in page.text) or ("Basic correction" in page.text)
-    assert ("Farbprofil" in page.text) or ("Color profile" in page.text)
+    assert 'id="inspector-look-compare"' in page.text
+    # Accordion defaults: Look & color open; Fine-tune and Color profiles closed.
+    basic_idx = page.text.find('id="inspector-image-section-basic"')
+    advanced_idx = page.text.find('id="inspector-image-section-advanced"')
+    profile_idx = page.text.find('id="inspector-image-section-profile"')
+    assert 0 <= basic_idx < advanced_idx < profile_idx
+    assert 'class="studio-image-section" open>' in page.text[
+        basic_idx : basic_idx + 80
+    ]
+    assert 'class="studio-image-section">' in page.text[
+        advanced_idx : advanced_idx + 80
+    ]
+    assert 'class="studio-image-section">' in page.text[
+        profile_idx : profile_idx + 80
+    ]
+    # Jinja escapes & as &amp; in HTML text nodes.
+    assert ("Look &amp; Farben" in page.text) or ("Look &amp; color" in page.text)
+    assert ("Feinabstimmung" in page.text) or ("Fine-tune" in page.text)
+    assert ("Farbprofile &amp; LUTs" in page.text) or (
+        "Color profiles &amp; LUTs" in page.text
+    )
+    assert ("Original zum Vergleichen anzeigen" in page.text) or (
+        "Show original for comparison" in page.text
+    )
+    assert ("Eigene Farbdatei (.cube)" in page.text) or (
+        "Your color file (.cube)" in page.text
+    )
     assert 'data-image-adjust=' in page.text
     assert 'data-color-profile=' in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     assert "imagePanel.hidden = !canImage" in script
     assert "fillImageInspectorSections" in script
+    fill_fn = script.split("function fillImageInspectorSections", 1)[1].split(
+        "let colorSaveChain", 1
+    )[0]
+    assert "basic.open" not in fill_fn
+    assert "advanced.hidden" not in fill_fn
+    assert "profile.hidden" not in fill_fn
+    assert "bwRamp.hidden = !isVideo" in fill_fn
     write_fn = script.split("function writeImageAdjust", 1)[1].split(
         "function imageAdjustIsNeutral", 1
     )[0]

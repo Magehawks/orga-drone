@@ -399,3 +399,38 @@ msgstr "Undo"
 msgid "Redo"
 msgstr "Redo"
 
+msgid "Look & color"
+msgstr "Look & color"
+
+msgid "Fine-tune"
+msgstr "Fine-tune"
+
+msgid "Color profiles & LUTs"
+msgstr "Color profiles & LUTs"
+
+msgid "Show original for comparison"
+msgstr "Show original for comparison"
+
+msgid "Preview only. Export keeps the graded picture."
+msgstr "Preview only. Export keeps the graded picture."
+
+msgid "Replaces the four sliders below. Does not change LUTs or the file on disk."
+msgstr "Replaces the four sliders below. Does not change LUTs or the file on disk."
+
+msgid "Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay."
+msgstr "Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay."
+
+msgid "Reshape midrange light. Does not recover clipped highlights or deep blacks."
+msgstr "Reshape midrange light. Does not recover clipped highlights or deep blacks."
+
+msgid "Off by default. Restrained local filter on export; preview approximates it."
+msgstr "Off by default. Restrained local filter on export; preview approximates it."
+
+msgid "Your color file (.cube)"
+msgstr "Your color file (.cube)"
+
+msgid "Choose your color file (.cube)"
+msgstr "Choose your color file (.cube)"
+
+msgid "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged."
+msgstr "Local .cube only. Orga Drone does not ship camera-vendor LUTs. Preview approximates the grade; LUTs apply on export. Source files stay unchanged."
