@@ -96,6 +96,13 @@ from orga_drone.studio_lut import (
     lut_asset_dir,
     require_lut_asset,
 )
+from orga_drone.studio_preview_frame import (
+    PreviewFrameError,
+    PreviewFrameRequest,
+    look_needs_preview_still,
+    quantize_preview_time,
+    render_preview_frame,
+)
 from orga_drone.studio_map import (
     cached_osm_tile,
     gps_from_stored,
@@ -2126,6 +2133,77 @@ def create_app() -> FastAPI:
                 "quick_look": look_id_from_effect_settings(item.effect_settings),
                 "image": image_adjust_from_effect_settings(item.effect_settings).as_dict(),
             }
+        )
+
+    @app.get("/api/studio/{studio_item_id}/preview-frame")
+    async def api_studio_preview_frame(
+        studio_item_id: int,
+        t_s: float = Query(0.0),
+        detail: int = Query(0),
+    ) -> Response:
+        """JPEG still using the same grade+LUT builders as export (ADR 0028)."""
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        if clip.item_kind != "media" or clip.kind not in {"photo", "video"}:
+            raise HTTPException(
+                status_code=422,
+                detail="Preview stills are only for photo and video clips.",
+            )
+        if not clip.media_path or not clip.available:
+            raise HTTPException(status_code=409, detail="This media file is offline.")
+        media_path = Path(clip.media_path)
+        if not media_path.is_file():
+            raise HTTPException(status_code=409, detail="This media file is missing.")
+        image = image_adjust_from_effect_settings(clip.effect_settings)
+        look = color_look_from_effect_settings(clip.effect_settings)
+        if not look_needs_preview_still(look):
+            raise HTTPException(
+                status_code=422,
+                detail="No color file is active on this clip.",
+            )
+        local = quantize_preview_time(float(t_s) if t_s == t_s else 0.0)
+        origin = float(clip.source_start or 0.0)
+        abs_t = origin + local
+        if clip.source_end is not None:
+            abs_t = min(abs_t, float(clip.source_end))
+        abs_t = max(0.0, abs_t)
+        try:
+            jpeg = await asyncio.to_thread(
+                render_preview_frame,
+                PreviewFrameRequest(
+                    media_path=media_path,
+                    kind=str(clip.kind),
+                    source_time_s=abs_t if clip.kind == "video" else 0.0,
+                    image=image,
+                    look=look,
+                    detail=bool(detail),
+                ),
+                data_dir=settings.data_dir,
+            )
+        except LutMissingError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="A LUT file is missing. Choose the .cube again in Image, or clear the look.",
+            ) from exc
+        except PreviewFrameError as exc:
+            status = 409 if exc.code in {"media_missing", "lut_invalid"} else 500
+            if exc.code == "unsupported":
+                status = 422
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return FileResponse(
+            jpeg,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "private, max-age=60",
+                "X-Orga-Preview-Still": "1",
+            },
         )
 
     @app.patch("/api/studio/{studio_item_id}/color")

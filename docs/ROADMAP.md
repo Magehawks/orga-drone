@@ -62,6 +62,9 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 6. **itch.io Windows channel** via butler for the existing onefolder build.
    The process is documented for a Draft/Restricted test. A public paid
    launch waits on the A→B app-update record. This is not an in-app updater.
+7. **Studio color points** (#211): pause/scrub LUT stills (shared FFmpeg path),
+   then limited linear color animation on the effect lane (presets + manual).
+   Not a general NLE keyframe editor.
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
 dedicated product slice. Local MP4 export, optional soundtrack playlist in

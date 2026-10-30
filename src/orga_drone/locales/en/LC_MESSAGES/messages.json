@@ -738,7 +738,6 @@
   "Could not save the color look.": "Could not save the color look.",
   "Could not import that .cube LUT.": "Could not import that .cube LUT.",
   "A LUT file is missing. Choose the .cube again, or clear the look.": "A LUT file is missing. Choose the .cube again, or clear the look.",
-  "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.",
   "LUT file": "LUT file",
   "Could not apply that look.": "Could not apply that look.",
   "Natural": "Natural",
@@ -775,7 +774,6 @@
   "Open folder": "Open folder",
   "Orga Drone manages the files in this folder. Rename them here, not in Explorer.": "Orga Drone manages the files in this folder. Rename them here, not in Explorer.",
   "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy.": "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy.",
-  "The preview does not show this file. It is applied when you export.": "The preview does not show this file. It is applied when you export.",
   "Conversion file": "Conversion file",
   "Please choose": "Please choose",
   "This file converts D-Log M to Rec.709. Orga Drone cannot check this.": "This file converts D-Log M to Rec.709. Orga Drone cannot check this.",
@@ -798,5 +796,12 @@
   "Added {date}": "Added {date}",
   "File missing": "File missing",
   "Add the original .cube again to restore it, or stop using it in your clips first.": "Add the original .cube again to restore it, or stop using it in your clips first.",
-  "Remove from library": "Remove from library"
+  "Remove from library": "Remove from library",
+  "This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it.": "This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it.",
+  "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it.": "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it.",
+  "Updating picture…": "Updating picture…",
+  "Still frame with color file": "Still frame with color file",
+  "Playing without color file": "Playing without color file",
+  "Color file missing": "Color file missing",
+  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged."
 }

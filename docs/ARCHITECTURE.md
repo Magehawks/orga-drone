@@ -41,7 +41,9 @@ Override: `ORGA_DRONE_DATA_DIR` (unchanged; relative values resolve against the 
 | `{data_dir}/thumbs/` | Generated thumbnails/previews |
 | `{data_dir}/theme.json` | Theme preference |
 | `{data_dir}/luts/` | User-imported `.cube` LUT files (`{32hex}.cube`); catalog metadata in SQLite `lut_assets` (display name, SHA-256, imported_at) |
+| `{data_dir}/preview-stills/` | Ephemeral JPEG cache for Studio pause/scrub LUT+grade stills (ADR 0028); cleared with Settings cache clear |
 | `/api/luts` | Shared LUT library API (list/import/rename/delete/open-folder); Studio keeps a thin `/api/studio/luts` import alias |
+| `/api/studio/{id}/preview-frame` | Graded+LUT JPEG still via the same FFmpeg builders as export |
 | `{data_dir}/logs/studio-export.log` | Short Studio export job lines |
 | `{data_dir}/logs/studio-export-ffmpeg.log` | Full ffmpeg command + stderr on export failure |
 

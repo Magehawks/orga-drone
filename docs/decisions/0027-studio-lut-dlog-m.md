@@ -23,8 +23,10 @@ second pixel engine.
 5. Do not redistribute camera-vendor LUTs with the app.
 6. Export filter order: static grade → conversion LUT → creative LUT →
    saturation ramp → framing / scale.
-7. Preview continues to approximate grade sliders only; LUT application is
-   export-truth until a shared still path exists. UI copy states this honestly.
+7. Preview approximates grade sliders in CSS during playback. When a clip has a
+   non-neutral look, pause/scrub shows a server still built with the same
+   grade+LUT FFmpeg builders as export (ADR 0028). Playback may still omit the
+   LUT and must say so on screen.
 
 ## Addendum: central LUT catalog
 

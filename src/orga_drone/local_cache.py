@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REBUILDABLE_CACHE_DIRS = ("thumbs", "osm-tiles")
+REBUILDABLE_CACHE_DIRS = ("thumbs", "osm-tiles", "preview-stills")
 
 
 def _inside(root: Path, path: Path) -> bool:
@@ -43,7 +43,7 @@ def cache_sizes(data_dir: Path) -> dict[str, int]:
 
 
 def clear_regenerable_cache(data_dir: Path) -> int:
-    """Delete thumbnail and map-tile files under the app data folder.
+    """Delete thumbnail, map-tile, and preview-still files under the app data folder.
 
     Returns the number of bytes removed. The folders are recreated empty.
     """

@@ -74,7 +74,8 @@ Export: `src/orga_drone/studio_export.py`, `export/studio_encoder.py` (`EXPORT_F
 | --- | --- | --- |
 | Proxy preview vs full-res export | Preview may look softer | Keep; document for users under [#186](https://github.com/Magehawks/orga-drone/issues/186) |
 | Export WxH / CRF | Not simulated in preview | Expected; quality presets [#149](https://github.com/Magehawks/orga-drone/issues/149) |
-| LUT / sharpen / denoise | Not shipping yet | Gate with [#172](https://github.com/Magehawks/orga-drone/issues/172) / [#174](https://github.com/Magehawks/orga-drone/issues/174)–[#177](https://github.com/Magehawks/orga-drone/issues/177) |
+| LUT | Pause/scrub: server still via same grade+LUT builders as export (ADR 0028 / #211 PR1). Playback may omit LUT with on-screen chip. | Sharpen/denoise still approx / export-only until gated separately |
+| Sharpen / denoise | Export applies; preview does not claim pixel match | [#176](https://github.com/Magehawks/orga-drone/issues/176)–[#177](https://github.com/Magehawks/orga-drone/issues/177) |
 | Mask drag UX | Parity of placement covered by mask/zoom fixes; drag UX is [#179](https://github.com/Magehawks/orga-drone/issues/179) | Separate bug |
 | Pixel A/B suite | No automated preview-frame vs MP4 frame diff in CI | Future optional; this issue ships the contract + matrix |
 
