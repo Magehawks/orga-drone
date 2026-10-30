@@ -33,8 +33,10 @@ def test_lut_strength_pixels_match_mp4(
     data = tmp_path / "data"
     monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=data))
     video = tmp_path / "synthetic.mp4"
-    # A changing source verifies the second scrub time, as well as color.
-    _run(ffmpeg, "-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2",
+    # Stable color bars on either side of a visible timed change avoid confusing
+    # adjacent CFR frame rounding with a color mismatch on moving test patterns.
+    _run(ffmpeg, "-f", "lavfi", "-i",
+         "smptebars=s=320x180:r=30:d=2,negate=enable='gte(t,1)'",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video))
     original_hash = hashlib.sha256(video.read_bytes()).hexdigest()
     cube = tmp_path / "synthetic.cube"
@@ -54,13 +56,13 @@ def test_lut_strength_pixels_match_mp4(
             creative_lut=asset, creative_strength=strength,
         )
         grade = ImageAdjust(exposure=8, warmth=5, highlights=-5)
-        clip = StudioExportClip(video, "video", 1.0, source_start_s=0.3,
-                                source_end_s=1.3, image=grade, color_look=look)
+        clip = StudioExportClip(video, "video", 1.5, source_start_s=0.3,
+                                source_end_s=1.8, image=grade, color_look=look)
         output = FfmpegStudioEncoder().render(StudioExportConfig(
             output_path=tmp_path / f"export-{strength}.mp4", width=320, height=180,
             clips=(clip,), quality="best",
         ))
-        for local in (0.2, 0.6):
+        for local in (0.2, 1.0):
             still = render_preview_frame(PreviewFrameRequest(
                 video, "video", 0.3 + local, grade, look, max_edge=320,
             ), data_dir=data)

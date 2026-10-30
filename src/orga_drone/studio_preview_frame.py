@@ -33,7 +33,10 @@ PREVIEW_CACHE_MAX_BYTES = 400 * 1024 * 1024
 PREVIEW_FFMPEG_TIMEOUT_S = 45.0
 PREVIEW_COLD_LATENCY_WARN_S = 1.0
 JPEG_COLOR_CHAIN = (
-    "scale=in_color_matrix=bt709:out_color_matrix=bt601:in_range=tv:out_range=pc,"
+    # RGB is an explicit boundary: direct YUV→YUV matrix conversion differs
+    # between bundled FFmpeg builds. Decode the exported interpretation first.
+    "scale=in_color_matrix=bt709:in_range=tv,format=rgb24,"
+    "scale=out_color_matrix=bt601:out_range=pc,"
     "format=yuvj420p,setparams=colorspace=bt470bg:range=pc"
 )
 
@@ -95,7 +98,6 @@ def preview_filter_chain(
     work_dir: Path,
     max_edge: int = PREVIEW_MAX_EDGE,
     saturation: float = 1.0,
-    output_jpeg: bool = True,
 ) -> str:
     """Same grade→LUT order as export; scale for preview; detail omitted."""
     parts: list[str] = []
@@ -118,8 +120,7 @@ def preview_filter_chain(
         "format=yuv420p,"
         "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
     )
-    if output_jpeg:
-        parts.append(JPEG_COLOR_CHAIN)
+    parts.append(JPEG_COLOR_CHAIN)
     return ",".join(parts)
 
 
@@ -140,7 +141,7 @@ def cache_key_for(
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "v": 4,
+        "v": 5,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -234,7 +235,6 @@ def render_preview_frame(
                 work_dir=work,
                 max_edge=req.max_edge,
                 saturation=req.saturation,
-                output_jpeg=False,
             )
         except LutMissingError:
             raise
@@ -253,31 +253,19 @@ def render_preview_frame(
                 "1",
                 "-vf",
                 vf,
-                "-c:v", "rawvideo", "-pix_fmt", "yuv420p", "-f", "nut",
-                str(work / "frame.nut"),
+                "-q:v", str(PREVIEW_JPEG_Q), str(work / "frame.jpg"),
             ]
         )
         started = time.perf_counter()
-        # A raw single-frame boundary prevents the JPEG encoder negotiating an
-        # earlier RGB/YUV format differently from export on another FFmpeg build.
-        # NUT carries dimensions; no extra decode of the source or lossy encode.
-        jpeg_cmd = [
-            ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-            "-i", str(work / "frame.nut"), "-frames:v", "1",
-            "-vf", JPEG_COLOR_CHAIN, "-q:v", str(PREVIEW_JPEG_Q), str(work / "frame.jpg"),
-        ]
         try:
-            for command in (cmd, jpeg_cmd):
-                proc = subprocess.run(
-                    command,
-                    check=False,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    timeout=max(0.1, PREVIEW_FFMPEG_TIMEOUT_S - (time.perf_counter() - started)),
-                    **subprocess_no_window_kwargs(),
-                )
-                if proc.returncode != 0:
-                    break
+            proc = subprocess.run(
+                cmd,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=PREVIEW_FFMPEG_TIMEOUT_S,
+                **subprocess_no_window_kwargs(),
+            )
         except subprocess.TimeoutExpired as exc:
             raise PreviewFrameError(
                 "Building the preview still took too long.",

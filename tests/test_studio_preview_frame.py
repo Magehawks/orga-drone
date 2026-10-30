@@ -198,7 +198,7 @@ def test_failed_jpeg_never_becomes_a_cache_hit(
             render_preview_frame(req, data_dir=data)
         assert not list((data / PREVIEW_STILLS_DIR).glob("*.jpg"))
         assert not list((data / PREVIEW_STILLS_DIR / "work").glob("*/*"))
-    assert len(calls) == 4
+    assert len(calls) == 2
 
 
 def test_cache_key_stable_for_same_inputs(tmp_path: Path) -> None:

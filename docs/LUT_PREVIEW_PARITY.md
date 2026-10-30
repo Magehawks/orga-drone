@@ -19,12 +19,10 @@ saturation ramp. Quick Looks continue to replace the basic sliders. Technical
 conversion is independent of creative strength and never enabled automatically.
 Both output scalers explicitly convert to limited-range BT.709, instead of
 tagging pixels whose conversion matrix depended on FFmpeg graph negotiation.
-The still passes through one lossless raw YUV frame in a temporary NUT container
-before conversion to full-range BT.601 JPEG with matching metadata. This boundary
-prevents the JPEG encoder changing earlier pixel-format negotiation on different
-FFmpeg builds. It adds one small local FFmpeg invocation, without decoding the
-source twice. Temporary frames are removed on success or failure.
-Cache version 4 invalidates earlier stills.
+The still then converts to full-range BT.601 JPEG with matching metadata in the
+existing single FFmpeg invocation. JPEG cache entries publish atomically after
+successful rendering; temporary files are removed on success or failure.
+Cache version 5 invalidates earlier stills.
 Source media and stored LUT references are unchanged.
 An assigned creative LUT at 0% still uses the FFmpeg output color path (with
 the LUT filter skipped), avoiding a switch to browser-specific source decoding.
@@ -54,9 +52,12 @@ with controlled network/decode timing. It checks stale responses during debounce
 and decode, repeated redraws, pause/play/removal, creative strength, decoded LUT
 pixel selection, framing, transition opacity and avoidance of double grading.
 
-`tests/test_studio_lut_pixel_parity.py` generates moving synthetic footage and a
+`tests/test_studio_lut_pixel_parity.py` generates synthetic color bars with a timed
+color change and a
 non-identity synthetic LUT, exports actual MP4s, and compares two source timestamps
-after trimming. It checks creative strength 0/50/100 with and without confirmed
+after trimming. Sample times lie inside stable sections so adjacent-frame CFR
+rounding does not masquerade as a color error. It checks creative strength
+0/50/100 with and without confirmed
 technical conversion, non-neutral basic/tonal adjustment, ordered strength changes,
 missing LUT after caching, and unchanged source SHA-256. Maximum per-channel mean
 absolute error must remain below 8/255. No private media, coordinates, SRT or vendor
