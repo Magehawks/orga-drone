@@ -126,7 +126,14 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     assert 'id="detail-adjust-contrast"' in image
     assert 'id="detail-adjust-saturation"' in image
     assert 'id="detail-adjust-warmth"' in image
+    assert 'id="detail-adjust-highlights"' in image
+    assert 'id="detail-quick-look"' in image
+    assert 'id="detail-look-compare"' in image
+    assert 'id="detail-image-section-basic"' in image
+    assert 'id="detail-image-section-advanced"' in image
     assert 'id="detail-adjust-reset"' in image
+    assert "Look &amp; color" in image or "Look & color" in image
+    assert "Fine-tune" in image
     assert 'id="detail-export-run"' not in image
     assert 'id="detail-export-format"' not in image
     assert 'id="detail-export-preset"' not in image

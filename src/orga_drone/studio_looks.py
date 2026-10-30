@@ -93,3 +93,24 @@ def parse_look_payload(payload: Mapping[str, object]) -> str:
     if key and key not in _LOOK_VALUES:
         raise ValueError("unknown quick look")
     return key
+
+
+def dump_photo_adjust(image: ImageAdjust, look_id: str = "") -> str:
+    """Persist a library-photo grade. Flat ImageAdjust fields; optional look id.
+
+    Older rows store only the four basic sliders. Extra tonal keys and an
+    optional ``look`` object are additive and stay compatible with
+    ``image_adjust_from_stored``.
+    """
+    data: dict[str, object] = dict(image.as_dict())
+    key = str(look_id or "").strip().lower()
+    if key:
+        if key not in _LOOK_VALUES:
+            raise ValueError("unknown quick look")
+        data[LOOK_KEY] = {"id": key}
+    return json.dumps(data, separators=(",", ":"), sort_keys=True)
+
+
+def look_id_from_stored(raw: str | None) -> str:
+    """Look id saved on a photo meta row. Missing → custom (empty)."""
+    return look_id_from_effect_settings(raw)

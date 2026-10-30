@@ -820,5 +820,10 @@
   "Custom points": "Eigene Punkte",
   "Keep at least two points.": "Mindestens zwei Punkte behalten.",
   "Color file strength": "Farbdatei-Stärke",
-  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Zwischen den Punkten ändert sich das Bild gleichmäßig. Die Werte ersetzen Look & Farben in diesem Bereich. Die Farbdatei-Stärke braucht eine kreative .cube auf dem Clip."
+  "Between the points the picture changes evenly. Values replace Look & color for that range. Color file strength needs a creative .cube on the clip.": "Zwischen den Punkten ändert sich das Bild gleichmäßig. Die Werte ersetzen Look & Farben in diesem Bereich. Die Farbdatei-Stärke braucht eine kreative .cube auf dem Clip.",
+  "Sharpen, denoise, and color files stay in Studio for Story clips.": "Schärfen, Entrauschen und Farbdateien bleiben im Studio für Story-Clips.",
+  "Also resets Fine-tune tonals (highlights, shadows, blacks).": "Setzt auch die Feinabstimmung (Lichter, Schatten, Tiefen) zurück.",
+  "Replaces the four sliders below. Does not change the file on disk.": "Ersetzt die vier Schieberegler darunter. Die Datei auf dem Datenträger bleibt unverändert.",
+  "Unknown look.": "Unbekannter Look.",
+  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung, Wärme und Feinabstimmung müssen zwischen −100 und 100 liegen."
 }

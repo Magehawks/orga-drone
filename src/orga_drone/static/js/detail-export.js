@@ -39,12 +39,26 @@
 
   const gradePreview = document.getElementById("detail-export-grade-preview");
   const pagePreview = document.querySelector(".photo-preview");
-  const adjustInputs = ["exposure", "contrast", "saturation", "warmth"].map((key) => ({
+  const adjustPanel = document.getElementById("detail-image-adjust");
+  const adjustInputs = [
+    "exposure",
+    "contrast",
+    "saturation",
+    "warmth",
+    "highlights",
+    "shadows",
+    "blacks",
+  ].map((key) => ({
     key,
     input: document.getElementById(`detail-adjust-${key}`),
     value: document.getElementById(`detail-adjust-${key}-value`),
   }));
+  const lookSelect = document.getElementById("detail-quick-look");
+  const lookCompare = document.getElementById("detail-look-compare");
   const imageAdjustModel = readImageAdjustModel();
+  const quickLooksModel = readQuickLooksModel();
+  let activeLookId = "";
+  let compareOriginal = false;
 
   const presetSelect = document.getElementById("detail-export-preset");
   const exportFilename = document.getElementById("detail-export-filename");
@@ -90,16 +104,60 @@
     return Math.max(-100, Math.min(100, Math.round(number)));
   }
 
+  function readQuickLooksModel() {
+    const fallback = { ids: [], values: {} };
+    const raw =
+      (adjustPanel && adjustPanel.dataset.quickLooksModel) ||
+      root.dataset.quickLooksModel ||
+      "";
+    try {
+      const parsed = JSON.parse(raw || "");
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return {
+        ids: Array.isArray(parsed.ids) ? parsed.ids : [],
+        values: parsed.values && typeof parsed.values === "object" ? parsed.values : {},
+      };
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   function readAdjust() {
-    const adjust = { exposure: 0, contrast: 0, saturation: 0, warmth: 0 };
+    const adjust = {
+      exposure: 0,
+      contrast: 0,
+      saturation: 0,
+      warmth: 0,
+      highlights: 0,
+      shadows: 0,
+      blacks: 0,
+    };
     adjustInputs.forEach((row) => {
       adjust[row.key] = clampSlider(row.input ? row.input.value : 0);
     });
     return adjust;
   }
 
+  function writeAdjust(adjust, { lookId = "" } = {}) {
+    adjustInputs.forEach((row) => {
+      if (!row.input) return;
+      const value = clampSlider(adjust && adjust[row.key] != null ? adjust[row.key] : 0);
+      row.input.value = String(value);
+    });
+    activeLookId = lookId || "";
+    if (lookSelect) lookSelect.value = activeLookId;
+  }
+
   function imageAdjustIsNeutral(adjust) {
-    return !adjust.exposure && !adjust.contrast && !adjust.saturation && !adjust.warmth;
+    return (
+      !adjust.exposure &&
+      !adjust.contrast &&
+      !adjust.saturation &&
+      !adjust.warmth &&
+      !adjust.highlights &&
+      !adjust.shadows &&
+      !adjust.blacks
+    );
   }
 
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
@@ -136,13 +194,21 @@
       const factor = 1 + (adjust.saturation / 100) * imageAdjustModel.saturationDeltaAtFull;
       parts.push(`saturate(${factor.toFixed(4)})`);
     }
-    if (adjust.contrast) {
-      const factor = 1 + (adjust.contrast / 100) * imageAdjustModel.contrastDeltaAtFull;
-      parts.push(`contrast(${factor.toFixed(4)})`);
+    let contrast = 1 + (adjust.contrast / 100) * imageAdjustModel.contrastDeltaAtFull;
+    contrast += ((adjust.highlights || 0) / 100) * 0.08;
+    contrast -= ((adjust.shadows || 0) / 100) * 0.05;
+    contrast -= ((adjust.blacks || 0) / 100) * 0.04;
+    contrast = Math.min(1.6, Math.max(0.4, contrast));
+    if (Math.abs(contrast - 1) > 0.0005) {
+      parts.push(`contrast(${contrast.toFixed(4)})`);
     }
-    if (adjust.exposure) {
-      const ev = (adjust.exposure / 100) * imageAdjustModel.exposureEvAtFull;
-      parts.push(`brightness(${Math.pow(2, ev).toFixed(4)})`);
+    let brightness = Math.pow(2, (adjust.exposure / 100) * imageAdjustModel.exposureEvAtFull);
+    brightness += ((adjust.shadows || 0) / 100) * 0.06;
+    brightness += ((adjust.blacks || 0) / 100) * 0.04;
+    brightness -= ((adjust.highlights || 0) / 100) * 0.05;
+    brightness = Math.min(2.2, Math.max(0.5, brightness));
+    if (Math.abs(brightness - 1) > 0.0005) {
+      parts.push(`brightness(${brightness.toFixed(4)})`);
     }
     return parts.join(" ");
   }
@@ -154,7 +220,7 @@
       if (row.value) row.value.textContent = String(adjust[row.key]);
     });
     const targets = [gradePreview, pagePreview].filter(Boolean);
-    if (imageAdjustIsNeutral(adjust)) {
+    if (compareOriginal || imageAdjustIsNeutral(adjust)) {
       targets.forEach((el) => {
         el.style.filter = "";
       });
@@ -664,6 +730,7 @@
     const body = { preset: preset.id, output_path: pickedPath };
     if (kind !== "photo") return body;
     Object.assign(body, readAdjust());
+    if (activeLookId) body.look_id = activeLookId;
     const fmt = selectedStillFormat();
     if (fmt) body.still_format = fmt;
     return body;
@@ -677,34 +744,64 @@
     } catch (_) {
       saved = null;
     }
-    if (!saved || typeof saved !== "object") return;
-    adjustInputs.forEach((row) => {
-      if (!row.input || saved[row.key] == null) return;
-      row.input.value = String(clampSlider(saved[row.key]));
-    });
+    const lookId =
+      (adjustPanel && adjustPanel.dataset.photoLook) || root.dataset.photoLook || "";
+    if (!saved || typeof saved !== "object") {
+      writeAdjust({}, { lookId: lookId || "" });
+      return;
+    }
+    writeAdjust(saved, { lookId: lookId || "" });
   }
 
-  async function saveAdjust() {
+  async function saveAdjust({ keepLook = false } = {}) {
     if (kind !== "photo" || !mediaId) return;
+    const body = readAdjust();
+    if (keepLook && activeLookId) body.look_id = activeLookId;
+    else body.look_id = "";
+    if (!keepLook) activeLookId = "";
+    if (lookSelect && !keepLook) lookSelect.value = "";
     try {
-      await fetch(`/api/media/${encodeURIComponent(mediaId)}/image-adjust`, {
+      const res = await fetch(`/api/media/${encodeURIComponent(mediaId)}/image-adjust`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(readAdjust()),
+        body: JSON.stringify(body),
         keepalive: true,
       });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.look_id != null) {
+        activeLookId = data.look_id || "";
+        if (lookSelect) lookSelect.value = activeLookId;
+      }
     } catch (_) {
       /* the next visit still has the last successful save */
     }
   }
 
-  function resetAdjust() {
-    adjustInputs.forEach((row) => {
-      if (row.input) row.input.value = "0";
-    });
+  async function applyLook(lookId) {
+    const values =
+      (quickLooksModel.values && quickLooksModel.values[lookId]) ||
+      (lookId === "natural" ? {} : null);
+    if (!lookId) {
+      activeLookId = "";
+      await saveAdjust({ keepLook: false });
+      applyGradePreview();
+      refreshHint();
+      return;
+    }
+    if (!values && lookId !== "natural") return;
+    writeAdjust(values || {}, { lookId });
     applyGradePreview();
     refreshHint();
-    saveAdjust();
+    await saveAdjust({ keepLook: true });
+  }
+
+  function resetAdjust() {
+    writeAdjust({}, { lookId: "" });
+    compareOriginal = false;
+    if (lookCompare) lookCompare.checked = false;
+    applyGradePreview();
+    refreshHint();
+    saveAdjust({ keepLook: false });
   }
 
   presetSelect?.addEventListener("change", () => {
@@ -719,17 +816,28 @@
     event.preventDefault();
     resetAdjust();
   });
+  lookSelect?.addEventListener("change", () => {
+    applyLook(lookSelect.value || "");
+  });
+  lookCompare?.addEventListener("change", () => {
+    compareOriginal = Boolean(lookCompare.checked);
+    applyGradePreview();
+  });
   adjustInputs.forEach((row) => {
     row.input?.addEventListener("input", () => {
+      if (activeLookId) {
+        activeLookId = "";
+        if (lookSelect) lookSelect.value = "";
+      }
       applyGradePreview();
       refreshHint();
     });
     row.input?.addEventListener("change", () => {
-      saveAdjust();
+      saveAdjust({ keepLook: false });
     });
   });
   window.addEventListener("pagehide", () => {
-    saveAdjust();
+    saveAdjust({ keepLook: Boolean(activeLookId) });
   });
   loadSavedAdjust();
   applyGradePreview();

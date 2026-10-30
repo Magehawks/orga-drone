@@ -428,45 +428,107 @@
     {% if item.kind == 'photo' and item_exportable %}
     <div class="detail-actions-panel" id="detail-panel-image" role="tabpanel"
          data-detail-tab-panel="image" aria-labelledby="detail-tab-image" hidden>
-      <div class="action-form" id="detail-image-adjust">
+      <div class="action-form studio-image-panel" id="detail-image-adjust"
+           data-quick-looks-model='{{ quick_looks_model|tojson }}'
+           data-photo-look="{{ photo_look|e }}"
+           data-look-custom="{{ _('Custom')|e }}"
+           data-look-natural="{{ _('Natural')|e }}"
+           data-look-cinematic="{{ _('Cinematic')|e }}"
+           data-look-golden-hour="{{ _('Golden Hour')|e }}"
+           data-look-vibrant="{{ _('Vibrant')|e }}"
+           data-look-cool="{{ _('Cool')|e }}"
+           data-look-black-and-white="{{ _('Black & White')|e }}">
         {% if photo_src %}
         <img id="detail-export-grade-preview" class="detail-export-grade-preview"
              src="{{ photo_src }}" alt="">
         {% endif %}
         <p class="studio-inspector-kind">{{ _('Adjust image') }}</p>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Brightness') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-exposure-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-exposure" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Brightness') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Contrast') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-contrast-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-contrast" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Contrast') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Saturation') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-saturation-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-saturation" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Saturation') }}">
-        </label>
-        <label class="studio-inspector-field">
-          <span class="studio-image-adjust-label">
-            <span>{{ _('Warmth') }}</span>
-            <span class="studio-image-adjust-value" id="detail-adjust-warmth-value">0</span>
-          </span>
-          <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
-                 aria-label="{{ _('Warmth') }}">
-        </label>
-        <button type="button" class="button ghost" id="detail-adjust-reset">{{ _('Reset adjustments') }}</button>
+        <details id="detail-image-section-basic" class="studio-image-section" open>
+          <summary>{{ _('Look & color') }}</summary>
+          <label class="studio-inspector-field" for="detail-quick-look">
+            <span>{{ _('Look') }}</span>
+            <select id="detail-quick-look" aria-label="{{ _('Look') }}"
+                    title="{{ _('Replaces the four sliders below. Does not change the file on disk.') }}">
+              <option value="">{{ _('Custom') }}</option>
+              <option value="natural">{{ _('Natural') }}</option>
+              <option value="cinematic">{{ _('Cinematic') }}</option>
+              <option value="golden_hour">{{ _('Golden Hour') }}</option>
+              <option value="vibrant">{{ _('Vibrant') }}</option>
+              <option value="cool">{{ _('Cool') }}</option>
+              <option value="black_and_white">{{ _('Black & White') }}</option>
+            </select>
+          </label>
+          <label class="studio-inspector-field studio-frame-motion"
+                 title="{{ _('Preview only. Export keeps the graded picture.') }}">
+            <input type="checkbox" id="detail-look-compare">
+            <span>{{ _('Show original for comparison') }}</span>
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Brightness') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-exposure-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-exposure" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Brightness') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Contrast') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-contrast-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-contrast" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Contrast') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Saturation') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-saturation-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-saturation" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Saturation') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Warmth') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-warmth-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-warmth" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Warmth') }}">
+          </label>
+          <button type="button" class="button ghost" id="detail-adjust-reset"
+                  title="{{ _('Also resets Fine-tune tonals (highlights, shadows, blacks).') }}">{{ _('Reset adjustments') }}</button>
+        </details>
+        <details id="detail-image-section-advanced" class="studio-image-section">
+          <summary>{{ _('Fine-tune') }}</summary>
+          <label class="studio-inspector-field"
+                 title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Highlights') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-highlights-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-highlights" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Highlights') }}">
+          </label>
+          <label class="studio-inspector-field"
+                 title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Shadows') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-shadows-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-shadows" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Shadows') }}">
+          </label>
+          <label class="studio-inspector-field"
+                 title="{{ _('Reshape midrange light. Does not recover clipped highlights or deep blacks.') }}">
+            <span class="studio-image-adjust-label">
+              <span>{{ _('Blacks') }}</span>
+              <span class="studio-image-adjust-value" id="detail-adjust-blacks-value">0</span>
+            </span>
+            <input type="range" id="detail-adjust-blacks" min="-100" max="100" step="1" value="0"
+                   aria-label="{{ _('Blacks') }}">
+          </label>
+          <p class="hint">{{ _('Sharpen, denoise, and color files stay in Studio for Story clips.') }}</p>
+        </details>
         <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
       </div>
     </div>
@@ -510,6 +572,7 @@
          {% if item.kind == 'photo' %}
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-image-adjust='{{ photo_adjust|tojson }}'
+         data-photo-look="{{ photo_look|e }}"
          data-grade-reencode="{{ _('Re-encodes this still with the adjustments.')|e }}"
          data-grade-png="{{ _('Saves a PNG of this still. The library file stays unchanged.')|e }}"
          {% endif %}

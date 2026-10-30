@@ -10,10 +10,16 @@ from fastapi.testclient import TestClient
 from orga_drone.app import create_app
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
-from orga_drone.studio_image import image_adjust_from_effect_settings
+from orga_drone.studio_image import (
+    ImageAdjust,
+    image_adjust_from_effect_settings,
+    image_adjust_from_stored,
+)
 from orga_drone.studio_looks import (
     LOOK_IDS,
+    dump_photo_adjust,
     look_id_from_effect_settings,
+    look_id_from_stored,
     look_image_adjust,
     parse_look_payload,
     quick_looks_preview_model,
@@ -102,3 +108,21 @@ def test_quick_look_replaces_sliders_and_persists(
     assert image_adjust_from_effect_settings(kept.effect_settings).as_dict() == body[
         "image"
     ]
+
+
+def test_dump_photo_adjust_keeps_legacy_flat_json_readable() -> None:
+    legacy = '{"contrast": 10, "exposure": 5, "saturation": 0, "warmth": -2}'
+    assert look_id_from_stored(legacy) == ""
+    loaded = image_adjust_from_stored(legacy)
+    assert loaded.exposure == 5
+    assert loaded.contrast == 10
+    assert loaded.highlights == 0
+
+    rich = dump_photo_adjust(
+        ImageAdjust(exposure=2, contrast=16, saturation=38, warmth=4, highlights=8),
+        "vibrant",
+    )
+    assert look_id_from_stored(rich) == "vibrant"
+    again = image_adjust_from_stored(rich)
+    assert again.saturation == 38
+    assert again.highlights == 8

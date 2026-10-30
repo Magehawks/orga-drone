@@ -2065,16 +2065,33 @@ class Database:
             return image_adjust_from_stored(None)
         return image_adjust_from_stored(row["image_adjust_json"])
 
+    def get_photo_look_id(self, media_path: str | Path) -> str:
+        """Quick Look id for a photo. Missing → empty (Custom)."""
+        from orga_drone.studio_looks import look_id_from_stored
+
+        media_path = str(media_path)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT image_adjust_json FROM media_meta WHERE media_path = ?",
+                (media_path,),
+            ).fetchone()
+        if row is None:
+            return ""
+        return look_id_from_stored(row["image_adjust_json"])
+
     def set_image_adjust(
         self,
         media_path: str | Path,
         image,
         *,
         identity_key: str | None = None,
+        look_id: str = "",
     ) -> None:
         """Store a photo grade on the user-meta row. Does not change other fields or the file."""
+        from orga_drone.studio_looks import dump_photo_adjust
+
         media_path = str(media_path)
-        raw = json.dumps(image.as_dict(), separators=(",", ":"), sort_keys=True)
+        raw = dump_photo_adjust(image, look_id)
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
             existing = conn.execute(
