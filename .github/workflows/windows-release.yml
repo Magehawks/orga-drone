@@ -212,13 +212,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          cd release-assets
-          sha256sum -c orga-drone-windows-x64.zip.sha256
-          version="$(sed -n 's/^version=//p' release-build.txt | tr -d '\r')"
-          commit="$(sed -n 's/^commit=//p' release-build.txt | tr -d '\r')"
-          sha="$(awk '{print $1}' orga-drone-windows-x64.zip.sha256 | tr -d '\r')"
+          # Stay in the workspace root so `gh` can resolve the repository.
+          # Assets live under release-assets/ from the download step.
+          sha256sum -c release-assets/orga-drone-windows-x64.zip.sha256
+          version="$(sed -n 's/^version=//p' release-assets/release-build.txt | tr -d '\r')"
+          commit="$(sed -n 's/^commit=//p' release-assets/release-build.txt | tr -d '\r')"
+          sha="$(awk '{print $1}' release-assets/orga-drone-windows-x64.zip.sha256 | tr -d '\r')"
           if [ -z "${version}" ] || [ -z "${commit}" ] || [ -z "${sha}" ]; then
             echo "release-build.txt is missing version, commit, or checksum"
             exit 1
@@ -276,16 +278,16 @@ jobs:
             fi
             echo "Draft already exists. Replaced the zip and checksum. Release notes were left unchanged."
             gh release upload "${RELEASE_TAG}" \
-              orga-drone-windows-x64.zip \
-              orga-drone-windows-x64.zip.sha256 \
+              release-assets/orga-drone-windows-x64.zip \
+              release-assets/orga-drone-windows-x64.zip.sha256 \
               --clobber
           else
             gh release create "${RELEASE_TAG}" \
               --draft \
               --title "orga-drone ${RELEASE_TAG}" \
               --notes-file DRAFT_RELEASE_NOTES.md \
-              orga-drone-windows-x64.zip \
-              orga-drone-windows-x64.zip.sha256
+              release-assets/orga-drone-windows-x64.zip \
+              release-assets/orga-drone-windows-x64.zip.sha256
           fi
           gh release edit "${RELEASE_TAG}" --draft
           is_draft="$(gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft)"
