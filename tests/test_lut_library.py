@@ -185,3 +185,55 @@ def test_http_luts_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert studio.status_code in {200, 303}
     deleted = client.delete(f"/api/luts/{asset}")
     assert deleted.status_code == 200
+
+
+def test_http_delete_blocked_across_projects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    client = TestClient(app)
+    cube = write_identity_cube(tmp_path / "shared.cube")
+    imported = client.post("/api/luts", json={"path": str(cube)}).json()
+    asset = imported["asset_name"]
+    media_id = _seed_media(db, tmp_path / "lib")
+    item = db.get_media(media_id)
+    assert item is not None
+    p1 = db.create_studio_project("Alpen")
+    p2 = db.create_studio_project("Strand")
+    clip1, _ = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        project_id=p1.id,
+    )
+    clip2, _ = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        project_id=p2.id,
+    )
+    payload = {
+        "input_profile": "rec709",
+        "conversion_lut": "",
+        "creative_lut": asset,
+        "creative_strength": 100,
+        "conversion_confirmed": False,
+    }
+    db.set_studio_color_look(clip1, payload)
+    db.set_studio_color_look(clip2, payload)
+    blocked = client.delete(f"/api/luts/{asset}")
+    assert blocked.status_code == 409
+    body = blocked.json()
+    assert body["in_use"] is True
+    assert body["clip_count"] == 2
+    assert body["project_count"] == 2
+    assert "Alpen" in body["project_titles"]
+    assert "Strand" in body["project_titles"]

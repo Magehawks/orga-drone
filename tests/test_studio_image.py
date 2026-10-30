@@ -352,9 +352,8 @@ def test_http_image_adjust_validation_and_inspector(
     assert ("Original zum Vergleichen anzeigen" in page.text) or (
         "Show original for comparison" in page.text
     )
-    assert ("Eigene Farbdatei (.cube)" in page.text) or (
-        "Your color file (.cube)" in page.text
-    )
+    assert ("Farbdatei (.cube)" in page.text) or ("Color file (.cube)" in page.text)
+    assert 'id="inspector-color-creative-select"' in page.text
     assert 'data-image-adjust=' in page.text
     assert 'data-color-profile=' in page.text
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")

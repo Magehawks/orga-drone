@@ -388,12 +388,12 @@ def delete_lut(db: Database, data_dir: Path, asset_name: str) -> None:
     if usage.clip_count > 0:
         raise LutInUseError(usage)
     path = resolve_lut_asset(data_dir, asset_name)
-    db.delete_lut_asset(asset_name)
     if path.is_file():
         try:
             path.unlink()
         except OSError as exc:
             raise LutInvalidError("LUT file could not be deleted") from exc
+    db.delete_lut_asset(asset_name)
 
 
 def display_name_map(db: Database, data_dir: Path) -> dict[str, str]:
