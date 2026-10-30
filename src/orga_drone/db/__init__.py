@@ -3828,6 +3828,7 @@ class Database:
                         contrast=key.contrast,
                         saturation=key.saturation,
                         warmth=key.warmth,
+                        lut_strength=key.lut_strength,
                     )
                 )
             blob = dump_color_animation(

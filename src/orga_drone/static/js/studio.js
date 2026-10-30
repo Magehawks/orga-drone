@@ -2258,11 +2258,20 @@
   let lutStillToken = 0;
   let lutStillObjectUrl = "";
 
-  function colorLookNeedsStill(look) {
+  function colorLookNeedsStill(look, clip) {
     if (!look) return false;
-    // Match server look_needs_preview_still: only when a .cube is in the graph.
+    // Conversion or any creative .cube can appear in the export graph. Strength
+    // may be animated via color points even when the static slider is 0.
     if (look.conversion_lut && look.conversion_confirmed) return true;
-    if (look.creative_lut && Number(look.creative_strength) > 0) return true;
+    if (look.creative_lut) {
+      if (Number(look.creative_strength) > 0) return true;
+      const anim = clip ? readColorAnimation(clip) : null;
+      if (anim && Array.isArray(anim.keys)) {
+        return anim.keys.some(
+          (key) => key && key.lut_strength != null && Number(key.lut_strength) > 0
+        );
+      }
+    }
     return false;
   }
 
@@ -2323,12 +2332,12 @@
     const look = readColorLook(clip);
     const anim = readColorAnimation(clip);
     const animActive = Boolean(anim && Array.isArray(anim.keys) && anim.keys.length >= 2);
-    if (!colorLookNeedsStill(look) && !animActive) {
+    if (!colorLookNeedsStill(look, clip) && !animActive) {
       clearLutPreviewStill();
       return;
     }
     // Color-animation-only stills wait for a color file; CSS covers grade keys.
-    if (!colorLookNeedsStill(look)) {
+    if (!colorLookNeedsStill(look, clip)) {
       clearLutPreviewStill();
       return;
     }

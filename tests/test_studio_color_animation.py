@@ -299,13 +299,23 @@ def test_color_animation_api(
     assert page.status_code == 200
     assert 'id="inspector-color-animation"' in page.text
     assert "data-color-animation-model=" in page.text
+    fade = client.patch(
+        f"/api/studio/{clip_id}/color-animation",
+        json={"preset_id": "lut_fade_in", "bar": {"start_s": 0.0, "end_s": 3.0}},
+        headers=headers,
+    )
+    assert fade.status_code == 200, fade.text
     moved = client.patch(
         f"/api/studio/{clip_id}/effect-lane",
         json={"kind": "color", "op": "update", "start_s": 0.5, "end_s": 2.5},
         headers=headers,
     )
     assert moved.status_code == 200, moved.text
-    assert moved.json()["effect_lane"]["color_animation"]["bar"]["start_s"] == 0.5
+    moved_anim = moved.json()["effect_lane"]["color_animation"]
+    assert moved_anim["bar"]["start_s"] == 0.5
+    strengths = [key.get("lut_strength") for key in moved_anim["keys"]]
+    assert strengths[0] == 0
+    assert strengths[-1] == 100
     deleted = client.patch(
         f"/api/studio/{clip_id}/effect-lane",
         json={"kind": "color", "op": "delete"},

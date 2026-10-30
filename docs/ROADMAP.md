@@ -62,9 +62,9 @@ Not scheduled commitments — candidate improvements toward the **Studio MVP
 6. **itch.io Windows channel** via butler for the existing onefolder build.
    The process is documented for a Draft/Restricted test. A public paid
    launch waits on the A→B app-update record. This is not an in-app updater.
-7. **Studio creative LUT strength animation** (#211 PR3) — `lut_fade_in` /
-   `lut_fade_out` presets and Manual `lut_strength` on the shared color-point
-   engine (pause/scrub stills + export). Conversion LUT stays static.
+7. ~~Studio creative LUT strength animation (#211 PR3)~~ — shipped on the
+   shared color-point engine (`lut_fade_in` / `lut_fade_out` + Manual
+   `lut_strength`). Conversion LUT stays static.
 
 Do **not** treat WhatsApp / YouTube / etc. integrations as near-term without a
 dedicated product slice. Local MP4 export, optional soundtrack playlist in
