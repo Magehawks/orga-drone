@@ -20,7 +20,7 @@ conversion is independent of creative strength and never enabled automatically.
 Both output scalers explicitly convert to limited-range BT.709, instead of
 tagging pixels whose conversion matrix depended on FFmpeg graph negotiation.
 The still then converts to full-range BT.601 JPEG with matching metadata.
-Cache version 2 invalidates earlier stills.
+Cache version 3 invalidates earlier stills.
 Source media and stored LUT references are unchanged.
 An assigned creative LUT at 0% still uses the FFmpeg output color path (with
 the LUT filter skipped), avoiding a switch to browser-specific source decoding.

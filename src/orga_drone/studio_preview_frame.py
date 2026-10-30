@@ -135,7 +135,7 @@ def cache_key_for(
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "v": 2,
+        "v": 3,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
