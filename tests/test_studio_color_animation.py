@@ -181,3 +181,17 @@ def test_color_animation_api(
     assert page.status_code == 200
     assert 'id="inspector-color-animation"' in page.text
     assert "data-color-animation-model=" in page.text
+    moved = client.patch(
+        f"/api/studio/{clip_id}/effect-lane",
+        json={"kind": "color", "op": "update", "start_s": 0.5, "end_s": 2.5},
+        headers=headers,
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["effect_lane"]["color_animation"]["bar"]["start_s"] == 0.5
+    deleted = client.patch(
+        f"/api/studio/{clip_id}/effect-lane",
+        json={"kind": "color", "op": "delete"},
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["effect_lane"]["color_animation"] is None

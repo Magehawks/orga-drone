@@ -1588,7 +1588,14 @@ class FfmpegStudioEncoder:
             from orga_drone.studio_color_animation import expand_export_clip_for_color
 
             pieces: list[StudioExportClip] = []
+            clip_origin = float(clip.source_start_s)
             for slow_piece in _slow_pieces(clip):
+                # Color keys are relative to the original trimmed in-point.
+                object.__setattr__(
+                    slow_piece,
+                    "color_local_origin",
+                    float(slow_piece.source_start_s) - clip_origin,
+                )
                 pieces.extend(expand_export_clip_for_color(slow_piece))  # type: ignore[arg-type]
             if len(pieces) == 1:
                 self._render_video(

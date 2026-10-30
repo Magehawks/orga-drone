@@ -7,7 +7,6 @@
   "Theme": "Theme",
   "Dark": "Dark",
   "Light": "Light",
-  "Custom": "Custom",
   "Accent": "Accent",
   "Background": "Background",
   "Panel": "Panel",
@@ -816,5 +815,8 @@
   "Between the points the picture changes evenly. Values replace Look & color for that range.": "Between the points the picture changes evenly. Values replace Look & color for that range.",
   "Remove color change": "Remove color change",
   "Set the playhead inside the color bar.": "Set the playhead inside the color bar.",
-  "At most 8 points.": "At most 8 points."
+  "At most 8 points.": "At most 8 points.",
+  "Custom": "Custom",
+  "Custom points": "Custom points",
+  "Keep at least two points.": "Keep at least two points."
 }

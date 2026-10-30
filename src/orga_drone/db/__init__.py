@@ -3797,6 +3797,48 @@ class Database:
             if not found:
                 raise ValueError("mask not found")
             blob = dump_masks(settings, updated)
+        elif kind == "color" and op == "delete":
+            from orga_drone.studio_color_animation import (
+                ColorAnimation,
+                dump_color_animation,
+            )
+
+            blob = dump_color_animation(settings, ColorAnimation())
+        elif kind == "color":
+            from orga_drone.studio_color_animation import (
+                ColorKey,
+                color_animation_from_effect_settings,
+                dump_color_animation,
+            )
+
+            start_s, end_s = span()
+            anim = color_animation_from_effect_settings(settings)
+            if not anim.is_active:
+                raise ValueError("color change not found")
+            old_span = max(0.05, anim.bar_end_s - anim.bar_start_s)
+            new_span = end_s - start_s
+            scaled = []
+            for key in anim.keys:
+                u = (key.t - anim.bar_start_s) / old_span
+                u = min(1.0, max(0.0, u))
+                scaled.append(
+                    ColorKey(
+                        t=round(start_s + u * new_span, 4),
+                        exposure=key.exposure,
+                        contrast=key.contrast,
+                        saturation=key.saturation,
+                        warmth=key.warmth,
+                    )
+                )
+            blob = dump_color_animation(
+                settings,
+                replace(
+                    anim,
+                    bar_start_s=start_s,
+                    bar_end_s=end_s,
+                    keys=tuple(scaled),
+                ),
+            )
         else:
             raise ValueError("unknown effect")
         now = datetime.now().isoformat(timespec="seconds")

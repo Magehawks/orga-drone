@@ -7,7 +7,6 @@
   "Theme": "Design",
   "Dark": "Dunkel",
   "Light": "Hell",
-  "Custom": "Eigene",
   "Accent": "Akzent",
   "Background": "Hintergrund",
   "Panel": "Fläche",
@@ -816,5 +815,8 @@
   "Between the points the picture changes evenly. Values replace Look & color for that range.": "Zwischen den Punkten ändert sich das Bild gleichmäßig. Die Werte ersetzen Look & Farben in diesem Bereich.",
   "Remove color change": "Farbänderung entfernen",
   "Set the playhead inside the color bar.": "Playhead in die Farbänderung setzen.",
-  "At most 8 points.": "Maximal 8 Punkte."
+  "At most 8 points.": "Maximal 8 Punkte.",
+  "Custom": "Benutzerdefiniert",
+  "Custom points": "Eigene Punkte",
+  "Keep at least two points.": "Mindestens zwei Punkte behalten."
 }

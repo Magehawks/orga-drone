@@ -1129,7 +1129,7 @@
         if (Number.isFinite(start) && Number.isFinite(end) && end - start >= 0.05) {
           const presetName = colorAnim.preset_id
             ? colorAnimPresetLabel(colorAnim.preset_id)
-            : (root.dataset.colorAnimCustom || "Custom");
+            : (root.dataset.colorAnimCustom || "Custom points");
           bars.push({
             kind: "color",
             id: "",
@@ -1454,6 +1454,13 @@
       const bar = slowBarOf(clip);
       return bar || { start: 0, end: dur };
     }
+    if (el.dataset.kind === "color") {
+      const anim = readColorAnimation(clip);
+      if (anim && anim.bar) {
+        return { start: Number(anim.bar.start_s) || 0, end: Number(anim.bar.end_s) || dur };
+      }
+      return { start: 0, end: dur };
+    }
     const mask = readMasks(clip).find((item) => item.id === el.dataset.maskId);
     if (mask && mask.start_s != null) return { start: Number(mask.start_s), end: Number(mask.end_s) };
     return { start: 0, end: dur };
@@ -1475,12 +1482,16 @@
     clip.dataset.masks = JSON.stringify(data.masks || []);
     clip.dataset.zoomBar = JSON.stringify(data.zoom_bar);
     clip.dataset.slowBar = JSON.stringify(data.slow_bar);
+    if (data.effect_lane && Object.prototype.hasOwnProperty.call(data.effect_lane, "color_animation")) {
+      writeColorAnimation(clip, data.effect_lane.color_animation || null);
+    }
     if (data.playback_speed != null) clip.dataset.playbackSpeed = String(data.playback_speed);
     if (data.effective_duration_s != null) clip.dataset.effectiveDuration = String(data.effective_duration_s);
     layoutTimeline();
     applyFramePreview(resolveAt(state.projectTimeS));
     drawPrivacyMasks();
     applyClipPlayback(previewVideo, clip);
+    fillColorAnimationInspector(clip);
   }
 
   function deleteSelectedEffectBar() {
@@ -2614,6 +2625,8 @@
     fillColorAnimationInspector(clip);
   }
 
+  let selectedColorPointIndex = -1;
+
   function fillColorAnimationInspector(clip) {
     const section = document.getElementById("inspector-color-animation");
     if (!section) return;
@@ -2637,10 +2650,76 @@
     const applyBtn = document.getElementById("color-anim-apply-preset");
     if (applyBtn) applyBtn.disabled = !select || !select.value;
     const count = document.getElementById("color-anim-points-count");
-    if (count) {
-      const n = anim && Array.isArray(anim.keys) ? anim.keys.length : 0;
-      count.textContent = n ? `${n}/8` : "";
+    const keys = anim && Array.isArray(anim.keys) ? anim.keys : [];
+    if (count) count.textContent = keys.length ? `${keys.length}/8` : "";
+    const mode = anim && anim.mode === "manual" ? "manual" : "preset";
+    const modePreset = document.getElementById("color-anim-mode-presets");
+    const modeManual = document.getElementById("color-anim-mode-manual");
+    const presetsPanel = document.getElementById("color-anim-presets-panel");
+    const manualPanel = document.getElementById("color-anim-manual-panel");
+    if (modePreset) modePreset.classList.toggle("is-active", mode === "preset");
+    if (modeManual) modeManual.classList.toggle("is-active", mode === "manual");
+    if (presetsPanel) presetsPanel.hidden = mode !== "preset";
+    if (manualPanel) manualPanel.hidden = mode !== "manual";
+    const list = document.getElementById("color-anim-point-list");
+    if (list) {
+      list.replaceChildren();
+      keys.forEach((key, index) => {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "button ghost";
+        if (index === selectedColorPointIndex) btn.classList.add("is-active");
+        btn.textContent = `${Number(key.t).toFixed(1)}s · W ${key.warmth || 0}`;
+        btn.addEventListener("click", () => {
+          selectedColorPointIndex = index;
+          fillColorAnimationInspector(clip);
+        });
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
     }
+    const editor = document.getElementById("color-anim-point-editor");
+    const key = keys[selectedColorPointIndex];
+    if (editor) editor.hidden = !key;
+    if (key) {
+      const setPair = (inputId, valueId, value) => {
+        const input = document.getElementById(inputId);
+        const valueEl = document.getElementById(valueId);
+        if (input) input.value = String(value);
+        if (valueEl) valueEl.textContent = String(value);
+      };
+      setPair("color-anim-point-time", null, Number(key.t));
+      setPair("color-anim-exposure", "color-anim-exposure-value", key.exposure || 0);
+      setPair("color-anim-contrast", "color-anim-contrast-value", key.contrast || 0);
+      setPair("color-anim-saturation", "color-anim-saturation-value", key.saturation || 0);
+      setPair("color-anim-warmth", "color-anim-warmth-value", key.warmth || 0);
+    }
+  }
+
+  async function persistSelectedColorPoint(clip) {
+    const anim = readColorAnimation(clip);
+    if (!anim || !Array.isArray(anim.keys) || selectedColorPointIndex < 0) return;
+    const keys = anim.keys.map((key) => ({ ...key }));
+    const current = keys[selectedColorPointIndex];
+    if (!current) return;
+    const timeEl = document.getElementById("color-anim-point-time");
+    const readSlider = (id) => {
+      const el = document.getElementById(id);
+      return el ? Number(el.value) || 0 : 0;
+    };
+    current.t = timeEl ? Number(timeEl.value) || 0 : current.t;
+    current.exposure = readSlider("color-anim-exposure");
+    current.contrast = readSlider("color-anim-contrast");
+    current.saturation = readSlider("color-anim-saturation");
+    current.warmth = readSlider("color-anim-warmth");
+    keys.sort((a, b) => Number(a.t) - Number(b.t));
+    selectedColorPointIndex = keys.findIndex((key) => key === current);
+    await saveColorAnimation(clip, {
+      mode: "manual",
+      bar: anim.bar,
+      keys,
+    });
   }
 
   function initColorAnimationUi() {
@@ -2704,6 +2783,54 @@
             bar: anim.bar,
             keys: anim.keys,
           });
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+    ["color-anim-exposure", "color-anim-contrast", "color-anim-saturation", "color-anim-warmth"].forEach((id) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.addEventListener("input", () => {
+        const valueEl = document.getElementById(`${id}-value`);
+        if (valueEl) valueEl.textContent = input.value;
+      });
+      input.addEventListener("change", async () => {
+        const clip = selectedAdjustableClip();
+        if (!clip) return;
+        try {
+          await persistSelectedColorPoint(clip);
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    });
+    const timeInput = document.getElementById("color-anim-point-time");
+    if (timeInput) {
+      timeInput.addEventListener("change", async () => {
+        const clip = selectedAdjustableClip();
+        if (!clip) return;
+        try {
+          await persistSelectedColorPoint(clip);
+        } catch (err) {
+          showFlash(err.message || msgColorAnimFailed);
+        }
+      });
+    }
+    const deletePointBtn = document.getElementById("color-anim-delete-point");
+    if (deletePointBtn) {
+      deletePointBtn.addEventListener("click", async () => {
+        const clip = selectedAdjustableClip();
+        const anim = clip && readColorAnimation(clip);
+        if (!clip || !anim || !Array.isArray(anim.keys) || selectedColorPointIndex < 0) return;
+        if (anim.keys.length <= 2) {
+          showFlash(root.dataset.colorAnimMinPoints || "Keep at least two points.");
+          return;
+        }
+        const keys = anim.keys.filter((_, index) => index !== selectedColorPointIndex);
+        selectedColorPointIndex = Math.min(selectedColorPointIndex, keys.length - 1);
+        try {
+          await saveColorAnimation(clip, { mode: "manual", bar: anim.bar, keys });
         } catch (err) {
           showFlash(err.message || msgColorAnimFailed);
         }

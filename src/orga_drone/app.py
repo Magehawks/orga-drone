@@ -2369,6 +2369,7 @@ def create_app() -> FastAPI:
                 ],
                 "zoom_bar": zoom if isinstance(zoom, dict) else None,
                 "slow_bar": slow if isinstance(slow, dict) else None,
+                "effect_lane": stored,
             }
         )
 
