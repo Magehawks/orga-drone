@@ -2012,6 +2012,37 @@ img.studio-preview-media.studio-preview-layer-b,
 video.studio-preview-media.studio-preview-layer-b {
   z-index: 1;
 }
+.studio-preview-lut-still {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  pointer-events: none;
+}
+.studio-preview-lut-still[hidden] {
+  display: none !important;
+}
+.studio-preview-lut-chip {
+  position: absolute;
+  left: 0.55rem;
+  bottom: 0.55rem;
+  z-index: 6;
+  margin: 0;
+  max-width: calc(100% - 1.1rem);
+  padding: 0.28rem 0.55rem;
+  border-radius: 0.35rem;
+  background: rgba(10, 12, 14, 0.78);
+  color: #f4f6f8;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  pointer-events: none;
+}
+.studio-preview-lut-chip[hidden] {
+  display: none !important;
+}
 .studio-preview-frame.is-framing {
   cursor: grab;
 }

@@ -447,9 +447,6 @@ msgstr "Orga Drone manages the files in this folder. Rename them here, not in Ex
 msgid "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy."
 msgstr "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy."
 
-msgid "The preview does not show this file. It is applied when you export."
-msgstr "The preview does not show this file. It is applied when you export."
-
 msgid "Conversion file"
 msgstr "Conversion file"
 
@@ -521,3 +518,25 @@ msgstr "Remove from library"
 
 msgid "Rename"
 msgstr "Rename"
+
+msgid "This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it."
+msgstr "This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it."
+
+msgid "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it."
+msgstr "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it."
+
+msgid "Updating picture…"
+msgstr "Updating picture…"
+
+msgid "Still frame with color file"
+msgstr "Still frame with color file"
+
+msgid "Playing without color file"
+msgstr "Playing without color file"
+
+msgid "Color file missing"
+msgstr "Color file missing"
+
+msgid "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged."
+msgstr "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged."
+

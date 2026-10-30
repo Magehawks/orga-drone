@@ -127,8 +127,12 @@ def test_ffmpeg_lut_chain_applies_conversion_and_strength(
     assert triples[0] == pytest.approx((0.0, 0.0, 0.0))
     escaped = escape_ffmpeg_lut_path(require_lut_asset(data_dir, conversion))
     assert "lut3d=file=" in f"lut3d=file={escaped}"
-    assert "\\" not in escaped.replace("\\:", "")
     assert "'" not in escaped
+    # Windows drive letters need a doubled backslash before ``:`` in argv.
+    if len(escaped) >= 2 and escaped[0].isalpha() and escaped[1:3] == "\\\\":
+        assert escaped[3] == ":" or escaped.startswith(escaped[0] + "\\\\:")
+    else:
+        assert "\\" not in escaped.replace("\\:", "")
 
 
 def test_color_api_requires_confirm_and_persists(

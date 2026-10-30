@@ -738,7 +738,6 @@
   "Could not save the color look.": "Farblook konnte nicht gespeichert werden.",
   "Could not import that .cube LUT.": "Diese .cube-LUT konnte nicht importiert werden.",
   "A LUT file is missing. Choose the .cube again, or clear the look.": "Eine LUT-Datei fehlt. Wählen Sie die .cube erneut oder entfernen Sie den Look.",
-  "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.": "D-Log-M-Umwandlung mit Ihrer .cube-LUT anwenden? Die Vorschau nähert weiterhin die Grundkorrektur an; die LUT gilt beim Export. Quelldateien bleiben unverändert.",
   "LUT file": "LUT-Datei",
   "Could not apply that look.": "Dieser Look konnte nicht angewendet werden.",
   "Natural": "Natürlich",
@@ -775,7 +774,6 @@
   "Open folder": "Ordner öffnen",
   "Orga Drone manages the files in this folder. Rename them here, not in Explorer.": "Die Dateien in diesem Ordner verwaltet Orga Drone. Benennen Sie sie hier um, nicht im Explorer.",
   "Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy.": "Hier landen Farbdateien, die Sie schon haben (z. B. vom Drohnenhersteller). Orga Drone liefert keine mit. Ihre Originaldatei bleibt unverändert; die App legt eine Kopie ab.",
-  "The preview does not show this file. It is applied when you export.": "Die Vorschau zeigt diese Datei nicht. Sie wird beim Export angewendet.",
   "Conversion file": "Umwandlungsdatei",
   "Please choose": "Bitte wählen",
   "This file converts D-Log M to Rec.709. Orga Drone cannot check this.": "Diese Datei wandelt D-Log M in Rec.709 um. Orga Drone kann das nicht prüfen.",
@@ -798,5 +796,12 @@
   "Added {date}": "Hinzugefügt {date}",
   "File missing": "Datei fehlt",
   "Add the original .cube again to restore it, or stop using it in your clips first.": "Fügen Sie die ursprüngliche .cube erneut hinzu, um sie wiederherzustellen, oder verwenden Sie sie in den Clips nicht mehr.",
-  "Remove from library": "Aus Bibliothek entfernen"
+  "Remove from library": "Aus Bibliothek entfernen",
+  "This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it.": "Dieser Clip nutzt eine Farbdatei. Beim Scrubben oder Pausieren zeigt die Vorschau ein berechnetes Standbild, das kurz dauern kann. Bei der Wiedergabe wird die Farbdatei nicht gezeigt. Der Export wendet sie an.",
+  "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it.": "In Studio siehst du eine Farbdatei beim Scrubben oder Pausieren als berechnetes Standbild. Bei der Wiedergabe kann sie fehlen. Der Export wendet sie immer an.",
+  "Updating picture…": "Bild wird aktualisiert …",
+  "Still frame with color file": "Standbild mit Farbdatei",
+  "Playing without color file": "Wiedergabe ohne Farbdatei",
+  "Color file missing": "Farbdatei fehlt",
+  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "D-Log-M-Umwandlung mit deiner .cube-LUT anwenden? Beim Scrubben oder Pausieren siehst du ein berechnetes Standbild mit der Datei; die Wiedergabe nähert ohne sie an. Der Export wendet sie an. Quelldateien bleiben unverändert."
 }

@@ -4,9 +4,9 @@ Technical conversion and creative looks are separate. SRT ``color_md`` is a
 hint only — conversion never applies without an explicit user action and a
 validated LUT file. Orga Drone does not redistribute camera-vendor LUTs;
 users supply their own ``.cube`` files. Export uses FFmpeg ``lut3d`` after the
-existing static grade and before the saturation ramp. Preview stays an
-approximation of the grade sliders; LUT application is export-truth until a
-shared still path exists.
+existing static grade and before the saturation ramp. Pause/scrub preview uses
+the same builders via server stills (ADR 0028); playback may still approximate
+the grade without the LUT and must say so.
 """
 
 from __future__ import annotations
@@ -287,9 +287,13 @@ def dump_color_look(existing: str | None, look: ColorLook) -> str:
 def escape_ffmpeg_lut_path(path: Path) -> str:
     """Make a filesystem path safe inside an FFmpeg filter option value."""
     text = str(path.resolve()).replace("\\", "/")
-    # Windows drive letters must keep a single escaped colon for FFmpeg.
+    # Windows drive letters use ``:``, which also separates filter options.
+    # When the graph is passed as an argv value (no shell), CreateProcess /
+    # the Windows FFmpeg build eats one backslash before the filter parser
+    # runs — so the drive colon must be written as ``\\\\:`` in the Python
+    # string (two backslashes in argv). A single ``\\:`` fails on Windows.
     if len(text) >= 2 and text[1] == ":":
-        text = f"{text[0]}\\:{text[2:]}"
+        text = f"{text[0]}\\\\:{text[2:]}"
     return text.replace("'", "\\'")
 
 

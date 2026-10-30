@@ -409,7 +409,7 @@
   if (!Array.isArray(lutCatalog)) lutCatalog = [];
   const msgColorDlogConfirm =
     root.dataset.colorDlogConfirm ||
-    "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.";
+    "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.";
   const labelColorLut = root.dataset.colorLutLabel || "LUT file";
   const msgLookFailed = root.dataset.lookFailed || "Could not apply that look.";
   const msgDetailFailed = root.dataset.detailFailed || "Could not save sharpen or denoise.";
@@ -2212,7 +2212,153 @@
       "studio-preview-grade-matrix-b",
       incomingLocal
     );
+    scheduleLutPreviewStill(primary, primaryLocal);
     schedulePreviewBlit();
+  }
+
+  const previewLutStill = document.getElementById("studio-preview-lut-still");
+  const previewLutChip = document.getElementById("studio-preview-lut-chip");
+  const msgLutChipUpdating = root.dataset.lutChipUpdating || "Updating picture…";
+  const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
+  const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
+  const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
+  let lutStillAbort = null;
+  let lutStillTimer = 0;
+  let lutStillToken = 0;
+  let lutStillObjectUrl = "";
+
+  function colorLookNeedsStill(look) {
+    if (!look) return false;
+    if (look.conversion_lut && look.conversion_confirmed) return true;
+    if (look.creative_lut && look.creative_strength > 0) return true;
+    return false;
+  }
+
+  function setLutPreviewChip(text) {
+    if (!previewLutChip) return;
+    if (!text) {
+      previewLutChip.hidden = true;
+      previewLutChip.textContent = "";
+      return;
+    }
+    previewLutChip.textContent = text;
+    previewLutChip.hidden = false;
+  }
+
+  function clearLutPreviewStill() {
+    if (lutStillTimer) {
+      window.clearTimeout(lutStillTimer);
+      lutStillTimer = 0;
+    }
+    if (lutStillAbort) {
+      try {
+        lutStillAbort.abort();
+      } catch (_) {
+        /* ignore */
+      }
+      lutStillAbort = null;
+    }
+    lutStillToken += 1;
+    if (previewLutStill) {
+      previewLutStill.hidden = true;
+      previewLutStill.removeAttribute("src");
+    }
+    if (lutStillObjectUrl) {
+      try {
+        URL.revokeObjectURL(lutStillObjectUrl);
+      } catch (_) {
+        /* ignore */
+      }
+      lutStillObjectUrl = "";
+    }
+    setLutPreviewChip("");
+  }
+
+  function scheduleLutPreviewStill(clip, localS) {
+    if (!previewLutStill) return;
+    if (compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
+      clearLutPreviewStill();
+      return;
+    }
+    const look = readColorLook(clip);
+    if (!colorLookNeedsStill(look)) {
+      clearLutPreviewStill();
+      return;
+    }
+    if (state.playing) {
+      if (lutStillTimer) {
+        window.clearTimeout(lutStillTimer);
+        lutStillTimer = 0;
+      }
+      if (lutStillAbort) {
+        try {
+          lutStillAbort.abort();
+        } catch (_) {
+          /* ignore */
+        }
+        lutStillAbort = null;
+      }
+      previewLutStill.hidden = true;
+      setLutPreviewChip(msgLutChipPlaying);
+      return;
+    }
+    const studioId = clip.dataset.studioId;
+    if (!studioId) {
+      clearLutPreviewStill();
+      return;
+    }
+    const quant = Math.round((Number(localS) || 0) * 10) / 10;
+    if (lutStillTimer) window.clearTimeout(lutStillTimer);
+    setLutPreviewChip(msgLutChipUpdating);
+    lutStillTimer = window.setTimeout(() => {
+      lutStillTimer = 0;
+      const token = ++lutStillToken;
+      if (lutStillAbort) {
+        try {
+          lutStillAbort.abort();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      const controller = new AbortController();
+      lutStillAbort = controller;
+      const url = `/api/studio/${studioId}/preview-frame?t_s=${encodeURIComponent(String(quant))}&detail=0`;
+      fetch(url, { headers: { Accept: "image/jpeg" }, signal: controller.signal })
+        .then(async (res) => {
+          if (token !== lutStillToken) return null;
+          if (res.status === 409) {
+            setLutPreviewChip(msgLutChipMissing);
+            previewLutStill.hidden = true;
+            return null;
+          }
+          if (!res.ok) {
+            setLutPreviewChip(msgLutChipMissing);
+            previewLutStill.hidden = true;
+            return null;
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          if (!blob || token !== lutStillToken) return;
+          if (lutStillObjectUrl) {
+            try {
+              URL.revokeObjectURL(lutStillObjectUrl);
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          lutStillObjectUrl = URL.createObjectURL(blob);
+          previewLutStill.src = lutStillObjectUrl;
+          previewLutStill.hidden = false;
+          setLutPreviewChip(msgLutChipStill);
+        })
+        .catch((err) => {
+          if (err && err.name === "AbortError") return;
+          if (token !== lutStillToken) return;
+          setLutPreviewChip(msgLutChipMissing);
+          previewLutStill.hidden = true;
+        });
+    }, 120);
   }
 
   function canvasFilterFrom(styleFilter) {
