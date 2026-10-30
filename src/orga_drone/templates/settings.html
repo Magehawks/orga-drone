@@ -79,4 +79,45 @@
     <button type="submit" class="button ghost">{{ _('Clear cache') }}</button>
   </form>
 </section>
+
+<section class="settings-section" id="settings-luts"
+         data-lut-already="{{ _('This file is already in your library as \"{name}\".')|e }}"
+         data-lut-restored="{{ _('The color file was restored in your library as \"{name}\".')|e }}"
+         data-lut-import-failed="{{ _('Could not import that .cube LUT.')|e }}"
+         data-lut-rename-failed="{{ _('Could not rename that color file.')|e }}"
+         data-lut-delete-failed="{{ _('Could not remove that color file.')|e }}"
+         data-lut-in-use="{{ _('Cannot remove: used in {n} clips in {m} projects ({names}). Choose Don’t use there first.')|e }}"
+         data-lut-delete-confirm="{{ _('Remove {name} from the library? The copy inside Orga Drone is deleted. Your original .cube stays where it is.')|e }}"
+         data-lut-used="{{ _('Used in {n} clips')|e }}"
+         data-lut-unused="{{ _('Not used')|e }}"
+         data-lut-added="{{ _('Added {date}')|e }}"
+         data-lut-file-missing="{{ _('File missing')|e }}"
+         data-lut-file-missing-help="{{ _('Add the original .cube again to restore it, or stop using it in your clips first.')|e }}"
+         data-lut-empty="{{ _('Color files you already have go here (for example from your drone maker). Orga Drone includes none. Your original file stays unchanged; the app keeps a copy.')|e }}"
+         data-lut-folder-hint="{{ _('Orga Drone manages the files in this folder. Rename them here, not in Explorer.')|e }}"
+         data-lut-rename="{{ _('Rename')|e }}"
+         data-lut-remove="{{ _('Remove from library')|e }}">
+  <h2>{{ _('Color profiles & LUTs') }}</h2>
+  <p class="hint">{{ _('The preview does not show this file. It is applied when you export.') }}</p>
+  <div class="settings-lut-toolbar">
+    <button type="button" class="button" id="settings-lut-add">{{ _('Add file…') }}</button>
+    {% if lut_folder_reveal %}
+    <button type="button" class="button ghost" id="settings-lut-open-folder">{{ _('Open folder') }}</button>
+    {% endif %}
+  </div>
+  {% if lut_folder_reveal %}
+  <p class="hint">{{ _('Orga Drone manages the files in this folder. Rename them here, not in Explorer.') }}</p>
+  <p class="mono settings-lut-path">{{ luts_dir }}</p>
+  {% endif %}
+  <p id="settings-lut-status" class="hint" role="status" hidden></p>
+  <ul id="settings-lut-list" class="settings-lut-list" aria-live="polite"></ul>
+  <input type="file" id="settings-lut-file-input" accept=".cube,text/plain" hidden>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__LUT_CATALOG__ = {{ lut_catalog|tojson }};
+</script>
+<script src="/static/js/settings-luts.js" defer></script>
 {% endblock %}

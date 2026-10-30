@@ -396,6 +396,17 @@
   const msgColorFailed = root.dataset.colorFailed || "Could not save the color look.";
   const msgColorLutFailed = root.dataset.colorLutFailed || "Could not import that .cube LUT.";
   const msgColorLutMissing = root.dataset.colorLutMissing || "A LUT file is missing. Choose the .cube again, or clear the look.";
+  const msgColorLutAlready = root.dataset.colorLutAlready || 'This file is already in your library as "{name}".';
+  const msgColorLutRestored = root.dataset.colorLutRestored || 'The color file was restored in your library as "{name}".';
+  const msgColorLutMissingOption = root.dataset.colorLutMissingOption || "Unknown color file (missing)";
+  const msgColorFileMissingSuffix = root.dataset.colorFileMissingSuffix || "(file missing)";
+  let lutCatalog = [];
+  try {
+    lutCatalog = JSON.parse(root.dataset.lutCatalog || "[]") || [];
+  } catch (_) {
+    lutCatalog = [];
+  }
+  if (!Array.isArray(lutCatalog)) lutCatalog = [];
   const msgColorDlogConfirm =
     root.dataset.colorDlogConfirm ||
     "Apply D-Log M conversion with your .cube LUT? Preview still approximates the grade; the LUT is applied on export. Source files stay unchanged.";
@@ -2316,10 +2327,55 @@
     clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
   }
 
-  function shortLutLabel(assetName) {
+  function lutDisplayName(assetName) {
     const name = String(assetName || "");
     if (!name) return root.dataset.noneLabel || "None";
-    return name.slice(0, 8) + "…";
+    const hit = lutCatalog.find((item) => item && item.asset_name === name);
+    if (hit && hit.display_name) return String(hit.display_name);
+    return msgColorLutMissingOption;
+  }
+
+  function fillLutSelect(selectEl, selectedAsset, { includeNone, includePleaseChoose }) {
+    if (!selectEl) return;
+    const previous = selectedAsset || selectEl.value || "";
+    selectEl.innerHTML = "";
+    if (includePleaseChoose) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = root.dataset.pleaseChoose || "Please choose";
+      selectEl.appendChild(opt);
+    } else if (includeNone) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = root.dataset.noneLabel || "None";
+      selectEl.appendChild(opt);
+    }
+    const seen = new Set();
+    lutCatalog.forEach((item) => {
+      if (!item || !item.asset_name) return;
+      seen.add(item.asset_name);
+      const opt = document.createElement("option");
+      opt.value = item.asset_name;
+      let label = String(item.display_name || item.asset_name);
+      if (item.file_present === false) label = `${label} ${msgColorFileMissingSuffix}`;
+      opt.textContent = label;
+      selectEl.appendChild(opt);
+    });
+    if (previous && !seen.has(previous)) {
+      const opt = document.createElement("option");
+      opt.value = previous;
+      opt.textContent = msgColorLutMissingOption;
+      selectEl.appendChild(opt);
+    }
+    selectEl.value = previous;
+  }
+
+  function syncConversionApplyEnabled() {
+    const apply = document.getElementById("inspector-color-dlog-apply");
+    const select = document.getElementById("inspector-color-conversion-select");
+    const confirm = document.getElementById("inspector-color-conversion-confirm");
+    if (!apply) return;
+    apply.disabled = !(select && select.value && confirm && confirm.checked);
   }
 
   function fillColorLook(clip) {
@@ -2329,8 +2385,10 @@
     const suggest = document.getElementById("inspector-color-dlog-suggest");
     const conversionStatus = document.getElementById("inspector-color-conversion-status");
     const conversionClear = document.getElementById("inspector-color-conversion-clear");
-    const creativeName = document.getElementById("inspector-color-creative-name");
-    const creativeClear = document.getElementById("inspector-color-creative-clear");
+    const conversionChange = document.getElementById("inspector-color-conversion-change");
+    const conversionSelect = document.getElementById("inspector-color-conversion-select");
+    const creativeSelect = document.getElementById("inspector-color-creative-select");
+    const creativeMissing = document.getElementById("inspector-color-creative-missing");
     const strengthField = document.getElementById("inspector-color-strength-field");
     const strengthInput = document.getElementById("inspector-color-strength");
     const strengthValue = document.getElementById("inspector-color-strength-value");
@@ -2347,22 +2405,48 @@
       }
     }
     if (suggest) suggest.hidden = !(isDlogHint && !conversionOn);
+    fillLutSelect(conversionSelect, conversionOn ? "" : look.conversion_lut, {
+      includeNone: false,
+      includePleaseChoose: true,
+    });
+    fillLutSelect(creativeSelect, look.creative_lut, {
+      includeNone: true,
+      includePleaseChoose: false,
+    });
     if (conversionStatus) {
       conversionStatus.hidden = !conversionOn;
       conversionStatus.textContent = conversionOn
-        ? (root.dataset.colorProfileDlogM || "D-Log M") + " → Rec.709"
+        ? `${root.dataset.colorProfileDlogM || "D-Log M"} → Rec.709 · ${lutDisplayName(look.conversion_lut)}`
         : "";
     }
     if (conversionClear) conversionClear.hidden = !conversionOn;
-    if (creativeName) {
-      creativeName.textContent = look.creative_lut
-        ? shortLutLabel(look.creative_lut)
-        : (root.dataset.noneLabel || "None");
+    if (conversionChange) conversionChange.hidden = !conversionOn;
+    const creativeHit = lutCatalog.find((item) => item && item.asset_name === look.creative_lut);
+    const creativeMissingFile = Boolean(
+      look.creative_lut && (!creativeHit || creativeHit.file_present === false)
+    );
+    if (creativeMissing) {
+      creativeMissing.hidden = !creativeMissingFile;
+      creativeMissing.textContent = creativeMissingFile
+        ? msgColorLutMissing
+        : "";
     }
-    if (creativeClear) creativeClear.hidden = !look.creative_lut;
     if (strengthField) strengthField.hidden = !look.creative_lut;
     if (strengthInput) strengthInput.value = String(look.creative_strength);
     if (strengthValue) strengthValue.textContent = String(look.creative_strength);
+    syncConversionApplyEnabled();
+  }
+
+  async function refreshLutCatalog() {
+    try {
+      const res = await fetch("/api/luts", { headers: { Accept: "application/json" } });
+      const body = await readJson(res);
+      if (res.ok && body && Array.isArray(body.luts)) {
+        lutCatalog = body.luts;
+      }
+    } catch (_) {
+      /* keep seed catalog */
+    }
   }
 
   function neutralDetail() {
@@ -2491,28 +2575,35 @@
   }
 
   async function importCubeLut(fileOrPath) {
+    let body;
     if (typeof fileOrPath === "string") {
-      const res = await fetch("/api/studio/luts", {
+      const res = await fetch("/api/luts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ path: fileOrPath }),
       });
-      const body = await readJson(res);
+      body = await readJson(res);
       if (!res.ok || !body || !body.ok || !body.asset_name) {
         throw new Error((body && body.detail) || msgColorLutFailed);
       }
-      return body.asset_name;
+    } else {
+      const form = new FormData();
+      form.append("file", fileOrPath, fileOrPath.name || "look.cube");
+      const res = await fetch("/api/luts", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: form,
+      });
+      body = await readJson(res);
+      if (!res.ok || !body || !body.ok || !body.asset_name) {
+        throw new Error((body && body.detail) || msgColorLutFailed);
+      }
     }
-    const form = new FormData();
-    form.append("file", fileOrPath, fileOrPath.name || "look.cube");
-    const res = await fetch("/api/studio/luts", {
-      method: "POST",
-      headers: { Accept: "application/json" },
-      body: form,
-    });
-    const body = await readJson(res);
-    if (!res.ok || !body || !body.ok || !body.asset_name) {
-      throw new Error((body && body.detail) || msgColorLutFailed);
+    await refreshLutCatalog();
+    if (body.already_present) {
+      showFlash(msgColorLutAlready.replace("{name}", body.display_name || body.asset_name));
+    } else if (body.restored) {
+      showFlash(msgColorLutRestored.replace("{name}", body.display_name || body.asset_name));
     }
     return body.asset_name;
   }
@@ -8544,24 +8635,54 @@
     queueImageAdjustSave(clip);
   });
 
-  document.getElementById("inspector-color-dlog-apply")?.addEventListener("click", async () => {
+  document.getElementById("inspector-color-dlog-apply")?.addEventListener("click", () => {
     const clip = selectedAdjustableClip();
     if (!clip) return;
-    if (!window.confirm(msgColorDlogConfirm)) return;
+    const select = document.getElementById("inspector-color-conversion-select");
+    const confirm = document.getElementById("inspector-color-conversion-confirm");
+    const asset = select && select.value;
+    if (!asset || !(confirm && confirm.checked)) return;
+    const look = readColorLook(clip);
+    look.input_profile = "dlog_m";
+    look.conversion_lut = asset;
+    look.conversion_confirmed = true;
+    writeColorLook(clip, look);
+    fillColorLook(clip);
+    setSaveState(false);
+    queueColorLookSave(clip);
+  });
+
+  document.getElementById("inspector-color-conversion-select")?.addEventListener("change", () => {
+    syncConversionApplyEnabled();
+  });
+  document.getElementById("inspector-color-conversion-confirm")?.addEventListener("change", () => {
+    syncConversionApplyEnabled();
+  });
+
+  document.getElementById("inspector-color-conversion-add")?.addEventListener("click", async () => {
     try {
       const asset = await chooseCubeAsset();
-      const look = readColorLook(clip);
-      look.input_profile = "dlog_m";
-      look.conversion_lut = asset;
-      look.conversion_confirmed = true;
-      writeColorLook(clip, look);
-      fillColorLook(clip);
-      setSaveState(false);
-      queueColorLookSave(clip);
+      const select = document.getElementById("inspector-color-conversion-select");
+      if (select) select.value = asset;
+      syncConversionApplyEnabled();
+      const clip = selectedAdjustableClip();
+      if (clip) fillColorLook(clip);
     } catch (err) {
       if (err && err.message === "cancelled") return;
       showFlash((err && err.message) || msgColorLutFailed);
     }
+  });
+
+  document.getElementById("inspector-color-conversion-change")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const look = readColorLook(clip);
+    look.conversion_confirmed = false;
+    writeColorLook(clip, look);
+    fillColorLook(clip);
+    const select = document.getElementById("inspector-color-conversion-select");
+    if (select && look.conversion_lut) select.value = look.conversion_lut;
+    syncConversionApplyEnabled();
   });
 
   document.getElementById("inspector-color-conversion-clear")?.addEventListener("click", () => {
@@ -8595,12 +8716,14 @@
     }
   });
 
-  document.getElementById("inspector-color-creative-clear")?.addEventListener("click", () => {
+  document.getElementById("inspector-color-creative-select")?.addEventListener("change", () => {
     const clip = selectedAdjustableClip();
     if (!clip) return;
+    const select = document.getElementById("inspector-color-creative-select");
     const look = readColorLook(clip);
-    look.creative_lut = "";
-    look.creative_strength = 100;
+    look.creative_lut = (select && select.value) || "";
+    if (!look.creative_lut) look.creative_strength = 100;
+    else if (!look.creative_strength) look.creative_strength = 100;
     writeColorLook(clip, look);
     fillColorLook(clip);
     setSaveState(false);

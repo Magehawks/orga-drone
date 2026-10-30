@@ -209,8 +209,15 @@ def test_color_api_requires_confirm_and_persists(
     assert body["color_look"]["conversion_confirmed"] is True
     page = client.get("/studio")
     assert page.status_code == 200
-    assert "Convert D-Log M" in page.text or "D-Log M umwandeln" in page.text
+    assert (
+        "Apply conversion" in page.text
+        or "Umwandlung anwenden" in page.text
+        or "Convert D-Log M" in page.text
+        or "D-Log M umwandeln" in page.text
+    )
+    assert 'id="inspector-color-creative-select"' in page.text
     assert "data-color-look=" in page.text
+    assert "data-lut-catalog=" in page.text
 
 
 def test_strength_blend_moves_toward_identity(tmp_path: Path) -> None:
