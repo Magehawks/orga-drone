@@ -195,6 +195,17 @@ def effect_bars(raw: str | None, source_duration_s: float, playback_speed: float
     slow = slow_bar(raw, source_duration_s, playback_speed)
     if slow is not None:
         bars.append(slow)
+    from orga_drone.studio_color_animation import color_animation_from_effect_settings
+
+    anim = color_animation_from_effect_settings(raw)
+    if anim.is_active:
+        bars.append(
+            TimedBar(
+                start_s=anim.bar_start_s,
+                end_s=anim.bar_end_s,
+                kind="color",
+            )
+        )
     return bars
 
 
@@ -203,9 +214,19 @@ def stored_lane(raw: str | None) -> dict[str, object]:
     data = _load(raw)
     zoom = data.get(ZOOM_BAR_KEY)
     slow = data.get(SLOW_BAR_KEY)
+    from orga_drone.studio_color_animation import (
+        COLOR_ANIM_KEY,
+        color_animation_from_effect_settings,
+    )
+
+    anim = color_animation_from_effect_settings(raw)
+    color_blob = data.get(COLOR_ANIM_KEY)
     return {
         "zoom_bar": zoom if isinstance(zoom, dict) else None,
         "slow_bar": slow if isinstance(slow, dict) else None,
+        "color_animation": anim.as_dict() if anim.is_active else (
+            color_blob if isinstance(color_blob, dict) else None
+        ),
     }
 
 

@@ -411,6 +411,15 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else ImageAdjust()
     )
+    from orga_drone.studio_color_animation import color_animation_from_effect_settings
+
+    color_anim = (
+        color_animation_from_effect_settings(clip.effect_settings)
+        if kind == "video"
+        else None
+    )
+    if color_anim is not None and not color_anim.is_active:
+        color_anim = None
     color_look = (
         color_look_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
@@ -528,6 +537,7 @@ def _clip_to_export_clip(
             loop_transition_curve(clip.effect_settings) if kind == "video" else "linear"
         ),
         image=image,
+        color_animation=color_anim,
         color_look=color_look,
         detail=detail,
         saturation_ramp=saturation_ramp,

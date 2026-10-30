@@ -7,7 +7,7 @@
   "Theme": "Design",
   "Dark": "Dunkel",
   "Light": "Hell",
-  "Custom": "Benutzerdefiniert",
+  "Custom": "Eigene",
   "Accent": "Akzent",
   "Background": "Hintergrund",
   "Panel": "Fläche",
@@ -803,5 +803,18 @@
   "Still frame with color file": "Standbild mit Farbdatei",
   "Playing without color file": "Wiedergabe ohne Farbdatei",
   "Color file missing": "Farbdatei fehlt",
-  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "D-Log-M-Umwandlung mit deiner .cube-LUT anwenden? Beim Scrubben oder Pausieren siehst du ein berechnetes Standbild mit der Datei; die Wiedergabe nähert ohne sie an. Der Export wendet sie an. Quelldateien bleiben unverändert."
+  "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "D-Log-M-Umwandlung mit deiner .cube-LUT anwenden? Beim Scrubben oder Pausieren siehst du ein berechnetes Standbild mit der Datei; die Wiedergabe nähert ohne sie an. Der Export wendet sie an. Quelldateien bleiben unverändert.",
+  "Color change": "Farbänderung",
+  "Presets": "Vorlagen",
+  "Manual": "Manuell",
+  "Preset": "Vorlage",
+  "Apply preset": "Vorlage anwenden",
+  "Presets create color points on the effect lane. They do not analyze the clip.": "Vorlagen erzeugen Farbpunkte auf der Effektspur. Sie analysieren den Clip nicht.",
+  "Add point at playhead": "Punkt am Playhead",
+  "Time (s)": "Zeit (s)",
+  "Delete point": "Punkt löschen",
+  "Between the points the picture changes evenly. Values replace Look & color for that range.": "Zwischen den Punkten ändert sich das Bild gleichmäßig. Die Werte ersetzen Look & Farben in diesem Bereich.",
+  "Remove color change": "Farbänderung entfernen",
+  "Set the playhead inside the color bar.": "Playhead in die Farbänderung setzen.",
+  "At most 8 points.": "Maximal 8 Punkte."
 }

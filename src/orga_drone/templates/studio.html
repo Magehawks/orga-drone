@@ -188,6 +188,11 @@
          data-lut-chip-missing="{{ _('Color file missing')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-color-look-model='{{ color_look_model|tojson }}'
+         data-color-animation-model='{{ color_animation_model|tojson }}'
+         data-color-anim-failed="{{ _('Could not save the color change.')|e }}"
+         data-color-anim-custom="{{ _('Custom')|e }}"
+         data-color-anim-playhead="{{ _('Set the playhead inside the color bar.')|e }}"
+         data-color-anim-max="{{ _('At most 8 points.')|e }}"
          data-lut-catalog='{{ lut_catalog|tojson }}'
          data-quick-looks-model='{{ quick_looks_model|tojson }}'
          data-detail-model='{{ detail_model|tojson }}'
@@ -682,6 +687,7 @@
                   data-detail='{{ row.detail|tojson }}'
                   data-color-profile="{{ row.color_profile_hint|e }}"
                   data-saturation-ramp='{{ row.saturation_ramp|tojson }}'
+                  data-color-animation='{{ row.color_animation|tojson }}'
                   data-overlays='{{ row.overlays|tojson|replace("'", "\\u0027") }}'
                   data-masks='{{ row.masks|tojson|replace("'", "\\u0027") }}'
                   data-frame='{{ row.frame|tojson }}'
@@ -738,7 +744,8 @@
                      data-label-zoom="{{ _('Zoom') }}"
                      data-label-blur="{{ _('Lane blur') }}"
                      data-label-pixelate="{{ _('Pixelate') }}"
-                     data-label-slow="{{ _('Slow motion') }}"></div>
+                     data-label-slow="{{ _('Slow motion') }}"
+                     data-label-color="{{ _('Color') }}"></div>
                 <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
                   <div class="studio-music-body" id="studio-music-body">
                     <div class="studio-music-empty" id="studio-music-empty">
@@ -1176,6 +1183,67 @@
             <button type="button" class="button ghost" id="overlay-remove">{{ _('Remove overlay') }}</button>
           </div>
           <p class="hint">{{ _('Overlays stay on this Story clip between their start and end. The file on disk stays unchanged. Preview approximates the exported picture.') }}</p>
+        </div>
+        <div id="inspector-color-animation" data-inspector-tab="effects" hidden>
+          <p class="studio-inspector-kind">{{ _('Color change') }}</p>
+          <div class="studio-color-anim-mode" role="group" aria-label="{{ _('Color change') }}">
+            <button type="button" class="button ghost is-active" id="color-anim-mode-presets"
+                    data-mode="preset">{{ _('Presets') }}</button>
+            <button type="button" class="button ghost" id="color-anim-mode-manual"
+                    data-mode="manual">{{ _('Manual') }}</button>
+          </div>
+          <div id="color-anim-presets-panel">
+            <label class="studio-inspector-field" for="color-anim-preset">
+              <span>{{ _('Preset') }}</span>
+              <select id="color-anim-preset" aria-label="{{ _('Preset') }}">
+                <option value="">{{ _('None') }}</option>
+              </select>
+            </label>
+            <button type="button" class="button" id="color-anim-apply-preset" disabled>{{ _('Apply preset') }}</button>
+            <p class="hint">{{ _('Presets create color points on the effect lane. They do not analyze the clip.') }}</p>
+          </div>
+          <div id="color-anim-manual-panel" hidden>
+            <p class="meta-line" id="color-anim-points-count"></p>
+            <button type="button" class="button ghost" id="color-anim-add-point">{{ _('Add point at playhead') }}</button>
+            <ul class="studio-overlay-list" id="color-anim-point-list"></ul>
+            <div id="color-anim-point-editor" hidden>
+              <label class="studio-inspector-field">
+                <span>{{ _('Time (s)') }}</span>
+                <input type="number" id="color-anim-point-time" min="0" step="0.1">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Brightness') }}</span>
+                  <span class="studio-image-adjust-value" id="color-anim-exposure-value">0</span>
+                </span>
+                <input type="range" id="color-anim-exposure" min="-100" max="100" step="1" value="0">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Contrast') }}</span>
+                  <span class="studio-image-adjust-value" id="color-anim-contrast-value">0</span>
+                </span>
+                <input type="range" id="color-anim-contrast" min="-100" max="100" step="1" value="0">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Saturation') }}</span>
+                  <span class="studio-image-adjust-value" id="color-anim-saturation-value">0</span>
+                </span>
+                <input type="range" id="color-anim-saturation" min="-100" max="100" step="1" value="0">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Warmth') }}</span>
+                  <span class="studio-image-adjust-value" id="color-anim-warmth-value">0</span>
+                </span>
+                <input type="range" id="color-anim-warmth" min="-100" max="100" step="1" value="0">
+              </label>
+              <button type="button" class="button ghost" id="color-anim-delete-point">{{ _('Delete point') }}</button>
+            </div>
+            <p class="hint">{{ _('Between the points the picture changes evenly. Values replace Look & color for that range.') }}</p>
+          </div>
+          <button type="button" class="button ghost" id="color-anim-remove" hidden>{{ _('Remove color change') }}</button>
         </div>
         <div id="inspector-masks" data-inspector-tab="effects" hidden>
           <p class="studio-inspector-kind">{{ _('Privacy') }}</p>
