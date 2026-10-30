@@ -1,7 +1,8 @@
 # Windows onefolder release candidate.
-# Manual runs upload a zip artifact only.
-# A vX.Y.Z tag whose version matches pyproject.toml also opens a draft
-# GitHub Release. Nothing in this workflow publishes a public release.
+# Builds a zip as a private Actions artifact (30 days). It is never attached
+# to a GitHub Release — public Windows downloads stay on itch.io / local builds.
+# A vX.Y.Z tag whose version matches pyproject.toml also opens a notes-only
+# draft GitHub Release. Nothing in this workflow publishes a public release.
 # See packaging/README.md for the MOTW smoke gate and publish / rollback steps.
 
 name: Windows release
@@ -208,7 +209,7 @@ jobs:
           name: orga-drone-windows-x64
           path: release-assets
 
-      - name: Create or update the draft release
+      - name: Create or update the notes-only draft release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -216,7 +217,8 @@ jobs:
         run: |
           set -euo pipefail
           # Stay in the workspace root so `gh` can resolve the repository.
-          # Assets live under release-assets/ from the download step.
+          # Verify the Actions artifact checksum, but never attach the zip to
+          # the GitHub Release (Windows binaries stay local / itch.io).
           sha256sum -c release-assets/orga-drone-windows-x64.zip.sha256
           version="$(sed -n 's/^version=//p' release-assets/release-build.txt | tr -d '\r')"
           commit="$(sed -n 's/^commit=//p' release-assets/release-build.txt | tr -d '\r')"
@@ -238,33 +240,31 @@ jobs:
           sha = os.environ["SHA256"]
           tag = os.environ["TAG"]
           Path("DRAFT_RELEASE_NOTES.md").write_text(
-              f"""## Draft — not a public release
+              f"""## Draft — notes only (no Windows zip on GitHub)
 
           Built by the Windows release workflow. This draft is **not public**.
-          Publish it only after the mandatory Windows MOTW smoke test in
-          `packaging/README.md` passes. Leave it unpublished on failure.
+          The Windows onefolder zip is an Actions artifact and/or a local
+          `releases/` build — it is **not** attached to this GitHub Release.
+          Publish notes only after the mandatory Windows MOTW smoke test in
+          `packaging/README.md` passes. Leave unpublished on failure.
 
           | | |
           | --- | --- |
           | Version | {version} |
           | Tag | {tag} |
           | Commit | {commit} |
-          | Artifact | orga-drone-windows-x64.zip |
+          | Maintainer artifact | Actions `orga-drone-windows-x64` (not a Release asset) |
           | SHA256 | {sha} |
 
           ### Maintainer gate
 
-          1. In a browser, while signed in, download `orga-drone-windows-x64.zip` **from this draft** (not `gh release download`, curl, or the Actions artifact wrapper).
-          2. Confirm `Zone.Identifier` / `ZoneId=3`, extract with Windows Explorer into a path with parentheses, and run the functional checks (native window, Library folder picker, Studio soundtrack picker, Studio MP4 save dialog, 1080p export, project and playlist persisted after restart).
+          1. Download the Actions artifact `orga-drone-windows-x64` in a browser (or build locally into `releases/{version}/`), then smoke-test with MOTW as in `packaging/README.md`.
+          2. Confirm `Zone.Identifier` / `ZoneId=3`, extract with Windows Explorer into a path with parentheses, and run the functional checks.
           3. Record the tested ZIP SHA256, commit, test date, and outcome in these notes.
-          4. Publish only if every check passed.
+          4. Publish the GitHub Release **without** uploading `orga-drone-windows-x64.zip`.
 
           ```
           {sha}  orga-drone-windows-x64.zip
-          ```
-
-          ```powershell
-          Get-FileHash -Algorithm SHA256 .\\orga-drone-windows-x64.zip
           ```
           """,
               encoding="utf-8",
@@ -273,26 +273,25 @@ jobs:
           if gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft > /tmp/is_draft; then
             is_draft="$(cat /tmp/is_draft)"
             if [ "${is_draft}" != "true" ]; then
-              echo "Release ${RELEASE_TAG} is already published. Refusing to replace it."
+              echo "Release ${RELEASE_TAG} is already published. Refusing to replace notes."
               exit 1
             fi
-            echo "Draft already exists. Replaced the zip and checksum. Release notes were left unchanged."
-            gh release upload "${RELEASE_TAG}" \
-              release-assets/orga-drone-windows-x64.zip \
-              release-assets/orga-drone-windows-x64.zip.sha256 \
-              --clobber
+            echo "Draft already exists. Leaving notes and assets unchanged (no zip upload)."
           else
             gh release create "${RELEASE_TAG}" \
               --draft \
               --title "orga-drone ${RELEASE_TAG}" \
-              --notes-file DRAFT_RELEASE_NOTES.md \
-              release-assets/orga-drone-windows-x64.zip \
-              release-assets/orga-drone-windows-x64.zip.sha256
+              --notes-file DRAFT_RELEASE_NOTES.md
           fi
           gh release edit "${RELEASE_TAG}" --draft
           is_draft="$(gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft)"
           if [ "${is_draft}" != "true" ]; then
             echo "Release ${RELEASE_TAG} is not a draft. Refusing to leave a public release."
+            exit 1
+          fi
+          asset_count="$(gh release view "${RELEASE_TAG}" --json assets --jq '.assets | length')"
+          if [ "${asset_count}" != "0" ]; then
+            echo "Refusing: GitHub Release unexpectedly has ${asset_count} asset(s). Binaries must not be attached."
             exit 1
           fi
           gh release view "${RELEASE_TAG}" --json isDraft,url --jq '{isDraft: .isDraft, url: .url}'

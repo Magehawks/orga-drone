@@ -153,9 +153,10 @@ The application helps users:
   cloud sync, or automatic albums.
 - There is **no** plugin API or multi-OS installer
   pipeline in the current tree. A Windows onefolder zip can be built in
-  GitHub Actions; a maintainer publishes the GitHub Release only after the
-  MOTW smoke test (`packaging/README.md`). A Windows itch.io butler process
-  is documented for a Draft/Restricted test channel and is not a public paid
+  GitHub Actions (artifact) or locally under `releases/`; it is not attached
+  to GitHub Releases. A maintainer publishes notes-only after the MOTW smoke
+  test (`packaging/README.md`). A Windows itch.io butler process is
+  documented for a Draft/Restricted test channel and is not a public paid
   launch. ZIP installs do not receive itch.io app updates. About shows the
   installed version. An optional startup check, off by default, reports a
   newer published Windows release and links to it; it does not download,
