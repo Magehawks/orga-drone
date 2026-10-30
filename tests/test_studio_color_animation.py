@@ -103,6 +103,80 @@ def test_expand_export_clip_splits_grade() -> None:
     assert all(piece.color_animation is None for piece in pieces)
 
 
+def test_expand_untrimmed_clip_without_source_end() -> None:
+    """Untrimmed Studio clips often leave source_end_s unset."""
+    from orga_drone.export.studio_config import StudioExportClip
+
+    anim = build_preset("warm_up", bar_start_s=0.0, bar_end_s=4.0)
+    clip = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=4.0,
+        source_start_s=0.0,
+        source_end_s=None,
+        image=ImageAdjust(),
+        color_animation=anim,
+    )
+    pieces = expand_export_clip_for_color(clip)
+    assert len(pieces) >= 2
+    assert pieces[0].image.warmth < pieces[-1].image.warmth
+    assert pieces[-1].image.warmth >= 20
+    assert pieces[-1].source_end_s == pytest.approx(4.0)
+
+
+def test_expand_two_key_preset_is_dense_and_monotonic() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+
+    anim = build_preset("warm_up", bar_start_s=0.0, bar_end_s=4.0)
+    clip = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=4.0,
+        source_start_s=10.0,
+        source_end_s=14.0,
+        image=ImageAdjust(),
+        color_animation=anim,
+    )
+    pieces = expand_export_clip_for_color(clip)
+    assert len(pieces) >= 4  # densified beyond the two key boundaries
+    warmths = [piece.image.warmth for piece in pieces]
+    assert warmths == sorted(warmths)
+    assert warmths[0] < warmths[-1]
+
+
+def test_expand_honors_color_local_origin_for_slow_piece() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+
+    anim = build_preset("warm_up", bar_start_s=0.0, bar_end_s=4.0)
+    # Second half of the clip (slow piece), keys still relative to in-point 0.
+    piece = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=2.0,
+        source_start_s=12.0,
+        source_end_s=14.0,
+        image=ImageAdjust(),
+        color_animation=anim,
+    )
+    object.__setattr__(piece, "color_local_origin", 2.0)
+    pieces = expand_export_clip_for_color(piece)
+    assert pieces
+    # Mid of this piece is clip-local ~3.0 → near the warm end of warm_up.
+    assert pieces[-1].image.warmth >= 25
+    # Without origin the same absolute mid (~1s into the piece) would sample ~1.0.
+    bare = StudioExportClip(
+        source_path=Path("x.mp4"),
+        kind="video",
+        duration_s=2.0,
+        source_start_s=12.0,
+        source_end_s=14.0,
+        image=ImageAdjust(),
+        color_animation=anim,
+    )
+    wrong = expand_export_clip_for_color(bare)
+    assert wrong[-1].image.warmth < pieces[-1].image.warmth
+
+
 def test_apply_keyed_image_passthrough() -> None:
     base = ImageAdjust(exposure=5, highlights=10)
     anim = ColorAnimation(
@@ -181,3 +255,17 @@ def test_color_animation_api(
     assert page.status_code == 200
     assert 'id="inspector-color-animation"' in page.text
     assert "data-color-animation-model=" in page.text
+    moved = client.patch(
+        f"/api/studio/{clip_id}/effect-lane",
+        json={"kind": "color", "op": "update", "start_s": 0.5, "end_s": 2.5},
+        headers=headers,
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["effect_lane"]["color_animation"]["bar"]["start_s"] == 0.5
+    deleted = client.patch(
+        f"/api/studio/{clip_id}/effect-lane",
+        json={"kind": "color", "op": "delete"},
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["effect_lane"]["color_animation"] is None

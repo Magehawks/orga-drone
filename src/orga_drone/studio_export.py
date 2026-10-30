@@ -395,6 +395,13 @@ def _clip_to_export_clip(
             return None
     start = float(play_in) if play_in is not None else 0.0
     end = float(play_out) if play_out is not None else None
+    if end is None and kind == "video":
+        # Color points and slow splits need a concrete source out. Prefer the
+        # indexed media duration; otherwise derive from wall-clock duration.
+        if media.duration_s is not None and float(media.duration_s) > 0:
+            end = float(media.duration_s)
+        else:
+            end = start + float(seconds) * float(speed)
     loop_join = 0.0
     if kind == "video" and one_play is not None and not forward_active and repeats > 1:
         loop_join = applied_join_s(

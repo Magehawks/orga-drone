@@ -432,7 +432,11 @@ def apply_keyed_image(base: ImageAdjust, anim: ColorAnimation | None, local_s: f
 def expand_export_clip_for_color(clip: object) -> list[object]:
     """Split a video export clip into piecewise-constant grade pieces.
 
-    ``clip`` is a ``StudioExportClip``. Import is deferred to avoid cycles.
+    ``clip`` is a ``StudioExportClip``. Color times are relative to the
+    **original** clip in-point. When the encoder already split a slow bar,
+    pass ``color_origin_s`` on the piece (offset of this piece into the
+    original clip) via a temporary attribute, or keep ``color_animation``
+    times absolute to the original and pass ``origin_offset_s``.
     """
     from orga_drone.export.studio_config import StudioExportClip
 
@@ -443,37 +447,55 @@ def expand_export_clip_for_color(clip: object) -> list[object]:
         anim is None
         or not anim.is_active
         or clip.kind != "video"
-        or clip.source_end_s is None
         or clip.section_repeats > 1
         or clip.forward_loop
     ):
         return [clip]
-    origin = float(clip.source_start_s)
-    total = float(clip.source_end_s) - origin
-    if total < MIN_BAR_SPAN_S:
+    piece_origin = float(clip.source_start_s or 0.0)
+    speed = float(clip.playback_speed) or 1.0
+    if clip.source_end_s is not None:
+        piece_end = float(clip.source_end_s)
+    else:
+        # Untrimmed clips often leave source_end_s unset; recover source span
+        # from wall-clock duration at the piece playback speed.
+        piece_end = piece_origin + float(clip.duration_s) * speed
+    piece_len = piece_end - piece_origin
+    if piece_len < MIN_BAR_SPAN_S:
         return [clip]
+    # Absolute file time → clip-local. Slow pieces still carry absolute source
+    # times; color keys stay relative to the story clip's trimmed in-point.
+    # ``color_local_origin`` is the clip-local offset of this piece's start.
+    local_origin = float(getattr(clip, "color_local_origin", 0.0) or 0.0)
     cuts = [0.0]
     for boundary in segment_boundaries(anim):
-        if 0.0 < boundary < total:
-            cuts.append(boundary)
-    cuts.append(total)
-    cuts = sorted(set(round(value, 4) for value in cuts))
+        local = boundary - local_origin
+        if 0.0 < local < piece_len:
+            cuts.append(local)
+    # Subdivide long spans so a 2-key preset is not a single flat midpoint.
+    refined: list[float] = [0.0]
+    for begin, finish in zip(cuts, cuts[1:] + [piece_len]):
+        refined.append(begin)
+        span = finish - begin
+        if span > 0.4:
+            steps = max(2, min(8, int(span / 0.35)))
+            for step in range(1, steps):
+                refined.append(begin + span * step / steps)
+    refined.append(piece_len)
+    cuts = sorted({round(value, 4) for value in refined if 0.0 <= value <= piece_len})
     pieces: list[StudioExportClip] = []
-    speed = float(clip.playback_speed) or 1.0
     for begin, finish in zip(cuts, cuts[1:]):
         if finish - begin < 0.05:
             continue
-        # Midpoint holds a constant grade that tracks the linear curve.
-        sample_t = (begin + finish) * 0.5
+        sample_t = local_origin + (begin + finish) * 0.5
         image = apply_keyed_image(clip.image, anim, sample_t)
         pieces.append(
             replace(
                 clip,
-                source_start_s=origin + begin,
-                source_end_s=origin + finish,
+                source_start_s=piece_origin + begin,
+                source_end_s=piece_origin + finish,
                 duration_s=(finish - begin) / speed,
                 image=image,
                 color_animation=None,
             )
         )
-    return pieces or [clip]
+    return list(pieces) if pieces else [clip]
