@@ -219,7 +219,11 @@ jobs:
           # Stay in the workspace root so `gh` can resolve the repository.
           # Verify the Actions artifact checksum, but never attach the zip to
           # the GitHub Release (Windows binaries stay local / itch.io).
-          sha256sum -c release-assets/orga-drone-windows-x64.zip.sha256
+          # Checksum file lists a bare zip name — verify from that directory.
+          (
+            cd release-assets
+            sha256sum -c orga-drone-windows-x64.zip.sha256
+          )
           version="$(sed -n 's/^version=//p' release-assets/release-build.txt | tr -d '\r')"
           commit="$(sed -n 's/^commit=//p' release-assets/release-build.txt | tr -d '\r')"
           sha="$(awk '{print $1}' release-assets/orga-drone-windows-x64.zip.sha256 | tr -d '\r')"

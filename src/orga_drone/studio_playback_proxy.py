@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
+from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import (
     ColorLook,
@@ -60,6 +62,8 @@ class PlaybackProxyRequest:
     source_end_s: float | None = None
     image: ImageAdjust = field(default_factory=ImageAdjust)
     look: ColorLook = field(default_factory=ColorLook)
+    hsl: HslAdjust = field(default_factory=HslAdjust)
+    color_wheels: ColorWheels = field(default_factory=ColorWheels)
     max_width: int = PROXY_MAX_WIDTH
     max_height: int = PROXY_MAX_HEIGHT
     saturation: float = 1.0
@@ -188,12 +192,12 @@ def proxy_filter_chain(
     max_height: int = PROXY_MAX_HEIGHT,
     saturation: float = 1.0,
 ) -> str:
-    """Scale first, then apply grade/LUT for a faster preview proxy.
+    """Scale first, then grade → LUT → HSL → wheels for a faster preview proxy.
 
-    Export keeps grade → LUT → scale. The proxy is a preview artifact, so
-    downscaling before the per-pixel LUT cuts generation time substantially;
-    measured mean color difference against the export order stays below 2.4/255
-    on the real 4K fixture.
+    Export keeps grade → LUT → HSL → wheels → scale. The proxy is a preview
+    artifact, so downscaling before the per-pixel LUT stages cuts generation
+    time substantially; measured mean color difference against the export order
+    stays below 2.4/255 on the real 4K fixture.
     """
     edge_w = max(64, min(2160, int(max_width)))
     edge_h = max(64, min(2160, int(max_height)))
@@ -208,6 +212,10 @@ def proxy_filter_chain(
         lut = ffmpeg_lut_chain(req.look, data_dir=data_dir, work_dir=work_dir)
         if lut:
             parts.append(lut)
+    if not req.hsl.is_neutral:
+        parts.append(ffmpeg_hsl_chain(req.hsl, data_dir=data_dir))
+    if not req.color_wheels.is_neutral:
+        parts.append(ffmpeg_color_wheels_chain(req.color_wheels, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     parts.append(
@@ -232,6 +240,8 @@ def cache_key_for(
         "out": None if req.source_end_s is None else round(float(req.source_end_s), 6),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
+        "hsl": req.hsl.as_dict(),
+        "color_wheels": req.color_wheels.as_dict(),
         "lut_content": _lut_digests(req, data_dir),
         "width": int(req.max_width),
         "height": int(req.max_height),
@@ -288,9 +298,13 @@ def render_playback_proxy(
     never publishes a partial file: the result is moved into place only after a
     non-empty, successful encode.
     """
-    if not look_needs_preview_still(req.look):
+    if (
+        not look_needs_preview_still(req.look)
+        and req.hsl.is_neutral
+        and req.color_wheels.is_neutral
+    ):
         raise PlaybackProxyError(
-            "Assign a color file before building a playback proxy.",
+            "Assign a color file, HSL adjustment, or colour wheels before building a playback proxy.",
             code="no_lut",
         )
     media = req.media_path

@@ -65,6 +65,14 @@ from orga_drone.studio_frame import (
     frame_preview_model,
 )
 from orga_drone.studio_hud import empty_hud_state, hud_client_state
+from orga_drone.studio_hsl import (
+    hsl_adjust_from_effect_settings,
+    hsl_preview_model,
+)
+from orga_drone.studio_color_wheels import (
+    color_wheels_from_effect_settings,
+    color_wheels_preview_model,
+)
 from orga_drone.studio_image import (
     color_profile_hint_from_srt,
     export_payload_sets_adjust,
@@ -104,7 +112,7 @@ from orga_drone.studio_color_animation import (
 from orga_drone.studio_preview_frame import (
     PreviewFrameError,
     PreviewFrameRequest,
-    look_needs_preview_still,
+    color_needs_preview_still,
     quantize_preview_time,
     render_preview_frame,
 )
@@ -374,7 +382,9 @@ def create_app() -> FastAPI:
         if (clip.kind or "") != "video":
             return None
         look = color_look_from_effect_settings(clip.effect_settings)
-        if not look_needs_preview_still(look):
+        hsl = hsl_adjust_from_effect_settings(clip.effect_settings)
+        color_wheels = color_wheels_from_effect_settings(clip.effect_settings)
+        if not color_needs_preview_still(look, hsl, color_wheels):
             return None
         if color_animation_from_effect_settings(clip.effect_settings).is_active:
             return None
@@ -403,6 +413,8 @@ def create_app() -> FastAPI:
             source_end_s=end,
             image=image_adjust_from_effect_settings(clip.effect_settings),
             look=look,
+            hsl=hsl,
+            color_wheels=color_wheels,
         )
 
     app.state.scan_jobs = ScanJobStore()
@@ -1462,6 +1474,12 @@ def create_app() -> FastAPI:
                         "color_look": color_look_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
+                        "hsl": hsl_adjust_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
+                        "color_wheels": color_wheels_from_effect_settings(
+                            it.effect_settings
+                        ).as_dict(),
                         "quick_look": look_id_from_effect_settings(it.effect_settings),
                         "detail": detail_from_effect_settings(it.effect_settings).as_dict(),
                         "color_profile_hint": color_profile_hint,
@@ -1581,6 +1599,8 @@ def create_app() -> FastAPI:
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
+            hsl_model=hsl_preview_model(),
+            color_wheels_model=color_wheels_preview_model(),
             color_look_model=color_look_preview_model(),
             color_animation_model=color_animation_preview_model(),
             lut_catalog=lut_catalog,
@@ -2265,6 +2285,8 @@ def create_app() -> FastAPI:
         )
 
         base_look = color_look_from_effect_settings(clip.effect_settings)
+        hsl = hsl_adjust_from_effect_settings(clip.effect_settings)
+        color_wheels = color_wheels_from_effect_settings(clip.effect_settings)
         anim = color_animation_from_effect_settings(clip.effect_settings)
         if clip.kind == "video":
             image = image_adjust_at(clip.effect_settings, local)
@@ -2272,10 +2294,10 @@ def create_app() -> FastAPI:
         else:
             image = image_adjust_from_effect_settings(clip.effect_settings)
             look = base_look
-        if not look_needs_preview_still(look):
+        if not color_needs_preview_still(look, hsl, color_wheels):
             raise HTTPException(
                 status_code=422,
-                detail="No color file is active on this clip.",
+                detail="No color file, HSL adjustment, or color wheels are active on this clip.",
             )
         origin = float(clip.source_start or 0.0)
         abs_t = origin + local
@@ -2294,6 +2316,8 @@ def create_app() -> FastAPI:
                     source_time_s=abs_t if clip.kind == "video" else 0.0,
                     image=image,
                     look=look,
+                    hsl=hsl,
+                    color_wheels=color_wheels,
                     detail=bool(detail),
                     saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
                 ),
@@ -2389,6 +2413,66 @@ def create_app() -> FastAPI:
                 "url": f"/api/studio/{studio_item_id}/playback-proxy",
                 "bytes": path.stat().st_size,
                 "generation_s": round(time.perf_counter() - started, 3),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/hsl")
+    async def api_studio_hsl(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include HSL settings"
+            )
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_hsl(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        hsl = hsl_adjust_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "hsl": hsl.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/color-wheels")
+    async def api_studio_color_wheels(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400, detail="JSON body must include colour wheels"
+            )
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_color_wheels(studio_item_id, payload)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        color_wheels = color_wheels_from_effect_settings(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "color_wheels": color_wheels.as_dict(),
             }
         )
 

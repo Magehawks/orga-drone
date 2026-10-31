@@ -15,6 +15,17 @@ const context = {
   window: { setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; }, clearTimeout: id => timers.delete(id) },
   state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
+  readHsl: clip => {
+    try {
+      const parsed = JSON.parse(clip.dataset.hsl || '');
+      if (parsed && parsed.ranges) return parsed;
+    } catch (_) { /* neutral */ }
+    return { ranges: {} };
+  },
+  hslIsNeutral: hsl => !hsl || !hsl.ranges ||
+    Object.values(hsl.ranges).every(v => !v.hue && !v.saturation && !v.luminance),
+  readColorWheels: () => ({ wheels: {} }),
+  colorWheelsIsNeutral: () => true,
   lutProxySrcFor: () => proxySrc,
   lutWebglCanHandle: () => false,
   lutWebglReadyFor: () => false,
@@ -23,6 +34,9 @@ const context = {
   previewLutFrameFor: () => null,
   playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
+  hslSaveChain: Promise.resolve(), msgHslChipPlaying: 'Playing without HSL preview',
+  colorWheelsSaveChain: Promise.resolve(), msgColorWheelsChipPlaying: 'Playing without color grading preview',
+  msgWheelNeutral: 'Neutral',
   resolveAt: () => null,
   URL: { createObjectURL: blob => blob.id, revokeObjectURL() {} },
   Image: class { decode() { return new Promise((resolve, reject) => decodes.push({ resolve, reject })); } },

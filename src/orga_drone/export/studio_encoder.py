@@ -43,6 +43,8 @@ from orga_drone.studio_frame import (
 from orga_drone.studio_audio import export_audio_args
 from orga_drone.studio_image import ffmpeg_grade_chain, ffmpeg_saturation_ramp
 from orga_drone.studio_detail import ffmpeg_detail_chain
+from orga_drone.studio_color_wheels import ffmpeg_color_wheels_chain
+from orga_drone.studio_hsl import ffmpeg_hsl_chain
 from orga_drone.studio_lut import LutMissingError, ffmpeg_lut_chain
 from orga_drone.studio_speed import (
     coerce_playback_speed,
@@ -229,6 +231,28 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
     detail = (
         ffmpeg_detail_chain(clip.detail) if clip.kind in {"photo", "video"} else ""
     )
+    hsl = ""
+    if clip.kind in {"photo", "video"} and not clip.hsl.is_neutral:
+        from orga_drone.config import settings
+
+        try:
+            hsl = ffmpeg_hsl_chain(clip.hsl, data_dir=settings.data_dir)
+        except OSError as exc:
+            raise StudioExportError(
+                "Could not build the HSL color preview.", code="hsl_failed"
+            ) from exc
+    wheels = ""
+    if clip.kind in {"photo", "video"} and not clip.color_wheels.is_neutral:
+        from orga_drone.config import settings
+
+        try:
+            wheels = ffmpeg_color_wheels_chain(
+                clip.color_wheels, data_dir=settings.data_dir
+            )
+        except OSError as exc:
+            raise StudioExportError(
+                "Could not build the colour wheel preview.", code="wheels_failed"
+            ) from exc
     ramp = (
         ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=0.0)
         if clip.kind == "video"
@@ -278,7 +302,7 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
         )
     return ",".join(
         part
-        for part in (trim, grade, lut, detail, ramp, prefix, base, suffix, stretch)
+        for part in (trim, grade, lut, hsl, wheels, detail, ramp, prefix, base, suffix, stretch)
         if part
     )
 
