@@ -43,6 +43,8 @@ PROXY_CRF = 20
 PROXY_PRESET = "veryfast"
 PROXY_GOP_FRAMES = 30
 PROXY_FFMPEG_TIMEOUT_S = 180.0
+PROXY_FFMPEG_TIMEOUT_MAX_S = 1800.0
+PROXY_TIMEOUT_REALTIME_FACTOR = 8.0
 PROXY_VERSION = 2
 PROXY_CACHE_MAX_BYTES = 512 * 1024 * 1024
 PROXY_CACHE_MAX_AGE_S = 14 * 24 * 60 * 60
@@ -75,6 +77,18 @@ def playback_proxies_dir(data_dir: Path) -> Path:
     path = data_dir / PLAYBACK_PROXIES_DIR
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def proxy_timeout_for(clip_duration_s: float) -> float:
+    """Scale the FFmpeg budget for real long 4K clips, with a hard cap."""
+    try:
+        duration = float(clip_duration_s)
+    except (TypeError, ValueError):
+        return PROXY_FFMPEG_TIMEOUT_S
+    if duration != duration or duration <= 0:
+        return PROXY_FFMPEG_TIMEOUT_S
+    scaled = duration * PROXY_TIMEOUT_REALTIME_FACTOR
+    return max(PROXY_FFMPEG_TIMEOUT_S, min(PROXY_FFMPEG_TIMEOUT_MAX_S, scaled))
 
 
 def _lut_digests(req: PlaybackProxyRequest, data_dir: Path) -> dict[str, str]:
@@ -321,6 +335,7 @@ def render_playback_proxy(
             raise PlaybackProxyError(str(exc) or "Invalid color look.", code="lut_invalid") from exc
 
         start = max(0.0, float(req.source_start_s))
+        duration_s = None
         cmd = [
             ffmpeg,
             "-y",
@@ -334,6 +349,7 @@ def render_playback_proxy(
         ]
         if req.source_end_s is not None:
             duration = max(0.0, float(req.source_end_s) - start)
+            duration_s = duration
             cmd.extend(["-t", f"{duration:.3f}"])
         cmd.extend(
             [
@@ -381,7 +397,7 @@ def render_playback_proxy(
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
-                timeout=PROXY_FFMPEG_TIMEOUT_S,
+                timeout=proxy_timeout_for(duration_s or 0.0),
                 **subprocess_no_window_kwargs(),
             )
         except subprocess.TimeoutExpired as exc:

@@ -1832,9 +1832,13 @@
     if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return "";
     const ramp = readSaturationRamp(clip);
     if (ramp && ramp.enabled) return "";
+    const clipId = String(clip.dataset.studioId);
     const selected = state.selected;
-    if (!selected || selected.type !== "clip" ||
-        String(selected.id) !== String(clip.dataset.studioId)) return "";
+    const selectedMatch = !!(selected && selected.type === "clip" &&
+      String(selected.id) === clipId);
+    const activeMatch = state.activeStudioId != null &&
+      String(state.activeStudioId) === clipId;
+    if (!selectedMatch && !activeMatch) return "";
     return clip.dataset.lutProxyUrl || "";
   }
 
@@ -2383,6 +2387,12 @@
     }
     // Color-animation-only stills wait for a color file; CSS covers grade keys.
     if (!colorLookNeedsStill(look, clip)) {
+      clearLutPreviewStill();
+      return;
+    }
+    // The proxy already contains grade+LUT at video resolution. Keep its frame
+    // for pause/seek/selection instead of overpainting a soft 720-edge JPEG.
+    if (lutProxySrcFor(clip)) {
       clearLutPreviewStill();
       return;
     }

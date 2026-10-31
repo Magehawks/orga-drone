@@ -25,6 +25,7 @@ from orga_drone.studio_playback_proxy import (
     cache_key_for,
     cached_playback_proxy,
     cleanup_playback_proxies,
+    proxy_timeout_for,
     render_playback_proxy,
 )
 
@@ -264,6 +265,14 @@ def test_cache_key_covers_inputs_and_lut_content(
     lines = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
     (data / "luts" / asset).write_text("\n".join(lines) + "\n", encoding="utf-8")
     assert cached_playback_proxy(base, data_dir=data) is None
+
+
+def test_proxy_timeout_scales_for_long_real_clips() -> None:
+    assert proxy_timeout_for(0) == 180.0
+    assert proxy_timeout_for(10) == 180.0
+    assert proxy_timeout_for(77.326) == pytest.approx(618.608)
+    assert proxy_timeout_for(float("nan")) == 180.0
+    assert proxy_timeout_for(100_000) == 1800.0
 
 
 def test_cleanup_bounds_cache_and_keeps_outside_files(tmp_path: Path) -> None:

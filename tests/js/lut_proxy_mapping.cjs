@@ -7,7 +7,7 @@ const source = script.split('function lutProxySrcFor')[1].split('function imageS
 let customAudio = null;
 const context = {
   root: { dataset: { lutProxyEnabled: '0' } },
-  state: { selected: { type: 'clip', id: '1' } },
+  state: { selected: { type: 'clip', id: '1' }, activeStudioId: null },
   loadedVideoSrc: '',
   playbackSpeed: () => 1,
   slowBarOf: () => null,
@@ -41,6 +41,9 @@ const otherClip = {
 };
 context.state.selected = { type: 'clip', id: '2' };
 assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'proxy -> original');
+context.state.activeStudioId = '1';
+assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl, 'active clip uses proxy without selection');
+context.state.activeStudioId = null;
 assert.equal(context.videoSrcFor(otherClip), otherClip.dataset.lutProxyUrl, 'original -> proxy');
 context.state.selected = { type: 'clip', id: '1' };
 assert.equal(context.videoSrcFor(otherClip), '/media/2/stream', 'proxy -> original (reverse)');

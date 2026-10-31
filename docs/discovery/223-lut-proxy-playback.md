@@ -104,6 +104,25 @@ CDP against `/studio?lut_proxy=1`:
 | Decoded proxy pixel at flash | RGB(230, 165, 205): warm LUT result |
 | Screenshot | 99,163 B |
 
+## Real 4K clip measurement
+
+With a 77.3 s DJI 4K clip and the user's local LUT, the 720p proxy took 242 s
+and produced a 21.76 MB MP4 on this machine. The old fixed 180 s FFmpeg timeout
+was too short and left no proxy, which reproduced the "playing without color
+file" state on real footage. The timeout now scales with clip duration
+(`8 × duration`, floor 180 s, cap 1800 s).
+
+In a packaged-EXE WebView2 smoke with that real proxy, the selected frame, play,
+pause, a ruler seek to 30 s, and re-selecting the clip all used the same
+1280×720 proxy video source. The LUT chip and the 720-edge JPEG still stayed
+hidden throughout; no CSS grade or second color pass was applied. The source
+file's size and mtime were unchanged.
+
+While a proxy exists, pause/seek/selection keep its decoded video frame instead
+of overlaying the 720-edge JPEG still. The still is only used when no proxy is
+available. The proxy is accepted for the selected clip and for the active
+playhead clip, so moving the playhead does not silently disable it.
+
 ## Known limitations
 
 - No automatic generation or background queue. #224 adds content-keyed LUT
@@ -111,12 +130,14 @@ CDP against `/studio?lut_proxy=1`:
 - A proxy is valid only for the settings that produced its cache key. Changing
   grade/LUT/source range makes the endpoint return 404; the page must be
   reloaded after generating the new proxy.
-- Only the selected clip is proxied; transitions with an unselected partner
-  remain approximate.
+- The proxy covers the active or selected clip; transitions with a non-active
+  partner remain approximate.
 - Clips with custom clip-audio trimming fall back to ordinary source playback
   instead of using the proxy; see #228.
 - The developer query flag is not a public feature toggle and is not advertised
   in the UI.
+- Long 4K clips still take minutes to prepare. The dev-only LUT proxy button
+  shows the existing updating chip while it works.
 - No animated LUT, slow-motion, repeat, mask, overlay, map, or HUD parity.
 
 ## Verification
