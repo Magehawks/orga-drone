@@ -21,13 +21,15 @@ const context = {
   readColorAnimation: () => null,
   readSaturationRamp: () => ({ enabled: false }),
   state: { selected: { type: 'clip', id: '1' }, activeStudioId: null },
+  playheadDragging: false,
   window: {
     setTimeout: callback => { timers.push(callback); return timers.length; },
     clearTimeout: () => {},
   },
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
   setLutPreviewChip() {},
-  syncPreviewMedia() {},
+  syncPreviewMedia() { context.syncCount += 1; },
+  syncCount: 0,
   String, JSON, Math,
 };
 vm.createContext(context);
@@ -77,6 +79,34 @@ function reply(request, url) {
   reply(requests[1], '/proxy/final');
   await settle();
   assert.equal(clip.dataset.lutProxyUrl, '/proxy/final');
+
+  // A selected but non-active clip must not reload the active picture.
+  requests.length = 0;
+  context.syncCount = 0;
+  context.state.activeStudioId = '2';
+  clip.dataset.lutProxyUrl = '';
+  look = { ...look, creative_strength: 40 };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  reply(requests[0], '/proxy/selected-only');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '/proxy/selected-only');
+  assert.equal(context.syncCount, 0, 'selected-only completion does not reload');
+
+  // The active clip picks up the new proxy immediately.
+  requests.length = 0;
+  context.syncCount = 0;
+  context.state.activeStudioId = '1';
+  clip.dataset.lutProxyUrl = '';
+  look = { ...look, creative_strength: 30 };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  reply(requests[0], '/proxy/active');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '/proxy/active');
+  assert.equal(context.syncCount, 1, 'active completion refreshes the preview');
 
   // Ineligible clips do not request a proxy.
   requests.length = 0;

@@ -2509,12 +2509,9 @@
     return !!(stateForClip && stateForClip.pending);
   }
 
-  function isActiveOrSelectedClip(clip) {
-    if (!clip) return false;
-    const id = String(clip.dataset.studioId);
-    const selected = state.selected;
-    return (selected && selected.type === "clip" && String(selected.id) === id) ||
-      (state.activeStudioId != null && String(state.activeStudioId) === id);
+  function isActiveClip(clip) {
+    if (!clip || state.activeStudioId == null) return false;
+    return String(state.activeStudioId) === String(clip.dataset.studioId);
   }
 
   function scheduleLutProxyPrepare(clip, delay = 300) {
@@ -2553,7 +2550,7 @@
         if (!res.ok) {
           stateForClip.pending = false;
           stateForClip.failed = true;
-          if (isActiveOrSelectedClip(clip)) setLutPreviewChip(msgLutChipFailed);
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
           return;
         }
         const data = await res.json();
@@ -2563,13 +2560,16 @@
         if (!url) {
           stateForClip.pending = false;
           stateForClip.failed = true;
-          if (isActiveOrSelectedClip(clip)) setLutPreviewChip(msgLutChipFailed);
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
           return;
         }
         clip.dataset.lutProxyUrl = url;
         stateForClip.pending = false;
         stateForClip.failed = false;
-        if (isActiveOrSelectedClip(clip)) {
+        // Never reload the active picture for a merely selected, non-active
+        // clip, and do not interrupt an in-progress playhead drag. The new
+        // source is picked up by the next sync/seek.
+        if (isActiveClip(clip) && !playheadDragging) {
           setLutPreviewChip("");
           syncPreviewMedia({ seek: true });
         }
@@ -2577,7 +2577,7 @@
         if (lutProxyPrepare.get(id) === stateForClip && stateForClip.token === token) {
           stateForClip.pending = false;
           stateForClip.failed = true;
-          if (isActiveOrSelectedClip(clip)) setLutPreviewChip(msgLutChipFailed);
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
         }
       }
     }, delay);
