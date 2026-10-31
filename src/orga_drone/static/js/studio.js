@@ -393,6 +393,7 @@
   const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
   const msgSpeedFailed = root.dataset.speedFailed || "Could not change speed.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
+  const msgHslFailed = root.dataset.hslFailed || "Could not save HSL color settings.";
   const msgColorFailed = root.dataset.colorFailed || "Could not save the color look.";
   const msgColorLutFailed = root.dataset.colorLutFailed || "Could not import that .cube LUT.";
   const msgColorLutMissing = root.dataset.colorLutMissing || "A LUT file is missing. Choose the .cube again, or clear the look.";
@@ -2082,6 +2083,70 @@
     );
   }
 
+  const HSL_RANGE_IDS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"];
+  const HSL_FIELDS = [
+    ["hue", "inspector-hsl-hue", "inspector-hsl-hue-value"],
+    ["saturation", "inspector-hsl-saturation", "inspector-hsl-saturation-value"],
+    ["luminance", "inspector-hsl-luminance", "inspector-hsl-luminance-value"],
+  ];
+  let selectedHslRange = "red";
+
+  function clampHslSlider(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-100, Math.min(100, Math.round(number)));
+  }
+
+  function neutralHslRange() {
+    return { hue: 0, saturation: 0, luminance: 0 };
+  }
+
+  function neutralHslAdjust() {
+    const ranges = {};
+    HSL_RANGE_IDS.forEach((rangeId) => {
+      ranges[rangeId] = neutralHslRange();
+    });
+    return { ranges };
+  }
+
+  function readHsl(clip) {
+    const neutral = neutralHslAdjust();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.hsl || "");
+      const ranges = parsed && parsed.ranges;
+      if (!ranges || typeof ranges !== "object") return neutral;
+      HSL_RANGE_IDS.forEach((rangeId) => {
+        const value = ranges[rangeId];
+        if (!value || typeof value !== "object") return;
+        neutral.ranges[rangeId] = {
+          hue: clampHslSlider(value.hue),
+          saturation: clampHslSlider(value.saturation),
+          luminance: clampHslSlider(value.luminance),
+        };
+      });
+      return neutral;
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function hslIsNeutral(hsl) {
+    if (!hsl || !hsl.ranges) return true;
+    return HSL_RANGE_IDS.every((rangeId) => {
+      const value = hsl.ranges[rangeId] || {};
+      return !value.hue && !value.saturation && !value.luminance;
+    });
+  }
+
+  function writeHsl(clip, hsl, persisted = false) {
+    if (!clip) return;
+    clip.dataset.hsl = JSON.stringify(hsl || neutralHslAdjust());
+    clip.dataset.hslPreviewDirty = persisted ? "0" : "1";
+    clearLutPreviewStill();
+    if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
+  }
+
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
   // studio_image.blackbody_channel_gains. ffmpeg 7.1 colortemperature on
   // rgb(127, 95, 63) at 4800 K is (127, 83, 49).
@@ -2302,6 +2367,7 @@
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
   const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
   const msgLutChipComposite = root.dataset.lutChipComposite || "Color still; transition colors approximate";
+  const msgHslChipPlaying = root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
   let lutStillAbort = null;
   let lutStillTimer = 0;
   let lutStillToken = 0;
@@ -2375,25 +2441,24 @@
       return;
     }
     const look = readColorLook(clip);
-    const anim = readColorAnimation(clip);
-    const animActive = Boolean(anim && Array.isArray(anim.keys) && anim.keys.length >= 2);
-    if (!colorLookNeedsStill(look, clip) && !animActive) {
+    const hsl = readHsl(clip);
+    const hslActive = !hslIsNeutral(hsl);
+    const lookActive = colorLookNeedsStill(look, clip);
+    if (!lookActive && !hslActive) {
       clearLutPreviewStill();
       return;
     }
-    // Color-animation-only stills wait for a color file; CSS covers grade keys.
-    if (!colorLookNeedsStill(look, clip)) {
-      clearLutPreviewStill();
-      return;
-    }
-    if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1") {
+    if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1" ||
+        clip.dataset.hslPreviewDirty === "1") {
       clearLutPreviewStill();
       setLutPreviewChip(msgLutChipUpdating);
       return;
     }
     if (state.playing) {
       clearLutPreviewStill();
-      setLutPreviewChip(lutProxySrcFor(clip) ? "" : msgLutChipPlaying);
+      setLutPreviewChip(
+        lutProxySrcFor(clip) ? "" : (hslActive && !lookActive ? msgHslChipPlaying : msgLutChipPlaying)
+      );
       return;
     }
     const studioId = clip.dataset.studioId;
@@ -2405,7 +2470,7 @@
     const sourceOff = lutStillSourceOffset(clip, localS);
     const quant = Math.round(sourceOff * 10) / 10;
     const key = JSON.stringify([studioId, quant, clip.dataset.sourceIn,
-      clip.dataset.sourceOut, look, readImageAdjust(clip), anim, clip.dataset.saturationRamp]);
+      clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, clip.dataset.saturationRamp]);
     if (key === lutStillKey) return;
     // Reject old responses now, including during the debounce and image decode.
     clearLutPreviewStill();
@@ -2415,7 +2480,7 @@
     lutStillTimer = window.setTimeout(async () => {
       lutStillTimer = 0;
       // The endpoint reads persisted settings. Do not race an in-flight edit.
-      await Promise.all([colorSaveChain, imageSaveChain]);
+      await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain]);
       if (token !== lutStillToken) return;
       const controller = new AbortController();
       lutStillAbort = controller;
@@ -2507,7 +2572,38 @@
     if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
     const compare = document.getElementById("inspector-look-compare");
     if (compare) compare.checked = compareBeforeAfter;
+    fillHsl(clip);
     fillColorAnimationInspector(clip);
+  }
+
+  function hslRangeFromControls(clip) {
+    const base = readHsl(clip);
+    const value = { ...(base.ranges[selectedHslRange] || neutralHslRange()) };
+    HSL_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      const shown = clampHslSlider(input ? input.value : value[key]);
+      value[key] = shown;
+      if (valueEl) valueEl.textContent = String(shown);
+    });
+    base.ranges[selectedHslRange] = value;
+    return base;
+  }
+
+  function fillHsl(clip) {
+    const hsl = readHsl(clip);
+    const value = hsl.ranges[selectedHslRange] || neutralHslRange();
+    HSL_FIELDS.forEach(([key, inputId, valueId]) => {
+      const input = document.getElementById(inputId);
+      const valueEl = document.getElementById(valueId);
+      if (input) input.value = String(value[key]);
+      if (valueEl) valueEl.textContent = String(value[key]);
+    });
+    document.querySelectorAll("[data-hsl-range]").forEach((button) => {
+      const active = button.dataset.hslRange === selectedHslRange;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
   }
 
   async function applyQuickLook(clip, lookId) {
@@ -3376,6 +3472,57 @@
     setSaveState(true);
   }
 
+  let hslSaveChain = Promise.resolve();
+  let hslSaveTimer = 0;
+  const hslPendingStudioIds = new Set();
+
+  function queueHslSave(clip) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    hslPendingStudioIds.add(String(studioId));
+    if (hslSaveTimer) window.clearTimeout(hslSaveTimer);
+    // Rapid slider releases coalesce into the latest per-clip settings.
+    hslSaveTimer = window.setTimeout(() => {
+      hslSaveTimer = 0;
+      const pendingIds = [...hslPendingStudioIds];
+      hslPendingStudioIds.clear();
+      pendingIds.forEach((pendingId) => {
+        hslSaveChain = hslSaveChain
+          .then(() => saveHsl(pendingId))
+          .catch((err) => {
+            showFlash((err && err.message) || msgHslFailed);
+          });
+      });
+    }, 150);
+  }
+
+  async function saveHsl(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const hsl = readHsl(clip);
+    const res = await fetch(`/api/studio/${studioId}/hsl`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ ranges: hsl.ranges }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgHslFailed);
+    }
+    if (JSON.stringify(readHsl(clip)) === JSON.stringify(hsl)) {
+      writeHsl(clip, body.hsl || hsl, true);
+    }
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillHsl(clip);
+    }
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
   let selectedMaskId = null;
   let maskDragging = false;
   const maskScratch = document.createElement("canvas");
@@ -4149,7 +4296,8 @@
       Math.abs(frame.y_end - 0.5) > 0.001;
     image.classList.toggle(
       "has-settings",
-      !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive
+      !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive ||
+        !hslIsNeutral(readHsl(clip))
     );
     const hud = readHud(clip);
     effects.classList.toggle("has-settings", readMasks(clip).length > 0 || hud.enabled === true);
@@ -9333,6 +9481,56 @@
     applyPreviewGrades(resolveAt(state.projectTimeS));
     setSaveState(false);
     queueImageAdjustSave(clip);
+  });
+
+  HSL_FIELDS.forEach(([, inputId]) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      writeHsl(clip, hslRangeFromControls(clip));
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      setSaveState(false);
+    });
+    input.addEventListener("change", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      writeHsl(clip, hslRangeFromControls(clip));
+      queueHslSave(clip);
+    });
+  });
+
+  document.querySelectorAll("[data-hsl-range]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      if (clip.dataset.hslPreviewDirty === "1") queueHslSave(clip);
+      selectedHslRange = button.dataset.hslRange || "red";
+      fillHsl(clip);
+    });
+  });
+
+  document.getElementById("inspector-hsl-reset")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    const hsl = readHsl(clip);
+    hsl.ranges[selectedHslRange] = neutralHslRange();
+    writeHsl(clip, hsl);
+    fillHsl(clip);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(false);
+    queueHslSave(clip);
+  });
+
+  document.getElementById("inspector-hsl-reset-all")?.addEventListener("click", () => {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    writeHsl(clip, neutralHslAdjust());
+    fillHsl(clip);
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(false);
+    queueHslSave(clip);
   });
 
   document.getElementById("inspector-color-dlog-apply")?.addEventListener("click", () => {

@@ -827,5 +827,22 @@
   "Unknown look.": "Unbekannter Look.",
   "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Helligkeit, Kontrast, Sättigung, Wärme und Feinabstimmung müssen zwischen −100 und 100 liegen.",
   "Color preview unavailable; try pausing or seeking again": "Farbvorschau nicht verfügbar; erneut pausieren oder eine andere Stelle wählen",
-  "Color still; transition colors approximate": "Farbstandbild; Übergangsfarben angenähert"
+  "Color still; transition colors approximate": "Farbstandbild; Übergangsfarben angenähert",
+  "HSL color mixer": "HSL-Farbmischer",
+  "Hue": "Farbton",
+  "Luminance": "Luminanz",
+  "Red": "Rot",
+  "Orange": "Orange",
+  "Yellow": "Gelb",
+  "Green": "Grün",
+  "Aqua": "Aqua",
+  "Blue": "Blau",
+  "Purple": "Violett",
+  "Magenta": "Magenta",
+  "Color range": "Farbbereich",
+  "Reset this color": "Diese Farbe zurücksetzen",
+  "Reset all HSL": "Gesamtes HSL zurücksetzen",
+  "Adjust one color range without changing the others. Neutral values leave the picture unchanged.": "Passe einen Farbbereich an, ohne die anderen zu verändern. Neutrale Werte lassen das Bild unverändert.",
+  "Could not save HSL color settings.": "HSL-Farbeinstellungen konnten nicht gespeichert werden.",
+  "Playing without HSL preview; pause or seek to see it": "Wiedergabe ohne HSL-Vorschau; pausiere oder spule, um sie zu sehen"
 }

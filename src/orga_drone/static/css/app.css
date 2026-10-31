@@ -2093,6 +2093,33 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-image-section > :not(summary) {
   min-width: 0;
 }
+.studio-hsl-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.35rem;
+}
+.studio-hsl-swatch {
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--hsl-swatch, var(--border));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 18%);
+  cursor: pointer;
+}
+.studio-hsl-swatch.is-active,
+.studio-hsl-swatch:focus-visible {
+  border-color: var(--text);
+  outline: none;
+}
+.studio-hsl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
 .studio-color-file-row {
   display: flex;
   flex-wrap: wrap;

@@ -190,6 +190,9 @@
           data-lut-chip-failed="{{ _('Color preview unavailable; try pausing or seeking again')|e }}"
           data-lut-chip-composite="{{ _('Color still; transition colors approximate')|e }}"
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
+         data-hsl-model='{{ hsl_model|tojson }}'
+         data-hsl-failed="{{ _('Could not save HSL color settings.')|e }}"
+         data-hsl-chip-playing="{{ _('Playing without HSL preview; pause or seek to see it')|e }}"
          data-color-look-model='{{ color_look_model|tojson }}'
          data-color-animation-model='{{ color_animation_model|tojson }}'
          data-color-anim-failed="{{ _('Could not save the color change.')|e }}"
@@ -687,6 +690,7 @@
                   data-has-proxy="{{ '1' if row.has_proxy else '0' }}"
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
+                  data-hsl='{{ row.hsl|tojson }}'
                   data-color-look='{{ row.color_look|tojson }}'
                   data-quick-look="{{ row.quick_look|e }}"
                   data-detail='{{ row.detail|tojson }}'
@@ -935,6 +939,66 @@
               </label>
               <button type="button" class="button ghost" id="inspector-image-reset"
                       title="{{ _('Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.') }}">{{ _('Reset adjustments') }}</button>
+            </div>
+          </details>
+          <details id="inspector-image-section-hsl" class="studio-image-section">
+            <summary>{{ _('HSL color mixer') }}</summary>
+            <div id="inspector-hsl">
+              <div class="studio-hsl-swatches" role="tablist" aria-label="{{ _('Color range') }}">
+                <button type="button" class="studio-hsl-swatch is-active" data-hsl-range="red"
+                        style="--hsl-swatch: #e5484d" role="tab" aria-selected="true"
+                        title="{{ _('Red') }}" aria-label="{{ _('Red') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="orange"
+                        style="--hsl-swatch: #f76b15" role="tab" aria-selected="false"
+                        title="{{ _('Orange') }}" aria-label="{{ _('Orange') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="yellow"
+                        style="--hsl-swatch: #f5d90a" role="tab" aria-selected="false"
+                        title="{{ _('Yellow') }}" aria-label="{{ _('Yellow') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="green"
+                        style="--hsl-swatch: #30a46c" role="tab" aria-selected="false"
+                        title="{{ _('Green') }}" aria-label="{{ _('Green') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="aqua"
+                        style="--hsl-swatch: #00a2c7" role="tab" aria-selected="false"
+                        title="{{ _('Aqua') }}" aria-label="{{ _('Aqua') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="blue"
+                        style="--hsl-swatch: #3e63dd" role="tab" aria-selected="false"
+                        title="{{ _('Blue') }}" aria-label="{{ _('Blue') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="purple"
+                        style="--hsl-swatch: #8e4ec6" role="tab" aria-selected="false"
+                        title="{{ _('Purple') }}" aria-label="{{ _('Purple') }}"></button>
+                <button type="button" class="studio-hsl-swatch" data-hsl-range="magenta"
+                        style="--hsl-swatch: #d6409f" role="tab" aria-selected="false"
+                        title="{{ _('Magenta') }}" aria-label="{{ _('Magenta') }}"></button>
+              </div>
+              <p class="hint">{{ _('Adjust one color range without changing the others. Neutral values leave the picture unchanged.') }}</p>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Hue') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-hsl-hue-value">0</span>
+                </span>
+                <input type="range" id="inspector-hsl-hue" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Hue') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Saturation') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-hsl-saturation-value">0</span>
+                </span>
+                <input type="range" id="inspector-hsl-saturation" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Saturation') }}">
+              </label>
+              <label class="studio-inspector-field">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Luminance') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-hsl-luminance-value">0</span>
+                </span>
+                <input type="range" id="inspector-hsl-luminance" min="-100" max="100" step="1" value="0"
+                       aria-label="{{ _('Luminance') }}">
+              </label>
+              <div class="studio-hsl-actions">
+                <button type="button" class="button ghost" id="inspector-hsl-reset">{{ _('Reset this color') }}</button>
+                <button type="button" class="button ghost" id="inspector-hsl-reset-all">{{ _('Reset all HSL') }}</button>
+              </div>
             </div>
           </details>
           <details id="inspector-image-section-advanced" class="studio-image-section">

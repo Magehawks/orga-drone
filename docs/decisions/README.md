@@ -57,3 +57,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0026](0026-studio-soundtrack-lead-in.md) | Studio soundtrack lead-in | Accepted |
 | [0027](0027-studio-lut-dlog-m.md) | Studio local `.cube` LUT and D-Log M conversion | Accepted |
 | [0028](0028-studio-lut-preview-stills.md) | Studio LUT preview via shared FFmpeg stills | Accepted |
+| [0029](0029-studio-hsl-color-mixer.md) | Studio HSL colour mixer as a generated 3D LUT | Accepted |
