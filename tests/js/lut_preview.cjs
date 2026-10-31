@@ -7,15 +7,20 @@ function section(start, end) { return script.split(start)[1].split(end)[0]; }
 const source = 'const previewLutStill' + section('const previewLutStill', 'function canvasFilterFrom') +
   'function neutralColorLook' + section('function neutralColorLook', 'function writeColorLook');
 const still = { hidden: true, removeAttribute() {}, naturalWidth: 320, naturalHeight: 180 };
-const chip = {};
+const chip = { addEventListener() {} };
 let timers = new Map(), nextTimer = 1, requests = [], decodes = [];
+let proxySrc = "";
 const context = {
   root: { dataset: {} }, document: { getElementById: id => id.endsWith('still') ? still : chip },
   window: { setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; }, clearTimeout: id => timers.delete(id) },
   state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
-  lutProxySrcFor: () => "",
+  lutProxySrcFor: () => proxySrc,
+  lutWebglCanHandle: () => false,
+  lutWebglReadyFor: () => false,
+  lutProxyEligible: () => false,
   previewVideo: null, previewVideoB: null, lutProxyActiveFor: () => false,
+  previewLutFrameFor: () => null,
   playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
   resolveAt: () => null,
@@ -26,6 +31,12 @@ const context = {
 };
 vm.createContext(context); vm.runInContext(source, context);
 const clip = { dataset: { studioId: '1', kind: 'video', colorLook: JSON.stringify({ creative_lut: 'a', creative_strength: 100 }) } };
+proxySrc = '/api/studio/1/playback-proxy?lut_proxy=1';
+context.scheduleLutPreviewStill(clip, 1);
+assert.equal(timers.size, 0, 'proxy keeps its video frame instead of a soft still');
+assert.equal(requests.length, 0, 'proxy does not request a JPEG still');
+assert.equal(still.hidden, true);
+proxySrc = "";
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function fire() { const callbacks = [...timers.values()]; timers.clear(); for (const f of callbacks) await f(); }
 async function reply(request, id) { request.resolve({ ok: true, status: 200, blob: async () => ({ id }) }); await tick(); }

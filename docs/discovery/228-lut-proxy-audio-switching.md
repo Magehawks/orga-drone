@@ -1,6 +1,6 @@
 # Issue #228: LUT proxy audio and clip-switch safety
 
-- **Status:** Experimental developer opt-in only
+- **Status:** Automatic for eligible clips; custom audio keeps source playback
 - **Date:** 2026-10-31
 - **Related:** #223 playback, #224 cache identity/cleanup
 

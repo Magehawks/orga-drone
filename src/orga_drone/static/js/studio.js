@@ -1820,22 +1820,118 @@
     };
   }
 
-  function lutProxySrcFor(clip) {
-    if (root.dataset.lutProxyEnabled !== "1") return "";
-    if (!clip || clip.dataset.kind !== "video") return "";
+  function lutProxyEligible(clip) {
+    if (!clip || clip.dataset.kind !== "video") return false;
     // Custom clip-audio trim/mute/offset uses the source audio element; keep
     // that path on ordinary playback where those rules are already proven.
-    if (readClipAudio(clip)) return "";
-    if (playbackSpeed(clip) < 0.999 || slowBarOf(clip)) return "";
-    if (sectionRepeats(clip) > 1 || forwardLoopActive(clip)) return "";
+    if (readClipAudio(clip)) return false;
+    if (playbackSpeed(clip) < 0.999 || slowBarOf(clip)) return false;
+    if (sectionRepeats(clip) > 1 || forwardLoopActive(clip)) return false;
     const anim = readColorAnimation(clip);
-    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return "";
+    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return false;
     const ramp = readSaturationRamp(clip);
-    if (ramp && ramp.enabled) return "";
+    if (ramp && ramp.enabled) return false;
+    const look = readColorLook(clip);
+    return !!((look.conversion_lut && look.conversion_confirmed) || look.creative_lut);
+  }
+
+  function lutProxySrcFor(clip) {
+    if (!lutProxyEligible(clip)) return "";
+    if (lutWebglCanHandle(clip)) return "";
+    const clipId = String(clip.dataset.studioId);
     const selected = state.selected;
-    if (!selected || selected.type !== "clip" ||
-        String(selected.id) !== String(clip.dataset.studioId)) return "";
+    const selectedMatch = !!(selected && selected.type === "clip" &&
+      String(selected.id) === clipId);
+    const activeMatch = state.activeStudioId != null &&
+      String(state.activeStudioId) === clipId;
+    if (!selectedMatch && !activeMatch) return "";
     return clip.dataset.lutProxyUrl || "";
+  }
+
+  let lutRendererA = null;
+  let lutRendererB = null;
+
+  function lookHasLut(look) {
+    return !!look && !!(
+      (look.conversion_lut && look.conversion_confirmed) || look.creative_lut
+    );
+  }
+
+  function lutWebglCanHandle(clip) {
+    if (!clip || clip.dataset.kind !== "video") return false;
+    if (!window.OrgaLutPreview || !window.OrgaLutPreview.supported) return false;
+    const anim = readColorAnimation(clip);
+    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return false;
+    return lookHasLut(readColorLook(clip));
+  }
+
+  function lutRendererFor(media) {
+    if (media === previewVideo) {
+      if (!lutRendererA) {
+        lutRendererA = window.OrgaLutPreview?.createRenderer?.() || null;
+        if (lutRendererA) {
+          lutRendererA.onReady = () => {
+            clearLutPreviewStill();
+            schedulePreviewBlit();
+          };
+        }
+      }
+      return lutRendererA;
+    }
+    if (media === previewVideoB) {
+      if (!lutRendererB) {
+        lutRendererB = window.OrgaLutPreview?.createRenderer?.() || null;
+        if (lutRendererB) {
+          lutRendererB.onReady = () => {
+            clearLutPreviewStill();
+            schedulePreviewBlit();
+          };
+        }
+      }
+      return lutRendererB;
+    }
+    return null;
+  }
+
+  function lutWebglReadyFor(clip) {
+    if (!lutWebglCanHandle(clip)) return false;
+    const media = clipForPreviewMedia(previewVideo) === clip
+      ? previewVideo
+      : (clipForPreviewMedia(previewVideoB) === clip ? previewVideoB : null);
+    if (!media) return false;
+    const renderer = lutRendererFor(media);
+    return !!renderer && renderer.isReady(readColorLook(clip));
+  }
+
+  function previewLutFrameFor(media, frameW, frameH) {
+    const clip = clipForPreviewMedia(media);
+    if (!lutWebglCanHandle(clip)) return null;
+    const renderer = lutRendererFor(media);
+    if (!renderer) return null;
+    const look = readColorLook(clip);
+    const hit = resolveAt(state.projectTimeS);
+    const localS = hit && hit.overlapClip === clip
+      ? hit.overlapLocalS
+      : (hit && hit.clip === clip ? hit.localS : 0);
+    const adjust = compareBeforeAfter ? neutralImageAdjust() : readImageAdjustAt(clip, localS);
+    const ramp = compareBeforeAfter
+      ? 1
+      : saturationRampMultiplier(readSaturationRamp(clip), localS);
+    return renderer.render(media, {
+      grade: gradeFactors(adjust, ramp),
+      look,
+      frameW,
+      frameH,
+      dpr: window.devicePixelRatio || 1,
+    });
+  }
+
+  function lutWebglCanvasFor(media) {
+    const clip = clipForPreviewMedia(media);
+    if (!lutWebglCanHandle(clip)) return null;
+    const renderer = lutRendererFor(media);
+    if (!renderer || !renderer.isReady(readColorLook(clip))) return null;
+    return renderer.canvas;
   }
 
   function lutProxyActiveFor(clip) {
@@ -2068,6 +2164,7 @@
     });
     clip.dataset.imagePreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill();
+    if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
 
   function imageAdjustIsNeutral(adjust) {
@@ -2112,32 +2209,40 @@
     return Math.round(Math.min(40000, Math.max(1000, kelvin)));
   }
 
-  function cssFilterFor(adjust, rampMultiplier) {
+  function gradeFactors(adjust, rampMultiplier) {
     const model = imageAdjustModel;
-    const parts = [];
-    if (adjust.saturation) {
-      const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
-      parts.push(`saturate(${factor.toFixed(4)})`);
-    }
+    let saturation = 1 + ((adjust.saturation || 0) / 100) * model.saturationDeltaAtFull;
     let contrast = 1 + ((adjust.contrast || 0) / 100) * model.contrastDeltaAtFull;
     contrast += ((adjust.highlights || 0) / 100) * 0.08;
     contrast -= ((adjust.shadows || 0) / 100) * 0.05;
     contrast -= ((adjust.blacks || 0) / 100) * 0.04;
     contrast = Math.max(0.4, Math.min(1.6, contrast));
-    if (Math.abs(contrast - 1) > 0.0005) {
-      parts.push(`contrast(${contrast.toFixed(4)})`);
-    }
     let brightness = Math.pow(2, ((adjust.exposure || 0) / 100) * model.exposureEvAtFull);
     brightness += ((adjust.shadows || 0) / 100) * 0.06;
     brightness += ((adjust.blacks || 0) / 100) * 0.04;
     brightness -= ((adjust.highlights || 0) / 100) * 0.05;
     brightness = Math.max(0.5, Math.min(2.2, brightness));
-    if (Math.abs(brightness - 1) > 0.0005) {
-      parts.push(`brightness(${brightness.toFixed(4)})`);
+    const ramp = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
+    const warmthGains = adjust.warmth
+      ? blackbodyGains(kelvinForWarmth(adjust.warmth))
+      : [1, 1, 1];
+    return { saturation, contrast, brightness, ramp, warmthGains };
+  }
+
+  function cssFilterFor(adjust, rampMultiplier) {
+    const factors = gradeFactors(adjust, rampMultiplier);
+    const parts = [];
+    if (adjust.saturation) {
+      parts.push(`saturate(${factors.saturation.toFixed(4)})`);
     }
-    const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
-    if (mult < 0.9995) {
-      parts.push(`saturate(${Math.max(0, mult).toFixed(4)})`);
+    if (Math.abs(factors.contrast - 1) > 0.0005) {
+      parts.push(`contrast(${factors.contrast.toFixed(4)})`);
+    }
+    if (Math.abs(factors.brightness - 1) > 0.0005) {
+      parts.push(`brightness(${factors.brightness.toFixed(4)})`);
+    }
+    if (factors.ramp < 0.9995) {
+      parts.push(`saturate(${Math.max(0, factors.ramp).toFixed(4)})`);
     }
     return parts.join(" ");
   }
@@ -2298,6 +2403,7 @@
   const previewLutChip = document.getElementById("studio-preview-lut-chip");
   const msgLutChipUpdating = root.dataset.lutChipUpdating || "Updating picture…";
   const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
+  const msgLutChipProxyPreparing = root.dataset.lutChipProxyPreparing || "LUT video is being prepared...";
   const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
   const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
@@ -2386,6 +2492,16 @@
       clearLutPreviewStill();
       return;
     }
+    // The proxy already contains grade+LUT at video resolution. Keep its frame
+    // for pause/seek/selection instead of overpainting a soft 720-edge JPEG.
+    if (lutWebglReadyFor(clip)) {
+      clearLutPreviewStill();
+      return;
+    }
+    if (lutProxySrcFor(clip)) {
+      clearLutPreviewStill();
+      return;
+    }
     if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1") {
       clearLutPreviewStill();
       setLutPreviewChip(msgLutChipUpdating);
@@ -2393,7 +2509,9 @@
     }
     if (state.playing) {
       clearLutPreviewStill();
-      setLutPreviewChip(lutProxySrcFor(clip) ? "" : msgLutChipPlaying);
+      setLutPreviewChip(lutProxySrcFor(clip) ? "" : (
+        lutProxyPreparingFor(clip) ? msgLutChipProxyPreparing : msgLutChipPlaying
+      ));
       return;
     }
     const studioId = clip.dataset.studioId;
@@ -2458,7 +2576,10 @@
           const hit = resolveAt(state.projectTimeS);
           const composite = hit && (hit.overlapClip ||
             (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
-          setLutPreviewChip(composite ? msgLutChipComposite : msgLutChipStill);
+          const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
+          setLutPreviewChip(
+            lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
+          );
           drawPrivacyMasks();
           schedulePreviewBlit();
         })
@@ -2470,6 +2591,102 @@
           previewLutStill.hidden = true;
         });
     }, 120);
+  }
+
+  const lutProxyPrepare = new Map();
+
+  function lutProxyPrepareKey(clip) {
+    return JSON.stringify([
+      clip.dataset.colorLook, clip.dataset.imageAdjust, clip.dataset.sourceIn,
+      clip.dataset.sourceOut, clip.dataset.saturationRamp, clip.dataset.playbackSpeed,
+    ]);
+  }
+
+  function lutProxyPreparingFor(clip) {
+    if (!clip || !clip.dataset.studioId) return false;
+    const stateForClip = lutProxyPrepare.get(String(clip.dataset.studioId));
+    return !!(stateForClip && stateForClip.pending);
+  }
+
+  function isActiveClip(clip) {
+    if (!clip || state.activeStudioId == null) return false;
+    return String(state.activeStudioId) === String(clip.dataset.studioId);
+  }
+
+  function scheduleLutProxyPrepare(clip, delay = 300) {
+    if (!clip || !clip.dataset.studioId) return;
+    const id = String(clip.dataset.studioId);
+    if (lutWebglCanHandle(clip)) {
+      clip.dataset.lutProxyUrl = "";
+      const stale = lutProxyPrepare.get(id);
+      if (stale && stale.timer) window.clearTimeout(stale.timer);
+      lutProxyPrepare.delete(id);
+      return;
+    }
+    if (!lutProxyEligible(clip)) {
+      clip.dataset.lutProxyUrl = "";
+      const stale = lutProxyPrepare.get(id);
+      if (stale && stale.timer) window.clearTimeout(stale.timer);
+      lutProxyPrepare.delete(id);
+      return;
+    }
+    const key = lutProxyPrepareKey(clip);
+    let stateForClip = lutProxyPrepare.get(id);
+    // Keep the pending timer: a second selection/grade call with the same key
+    // must not clear it and then return without scheduling a new one.
+    if (stateForClip && stateForClip.key === key && stateForClip.pending) return;
+    if (stateForClip && stateForClip.timer) {
+      window.clearTimeout(stateForClip.timer);
+      stateForClip.timer = 0;
+    }
+    if (clip.dataset.lutProxyUrl && (!stateForClip || stateForClip.key === key)) return;
+    clip.dataset.lutProxyUrl = "";
+    const token = (stateForClip ? stateForClip.token : 0) + 1;
+    stateForClip = { token, key, pending: true, failed: false, timer: 0 };
+    lutProxyPrepare.set(id, stateForClip);
+    stateForClip.timer = window.setTimeout(async () => {
+      stateForClip.timer = 0;
+      try {
+        const res = await fetch(`/api/studio/${id}/playback-proxy`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (lutProxyPrepare.get(id) !== stateForClip || stateForClip.token !== token) return;
+        if (!res.ok) {
+          stateForClip.pending = false;
+          stateForClip.failed = true;
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
+          return;
+        }
+        const data = await res.json();
+        if (lutProxyPrepare.get(id) !== stateForClip || stateForClip.token !== token) return;
+        if (lutProxyPrepareKey(clip) !== key) return;
+        const url = data && data.url ? String(data.url) : "";
+        if (!url) {
+          stateForClip.pending = false;
+          stateForClip.failed = true;
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
+          return;
+        }
+        clip.dataset.lutProxyUrl = url;
+        stateForClip.pending = false;
+        stateForClip.failed = false;
+        // Never reload the active picture for a merely selected, non-active
+        // clip, and do not interrupt an in-progress playhead drag. The new
+        // source is picked up by the next sync/seek.
+        if (isActiveClip(clip) && !playheadDragging) {
+          setLutPreviewChip("");
+          syncPreviewMedia({ seek: true });
+        }
+      } catch (_) {
+        if (lutProxyPrepare.get(id) === stateForClip && stateForClip.token === token) {
+          stateForClip.pending = false;
+          stateForClip.failed = true;
+          if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
+        }
+      }
+    }, delay);
   }
 
   function canvasFilterFrom(styleFilter) {
@@ -2525,6 +2742,7 @@
     clip.dataset.quickLook = body.quick_look || "";
     fillImageAdjust(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    scheduleLutProxyPrepare(clip);
     setSaveState(true);
   }
 
@@ -2585,6 +2803,7 @@
     if (!clip) return;
     clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
     clearLutPreviewStill();
+    scheduleLutProxyPrepare(clip);
     if (colorLookNeedsStill(look, clip)) setLutPreviewChip(msgLutChipUpdating);
   }
 
@@ -3568,8 +3787,12 @@
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
     const rendered = !reuseDraft && !state.playing && (media === previewVideo || media === previewImage) &&
       previewLayerReady(previewLutStill) ? previewLutStill : null;
-    const picture = rendered || media;
-    if (rendered) {
+    const webgl = lutWebglCanvasFor(media);
+    const picture = webgl || rendered || media;
+    if (webgl) {
+      srcW = webgl.width;
+      srcH = webgl.height;
+    } else if (rendered) {
       srcW = rendered.naturalWidth;
       srcH = rendered.naturalHeight;
     }
@@ -5094,18 +5317,27 @@
 
   function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
     if (!previewLayerReady(media)) return false;
-    const picture = rendered || media;
-    const srcW = picture.videoWidth || picture.naturalWidth || 0;
-    const srcH = picture.videoHeight || picture.naturalHeight || 0;
+    const webgl = previewLutFrameFor(media, frameW, frameH);
+    if (webgl && previewFrame) {
+      previewFrame.dataset.lutWebgl = "1";
+      previewFrame.dataset.lutWebglWidth = String(webgl.width);
+      previewFrame.dataset.lutWebglHeight = String(webgl.height);
+    }
+    const picture = webgl || rendered || media;
+    const srcW = picture.videoWidth || picture.naturalWidth || picture.width || 0;
+    const srcH = picture.videoHeight || picture.naturalHeight || picture.height || 0;
+    if (!srcW || !srcH) return false;
     const fit = contentRect(frameW, frameH, srcW, srcH);
     const xform = readPreviewTransform(media);
     const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
-    // Server stills and LUT proxies already contain the grade and LUT.
+    // WebGL output, server stills and LUT proxies already contain grade + LUT.
     const proxyRendered = (media === previewVideo || media === previewVideoB) &&
       lutProxyActiveFor(clipForPreviewMedia(media));
-    const filter = rendered || proxyRendered ? "none" : canvasFilterFrom(media.style.filter);
+    const filter = webgl || rendered || proxyRendered
+      ? "none"
+      : canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;
@@ -6387,6 +6619,7 @@
       // Keep selection from stealing the playhead, but still sync preview/active chrome.
       syncPreviewMedia({ seek: true });
     }
+    scheduleLutProxyPrepare(clip);
     updateRemoveEnabled();
   }
 
