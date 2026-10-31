@@ -1,0 +1,95 @@
+// Automatic LUT proxy preparation: no flag, no manual button (#231).
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const script = fs.readFileSync('src/orga_drone/static/js/studio.js', 'utf8');
+function section(start, end) { return script.split(start)[1].split(end)[0]; }
+const source =
+  'function lutProxyEligible' + section('function lutProxyEligible', 'function imageSrcFor') +
+  'const lutProxyPrepare' + section('const lutProxyPrepare', 'function canvasFilterFrom');
+const timers = [];
+const requests = [];
+let look = { conversion_lut: '', creative_lut: 'a', creative_strength: 100, conversion_confirmed: false };
+let clipAudio = null;
+const context = {
+  readColorLook: () => look,
+  readClipAudio: () => clipAudio,
+  playbackSpeed: () => 1,
+  slowBarOf: () => null,
+  sectionRepeats: () => 1,
+  forwardLoopActive: () => false,
+  readColorAnimation: () => null,
+  readSaturationRamp: () => ({ enabled: false }),
+  state: { selected: { type: 'clip', id: '1' }, activeStudioId: null },
+  window: {
+    setTimeout: callback => { timers.push(callback); return timers.length; },
+    clearTimeout: () => {},
+  },
+  fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
+  setLutPreviewChip() {},
+  syncPreviewMedia() {},
+  String, JSON, Math,
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+const clip = {
+  dataset: {
+    kind: 'video', studioId: '1', colorLook: '{}', imageAdjust: '{}',
+    sourceIn: '0', sourceOut: '3', saturationRamp: '', playbackSpeed: '1',
+  },
+};
+const settle = () => new Promise(resolve => setImmediate(resolve));
+async function fire() {
+  const pending = timers.splice(0);
+  for (const callback of pending) callback();
+  await settle();
+}
+function reply(request, url) {
+  request.resolve({ ok: true, json: async () => ({ url }) });
+}
+(async () => {
+  context.scheduleLutProxyPrepare(clip, 0);
+  assert.equal(context.lutProxyPreparingFor(clip), true);
+  await fire();
+  assert.equal(requests.length, 1);
+  reply(requests[0], '/proxy/100');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '/proxy/100');
+
+  // LUT strength changes invalidate and supersede the first response.
+  requests.length = 0;
+  clip.dataset.lutProxyUrl = '';
+  look = { ...look, creative_strength: 50 };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 1);
+  look = { ...look, creative_strength: 100 };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 2);
+  reply(requests[0], '/proxy/stale');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '', 'stale response cannot activate');
+  reply(requests[1], '/proxy/final');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '/proxy/final');
+
+  // Ineligible clips do not request a proxy.
+  requests.length = 0;
+  timers.length = 0;
+  clipAudio = { sourceIn: 1, sourceOut: 2, place: 0 };
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 0, 'custom audio falls back');
+  clipAudio = null;
+
+  // No LUT means no proxy request.
+  look = { conversion_lut: '', creative_lut: '', creative_strength: 100, conversion_confirmed: false };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 0, 'no LUT means no proxy');
+  console.log('lut proxy auto preparation ok');
+})().catch(error => { console.error(error); process.exitCode = 1; });

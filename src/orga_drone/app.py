@@ -1297,38 +1297,20 @@ def create_app() -> FastAPI:
         select: int | None = None,
         focus: str | None = None,
     ) -> Response:
-        lut_proxy_query = request.query_params.get("lut_proxy")
-        lut_proxy_enabled = lut_proxy_query == "1" or (
-            lut_proxy_query is None and request.cookies.get("lut_proxy") == "1"
-        )
-
-        def with_lut_proxy_cookie(response: Response) -> Response:
-            if lut_proxy_query == "1":
-                response.set_cookie(
-                    "lut_proxy", "1", httponly=True, samesite="lax"
-                )
-            elif lut_proxy_query == "0":
-                response.delete_cookie("lut_proxy")
-            return response
-
         if project_id is not None:
             target = db.get_studio_project(project_id)
             if target is None:
                 raise HTTPException(status_code=404, detail="studio project not found")
             db.set_open_studio_project_id(target.id)
             suffix = f"?msg={msg}" if msg else ""
-            return with_lut_proxy_cookie(
-                RedirectResponse(url=f"/studio{suffix}", status_code=303)
-            )
+            return RedirectResponse(url=f"/studio{suffix}", status_code=303)
 
         project = db.resolve_studio_page_project()
         if project is None:
             gallery_url = "/studio/projects"
             if msg:
                 gallery_url = f"{gallery_url}?msg={msg}"
-            return with_lut_proxy_cookie(
-                RedirectResponse(url=gallery_url, status_code=303)
-            )
+            return RedirectResponse(url=gallery_url, status_code=303)
         projects = db.list_studio_projects()
         studio_mode = "editor"
         items = db.list_studio_items(project.id) if project is not None else []
@@ -1436,14 +1418,14 @@ def create_app() -> FastAPI:
                                 if not preview_url:
                                     preview_url = f"/media/{it.media_id}/thumb"
                 color_anim_row = color_animation_from_effect_settings(it.effect_settings)
-                if lut_proxy_enabled and (it.kind or "") == "video" and can_play:
+                if (it.kind or "") == "video" and can_play:
                     proxy_request = _playback_proxy_request_for_clip(it)
                     if proxy_request is not None and (
                         cached_playback_proxy(proxy_request, data_dir=settings.data_dir)
                         is not None
                     ):
                         lut_proxy_url = (
-                            f"/api/studio/{it.id}/playback-proxy?lut_proxy=1"
+                            f"/api/studio/{it.id}/playback-proxy"
                         )
                 item_display.append(
                     {
@@ -1588,7 +1570,7 @@ def create_app() -> FastAPI:
                 )
         story_history = history_flags(project.id if project is not None else None)
         lut_catalog = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
-        return with_lut_proxy_cookie(render(
+        return render(
             request,
             "studio.html",
             items=items,
@@ -1596,7 +1578,6 @@ def create_app() -> FastAPI:
             project=project,
             projects=projects,
             studio_mode=studio_mode,
-            lut_proxy_enabled=lut_proxy_enabled,
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
@@ -1618,7 +1599,7 @@ def create_app() -> FastAPI:
             nav_active="studio",
             select_id=select,
             focus_field=focus,
-        ))
+        )
 
     def _studio_project_json(project: Any) -> dict[str, Any]:
         return {
@@ -2325,13 +2306,8 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/api/studio/{studio_item_id}/playback-proxy")
-    async def api_studio_playback_proxy_file(
-        studio_item_id: int,
-        lut_proxy: bool = Query(False),
-    ) -> Response:
-        """Serve an already generated experimental static-LUT proxy (#223)."""
-        if not lut_proxy:
-            raise HTTPException(status_code=404, detail="Not found")
+    async def api_studio_playback_proxy_file(studio_item_id: int) -> Response:
+        """Serve an already generated static-LUT proxy."""
         clip = _studio_clip_or_404(studio_item_id)
         if (clip.kind or "") != "video":
             raise HTTPException(
@@ -2364,13 +2340,8 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/api/studio/{studio_item_id}/playback-proxy")
-    async def api_studio_playback_proxy_build(
-        studio_item_id: int,
-        lut_proxy: bool = Query(False),
-    ) -> JSONResponse:
-        """Explicitly build one experimental proxy. No automatic generation."""
-        if not lut_proxy:
-            raise HTTPException(status_code=404, detail="Not found")
+    async def api_studio_playback_proxy_build(studio_item_id: int) -> JSONResponse:
+        """Prepare one proxy in a worker thread; the browser never blocks."""
         clip = _studio_clip_or_404(studio_item_id)
         if (clip.kind or "") != "video":
             raise HTTPException(
@@ -2402,7 +2373,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=status, detail=str(exc)) from exc
         return JSONResponse(
             {
-                "url": f"/api/studio/{studio_item_id}/playback-proxy?lut_proxy=1",
+                "url": f"/api/studio/{studio_item_id}/playback-proxy",
                 "bytes": path.stat().st_size,
                 "generation_s": round(time.perf_counter() - started, 3),
             }

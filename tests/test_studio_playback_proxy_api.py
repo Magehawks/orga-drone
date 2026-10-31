@@ -147,10 +147,8 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert colored.status_code == 200
 
-    url = f"/api/studio/{clip_id}/playback-proxy?lut_proxy=1"
+    url = f"/api/studio/{clip_id}/playback-proxy"
     assert client.get(url).status_code == 404
-    assert client.get(url.replace("?lut_proxy=1", "")).status_code == 404
-    assert client.post(url.replace("?lut_proxy=1", "")).status_code == 404
     built = client.post(url)
     assert built.status_code == 200, built.text
     payload = built.json()
@@ -170,20 +168,10 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert ranged.status_code == 206
     assert len(ranged.content) == 100
 
-    page = client.get("/studio?lut_proxy=1")
+    page = client.get("/studio")
     assert page.status_code == 200
-    assert 'data-lut-proxy-enabled="1"' in page.text
-    assert 'id="studio-lut-proxy-build"' in page.text
+    assert 'id="studio-lut-proxy-build"' not in page.text
     assert f'data-lut-proxy-url="{url}"' in page.text
-    assert client.cookies.get("lut_proxy") == "1"
-    sticky = client.get("/studio")
-    assert 'data-lut-proxy-enabled="1"' in sticky.text
-    assert f'data-lut-proxy-url="{url}"' in sticky.text
-    fresh = TestClient(app)
-    disabled = fresh.get("/studio")
-    assert 'data-lut-proxy-enabled="0"' in disabled.text
-    assert 'id="studio-lut-proxy-build"' not in disabled.text
-    assert f'data-lut-proxy-url="{url}"' not in disabled.text
 
     from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
 
@@ -201,7 +189,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
             (with_audio, clip_id),
         )
     assert client.post(url).status_code == 409
-    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio").text
     with db.connect() as conn:
         conn.execute(
             "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
@@ -215,7 +203,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
         changed_cube.read_text(encoding="utf-8"), encoding="utf-8"
     )
     assert client.get(url).status_code == 404
-    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio").text
 
     proxy_files = list((data_dir / "playback-proxies").glob("*.mp4"))
     assert len(proxy_files) == 1
@@ -250,7 +238,3 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert changed.status_code == 200
     assert client.get(url).status_code == 404
-    off = client.get("/studio?lut_proxy=0")
-    assert 'data-lut-proxy-enabled="0"' in off.text
-    assert client.cookies.get("lut_proxy") is None
-    assert 'data-lut-proxy-enabled="0"' in client.get("/studio").text

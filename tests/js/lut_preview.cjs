@@ -16,6 +16,7 @@ const context = {
   state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   lutProxySrcFor: () => proxySrc,
+  lutProxyEligible: () => false,
   previewVideo: null, previewVideoB: null, lutProxyActiveFor: () => false,
   playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),

@@ -1,45 +1,34 @@
-# Issue #223: opt-in single-clip LUT proxy playback
+# Issue #223: automatic single-clip LUT proxy playback
 
-- **Status:** Experimental, opt-in, no public toggle
+- **Status:** Automatic for eligible LUT clips; no developer flag
 - **Date:** 2026-10-31
-- **Related:** #221 feasibility, #222 proxy generator, #224 (not implemented)
+- **Related:** #221 feasibility, #222 proxy generator, #224 cache identity
 
-## How it is enabled
+## Normal workflow
 
-The Studio page accepts a developer query flag:
+1. Open a clip in Studio.
+2. Choose a LUT.
+3. The preview prepares the proxy for that clip in the background.
+4. Play, pause, seek, and clip selection use the same proxy frame.
 
-```text
-/studio?lut_proxy=1
-```
+No query flag and no LUT-proxy button are required. When a LUT is selected (or a
+project with a LUT clip is opened), the client debounces and calls the internal
+`POST /api/studio/{clip_id}/playback-proxy` endpoint for the selected/active
+clip only. The request runs in a worker thread; the Studio UI stays responsive.
+Generation for other clips is not started.
 
-Without the flag, the page renders no proxy URL and the player behaves exactly as
-before. With the flag, the page adds a `data-lut-proxy-url` only for video clips
-whose current settings already have a cached #222 proxy. Nothing is generated
-automatically.
-
-The flag also sets a session cookie, so navigating to Studio through the sidebar
-does not lose the experiment. `?lut_proxy=0` clears it.
-
-When enabled, a developer-only **LUT proxy** button appears in the Story toolbar.
-It builds the proxy for the selected eligible clip through the existing POST
-endpoint, attaches the returned URL to that clip, and refreshes the preview. This
-is the normal workflow for a local test EXE; calling the API by hand is no longer
-required.
-
-An explicit developer action builds one proxy for one clip:
-
-```text
-POST /api/studio/{clip_id}/playback-proxy?lut_proxy=1
-```
-
-It returns `{url, bytes, generation_s}`. `GET` on the same URL streams the
-cached MP4 with Range support. Both endpoints return 404 when the experimental
-flag is absent.
+`GET` on the same URL streams the cached MP4 with Range support. A page render
+adds a `data-lut-proxy-url` only when a valid proxy is already cached; otherwise
+the client prepares it. The server page no longer needs a developer flag or
+cookie.
 
 ## Player behavior
 
-- Only the **selected** video clip uses the proxy. Other Story clips keep the
-  existing source playback and the existing "Playing without color file" label.
+- The **active playhead clip or selected** video clip uses the proxy. Other Story
+  clips keep normal source playback.
+- While a proxy is being prepared, pause/seek/selection keep the normal source
+  and show the existing updating chip, so a focus change does not suddenly swap
+  in a soft JPEG still.
 - `videoSrcFor()` prefers the LUT proxy, then the existing media proxy, then the
   original stream. Missing proxy URLs fall back to the original stream.
 - Proxy time is clip-local: `source time = source_in + proxy time`. Seeking and
@@ -61,7 +50,7 @@ A clip uses the proxy only when all of these are true:
 - the grade is static (no color-animation keys and no active saturation ramp);
 - playback speed is 1× and no slow-motion bar is stored;
 - section repeat / forward loop are not active;
-- the clip is the current Story selection.
+- the clip is the active playhead clip or the Story selection.
 
 This keeps source/proxy time mapping and audio simple. Animated LUTs,
 transitions, slow motion, repeats, masks, overlays, maps, and HUD are not
@@ -92,12 +81,12 @@ return 404 instead of serving stale colors.
 
 Source desktop app (`python -m orga_drone`, WebView2 Edg/156) with
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9229`, driven by
-CDP against `/studio?lut_proxy=1`:
+CDP against `/studio`:
 
 | Check | Result |
 |---|---|
 | Explicit POST creates proxy | 200, 12,544 B, 0.191 s |
-| Video element source | `/api/studio/1/playback-proxy?lut_proxy=1` |
+| Video element source | `/api/studio/1/playback-proxy` |
 | Play | playing, unmuted, 0.906 s advanced over ~0.9 s |
 | Pause | paused, current time stable |
 | Seek via ruler to 1.05 s | `currentTime = 1.044956` (inside one 30 fps frame) |
@@ -125,19 +114,19 @@ playhead clip, so moving the playhead does not silently disable it.
 
 ## Known limitations
 
-- No automatic generation or background queue. #224 adds content-keyed LUT
+- Automatic preparation is limited to the selected/active clip; there is no
+  whole-project pre-render or background queue. #224 adds content-keyed LUT
   invalidation and bounded cleanup, but there is no periodic sweeper.
 - A proxy is valid only for the settings that produced its cache key. Changing
-  grade/LUT/source range makes the endpoint return 404; the page must be
-  reloaded after generating the new proxy.
+  grade/LUT/source range makes the old URL return 404; the client clears it and
+  schedules a new preparation.
 - The proxy covers the active or selected clip; transitions with a non-active
   partner remain approximate.
 - Clips with custom clip-audio trimming fall back to ordinary source playback
   instead of using the proxy; see #228.
-- The developer query flag is not a public feature toggle and is not advertised
-  in the UI.
-- Long 4K clips still take minutes to prepare. The dev-only LUT proxy button
-  shows the existing updating chip while it works.
+- Long 4K clips still take minutes to prepare. The automatic preparation shows
+  the existing updating chip; until it finishes, the clip uses the normal source
+  rather than a soft JPEG still.
 - No animated LUT, slow-motion, repeat, mask, overlay, map, or HUD parity.
 
 ## Verification

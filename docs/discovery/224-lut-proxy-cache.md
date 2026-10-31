@@ -62,9 +62,10 @@ background.
 
 ## Fallback and playback behavior
 
-#223 behavior is unchanged: the developer flag `/studio?lut_proxy=1`, only the
-selected clip uses a ready proxy, and missing/erroring proxies fall back to the
-original stream. There is no automatic generation at play time.
+#223 behavior is unchanged for eligible clips: the active/selected clip uses
+the automatically prepared proxy, and missing/erroring proxies fall back to the
+original stream. There is no developer flag and no automatic generation at play
+time beyond the selected/active clip.
 
 ## Verification
 

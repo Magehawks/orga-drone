@@ -53,7 +53,6 @@
          id="studio-root"
          data-studio-mode="{{ studio_mode }}"
          data-project-id="{{ project.id if project else '' }}"
-         data-lut-proxy-enabled="{{ '1' if lut_proxy_enabled else '0' }}"
          data-default-photo-duration="{{ default_photo_duration_s }}"
          data-total-s="{{ summary.estimated_total_s }}"
          data-total-label="{{ summary.estimated_total_label }}"
@@ -586,13 +585,6 @@
             {{ lucide('plus') }}
             <span class="studio-btn-label">{{ _('Add soundtrack') }}</span>
           </button>
-          {% if lut_proxy_enabled %}
-          <button type="button" class="studio-transport-btn studio-icon-button" id="studio-lut-proxy-build"
-                  title="LUT proxy" aria-label="LUT proxy">
-            {{ lucide('save') }}
-            <span class="studio-btn-label">LUT proxy</span>
-          </button>
-          {% endif %}
           {% if items %}
           <form method="post" action="/studio/clear" class="studio-clear-form"
                 onsubmit="return confirm('{{ _('Remove all clips from this Story? This does not delete the project or your files.')|e }}');">
