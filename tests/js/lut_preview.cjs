@@ -14,6 +14,8 @@ const context = {
   window: { setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; }, clearTimeout: id => timers.delete(id) },
   state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
+  lutProxySrcFor: () => "",
+  previewVideo: null, previewVideoB: null, lutProxyActiveFor: () => false,
   playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
   resolveAt: () => null,

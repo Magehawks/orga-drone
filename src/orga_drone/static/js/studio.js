@@ -742,6 +742,12 @@
       audio.pause();
       return;
     }
+    if (lutProxyActiveFor(clip)) {
+      audio.pause();
+      video.muted = false;
+      video.volume = state.volume;
+      return;
+    }
     const offset = Math.max(0, (video.currentTime || 0) - sourceInS(clip));
     const slow = speedAtSource(clip, offset) < 0.999;
     const stream = clip.dataset.streamUrl || "";
@@ -1814,7 +1820,41 @@
     };
   }
 
+  function lutProxySrcFor(clip) {
+    if (root.dataset.lutProxyEnabled !== "1") return "";
+    if (!clip || clip.dataset.kind !== "video") return "";
+    if (playbackSpeed(clip) < 0.999 || slowBarOf(clip)) return "";
+    if (sectionRepeats(clip) > 1 || forwardLoopActive(clip)) return "";
+    const anim = readColorAnimation(clip);
+    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return "";
+    const ramp = readSaturationRamp(clip);
+    if (ramp && ramp.enabled) return "";
+    const selected = state.selected;
+    if (!selected || selected.type !== "clip" ||
+        String(selected.id) !== String(clip.dataset.studioId)) return "";
+    return clip.dataset.lutProxyUrl || "";
+  }
+
+  function lutProxyActiveFor(clip) {
+    const src = lutProxySrcFor(clip);
+    return !!src && loadedVideoSrc === src;
+  }
+
+  function clipMediaTarget(clip, mapped, inS) {
+    return lutProxyActiveFor(clip)
+      ? Math.max(0, mapped)
+      : Math.max(inS, inS + mapped);
+  }
+
+  function clipOffsetFromMediaTime(clip, mediaTime, inS) {
+    return lutProxyActiveFor(clip)
+      ? Math.max(0, mediaTime)
+      : Math.max(0, mediaTime - inS);
+  }
+
   function videoSrcFor(clip) {
+    const lutProxy = lutProxySrcFor(clip);
+    if (lutProxy) return lutProxy;
     if (clip.dataset.hasProxy === "1" && clip.dataset.proxyUrl) {
       return clip.dataset.proxyUrl;
     }
@@ -2350,7 +2390,7 @@
     }
     if (state.playing) {
       clearLutPreviewStill();
-      setLutPreviewChip(msgLutChipPlaying);
+      setLutPreviewChip(lutProxySrcFor(clip) ? "" : msgLutChipPlaying);
       return;
     }
     const studioId = clip.dataset.studioId;
@@ -4715,6 +4755,7 @@
     if (!previewVideo) return;
     const inS = clip ? loopPlayInS(clip) : 0;
     const outS = clip ? loopPlayOutS(clip) : null;
+    const lutProxy = lutProxyActiveFor(clip);
     const point = clip
       ? sectionPoint(clip, localS)
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
@@ -4723,12 +4764,12 @@
     const mapped = clip && slowBarOf(clip) && speed >= 0.999
       ? storyToSource(clip, point.offset)
       : Math.max(0, point.offset) * speed;
-    const target = Math.max(inS, inS + mapped);
+    const target = clipMediaTarget(clip, mapped, inS);
     const apply = () => {
       try {
         applyClipPlayback(previewVideo, clip);
         let max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
-        if (outS != null && Number.isFinite(outS)) {
+        if (!lutProxy && outS != null && Number.isFinite(outS)) {
           max = Math.min(max > 0 ? max : outS, outS);
         }
         previewVideo.currentTime = Math.min(target, max > 0 ? max : target);
@@ -4749,6 +4790,15 @@
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
+    const lutSrc = clip ? lutProxySrcFor(clip) : "";
+    if (lutSrc && src === lutSrc) {
+      previewVideo.addEventListener("error", () => {
+        if (!clip || loadedVideoSrc !== lutSrc) return;
+        delete clip.dataset.lutProxyUrl;
+        loadedVideoSrc = "";
+        showVideo(videoSrcFor(clip), localS, { play: state.playing, clip });
+      }, { once: true });
+    }
     applyClipPlayback(previewVideo, clip);
     const needLoad = !src || loadedVideoSrc !== src;
     if (needLoad) {
@@ -5049,8 +5099,10 @@
     const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
-    // Server stills already contain the grade and LUT; never grade them twice.
-    const filter = rendered ? "none" : canvasFilterFrom(media.style.filter);
+    // Server stills and LUT proxies already contain the grade and LUT.
+    const proxyRendered = (media === previewVideo || media === previewVideoB) &&
+      lutProxyActiveFor(clipForPreviewMedia(media));
+    const filter = rendered || proxyRendered ? "none" : canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;
@@ -5368,7 +5420,7 @@
     const cycle = sectionCycleS(playing);
     const mediaTime = previewVideo.currentTime || 0;
     applyClipPlayback(previewVideo, playing);
-    const offset = Math.max(0, mediaTime - inS);
+    const offset = clipOffsetFromMediaTime(playing, mediaTime, inS);
     const within = slowBarOf(playing) && speed >= 0.999
       ? sourceToStory(playing, offset)
       : offset / speed;

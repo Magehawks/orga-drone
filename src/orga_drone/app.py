@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, NoReturn
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
@@ -106,6 +107,12 @@ from orga_drone.studio_preview_frame import (
     look_needs_preview_still,
     quantize_preview_time,
     render_preview_frame,
+)
+from orga_drone.studio_playback_proxy import (
+    PlaybackProxyError,
+    PlaybackProxyRequest,
+    cached_playback_proxy,
+    render_playback_proxy,
 )
 from orga_drone.studio_map import (
     cached_osm_tile,
@@ -349,6 +356,52 @@ def create_app() -> FastAPI:
         if row is None:
             return None
         return int(row["project_id"])
+
+    def _studio_clip_or_404(studio_item_id: int) -> Any:
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        return clip
+
+    def _playback_proxy_request_for_clip(clip: Any) -> PlaybackProxyRequest | None:
+        """Static single-clip proxy eligibility, including no animated color."""
+        if (clip.kind or "") != "video":
+            return None
+        look = color_look_from_effect_settings(clip.effect_settings)
+        if not look_needs_preview_still(look):
+            return None
+        if color_animation_from_effect_settings(clip.effect_settings).is_active:
+            return None
+        if saturation_ramp_from_effect_settings(clip.effect_settings).is_active:
+            return None
+        if abs(float(clip.playback_speed or 1.0) - 1.0) > 1e-6:
+            return None
+        if stored_lane(clip.effect_settings).get("slow_bar") is not None:
+            return None
+        if section_repeats_from_effect_settings(clip.effect_settings) != 1:
+            return None
+        start = max(0.0, float(clip.source_start or 0.0))
+        end_raw = clip.source_end if clip.source_end is not None else clip.duration_s
+        if end_raw is None:
+            return None
+        end = float(end_raw)
+        if end <= start + 0.05:
+            return None
+        if not clip.media_path:
+            return None
+        return PlaybackProxyRequest(
+            media_path=Path(str(clip.media_path)),
+            source_start_s=start,
+            source_end_s=end,
+            image=image_adjust_from_effect_settings(clip.effect_settings),
+            look=look,
+        )
 
     app.state.scan_jobs = ScanJobStore()
     app.state.export_jobs = ExportJobStore()
@@ -1258,6 +1311,7 @@ def create_app() -> FastAPI:
             return RedirectResponse(url=gallery_url, status_code=303)
         projects = db.list_studio_projects()
         studio_mode = "editor"
+        lut_proxy_enabled = request.query_params.get("lut_proxy") == "1"
         items = db.list_studio_items(project.id) if project is not None else []
         for it in items:
             if (it.kind or "") != "video" or it.duration_s is not None:
@@ -1312,6 +1366,7 @@ def create_app() -> FastAPI:
                     seconds = item_effective_seconds(it)
                 stream_url = ""
                 proxy_url = ""
+                lut_proxy_url = ""
                 preview_url = ""
                 has_proxy = False
                 can_play = False
@@ -1362,6 +1417,15 @@ def create_app() -> FastAPI:
                                 if not preview_url:
                                     preview_url = f"/media/{it.media_id}/thumb"
                 color_anim_row = color_animation_from_effect_settings(it.effect_settings)
+                if lut_proxy_enabled and (it.kind or "") == "video" and can_play:
+                    proxy_request = _playback_proxy_request_for_clip(it)
+                    if proxy_request is not None and (
+                        cached_playback_proxy(proxy_request, data_dir=settings.data_dir)
+                        is not None
+                    ):
+                        lut_proxy_url = (
+                            f"/api/studio/{it.id}/playback-proxy?lut_proxy=1"
+                        )
                 item_display.append(
                     {
                         "item": it,
@@ -1385,6 +1449,7 @@ def create_app() -> FastAPI:
                         ),
                         "stream_url": stream_url,
                         "proxy_url": proxy_url,
+                        "lut_proxy_url": lut_proxy_url,
                         "preview_url": preview_url,
                         "has_proxy": has_proxy,
                         "can_play": can_play,
@@ -1512,6 +1577,7 @@ def create_app() -> FastAPI:
             project=project,
             projects=projects,
             studio_mode=studio_mode,
+            lut_proxy_enabled=lut_proxy_enabled,
             summary=summary,
             default_photo_duration_s=DEFAULT_PHOTO_DURATION_S,
             image_adjust_model=image_adjust_preview_model(),
@@ -2237,6 +2303,90 @@ def create_app() -> FastAPI:
                 "Cache-Control": "no-store",
                 "X-Orga-Preview-Still": "1",
             },
+        )
+
+    @app.get("/api/studio/{studio_item_id}/playback-proxy")
+    async def api_studio_playback_proxy_file(
+        studio_item_id: int,
+        lut_proxy: bool = Query(False),
+    ) -> Response:
+        """Serve an already generated experimental static-LUT proxy (#223)."""
+        if not lut_proxy:
+            raise HTTPException(status_code=404, detail="Not found")
+        clip = _studio_clip_or_404(studio_item_id)
+        if (clip.kind or "") != "video":
+            raise HTTPException(
+                status_code=422,
+                detail="Playback proxies are only for video clips.",
+            )
+        if not clip.media_path or not clip.available:
+            raise HTTPException(status_code=409, detail="This media file is offline.")
+        request = _playback_proxy_request_for_clip(clip)
+        if request is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This clip is not eligible for a static LUT proxy.",
+            )
+        path = cached_playback_proxy(request, data_dir=settings.data_dir)
+        if path is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No playback proxy has been generated for this clip.",
+            )
+        return FileResponse(
+            path,
+            media_type="video/mp4",
+            content_disposition_type="inline",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-store",
+                "X-Orga-Lut-Proxy": "1",
+            },
+        )
+
+    @app.post("/api/studio/{studio_item_id}/playback-proxy")
+    async def api_studio_playback_proxy_build(
+        studio_item_id: int,
+        lut_proxy: bool = Query(False),
+    ) -> JSONResponse:
+        """Explicitly build one experimental proxy. No automatic generation."""
+        if not lut_proxy:
+            raise HTTPException(status_code=404, detail="Not found")
+        clip = _studio_clip_or_404(studio_item_id)
+        if (clip.kind or "") != "video":
+            raise HTTPException(
+                status_code=422,
+                detail="Playback proxies are only for video clips.",
+            )
+        if not clip.media_path or not clip.available:
+            raise HTTPException(status_code=409, detail="This media file is offline.")
+        request = _playback_proxy_request_for_clip(clip)
+        if request is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This clip is not eligible for a static LUT proxy.",
+            )
+        started = time.perf_counter()
+        try:
+            path = await asyncio.to_thread(
+                render_playback_proxy,
+                request,
+                data_dir=settings.data_dir,
+            )
+        except LutMissingError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="A LUT file is missing. Choose the .cube again in Image, or clear the look.",
+            ) from exc
+        except PlaybackProxyError as exc:
+            status = 409 if exc.code in {"no_lut", "media_missing", "lut_invalid"} else 500
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return JSONResponse(
+            {
+                "url": f"/api/studio/{studio_item_id}/playback-proxy?lut_proxy=1",
+                "bytes": path.stat().st_size,
+                "generation_s": round(time.perf_counter() - started, 3),
+            }
         )
 
     @app.patch("/api/studio/{studio_item_id}/color")
