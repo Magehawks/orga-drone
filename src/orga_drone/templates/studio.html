@@ -53,7 +53,6 @@
          id="studio-root"
          data-studio-mode="{{ studio_mode }}"
          data-project-id="{{ project.id if project else '' }}"
-         data-lut-proxy-enabled="{{ '1' if lut_proxy_enabled else '0' }}"
          data-default-photo-duration="{{ default_photo_duration_s }}"
          data-total-s="{{ summary.estimated_total_s }}"
          data-total-label="{{ summary.estimated_total_label }}"
@@ -185,6 +184,7 @@
          data-color-lut-label="{{ _('LUT file')|e }}"
          data-lut-chip-updating="{{ _('Updating picture…')|e }}"
          data-lut-chip-still="{{ _('Still frame with color file')|e }}"
+         data-lut-chip-proxy-preparing="{{ _('LUT video is being prepared...')|e }}"
          data-lut-chip-playing="{{ _('Playing without color file')|e }}"
          data-lut-chip-missing="{{ _('Color file missing')|e }}"
           data-lut-chip-failed="{{ _('Color preview unavailable; try pausing or seeking again')|e }}"
@@ -1165,7 +1165,8 @@
             <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
             <div class="studio-color-actions">
               <button type="button" class="button ghost" id="inspector-color-conversion-change" hidden>{{ _('Change file') }}</button>
-              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _("Don't use") }}</button>
+              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden
+                      title="{{ _('Removes the technical conversion file. The creative LUT stays selected.')|e }}">{{ _('Remove conversion') }}</button>
             </div>
             <label class="studio-inspector-field" for="inspector-color-creative-select">
               <span>{{ _('Color file (.cube)') }}</span>
@@ -1624,5 +1625,6 @@
 </section>
 {% endblock %}
 {% block scripts %}
+<script src="/static/js/studio-lut-webgl.js" defer></script>
 <script src="/static/js/studio.js" defer></script>
 {% endblock %}

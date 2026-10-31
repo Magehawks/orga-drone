@@ -19,12 +19,16 @@ from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_image import ImageAdjust
 from orga_drone.studio_lut import ColorLook, import_lut_from_path
 from orga_drone.studio_playback_proxy import (
+    PROXY_CRF,
+    PROXY_PRESET,
     PROXY_VERSION,
     PlaybackProxyError,
     PlaybackProxyRequest,
     cache_key_for,
     cached_playback_proxy,
     cleanup_playback_proxies,
+    proxy_filter_chain,
+    proxy_timeout_for,
     render_playback_proxy,
 )
 
@@ -264,6 +268,33 @@ def test_cache_key_covers_inputs_and_lut_content(
     lines = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
     (data / "luts" / asset).write_text("\n".join(lines) + "\n", encoding="utf-8")
     assert cached_playback_proxy(base, data_dir=data) is None
+
+
+def test_proxy_chain_scales_before_lut_and_uses_fast_encoder(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    cube = tmp_path / "synthetic.cube"
+    _write_cube(cube)
+    asset = import_lut_from_path(data, cube)
+    request = PlaybackProxyRequest(
+        tmp_path / "source.mp4",
+        image=ImageAdjust(exposure=5),
+        look=ColorLook(creative_lut=asset, creative_strength=100),
+    )
+    chain = proxy_filter_chain(
+        request, data_dir=data, work_dir=tmp_path / "work"
+    )
+    assert chain.startswith("scale=")
+    assert chain.index("lut3d=") > chain.index("scale=")
+    assert PROXY_PRESET == "ultrafast"
+    assert PROXY_CRF == 23
+
+
+def test_proxy_timeout_scales_for_long_real_clips() -> None:
+    assert proxy_timeout_for(0) == 180.0
+    assert proxy_timeout_for(10) == 180.0
+    assert proxy_timeout_for(77.326) == pytest.approx(618.608)
+    assert proxy_timeout_for(float("nan")) == 180.0
+    assert proxy_timeout_for(100_000) == 1800.0
 
 
 def test_cleanup_bounds_cache_and_keeps_outside_files(tmp_path: Path) -> None:

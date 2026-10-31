@@ -141,16 +141,19 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     imported = client.post("/api/studio/luts", json={"path": str(cube)})
     assert imported.status_code == 200
     asset = imported.json()["asset_name"]
+    lut_file = client.get(f"/api/luts/{asset}")
+    assert lut_file.status_code == 200
+    assert lut_file.headers["content-type"].startswith("text/plain")
+    assert "LUT_3D_SIZE" in lut_file.text
+    assert client.get("/api/luts/not-a-lut.cube").status_code == 404
     colored = client.patch(
         f"/api/studio/{clip_id}/color",
         json={"creative_lut": asset, "creative_strength": 100},
     )
     assert colored.status_code == 200
 
-    url = f"/api/studio/{clip_id}/playback-proxy?lut_proxy=1"
+    url = f"/api/studio/{clip_id}/playback-proxy"
     assert client.get(url).status_code == 404
-    assert client.get(url.replace("?lut_proxy=1", "")).status_code == 404
-    assert client.post(url.replace("?lut_proxy=1", "")).status_code == 404
     built = client.post(url)
     assert built.status_code == 200, built.text
     payload = built.json()
@@ -170,13 +173,11 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert ranged.status_code == 206
     assert len(ranged.content) == 100
 
-    page = client.get("/studio?lut_proxy=1")
+    page = client.get("/studio")
     assert page.status_code == 200
-    assert 'data-lut-proxy-enabled="1"' in page.text
+    assert 'id="studio-lut-proxy-build"' not in page.text
+    assert 'id="inspector-color-conversion-clear"' in page.text
     assert f'data-lut-proxy-url="{url}"' in page.text
-    disabled = client.get("/studio")
-    assert 'data-lut-proxy-enabled="0"' in disabled.text
-    assert f'data-lut-proxy-url="{url}"' not in disabled.text
 
     from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
 
@@ -194,7 +195,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
             (with_audio, clip_id),
         )
     assert client.post(url).status_code == 409
-    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio").text
     with db.connect() as conn:
         conn.execute(
             "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
@@ -208,7 +209,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
         changed_cube.read_text(encoding="utf-8"), encoding="utf-8"
     )
     assert client.get(url).status_code == 404
-    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio").text
 
     proxy_files = list((data_dir / "playback-proxies").glob("*.mp4"))
     assert len(proxy_files) == 1
@@ -243,3 +244,35 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert changed.status_code == 200
     assert client.get(url).status_code == 404
+
+    both = client.patch(
+        f"/api/studio/{clip_id}/color",
+        json={
+            "input_profile": "dlog_m",
+            "conversion_lut": asset,
+            "conversion_confirmed": True,
+            "creative_lut": asset,
+            "creative_strength": 77,
+        },
+    )
+    assert both.status_code == 200
+    cleared_conversion = client.patch(
+        f"/api/studio/{clip_id}/color",
+        json={
+            "input_profile": "rec709",
+            "conversion_lut": "",
+            "conversion_confirmed": False,
+            "creative_lut": asset,
+            "creative_strength": 77,
+        },
+    )
+    assert cleared_conversion.status_code == 200
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT effect_settings FROM studio_clips WHERE id = ?", (clip_id,)
+        ).fetchone()
+    stored_color = json.loads(row["effect_settings"]).get("color", {})
+    assert stored_color["conversion_lut"] == ""
+    assert stored_color["conversion_confirmed"] is False
+    assert stored_color["creative_lut"] == asset
+    assert stored_color["creative_strength"] == 77

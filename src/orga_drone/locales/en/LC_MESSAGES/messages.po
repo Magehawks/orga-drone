@@ -465,6 +465,12 @@ msgstr "Change file"
 msgid "Don't use"
 msgstr "Don't use"
 
+msgid "Remove conversion"
+msgstr "Remove conversion"
+
+msgid "Removes the technical conversion file. The creative LUT stays selected."
+msgstr "Removes the technical conversion file. The creative LUT stays selected."
+
 msgid "Color file (.cube)"
 msgstr "Color file (.cube)"
 
@@ -530,6 +536,9 @@ msgstr "Updating picture…"
 
 msgid "Still frame with color file"
 msgstr "Still frame with color file"
+
+msgid "LUT video is being prepared..."
+msgstr "LUT video is being prepared..."
 
 msgid "Playing without color file"
 msgstr "Playing without color file"
