@@ -178,6 +178,29 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert 'data-lut-proxy-enabled="0"' in disabled.text
     assert f'data-lut-proxy-url="{url}"' not in disabled.text
 
+    from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
+
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT effect_settings FROM studio_clips WHERE id = ?", (clip_id,)
+        ).fetchone()
+        original = str(row["effect_settings"] or "{}")
+        with_audio = dump_detached_audio(
+            original,
+            DetachedAudio(active=True, source_in_s=0.2, source_out_s=2.0, place_s=0.0),
+        )
+        conn.execute(
+            "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+            (with_audio, clip_id),
+        )
+    assert client.post(url).status_code == 409
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+            (original, clip_id),
+        )
+
     changed_cube = tmp_path / "changed.cube"
     lines = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
     changed_cube.write_text("\n".join(lines) + "\n", encoding="utf-8")

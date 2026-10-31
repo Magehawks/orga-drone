@@ -380,6 +380,8 @@ def create_app() -> FastAPI:
             return None
         if saturation_ramp_from_effect_settings(clip.effect_settings).is_active:
             return None
+        if detached_audio_from_effect_settings(clip.effect_settings).is_heard:
+            return None
         if abs(float(clip.playback_speed or 1.0) - 1.0) > 1e-6:
             return None
         if stored_lane(clip.effect_settings).get("slow_bar") is not None:
