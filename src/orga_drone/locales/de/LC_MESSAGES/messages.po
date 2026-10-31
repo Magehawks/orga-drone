@@ -531,6 +531,9 @@ msgstr "Bild wird aktualisiert …"
 msgid "Still frame with color file"
 msgstr "Standbild mit Farbdatei"
 
+msgid "LUT video is being prepared..."
+msgstr "LUT-Video wird vorbereitet ..."
+
 msgid "Playing without color file"
 msgstr "Wiedergabe ohne Farbdatei"
 

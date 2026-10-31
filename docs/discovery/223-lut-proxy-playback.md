@@ -93,19 +93,32 @@ CDP against `/studio`:
 | Decoded proxy pixel at flash | RGB(230, 165, 205): warm LUT result |
 | Screenshot | 99,163 B |
 
-## Real 4K clip measurement
+## Real 4K performance (before/after)
 
-With a 77.3 s DJI 4K clip and the user's local LUT, the 720p proxy took 242 s
-and produced a 21.76 MB MP4 on this machine. The old fixed 180 s FFmpeg timeout
-was too short and left no proxy, which reproduced the "playing without color
-file" state on real footage. The timeout now scales with clip duration
-(`8 × duration`, floor 180 s, cap 1800 s).
+With a 77.3 s DJI 4K clip, its Golden Hour grade and the user's local LUT:
 
-In a packaged-EXE WebView2 smoke with that real proxy, the selected frame, play,
-pause, a ruler seek to 30 s, and re-selecting the clip all used the same
-1280×720 proxy video source. The LUT chip and the 720-edge JPEG still stayed
-hidden throughout; no CSS grade or second color pass was applied. The source
-file's size and mtime were unchanged.
+| Measurement | Before | After |
+|---|---|---|
+| First visible LUT preview | none until proxy done | **0.9–1.7 s** LUT JPEG still |
+| Full proxy | 242 s | **101–105 s** |
+| Encoding | LUT at 4K, x264 veryfast CRF20 | scale to 720p first, x264 **ultrafast CRF23** |
+| Proxy size | 21.76 MB | 45.8–49.3 MB |
+| Color difference vs old order | — | **< 2.4/255** on stable frames |
+
+The faster proxy applies scale before the per-pixel LUT (the export keeps its
+grade → LUT → scale order). The measured mean color difference against a fresh
+reference with the old order was 1.5–2.3/255, inside the 8/255 budget.
+
+During preparation the Studio shows a fast LUT still with
+"Still frame with color file · LUT video is being prepared..."; during playback
+it shows "LUT video is being prepared..." instead of claiming the video is
+ready. Play/pause/seek/selection measured 1–8 ms while the 4K proxy encoded.
+When the proxy is ready, the still and chip disappear and the 1280×720 proxy is
+used for every state.
+
+In the packaged-EXE 00:58 regression, selected, play, pause, seek to 58 s and
+re-selection all used the same proxy source; the time stayed 58.026046 and the
+source size/mtime was unchanged.
 
 While a proxy exists, pause/seek/selection keep its decoded video frame instead
 of overlaying the 720-edge JPEG still. The still is only used when no proxy is

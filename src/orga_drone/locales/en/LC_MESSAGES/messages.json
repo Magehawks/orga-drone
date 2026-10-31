@@ -800,6 +800,7 @@
   "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it.": "In Studio, scrub or pause to see a color file on a rendered still. Playback may hide it. Export always applies it.",
   "Updating picture…": "Updating picture…",
   "Still frame with color file": "Still frame with color file",
+  "LUT video is being prepared...": "LUT video is being prepared...",
   "Playing without color file": "Playing without color file",
   "Color file missing": "Color file missing",
   "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.": "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged.",

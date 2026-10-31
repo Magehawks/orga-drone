@@ -14,7 +14,7 @@
 - conversion/creative LUT references, confirmation, and strength;
 - the **SHA-256 of every LUT file that actually participates** in the render;
 - proxy width/height box, saturation, fps, CRF, preset, GOP;
-- proxy format version (`PROXY_VERSION = 2`).
+- proxy format version (`PROXY_VERSION = 3`).
 
 LUT content is hashed, not just the filename. Replacing bytes in
 `{data_dir}/luts/<name>.cube` while keeping the same name produces a different

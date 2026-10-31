@@ -49,7 +49,9 @@ function reply(request, url) {
 }
 (async () => {
   context.scheduleLutProxyPrepare(clip, 0);
+  context.scheduleLutProxyPrepare(clip, 0);
   assert.equal(context.lutProxyPreparingFor(clip), true);
+  assert.equal(timers.length, 1, 'repeated selection keeps the pending timer');
   await fire();
   assert.equal(requests.length, 1);
   reply(requests[0], '/proxy/100');

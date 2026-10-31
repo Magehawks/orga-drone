@@ -2308,6 +2308,7 @@
   const previewLutChip = document.getElementById("studio-preview-lut-chip");
   const msgLutChipUpdating = root.dataset.lutChipUpdating || "Updating picture…";
   const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
+  const msgLutChipProxyPreparing = root.dataset.lutChipProxyPreparing || "LUT video is being prepared...";
   const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
   const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
@@ -2398,11 +2399,6 @@
     }
     // The proxy already contains grade+LUT at video resolution. Keep its frame
     // for pause/seek/selection instead of overpainting a soft 720-edge JPEG.
-    if (lutProxyPreparingFor(clip)) {
-      clearLutPreviewStill();
-      setLutPreviewChip(msgLutChipUpdating);
-      return;
-    }
     if (lutProxySrcFor(clip)) {
       clearLutPreviewStill();
       return;
@@ -2414,7 +2410,9 @@
     }
     if (state.playing) {
       clearLutPreviewStill();
-      setLutPreviewChip(lutProxySrcFor(clip) ? "" : msgLutChipPlaying);
+      setLutPreviewChip(lutProxySrcFor(clip) ? "" : (
+        lutProxyPreparingFor(clip) ? msgLutChipProxyPreparing : msgLutChipPlaying
+      ));
       return;
     }
     const studioId = clip.dataset.studioId;
@@ -2479,7 +2477,10 @@
           const hit = resolveAt(state.projectTimeS);
           const composite = hit && (hit.overlapClip ||
             (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
-          setLutPreviewChip(composite ? msgLutChipComposite : msgLutChipStill);
+          const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
+          setLutPreviewChip(
+            lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
+          );
           drawPrivacyMasks();
           schedulePreviewBlit();
         })
@@ -2528,11 +2529,13 @@
     }
     const key = lutProxyPrepareKey(clip);
     let stateForClip = lutProxyPrepare.get(id);
+    // Keep the pending timer: a second selection/grade call with the same key
+    // must not clear it and then return without scheduling a new one.
+    if (stateForClip && stateForClip.key === key && stateForClip.pending) return;
     if (stateForClip && stateForClip.timer) {
       window.clearTimeout(stateForClip.timer);
       stateForClip.timer = 0;
     }
-    if (stateForClip && stateForClip.key === key && stateForClip.pending) return;
     if (clip.dataset.lutProxyUrl && (!stateForClip || stateForClip.key === key)) return;
     clip.dataset.lutProxyUrl = "";
     const token = (stateForClip ? stateForClip.token : 0) + 1;
