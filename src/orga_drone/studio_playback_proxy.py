@@ -132,6 +132,27 @@ def cache_key_for(
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def cached_playback_proxy(
+    req: PlaybackProxyRequest,
+    *,
+    data_dir: Path,
+    cache_dir: Path | None = None,
+) -> Path | None:
+    """Return an already generated proxy path without starting FFmpeg."""
+    if not req.media_path.is_file():
+        return None
+    try:
+        st = req.media_path.stat()
+    except OSError:
+        return None
+    folder = cache_dir if cache_dir is not None else playback_proxies_dir(data_dir)
+    key = cache_key_for(req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
+    path = folder / f"{key}.mp4"
+    if path.is_file() and path.stat().st_size > 0:
+        return path
+    return None
+
+
 def render_playback_proxy(
     req: PlaybackProxyRequest,
     *,
