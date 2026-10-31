@@ -97,7 +97,8 @@ CDP against `/studio?lut_proxy=1`:
 
 ## Known limitations
 
-- No automatic generation, background queue, or regeneration (#224).
+- No automatic generation or background queue. #224 adds content-keyed LUT
+  invalidation and bounded cleanup, but there is no periodic sweeper.
 - A proxy is valid only for the settings that produced its cache key. Changing
   grade/LUT/source range makes the endpoint return 404; the page must be
   reloaded after generating the new proxy.

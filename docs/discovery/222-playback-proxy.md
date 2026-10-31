@@ -22,8 +22,9 @@ stills: grade → conversion LUT → creative LUT → saturation → scale.
   removed on success and failure.
 - No Studio UI, timeline, player, or export code was changed.
 
-This deliberately is not the #224 cache manager: eviction, cross-job
-invalidation, and background scheduling remain out of scope.
+Issue #224 adds content-keyed LUT identity and a bounded cleanup sweep. This
+module itself remains one deterministic file per request; there is still no
+background scheduling or job queue.
 
 ## Measured on the test machine
 

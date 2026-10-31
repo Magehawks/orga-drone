@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,8 +19,12 @@ from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_image import ImageAdjust
 from orga_drone.studio_lut import ColorLook, import_lut_from_path
 from orga_drone.studio_playback_proxy import (
+    PROXY_VERSION,
     PlaybackProxyError,
     PlaybackProxyRequest,
+    cache_key_for,
+    cached_playback_proxy,
+    cleanup_playback_proxies,
     render_playback_proxy,
 )
 
@@ -205,3 +211,135 @@ def test_playback_proxy_failure_leaves_no_partial_file(
     work = cache / "work"
     assert not work.exists() or not any(work.iterdir())
     assert media.read_bytes() == original
+
+
+def test_cache_key_covers_inputs_and_lut_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = tmp_path / "data"
+    media = tmp_path / "source.mp4"
+    media.write_bytes(b"media")
+    cube = tmp_path / "synthetic.cube"
+    _write_cube(cube)
+    asset = import_lut_from_path(data, cube)
+    stat = media.stat()
+    base = PlaybackProxyRequest(
+        media,
+        source_start_s=1.0,
+        source_end_s=2.0,
+        image=ImageAdjust(exposure=3),
+        look=ColorLook(creative_lut=asset, creative_strength=50),
+    )
+    base_args = {
+        "media_mtime_ns": stat.st_mtime_ns,
+        "media_size": stat.st_size,
+        "data_dir": data,
+    }
+    key = cache_key_for(base, **base_args)
+    variants = [
+        replace(base, source_start_s=1.1),
+        replace(base, source_end_s=2.1),
+        replace(base, image=ImageAdjust(exposure=4)),
+        replace(base, look=ColorLook(creative_lut=asset, creative_strength=51)),
+        replace(base, max_width=1279),
+        replace(base, saturation=0.9),
+    ]
+    for variant in variants:
+        assert cache_key_for(variant, **base_args) != key
+    assert cache_key_for(base, **{**base_args, "media_size": stat.st_size + 1}) != key
+    assert cache_key_for(
+        base, **{**base_args, "media_mtime_ns": stat.st_mtime_ns + 1}
+    ) != key
+    monkeypatch.setattr(
+        "orga_drone.studio_playback_proxy.PROXY_VERSION", PROXY_VERSION + 1
+    )
+    assert cache_key_for(base, **base_args) != key
+    monkeypatch.undo()
+    data.joinpath("playback-proxies").mkdir(parents=True)
+    cached = data / "playback-proxies" / f"{key}.mp4"
+    cached.write_bytes(b"proxy")
+    assert cached_playback_proxy(base, data_dir=data) == cached
+    assert cached_playback_proxy(base, data_dir=data, cache_dir=data / "playback-proxies")
+    # Same asset name, different content: old cache entry is not reusable.
+    lines = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
+    (data / "luts" / asset).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert cached_playback_proxy(base, data_dir=data) is None
+
+
+def test_cleanup_bounds_cache_and_keeps_outside_files(tmp_path: Path) -> None:
+    now = 1_000_000.0
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(b"outside")
+    note = cache / "note.txt"
+    note.write_bytes(b"keep")
+    old = cache / "old.mp4"
+    old.write_bytes(b"old")
+    fresh = cache / "fresh.mp4"
+    fresh.write_bytes(b"fresh")
+    keep = cache / "keep.mp4"
+    keep.write_bytes(b"keep")
+    work = cache / "work"
+    work.mkdir()
+    old_work = work / "old"
+    old_work.mkdir()
+    fresh_work = work / "fresh"
+    fresh_work.mkdir()
+    for path, age in (
+        (old, 1_000),
+        (fresh, 100),
+        (keep, 10),
+        (old_work, 1_000),
+        (fresh_work, 10),
+    ):
+        os.utime(path, (now - age, now - age))
+    removed = cleanup_playback_proxies(
+        cache,
+        max_bytes=8,
+        max_age_s=500,
+        orphan_age_s=500,
+        now=now,
+        keep=keep,
+    )
+    assert removed == 3
+    assert not old.exists()
+    assert not fresh.exists()
+    assert keep.exists()
+    assert note.exists()
+    assert outside.exists()
+    assert not old_work.exists()
+    assert fresh_work.exists()
+
+
+def test_superseded_generation_does_not_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = tmp_path / "data"
+    media = tmp_path / "source.mp4"
+    media.write_bytes(b"media")
+    cube = tmp_path / "synthetic.cube"
+    _write_cube(cube)
+    asset = import_lut_from_path(data, cube)
+    cache = tmp_path / "cache"
+    request = PlaybackProxyRequest(
+        media,
+        look=ColorLook(creative_lut=asset, creative_strength=100),
+    )
+
+    def run_changed(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        changed = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
+        (data / "luts" / asset).write_text(
+            "\n".join(changed) + "\n", encoding="utf-8"
+        )
+        Path(args[0][-1]).write_bytes(b"partial")  # type: ignore[index]
+        return subprocess.CompletedProcess(args[0], 0, b"", b"")
+
+    monkeypatch.setattr("orga_drone.studio_playback_proxy.find_ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr("orga_drone.studio_playback_proxy.subprocess.run", run_changed)
+    with pytest.raises(PlaybackProxyError) as exc:
+        render_playback_proxy(request, data_dir=data, cache_dir=cache)
+    assert exc.value.code == "superseded"
+    assert not list(cache.rglob("*.mp4"))
+    work = cache / "work"
+    assert not work.exists() or not any(work.iterdir())
