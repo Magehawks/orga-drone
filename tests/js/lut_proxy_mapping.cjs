@@ -4,6 +4,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const script = fs.readFileSync('src/orga_drone/static/js/studio.js', 'utf8');
 const source = script.split('function lutProxySrcFor')[1].split('function imageSrcFor')[0];
+let customAudio = null;
 const context = {
   root: { dataset: { lutProxyEnabled: '0' } },
   state: { selected: { type: 'clip', id: '1' } },
@@ -14,6 +15,7 @@ const context = {
   forwardLoopActive: () => false,
   readColorAnimation: () => null,
   readSaturationRamp: () => ({ enabled: false }),
+  readClipAudio: () => customAudio,
   String, Math, Array,
 };
 vm.createContext(context);
@@ -31,9 +33,18 @@ const clip = {
 assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'disabled by default');
 context.root.dataset.lutProxyEnabled = '1';
 assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl, 'selected clip uses proxy');
+const otherClip = {
+  dataset: {
+    kind: 'video', studioId: '2', lutProxyUrl: '/api/studio/2/playback-proxy?lut_proxy=1',
+    streamUrl: '/media/2/stream', hasProxy: '0',
+  },
+};
 context.state.selected = { type: 'clip', id: '2' };
-assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'other clips fall back');
+assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'proxy -> original');
+assert.equal(context.videoSrcFor(otherClip), otherClip.dataset.lutProxyUrl, 'original -> proxy');
 context.state.selected = { type: 'clip', id: '1' };
+assert.equal(context.videoSrcFor(otherClip), '/media/2/stream', 'proxy -> original (reverse)');
+assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl, 'proxy -> proxy selection');
 context.playbackSpeed = () => 0.5;
 assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'slow motion falls back');
 context.playbackSpeed = () => 1;
@@ -50,6 +61,9 @@ context.readSaturationRamp = () => ({ enabled: true });
 assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'saturation ramp falls back');
 context.readSaturationRamp = () => ({ enabled: false });
 assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl);
+customAudio = { sourceIn: 0.5, sourceOut: 2.5, place: 0 };
+assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'custom clip audio falls back');
+customAudio = null;
 
 assert.equal(context.clipMediaTarget(clip, 1, 5), 6, 'source media uses source in offset');
 context.loadedVideoSrc = clip.dataset.lutProxyUrl;

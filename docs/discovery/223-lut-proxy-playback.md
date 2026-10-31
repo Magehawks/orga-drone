@@ -104,8 +104,8 @@ CDP against `/studio?lut_proxy=1`:
   reloaded after generating the new proxy.
 - Only the selected clip is proxied; transitions with an unselected partner
   remain approximate.
-- Custom clip-audio trimming is bypassed while the proxy is active because the
-  proxy's embedded audio is used.
+- Clips with custom clip-audio trimming fall back to ordinary source playback
+  instead of using the proxy; see #228.
 - The developer query flag is not a public feature toggle and is not advertised
   in the UI.
 - No animated LUT, slow-motion, repeat, mask, overlay, map, or HUD parity.

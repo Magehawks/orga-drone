@@ -742,13 +742,7 @@
       audio.pause();
       return;
     }
-    if (lutProxyActiveFor(clip)) {
-      audio.pause();
-      video.muted = false;
-      video.volume = state.volume;
-      return;
-    }
-    const offset = Math.max(0, (video.currentTime || 0) - sourceInS(clip));
+    const offset = clipOffsetFromMediaTime(clip, video.currentTime || 0, sourceInS(clip));
     const slow = speedAtSource(clip, offset) < 0.999;
     const stream = clip.dataset.streamUrl || "";
     const proxy = clip.dataset.hasProxy === "1";
@@ -756,6 +750,12 @@
     if (slow) {
       audio.pause();
       video.muted = true;
+      return;
+    }
+    if (lutProxyActiveFor(clip) && !range.custom) {
+      audio.pause();
+      video.muted = false;
+      video.volume = state.volume;
       return;
     }
     if (range.custom) {
@@ -1823,6 +1823,9 @@
   function lutProxySrcFor(clip) {
     if (root.dataset.lutProxyEnabled !== "1") return "";
     if (!clip || clip.dataset.kind !== "video") return "";
+    // Custom clip-audio trim/mute/offset uses the source audio element; keep
+    // that path on ordinary playback where those rules are already proven.
+    if (readClipAudio(clip)) return "";
     if (playbackSpeed(clip) < 0.999 || slowBarOf(clip)) return "";
     if (sectionRepeats(clip) > 1 || forwardLoopActive(clip)) return "";
     const anim = readColorAnimation(clip);
