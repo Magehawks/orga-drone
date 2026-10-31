@@ -10,6 +10,7 @@ from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_hud import HudInterval
 from orga_drone.studio_detail import DetailEnhance
 from orga_drone.studio_color_animation import ColorAnimation
+from orga_drone.studio_hsl import HslAdjust
 from orga_drone.studio_image import ImageAdjust, SaturationRamp
 from orga_drone.studio_lut import ColorLook
 from orga_drone.studio_map import GpsSample, MapPlacement
@@ -55,6 +56,7 @@ class StudioExportClip:
     image: ImageAdjust = field(default_factory=ImageAdjust)
     color_animation: ColorAnimation | None = None
     color_look: ColorLook = field(default_factory=ColorLook)
+    hsl: HslAdjust = field(default_factory=HslAdjust)
     detail: DetailEnhance = field(default_factory=DetailEnhance)
     saturation_ramp: SaturationRamp = field(default_factory=SaturationRamp)
     frame: FrameTransform = field(default_factory=FrameTransform)

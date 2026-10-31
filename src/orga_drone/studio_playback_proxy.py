@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import (
     ColorLook,
@@ -58,6 +59,7 @@ class PlaybackProxyRequest:
     source_end_s: float | None = None
     image: ImageAdjust = field(default_factory=ImageAdjust)
     look: ColorLook = field(default_factory=ColorLook)
+    hsl: HslAdjust = field(default_factory=HslAdjust)
     max_width: int = PROXY_MAX_WIDTH
     max_height: int = PROXY_MAX_HEIGHT
     saturation: float = 1.0
@@ -174,7 +176,7 @@ def proxy_filter_chain(
     max_height: int = PROXY_MAX_HEIGHT,
     saturation: float = 1.0,
 ) -> str:
-    """Export grade → LUT order, then a 720p CFR H.264 output frame."""
+    """Export grade → LUT → HSL order, then a 720p CFR H.264 output frame."""
     parts: list[str] = []
     grade = ffmpeg_grade_chain(req.image)
     if grade:
@@ -183,6 +185,8 @@ def proxy_filter_chain(
         lut = ffmpeg_lut_chain(req.look, data_dir=data_dir, work_dir=work_dir)
         if lut:
             parts.append(lut)
+    if not req.hsl.is_neutral:
+        parts.append(ffmpeg_hsl_chain(req.hsl, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge_w = max(64, min(2160, int(max_width)))
@@ -211,6 +215,7 @@ def cache_key_for(
         "out": None if req.source_end_s is None else round(float(req.source_end_s), 6),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
+        "hsl": req.hsl.as_dict(),
         "lut_content": _lut_digests(req, data_dir),
         "width": int(req.max_width),
         "height": int(req.max_height),
@@ -267,9 +272,9 @@ def render_playback_proxy(
     never publishes a partial file: the result is moved into place only after a
     non-empty, successful encode.
     """
-    if not look_needs_preview_still(req.look):
+    if not look_needs_preview_still(req.look) and req.hsl.is_neutral:
         raise PlaybackProxyError(
-            "Assign a color file before building a playback proxy.",
+            "Assign a color file or HSL adjustment before building a playback proxy.",
             code="no_lut",
         )
     media = req.media_path

@@ -827,5 +827,22 @@
   "Unknown look.": "Unknown look.",
   "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.",
   "Color preview unavailable; try pausing or seeking again": "Color preview unavailable; try pausing or seeking again",
-  "Color still; transition colors approximate": "Color still; transition colors approximate"
+  "Color still; transition colors approximate": "Color still; transition colors approximate",
+  "HSL color mixer": "HSL color mixer",
+  "Hue": "Hue",
+  "Luminance": "Luminance",
+  "Red": "Red",
+  "Orange": "Orange",
+  "Yellow": "Yellow",
+  "Green": "Green",
+  "Aqua": "Aqua",
+  "Blue": "Blue",
+  "Purple": "Purple",
+  "Magenta": "Magenta",
+  "Color range": "Color range",
+  "Reset this color": "Reset this color",
+  "Reset all HSL": "Reset all HSL",
+  "Adjust one color range without changing the others. Neutral values leave the picture unchanged.": "Adjust one color range without changing the others. Neutral values leave the picture unchanged.",
+  "Could not save HSL color settings.": "Could not save HSL color settings.",
+  "Playing without HSL preview; pause or seek to see it": "Playing without HSL preview; pause or seek to see it"
 }

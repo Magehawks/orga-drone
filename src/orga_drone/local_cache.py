@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REBUILDABLE_CACHE_DIRS = ("thumbs", "osm-tiles", "preview-stills")
+REBUILDABLE_CACHE_DIRS = ("thumbs", "osm-tiles", "preview-stills", "hsl-luts")
 
 
 def _inside(root: Path, path: Path) -> bool:
