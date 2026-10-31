@@ -43,7 +43,10 @@ PROXY_CRF = 20
 PROXY_PRESET = "veryfast"
 PROXY_GOP_FRAMES = 30
 PROXY_FFMPEG_TIMEOUT_S = 180.0
-PROXY_VERSION = 1
+PROXY_VERSION = 2
+PROXY_CACHE_MAX_BYTES = 512 * 1024 * 1024
+PROXY_CACHE_MAX_AGE_S = 14 * 24 * 60 * 60
+PROXY_ORPHAN_WORK_AGE_S = 6 * 60 * 60
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,94 @@ def playback_proxies_dir(data_dir: Path) -> Path:
     path = data_dir / PLAYBACK_PROXIES_DIR
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _lut_digests(req: PlaybackProxyRequest, data_dir: Path) -> dict[str, str]:
+    """Content hashes for every LUT that actually participates in the render."""
+    names: set[str] = set()
+    if req.look.conversion_lut and req.look.conversion_confirmed:
+        names.add(req.look.conversion_lut)
+    if req.look.creative_lut and req.look.creative_strength > 0:
+        names.add(req.look.creative_lut)
+    digests: dict[str, str] = {}
+    for name in sorted(names):
+        path = require_lut_asset(data_dir, name)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digests[name] = digest.hexdigest()
+    return digests
+
+
+def _safe_unlink(path: Path, folder: Path) -> bool:
+    try:
+        resolved = path.resolve()
+        if resolved.parent != folder:
+            return False
+        path.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def cleanup_playback_proxies(
+    cache_dir: Path,
+    *,
+    max_bytes: int = PROXY_CACHE_MAX_BYTES,
+    max_age_s: int = PROXY_CACHE_MAX_AGE_S,
+    orphan_age_s: int = PROXY_ORPHAN_WORK_AGE_S,
+    now: float | None = None,
+    keep: Path | None = None,
+) -> int:
+    """Remove expired/oversized proxies and old work dirs inside the cache only."""
+    folder = Path(cache_dir).resolve()
+    if not folder.is_dir():
+        return 0
+    now_s = time.time() if now is None else now
+    keep_path = keep.resolve() if keep is not None else None
+    removed = 0
+    entries: list[tuple[float, int, Path]] = []
+    total = 0
+    for path in folder.glob("*.mp4"):
+        if not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        entries.append((stat.st_mtime, stat.st_size, path))
+        total += stat.st_size
+    for mtime, size, path in entries:
+        if keep_path is not None and path.resolve() == keep_path:
+            continue
+        if max_age_s > 0 and now_s - mtime > max_age_s:
+            if _safe_unlink(path, folder):
+                total -= size
+                removed += 1
+    remaining = [entry for entry in entries if entry[2].is_file()]
+    remaining.sort(key=lambda entry: entry[0])
+    for _mtime, size, path in remaining:
+        if total <= max_bytes:
+            break
+        if keep_path is not None and path.resolve() == keep_path:
+            continue
+        if _safe_unlink(path, folder):
+            total -= size
+            removed += 1
+    work = folder / "work"
+    if work.is_dir() and orphan_age_s > 0:
+        for child in work.iterdir():
+            try:
+                if not child.is_dir() or child.resolve().parent != work.resolve():
+                    continue
+                stat = child.stat()
+                if now_s - stat.st_mtime > orphan_age_s:
+                    shutil.rmtree(child, ignore_errors=True)
+                    removed += 1
+            except OSError:
+                continue
+    return removed
 
 
 def proxy_filter_chain(
@@ -110,6 +201,7 @@ def cache_key_for(
     *,
     media_mtime_ns: int,
     media_size: int,
+    data_dir: Path,
 ) -> str:
     payload = {
         "path": str(req.media_path.resolve()),
@@ -119,6 +211,7 @@ def cache_key_for(
         "out": None if req.source_end_s is None else round(float(req.source_end_s), 6),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
+        "lut_content": _lut_digests(req, data_dir),
         "width": int(req.max_width),
         "height": int(req.max_height),
         "saturation": req.saturation,
@@ -146,7 +239,15 @@ def cached_playback_proxy(
     except OSError:
         return None
     folder = cache_dir if cache_dir is not None else playback_proxies_dir(data_dir)
-    key = cache_key_for(req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
+    try:
+        key = cache_key_for(
+            req,
+            media_mtime_ns=st.st_mtime_ns,
+            media_size=st.st_size,
+            data_dir=data_dir,
+        )
+    except LutMissingError:
+        return None
     path = folder / f"{key}.mp4"
     if path.is_file() and path.stat().st_size > 0:
         return path
@@ -185,7 +286,12 @@ def render_playback_proxy(
         require_lut_asset(data_dir, req.look.conversion_lut)
     if req.look.creative_lut and req.look.creative_strength > 0:
         require_lut_asset(data_dir, req.look.creative_lut)
-    key = cache_key_for(req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
+    key = cache_key_for(
+        req,
+        media_mtime_ns=st.st_mtime_ns,
+        media_size=st.st_size,
+        data_dir=data_dir,
+    )
     dest = folder / f"{key}.mp4"
     if dest.is_file() and dest.stat().st_size > 0:
         return dest
@@ -296,7 +402,26 @@ def render_playback_proxy(
                 detail or "Could not build the playback proxy.",
                 code="proxy_failed",
             )
+        try:
+            current = media.stat()
+            current_key = cache_key_for(
+                req,
+                media_mtime_ns=current.st_mtime_ns,
+                media_size=current.st_size,
+                data_dir=data_dir,
+            )
+        except (OSError, LutMissingError) as exc:
+            raise PlaybackProxyError(
+                "Proxy inputs changed while rendering.",
+                code="superseded",
+            ) from exc
+        if current_key != key:
+            raise PlaybackProxyError(
+                "Proxy inputs changed while rendering.",
+                code="superseded",
+            )
         temp.replace(dest)
+        cleanup_playback_proxies(folder, keep=dest)
         return dest
     finally:
         shutil.rmtree(work, ignore_errors=True)

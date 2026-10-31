@@ -157,6 +157,9 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert payload["bytes"] > 0
     assert payload["generation_s"] >= 0
     assert payload["url"] == url
+    reused = client.post(url)
+    assert reused.status_code == 200
+    assert reused.json()["bytes"] == payload["bytes"]
 
     served = client.get(url)
     assert served.status_code == 200
@@ -174,6 +177,15 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     disabled = client.get("/studio")
     assert 'data-lut-proxy-enabled="0"' in disabled.text
     assert f'data-lut-proxy-url="{url}"' not in disabled.text
+
+    changed_cube = tmp_path / "changed.cube"
+    lines = ['TITLE "Changed"', "LUT_3D_SIZE 2"] + ["1 1 1"] * 7 + ["0 0 0"]
+    changed_cube.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (data_dir / "luts" / asset).write_text(
+        changed_cube.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    assert client.get(url).status_code == 404
+    assert f'data-lut-proxy-url="{url}"' not in client.get("/studio?lut_proxy=1").text
 
     proxy_files = list((data_dir / "playback-proxies").glob("*.mp4"))
     assert len(proxy_files) == 1
