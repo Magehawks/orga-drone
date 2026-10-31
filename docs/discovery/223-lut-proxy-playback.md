@@ -8,11 +8,14 @@
 
 1. Open a clip in Studio.
 2. Choose a LUT.
-3. The preview prepares the proxy for that clip in the background.
-4. Play, pause, seek, and clip selection use the same proxy frame.
+3. With WebGL2 available, the live preview applies the grade/LUT immediately
+   (see `231-realtime-lut-poc.md`). Otherwise the client prepares a proxy in the
+   background.
+4. Play, pause, seek, and clip selection use the same corrected video frame.
 
-No query flag and no LUT-proxy button are required. When a LUT is selected (or a
-project with a LUT clip is opened), the client debounces and calls the internal
+No query flag and no LUT-proxy button are required. When WebGL2 is unavailable
+and a LUT is selected (or a project with a LUT clip is opened), the client
+debounces and calls the internal
 `POST /api/studio/{clip_id}/playback-proxy` endpoint for the selected/active
 clip only. The request runs in a worker thread; the Studio UI stays responsive.
 Generation for other clips is not started.
