@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, require_lut_asset
@@ -55,6 +56,7 @@ class PreviewFrameRequest:
     image: ImageAdjust
     look: ColorLook
     hsl: HslAdjust = HslAdjust()
+    color_wheels: ColorWheels = ColorWheels()
     detail: bool = False
     max_edge: int = PREVIEW_MAX_EDGE
     saturation: float = 1.0
@@ -88,8 +90,22 @@ def hsl_needs_preview_still(hsl: HslAdjust) -> bool:
     return not hsl.is_neutral
 
 
-def color_needs_preview_still(look: ColorLook, hsl: HslAdjust) -> bool:
-    return look_needs_preview_still(look) or hsl_needs_preview_still(hsl)
+def color_wheels_need_preview_still(color_wheels: ColorWheels) -> bool:
+    """Non-neutral colour wheels need the same rendered path as a LUT."""
+    return not color_wheels.is_neutral
+
+
+def color_needs_preview_still(
+    look: ColorLook,
+    hsl: HslAdjust,
+    color_wheels: ColorWheels | None = None,
+) -> bool:
+    wheels = color_wheels if color_wheels is not None else ColorWheels()
+    return (
+        look_needs_preview_still(look)
+        or hsl_needs_preview_still(hsl)
+        or color_wheels_need_preview_still(wheels)
+    )
 
 
 def quantize_preview_time(t_s: float, *, step: float = PREVIEW_QUANTIZE_S) -> float:
@@ -110,8 +126,9 @@ def preview_filter_chain(
     max_edge: int = PREVIEW_MAX_EDGE,
     saturation: float = 1.0,
     hsl: HslAdjust | None = None,
+    color_wheels: ColorWheels | None = None,
 ) -> str:
-    """Same grade→LUT→HSL order as export; scale for preview; detail omitted."""
+    """Same grade→LUT→HSL→wheels order as export; scale for preview."""
     parts: list[str] = []
     grade = ffmpeg_grade_chain(image)
     if grade:
@@ -122,6 +139,8 @@ def preview_filter_chain(
             parts.append(lut)
     if hsl is not None and not hsl.is_neutral:
         parts.append(ffmpeg_hsl_chain(hsl, data_dir=data_dir))
+    if color_wheels is not None and not color_wheels.is_neutral:
+        parts.append(ffmpeg_color_wheels_chain(color_wheels, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge = max(64, min(2160, int(max_edge)))
@@ -153,10 +172,11 @@ def cache_key_for(
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
+        "color_wheels": req.color_wheels.as_dict(),
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "v": 6,
+        "v": 7,
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -251,6 +271,7 @@ def render_preview_frame(
                 max_edge=req.max_edge,
                 saturation=req.saturation,
                 hsl=req.hsl,
+                color_wheels=req.color_wheels,
             )
         except LutMissingError:
             raise

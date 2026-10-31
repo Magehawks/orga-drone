@@ -844,5 +844,11 @@
   "Reset all HSL": "Reset all HSL",
   "Adjust one color range without changing the others. Neutral values leave the picture unchanged.": "Adjust one color range without changing the others. Neutral values leave the picture unchanged.",
   "Could not save HSL color settings.": "Could not save HSL color settings.",
-  "Playing without HSL preview; pause or seek to see it": "Playing without HSL preview; pause or seek to see it"
+  "Playing without HSL preview; pause or seek to see it": "Playing without HSL preview; pause or seek to see it",
+  "Color Grading": "Color Grading",
+  "Midtones": "Midtones",
+  "Neutral": "Neutral",
+  "Could not save color grading.": "Could not save color grading.",
+  "Playing without color grading preview; pause or seek to see it": "Playing without color grading preview; pause or seek to see it",
+  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength."
 }

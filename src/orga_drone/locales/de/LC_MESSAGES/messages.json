@@ -844,5 +844,11 @@
   "Reset all HSL": "Gesamtes HSL zurücksetzen",
   "Adjust one color range without changing the others. Neutral values leave the picture unchanged.": "Passe einen Farbbereich an, ohne die anderen zu verändern. Neutrale Werte lassen das Bild unverändert.",
   "Could not save HSL color settings.": "HSL-Farbeinstellungen konnten nicht gespeichert werden.",
-  "Playing without HSL preview; pause or seek to see it": "Wiedergabe ohne HSL-Vorschau; pausiere oder spule, um sie zu sehen"
+  "Playing without HSL preview; pause or seek to see it": "Wiedergabe ohne HSL-Vorschau; pausiere oder spule, um sie zu sehen",
+  "Color Grading": "Color Grading",
+  "Midtones": "Mitteltöne",
+  "Neutral": "Neutral",
+  "Could not save color grading.": "Farbkorrektur konnte nicht gespeichert werden.",
+  "Playing without color grading preview; pause or seek to see it": "Wiedergabe ohne Farbkorrektur-Vorschau; pausiere oder spule, um sie zu sehen",
+  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Ziehe den Punkt in jedem Rad. Die Mitte ist neutral; der Winkel bestimmt die Farbtonrichtung und der Abstand die Stärke."
 }

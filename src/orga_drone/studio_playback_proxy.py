@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import (
@@ -60,6 +61,7 @@ class PlaybackProxyRequest:
     image: ImageAdjust = field(default_factory=ImageAdjust)
     look: ColorLook = field(default_factory=ColorLook)
     hsl: HslAdjust = field(default_factory=HslAdjust)
+    color_wheels: ColorWheels = field(default_factory=ColorWheels)
     max_width: int = PROXY_MAX_WIDTH
     max_height: int = PROXY_MAX_HEIGHT
     saturation: float = 1.0
@@ -187,6 +189,8 @@ def proxy_filter_chain(
             parts.append(lut)
     if not req.hsl.is_neutral:
         parts.append(ffmpeg_hsl_chain(req.hsl, data_dir=data_dir))
+    if not req.color_wheels.is_neutral:
+        parts.append(ffmpeg_color_wheels_chain(req.color_wheels, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge_w = max(64, min(2160, int(max_width)))
@@ -216,6 +220,7 @@ def cache_key_for(
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
+        "color_wheels": req.color_wheels.as_dict(),
         "lut_content": _lut_digests(req, data_dir),
         "width": int(req.max_width),
         "height": int(req.max_height),
@@ -272,9 +277,13 @@ def render_playback_proxy(
     never publishes a partial file: the result is moved into place only after a
     non-empty, successful encode.
     """
-    if not look_needs_preview_still(req.look) and req.hsl.is_neutral:
+    if (
+        not look_needs_preview_still(req.look)
+        and req.hsl.is_neutral
+        and req.color_wheels.is_neutral
+    ):
         raise PlaybackProxyError(
-            "Assign a color file or HSL adjustment before building a playback proxy.",
+            "Assign a color file, HSL adjustment, or colour wheels before building a playback proxy.",
             code="no_lut",
         )
     media = req.media_path
