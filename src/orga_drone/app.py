@@ -2203,6 +2203,9 @@ def create_app() -> FastAPI:
         if clip.source_end is not None:
             abs_t = min(abs_t, float(clip.source_end))
         abs_t = max(0.0, abs_t)
+        from orga_drone.studio_image import saturation_multiplier
+
+        ramp = saturation_ramp_from_effect_settings(clip.effect_settings)
         try:
             jpeg = await asyncio.to_thread(
                 render_preview_frame,
@@ -2213,6 +2216,7 @@ def create_app() -> FastAPI:
                     image=image,
                     look=look,
                     detail=bool(detail),
+                    saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
                 ),
                 data_dir=settings.data_dir,
             )
@@ -2230,7 +2234,7 @@ def create_app() -> FastAPI:
             jpeg,
             media_type="image/jpeg",
             headers={
-                "Cache-Control": "private, max-age=60",
+                "Cache-Control": "no-store",
                 "X-Orga-Preview-Still": "1",
             },
         )

@@ -89,7 +89,8 @@ def _x264_video_args() -> list[str]:
 def _segment_vf(width: int, height: int) -> str:
     """Scale/pad + CFR + limited-range BT.709 yuv420p (photo and video match)."""
     return (
-        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease:"
+        "out_color_matrix=bt709:out_range=tv,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
         f"fps={EXPORT_FPS},format=yuv420p,"
         "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"

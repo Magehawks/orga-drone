@@ -15,6 +15,7 @@ from orga_drone.studio_lut import ColorLook, import_lut_from_path, write_identit
 from orga_drone.studio_preview_frame import (
     PREVIEW_STILLS_DIR,
     PreviewFrameRequest,
+    PreviewFrameError,
     cache_key_for,
     look_needs_preview_still,
     preview_filter_chain,
@@ -121,6 +122,9 @@ def test_quantize_and_look_gate() -> None:
         ColorLook(creative_lut="a" * 32 + ".cube", creative_strength=50)
     )
     assert look_needs_preview_still(
+        ColorLook(creative_lut="a" * 32 + ".cube", creative_strength=0)
+    )
+    assert look_needs_preview_still(
         ColorLook(
             input_profile="dlog_m",
             conversion_lut="a" * 32 + ".cube",
@@ -162,6 +166,39 @@ def test_render_preview_frame_caches_jpeg(tmp_path: Path) -> None:
     assert first.suffix == ".jpg"
     assert first.stat().st_size > 100
     assert (data_dir / PREVIEW_STILLS_DIR).is_dir()
+    assert not list((data_dir / PREVIEW_STILLS_DIR / "work").glob("*/*"))
+
+
+@pytest.mark.parametrize("failure", ["timeout", "oserror", "exit"])
+def test_failed_jpeg_never_becomes_a_cache_hit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    data = tmp_path / "data"
+    media = tmp_path / "source.mp4"
+    media.write_bytes(b"synthetic source placeholder")
+    monkeypatch.setattr("orga_drone.studio_preview_frame.find_ffmpeg", lambda: "ffmpeg")
+    calls = []
+
+    def run(cmd, **kwargs):
+        output = Path(cmd[-1])
+        output.write_bytes(b"partial frame")
+        calls.append(cmd)
+        if output.suffix == ".jpg":
+            if failure == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 45)
+            if failure == "oserror":
+                raise OSError("test JPEG failure")
+            return subprocess.CompletedProcess(cmd, 1, stderr=b"test failure")
+        return subprocess.CompletedProcess(cmd, 0, stderr=b"")
+
+    monkeypatch.setattr("orga_drone.studio_preview_frame.subprocess.run", run)
+    req = PreviewFrameRequest(media, "video", 0, ImageAdjust(), ColorLook())
+    for _ in range(2):
+        with pytest.raises(PreviewFrameError):
+            render_preview_frame(req, data_dir=data)
+        assert not list((data / PREVIEW_STILLS_DIR).glob("*.jpg"))
+        assert not list((data / PREVIEW_STILLS_DIR / "work").glob("*/*"))
+    assert len(calls) == 2
 
 
 def test_cache_key_stable_for_same_inputs(tmp_path: Path) -> None:
@@ -255,7 +292,22 @@ def test_preview_frame_api_and_cache_clear(
     assert still.status_code == 200
     assert still.headers["content-type"].startswith("image/jpeg")
     assert still.headers.get("x-orga-preview-still") == "1"
+    assert still.headers["cache-control"] == "no-store"
     assert len(still.content) > 100
+    # The same mutable URL must return each persisted strength, including 0%.
+    frames = {}
+    for strength in (50, 0, 100):
+        changed = client.patch(
+            f"/api/studio/{clip_id}/color",
+            json={"creative_lut": asset, "creative_strength": strength},
+        )
+        assert changed.status_code == 200
+        frame = client.get(f"/api/studio/{clip_id}/preview-frame?t_s=0.25")
+        assert frame.status_code == 200
+        assert frame.headers["cache-control"] == "no-store"
+        frames[strength] = frame.content
+    assert frames[0] != frames[100]
+    assert frames[100] == still.content
     cached = list((data_dir / PREVIEW_STILLS_DIR).glob("*.jpg"))
     assert cached
     page = client.get("/studio")

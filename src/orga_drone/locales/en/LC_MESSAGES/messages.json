@@ -825,5 +825,7 @@
   "Also resets Fine-tune tonals (highlights, shadows, blacks).": "Also resets Fine-tune tonals (highlights, shadows, blacks).",
   "Replaces the four sliders below. Does not change the file on disk.": "Replaces the four sliders below. Does not change the file on disk.",
   "Unknown look.": "Unknown look.",
-  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100."
+  "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.": "Brightness, contrast, saturation, warmth, and fine-tune sliders must be from -100 to 100.",
+  "Color preview unavailable; try pausing or seeking again": "Color preview unavailable; try pausing or seeking again",
+  "Color still; transition colors approximate": "Color still; transition colors approximate"
 }

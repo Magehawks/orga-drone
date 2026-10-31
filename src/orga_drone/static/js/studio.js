@@ -2012,7 +2012,7 @@
     }
   }
 
-  function writeImageAdjust(clip, adjust) {
+  function writeImageAdjust(clip, adjust, persisted = false) {
     if (!clip) return;
     clip.dataset.imageAdjust = JSON.stringify({
       exposure: clampImageSlider(adjust.exposure),
@@ -2023,6 +2023,8 @@
       shadows: clampImageSlider(adjust.shadows),
       blacks: clampImageSlider(adjust.blacks),
     });
+    clip.dataset.imagePreviewDirty = persisted ? "0" : "1";
+    clearLutPreviewStill();
   }
 
   function imageAdjustIsNeutral(adjust) {
@@ -2143,7 +2145,7 @@
     }
   }
 
-  function writeSaturationRamp(clip, ramp) {
+  function writeSaturationRamp(clip, ramp, persisted = false) {
     if (!clip) return;
     clip.dataset.saturationRamp = JSON.stringify({
       enabled: ramp.enabled === true,
@@ -2152,6 +2154,8 @@
       start_saturation: clampRampPercent(ramp.start_saturation),
       end_saturation: clampRampPercent(ramp.end_saturation),
     });
+    clip.dataset.rampPreviewDirty = persisted ? "0" : "1";
+    clearLutPreviewStill();
   }
 
   function saturationRampMultiplier(ramp, localS) {
@@ -2253,25 +2257,21 @@
   const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
   const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
+  const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
+  const msgLutChipComposite = root.dataset.lutChipComposite || "Color still; transition colors approximate";
   let lutStillAbort = null;
   let lutStillTimer = 0;
   let lutStillToken = 0;
   let lutStillObjectUrl = "";
+  let lutStillKey = "";
 
   function colorLookNeedsStill(look, clip) {
     if (!look) return false;
-    // Conversion or any creative .cube can appear in the export graph. Strength
-    // may be animated via color points even when the static slider is 0.
+    // Keep 0% on the same output color path as 50/100%, even though the LUT
+    // filter itself is skipped. Browser decoding may interpret untagged video
+    // differently from export's BT.709 output.
     if (look.conversion_lut && look.conversion_confirmed) return true;
-    if (look.creative_lut) {
-      if (Number(look.creative_strength) > 0) return true;
-      const anim = clip ? readColorAnimation(clip) : null;
-      if (anim && Array.isArray(anim.keys)) {
-        return anim.keys.some(
-          (key) => key && key.lut_strength != null && Number(key.lut_strength) > 0
-        );
-      }
-    }
+    if (look.creative_lut) return true;
     return false;
   }
 
@@ -2295,6 +2295,7 @@
   }
 
   function clearLutPreviewStill() {
+    lutStillKey = "";
     if (lutStillTimer) {
       window.clearTimeout(lutStillTimer);
       lutStillTimer = 0;
@@ -2321,11 +2322,12 @@
       lutStillObjectUrl = "";
     }
     setLutPreviewChip("");
+    schedulePreviewBlit();
   }
 
   function scheduleLutPreviewStill(clip, localS) {
     if (!previewLutStill) return;
-    if (compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
+    if (reuseDraft || compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
       clearLutPreviewStill();
       return;
     }
@@ -2341,20 +2343,13 @@
       clearLutPreviewStill();
       return;
     }
+    if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1") {
+      clearLutPreviewStill();
+      setLutPreviewChip(msgLutChipUpdating);
+      return;
+    }
     if (state.playing) {
-      if (lutStillTimer) {
-        window.clearTimeout(lutStillTimer);
-        lutStillTimer = 0;
-      }
-      if (lutStillAbort) {
-        try {
-          lutStillAbort.abort();
-        } catch (_) {
-          /* ignore */
-        }
-        lutStillAbort = null;
-      }
-      previewLutStill.hidden = true;
+      clearLutPreviewStill();
       setLutPreviewChip(msgLutChipPlaying);
       return;
     }
@@ -2366,54 +2361,69 @@
     // t_s is source offset from the clip in-point (same mapping as seekVideoLocal).
     const sourceOff = lutStillSourceOffset(clip, localS);
     const quant = Math.round(sourceOff * 10) / 10;
-    if (lutStillTimer) window.clearTimeout(lutStillTimer);
+    const key = JSON.stringify([studioId, quant, clip.dataset.sourceIn,
+      clip.dataset.sourceOut, look, readImageAdjust(clip), anim, clip.dataset.saturationRamp]);
+    if (key === lutStillKey) return;
+    // Reject old responses now, including during the debounce and image decode.
+    clearLutPreviewStill();
+    lutStillKey = key;
+    const token = lutStillToken;
     setLutPreviewChip(msgLutChipUpdating);
-    lutStillTimer = window.setTimeout(() => {
+    lutStillTimer = window.setTimeout(async () => {
       lutStillTimer = 0;
-      const token = ++lutStillToken;
-      if (lutStillAbort) {
-        try {
-          lutStillAbort.abort();
-        } catch (_) {
-          /* ignore */
-        }
-      }
+      // The endpoint reads persisted settings. Do not race an in-flight edit.
+      await Promise.all([colorSaveChain, imageSaveChain]);
+      if (token !== lutStillToken) return;
       const controller = new AbortController();
       lutStillAbort = controller;
       const url = `/api/studio/${studioId}/preview-frame?t_s=${encodeURIComponent(String(quant))}&detail=0`;
-      fetch(url, { headers: { Accept: "image/jpeg" }, signal: controller.signal })
+      fetch(url, { cache: "no-store", headers: { Accept: "image/jpeg" }, signal: controller.signal })
         .then(async (res) => {
           if (token !== lutStillToken) return null;
           if (res.status === 409) {
+            lutStillKey = "";
             setLutPreviewChip(msgLutChipMissing);
             previewLutStill.hidden = true;
             return null;
           }
           if (!res.ok) {
-            setLutPreviewChip(msgLutChipMissing);
+            lutStillKey = "";
+            setLutPreviewChip(msgLutChipFailed);
             previewLutStill.hidden = true;
             return null;
           }
           return res.blob();
         })
-        .then((blob) => {
+        .then(async (blob) => {
           if (!blob || token !== lutStillToken) return;
-          if (lutStillObjectUrl) {
-            try {
-              URL.revokeObjectURL(lutStillObjectUrl);
-            } catch (_) {
-              /* ignore */
-            }
+          const objectUrl = URL.createObjectURL(blob);
+          const decoded = new Image();
+          decoded.src = objectUrl;
+          try {
+            await decoded.decode();
+          } catch (err) {
+            URL.revokeObjectURL(objectUrl);
+            throw err;
           }
-          lutStillObjectUrl = URL.createObjectURL(blob);
-          previewLutStill.src = lutStillObjectUrl;
+          if (token !== lutStillToken) {
+            URL.revokeObjectURL(objectUrl);
+            return;
+          }
+          lutStillObjectUrl = objectUrl;
+          previewLutStill.src = objectUrl;
           previewLutStill.hidden = false;
-          setLutPreviewChip(msgLutChipStill);
+          const hit = resolveAt(state.projectTimeS);
+          const composite = hit && (hit.overlapClip ||
+            (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
+          setLutPreviewChip(composite ? msgLutChipComposite : msgLutChipStill);
+          drawPrivacyMasks();
+          schedulePreviewBlit();
         })
         .catch((err) => {
           if (err && err.name === "AbortError") return;
           if (token !== lutStillToken) return;
-          setLutPreviewChip(msgLutChipMissing);
+          lutStillKey = "";
+          setLutPreviewChip(msgLutChipFailed);
           previewLutStill.hidden = true;
         });
     }, 120);
@@ -2468,7 +2478,7 @@
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgLookFailed);
     }
-    if (body.image) writeImageAdjust(clip, body.image);
+    if (body.image) writeImageAdjust(clip, body.image, true);
     clip.dataset.quickLook = body.quick_look || "";
     fillImageAdjust(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
@@ -2518,7 +2528,8 @@
         creative_lut: String(parsed.creative_lut || ""),
         creative_strength: Math.max(
           0,
-          Math.min(100, Math.round(Number(parsed.creative_strength) || 100))
+          Math.min(100, Math.round(Number.isFinite(Number(parsed.creative_strength)) &&
+            parsed.creative_strength != null ? Number(parsed.creative_strength) : 100))
         ),
         conversion_confirmed: Boolean(parsed.conversion_confirmed),
       };
@@ -2530,6 +2541,8 @@
   function writeColorLook(clip, look) {
     if (!clip) return;
     clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
+    clearLutPreviewStill();
+    if (colorLookNeedsStill(look, clip)) setLutPreviewChip(msgLutChipUpdating);
   }
 
   let colorAnimationModel = { maxKeys: 8, minKeyGapS: 0.1, presets: [] };
@@ -3177,7 +3190,11 @@
       }
       throw new Error(detail || msgColorFailed);
     }
-    writeColorLook(clip, body.color_look || look);
+    // A response for an older slider value must not overwrite a newer edit.
+    if (JSON.stringify(readColorLook(clip)) === JSON.stringify(look)) {
+      writeColorLook(clip, body.color_look || look);
+    }
+    applyPreviewGrades(resolveAt(state.projectTimeS));
     if (
       state.selected &&
       state.selected.type === "clip" &&
@@ -3301,7 +3318,9 @@
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgImageFailed);
     }
-    writeImageAdjust(clip, body.image || adjust);
+    if (JSON.stringify(readImageAdjust(clip)) === JSON.stringify(adjust)) {
+      writeImageAdjust(clip, body.image || adjust, true);
+    }
     if (
       state.selected &&
       state.selected.type === "clip" &&
@@ -3504,6 +3523,13 @@
   }
 
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
+    const rendered = !reuseDraft && !state.playing && (media === previewVideo || media === previewImage) &&
+      previewLayerReady(previewLutStill) ? previewLutStill : null;
+    const picture = rendered || media;
+    if (rendered) {
+      srcW = rendered.naturalWidth;
+      srcH = rendered.naturalHeight;
+    }
     const dx = mask.x * box.width;
     const dy = mask.y * box.height;
     const dw = Math.max(1, mask.w * box.width);
@@ -3534,7 +3560,7 @@
         }
         scratch.imageSmoothingEnabled = false;
         scratch.clearRect(0, 0, cols, rows);
-        scratch.drawImage(media, sx, sy, sw, sh, 0, 0, cols, rows);
+        scratch.drawImage(picture, sx, sy, sw, sh, 0, 0, cols, rows);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(maskScratch, 0, 0, cols, rows, dx, dy, dw, dh);
       } else {
@@ -3543,7 +3569,7 @@
         const padY = (radius / box.height) * view.h;
         ctx.filter = `blur(${radius}px)`;
         ctx.drawImage(
-          media,
+          picture,
           sx - padX,
           sy - padY,
           sw + padX * 2,
@@ -5013,16 +5039,18 @@
     return previewGradeScratch;
   }
 
-  function drawPreviewLayer(ctx, media, frameW, frameH) {
+  function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
     if (!previewLayerReady(media)) return false;
-    const srcW = media.videoWidth || media.naturalWidth || 0;
-    const srcH = media.videoHeight || media.naturalHeight || 0;
+    const picture = rendered || media;
+    const srcW = picture.videoWidth || picture.naturalWidth || 0;
+    const srcH = picture.videoHeight || picture.naturalHeight || 0;
     const fit = contentRect(frameW, frameH, srcW, srcH);
     const xform = readPreviewTransform(media);
     const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
-    const filter = canvasFilterFrom(media.style.filter);
+    // Server stills already contain the grade and LUT; never grade them twice.
+    const filter = rendered ? "none" : canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;
@@ -5030,7 +5058,7 @@
       ctx.imageSmoothingQuality = "high";
       ctx.translate(xform.tx, xform.ty);
       ctx.scale(xform.scale, xform.scale);
-      const source = previewGradeSource(media, filter);
+      const source = previewGradeSource(picture, filter);
       ctx.filter = filter || "none";
       ctx.drawImage(source, fit.x, fit.y, fit.w, fit.h);
       return true;
@@ -5039,7 +5067,7 @@
         ctx.filter = "none";
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(media, fit.x, fit.y, fit.w, fit.h);
+        ctx.drawImage(picture, fit.x, fit.y, fit.w, fit.h);
         return true;
       } catch (_) {
         return false;
@@ -5060,7 +5088,7 @@
     if (before && before.parentNode === previewFrame) previewFrame.insertBefore(canvas, before);
     else previewFrame.appendChild(canvas);
     previewBlitCanvas = canvas;
-    [previewVideo, previewVideoB, previewImage, previewImageB].forEach((media) => {
+    [previewVideo, previewVideoB, previewImage, previewImageB, previewLutStill].forEach((media) => {
       if (!media) return;
       const kick = () => schedulePreviewBlit();
       media.addEventListener("loadeddata", kick);
@@ -5108,7 +5136,8 @@
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, cssW, cssH);
     const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH);
-    const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH);
+    const rendered = !reuseDraft && !state.playing && previewLayerReady(previewLutStill) ? previewLutStill : null;
+    const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH, rendered);
     canvas.hidden = !(drewSecondary || drewPrimary);
   }
 
@@ -8026,6 +8055,7 @@
     const catalog = Number(row.dataset.mediaDuration);
     if (!Number.isFinite(catalog) || catalog <= 0) return;
     pausePlayback();
+    clearLutPreviewStill();
     reuseDraft = {
       clip: null,
       mediaId: row.dataset.originalMediaId || "",
@@ -8051,6 +8081,7 @@
     if (clip.dataset.available !== "1" || clip.dataset.canPlay !== "1") return;
     hideClipMenu();
     pausePlayback();
+    clearLutPreviewStill();
     const range = defaultReuseRange(clip, catalog);
     reuseDraft = {
       clip,
@@ -9449,7 +9480,9 @@
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgBwFailed);
     }
-    writeSaturationRamp(clip, body.saturation_ramp || ramp);
+    if (JSON.stringify(readSaturationRamp(clip)) === JSON.stringify(ramp)) {
+      writeSaturationRamp(clip, body.saturation_ramp || ramp, true);
+    }
     if (
       state.selected &&
       state.selected.type === "clip" &&

@@ -540,3 +540,9 @@ msgstr "Farbdatei fehlt"
 msgid "Apply D-Log M conversion with your .cube LUT? Scrub or pause to see a rendered still with the file; playback approximates without it. Export applies it. Source files stay unchanged."
 msgstr "D-Log-M-Umwandlung mit deiner .cube-LUT anwenden? Beim Scrubben oder Pausieren siehst du ein berechnetes Standbild mit der Datei; die Wiedergabe nähert ohne sie an. Der Export wendet sie an. Quelldateien bleiben unverändert."
 
+
+msgid "Color preview unavailable; try pausing or seeking again"
+msgstr "Farbvorschau nicht verfügbar; erneut pausieren oder eine andere Stelle wählen"
+
+msgid "Color still; transition colors approximate"
+msgstr "Farbstandbild; Übergangsfarben angenähert"

@@ -2013,6 +2013,8 @@ video.studio-preview-media.studio-preview-layer-b {
   z-index: 1;
 }
 .studio-preview-lut-still {
+  /* Decoded pixel source for the blit compositor, which preserves clip framing. */
+  visibility: hidden;
   position: absolute;
   inset: 0;
   /* Above the graded video, below masks / HUD / annotations / map. */
