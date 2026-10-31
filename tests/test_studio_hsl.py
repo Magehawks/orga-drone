@@ -340,6 +340,8 @@ def test_hsl_preview_api_and_clip_switch(tmp_path: Path, monkeypatch: pytest.Mon
     assert page.status_code == 200
     assert "HSL color mixer" in page.text or "HSL-Farbmischer" in page.text
     assert 'data-hsl=' in page.text
+    assert 'id="inspector-image-section-hsl" class="studio-image-section" open' in page.text
+    assert page.text.count("data-hsl-range=") == 8
     # Resetting all ranges returns the clip to the ordinary photo path.
     reset = client.patch(f"/api/studio/{clip_id}/hsl", json={"ranges": {
         key: {"hue": 0, "saturation": 0, "luminance": 0} for key in RANGE_IDS
