@@ -1046,7 +1046,8 @@
             <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
             <div class="studio-color-actions">
               <button type="button" class="button ghost" id="inspector-color-conversion-change" hidden>{{ _('Change file') }}</button>
-              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden>{{ _("Don't use") }}</button>
+              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden
+                      title="{{ _('Removes the technical conversion file. The creative LUT stays selected.')|e }}">{{ _('Remove conversion') }}</button>
             </div>
             <label class="studio-inspector-field" for="inspector-color-creative-select">
               <span>{{ _('Color file (.cube)') }}</span>

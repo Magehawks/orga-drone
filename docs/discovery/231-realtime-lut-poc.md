@@ -87,6 +87,48 @@ The font/color grade is applied by the shader using the same `gradeFactors`
 math as the CSS preview; LUT interpolation is WebGL linear 3D texture sampling.
 The PoC LUT-only frame differed from the FFmpeg LUT-only still by 4.5–4.8/255.
 
+## Edge flicker repair
+
+The first WebGL integration downscaled the 4K source to a fixed 1280×720 scratch
+canvas with Canvas2D's default `imageSmoothingQuality = "low"`, then the
+compositor scaled that canvas again to the display. LUT activation amplified
+the aliasing on moving edges.
+
+The renderer now:
+
+- targets the actual preview/display pixel size (DPR-aware, clamped to the
+  source size), so the compositor does not upscale a fixed 720p texture;
+- sets `imageSmoothingEnabled = true` and `imageSmoothingQuality = "high"`
+  before the 4K→preview downscale;
+- keeps 3D LUT linear sampling, which was not the flicker cause.
+
+Measured on the real 59.94 fps DJI 4K clip in the packaged EXE:
+
+| Measurement | Before | After |
+|---|---|---|
+| WebGL scratch scale | fixed 1280×720, low quality | display-matched, high quality |
+| Second compositor scale | yes (720p → display) | none (1:1 backing pixels) |
+| Preview frames / 1.5 s | ~60 fps, 0 dropped | ~60 fps, 0 dropped |
+| First corrected frame | ~103 ms | ~105 ms |
+
+No 30 fps cap is applied; the renderer uses `requestAnimationFrame` and the video
+element's native 59.94 fps. `requestVideoFrameCallback` was not required; the
+PoC showed zero dropped frames.
+
+## “Don’t use” / conversion button
+
+The button in the conversion block was always the **technical conversion**
+clear, not the creative LUT clear. Its label was misleading. It is now
+**Remove conversion** with the tooltip “Removes the technical conversion file.
+The creative LUT stays selected.”
+
+- **Remove conversion** clears only the D-Log/conversion `.cube`; a selected
+  creative LUT remains active.
+- The creative LUT's existing **Strength** slider at 0 % disables its visible
+  effect while keeping the file selected for later re-activation.
+- The creative dropdown's **None** removes the creative assignment.
+- No new toggle or state was added; export semantics are unchanged.
+
 ## Limitations
 
 - The renderer is GPU-dependent; unsupported WebView2/ANGLE environments fall
@@ -94,7 +136,8 @@ The PoC LUT-only frame differed from the FFmpeg LUT-only still by 4.5–4.8/255.
 - Animated color (keyframes) still uses the existing fallback; static grade,
   creative/conversion LUT, LUT strength and saturation ramp are supported.
 - Photos continue to use the existing still/proxy path.
-- The WebGL renderer runs at preview resolution (max 1280×720 box), not at the
-  full 4K source size. This is intentional and matches the displayed preview.
+- The WebGL renderer runs at the display pixel size (DPR-aware, clamped to the
+  source), not at the full 4K source size. This is intentional and matches the
+  displayed preview.
 - Seek backward remains browser-limited (~233 ms in the PoC), still far below
   the 5 s target.

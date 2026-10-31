@@ -779,6 +779,8 @@
   "Apply conversion": "Umwandlung anwenden",
   "Change file": "Datei ändern",
   "Don't use": "Nicht verwenden",
+  "Remove conversion": "Konvertierung entfernen",
+  "Removes the technical conversion file. The creative LUT stays selected.": "Entfernt die technische Konvertierungsdatei. Die kreative LUT bleibt ausgewählt.",
   "Color file (.cube)": "Farbdatei (.cube)",
   "Manage color files": "Farbdateien verwalten",
   "How strongly the file changes the picture. 0% = no effect.": "Wie stark die Datei das Bild verändert. 0 % = keine Wirkung.",

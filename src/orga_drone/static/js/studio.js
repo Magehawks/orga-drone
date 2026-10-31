@@ -1903,7 +1903,7 @@
     return !!renderer && renderer.isReady(readColorLook(clip));
   }
 
-  function previewLutFrameFor(media) {
+  function previewLutFrameFor(media, frameW, frameH) {
     const clip = clipForPreviewMedia(media);
     if (!lutWebglCanHandle(clip)) return null;
     const renderer = lutRendererFor(media);
@@ -1917,7 +1917,13 @@
     const ramp = compareBeforeAfter
       ? 1
       : saturationRampMultiplier(readSaturationRamp(clip), localS);
-    return renderer.render(media, { grade: gradeFactors(adjust, ramp), look });
+    return renderer.render(media, {
+      grade: gradeFactors(adjust, ramp),
+      look,
+      frameW,
+      frameH,
+      dpr: window.devicePixelRatio || 1,
+    });
   }
 
   function lutWebglCanvasFor(media) {
@@ -5311,7 +5317,12 @@
 
   function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
     if (!previewLayerReady(media)) return false;
-    const webgl = previewLutFrameFor(media);
+    const webgl = previewLutFrameFor(media, frameW, frameH);
+    if (webgl && previewFrame) {
+      previewFrame.dataset.lutWebgl = "1";
+      previewFrame.dataset.lutWebglWidth = String(webgl.width);
+      previewFrame.dataset.lutWebglHeight = String(webgl.height);
+    }
     const picture = webgl || rendered || media;
     const srcW = picture.videoWidth || picture.naturalWidth || picture.width || 0;
     const srcH = picture.videoHeight || picture.naturalHeight || picture.height || 0;

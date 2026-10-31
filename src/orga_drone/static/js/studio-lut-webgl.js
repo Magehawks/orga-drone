@@ -239,16 +239,19 @@
         });
     }
 
-    render(video, { grade, look }) {
+    render(video, { grade, look, frameW, frameH, dpr }) {
       if (!this.available || !this.scratchCtx || !look) return null;
       this.ensureLook(look);
       if (!this.isReady(look)) return null;
       const srcW = video.videoWidth || 0;
       const srcH = video.videoHeight || 0;
       if (!srcW || !srcH) return null;
-      const scale = Math.min(1280 / srcW, 720 / srcH);
-      let width = Math.max(2, Math.round(srcW * scale));
-      let height = Math.max(2, Math.round(srcH * scale));
+      const cssW = Math.max(2, Number(frameW) || 1280);
+      const cssH = Math.max(2, Number(frameH) || 720);
+      const ratio = Math.max(1, Math.min(3, Number(dpr) || 1));
+      const scale = Math.min(cssW / srcW, cssH / srcH) * ratio;
+      let width = Math.min(srcW, Math.max(2, Math.round(srcW * scale)));
+      let height = Math.min(srcH, Math.max(2, Math.round(srcH * scale)));
       width -= width % 2;
       height -= height % 2;
       if (this.canvas.width !== width || this.canvas.height !== height) {
@@ -260,6 +263,8 @@
         this.scratch.height = height;
       }
       const gl = this.gl;
+      this.scratchCtx.imageSmoothingEnabled = true;
+      this.scratchCtx.imageSmoothingQuality = "high";
       this.scratchCtx.drawImage(video, 0, 0, width, height);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.videoTex);

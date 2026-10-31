@@ -465,6 +465,12 @@ msgstr "Datei ändern"
 msgid "Don't use"
 msgstr "Nicht verwenden"
 
+msgid "Remove conversion"
+msgstr "Konvertierung entfernen"
+
+msgid "Removes the technical conversion file. The creative LUT stays selected."
+msgstr "Entfernt die technische Konvertierungsdatei. Die kreative LUT bleibt ausgewählt."
+
 msgid "Color file (.cube)"
 msgstr "Farbdatei (.cube)"
 

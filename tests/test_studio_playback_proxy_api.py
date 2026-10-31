@@ -176,6 +176,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     page = client.get("/studio")
     assert page.status_code == 200
     assert 'id="studio-lut-proxy-build"' not in page.text
+    assert 'id="inspector-color-conversion-clear"' in page.text
     assert f'data-lut-proxy-url="{url}"' in page.text
 
     from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
@@ -243,3 +244,35 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert changed.status_code == 200
     assert client.get(url).status_code == 404
+
+    both = client.patch(
+        f"/api/studio/{clip_id}/color",
+        json={
+            "input_profile": "dlog_m",
+            "conversion_lut": asset,
+            "conversion_confirmed": True,
+            "creative_lut": asset,
+            "creative_strength": 77,
+        },
+    )
+    assert both.status_code == 200
+    cleared_conversion = client.patch(
+        f"/api/studio/{clip_id}/color",
+        json={
+            "input_profile": "rec709",
+            "conversion_lut": "",
+            "conversion_confirmed": False,
+            "creative_lut": asset,
+            "creative_strength": 77,
+        },
+    )
+    assert cleared_conversion.status_code == 200
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT effect_settings FROM studio_clips WHERE id = ?", (clip_id,)
+        ).fetchone()
+    stored_color = json.loads(row["effect_settings"]).get("color", {})
+    assert stored_color["conversion_lut"] == ""
+    assert stored_color["conversion_confirmed"] is False
+    assert stored_color["creative_lut"] == asset
+    assert stored_color["creative_strength"] == 77
