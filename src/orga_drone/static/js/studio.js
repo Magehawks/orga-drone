@@ -1837,6 +1837,7 @@
 
   function lutProxySrcFor(clip) {
     if (!lutProxyEligible(clip)) return "";
+    if (lutWebglCanHandle(clip)) return "";
     const clipId = String(clip.dataset.studioId);
     const selected = state.selected;
     const selectedMatch = !!(selected && selected.type === "clip" &&
@@ -1845,6 +1846,86 @@
       String(state.activeStudioId) === clipId;
     if (!selectedMatch && !activeMatch) return "";
     return clip.dataset.lutProxyUrl || "";
+  }
+
+  let lutRendererA = null;
+  let lutRendererB = null;
+
+  function lookHasLut(look) {
+    return !!look && !!(
+      (look.conversion_lut && look.conversion_confirmed) || look.creative_lut
+    );
+  }
+
+  function lutWebglCanHandle(clip) {
+    if (!clip || clip.dataset.kind !== "video") return false;
+    if (!window.OrgaLutPreview || !window.OrgaLutPreview.supported) return false;
+    const anim = readColorAnimation(clip);
+    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return false;
+    return lookHasLut(readColorLook(clip));
+  }
+
+  function lutRendererFor(media) {
+    if (media === previewVideo) {
+      if (!lutRendererA) {
+        lutRendererA = window.OrgaLutPreview?.createRenderer?.() || null;
+        if (lutRendererA) {
+          lutRendererA.onReady = () => {
+            clearLutPreviewStill();
+            schedulePreviewBlit();
+          };
+        }
+      }
+      return lutRendererA;
+    }
+    if (media === previewVideoB) {
+      if (!lutRendererB) {
+        lutRendererB = window.OrgaLutPreview?.createRenderer?.() || null;
+        if (lutRendererB) {
+          lutRendererB.onReady = () => {
+            clearLutPreviewStill();
+            schedulePreviewBlit();
+          };
+        }
+      }
+      return lutRendererB;
+    }
+    return null;
+  }
+
+  function lutWebglReadyFor(clip) {
+    if (!lutWebglCanHandle(clip)) return false;
+    const media = clipForPreviewMedia(previewVideo) === clip
+      ? previewVideo
+      : (clipForPreviewMedia(previewVideoB) === clip ? previewVideoB : null);
+    if (!media) return false;
+    const renderer = lutRendererFor(media);
+    return !!renderer && renderer.isReady(readColorLook(clip));
+  }
+
+  function previewLutFrameFor(media) {
+    const clip = clipForPreviewMedia(media);
+    if (!lutWebglCanHandle(clip)) return null;
+    const renderer = lutRendererFor(media);
+    if (!renderer) return null;
+    const look = readColorLook(clip);
+    const hit = resolveAt(state.projectTimeS);
+    const localS = hit && hit.overlapClip === clip
+      ? hit.overlapLocalS
+      : (hit && hit.clip === clip ? hit.localS : 0);
+    const adjust = compareBeforeAfter ? neutralImageAdjust() : readImageAdjustAt(clip, localS);
+    const ramp = compareBeforeAfter
+      ? 1
+      : saturationRampMultiplier(readSaturationRamp(clip), localS);
+    return renderer.render(media, { grade: gradeFactors(adjust, ramp), look });
+  }
+
+  function lutWebglCanvasFor(media) {
+    const clip = clipForPreviewMedia(media);
+    if (!lutWebglCanHandle(clip)) return null;
+    const renderer = lutRendererFor(media);
+    if (!renderer || !renderer.isReady(readColorLook(clip))) return null;
+    return renderer.canvas;
   }
 
   function lutProxyActiveFor(clip) {
@@ -2122,32 +2203,40 @@
     return Math.round(Math.min(40000, Math.max(1000, kelvin)));
   }
 
-  function cssFilterFor(adjust, rampMultiplier) {
+  function gradeFactors(adjust, rampMultiplier) {
     const model = imageAdjustModel;
-    const parts = [];
-    if (adjust.saturation) {
-      const factor = 1 + (adjust.saturation / 100) * model.saturationDeltaAtFull;
-      parts.push(`saturate(${factor.toFixed(4)})`);
-    }
+    let saturation = 1 + ((adjust.saturation || 0) / 100) * model.saturationDeltaAtFull;
     let contrast = 1 + ((adjust.contrast || 0) / 100) * model.contrastDeltaAtFull;
     contrast += ((adjust.highlights || 0) / 100) * 0.08;
     contrast -= ((adjust.shadows || 0) / 100) * 0.05;
     contrast -= ((adjust.blacks || 0) / 100) * 0.04;
     contrast = Math.max(0.4, Math.min(1.6, contrast));
-    if (Math.abs(contrast - 1) > 0.0005) {
-      parts.push(`contrast(${contrast.toFixed(4)})`);
-    }
     let brightness = Math.pow(2, ((adjust.exposure || 0) / 100) * model.exposureEvAtFull);
     brightness += ((adjust.shadows || 0) / 100) * 0.06;
     brightness += ((adjust.blacks || 0) / 100) * 0.04;
     brightness -= ((adjust.highlights || 0) / 100) * 0.05;
     brightness = Math.max(0.5, Math.min(2.2, brightness));
-    if (Math.abs(brightness - 1) > 0.0005) {
-      parts.push(`brightness(${brightness.toFixed(4)})`);
+    const ramp = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
+    const warmthGains = adjust.warmth
+      ? blackbodyGains(kelvinForWarmth(adjust.warmth))
+      : [1, 1, 1];
+    return { saturation, contrast, brightness, ramp, warmthGains };
+  }
+
+  function cssFilterFor(adjust, rampMultiplier) {
+    const factors = gradeFactors(adjust, rampMultiplier);
+    const parts = [];
+    if (adjust.saturation) {
+      parts.push(`saturate(${factors.saturation.toFixed(4)})`);
     }
-    const mult = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
-    if (mult < 0.9995) {
-      parts.push(`saturate(${Math.max(0, mult).toFixed(4)})`);
+    if (Math.abs(factors.contrast - 1) > 0.0005) {
+      parts.push(`contrast(${factors.contrast.toFixed(4)})`);
+    }
+    if (Math.abs(factors.brightness - 1) > 0.0005) {
+      parts.push(`brightness(${factors.brightness.toFixed(4)})`);
+    }
+    if (factors.ramp < 0.9995) {
+      parts.push(`saturate(${Math.max(0, factors.ramp).toFixed(4)})`);
     }
     return parts.join(" ");
   }
@@ -2399,6 +2488,10 @@
     }
     // The proxy already contains grade+LUT at video resolution. Keep its frame
     // for pause/seek/selection instead of overpainting a soft 720-edge JPEG.
+    if (lutWebglReadyFor(clip)) {
+      clearLutPreviewStill();
+      return;
+    }
     if (lutProxySrcFor(clip)) {
       clearLutPreviewStill();
       return;
@@ -2517,6 +2610,13 @@
   function scheduleLutProxyPrepare(clip, delay = 300) {
     if (!clip || !clip.dataset.studioId) return;
     const id = String(clip.dataset.studioId);
+    if (lutWebglCanHandle(clip)) {
+      clip.dataset.lutProxyUrl = "";
+      const stale = lutProxyPrepare.get(id);
+      if (stale && stale.timer) window.clearTimeout(stale.timer);
+      lutProxyPrepare.delete(id);
+      return;
+    }
     if (!lutProxyEligible(clip)) {
       clip.dataset.lutProxyUrl = "";
       const stale = lutProxyPrepare.get(id);
@@ -3681,8 +3781,12 @@
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
     const rendered = !reuseDraft && !state.playing && (media === previewVideo || media === previewImage) &&
       previewLayerReady(previewLutStill) ? previewLutStill : null;
-    const picture = rendered || media;
-    if (rendered) {
+    const webgl = lutWebglCanvasFor(media);
+    const picture = webgl || rendered || media;
+    if (webgl) {
+      srcW = webgl.width;
+      srcH = webgl.height;
+    } else if (rendered) {
       srcW = rendered.naturalWidth;
       srcH = rendered.naturalHeight;
     }
@@ -5207,18 +5311,22 @@
 
   function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
     if (!previewLayerReady(media)) return false;
-    const picture = rendered || media;
-    const srcW = picture.videoWidth || picture.naturalWidth || 0;
-    const srcH = picture.videoHeight || picture.naturalHeight || 0;
+    const webgl = previewLutFrameFor(media);
+    const picture = webgl || rendered || media;
+    const srcW = picture.videoWidth || picture.naturalWidth || picture.width || 0;
+    const srcH = picture.videoHeight || picture.naturalHeight || picture.height || 0;
+    if (!srcW || !srcH) return false;
     const fit = contentRect(frameW, frameH, srcW, srcH);
     const xform = readPreviewTransform(media);
     const parsed = media.style.opacity === "" ? 1 : Number(media.style.opacity);
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
-    // Server stills and LUT proxies already contain the grade and LUT.
+    // WebGL output, server stills and LUT proxies already contain grade + LUT.
     const proxyRendered = (media === previewVideo || media === previewVideoB) &&
       lutProxyActiveFor(clipForPreviewMedia(media));
-    const filter = rendered || proxyRendered ? "none" : canvasFilterFrom(media.style.filter);
+    const filter = webgl || rendered || proxyRendered
+      ? "none"
+      : canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;

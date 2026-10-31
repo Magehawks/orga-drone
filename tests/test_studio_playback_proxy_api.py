@@ -141,6 +141,11 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     imported = client.post("/api/studio/luts", json={"path": str(cube)})
     assert imported.status_code == 200
     asset = imported.json()["asset_name"]
+    lut_file = client.get(f"/api/luts/{asset}")
+    assert lut_file.status_code == 200
+    assert lut_file.headers["content-type"].startswith("text/plain")
+    assert "LUT_3D_SIZE" in lut_file.text
+    assert client.get("/api/luts/not-a-lut.cube").status_code == 404
     colored = client.patch(
         f"/api/studio/{clip_id}/color",
         json={"creative_lut": asset, "creative_strength": 100},

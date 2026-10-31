@@ -2071,6 +2071,19 @@ def create_app() -> FastAPI:
         entries = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
         return JSONResponse({"ok": True, "luts": entries})
 
+    @app.get("/api/luts/{asset_name}")
+    async def api_luts_file(asset_name: str) -> Response:
+        """Read-only .cube bytes for the local WebGL preview."""
+        try:
+            path = require_lut_asset(settings.data_dir, asset_name)
+        except (ValueError, LutMissingError) as exc:
+            raise HTTPException(status_code=404, detail="LUT not found") from exc
+        return Response(
+            content=path.read_text(encoding="utf-8", errors="replace"),
+            media_type="text/plain",
+            headers={"Cache-Control": "private, max-age=3600"},
+        )
+
     @app.post("/api/luts")
     async def api_luts_import(request: Request) -> JSONResponse:
         return await _import_lut_from_request(request)

@@ -13,6 +13,7 @@ let look = { conversion_lut: '', creative_lut: 'a', creative_strength: 100, conv
 let clipAudio = null;
 const context = {
   readColorLook: () => look,
+  lutWebglCanHandle: () => false,
   readClipAudio: () => clipAudio,
   playbackSpeed: () => 1,
   slowBarOf: () => null,

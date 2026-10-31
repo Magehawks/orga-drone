@@ -1,6 +1,6 @@
 # PR #231: real-time LUT preview PoC
 
-- **Status:** PoC successful; editor integration not yet started
+- **Status:** Implemented in the Studio preview
 - **Date:** 2026-10-31
 - **Method:** packaged Windows EXE, WebView2, CDP-injected test harness
 - **Media:** real 77.3 s DJI 4K clip, 33³ local `.cube`, frame at 58 s
@@ -50,31 +50,51 @@ Option A meets the product target with a wide margin. Option B still leaves
 joins, cache identity, and background load; it does not remove the long-running
 encoder. Option C is the current behavior the product decision rejects.
 
-## Recommended integration (not implemented yet)
+## Integration in Studio
 
-1. Expose the selected local `.cube` to the Studio client through a safe
-   read-only route (or pass validated LUT data with the page).
-2. Build one WebGL2 pass that applies the existing grade values and the 3D LUT
-   to the decoded primary video at the preview display size.
-3. Feed that WebGL canvas into the existing 2D preview compositor as the picture
-   source, so framing, masks, overlays and transitions keep their current
-   behavior. Keep the proxy/still fallback for WebGL-unavailable or ineligible
-   clips.
-4. Use the same WebGL pass for pause/seek so the still and video share one
-   corrected source; no 720-edge JPEG over a WebGL frame.
-5. Preserve the export pipeline and cache logic unchanged. The full proxy can
-   remain an optional cache for export/other uses; it must not gate preview.
+The PoC is now the Studio preview path for eligible video clips:
 
-This is a larger compositor change than the current PR slice. Per the product
-instruction, the PoC is reported before implementation rather than silently
-rewriting the editor.
+1. `GET /api/luts/{asset}` serves the selected local `.cube` read-only.
+2. `static/js/studio-lut-webgl.js` applies the existing grade factors plus the
+   conversion/creative 3D LUTs on WebGL2 at the display size.
+3. The WebGL canvas feeds the existing 2D compositor and mask sampling; framing,
+   zoom/pan, overlays and transitions remain on the existing compositor.
+4. Pause/seek use the same WebGL frame; the server still is suppressed once the
+   LUT renderer is ready.
+5. The proxy path remains as fallback when WebGL2 is unavailable or a clip is
+   ineligible. Auto proxy preparation is skipped for WebGL-capable clips.
+6. Export is unchanged.
 
-## Limitations of the PoC
+### Packaged-EXE Studio smoke (real 77.3 s DJI 4K clip)
 
-- The PoC harness was injected into the packaged app; it is not yet connected to
-  Studio's clip model, grade sliders, masks, overlays, transitions, or audio.
-- The renderer is GPU-dependent; an unsupported WebView2/ANGLE environment must
-  fall back to the current still/proxy path.
-- Color management between browser video decode, WebGL, and FFmpeg stills still
-  needs an integration test on stable frames.
-- Seek backward is 233 ms (browser decode/cache), still below the 5 s goal.
+| Measurement | Result |
+|---|---|
+| WebGL2 supported | yes (ANGLE / AMD RX 6700 XT) |
+| LUT fetch + first corrected Studio frame | **103–105 ms** after selection |
+| Video source | original `/media/36991/stream` (no proxy) |
+| Proxy files created | **0** |
+| Still/chip | hidden; no soft JPEG overlay |
+| LUT strength 100 → 50 while playing | canvas pixel changed, no reload |
+| LUT selection while playing | new LUT fetched, canvas pixel changed |
+| 1.5 s playback | 90 video frames, **0 dropped** |
+| Seek to 58 s | source/time correct |
+| Clip focus at 00:58 | same source and time |
+| Mask + text overlay active | mask canvas visible, one overlay child |
+| WebGL disabled fallback | auto proxy generated and played normally |
+| Source file | unchanged |
+
+The font/color grade is applied by the shader using the same `gradeFactors`
+math as the CSS preview; LUT interpolation is WebGL linear 3D texture sampling.
+The PoC LUT-only frame differed from the FFmpeg LUT-only still by 4.5–4.8/255.
+
+## Limitations
+
+- The renderer is GPU-dependent; unsupported WebView2/ANGLE environments fall
+  back to the still/proxy path.
+- Animated color (keyframes) still uses the existing fallback; static grade,
+  creative/conversion LUT, LUT strength and saturation ramp are supported.
+- Photos continue to use the existing still/proxy path.
+- The WebGL renderer runs at preview resolution (max 1280×720 box), not at the
+  full 4K source size. This is intentional and matches the displayed preview.
+- Seek backward remains browser-limited (~233 ms in the PoC), still far below
+  the 5 s target.

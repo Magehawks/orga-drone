@@ -20,6 +20,7 @@ const context = {
     creative_strength: 100, conversion_confirmed: false,
   }),
   readClipAudio: () => customAudio,
+  window: {},
   String, Math, Array,
 };
 vm.createContext(context);
