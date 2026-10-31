@@ -394,6 +394,7 @@
   const msgSpeedFailed = root.dataset.speedFailed || "Could not change speed.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
   const msgHslFailed = root.dataset.hslFailed || "Could not save HSL color settings.";
+  const msgColorWheelsFailed = root.dataset.colorWheelsFailed || "Could not save color grading.";
   const msgColorFailed = root.dataset.colorFailed || "Could not save the color look.";
   const msgColorLutFailed = root.dataset.colorLutFailed || "Could not import that .cube LUT.";
   const msgColorLutMissing = root.dataset.colorLutMissing || "A LUT file is missing. Choose the .cube again, or clear the look.";
@@ -2147,6 +2148,85 @@
     if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
   }
 
+  const COLOR_WHEEL_IDS = ["shadows", "midtones", "highlights"];
+
+  function neutralColorWheelPoint() {
+    return { x: 0, y: 0 };
+  }
+
+  function neutralColorWheels() {
+    const wheels = {};
+    COLOR_WHEEL_IDS.forEach((wheelId) => {
+      wheels[wheelId] = neutralColorWheelPoint();
+    });
+    return { wheels };
+  }
+
+  function clampWheelCoordinate(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-1, Math.min(1, Math.round(number * 10000) / 10000));
+  }
+
+  function normalizeColorWheelPoint(point) {
+    const x = clampWheelCoordinate(point && point.x);
+    const y = clampWheelCoordinate(point && point.y);
+    const radius = Math.hypot(x, y);
+    if (radius > 1) {
+      return { x: Math.round((x / radius) * 10000) / 10000, y: Math.round((y / radius) * 10000) / 10000 };
+    }
+    return { x, y };
+  }
+
+  function readColorWheels(clip) {
+    const neutral = neutralColorWheels();
+    if (!clip) return neutral;
+    try {
+      const parsed = JSON.parse(clip.dataset.colorWheels || "");
+      const wheels = parsed && parsed.wheels;
+      if (!wheels || typeof wheels !== "object") return neutral;
+      COLOR_WHEEL_IDS.forEach((wheelId) => {
+        neutral.wheels[wheelId] = normalizeColorWheelPoint(wheels[wheelId]);
+      });
+      return neutral;
+    } catch (_) {
+      return neutral;
+    }
+  }
+
+  function colorWheelsIsNeutral(colorWheels) {
+    if (!colorWheels || !colorWheels.wheels) return true;
+    return COLOR_WHEEL_IDS.every((wheelId) => {
+      const point = colorWheels.wheels[wheelId] || {};
+      return !point.x && !point.y;
+    });
+  }
+
+  function colorWheelPointFromRect(clientX, clientY, rect) {
+    const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    return normalizeColorWheelPoint({
+      x: (Number(clientX) - centerX) / radius,
+      y: (Number(clientY) - centerY) / radius,
+    });
+  }
+
+  function colorWheelStatusText(point) {
+    if (!point || (!point.x && !point.y)) return msgWheelNeutral;
+    const hue = Math.round((Math.atan2(point.y, point.x) * 180) / Math.PI + 360) % 360;
+    const strength = Math.round(Math.min(1, Math.hypot(point.x, point.y)) * 100);
+    return `${hue}° · ${strength}%`;
+  }
+
+  function writeColorWheels(clip, colorWheels, persisted = false) {
+    if (!clip) return;
+    clip.dataset.colorWheels = JSON.stringify(colorWheels || neutralColorWheels());
+    clip.dataset.colorWheelsPreviewDirty = persisted ? "0" : "1";
+    clearLutPreviewStill();
+    if (!colorWheelsIsNeutral(colorWheels)) setLutPreviewChip(msgLutChipUpdating);
+  }
+
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
   // studio_image.blackbody_channel_gains. ffmpeg 7.1 colortemperature on
   // rgb(127, 95, 63) at 4800 K is (127, 83, 49).
@@ -2368,6 +2448,8 @@
   const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
   const msgLutChipComposite = root.dataset.lutChipComposite || "Color still; transition colors approximate";
   const msgHslChipPlaying = root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
+  const msgColorWheelsChipPlaying = root.dataset.colorWheelsChipPlaying || "Playing without color grading preview; pause or seek to see it";
+  const msgWheelNeutral = root.dataset.wheelNeutral || "Neutral";
   let lutStillAbort = null;
   let lutStillTimer = 0;
   let lutStillToken = 0;
@@ -2442,23 +2524,31 @@
     }
     const look = readColorLook(clip);
     const hsl = readHsl(clip);
+    const colorWheels = readColorWheels(clip);
     const hslActive = !hslIsNeutral(hsl);
+    const wheelsActive = !colorWheelsIsNeutral(colorWheels);
     const lookActive = colorLookNeedsStill(look, clip);
-    if (!lookActive && !hslActive) {
+    if (!lookActive && !hslActive && !wheelsActive) {
       clearLutPreviewStill();
       return;
     }
     if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1" ||
-        clip.dataset.hslPreviewDirty === "1") {
+        clip.dataset.hslPreviewDirty === "1" || clip.dataset.colorWheelsPreviewDirty === "1") {
       clearLutPreviewStill();
       setLutPreviewChip(msgLutChipUpdating);
       return;
     }
     if (state.playing) {
       clearLutPreviewStill();
-      setLutPreviewChip(
-        lutProxySrcFor(clip) ? "" : (hslActive && !lookActive ? msgHslChipPlaying : msgLutChipPlaying)
-      );
+      if (lutProxySrcFor(clip)) {
+        setLutPreviewChip("");
+      } else if (!lookActive && !hslActive && wheelsActive) {
+        setLutPreviewChip(msgColorWheelsChipPlaying);
+      } else if (!lookActive && hslActive) {
+        setLutPreviewChip(msgHslChipPlaying);
+      } else {
+        setLutPreviewChip(msgLutChipPlaying);
+      }
       return;
     }
     const studioId = clip.dataset.studioId;
@@ -2470,7 +2560,8 @@
     const sourceOff = lutStillSourceOffset(clip, localS);
     const quant = Math.round(sourceOff * 10) / 10;
     const key = JSON.stringify([studioId, quant, clip.dataset.sourceIn,
-      clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, clip.dataset.saturationRamp]);
+      clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, colorWheels,
+      clip.dataset.saturationRamp]);
     if (key === lutStillKey) return;
     // Reject old responses now, including during the debounce and image decode.
     clearLutPreviewStill();
@@ -2480,7 +2571,7 @@
     lutStillTimer = window.setTimeout(async () => {
       lutStillTimer = 0;
       // The endpoint reads persisted settings. Do not race an in-flight edit.
-      await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain]);
+      await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]);
       if (token !== lutStillToken) return;
       const controller = new AbortController();
       lutStillAbort = controller;
@@ -2573,6 +2664,7 @@
     const compare = document.getElementById("inspector-look-compare");
     if (compare) compare.checked = compareBeforeAfter;
     fillHsl(clip);
+    fillColorWheels(clip);
     fillColorAnimationInspector(clip);
   }
 
@@ -2604,6 +2696,36 @@
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
+  }
+
+  function fillColorWheels(clip) {
+    const colorWheels = readColorWheels(clip);
+    COLOR_WHEEL_IDS.forEach((wheelId) => {
+      const point = colorWheels.wheels[wheelId] || neutralColorWheelPoint();
+      const marker = document.getElementById(`color-wheel-point-${wheelId}`);
+      if (marker) {
+        marker.style.left = `${50 + point.x * 50}%`;
+        marker.style.top = `${50 + point.y * 50}%`;
+      }
+      const status = document.getElementById(`color-wheel-status-${wheelId}`);
+      if (status) status.textContent = colorWheelStatusText(point);
+      const wheel = document.getElementById(`color-wheel-${wheelId}`);
+      if (wheel) {
+        wheel.setAttribute("aria-valuenow", String(Math.min(1, Math.hypot(point.x, point.y))));
+        wheel.setAttribute("aria-valuetext", colorWheelStatusText(point));
+      }
+    });
+  }
+
+  function updateColorWheelFromPointer(clip, wheelId, element, clientX, clientY) {
+    if (!clip || !element) return;
+    const rect = element.getBoundingClientRect();
+    const point = colorWheelPointFromRect(clientX, clientY, rect);
+    const colorWheels = readColorWheels(clip);
+    colorWheels.wheels[wheelId] = point;
+    writeColorWheels(clip, colorWheels);
+    fillColorWheels(clip);
+    setSaveState(false);
   }
 
   async function applyQuickLook(clip, lookId) {
@@ -3523,6 +3645,56 @@
     setSaveState(true);
   }
 
+  let colorWheelsSaveChain = Promise.resolve();
+  let colorWheelsSaveTimer = 0;
+  const colorWheelsPendingStudioIds = new Set();
+
+  function queueColorWheelsSave(clip) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    colorWheelsPendingStudioIds.add(String(studioId));
+    if (colorWheelsSaveTimer) window.clearTimeout(colorWheelsSaveTimer);
+    colorWheelsSaveTimer = window.setTimeout(() => {
+      colorWheelsSaveTimer = 0;
+      const pendingIds = [...colorWheelsPendingStudioIds];
+      colorWheelsPendingStudioIds.clear();
+      pendingIds.forEach((pendingId) => {
+        colorWheelsSaveChain = colorWheelsSaveChain
+          .then(() => saveColorWheels(pendingId))
+          .catch((err) => {
+            showFlash((err && err.message) || msgColorWheelsFailed);
+          });
+      });
+    }, 150);
+  }
+
+  async function saveColorWheels(studioId) {
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+    if (!clip) return;
+    const colorWheels = readColorWheels(clip);
+    const res = await fetch(`/api/studio/${studioId}/color-wheels`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ wheels: colorWheels.wheels }),
+    });
+    const body = await readJson(res);
+    if (!res.ok || !body || !body.ok) {
+      throw new Error((body && body.detail) || msgColorWheelsFailed);
+    }
+    if (JSON.stringify(readColorWheels(clip)) === JSON.stringify(colorWheels)) {
+      writeColorWheels(clip, body.color_wheels || colorWheels, true);
+    }
+    if (
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(studioId)
+    ) {
+      fillColorWheels(clip);
+    }
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    setSaveState(true);
+  }
+
   let selectedMaskId = null;
   let maskDragging = false;
   const maskScratch = document.createElement("canvas");
@@ -4297,7 +4469,7 @@
     image.classList.toggle(
       "has-settings",
       !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive ||
-        !hslIsNeutral(readHsl(clip))
+        !hslIsNeutral(readHsl(clip)) || !colorWheelsIsNeutral(readColorWheels(clip))
     );
     const hud = readHud(clip);
     effects.classList.toggle("has-settings", readMasks(clip).length > 0 || hud.enabled === true);
@@ -9531,6 +9703,85 @@
     applyPreviewGrades(resolveAt(state.projectTimeS));
     setSaveState(false);
     queueHslSave(clip);
+  });
+
+  document.querySelectorAll("[data-color-wheel]").forEach((wheelElement) => {
+    const wheelId = wheelElement.dataset.colorWheel;
+    let dragging = false;
+
+    wheelElement.addEventListener("pointerdown", (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      dragging = true;
+      wheelElement.classList.add("is-dragging");
+      try {
+        wheelElement.setPointerCapture(event.pointerId);
+      } catch (_) {
+        /* ignore */
+      }
+      updateColorWheelFromPointer(clip, wheelId, wheelElement, event.clientX, event.clientY);
+      event.preventDefault();
+    });
+
+    wheelElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      updateColorWheelFromPointer(clip, wheelId, wheelElement, event.clientX, event.clientY);
+      event.preventDefault();
+    });
+
+    const finishDrag = (event) => {
+      if (!dragging) return;
+      dragging = false;
+      wheelElement.classList.remove("is-dragging");
+      try {
+        wheelElement.releasePointerCapture(event.pointerId);
+      } catch (_) {
+        /* ignore */
+      }
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      queueColorWheelsSave(clip);
+    };
+    wheelElement.addEventListener("pointerup", finishDrag);
+    wheelElement.addEventListener("pointercancel", finishDrag);
+
+    wheelElement.addEventListener("keydown", (event) => {
+      const keys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+      if (!keys.includes(event.key)) return;
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      event.preventDefault();
+      const colorWheels = readColorWheels(clip);
+      const point = { ...(colorWheels.wheels[wheelId] || neutralColorWheelPoint()) };
+      const step = event.shiftKey ? 0.002 : 0.02;
+      if (event.key === "ArrowLeft") point.x -= step;
+      if (event.key === "ArrowRight") point.x += step;
+      if (event.key === "ArrowUp") point.y -= step;
+      if (event.key === "ArrowDown") point.y += step;
+      colorWheels.wheels[wheelId] = normalizeColorWheelPoint(point);
+      writeColorWheels(clip, colorWheels);
+      fillColorWheels(clip);
+      setSaveState(false);
+      queueColorWheelsSave(clip);
+    });
+  });
+
+  COLOR_WHEEL_IDS.forEach((wheelId) => {
+    document.getElementById(`color-wheel-reset-${wheelId}`)?.addEventListener("click", () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      const colorWheels = readColorWheels(clip);
+      colorWheels.wheels[wheelId] = neutralColorWheelPoint();
+      writeColorWheels(clip, colorWheels);
+      fillColorWheels(clip);
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      setSaveState(false);
+      queueColorWheelsSave(clip);
+    });
   });
 
   document.getElementById("inspector-color-dlog-apply")?.addEventListener("click", () => {

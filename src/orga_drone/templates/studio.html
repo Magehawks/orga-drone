@@ -193,6 +193,10 @@
          data-hsl-model='{{ hsl_model|tojson }}'
          data-hsl-failed="{{ _('Could not save HSL color settings.')|e }}"
          data-hsl-chip-playing="{{ _('Playing without HSL preview; pause or seek to see it')|e }}"
+         data-color-wheels-model='{{ color_wheels_model|tojson }}'
+         data-color-wheels-failed="{{ _('Could not save color grading.')|e }}"
+         data-color-wheels-chip-playing="{{ _('Playing without color grading preview; pause or seek to see it')|e }}"
+         data-wheel-neutral="{{ _('Neutral')|e }}"
          data-color-look-model='{{ color_look_model|tojson }}'
          data-color-animation-model='{{ color_animation_model|tojson }}'
          data-color-anim-failed="{{ _('Could not save the color change.')|e }}"
@@ -691,6 +695,7 @@
                   data-can-play="{{ '1' if row.can_play else '0' }}"
                   data-image-adjust='{{ row.image_adjust|tojson }}'
                   data-hsl='{{ row.hsl|tojson }}'
+                  data-color-wheels='{{ row.color_wheels|tojson }}'
                   data-color-look='{{ row.color_look|tojson }}'
                   data-quick-look="{{ row.quick_look|e }}"
                   data-detail='{{ row.detail|tojson }}'
@@ -998,6 +1003,56 @@
               <div class="studio-hsl-actions">
                 <button type="button" class="button ghost" id="inspector-hsl-reset">{{ _('Reset this color') }}</button>
                 <button type="button" class="button ghost" id="inspector-hsl-reset-all">{{ _('Reset all HSL') }}</button>
+              </div>
+            </div>
+          </details>
+          <details id="inspector-image-section-color-wheels" class="studio-image-section" open>
+            <summary>{{ _('Color Grading') }}</summary>
+            <div id="inspector-color-wheels">
+              <p class="hint">{{ _('Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.') }}</p>
+              <div class="studio-color-wheel-grid">
+                <div class="studio-color-wheel-field">
+                  <div class="studio-color-wheel" id="color-wheel-shadows" data-color-wheel="shadows"
+                       role="slider" tabindex="0" aria-label="{{ _('Shadows') }}"
+                       aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                    <span class="studio-color-wheel-point" id="color-wheel-point-shadows" aria-hidden="true"></span>
+                  </div>
+                  <div class="studio-color-wheel-caption">
+                    <span>{{ _('Shadows') }}</span>
+                    <button type="button" class="button ghost studio-color-wheel-reset"
+                            id="color-wheel-reset-shadows"
+                            title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Shadows') }}">↺</button>
+                  </div>
+                  <span class="studio-color-wheel-status" id="color-wheel-status-shadows">{{ _('Neutral') }}</span>
+                </div>
+                <div class="studio-color-wheel-field">
+                  <div class="studio-color-wheel" id="color-wheel-midtones" data-color-wheel="midtones"
+                       role="slider" tabindex="0" aria-label="{{ _('Midtones') }}"
+                       aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                    <span class="studio-color-wheel-point" id="color-wheel-point-midtones" aria-hidden="true"></span>
+                  </div>
+                  <div class="studio-color-wheel-caption">
+                    <span>{{ _('Midtones') }}</span>
+                    <button type="button" class="button ghost studio-color-wheel-reset"
+                            id="color-wheel-reset-midtones"
+                            title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Midtones') }}">↺</button>
+                  </div>
+                  <span class="studio-color-wheel-status" id="color-wheel-status-midtones">{{ _('Neutral') }}</span>
+                </div>
+                <div class="studio-color-wheel-field">
+                  <div class="studio-color-wheel" id="color-wheel-highlights" data-color-wheel="highlights"
+                       role="slider" tabindex="0" aria-label="{{ _('Highlights') }}"
+                       aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                    <span class="studio-color-wheel-point" id="color-wheel-point-highlights" aria-hidden="true"></span>
+                  </div>
+                  <div class="studio-color-wheel-caption">
+                    <span>{{ _('Highlights') }}</span>
+                    <button type="button" class="button ghost studio-color-wheel-reset"
+                            id="color-wheel-reset-highlights"
+                            title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Highlights') }}">↺</button>
+                  </div>
+                  <span class="studio-color-wheel-status" id="color-wheel-status-highlights">{{ _('Neutral') }}</span>
+                </div>
               </div>
             </div>
           </details>

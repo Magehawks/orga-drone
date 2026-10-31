@@ -45,6 +45,7 @@ from orga_drone.studio_image import (
     saturation_ramp_from_effect_settings,
 )
 from orga_drone.studio_detail import detail_from_effect_settings
+from orga_drone.studio_color_wheels import color_wheels_from_effect_settings
 from orga_drone.studio_hsl import hsl_adjust_from_effect_settings
 from orga_drone.studio_lut import color_look_from_effect_settings
 from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
@@ -438,6 +439,11 @@ def _clip_to_export_clip(
         if kind in {"photo", "video"}
         else hsl_adjust_from_effect_settings(None)
     )
+    color_wheels = (
+        color_wheels_from_effect_settings(clip.effect_settings)
+        if kind in {"photo", "video"}
+        else color_wheels_from_effect_settings(None)
+    )
     detail = (
         detail_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
@@ -553,6 +559,7 @@ def _clip_to_export_clip(
         color_animation=color_anim,
         color_look=color_look,
         hsl=hsl,
+        color_wheels=color_wheels,
         detail=detail,
         saturation_ramp=saturation_ramp,
         frame=frame,
