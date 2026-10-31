@@ -17,6 +17,15 @@ before. With the flag, the page adds a `data-lut-proxy-url` only for video clips
 whose current settings already have a cached #222 proxy. Nothing is generated
 automatically.
 
+The flag also sets a session cookie, so navigating to Studio through the sidebar
+does not lose the experiment. `?lut_proxy=0` clears it.
+
+When enabled, a developer-only **LUT proxy** button appears in the Story toolbar.
+It builds the proxy for the selected eligible clip through the existing POST
+endpoint, attaches the returned URL to that clip, and refreshes the preview. This
+is the normal workflow for a local test EXE; calling the API by hand is no longer
+required.
+
 An explicit developer action builds one proxy for one clip:
 
 ```text

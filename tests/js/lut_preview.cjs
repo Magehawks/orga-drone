@@ -7,7 +7,7 @@ function section(start, end) { return script.split(start)[1].split(end)[0]; }
 const source = 'const previewLutStill' + section('const previewLutStill', 'function canvasFilterFrom') +
   'function neutralColorLook' + section('function neutralColorLook', 'function writeColorLook');
 const still = { hidden: true, removeAttribute() {}, naturalWidth: 320, naturalHeight: 180 };
-const chip = {};
+const chip = { addEventListener() {} };
 let timers = new Map(), nextTimer = 1, requests = [], decodes = [];
 const context = {
   root: { dataset: {} }, document: { getElementById: id => id.endsWith('still') ? still : chip },

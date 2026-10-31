@@ -1297,23 +1297,40 @@ def create_app() -> FastAPI:
         select: int | None = None,
         focus: str | None = None,
     ) -> Response:
+        lut_proxy_query = request.query_params.get("lut_proxy")
+        lut_proxy_enabled = lut_proxy_query == "1" or (
+            lut_proxy_query is None and request.cookies.get("lut_proxy") == "1"
+        )
+
+        def with_lut_proxy_cookie(response: Response) -> Response:
+            if lut_proxy_query == "1":
+                response.set_cookie(
+                    "lut_proxy", "1", httponly=True, samesite="lax"
+                )
+            elif lut_proxy_query == "0":
+                response.delete_cookie("lut_proxy")
+            return response
+
         if project_id is not None:
             target = db.get_studio_project(project_id)
             if target is None:
                 raise HTTPException(status_code=404, detail="studio project not found")
             db.set_open_studio_project_id(target.id)
             suffix = f"?msg={msg}" if msg else ""
-            return RedirectResponse(url=f"/studio{suffix}", status_code=303)
+            return with_lut_proxy_cookie(
+                RedirectResponse(url=f"/studio{suffix}", status_code=303)
+            )
 
         project = db.resolve_studio_page_project()
         if project is None:
             gallery_url = "/studio/projects"
             if msg:
                 gallery_url = f"{gallery_url}?msg={msg}"
-            return RedirectResponse(url=gallery_url, status_code=303)
+            return with_lut_proxy_cookie(
+                RedirectResponse(url=gallery_url, status_code=303)
+            )
         projects = db.list_studio_projects()
         studio_mode = "editor"
-        lut_proxy_enabled = request.query_params.get("lut_proxy") == "1"
         items = db.list_studio_items(project.id) if project is not None else []
         for it in items:
             if (it.kind or "") != "video" or it.duration_s is not None:
@@ -1571,7 +1588,7 @@ def create_app() -> FastAPI:
                 )
         story_history = history_flags(project.id if project is not None else None)
         lut_catalog = [entry.as_dict() for entry in list_catalog(db, settings.data_dir)]
-        return render(
+        return with_lut_proxy_cookie(render(
             request,
             "studio.html",
             items=items,
@@ -1601,7 +1618,7 @@ def create_app() -> FastAPI:
             nav_active="studio",
             select_id=select,
             focus_field=focus,
-        )
+        ))
 
     def _studio_project_json(project: Any) -> dict[str, Any]:
         return {

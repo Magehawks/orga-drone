@@ -2472,6 +2472,44 @@
     }, 120);
   }
 
+  const lutProxyBuildBtn = document.getElementById("studio-lut-proxy-build");
+
+  async function buildSelectedLutProxy() {
+    if (root.dataset.lutProxyEnabled !== "1" || !lutProxyBuildBtn) return;
+    const clip = selectedAdjustableClip();
+    if (!clip || clip.dataset.kind !== "video" || !clip.dataset.studioId) return;
+    if (state.playing) pausePlayback();
+    lutProxyBuildBtn.disabled = true;
+    setLutPreviewChip(msgLutChipUpdating);
+    try {
+      const res = await fetch(
+        `/api/studio/${clip.dataset.studioId}/playback-proxy?lut_proxy=1`,
+        { method: "POST", cache: "no-store", headers: { Accept: "application/json" } }
+      );
+      if (!res.ok) {
+        setLutPreviewChip(msgLutChipFailed);
+        return;
+      }
+      const data = await res.json();
+      const url = data && data.url ? String(data.url) : "";
+      if (!url) {
+        setLutPreviewChip(msgLutChipFailed);
+        return;
+      }
+      clip.dataset.lutProxyUrl = url;
+      setLutPreviewChip("");
+      syncPreviewMedia({ seek: true });
+    } catch (_) {
+      setLutPreviewChip(msgLutChipFailed);
+    } finally {
+      lutProxyBuildBtn.disabled = false;
+    }
+  }
+
+  lutProxyBuildBtn?.addEventListener("click", () => {
+    void buildSelectedLutProxy();
+  });
+
   function canvasFilterFrom(styleFilter) {
     const text = String(styleFilter || "none").replace(/url\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
     return text || "none";

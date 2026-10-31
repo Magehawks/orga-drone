@@ -173,9 +173,16 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     page = client.get("/studio?lut_proxy=1")
     assert page.status_code == 200
     assert 'data-lut-proxy-enabled="1"' in page.text
+    assert 'id="studio-lut-proxy-build"' in page.text
     assert f'data-lut-proxy-url="{url}"' in page.text
-    disabled = client.get("/studio")
+    assert client.cookies.get("lut_proxy") == "1"
+    sticky = client.get("/studio")
+    assert 'data-lut-proxy-enabled="1"' in sticky.text
+    assert f'data-lut-proxy-url="{url}"' in sticky.text
+    fresh = TestClient(app)
+    disabled = fresh.get("/studio")
     assert 'data-lut-proxy-enabled="0"' in disabled.text
+    assert 'id="studio-lut-proxy-build"' not in disabled.text
     assert f'data-lut-proxy-url="{url}"' not in disabled.text
 
     from orga_drone.studio_audio import DetachedAudio, dump_detached_audio
@@ -243,3 +250,7 @@ def test_proxy_api_playback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert changed.status_code == 200
     assert client.get(url).status_code == 404
+    off = client.get("/studio?lut_proxy=0")
+    assert 'data-lut-proxy-enabled="0"' in off.text
+    assert client.cookies.get("lut_proxy") is None
+    assert 'data-lut-proxy-enabled="0"' in client.get("/studio").text
