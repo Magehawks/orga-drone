@@ -11,7 +11,7 @@
     "lint:js": "eslint \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
     "format:check": "prettier --check \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
     "format:js": "prettier --write \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
-    "test:js": "node --test tests/js",
+    "test:js": "node --test",
     "check:js": "npm run lint:js && npm run format:check && npm run test:js"
   },
   "devDependencies": {
