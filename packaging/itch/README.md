@@ -27,9 +27,9 @@ tags it as a Windows executable. Do not use a production channel for this test.
 1. **Manual MOTW smoke test** in [`packaging/README.md`](../README.md). A green
    `dist\orga-drone` run is not enough. Record the zip SHA256, commit, and
    date before any upload.
-2. **ADR 0012** (GitHub Actions Windows pipeline) is an extra gate. The tag
-   path opens a draft release. It does not replace the smoke test and it
-   must not be bypassed.
+2. **ADR 0031** (manual Windows build) is an extra gate. The build workflow
+   produces a non-publishing Actions artifact only; it does not create a GitHub
+   Release. It does not replace the smoke test and must not be bypassed.
 3. **Page visibility** is Draft or Restricted. If you cannot keep the project
    off public browse and search, stop. Do not upload the test build to a
    public page.

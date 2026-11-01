@@ -18,7 +18,7 @@ Do not invent layers, services, or plugins that are not present.
 | App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip. itch.io butler process is documented in `packaging/itch/` and is not an in-app updater |
 | Tests | pytest under `tests/` |
-| CI | GitHub Actions on pull requests: Ruff, MyPy, pytest, JavaScript lint/format/tests (Node 22), plus a separate **App journey smoke** check (`tests/test_pr_journey_smoke.py`, synthetic JPEG, no private library). Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `docs/PR_E2E.md` and `packaging/README.md`. |
+| CI | GitHub Actions on pull requests: Ruff, MyPy, pytest, JavaScript lint/format/tests (Node 22), plus a separate **App journey smoke** check (`tests/test_pr_journey_smoke.py`, synthetic JPEG, no private library). A manual Windows build (`workflow_dispatch` only) produces a non-publishing onefolder zip artifact; it never creates a GitHub Release. See `docs/PR_E2E.md`, `docs/RELEASE_SECURITY.md`, and `packaging/README.md`. |
 
 Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 `create_app()` in `src/orga_drone/app.py`.

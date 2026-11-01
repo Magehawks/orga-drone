@@ -40,7 +40,7 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0009](0009-studio-title-cards.md) | Studio Title Cards as generated timeline items | Accepted |
 | [0010](0010-studio-visual-transitions.md) | Studio visual transitions | Accepted |
 | [0011](0011-studio-image-adjust.md) | Studio per-clip image adjustment | Accepted |
-| [0012](0012-windows-release-workflow.md) | Windows release workflow with a draft publish gate | Accepted |
+| [0012](0012-windows-release-workflow.md) | Windows release workflow with a draft publish gate | Superseded by ADR 0031 |
 | [0013](0013-itch-windows-channel.md) | itch.io Windows channel via butler | Accepted |
 | [0014](0014-studio-export-cancel.md) | Studio export cancellation | Accepted |
 | [0015](0015-update-notice.md) | Optional published-release notice | Accepted |
@@ -59,3 +59,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0028](0028-studio-lut-preview-stills.md) | Studio LUT preview via shared FFmpeg stills | Accepted |
 | [0029](0029-studio-hsl-color-mixer.md) | Studio HSL colour mixer as a generated 3D LUT | Accepted |
 | [0030](0030-studio-color-wheels.md) | Studio colour wheels as a generated 3D LUT | Accepted |
+| [0031](0031-manual-release-and-local-agent-config.md) | Manual-only releases and local-only agent configuration | Accepted |

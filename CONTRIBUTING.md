@@ -126,10 +126,12 @@ npm run test:js
 
 Install the Python tooling locally via `pip install -e ".[dev]"` (configuration in `pyproject.toml`). Install the JavaScript tooling via `npm ci` (configuration in `eslint.config.js` and `.prettierrc.json`).
 
-Windows release candidates are a separate **Windows release** workflow
-(manual dispatch or a `vX.Y.Z` tag). It does not run on pull requests and it
-does not publish a public release. Procedure, checksum, draft approval, and
-rollback: [`packaging/README.md`](packaging/README.md).
+Windows build candidates come from a separate **Manual Windows build**
+workflow (`workflow_dispatch` only). It does not run on pull requests, merges,
+or tag pushes, and it never publishes a release, uploads to itch.io, or posts a
+notification. Procedure, checksum, manual release, and rollback:
+[`packaging/README.md`](packaging/README.md). Publication limits and required
+repository settings: [`docs/RELEASE_SECURITY.md`](docs/RELEASE_SECURITY.md).
 
 ## Architecture and refactoring rules
 

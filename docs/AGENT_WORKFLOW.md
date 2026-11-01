@@ -12,14 +12,25 @@ but they must not implement speculative platform scope unless the current issue 
 
 ## Roles
 
-| Role | Cursor role | Responsibility | May change application code? |
+| Role | Role key | Responsibility | May change application code? |
 |---|---|---|---|
 | Product Owner | Human | Idea, product judgment, real-world test, merge decision | Yes, manually |
 | PM | `product-spec-reviewer` | User problem, target user, milestone fit, simplest slice, acceptance criteria, non-scope; selects UX concept when UI work applied | No |
 | UX | `product-ux-designer` | Usability / interaction discovery when UI work is meaningful; alternatives and trade-offs; no implementation issues | No |
 | CTO | `engineering-planner` | Architecture, compatibility, performance, security, test strategy, technical AC | No |
-| Developer | Main Cursor agent | Implement only the approved issue and run required checks | Yes |
+| Developer | Main implementation agent | Implement only the approved issue and run required checks | Yes |
 | Reviewer | `implementation-reviewer` | Independent adversarial review of the completed branch/PR | No |
+
+Role keys are stable gate identifiers, not file paths. Private IDE agent
+prompts are local-only and are not tracked in this repository. The gate
+verdicts are:
+
+| Gate | Verdicts |
+|---|---|
+| PM | `PM_APPROVED`, `PM_CHANGES_REQUESTED`, `PM_REJECTED` |
+| UX | `UX_RECOMMENDED`, `UX_NOT_REQUIRED`, `UX_NEEDS_PRODUCT_INPUT` |
+| CTO | `CTO_APPROVED`, `CTO_CHANGES_REQUESTED`, `CTO_BLOCKED` |
+| Reviewer | `REVIEW_APPROVED`, `REVIEW_CHANGES_REQUESTED`, `REVIEW_ARCHITECTURE_CONCERN` |
 
 ## State flow
 

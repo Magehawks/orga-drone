@@ -6,8 +6,9 @@ on:
   workflow_call:
 
 # Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks, and
-# App journey smoke. The Windows release workflow calls this workflow and
-# packages only after all checks pass.
+# App journey smoke. The manual Windows build calls this workflow and packages
+# only after all checks pass. CI has no release, upload, or notification step
+# and uses no repository secrets.
 # The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
   contents: read

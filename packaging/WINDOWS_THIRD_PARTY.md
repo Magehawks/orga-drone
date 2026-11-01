@@ -279,6 +279,6 @@ Still open, and still not a switch for GO or NO-GO:
 4. The separate-process question and the bootloader-exception question stay
    in the verdict. They do not flip it. A technical GO is not a legal opinion.
 5. No itch.io upload and no change to the public GitHub Release were made.
-   The Windows release workflow still uploads only a draft, and only after a
-   tag whose `verify-zip` exits 0. The human MOTW check named in that draft
-   has not been run on this zip.
+   The manual Windows build workflow uploads only a non-publishing Actions artifact
+   after `verify-zip` exits 0; it does not create a GitHub Release. The human
+   MOTW check named in `packaging/README.md` has not been run on this zip.

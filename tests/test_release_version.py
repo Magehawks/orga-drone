@@ -1,4 +1,4 @@
-"""Windows release tag must match pyproject.toml before any publish."""
+"""Manual Windows build stays version-gated and never publishes."""
 
 from __future__ import annotations
 
@@ -129,21 +129,20 @@ def test_cli_exit_codes(tmp_path: Path) -> None:
     assert "does not match" in bad.stderr
 
 
-def test_windows_release_workflow_is_gated() -> None:
+def test_windows_build_workflow_is_manual_and_gated() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "workflow_dispatch:" in text
     assert "pull_request:" not in text
-    assert "\n    branches:" not in text
-    assert "tags:" in text
-    assert '- "v*.*.*"' in text
+    assert "push:" not in text
+    assert "tags:" not in text
+    assert "release:" not in text
     assert "uses: ./.github/workflows/ci.yml" in text
     assert "needs: [verify-version, quality]" in text
     assert "pyinstaller packaging/orga-drone.spec" in text
     assert "--onefile" not in text
     assert "orga-drone-windows-x64.zip" in text
-    assert "--draft" in text
-    assert "already published" in text
-    assert text.count("contents: write") == 1
+    assert "gh release" not in text
+    assert "contents: write" not in text
     assert "actions/checkout@v" not in text
     assert "actions/setup-python@v" not in text
     assert "actions/upload-artifact@v" not in text
@@ -160,34 +159,3 @@ def test_spec_stays_onefolder() -> None:
     assert "exclude_binaries=True" in spec
     assert "COLLECT(" in spec
     assert "upx=False" in spec
-
-
-def test_draft_notes_script_writes_unindented_markdown(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import textwrap
-
-    text = WORKFLOW.read_text(encoding="utf-8")
-    marker = "python3 - <<'PY'\n"
-    start = text.index(marker) + len(marker)
-    body: list[str] = []
-    for line in text[start:].splitlines():
-        if line.strip() == "PY":
-            break
-        body.append(line)
-    else:
-        raise AssertionError("draft notes script is missing its PY terminator")
-    script = textwrap.dedent("\n".join(body))
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("VERSION", "1.2.3")
-    monkeypatch.setenv("COMMIT", "abc123")
-    monkeypatch.setenv("SHA256", "deadbeef")
-    monkeypatch.setenv("TAG", "v1.2.3")
-    exec(compile(script, "draft_notes.py", "exec"), {})
-    notes = (tmp_path / "DRAFT_RELEASE_NOTES.md").read_text(encoding="utf-8")
-    assert notes.startswith("## Draft — notes only (no Windows zip on GitHub)\n")
-    assert "| Version | 1.2.3 |" in notes
-    assert "| Commit | abc123 |" in notes
-    assert "deadbeef  orga-drone-windows-x64.zip" in notes
-    assert "Actions artifact `orga-drone-windows-x64`" in notes
-    assert "without** uploading `orga-drone-windows-x64.zip`" in notes

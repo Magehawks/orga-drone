@@ -26,8 +26,8 @@ below, actually replaces those terms.
 | There is no CLA and no SPDX identifier in the tree | No `CLA` file. A search for `SPDX` in source and docs found none |
 | First-party Python files do not carry copyright headers | A search for `Copyright (c)` / `SPDX-License` under `src/` found none |
 | Published Windows zips exist and are public | Git tags `v1.1.0` through `v1.9.0`. GitHub Release `v1.9.0` is not a draft and attaches `orga-drone-windows-x64.zip` |
-| New Windows builds are still a draft-then-publish GitHub path | `.github/workflows/windows-release.yml` and ADR 0012. A matching tag opens a **draft** release. The maintainer publishes it after the Mark-of-the-Web smoke test in `packaging/README.md` |
-| Manual workflow runs also upload the zip as an Actions artifact for 30 days | `windows-release.yml` (`retention-days: 30`). The repository is public |
+| Windows build candidates come from a manual Actions workflow | `.github/workflows/windows-release.yml` and ADR 0031. A maintainer starts it with `workflow_dispatch`; it uploads an artifact and does not create a GitHub Release. The maintainer publishes notes only after the Mark-of-the-Web smoke test in `packaging/README.md` |
+| Manual workflow runs upload the zip as an Actions artifact for 30 days | `windows-release.yml` (`retention-days: 30`). The repository is public |
 | itch.io is a Draft/Restricted test channel, not a paid launch | `packaging/itch/README.md`, ADR 0013, `packaging/itch_channel.py` (refuses `public`) |
 | itch.io pricing is unset | `packaging/itch/README.md`: “Leave pricing and public release unset.” |
 | The itch.io page draft still says the app is free under MIT | `packaging/itch/PAGE.md` |
@@ -140,10 +140,10 @@ exists. This pull request does not edit these files.
 | Issue checklist item | Surfaces |
 |----------------------|----------|
 | License and notices | Root `LICENSE`; `pyproject.toml` `license`; any future SPDX identifiers; notices for third parties. First-party copyright headers are absent today, so a later header pass would be new text, not a rewrite of existing headers. Do not invent that text in advance |
-| Stop calling the project open source | `README.md`, `AGENTS.md`, `docs/PRODUCT_VISION.md`, `CONTRIBUTING.md`, `.cursor/agents/product-spec-reviewer.md`, `.cursor/agents/product-ux-designer.md`, GitHub repository description, itch.io page, release notes |
+| Stop calling the project open source | `README.md`, `AGENTS.md`, `docs/PRODUCT_VISION.md`, `CONTRIBUTING.md`, `docs/AGENT_WORKFLOW.md` (agent role guidance), GitHub repository description, itch.io page, release notes |
 | Plain-language FAQ | New doc, clearly subordinate to the legal license. Topics the issue names: viewing source, self-compilation, personal use, modification, sharing, redistribution, commercial use, official builds, upgrade policy |
 | Buyer entitlements | itch.io page copy and a bounded update policy. See the proposal below. Not lifetime upgrades, not a support contract |
-| GitHub no longer publishes the new official zip | `.github/workflows/windows-release.yml` (draft release **and** the 30-day public artifact), ADR 0012, `README.md` download links, `packaging/README.md` publish steps. CI tests (Ruff, MyPy, pytest) stay. Source stays readable |
+| GitHub no longer publishes the new official zip | `packaging/README.md` manual release steps, ADR 0031, `README.md` download links. The manual workflow uploads an artifact only; CI tests (Ruff, MyPy, pytest) stay. Source stays readable |
 | itch.io as the paid Windows channel | `packaging/itch/README.md`, `packaging/itch/PAGE.md`, `packaging/itch_channel.py` (today it refuses a public page), ADR 0013. Versioning, checksums, release notes, and the existing MOTW smoke test still apply. The A→B test record is a separate gate and is not a paid launch |
 | Old MIT links stay honest | README and release notes must keep historical zips available as MIT and must not point a new paid build at `releases/latest` if that URL would serve it for free |
 | Marketplace, payment, VAT | itch.io project settings. Not in git. The helper leaves pricing unset on purpose |

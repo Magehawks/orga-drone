@@ -47,11 +47,13 @@ service, or generic drone administration product.
   path confinement are security boundaries. Do not weaken them.
 - The application never uploads or posts media. Share presets write local files.
 - Do not commit, push, tag, or publish a release unless the human asks.
-- Agents do not publish GitHub Releases or attach binaries. The Windows release
-  workflow produces an artifact/zip; a maintainer runs the Mark-of-the-Web smoke
-  test before a notes-only release. See
-  [`packaging/README.md`](packaging/README.md). The itch.io butler process is a
-  Draft/Restricted test channel, not a public launch.
+- Agents do not publish GitHub Releases or attach binaries. The manual Windows
+  build workflow produces a non-publishing artifact; a maintainer runs the
+  Mark-of-the-Web smoke test before a notes-only release. See
+  [`packaging/README.md`](packaging/README.md) and
+  [`docs/RELEASE_SECURITY.md`](docs/RELEASE_SECURITY.md). Pushes, pull requests,
+  merges, and tags must not publish, upload, or notify. The itch.io butler
+  process is a manual Draft/Restricted test channel, not a public launch.
 
 ## Repository map
 
@@ -93,6 +95,10 @@ service, or generic drone administration product.
 | Windows build/release | `packaging/` | `packaging/README.md` |
 | UI strings | `locales/` + template `data-*` messages | `docs/UX_WRITING.md` |
 | Tests | `tests/`, `tests/js/` | `docs/PR_E2E.md` |
+
+`.cursor/` is local-only IDE and agent configuration. It is not tracked. Shared
+agent guidance belongs in `AGENTS.md` and `docs/AGENT_WORKFLOW.md`; do not add
+`.cursor/` back to the repository.
 
 ## Regression-critical areas
 
@@ -203,7 +209,8 @@ to repository artifacts.
 | Decisions | `docs/decisions/` |
 | User help | `docs/user/` |
 | Packaging and release procedure | `packaging/README.md` |
-| Cursor rules and specialized agents | `.cursor/rules/`, `.cursor/agents/` |
+| Release security and repository settings | `docs/RELEASE_SECURITY.md` |
+| Agent roles and gates | `docs/AGENT_WORKFLOW.md` |
 
 ## Do not
 

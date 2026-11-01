@@ -1,8 +1,12 @@
 # ADR 0012: Windows release workflow with a draft publish gate
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR 0031](0031-manual-release-and-local-agent-config.md)
 - **Date:** 2026-10-23
 - **Deciders:** Issue #79
+
+> Historical record. ADR 0031 removes the tag trigger and the automatic draft
+> GitHub Release. The Windows workflow is now manual-only, builds an Actions
+> artifact, and never publishes. See `docs/RELEASE_SECURITY.md`.
 
 ## Context
 

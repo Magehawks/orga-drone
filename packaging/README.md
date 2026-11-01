@@ -73,10 +73,11 @@ releases/<version>/orga-drone-windows-x64.zip
 releases/<version>/README.md            # local notes; binaries stay off GitHub Releases
 ```
 
-The GitHub Actions workflow writes the same zip name and the same
-`orga-drone/` + `_internal/` layout as an Actions artifact only. See
-[GitHub Actions Windows release](#github-actions-windows-release). The local
-commands above stay available when Actions cannot be used.
+The manual GitHub Actions build writes the same zip name and the same
+`orga-drone/` + `_internal/` layout as a non-publishing Actions artifact only. See
+[Manual Windows build](#manual-windows-build-github-actions). It never creates
+or edits a GitHub Release. The local commands above stay available when Actions
+cannot be used.
 
 User data stays outside the binary (`%APPDATA%/orga-drone`). Do not embed library paths, `.env`, or media in artifacts.
 
@@ -134,9 +135,14 @@ Force browser mode only with `ORGA_DRONE_BROWSER=1`.
 UI fonts (Outfit, Sora, IBM Plex Mono) are bundled under `static/fonts/` and
 served locally. The desktop UI does not load Google Fonts from the network.
 
-## GitHub Actions Windows release
+## Manual Windows build (GitHub Actions)
 
 Workflow: `.github/workflows/windows-release.yml`.
+
+It runs only when a maintainer starts it with `workflow_dispatch`. Push, pull
+request, merge, and tag events do not start it. It never creates or edits a
+GitHub Release, never uploads to itch.io, and never posts to Discord. The only
+output is a non-publishing Actions artifact kept for 30 days.
 
 It builds the existing onefolder spec (`packaging/orga-drone.spec`,
 `packaging/run_orga_drone.py`) on `windows-latest` with Python 3.12 and
@@ -145,44 +151,38 @@ FFmpeg (imageio-ffmpeg), templates, static files, and locales are bundled the
 same way as a local build. Source media, `.env`, and the user SQLite database
 are not part of the app and the workflow fails if they appear in `dist/orga-drone`.
 
-Merging a pull request does **not** build or publish a release. Pull requests
-run `.github/workflows/ci.yml` (Ruff, MyPy, pytest, and the App journey smoke
-in `docs/PR_E2E.md`). The release workflow calls that same workflow and **does
-not package** if it fails. The journey smoke is a synthetic library path. It
-does not replace the Mark-of-the-Web checklist below.
+Pull requests run `.github/workflows/ci.yml` (Ruff, MyPy, pytest, and the App
+journey smoke in `docs/PR_E2E.md`). The manual Windows build calls that same
+workflow and **does not package** if it fails. The journey smoke is a synthetic
+library path. It does not replace the Mark-of-the-Web checklist below.
 
 ### When it runs
 
 | Trigger | Result |
 | --- | --- |
-| Actions → **Windows release** → **Run workflow** (`workflow_dispatch`) | Zip as Actions artifact only. No GitHub Release. |
-| Push of a `vX.Y.Z` tag | Zip as Actions artifact, then a **notes-only draft** GitHub Release if the tag matches `pyproject.toml` (no zip asset). |
+| Actions → **Manual Windows build** → **Run workflow** (`workflow_dispatch`) | Zip as a non-publishing Actions artifact only. No GitHub Release. |
+| Push, pull request, merge, or `vX.Y.Z` tag | Nothing. These events do not start the workflow and cannot publish. |
 
-The tag filter only starts the workflow. `packaging/verify_release_version.py`
-is the gate: the tag must be exactly `v` plus the `X.Y.Z` `project.version`,
-and `src/orga_drone/__init__.py` `__version__` must be the same string. A
-missing version, a non-semver version, or any other tag fails the job. Packaging
-and release creation are skipped. Nothing is published.
+A maintainer starts the build from a commit on `main`. `packaging/verify_release_version.py`
+is the gate: `pyproject.toml` `project.version` must be `X.Y.Z` and
+`src/orga_drone/__init__.py` `__version__` must be the same string. A missing
+version or a non-semver version fails the job before packaging. A manual run on
+a tag also checks that the tag is exactly `v{version}`.
 
 Each run prints `version=` and `commit=` in the logs and the job summary.
 The package job also prints `sha256=`.
 
-### Version and tag procedure
+### Version procedure
 
 1. Set the same `X.Y.Z` version in `pyproject.toml` (`project.version`) and
    `src/orga_drone/__init__.py` (`__version__`).
 2. Merge that change to `main`.
-3. Tag the release commit and push **only** the tag:
+3. Start the **Manual Windows build** workflow from that commit.
 
-```powershell
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-`vX.Y.Z` must match the version on that commit. Example: version `1.9.0` →
-tag `v1.9.0`. Do not create the tag from an open pull request if you expect
-the workflow to publish; the workflow refuses a mismatch and never publishes
-on merge alone.
+A `vX.Y.Z` tag is an optional historical marker. It does not start a build,
+create a release, or publish anything. If the maintainer creates one, it must
+match the version on that commit (version `1.9.0` → tag `v1.9.0`). Tag
+protection is a repository setting; see `docs/RELEASE_SECURITY.md`.
 
 ### Artifacts
 
@@ -203,8 +203,9 @@ MOTW smoke test. Do **not** upload the zip to the GitHub Release.
 Get-FileHash -Algorithm SHA256 .\orga-drone-windows-x64.zip
 ```
 
-Compare the hash to `orga-drone-windows-x64.zip.sha256` and to the draft notes.
-On Linux or macOS: `sha256sum -c orga-drone-windows-x64.zip.sha256`.
+Compare the hash to `orga-drone-windows-x64.zip.sha256` and to the release notes,
+if a manual release is created. On Linux or macOS:
+`sha256sum -c orga-drone-windows-x64.zip.sha256`.
 
 ### Obtain a candidate (not on the GitHub Release)
 
@@ -218,29 +219,29 @@ from the Actions artifact or a local `releases/<version>/` build.
    `curl`, or a copy from `dist/` for the MOTW path (those skip MOTW) unless
    you apply an equivalent `Zone.Identifier` stream.
 2. Local fallback: build into `releases/<version>/` with the PyInstaller
-   commands above. Publishing the notes-only GitHub Release still requires
-   the draft-approval step below.
+   commands above. A manual notes-only GitHub Release still requires the human
+   release gate below.
 
-### Approve and publish
+### Manual release (human only)
 
-The workflow creates a **notes-only** tag release with `gh release create
---draft` (no zip assets) and checks that it is still a draft before the job
-ends. Re-running the tag workflow refreshes the Actions artifact; it does not
-attach binaries. It **refuses** to rewrite notes if that tag is already
-public.
+The workflow does **not** create a GitHub Release. If the maintainer decides to
+publish one, create a **notes-only** draft by hand in the GitHub UI (or with a
+manual `gh release create vX.Y.Z --draft`). Never upload the Windows zip.
 
 After the smoke test passes, edit the draft notes so they include the tested
 ZIP SHA256, git commit, test date, and outcome, then press **Publish release**.
-That human step is the publication gate. Do not publish on failure.
+That human step is the publication gate. Do not publish on failure. Only a
+repository maintainer with write access may publish; see
+[`docs/RELEASE_SECURITY.md`](../docs/RELEASE_SECURITY.md).
 
 ### Recovery
 
 | Situation | What to do |
 | --- | --- |
-| Version/tag mismatch | Fix `pyproject.toml` and `__version__`, merge, then tag the corrected commit. The failed run did not create a release. |
-| Smoke test failed | Leave the draft unpublished. Optional: `gh release delete vX.Y.Z --yes` and `git push origin :refs/tags/vX.Y.Z` if that version should be reused. Do not force-push `main`. |
-| Need a new candidate for the same draft | Push nothing else; re-run the **Windows release** workflow for that tag, or push the same tag only after deleting it. Re-run replaces the draft assets and keeps existing notes. Update the SHA256 in the notes before publish. |
-| Published by mistake | `gh release edit vX.Y.Z --draft` returns it to a draft (it leaves the public release list). If GitHub rejects that edit, `gh release delete vX.Y.Z --yes` removes the release and its assets. Prefer a new patch tag for a real fix if anyone may already have downloaded the zip. |
+| Version mismatch | Fix `pyproject.toml` and `__version__`, merge, and start the manual build again. The failed run did not create a release. |
+| Smoke test failed | Leave any manual draft unpublished and delete it if one was created. A failed candidate is never published. |
+| Need a new candidate for the same release | Re-run the **Manual Windows build** workflow. It replaces the Actions artifact and never touches a release. Update the SHA256 in the notes before publishing. |
+| Published by mistake | `gh release edit vX.Y.Z --draft` returns the release to a draft (it leaves the public release list). If GitHub rejects that edit, `gh release delete vX.Y.Z --yes` removes the release and its assets. Prefer a new patch tag for a real fix if anyone may already have downloaded the zip. |
 | Actions unavailable | Use the local PyInstaller commands in [Windows build (PyInstaller)](#windows-build-pyinstaller). Do not commit `dist/` or the zip. |
 
 No code-signing, installer, or self-updater is involved. macOS and Linux are
@@ -248,12 +249,12 @@ still the Python application only.
 
 ## Windows pre-release smoke test (mandatory)
 
-Every Windows release **must** pass this checklist before the draft is
-**published**. Building a candidate is not publication. A green smoke test from
-`dist\orga-drone\` alone is **not sufficient** — that path never carries
+Every Windows release **must** pass this checklist before a maintainer
+**publishes** it. Building a candidate is not publication. A green smoke test
+from `dist\orga-drone\` alone is **not sufficient** — that path never carries
 Mark-of-the-Web (MOTW).
 
-Record the zip SHA256, git commit, test date, and outcome in the draft release
+Record the zip SHA256, git commit, test date, and outcome in the manual release
 notes before publishing. Do not publish if any step fails.
 
 ### Why MOTW matters
@@ -269,10 +270,10 @@ notes above. Each release must re-verify that path.
 
 #### 1. Obtain the candidate zip
 
-Preferred: run [GitHub Actions Windows release](#github-actions-windows-release)
-(`workflow_dispatch` for an artifact, or a `vX.Y.Z` tag for a draft release)
-and download `orga-drone-windows-x64.zip` as described there. You should not
-need to rebuild the exe locally.
+Preferred: start the [Manual Windows build](#manual-windows-build-github-actions)
+(`workflow_dispatch`) and download `orga-drone-windows-x64.zip` as described
+there. You should not need to rebuild the exe locally. Tag pushes do not start
+this build.
 
 Fallback: follow [Windows build (PyInstaller)](#windows-build-pyinstaller)
 above and package `dist/orga-drone` as `orga-drone-windows-x64.zip`.
@@ -324,8 +325,8 @@ Launch `orga-drone.exe` from the extracted folder and verify:
 - [ ] Close and relaunch — the open Studio project and soundtrack playlist are
   preserved.
 
-Do **not** publish the release if any step fails. A failed candidate stays a
-draft, or is deleted; it is not made public.
+Do **not** publish a release if any step fails. A failed candidate stays local
+or is deleted; it is not made public.
 
 ## itch.io test channel
 
@@ -337,4 +338,7 @@ rollback notes are in [`packaging/itch/README.md`](itch/README.md). The helper
 There is no in-app updater. Copies installed from a ZIP do not receive
 itch.io desktop-app updates. User data stays in `%APPDATA%\orga-drone`.
 
-Publishing a GitHub Release can notify Discord that this version is available on the itch.io test channel. The webhook lives in the GitHub Actions secret `DISCORD_RELEASE_WEBHOOK`, not in the repo.
+No workflow runs butler, uploads to itch.io, creates a GitHub Release, or posts
+a release notification. Publishing to itch.io is a manual maintainer step on the
+maintainer's machine. The release automation limits are documented in
+[`docs/RELEASE_SECURITY.md`](../docs/RELEASE_SECURITY.md).

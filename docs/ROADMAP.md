@@ -26,9 +26,10 @@ Highlights:
 - Flows, heuristic sessions, maps, rule-based Ask the library
 - User meta (stars/favorites/tags/notes), library albums, rename/merge, and spot GeoJSON on the detail page (Info / Location / Share / Image / Export tabs; Info also holds date, drone, and the other file facts; the picture stays left and the tabs stay right on a desktop window; a video has no Image tab; Single clip / Complete flight stays with the picture)
 - Heuristic duplicates, DE/EN UI, Windows desktop build path
-- Windows onefolder zip built in GitHub Actions (`workflow_dispatch` or a
-  `vX.Y.Z` tag). The tag path opens a **draft** GitHub Release; a maintainer
-  publishes it only after the MOTW smoke test in `packaging/README.md`.
+- Windows onefolder zip built by a manual GitHub Actions workflow
+  (`workflow_dispatch` only) as a non-publishing artifact. It does not create a
+  GitHub Release; a maintainer publishes notes only after the MOTW smoke test
+  in `packaging/README.md`.
   About shows the installed version. An optional check, off by default, links
   to a newer published Windows release and does not download or install it.
 - Library scan progress (live phase/counters during a library rescan)
@@ -107,8 +108,9 @@ the release notes. A roadmap edit is a separate maintainer decision.
    audits the current interaction model and proposes alternatives. PM then
    selects a concept. UX does not file implementation issues.
 4. After approval, **Engineering-Planner** produces a technical plan
-   (prefer Cursor Plan Mode for research-first planning).
-5. The main Cursor agent **implements** against the approved plan.
+   (research-first planning is preferred).
+5. The main implementation agent **implements** against the approved plan.
 6. **Implementation-Reviewer** reviews diff, tests, risks, and docs before commit.
 
-Canonical agent roles live under `.cursor/agents/`.
+Canonical agent roles and gate verdicts are defined in
+[`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md).

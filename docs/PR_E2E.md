@@ -20,9 +20,11 @@ The **CI** workflow (`.github/workflows/ci.yml`) runs on `pull_request`:
 A local `pytest` from the repo root runs the unit tests **and** the journey
 file. Install dev tools with `pip install -e ".[dev]"`.
 
-The **Windows release** workflow does not run on pull requests. It calls this
-CI workflow and builds a zip only after both checks pass. Publishing that zip
-still waits for the human Mark-of-the-Web checklist in `packaging/README.md`.
+The **Manual Windows build** workflow does not run on pull requests, merges,
+or tag pushes. A maintainer starts it by hand; it calls this CI workflow and
+builds a non-publishing zip artifact only after both checks pass. It never publishes a
+release. Any publication still waits for the human Mark-of-the-Web checklist in
+`packaging/README.md`.
 
 ## What the journey smoke runs
 

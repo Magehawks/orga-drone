@@ -12,9 +12,10 @@ keeps the library, Studio projects, and settings in `%APPDATA%\orga-drone`,
 outside the PyInstaller onefolder. GitHub Release zips do not update those
 installs in place.
 
-The Windows release workflow (ADR 0012) builds a draft GitHub Release. The
-manual Mark-of-the-Web smoke test in `packaging/README.md` is still the
-publish gate.
+The Windows release workflow (ADR 0012, superseded by ADR 0031) built a draft
+GitHub Release. The manual Mark-of-the-Web smoke test in `packaging/README.md`
+is still the publish gate. ADR 0031 removes the tag trigger, the draft-release
+automation, and the Discord notice; all publication is manual.
 
 ## Decision
 

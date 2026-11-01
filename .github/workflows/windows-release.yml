@@ -1,19 +1,14 @@
-# Windows onefolder release candidate.
-# Builds a zip as a private Actions artifact (30 days). It is never attached
-# to a GitHub Release — public Windows downloads stay on itch.io / local builds.
-# A vX.Y.Z tag whose version matches pyproject.toml also opens a notes-only
-# draft GitHub Release. Nothing in this workflow publishes a public release.
-# See packaging/README.md for the MOTW smoke gate and publish / rollback steps.
+# Manual Windows onefolder build.
+# Builds a zip as a non-publishing Actions artifact (30 days). It never creates or
+# updates a GitHub Release, never uploads to itch.io, and never posts to
+# Discord. Push, pull-request, merge, and tag events do not start it.
+# Only a maintainer can start it with workflow_dispatch.
+# See packaging/README.md and docs/RELEASE_SECURITY.md.
 
-name: Windows release
+name: Manual Windows build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      # Starts the workflow only. packaging/verify_release_version.py
-      # rejects anything other than v{pyproject version} before packaging.
-      - "v*.*.*"
 
 permissions:
   contents: read
@@ -24,7 +19,7 @@ concurrency:
 
 jobs:
   verify-version:
-    name: Tag matches pyproject.toml
+    name: Version matches pyproject.toml
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,7 +51,6 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
-      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -193,109 +187,3 @@ jobs:
             release-build.txt
           if-no-files-found: error
           retention-days: 30
-
-  draft-release:
-    name: Draft GitHub Release
-    needs: package
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - name: Download candidate
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: orga-drone-windows-x64
-          path: release-assets
-
-      - name: Create or update the notes-only draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          # Stay in the workspace root so `gh` can resolve the repository.
-          # Verify the Actions artifact checksum, but never attach the zip to
-          # the GitHub Release (Windows binaries stay local / itch.io).
-          # Checksum file lists a bare zip name — verify from that directory.
-          (
-            cd release-assets
-            sha256sum -c orga-drone-windows-x64.zip.sha256
-          )
-          version="$(sed -n 's/^version=//p' release-assets/release-build.txt | tr -d '\r')"
-          commit="$(sed -n 's/^commit=//p' release-assets/release-build.txt | tr -d '\r')"
-          sha="$(awk '{print $1}' release-assets/orga-drone-windows-x64.zip.sha256 | tr -d '\r')"
-          if [ -z "${version}" ] || [ -z "${commit}" ] || [ -z "${sha}" ]; then
-            echo "release-build.txt is missing version, commit, or checksum"
-            exit 1
-          fi
-          if [ "${RELEASE_TAG}" != "v${version}" ]; then
-            echo "Refusing to publish: tag ${RELEASE_TAG} != v${version}"
-            exit 1
-          fi
-          VERSION="${version}" COMMIT="${commit}" SHA256="${sha}" TAG="${RELEASE_TAG}" python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          version = os.environ["VERSION"]
-          commit = os.environ["COMMIT"]
-          sha = os.environ["SHA256"]
-          tag = os.environ["TAG"]
-          Path("DRAFT_RELEASE_NOTES.md").write_text(
-              f"""## Draft — notes only (no Windows zip on GitHub)
-
-          Built by the Windows release workflow. This draft is **not public**.
-          The Windows onefolder zip is an Actions artifact and/or a local
-          `releases/` build — it is **not** attached to this GitHub Release.
-          Publish notes only after the mandatory Windows MOTW smoke test in
-          `packaging/README.md` passes. Leave unpublished on failure.
-
-          | | |
-          | --- | --- |
-          | Version | {version} |
-          | Tag | {tag} |
-          | Commit | {commit} |
-          | Maintainer artifact | Actions `orga-drone-windows-x64` (not a Release asset) |
-          | SHA256 | {sha} |
-
-          ### Maintainer gate
-
-          1. Download the Actions artifact `orga-drone-windows-x64` in a browser (or build locally into `releases/{version}/`), then smoke-test with MOTW as in `packaging/README.md`.
-          2. Confirm `Zone.Identifier` / `ZoneId=3`, extract with Windows Explorer into a path with parentheses, and run the functional checks.
-          3. Record the tested ZIP SHA256, commit, test date, and outcome in these notes.
-          4. Publish the GitHub Release **without** uploading `orga-drone-windows-x64.zip`.
-
-          ```
-          {sha}  orga-drone-windows-x64.zip
-          ```
-          """,
-              encoding="utf-8",
-          )
-          PY
-          if gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft > /tmp/is_draft; then
-            is_draft="$(cat /tmp/is_draft)"
-            if [ "${is_draft}" != "true" ]; then
-              echo "Release ${RELEASE_TAG} is already published. Refusing to replace notes."
-              exit 1
-            fi
-            echo "Draft already exists. Leaving notes and assets unchanged (no zip upload)."
-          else
-            gh release create "${RELEASE_TAG}" \
-              --draft \
-              --title "orga-drone ${RELEASE_TAG}" \
-              --notes-file DRAFT_RELEASE_NOTES.md
-          fi
-          gh release edit "${RELEASE_TAG}" --draft
-          is_draft="$(gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft)"
-          if [ "${is_draft}" != "true" ]; then
-            echo "Release ${RELEASE_TAG} is not a draft. Refusing to leave a public release."
-            exit 1
-          fi
-          asset_count="$(gh release view "${RELEASE_TAG}" --json assets --jq '.assets | length')"
-          if [ "${asset_count}" != "0" ]; then
-            echo "Refusing: GitHub Release unexpectedly has ${asset_count} asset(s). Binaries must not be attached."
-            exit 1
-          fi
-          gh release view "${RELEASE_TAG}" --json isDraft,url --jq '{isDraft: .isDraft, url: .url}'
