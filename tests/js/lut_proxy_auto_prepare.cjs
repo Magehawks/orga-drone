@@ -10,9 +10,17 @@ const source =
 const timers = [];
 const requests = [];
 let look = { conversion_lut: '', creative_lut: 'a', creative_strength: 100, conversion_confirmed: false };
+let hsl = { ranges: {} };
+let colorWheels = { wheels: {} };
 let clipAudio = null;
 const context = {
   readColorLook: () => look,
+  readHsl: () => hsl,
+  hslIsNeutral: value => !value || !value.ranges ||
+    Object.values(value.ranges).every(item => !item.hue && !item.saturation && !item.luminance),
+  readColorWheels: () => colorWheels,
+  colorWheelsIsNeutral: value => !value || !value.wheels ||
+    Object.values(value.wheels).every(item => !item.x && !item.y),
   lutWebglCanHandle: () => false,
   readClipAudio: () => clipAudio,
   playbackSpeed: () => 1,
@@ -118,11 +126,49 @@ function reply(request, url) {
   assert.equal(requests.length, 0, 'custom audio falls back');
   clipAudio = null;
 
-  // No LUT means no proxy request.
+  // No color adjustment means no proxy request.
   look = { conversion_lut: '', creative_lut: '', creative_strength: 100, conversion_confirmed: false };
   clip.dataset.colorLook = JSON.stringify(look);
+  hsl = { ranges: {} };
+  clip.dataset.hsl = JSON.stringify(hsl);
+  colorWheels = { wheels: {} };
+  clip.dataset.colorWheels = JSON.stringify(colorWheels);
   context.scheduleLutProxyPrepare(clip, 0);
   await fire();
-  assert.equal(requests.length, 0, 'no LUT means no proxy');
+  assert.equal(requests.length, 0, 'neutral color means no proxy');
+
+  // HSL-only and wheels-only clips still need rendered playback colors.
+  hsl = { ranges: { red: { hue: 40, saturation: 20, luminance: 0 } } };
+  clip.dataset.hsl = JSON.stringify(hsl);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 1, 'HSL-only prepares a playback proxy');
+  reply(requests[0], '/proxy/hsl');
+  await settle();
+  assert.equal(clip.dataset.lutProxyUrl, '/proxy/hsl');
+  assert.equal(context.videoSrcFor(clip), '/proxy/hsl', 'HSL-only playback uses the proxy');
+
+  requests.length = 0;
+  hsl = { ranges: {} };
+  clip.dataset.hsl = JSON.stringify(hsl);
+  colorWheels = { wheels: { midtones: { x: 0.5, y: 0 } } };
+  clip.dataset.colorWheels = JSON.stringify(colorWheels);
+  context.scheduleLutProxyPrepare(clip, 0);
+  await fire();
+  assert.equal(requests.length, 1, 'wheels-only prepares a playback proxy');
+
+  // A changed HSL must supersede the cached proxy for the same LUT.
+  requests.length = 0;
+  clip.dataset.lutProxyUrl = '/proxy/wheels';
+  colorWheels = { wheels: {} };
+  clip.dataset.colorWheels = JSON.stringify(colorWheels);
+  look = { creative_lut: 'a', creative_strength: 100, input_profile: 'rec709', conversion_lut: '', conversion_confirmed: false };
+  clip.dataset.colorLook = JSON.stringify(look);
+  hsl = { ranges: { blue: { hue: -20, saturation: 0, luminance: 10 } } };
+  clip.dataset.hsl = JSON.stringify(hsl);
+  context.scheduleLutProxyPrepare(clip, 0);
+  assert.equal(clip.dataset.lutProxyUrl, '', 'HSL change drops the stale proxy');
+  await fire();
+  assert.equal(requests.length, 1);
   console.log('lut proxy auto preparation ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

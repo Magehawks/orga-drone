@@ -1834,7 +1834,12 @@
     const ramp = readSaturationRamp(clip);
     if (ramp && ramp.enabled) return false;
     const look = readColorLook(clip);
-    return !!((look.conversion_lut && look.conversion_confirmed) || look.creative_lut);
+    if ((look.conversion_lut && look.conversion_confirmed) || look.creative_lut) {
+      return true;
+    }
+    // The WebGL LUT renderer does not sample the generated HSL/wheel cubes, so
+    // these stages need the rendered proxy too (with or without a LUT).
+    return !hslIsNeutral(readHsl(clip)) || !colorWheelsIsNeutral(readColorWheels(clip));
   }
 
   function lutProxySrcFor(clip) {
@@ -2248,6 +2253,7 @@
     clip.dataset.hslPreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill();
     if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
+    if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
 
   const COLOR_WHEEL_IDS = ["shadows", "midtones", "highlights"];
@@ -2327,6 +2333,7 @@
     clip.dataset.colorWheelsPreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill();
     if (!colorWheelsIsNeutral(colorWheels)) setLutPreviewChip(msgLutChipUpdating);
+    if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
 
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
@@ -2759,8 +2766,9 @@
 
   function lutProxyPrepareKey(clip) {
     return JSON.stringify([
-      clip.dataset.colorLook, clip.dataset.imageAdjust, clip.dataset.sourceIn,
-      clip.dataset.sourceOut, clip.dataset.saturationRamp, clip.dataset.playbackSpeed,
+      clip.dataset.colorLook, clip.dataset.imageAdjust, clip.dataset.hsl,
+      clip.dataset.colorWheels, clip.dataset.sourceIn, clip.dataset.sourceOut,
+      clip.dataset.saturationRamp, clip.dataset.playbackSpeed,
     ]);
   }
 

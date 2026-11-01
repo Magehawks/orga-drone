@@ -20,5 +20,6 @@ def test_lut_proxy_mapping_and_audio() -> None:
         "tests/js/lut_proxy_mapping.cjs",
         "tests/js/lut_proxy_audio.cjs",
         "tests/js/lut_proxy_auto_prepare.cjs",
+        "tests/js/color_playback_proxy.cjs",
     ):
         subprocess.run([node, script], check=True, timeout=20)

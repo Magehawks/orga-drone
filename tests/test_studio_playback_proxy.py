@@ -16,6 +16,8 @@ from orga_drone.config import Settings
 from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
 from orga_drone.export.studio_encoder import FfmpegStudioEncoder
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.studio_color_wheels import ColorWheelPoint, ColorWheels
+from orga_drone.studio_hsl import HslAdjust, HslRange
 from orga_drone.studio_image import ImageAdjust
 from orga_drone.studio_lut import ColorLook, import_lut_from_path
 from orga_drone.studio_playback_proxy import (
@@ -374,3 +376,112 @@ def test_superseded_generation_does_not_publish(
     assert not list(cache.rglob("*.mp4"))
     work = cache / "work"
     assert not work.exists() or not any(work.iterdir())
+
+def _mean_difference(path_a: Path, path_b: Path) -> float:
+    with Image.open(path_a) as image_a, Image.open(path_b) as image_b:
+        reference = image_a.convert("RGB")
+        candidate = image_b.convert("RGB")
+        if candidate.size != reference.size:
+            candidate = candidate.resize(reference.size, Image.Resampling.LANCZOS)
+        difference = ImageChops.difference(reference, candidate)
+        return max(ImageStat.Stat(difference).mean)
+
+
+def test_playback_proxy_advances_with_hsl_and_wheels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HSL-only and wheel-only clips must play moving, graded proxy frames.
+
+    A still preview or an export does not prove playback: the proxy is the
+    media element source, so consecutive proxy frames must differ while both
+    match the export color pipeline.
+    """
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg unavailable")
+    data = tmp_path / "data"
+    data.mkdir()
+    monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=data))
+    source = tmp_path / "moving.mp4"
+    _run(
+        ffmpeg,
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=s=320x180:r=30:d=3",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        str(source),
+    )
+    cube = tmp_path / "synthetic.cube"
+    _write_cube(cube)
+    asset = import_lut_from_path(data, cube)
+    hsl = HslAdjust(red=HslRange(hue=55, saturation=25, luminance=5))
+    wheels = ColorWheels(midtones=ColorWheelPoint(x=0.6, y=-0.2))
+    look = ColorLook(creative_lut=asset, creative_strength=100)
+    variants = [
+        ("hsl", ColorLook(), hsl, ColorWheels()),
+        ("wheels", ColorLook(), HslAdjust(), wheels),
+        ("combined", look, hsl, wheels),
+    ]
+    for name, variant_look, variant_hsl, variant_wheels in variants:
+        request = PlaybackProxyRequest(
+            source,
+            source_start_s=0.0,
+            source_end_s=3.0,
+            look=variant_look,
+            hsl=variant_hsl,
+            color_wheels=variant_wheels,
+        )
+        proxy = render_playback_proxy(request, data_dir=data)
+        clip = StudioExportClip(
+            source,
+            "video",
+            3.0,
+            source_start_s=0.0,
+            source_end_s=3.0,
+            color_look=variant_look,
+            hsl=variant_hsl,
+            color_wheels=variant_wheels,
+        )
+        exported = FfmpegStudioEncoder().render(
+            StudioExportConfig(
+                output_path=tmp_path / f"export-{name}.mp4",
+                width=320,
+                height=180,
+                clips=(clip,),
+                quality="standard",
+            )
+        )
+        early = _extract(ffmpeg, proxy, 0.3, tmp_path / f"{name}-early.png")
+        late = _extract(ffmpeg, proxy, 1.5, tmp_path / f"{name}-late.png")
+        assert _mean_difference(early, late) > 3, (
+            f"{name}: proxy frames do not advance"
+        )
+        exported_frame = _extract(
+            ffmpeg, exported, 0.3, tmp_path / f"{name}-export.png"
+        )
+        assert _mean_difference(early, exported_frame) < 10, (
+            f"{name}: playback proxy color differs from export"
+        )
+        source_frame = _extract(ffmpeg, source, 0.3, tmp_path / f"{name}-source.png")
+        assert _mean_difference(early, source_frame) > 3, (
+            f"{name}: playback proxy is missing the color adjustment"
+        )
+    stat = source.stat()
+    base = PlaybackProxyRequest(source, source_start_s=0.0, source_end_s=3.0)
+    key_args = {
+        "media_mtime_ns": stat.st_mtime_ns,
+        "media_size": stat.st_size,
+        "data_dir": data,
+    }
+    assert cache_key_for(replace(base, hsl=hsl), **key_args) != cache_key_for(
+        base, **key_args
+    )
+    assert cache_key_for(
+        replace(base, color_wheels=wheels), **key_args
+    ) != cache_key_for(base, **key_args)
