@@ -1,3 +1,7 @@
+import { formatExportDuration } from "./format.js";
+
+export { formatExportDuration };
+
 const DEFAULT_MESSAGES = {
   failed: "Export failed.",
   cancelled: "Export cancelled.",
@@ -52,17 +56,6 @@ function messagesFromRoot(root) {
     }
   }
   return messages;
-}
-
-export function formatExportDuration(totalSeconds) {
-  const sec = Math.max(0, Math.round(Number(totalSeconds) || 0));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export function exportPhaseLabel(job, messages) {

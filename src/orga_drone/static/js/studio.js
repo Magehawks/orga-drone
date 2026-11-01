@@ -1,5 +1,7 @@
 import "./studio-lut-webgl.js";
 import { createExportUi } from "./studio/export.js";
+import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
+import { createProjectBrowser } from "./studio/project-browser.js";
 
 /**
  * Creator Studio UI.
@@ -18,14 +20,8 @@ import { createExportUi } from "./studio/export.js";
 
   const studioMode = root.dataset.studioMode || "editor";
   const msgTitleCardFailed = root.dataset.titleCardFailed || "Could not save title card.";
-  const msgCreateFailed = root.dataset.createFailed || "Could not create Studio project.";
-  const msgOpenFailed = root.dataset.openFailed || "Could not open Studio project.";
-  const msgDeleteFailed = root.dataset.deleteFailed || "Could not delete Studio project.";
-  const msgDeleteConfirm =
-    root.dataset.deleteConfirm ||
-    "Delete this Studio project? Clips in this project are removed. Your media files are not deleted.";
-  const msgRenamePrompt = root.dataset.renamePrompt || "New project title";
   const defaultProjectTitle = root.dataset.defaultTitle || "Your story";
+  const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
   let historyGesture = "";
   const nativeFetch = window.fetch.bind(window);
 
@@ -121,127 +117,14 @@ import { createExportUi } from "./studio/export.js";
     }
   }
 
-  async function createAndOpenProject(title) {
-    const clean = (title || "").trim() || defaultProjectTitle;
-    const created = await fetch("/api/studio/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ title: clean }),
-    });
-    const createdBody = await readJson(created);
-    if (!created.ok || !createdBody || !createdBody.id) {
-      throw new Error((createdBody && createdBody.detail) || msgCreateFailed);
-    }
-    const opened = await fetch(`/api/studio/projects/${createdBody.id}/open`, {
-      method: "POST",
-      headers: { Accept: "application/json" },
-    });
-    const openedBody = await readJson(opened);
-    if (!opened.ok) {
-      throw new Error((openedBody && openedBody.detail) || msgOpenFailed);
-    }
-    window.location.assign("/studio");
-  }
-
-  async function openProject(projectId) {
-    const res = await fetch(`/api/studio/projects/${projectId}/open`, {
-      method: "POST",
-      headers: { Accept: "application/json" },
-    });
-    const body = await readJson(res);
-    if (!res.ok) {
-      throw new Error((body && body.detail) || msgOpenFailed);
-    }
-    window.location.assign("/studio");
-  }
-
-  async function renameProject(projectId, currentTitle) {
-    const next = window.prompt(msgRenamePrompt, currentTitle || defaultProjectTitle);
-    if (next === null) return;
-    const clean = next.trim();
-    if (!clean) return;
-    const res = await fetch(`/api/studio/projects/${projectId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ title: clean }),
-    });
-    const body = await readJson(res);
-    if (!res.ok) {
-      throw new Error((body && body.detail) || msgTitleFailed);
-    }
-    window.location.reload();
-  }
-
-  async function deleteProject(projectId) {
-    if (!window.confirm(msgDeleteConfirm)) return;
-    const res = await fetch(`/api/studio/projects/${projectId}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-    });
-    const body = await readJson(res);
-    if (!res.ok) {
-      throw new Error((body && body.detail) || msgDeleteFailed);
-    }
-    window.location.assign("/studio");
-  }
-
-  function bindProjectUi(scope) {
-    if (!scope) return;
-    scope.querySelectorAll("[data-studio-project-create]").forEach((form) => {
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const input = form.querySelector('input[name="title"]');
-        const title = input && "value" in input ? String(input.value) : defaultProjectTitle;
-        createAndOpenProject(title).catch((err) => showRootFlash(err.message || msgCreateFailed));
-      });
-    });
-  }
-
-  function handleProjectActionClick(event) {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const openBtn = target.closest("[data-project-open]");
-    if (openBtn) {
-      event.preventDefault();
-      const id = Number(openBtn.getAttribute("data-project-open") || "0");
-      if (id) openProject(id).catch((err) => showRootFlash(err.message || msgOpenFailed));
-      return;
-    }
-    const renameBtn = target.closest("[data-project-rename]");
-    if (renameBtn) {
-      event.preventDefault();
-      const id = Number(renameBtn.getAttribute("data-project-rename") || "0");
-      const current = renameBtn.getAttribute("data-project-title") || "";
-      if (id) renameProject(id, current).catch((err) => showRootFlash(err.message || msgTitleFailed));
-      return;
-    }
-    const deleteBtn = target.closest("[data-project-delete]");
-    if (deleteBtn) {
-      event.preventDefault();
-      const id = Number(deleteBtn.getAttribute("data-project-delete") || "0");
-      if (id) deleteProject(id).catch((err) => showRootFlash(err.message || msgDeleteFailed));
-    }
-  }
-
-  root.addEventListener("click", handleProjectActionClick);
-  bindProjectUi(root);
-  const projectsDialog = document.getElementById("studio-projects-dialog");
-  bindProjectUi(projectsDialog);
-  if (projectsDialog) {
-    projectsDialog.addEventListener("click", handleProjectActionClick);
-  }
   let flushPendingTitleSave = () => {};
-  const projectsOpenBtn = document.getElementById("studio-projects-open");
-  if (projectsOpenBtn && projectsDialog) {
-    projectsOpenBtn.addEventListener("click", () => {
-      flushPendingTitleSave();
-      if (typeof projectsDialog.showModal === "function") projectsDialog.showModal();
-    });
-  }
-  const projectsCloseBtn = document.getElementById("studio-projects-close");
-  if (projectsCloseBtn && projectsDialog) {
-    projectsCloseBtn.addEventListener("click", () => projectsDialog.close());
-  }
+  createProjectBrowser({
+    root,
+    defaultTitle: defaultProjectTitle,
+    readJson,
+    showError: showRootFlash,
+    beforeOpen: () => flushPendingTitleSave(),
+  }).init();
 
   const grid = document.getElementById("studio-grid");
   if (studioMode !== "editor" || !grid) return;
@@ -472,12 +355,6 @@ import { createExportUi } from "./studio/export.js";
     return clips().map((el) => Number(el.dataset.studioId));
   }
 
-  function formatTemplate(tmpl, vars) {
-    return String(tmpl || "").replace(/\{(\w+)\}/g, (_, key) =>
-      vars[key] != null ? String(vars[key]) : ""
-    );
-  }
-
   function clipDisplayName(clip) {
     if (!clip) return "—";
     if (clip.dataset.kind === "title_card") {
@@ -587,14 +464,6 @@ import { createExportUi } from "./studio/export.js";
     const text = saveStateEl.querySelector(".studio-save-state-text");
     if (text) text.textContent = label;
     saveStateEl.setAttribute("title", label);
-  }
-
-  function formatTime(seconds) {
-    const total = Math.max(0, Math.round(Number(seconds) || 0));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
   const MIN_CUT_SEGMENT_S = 0.05;
@@ -6288,10 +6157,6 @@ import { createExportUi } from "./studio/export.js";
     if (loop) return Math.max(0, storyS);
     if (!(musicS > 0)) return 0;
     return Math.min(musicS, Math.max(0, storyS));
-  }
-
-  function formatLaneTime(seconds) {
-    return formatTime(seconds).replace(/^00:/, "");
   }
 
   function trackDurationS(track) {

@@ -1,9 +1,10 @@
 # Studio Frontend Modules
 
-Status: **one module extracted, target architecture still in progress.** The
-Studio UI still boots from `src/orga_drone/static/js/studio.js` (~11.6k lines).
+Status: **three modules extracted, target architecture still in progress.** The
+Studio UI still boots from `src/orga_drone/static/js/studio.js` (~11.5k lines).
 The JavaScript tooling and CI from PR 1, the ES-module entry from PR 3, and the
-export UI module are in place. Every other feature remains in the entry file.
+export UI, project browser, and formatting modules are in place. Every other
+feature remains in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -18,10 +19,15 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
-- `studio.js` is an ES module entry (IIFE internally) with roughly 470 function
+- `studio.js` is an ES module entry (IIFE internally) with roughly 465 function
   declarations.
 - `studio/export.js` owns the export dialog, options, progress, cancel, and
   success-banner behavior. `studio.js` only imports and initializes it.
+- `studio/project-browser.js` owns the create/open/rename/delete actions,
+  confirmation prompts, dialog lifecycle, and project action errors.
+- `studio/format.js` owns the shared time, lane-time, template, and export-clock
+  formatters. Frame zoom formatting remains in the entry because it depends on
+  the frame clamp.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
 - There are nine save chains and fourteen `save*` functions with repeated
@@ -32,8 +38,8 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio_cut.py`, `studio_speed.py`, `studio_transition.py`,
   `studio_estimate.py`, `studio_effect_lane.py`, `studio_lut.py`,
   `studio_hsl.py`, `studio_color_wheels.py`, and the `export/` package.
-- Existing JavaScript tests mostly slice `studio.js` as text. New modules must
-  use real module tests instead.
+- Export, project browser, and formatting now have direct module tests. Older
+  areas still use text-slicing tests; migrate those when their code moves.
 
 Do not treat the current line count as a product goal. Module boundaries and
 testability matter more.
@@ -53,13 +59,13 @@ existing tests and the PyInstaller static path keep working.
 | `studio/state.js` | Project id/title, selection, UI preferences | `get`, `set`, `subscribe`, `persist` | `api`, `format` | `projectId`, `title`, `selected`, `volume` | `PATCH /api/studio/projects/{id}` | Node state/storage roundtrip | clip data, playback time |
 | `studio/clip-model.js` | One API over clip `data-*` values | `list`, `get`, `duration`, `sourceRange`, `speed`, `sectionPoint`, `resolveAt`, `read*`, `write*` | `format` | **clip data (DOM as backing store)** | read-only; writes via `settings` | Node fake datasets, timing/transition fixtures | network, preview, save scheduler |
 | `studio/settings.js` | Serialized, debounced saves per clip setting | `createSaver({url, method, payload, apply, refresh})` | `api`, `clip-model` | save chains and pending ids | `/image`, `/hsl`, `/color-wheels`, `/detail`, `/frame`, `/masks`, `/overlays`, `/map`, `/hud`, `/saturation-ramp`, `/clip-audio`, `/color-animation`, `/effect-lane` | Node out-of-order/burst tests | foreign DOM; other savers |
-| `studio/format.js` | Pure formatting | `formatTime`, `formatLaneTime`, `formatTemplate`, `formatZoom` | none | none | none | Node table tests | DOM, network, state |
+| `studio/format.js` | **Implemented.** Shared pure formatting | `formatTemplate`, `formatTime`, `formatLaneTime`, `formatExportDuration` | none | none | none | `tests/js/format.test.js` | DOM, network, state |
 
 ### Feature modules
 
 | Module | Responsibility | Public interface | Allowed dependencies | Owns state | Backend endpoints | Tests / fixtures | Forbidden |
 |---|---|---|---|---|---|---|---|
-| `studio/project-browser.js` | Gallery/switcher, create/open/rename/delete | `initProjectBrowser({root, dialog, messages, defaultTitle, onError, beforeOpen})` | `api` | dialog/focus state | `/api/studio/projects*`, `/open` | Node action routing; Python route tests | Story grid, playback, export |
+| `studio/project-browser.js` | **Implemented.** Server-rendered project list actions: create/open/rename/delete, prompts, dialog lifecycle, errors | `createProjectBrowser({root, documentImpl, dialog, openButton, closeButton, defaultTitle, messages, fetchImpl, readJson, navigate, reload, prompt, confirm, showError, beforeOpen})` returns `{init, destroy}` | none; browser APIs and JSON reader are injected or defaulted | dialog/focus state, action errors | `/api/studio/projects*`, `/open`, `PATCH`, `DELETE` | `tests/js/project_browser.test.js`; Python route tests | Story grid, playback, export, client-side project list rendering |
 | `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | none; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
 | `studio/inspector/detail.js` | Sharpen/denoise panel | `createDetailControls({getSelectedClip, refresh, showError, setSaved})` | `clip-model`, `settings`, `format` | panel state | `PATCH /api/studio/{id}/detail` | Node clamp/read/write; Python roundtrip | other inspector panels |
 | `studio/inspector/image.js` | Image sliders and Quick Looks | `createImageControls({...})` | `clip-model`, `settings`, `preview` callback | panel state | `/image`, `/look` | Node neutral/clamp; pixel parity | playback, timeline |
@@ -150,8 +156,9 @@ written. Prefer function names over line numbers.
 | Studio change | Current location | Target module |
 |---|---|---|
 | Export dialog, polling, cancel, success banner | `studio/export.js` | `studio/export.js` (implemented) |
-| Project gallery/switcher | `studio.js:121-241` | `studio/project-browser.js` |
-| Time/template/zoom formatting | `studio.js:492-615, 5065, 6310, 9130` | `studio/format.js` |
+| Project gallery/switcher actions | `studio/project-browser.js` | `studio/project-browser.js` (implemented) |
+| Time/template formatting | `studio/format.js` | `studio/format.js` (implemented) |
+| Frame zoom formatting | `studio.js` (`formatZoom`) | stays in the entry because it uses the frame clamp |
 | Clip timing, transitions, section points | `studio.js:609-1830, 6708-6770` | `studio/clip-model.js` |
 | Preview layers, stills, proxy scheduling | `studio.js:1825-2920, 5318-6170` | `studio/preview.js` |
 | Playback clock and audio sync | `studio.js:5830-6170` | `studio/playback.js` |
@@ -164,6 +171,7 @@ written. Prefer function names over line numbers.
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -181,7 +189,7 @@ Each step is independently mergeable and behavior-neutral.
 1. **PR 1 (done):** JavaScript tooling and CI for new module paths.
 2. **PR 3 (done):** one ES-module entry point; no code moved.
 3. **PR 4 (done):** export UI extracted to `studio/export.js`; no app state dependencies.
-4. **Project browser + formatting:** pure/small modules.
+4. **PR 5 (done):** project browser and shared formatting extracted; server-rendered list stays server-rendered.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
 6. **Settings scheduler:** one save pipeline for image/HSL/wheels first.
 7. **Inspector detail:** first feature module with real module tests.
