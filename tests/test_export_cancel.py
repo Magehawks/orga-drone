@@ -175,7 +175,7 @@ def test_http_cancel_then_export_again(
     assert 'id="studio-export-cancel"' in page.text
     assert 'type="button"' in page.text
     assert ("Export abbrechen" in page.text) or ("Cancel export" in page.text)
-    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    script = Path("src/orga_drone/static/js/studio/export.js").read_text(encoding="utf-8")
     assert "/cancel" in script
     assert "exportCancelBtn.disabled = running" not in script
     assert "msgExportOverwrite" not in script
