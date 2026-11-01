@@ -2344,7 +2344,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/studio/{studio_item_id}/playback-proxy")
     async def api_studio_playback_proxy_file(studio_item_id: int) -> Response:
-        """Serve an already generated static-LUT proxy."""
+        """Serve an already generated color playback proxy."""
         clip = _studio_clip_or_404(studio_item_id)
         if (clip.kind or "") != "video":
             raise HTTPException(
@@ -2357,7 +2357,7 @@ def create_app() -> FastAPI:
         if request is None:
             raise HTTPException(
                 status_code=409,
-                detail="This clip is not eligible for a static LUT proxy.",
+                detail="This clip is not eligible for a playback color proxy.",
             )
         path = cached_playback_proxy(request, data_dir=settings.data_dir)
         if path is None:
@@ -2391,7 +2391,7 @@ def create_app() -> FastAPI:
         if request is None:
             raise HTTPException(
                 status_code=409,
-                detail="This clip is not eligible for a static LUT proxy.",
+                detail="This clip is not eligible for a playback color proxy.",
             )
         started = time.perf_counter()
         try:
