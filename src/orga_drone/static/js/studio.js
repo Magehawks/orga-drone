@@ -1,3 +1,5 @@
+import "./studio-lut-webgl.js";
+
 /**
  * Creator Studio UI.
  * Persistence: reorder, photo duration, Title Cards, music, and transitions via APIs.

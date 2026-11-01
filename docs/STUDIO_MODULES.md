@@ -1,9 +1,9 @@
 # Studio Frontend Modules (Target)
 
 Status: **target architecture, not the current implementation.** The current
-Studio UI is still one file, `src/orga_drone/static/js/studio.js` (~12k lines).
-The JavaScript tooling and CI from PR 1 are in place. No frontend module has
-been extracted yet.
+Studio UI is one ES module entry, `src/orga_drone/static/js/studio.js` (~12k
+lines). The JavaScript tooling and CI from PR 1 and the ES-module entry from
+PR 3 are in place. No frontend module has been extracted yet.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -18,7 +18,8 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
-- `studio.js` is an IIFE with roughly 495 function declarations.
+- `studio.js` is an ES module entry (IIFE internally) with roughly 495 function
+  declarations.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
 - There are nine save chains and fourteen `save*` functions with repeated
@@ -120,7 +121,7 @@ Use ES modules for new modules. The app is served over loopback HTTP, so module
 imports work in WebView2 and the browser fallback. PyInstaller copies the whole
 `static/` tree. Node 22 imports the same modules for tests.
 
-The current two `<script defer>` tags will become one
+The entry point is now a single
 `<script type="module" src="/static/js/studio.js">`. `studio-lut-webgl.js` stays
 a side-effect module and keeps `window.OrgaLutPreview` until `preview.js` owns
 that boundary. Do not add a bundler, transpiler, or framework.
@@ -176,7 +177,7 @@ written. Prefer function names over line numbers.
 Each step is independently mergeable and behavior-neutral.
 
 1. **PR 1 (done):** JavaScript tooling and CI for new module paths.
-2. **PR 3 (roadmap):** one ES-module entry point; no code moved.
+2. **PR 3 (done):** one ES-module entry point; no code moved.
 3. **Export UI:** smallest self-contained feature; no app state dependencies.
 4. **Project browser + formatting:** pure/small modules.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
