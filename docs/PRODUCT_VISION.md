@@ -1,7 +1,8 @@
 # orga-drone Product Vision
 
 This document is the **product source of truth** for Orga Drone.
-`AGENTS.md` summarizes the same constraints for agents; keep them aligned.
+`AGENTS.md` contains the agent-facing constraints and links here for product
+detail. Keep both aligned when shipping truth changes.
 
 Status language used below:
 

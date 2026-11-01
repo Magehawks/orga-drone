@@ -7,6 +7,9 @@ Thanks for helping improve this local drone media library. Contributions of code
 - Search [existing issues](https://github.com/Magehawks/orga-drone/issues) to avoid duplicates.
 - For larger changes, open an issue first so we can align on scope.
 - Keep changes focused — small PRs are easier to review.
+- Never commit secrets, `.env` files, private media, SRT files, flight logs, or
+  screenshots with people, homes, or precise locations. Tests and docs use
+  synthetic fixtures or the existing sanitized samples.
 
 ## User needs
 
@@ -21,7 +24,8 @@ Labels, the monthly triage, and how accepted work is linked to release notes: [`
 
 ## Development setup
 
-Requirements: **Python 3.11+**
+Requirements: **Python 3.11+**. Node **22.13+** is optional for running the
+application and required only for the JavaScript checks.
 
 ```bash
 git clone https://github.com/Magehawks/orga-drone.git
@@ -40,17 +44,40 @@ cp .env.example .env   # optional
 python -m orga_drone
 ```
 
-See [README.md](README.md) for runtime options, packaging notes, and feature overview.
+See [`docs/user/`](docs/user/) for usage, [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+for the current technical shape, and [`packaging/README.md`](packaging/README.md)
+for Windows builds.
+
+## Find your area
+
+| Change | Start here |
+|---|---|
+| Library scan, metadata, flows, sessions | `scan/`, `parse/`, `group/`, `db/` |
+| Browse, filters, detail page | `app.py`, `templates/`, `static/js/browse.js`, `static/js/detail-*.js` |
+| Studio timing, cut, speed, repeat | `studio_cut.py`, `studio_speed.py`, `studio_transition.py`, `studio_estimate.py` |
+| Studio color, LUT, HSL, wheels | `studio_image.py`, `studio_hsl.py`, `studio_color_wheels.py`, `studio_lut.py` |
+| Studio preview and playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` |
+| Studio export | `studio_export.py`, `export/` |
+| Studio frontend / inspector / timeline | `static/js/studio.js`, `templates/studio.html`, `docs/STUDIO_MODULES.md` |
+| Desktop shell and Windows packaging | `desktop.py`, `packaging/` |
+| UI strings | `src/orga_drone/locales/`, template `data-*` messages |
+| Tests | `tests/`, `tests/js/` |
+
+Coding agents should read [`AGENTS.md`](AGENTS.md) first. The Studio frontend
+target modules and dependency rules are in
+[`docs/STUDIO_MODULES.md`](docs/STUDIO_MODULES.md).
 
 ## Tests
 
-Run the full suite from the repo root:
+Run the full Python suite from the repo root:
 
 ```bash
 pytest
 ```
 
-Add or update tests when you change parsing, indexing, search, or API behavior. Tests live under `tests/`.
+Add or update tests when you change parsing, indexing, search, API, or Studio
+behavior. Python tests live under `tests/`; JavaScript module tests live under
+`tests/js/` and are run by `npm run test:js`.
 
 ### Manual check: Browse memory (large libraries)
 
@@ -104,6 +131,23 @@ Windows release candidates are a separate **Windows release** workflow
 does not publish a public release. Procedure, checksum, draft approval, and
 rollback: [`packaging/README.md`](packaging/README.md).
 
+## Architecture and refactoring rules
+
+- Prefer small modules in existing package areas. Do not add a generic
+  `utils/` bucket or a new top-level framework.
+- New Studio frontend modules use ES modules and follow
+  [`docs/STUDIO_MODULES.md`](docs/STUDIO_MODULES.md): one responsibility per
+  module, explicit imports, no cross-module DOM writes.
+- Do not add a bundler, React/Vue/Svelte, or a TypeScript migration.
+- Do not change the SQLite schema or `effect_settings` shape without an ADR and
+  migration plan.
+- Keep source media and existing projects compatible. Studio and exports are
+  additive references.
+- Do not mix refactoring with feature work. Behavior-neutral extraction PRs say
+  so in the summary and name their regression checks.
+- Playback, proxy/cache, audio sync, and export color-order code need a
+  dedicated issue and a regression plan before structural changes.
+
 ## Pull requests
 
 1. Branch from `main` (default branch).
@@ -113,6 +157,11 @@ rollback: [`packaging/README.md`](packaging/README.md).
 5. Fill in the PR template (summary, test plan).
 
 **Style:** Match existing code in the touched files — naming, typing, and structure. No drive-by refactors in the same PR unless required.
+
+**Refactoring / maintenance PRs:** state that the change is behavior-neutral,
+name the public interface or module boundary being introduced, list the
+regression tests, and describe how to roll the PR back. Do not mass-format
+legacy files.
 
 **i18n:** UI strings use JSON + `.po` locales under `src/orga_drone/locales/`. Add or update both DE and EN when you change user-visible text.
 

@@ -16,13 +16,25 @@ Closes #
 ## Test evidence
 
 - [ ] `ruff check .` passes locally
-- [ ] `mypy src` passes locally
+- [ ] `mypy src packaging/itch_channel.py packaging/windows_third_party.py` passes locally
 - [ ] `pytest` passes locally (includes `tests/test_pr_journey_smoke.py`)
+- [ ] `npm run check:js` passes locally when the diff touches Studio JS or `tests/js/`
 - [ ] Feature-specific regression tests added/updated
 
 Details:
 
 <!-- Commands, focused tests, relevant fixtures/synthetic media. -->
+
+## Architecture / refactor impact
+
+<!-- Fill this for module moves, state ownership changes, or behavior-neutral refactors. -->
+
+- [ ] Behavior is unchanged (or the approved issue explicitly changes it)
+- [ ] Public module interface / dependency direction is documented
+- [ ] No new cross-module state or duplicate business rule introduced
+- [ ] Rollback path is described below (revert, alias, or compatibility shim)
+
+Rollback:
 
 ## Docs / i18n
 
@@ -50,4 +62,4 @@ Reviewer verdict:
 
 <!-- Performance improvements, future profiles, cleanup, etc. Keep them out of the current diff unless required for correctness. -->
 
-<!-- CI on PRs runs Ruff, MyPy, unit tests, and App journey smoke. See docs/PR_E2E.md. -->
+<!-- CI on PRs runs Ruff, MyPy, unit tests, JavaScript lint/format/tests, and App journey smoke. See docs/PR_E2E.md. -->
