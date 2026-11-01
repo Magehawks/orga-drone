@@ -13,7 +13,8 @@ The **CI** workflow (`.github/workflows/ci.yml`) runs on `pull_request`:
 
 | Check | What it does |
 | --- | --- |
-| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
+| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
+| **JavaScript lint, format and tests** | `npm ci`, `npm run lint:js`, `npm run format:check`, `npm run test:js` on Node 22. No browser and no product data. |
 | **App journey smoke** | `pytest tests/test_pr_journey_smoke.py` |
 
 A local `pytest` from the repo root runs the unit tests **and** the journey

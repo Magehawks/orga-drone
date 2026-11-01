@@ -5,8 +5,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# Pull requests run quality (Ruff, MyPy, unit tests) and App journey smoke.
-# The Windows release workflow calls this workflow and packages only after both pass.
+# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks, and
+# App journey smoke. The Windows release workflow calls this workflow and
+# packages only after all checks pass.
 # The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
   contents: read
@@ -45,6 +46,33 @@ jobs:
         # The journey file has its own check so a failure is visible as
         # "App journey smoke". Local `pytest` still runs it.
         run: pytest --ignore=tests/test_pr_journey_smoke.py
+
+  javascript:
+    name: JavaScript lint, format and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint:js
+
+      - name: Prettier
+        run: npm run format:check
+
+      - name: Node tests
+        run: npm run test:js
 
   journey:
     name: App journey smoke
