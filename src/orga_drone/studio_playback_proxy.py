@@ -23,7 +23,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
 from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
@@ -419,7 +419,7 @@ def render_playback_proxy(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 timeout=proxy_timeout_for(duration_s or 0.0),
-                **subprocess_no_window_kwargs(),
+                **subprocess_below_normal_kwargs(),
             )
         except subprocess.TimeoutExpired as exc:
             raise PlaybackProxyError(

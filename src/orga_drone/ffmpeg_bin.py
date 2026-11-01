@@ -59,3 +59,20 @@ def subprocess_no_window_kwargs() -> dict[str, Any]:
     startupinfo.dwFlags |= show_flag
     startupinfo.wShowWindow = hide
     return {"creationflags": flag, "startupinfo": startupinfo}
+
+
+def subprocess_below_normal_kwargs() -> dict[str, Any]:
+    """No-window kwargs plus below-normal CPU priority for preview work.
+
+    Studio stills and playback proxies run while the user keeps editing. A
+    below-normal process keeps the WebView2 UI and video decode responsive on
+    small machines. Exports keep normal priority.
+    """
+    kwargs = subprocess_no_window_kwargs()
+    if sys.platform != "win32":
+        return kwargs
+    priority = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
+    if not priority:
+        return kwargs
+    kwargs["creationflags"] = int(kwargs.get("creationflags", 0)) | priority
+    return kwargs
