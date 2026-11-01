@@ -1,0 +1,23 @@
+{
+  "name": "orga-drone",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Development tooling for the Orga Drone web UI. Not a build pipeline.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "lint:js": "eslint \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
+    "format:check": "prettier --check \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
+    "format:js": "prettier --write \"src/orga_drone/static/js/studio/**/*.js\" \"tests/js/**/*.test.js\" --no-error-on-unmatched-pattern",
+    "test:js": "node --test",
+    "check:js": "npm run lint:js && npm run format:check && npm run test:js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10"
+  }
+}

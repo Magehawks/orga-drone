@@ -12,6 +12,11 @@ dist/
 venv/
 env/
 
+# JavaScript tooling
+node_modules/
+npm-debug.log*
+.eslintcache
+
 # Local app data / secrets
 .env
 data/

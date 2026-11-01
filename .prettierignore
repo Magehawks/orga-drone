@@ -1,0 +1,6 @@
+node_modules/
+src/orga_drone/static/vendor/
+dist*/
+build*/
+releases/
+package-lock.json

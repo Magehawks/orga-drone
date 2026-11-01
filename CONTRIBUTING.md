@@ -71,18 +71,33 @@ bounded DOM size via pagination.
 
 ## Quality checks (local and CI)
 
-Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12) with two checks:
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12 and Node 22) with three checks.
+
+Python:
 
 ```bash
 ruff check .
-mypy src
+mypy src packaging/itch_channel.py packaging/windows_third_party.py
 pytest --ignore=tests/test_pr_journey_smoke.py
 pytest tests/test_pr_journey_smoke.py
 ```
 
-The second command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
+The last Python command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
-Install the same tooling locally via `pip install -e ".[dev]"`. Configuration lives in `pyproject.toml`.
+JavaScript (Node 22.13+):
+
+```bash
+npm ci
+npm run lint:js
+npm run format:check
+npm run test:js
+```
+
+`npm run check:js` runs all three JavaScript checks. The current lint and format scope is new modules under `src/orga_drone/static/js/studio/` and `tests/js/**/*.test.js`. The legacy `studio.js` monolith stays out of scope until it is split. New modules use ES modules; no bundler is required.
+
+`npm audit` may report moderate advisories in the dev-only ESLint dependency tree (currently `minimatch`). They do not affect the shipped application, which has no npm runtime dependencies. Do not run `npm audit fix --force`; it would downgrade ESLint across major versions.
+
+Install the Python tooling locally via `pip install -e ".[dev]"` (configuration in `pyproject.toml`). Install the JavaScript tooling via `npm ci` (configuration in `eslint.config.js` and `.prettierrc.json`).
 
 Windows release candidates are a separate **Windows release** workflow
 (manual dispatch or a `vX.Y.Z` tag). It does not run on pull requests and it
@@ -91,10 +106,10 @@ rollback: [`packaging/README.md`](packaging/README.md).
 
 ## Pull requests
 
-1. Branch from `master` (default branch).
+1. Branch from `main` (default branch).
 2. Keep commits readable; squash locally if you prefer one commit per PR.
 3. Update docs when behavior or setup changes.
-4. Confirm `ruff check .`, `mypy src`, and `pytest` pass before opening the PR.
+4. Confirm `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py`, `pytest`, and `npm run check:js` pass before opening the PR.
 5. Fill in the PR template (summary, test plan).
 
 **Style:** Match existing code in the touched files — naming, typing, and structure. No drive-by refactors in the same PR unless required.
