@@ -7,7 +7,10 @@ from typing import Any
 
 import pytest
 
-from orga_drone.ffmpeg_bin import subprocess_no_window_kwargs
+from orga_drone.ffmpeg_bin import (
+    subprocess_below_normal_kwargs,
+    subprocess_no_window_kwargs,
+)
 
 
 def test_subprocess_no_window_kwargs_on_windows(
@@ -38,6 +41,28 @@ def test_subprocess_no_window_kwargs_non_windows(
 ) -> None:
     monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", platform)
     assert subprocess_no_window_kwargs() == {}
+
+
+def test_preview_processes_keep_no_window_and_lower_priority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", "win32")
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(
+        subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000, raising=False
+    )
+    kwargs = subprocess_below_normal_kwargs()
+    assert kwargs["creationflags"] == 0x08000000 | 0x00004000
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_preview_processes_lower_priority_only_on_windows(
+    monkeypatch: pytest.MonkeyPatch, platform: str
+) -> None:
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.sys.platform", platform)
+    assert subprocess_below_normal_kwargs() == {}
 
 
 def test_run_ffmpeg_pass_creationflags_on_windows(

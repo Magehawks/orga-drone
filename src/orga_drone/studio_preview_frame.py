@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
 from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
@@ -301,7 +301,7 @@ def render_preview_frame(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 timeout=PREVIEW_FFMPEG_TIMEOUT_S,
-                **subprocess_no_window_kwargs(),
+                **subprocess_below_normal_kwargs(),
             )
         except subprocess.TimeoutExpired as exc:
             raise PreviewFrameError(

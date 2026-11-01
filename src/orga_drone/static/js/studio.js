@@ -2783,39 +2783,79 @@
     return String(state.activeStudioId) === String(clip.dataset.studioId);
   }
 
+  function dropLutProxyPrepare(id) {
+    const stale = lutProxyPrepare.get(id);
+    if (stale && stale.timer) window.clearTimeout(stale.timer);
+    lutProxyPrepare.delete(id);
+  }
+
   function scheduleLutProxyPrepare(clip, delay = 300) {
     if (!clip || !clip.dataset.studioId) return;
     const id = String(clip.dataset.studioId);
     if (lutWebglCanHandle(clip)) {
       clip.dataset.lutProxyUrl = "";
-      const stale = lutProxyPrepare.get(id);
-      if (stale && stale.timer) window.clearTimeout(stale.timer);
-      lutProxyPrepare.delete(id);
+      dropLutProxyPrepare(id);
       return;
     }
     if (!lutProxyEligible(clip)) {
       clip.dataset.lutProxyUrl = "";
-      const stale = lutProxyPrepare.get(id);
-      if (stale && stale.timer) window.clearTimeout(stale.timer);
-      lutProxyPrepare.delete(id);
+      dropLutProxyPrepare(id);
       return;
     }
     const key = lutProxyPrepareKey(clip);
     let stateForClip = lutProxyPrepare.get(id);
+    if (!stateForClip) {
+      stateForClip = {
+        token: 0,
+        key,
+        pending: false,
+        failed: false,
+        timer: 0,
+        inFlight: false,
+        queuedKey: "",
+      };
+      lutProxyPrepare.set(id, stateForClip);
+    }
     // Keep the pending timer: a second selection/grade call with the same key
     // must not clear it and then return without scheduling a new one.
-    if (stateForClip && stateForClip.key === key && stateForClip.pending) return;
-    if (stateForClip && stateForClip.timer) {
+    if (stateForClip.key === key && stateForClip.pending) return;
+    if (
+      !stateForClip.inFlight &&
+      !stateForClip.timer &&
+      stateForClip.key === key &&
+      clip.dataset.lutProxyUrl
+    ) {
+      return;
+    }
+    stateForClip.key = key;
+    if (stateForClip.timer) {
       window.clearTimeout(stateForClip.timer);
       stateForClip.timer = 0;
     }
-    if (clip.dataset.lutProxyUrl && (!stateForClip || stateForClip.key === key)) return;
+    // Any proxy for older settings must not stand in for the new grade.
     clip.dataset.lutProxyUrl = "";
-    const token = (stateForClip ? stateForClip.token : 0) + 1;
-    stateForClip = { token, key, pending: true, failed: false, timer: 0 };
-    lutProxyPrepare.set(id, stateForClip);
+    if (stateForClip.inFlight) {
+      // One full render at a time. Keep only the newest pending settings so a
+      // burst of slider releases never starts several FFmpeg jobs at once.
+      stateForClip.queuedKey = key;
+      stateForClip.pending = true;
+      stateForClip.failed = false;
+      stateForClip.token += 1;
+      return;
+    }
+    startLutProxyBuild(clip, id, stateForClip, key, delay);
+  }
+
+  function startLutProxyBuild(clip, id, stateForClip, key, delay) {
+    stateForClip.key = key;
+    stateForClip.queuedKey = "";
+    stateForClip.pending = true;
+    stateForClip.failed = false;
+    stateForClip.token += 1;
+    const token = stateForClip.token;
     stateForClip.timer = window.setTimeout(async () => {
       stateForClip.timer = 0;
+      stateForClip.inFlight = true;
       try {
         const res = await fetch(`/api/studio/${id}/playback-proxy`, {
           method: "POST",
@@ -2831,7 +2871,13 @@
         }
         const data = await res.json();
         if (lutProxyPrepare.get(id) !== stateForClip || stateForClip.token !== token) return;
-        if (lutProxyPrepareKey(clip) !== key) return;
+        if (lutProxyPrepareKey(clip) !== key) {
+          // The user kept editing while this render was running. The next
+          // persisted save schedules one build for the final settings.
+          stateForClip.pending = false;
+          stateForClip.key = "";
+          return;
+        }
         const url = data && data.url ? String(data.url) : "";
         if (!url) {
           stateForClip.pending = false;
@@ -2854,6 +2900,13 @@
           stateForClip.pending = false;
           stateForClip.failed = true;
           if (isActiveClip(clip)) setLutPreviewChip(msgLutChipFailed);
+        }
+      } finally {
+        stateForClip.inFlight = false;
+        if (lutProxyPrepare.get(id) === stateForClip && stateForClip.queuedKey) {
+          const latestKey = stateForClip.queuedKey;
+          stateForClip.queuedKey = "";
+          startLutProxyBuild(clip, id, stateForClip, latestKey, 0);
         }
       }
     }, delay);

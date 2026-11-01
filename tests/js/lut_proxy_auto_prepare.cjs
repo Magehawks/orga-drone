@@ -69,7 +69,8 @@ function reply(request, url) {
   await settle();
   assert.equal(clip.dataset.lutProxyUrl, '/proxy/100');
 
-  // LUT strength changes invalidate and supersede the first response.
+  // A burst of LUT strength changes keeps one render in flight and coalesces
+  // later edits into a single follow-up render for the newest settings.
   requests.length = 0;
   clip.dataset.lutProxyUrl = '';
   look = { ...look, creative_strength: 50 };
@@ -77,14 +78,19 @@ function reply(request, url) {
   context.scheduleLutProxyPrepare(clip, 0);
   await fire();
   assert.equal(requests.length, 1);
+  look = { ...look, creative_strength: 75 };
+  clip.dataset.colorLook = JSON.stringify(look);
+  context.scheduleLutProxyPrepare(clip, 0);
   look = { ...look, creative_strength: 100 };
   clip.dataset.colorLook = JSON.stringify(look);
   context.scheduleLutProxyPrepare(clip, 0);
   await fire();
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 1, 'no second render starts while one is running');
   reply(requests[0], '/proxy/stale');
   await settle();
   assert.equal(clip.dataset.lutProxyUrl, '', 'stale response cannot activate');
+  await fire();
+  assert.equal(requests.length, 2, 'one final render uses the newest settings');
   reply(requests[1], '/proxy/final');
   await settle();
   assert.equal(clip.dataset.lutProxyUrl, '/proxy/final');
@@ -156,6 +162,8 @@ function reply(request, url) {
   context.scheduleLutProxyPrepare(clip, 0);
   await fire();
   assert.equal(requests.length, 1, 'wheels-only prepares a playback proxy');
+  reply(requests[0], '/proxy/wheels');
+  await settle();
 
   // A changed HSL must supersede the cached proxy for the same LUT.
   requests.length = 0;
