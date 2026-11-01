@@ -25,8 +25,9 @@ Research the real repository first. Do not implement application code.
 4. `docs/PRODUCT_VISION.md`
 5. `docs/ROADMAP.md`
 6. `docs/ARCHITECTURE.md`
-7. Relevant ADRs in `docs/decisions/`
-8. Existing source and tests in the affected areas
+7. `docs/STUDIO_MODULES.md` when the plan touches Studio frontend code
+8. Relevant ADRs in `docs/decisions/`
+9. Existing source and tests in the affected areas
 
 ## CTO checklist
 

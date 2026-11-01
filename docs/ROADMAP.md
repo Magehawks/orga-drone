@@ -52,17 +52,16 @@ Highlights:
 Not scheduled commitments — candidate improvements toward the **Studio MVP
 (target)** journey and core library quality:
 
-1. Export cancel / abort during long renders
-2. **Cheaper directory walks** (unchanged files already skip metadata extraction by size and mtime; scan progress is available)
-3. **Broader multi-brand parsers** beyond DJI-first depth
-4. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
+1. **Cheaper directory walks** (unchanged files already skip metadata extraction by size and mtime; scan progress is available)
+2. **Broader multi-brand parsers** beyond DJI-first depth
+3. **Installers and multi-OS release builds** (Windows MSIX, macOS, Linux).
    The Windows onefolder zip Actions workflow is available; it is not an
    installer and it does not publish on merge.
-5. Online geocoding providers (place tags are offline today)
-6. **itch.io Windows channel** via butler for the existing onefolder build.
+4. Online geocoding providers (place tags are offline today)
+5. **itch.io Windows channel** via butler for the existing onefolder build.
    The process is documented for a Draft/Restricted test. A public paid
    launch waits on the A→B app-update record. This is not an in-app updater.
-7. ~~Studio creative LUT strength animation (#211 PR3)~~ — shipped on the
+6. ~~Studio creative LUT strength animation (#211 PR3)~~ — shipped on the
    shared color-point engine (`lut_fade_in` / `lut_fade_out` + Manual
    `lut_strength`). Conversion LUT stays static.
 

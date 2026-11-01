@@ -18,7 +18,7 @@ Do not invent layers, services, or plugins that are not present.
 | App icon | Local PNG/ICO under `static/icons/` (Windows EXE from `packaging/assets/orga-drone.ico`) |
 | Packaging | setuptools (`src` layout); PyInstaller onefolder Windows zip. itch.io butler process is documented in `packaging/itch/` and is not an in-app updater |
 | Tests | pytest under `tests/` |
-| CI | GitHub Actions on pull requests: Ruff, MyPy, pytest, plus a separate **App journey smoke** check (`tests/test_pr_journey_smoke.py`, synthetic JPEG, no private library). Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `docs/PR_E2E.md` and `packaging/README.md`. |
+| CI | GitHub Actions on pull requests: Ruff, MyPy, pytest, JavaScript lint/format/tests (Node 22), plus a separate **App journey smoke** check (`tests/test_pr_journey_smoke.py`, synthetic JPEG, no private library). Windows onefolder zip on manual dispatch and `vX.Y.Z` tags (draft release; a maintainer publishes after the MOTW smoke test). See `docs/PR_E2E.md` and `packaging/README.md`. |
 
 Entry: `python -m orga_drone` → `src/orga_drone/__main__.py` →
 `create_app()` in `src/orga_drone/app.py`.
@@ -146,54 +146,33 @@ Browse Timeline (`browse_timeline.py`, `view=timeline`) groups the same indexed
 photos and videos by recording date. It reuses Browse filters and pagination
 and does not call the Studio story timeline.
 Studio page: Jinja layout + `static/js/studio.js` (project browser/switcher,
-project title, reorder/duration/cut APIs; `GET /studio` restores the last-opened
-project from `app_state`; synced Story preview via `/stream`/`/proxy`; local MP4
-export via async job
-`POST /api/studio/export` + poll `GET /api/studio/export/jobs/{id}` with
-determinate progress in the export dialog (one elapsed-time readout, current
-clip label; within-clip ffmpeg progress, then the final concat re-encode, so
-the bar reaches about 100% when that encode ends). An export never replaces an existing file.
-If the requested name is taken, or it is a library source, soundtrack, or project
-asset, the file is written to the next free numbered name (`video.mp4`, then
-`video_1.mp4`, then `video_2.mp4`). That name is claimed exclusively. If it is
-taken before the claim, the next free name is used. The success banner shows the
-name that was written. On success the dialog closes and Studio
-shows a dismissible banner with Open video / Show in folder
-(`POST /api/studio/export/open` and `/reveal`; Windows desktop; last
-successful output only). The media detail page exports that one photo or
-video through the same job, cancel, and open/reveal routes
-(`POST /api/media/{id}/export`). Info holds date, drone, and the other file
-facts with rating, tags, notes, albums, rename, and flow merge. Studio is
-Share; photo image adjustment is Image; the file export is Export; the map and
-GPS are Location when coordinates exist. A video has no Image tab. On a desktop
-window the picture stays on the left and these tabs stay on the right. Single
-clip / Complete flight stays with the picture.
-A photo is a local still (best quality copies
-a readable image when the grade is neutral; WhatsApp, Instagram, and TikTok
-are JPEG presets, not uploads). Studio Quick Looks plus brightness, contrast,
-saturation, warmth, and fine-tune tonals use the Studio ffmpeg grade before
-that preset. Neutral omits the grade. The library file is not modified. The
-grade (and optional look id) is stored on ``media_meta``
-(``image_adjust_json``), the same path and identity key as stars and notes, so a
-rescan can attach it again. Reset stores neutral. Best quality accepts JPEG or
-PNG; PNG is a re-encode. Preview uses the same CSS approximation as Studio. A video is one clip on the Studio encoder (best quality uses the
-highest existing resolution; those three presets are a 1080×1920 frame with
-the picture fitted inside it). Desktop save dialog. Optional project soundtrack
-playlist (`studio_audio_clips`, up to 8 songs) is previewed and mixed into the
-MP4; one project-level offset can delay the whole bed while keeping the songs
-sequential; Title Cards are
-generated `studio_clips` (HTML preview + ephemeral Pillow still on export);
-visual transitions Cut / Fade through black / Crossfade persist on the outgoing
-clip and render in preview + MP4). The Story timeline is a shared time canvas
-(`px/s` Fit/zoom; ruler, clips, playhead and the soundtrack coverage spans share
-one mapping; one project-level start moves the full bed; soundtrack tile width follows each song’s effective
-duration; transitions are labeled boundary overlays). Selected vs
-playhead-active clips use distinct chrome; the Inspector names the selected
-object. The open project title sits with a labeled **Projects** switcher;
-**Export** is the share action; **Clear Studio** is on the Story toolbar and
-clears `studio_clips` only. Transport/editing controls use vendored Lucide icons
-(`static/vendor/lucide/`; see README there). Export cancel/abort remains out of
-scope.
+project title, Story timeline, inspector, preview, music, and export dialog).
+`GET /studio` restores the last-opened project from `app_state`; Story preview
+uses `/stream` and `/proxy`. Export is an async job (`POST /api/studio/export`)
+polled through `GET /api/studio/export/jobs/{id}`. Progress is determinate: the
+dialog shows one elapsed-time readout and the current clip; Cancel stops the
+running encode. An export never replaces an existing file. A taken name is
+written as the next free numbered name and shown in the success banner. Open
+video / Show in folder use `/api/studio/export/open` and `/reveal` on Windows
+desktop. The media detail page exports one file through the same job, cancel,
+and open/reveal routes (`POST /api/media/{id}/export`).
+
+The Studio frontend is currently one IIFE with a DOM-backed clip model. The
+target module map, dependency rules, state ownership, endpoints, and migration
+order are in [`STUDIO_MODULES.md`](STUDIO_MODULES.md). Do not move playback,
+proxy/cache, audio-sync, or export color-order code without a dedicated issue.
+
+Detail page: Info holds date, drone, the other file facts, rating, tags, notes,
+albums, rename, and flow merge. Studio is Share; photo adjustment is Image; the
+file export is Export; map and GPS are Location when coordinates exist. A video
+has no Image tab. On a desktop window the picture stays left and the tabs stay
+right. A photo is a local still (best quality, or a local WhatsApp / Instagram /
+TikTok JPEG preset; nothing is uploaded). Neutral best quality copies readable
+original bytes; a moved slider uses the Studio grade before the preset. The
+grade and optional look id are stored on `media_meta` (`image_adjust_json`), so
+a matching rescan can attach them again. Best quality accepts JPEG or PNG; PNG
+is a re-encode. A video stays an MP4 from the Studio encoder and does not get
+the photo sliders. The library file is never modified.
 
 Typical user flow:
 
@@ -227,6 +206,7 @@ add folder → scan/parse (unchanged files skip extraction) → SQLite index →
 
 - Product: `docs/PRODUCT_VISION.md`
 - Roadmap: `docs/ROADMAP.md`
+- Studio frontend target modules: `docs/STUDIO_MODULES.md`
 - Decisions: `docs/decisions/`
 - Packaging: `packaging/README.md`
 - Pull-request journey check: `docs/PR_E2E.md`

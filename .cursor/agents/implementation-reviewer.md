@@ -22,6 +22,7 @@ Assume you did **not** write the implementation. Be adversarial but practical: l
 5. Relevant source, tests and ADRs
 6. CI/test evidence
 7. `docs/PRODUCT_VISION.md` and `docs/ARCHITECTURE.md` when product truth or architecture changed
+8. `docs/STUDIO_MODULES.md` when the diff touches Studio frontend modules
 
 ## Review checklist
 

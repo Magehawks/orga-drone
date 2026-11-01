@@ -56,7 +56,7 @@ Use the built-in Studio to arrange clips and photos, trim footage, add titles, t
 
 **Other platforms:** macOS and Linux can run the Python application from source; packaged desktop downloads are currently Windows-focused.
 
-[Installation and developer instructions](docs/PRODUCT_VISION.md)
+[Installation and developer instructions](CONTRIBUTING.md)
 
 ## Help shape Orga Drone
 
@@ -71,9 +71,11 @@ Found a bug or have an idea? [Open an issue](https://github.com/Magehawks/orga-d
 Orga Drone is developed in the open. DJI Avata 2 has been the primary development reference; compatibility and telemetry coverage can vary by camera and file format.
 
 - [Short user help](docs/user/README.md)
+- [Contributing and development setup](CONTRIBUTING.md)
+- [Current architecture](docs/ARCHITECTURE.md)
+- [Studio frontend module map](docs/STUDIO_MODULES.md)
 - [UX writing standard](docs/UX_WRITING.md)
 - [Product vision](docs/PRODUCT_VISION.md)
-- [Technical documentation and setup](docs/PRODUCT_VISION.md)
 - [Issues and feature requests](https://github.com/Magehawks/orga-drone/issues)
 - [Get the Windows app on itch.io](https://magehawks.itch.io/orga-drone)
 
