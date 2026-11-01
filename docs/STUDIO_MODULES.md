@@ -1,9 +1,9 @@
-# Studio Frontend Modules (Target)
+# Studio Frontend Modules
 
-Status: **target architecture, not the current implementation.** The current
-Studio UI is one ES module entry, `src/orga_drone/static/js/studio.js` (~12k
-lines). The JavaScript tooling and CI from PR 1 and the ES-module entry from
-PR 3 are in place. No frontend module has been extracted yet.
+Status: **one module extracted, target architecture still in progress.** The
+Studio UI still boots from `src/orga_drone/static/js/studio.js` (~11.6k lines).
+The JavaScript tooling and CI from PR 1, the ES-module entry from PR 3, and the
+export UI module are in place. Every other feature remains in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -18,8 +18,10 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
-- `studio.js` is an ES module entry (IIFE internally) with roughly 495 function
+- `studio.js` is an ES module entry (IIFE internally) with roughly 470 function
   declarations.
+- `studio/export.js` owns the export dialog, options, progress, cancel, and
+  success-banner behavior. `studio.js` only imports and initializes it.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
 - There are nine save chains and fourteen `save*` functions with repeated
@@ -58,7 +60,7 @@ existing tests and the PyInstaller static path keep working.
 | Module | Responsibility | Public interface | Allowed dependencies | Owns state | Backend endpoints | Tests / fixtures | Forbidden |
 |---|---|---|---|---|---|---|---|
 | `studio/project-browser.js` | Gallery/switcher, create/open/rename/delete | `initProjectBrowser({root, dialog, messages, defaultTitle, onError, beforeOpen})` | `api` | dialog/focus state | `/api/studio/projects*`, `/open` | Node action routing; Python route tests | Story grid, playback, export |
-| `studio/export.js` | Export dialog, options, progress, cancel, success banner | `initExportUi({projectId, messages, pickSaveFile})` | `api`, `format` | dialog/poll/timer state | `/api/studio/export*`, `/api/desktop/pick-save-file` | Node filename/phase tests; `test_export_*` | `state`, `clip-model`, Story DOM |
+| `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | none; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
 | `studio/inspector/detail.js` | Sharpen/denoise panel | `createDetailControls({getSelectedClip, refresh, showError, setSaved})` | `clip-model`, `settings`, `format` | panel state | `PATCH /api/studio/{id}/detail` | Node clamp/read/write; Python roundtrip | other inspector panels |
 | `studio/inspector/image.js` | Image sliders and Quick Looks | `createImageControls({...})` | `clip-model`, `settings`, `preview` callback | panel state | `/image`, `/look` | Node neutral/clamp; pixel parity | playback, timeline |
 | `studio/inspector/color.js` | HSL, wheels, LUT, color points | `createColorControls({...})` | `clip-model`, `settings`, `preview` | panel state | `/hsl`, `/color-wheels`, `/color`, `/color-animation` | Node math; Python pixel parity | direct proxy-cache access |
@@ -147,7 +149,7 @@ written. Prefer function names over line numbers.
 
 | Studio change | Current location | Target module |
 |---|---|---|
-| Export dialog, polling, cancel, success banner | `studio.js:9076-9600` | `studio/export.js` |
+| Export dialog, polling, cancel, success banner | `studio/export.js` | `studio/export.js` (implemented) |
 | Project gallery/switcher | `studio.js:121-241` | `studio/project-browser.js` |
 | Time/template/zoom formatting | `studio.js:492-615, 5065, 6310, 9130` | `studio/format.js` |
 | Clip timing, transitions, section points | `studio.js:609-1830, 6708-6770` | `studio/clip-model.js` |
@@ -178,7 +180,7 @@ Each step is independently mergeable and behavior-neutral.
 
 1. **PR 1 (done):** JavaScript tooling and CI for new module paths.
 2. **PR 3 (done):** one ES-module entry point; no code moved.
-3. **Export UI:** smallest self-contained feature; no app state dependencies.
+3. **PR 4 (done):** export UI extracted to `studio/export.js`; no app state dependencies.
 4. **Project browser + formatting:** pure/small modules.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
 6. **Settings scheduler:** one save pipeline for image/HSL/wheels first.

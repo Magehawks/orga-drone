@@ -99,7 +99,7 @@ def test_single_clip_concat_progress_does_not_stall_at_50() -> None:
 
 
 def test_export_progress_dialog_shows_one_time() -> None:
-    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    script = Path("src/orga_drone/static/js/studio/export.js").read_text(encoding="utf-8")
     start = script.index("function updateExportProgress")
     end = script.index("function setExportRunningUi")
     body = script[start:end]
