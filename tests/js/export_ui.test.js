@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   createExportUi,
   exportPhaseLabel,
-  formatExportDuration,
   suggestionForHeight,
 } from "../../src/orga_drone/static/js/studio/export.js";
 
@@ -276,10 +275,7 @@ function exportHandler({ jobResponses } = {}) {
   };
 }
 
-test("formats export durations and phase labels", () => {
-  assert.equal(formatExportDuration(0), "0:00");
-  assert.equal(formatExportDuration(59.6), "1:00");
-  assert.equal(formatExportDuration(3661), "1:01:01");
+test("formats export phase labels", () => {
   const messages = {
     preparing: "Preparing",
     combining: "Combining",

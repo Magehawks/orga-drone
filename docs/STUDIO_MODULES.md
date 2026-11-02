@@ -44,8 +44,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/proxy-policy.js` owns the pure LUT proxy eligibility, WebGL handling
   gate, and cache-key rules. `studio.js` still reads clip state and owns the
   proxy scheduling, fetch, cache, and UI-chip orchestration.
-- The DOM is the clip data store. Server-rendered `data-*` JSON is read and
-  written directly by many functions; there is no clip API.
+- The DOM is the clip data store. `studio/clip-model.js` is the read/write
+  facade for migrated fields, but legacy functions still read and write
+  `data-*` directly. There is no separate clip shadow state.
 - There are eight save chains and thirteen `save*` functions with repeated
   debounce, snapshot, and refresh logic.
 - Studio routes live in `app.py` (61 of 118 routes). `/studio` builds a large
@@ -84,7 +85,7 @@ existing tests and the PyInstaller static path keep working.
 | Module | Responsibility | Public interface | Allowed dependencies | Owns state | Backend endpoints | Tests / fixtures | Forbidden |
 |---|---|---|---|---|---|---|---|
 | `studio/project-browser.js` | **Implemented.** Server-rendered project list actions: create/open/rename/delete, prompts, dialog lifecycle, errors | `createProjectBrowser({root, documentImpl, dialog, openButton, closeButton, defaultTitle, messages, fetchImpl, readJson, navigate, reload, prompt, confirm, showError, beforeOpen})` returns `{init, destroy}` | none; browser APIs and JSON reader are injected or defaulted | dialog/focus state, action errors | `/api/studio/projects*`, `/open`, `PATCH`, `DELETE` | `tests/js/project_browser.test.js`; Python route tests | Story grid, playback, export, client-side project list rendering |
-| `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | none; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
+| `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | `format`; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
 | `studio/inspector/detail.js` | **Implemented.** Sharpen/denoise panel | `createDetailControls({getSelectedClip, getClipById, setSaved, showError, refresh, errorMessage, fetchImpl, readJson})`; returns `bind`, `destroy`, `fill`, `queueSave`, `read`, `write`, `neutral`, `clamp` | `settings`; DOM/fetch/timers injected | panel DOM and detail save | `PATCH /api/studio/{id}/detail` | `tests/js/inspector_detail.test.js`; Python roundtrip | other inspector panels |
 | `studio/inspector/image.js` | Image sliders and Quick Looks | `createImageControls({...})` | `clip-model`, `settings`, `preview` callback | panel state | `/image`, `/look` | Node neutral/clamp; pixel parity | playback, timeline |
 | `studio/inspector/color.js` | HSL, wheels, LUT, color points | `createColorControls({...})` | `clip-model`, `settings`, `preview` | panel state | `/hsl`, `/color-wheels`, `/color`, `/color-animation` | Node math; Python pixel parity | direct proxy-cache access |
@@ -115,6 +116,10 @@ settings ─> clip-model, api
 clip-model ─> format
 api, format, state ─> no internal Studio modules
 ```
+
+The diagram is the target dependency shape. In the current tree,
+`settings.js` and `clip-model.js` import no internal Studio modules;
+`export.js` imports `format.js`; `inspector/detail.js` imports `settings.js`.
 
 1. No module imports `studio.js`.
 2. Feature modules do not import other feature modules. Share through core

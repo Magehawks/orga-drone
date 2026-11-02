@@ -1,7 +1,5 @@
 import { formatExportDuration } from "./format.js";
 
-export { formatExportDuration };
-
 const DEFAULT_MESSAGES = {
   failed: "Export failed.",
   cancelled: "Export cancelled.",
