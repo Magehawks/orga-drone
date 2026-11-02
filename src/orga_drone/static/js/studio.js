@@ -3,6 +3,11 @@ import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
 import { createDetailControls } from "./studio/inspector/detail.js";
+import {
+  evaluateLutProxyEligibility,
+  evaluateLutWebglHandling,
+  lutProxyPrepareKey as proxyPrepareKey,
+} from "./studio/proxy-policy.js";
 
 /**
  * Creator Studio UI.
@@ -1675,24 +1680,40 @@ import { createDetailControls } from "./studio/inspector/detail.js";
     };
   }
 
+  function colorAnimationKeys(clip) {
+    const anim = readColorAnimation(clip);
+    return anim && Array.isArray(anim.keys) ? anim.keys.length : 0;
+  }
+
+  function hslActive(clip) {
+    return !hslIsNeutral(readHsl(clip));
+  }
+
+  function colorWheelsActive(clip) {
+    return !colorWheelsIsNeutral(readColorWheels(clip));
+  }
+
+  function saturationRampEnabled(clip) {
+    const ramp = readSaturationRamp(clip);
+    return !!(ramp && ramp.enabled);
+  }
+
   function lutProxyEligible(clip) {
     if (!clip || clip.dataset.kind !== "video") return false;
-    // Custom clip-audio trim/mute/offset uses the source audio element; keep
-    // that path on ordinary playback where those rules are already proven.
-    if (readClipAudio(clip)) return false;
-    if (playbackSpeed(clip) < 0.999 || slowBarOf(clip)) return false;
-    if (sectionRepeats(clip) > 1 || forwardLoopActive(clip)) return false;
-    const anim = readColorAnimation(clip);
-    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return false;
-    const ramp = readSaturationRamp(clip);
-    if (ramp && ramp.enabled) return false;
-    const look = readColorLook(clip);
-    if ((look.conversion_lut && look.conversion_confirmed) || look.creative_lut) {
-      return true;
-    }
-    // The WebGL LUT renderer does not sample the generated HSL/wheel cubes, so
-    // these stages need the rendered proxy too (with or without a LUT).
-    return !hslIsNeutral(readHsl(clip)) || !colorWheelsIsNeutral(readColorWheels(clip));
+    const hasLut = lookHasLut(readColorLook(clip));
+    return evaluateLutProxyEligibility({
+      kind: clip.dataset.kind,
+      hasClipAudio: !!readClipAudio(clip),
+      playbackSpeed: playbackSpeed(clip),
+      hasSlowBar: !!slowBarOf(clip),
+      sectionRepeats: sectionRepeats(clip),
+      forwardLoopActive: forwardLoopActive(clip),
+      colorAnimationKeys: colorAnimationKeys(clip),
+      saturationRampEnabled: saturationRampEnabled(clip),
+      hasLut,
+      hslActive: hasLut ? false : hslActive(clip),
+      colorWheelsActive: hasLut ? false : colorWheelsActive(clip),
+    });
   }
 
   function lutProxySrcFor(clip) {
@@ -1720,14 +1741,14 @@ import { createDetailControls } from "./studio/inspector/detail.js";
   function lutWebglCanHandle(clip) {
     if (!clip || clip.dataset.kind !== "video") return false;
     if (!window.OrgaLutPreview || !window.OrgaLutPreview.supported) return false;
-    const anim = readColorAnimation(clip);
-    if (anim && Array.isArray(anim.keys) && anim.keys.length >= 2) return false;
-    // The WebGL preview renders grade + user LUT. HSL and colour wheels are
-    // generated LUT stages that the current shader does not sample, so use the
-    // still/proxy path until the renderer supports them.
-    if (!hslIsNeutral(readHsl(clip))) return false;
-    if (!colorWheelsIsNeutral(readColorWheels(clip))) return false;
-    return lookHasLut(readColorLook(clip));
+    return evaluateLutWebglHandling({
+      kind: clip.dataset.kind,
+      webglSupported: true,
+      colorAnimationKeys: colorAnimationKeys(clip),
+      hslActive: hslActive(clip),
+      colorWheelsActive: colorWheelsActive(clip),
+      hasLut: lookHasLut(readColorLook(clip)),
+    });
   }
 
   function lutRendererFor(media) {
@@ -2618,11 +2639,7 @@ import { createDetailControls } from "./studio/inspector/detail.js";
   const lutProxyPrepare = new Map();
 
   function lutProxyPrepareKey(clip) {
-    return JSON.stringify([
-      clip.dataset.colorLook, clip.dataset.imageAdjust, clip.dataset.hsl,
-      clip.dataset.colorWheels, clip.dataset.sourceIn, clip.dataset.sourceOut,
-      clip.dataset.saturationRamp, clip.dataset.playbackSpeed,
-    ]);
+    return proxyPrepareKey(clip.dataset);
   }
 
   function lutProxyPreparingFor(clip) {

@@ -2,10 +2,11 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
+const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy.js');
 const script = fs.readFileSync('src/orga_drone/static/js/studio.js', 'utf8');
 function section(start, end) { return script.split(start)[1].split(end)[0]; }
 const source =
-  'function lutProxyEligible' + section('function lutProxyEligible', 'function imageSrcFor') +
+  'function colorAnimationKeys' + section('function colorAnimationKeys', 'function imageSrcFor') +
   'const lutProxyPrepare' + section('const lutProxyPrepare', 'function canvasFilterFrom');
 const timers = [];
 const requests = [];
@@ -41,8 +42,6 @@ const context = {
   syncCount: 0,
   String, JSON, Math,
 };
-vm.createContext(context);
-vm.runInContext(source, context);
 const clip = {
   dataset: {
     kind: 'video', studioId: '1', colorLook: '{}', imageAdjust: '{}',
@@ -59,6 +58,11 @@ function reply(request, url) {
   request.resolve({ ok: true, json: async () => ({ url }) });
 }
 (async () => {
+  const policy = await policyPromise;
+  context.evaluateLutProxyEligibility = policy.evaluateLutProxyEligibility;
+  context.proxyPrepareKey = policy.lutProxyPrepareKey;
+  vm.createContext(context);
+  vm.runInContext(source, context);
   context.scheduleLutProxyPrepare(clip, 0);
   context.scheduleLutProxyPrepare(clip, 0);
   assert.equal(context.lutProxyPreparingFor(clip), true);
