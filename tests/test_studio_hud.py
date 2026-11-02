@@ -263,7 +263,7 @@ def test_export_chain_uses_source_clock_and_hides_the_gap(
     assert over.index("format=yuv420p") < over.index("fade=t=in")
     script = tmp_path / "long.txt"
     args = video_filter_args("x" * (FILTER_INLINE_LIMIT + 1), script_path=script, complex_graph=False)
-    assert args[0] == "-filter_script:v"
+    assert args[0] == "-/filter:v"
     assert script.read_text(encoding="utf-8").startswith("x")
     stitch = build_stitch_filters(
         (

@@ -294,7 +294,7 @@ def test_long_filter_script_still_draws_the_flight_map(
         ),
     )
     extra, filters = _segment_filter_invocation(clip, 320, 180, tmp_path)
-    assert filters[0] == "-filter_complex_script"
+    assert filters[0] == "-/filter_complex"
     assert filters[-2:] == ["-map", "[vout]"]
     body = Path(filters[1]).read_text(encoding="utf-8")
     assert "flight-map-route.png" in " ".join(extra)
@@ -306,7 +306,7 @@ def test_long_filter_script_still_draws_the_flight_map(
 
 
 def _filter_graph_text(filters: list[str]) -> str:
-    if filters[0] in {"-filter_complex_script", "-filter_script:v"}:
+    if filters[0] in {"-/filter_complex", "-/filter:v"}:
         return Path(filters[1]).read_text(encoding="utf-8")
     return filters[1]
 
@@ -319,7 +319,7 @@ def test_flight_map_places_on_a_spilled_simple_filter(
     Orga Drone 2.0.0 failed a 17-clip Windows export with
     "The flight map could not be placed on this clip." The first clip was a
     127s video whose telemetry HUD exceeded the inline filter limit, so ffmpeg
-    received ``-filter_script:v``. The map only accepted ``-vf``.
+    received ``-/filter:v``. The map only accepted ``-vf``.
     """
     monkeypatch.setattr("orga_drone.studio_hud.FILTER_INLINE_LIMIT", 0)
     monkeypatch.setattr("orga_drone.studio_map.cached_osm_tile", lambda *_args, **_kwargs: None)
@@ -336,7 +336,7 @@ def test_flight_map_places_on_a_spilled_simple_filter(
         media_duration_s=4.0,
     )
     extra, filters = _segment_filter_invocation(photo, 320, 180, tmp_path)
-    assert filters[0] in {"-filter_complex", "-filter_complex_script"}
+    assert filters[0] in {"-filter_complex", "-/filter_complex"}
     body = _filter_graph_text(filters)
     assert "flight-map-route.png" in " ".join(extra)
     assert "flight-map-marker.png" in " ".join(extra)
@@ -346,7 +346,7 @@ def test_flight_map_places_on_a_spilled_simple_filter(
 
     plain = StudioExportClip(source_path=still, kind="photo", duration_s=2.0)
     _plain_extra, plain_filters = _segment_filter_invocation(plain, 320, 180, tmp_path)
-    assert plain_filters[0] == "-filter_script:v"
+    assert plain_filters[0] == "-/filter:v"
     assert "flight-map" not in _filter_graph_text(plain_filters)
 
     slowed = StudioExportClip(

@@ -382,7 +382,7 @@ def video_filter_args(
     if complex_graph:
         if inline:
             return ["-filter_complex", body, "-map", "[vout]"]
-        return ["-filter_complex_script", str(script_path), "-map", "[vout]"]
+        return ["-/filter_complex", str(script_path), "-map", "[vout]"]
     if inline:
         return ["-vf", body]
-    return ["-filter_script:v", str(script_path)]
+    return ["-/filter:v", str(script_path)]
