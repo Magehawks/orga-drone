@@ -1,11 +1,12 @@
 # Studio Frontend Modules
 
-Status: **five modules extracted and the settings scheduler started;
+Status: **six modules extracted and the settings scheduler started;
 target architecture still in progress.** The Studio UI still boots from
-`src/orga_drone/static/js/studio.js` (~11.5k lines). The JavaScript tooling and
+`src/orga_drone/static/js/studio.js` (~11.4k lines). The JavaScript tooling and
 CI from PR 1, the ES-module entry from PR 3, and the export UI, project browser,
-formatting, inspector detail, proxy policy, and settings modules are in place.
-Every other feature and the remaining save chains remain in the entry file.
+formatting, clip model, inspector detail, proxy policy, and settings modules are
+in place. Every other feature and the remaining save chains remain in the entry
+file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -29,6 +30,10 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/format.js` owns the shared time, lane-time, template, and export-clock
   formatters. Frame zoom formatting remains in the entry because it depends on
   the frame clamp.
+- `studio/clip-model.js` is the DOM-backed clip facade. It reads identity, type,
+  availability, source ranges, durations, playback speed, media URLs, and
+  display text, and exposes one narrow `setClipField` writer. It does not cache,
+  fetch, persist, or schedule work.
 - `studio/settings.js` owns serialized saves with optional debounce and one
   error callback. The Detail module is the first migrated consumer; image, HSL,
   wheels, masks, overlays, map, HUD, frame, saturation ramp, audio, color
@@ -69,7 +74,7 @@ existing tests and the PyInstaller static path keep working.
 | `studio.js` (entry) | Boot, messages, module wiring, history-fetch patch | none; initializes modules | all modules | boot/messages | none | Studio render smoke; existing pytest | feature logic, direct clip writes |
 | `studio/api.js` | HTTP and error normalization | `getJson`, `postJson`, `patchJson`, `del`, `StudioApiError` | none | none | all `/api/studio/*` | Node fake-`fetch` tests, error matrix | DOM, clip state, UI copy |
 | `studio/state.js` | Project id/title, selection, UI preferences | `get`, `set`, `subscribe`, `persist` | `api`, `format` | `projectId`, `title`, `selected`, `volume` | `PATCH /api/studio/projects/{id}` | Node state/storage roundtrip | clip data, playback time |
-| `studio/clip-model.js` | One API over clip `data-*` values | `list`, `get`, `duration`, `sourceRange`, `speed`, `sectionPoint`, `resolveAt`, `read*`, `write*` | `format` | **clip data (DOM as backing store)** | read-only; writes via `settings` | Node fake datasets, timing/transition fixtures | network, preview, save scheduler |
+| `studio/clip-model.js` | **Implemented.** DOM-backed clip facade | `listClipElements`, `findClip`, `clipId`, `clipKind`, `clipIsAvailable`, `clipCanPlay`, `clipHasProxy`, `clipMediaId`, `clipFilename`, `clipDisplayTitle`, `clipDisplaySubtitle`, `clipEffectiveDuration`, `clipSourceIn`, `clipSourceOut`, `clipMediaDuration`, `clipPlaybackSpeed`, `clipPhotoDuration`, `clipStreamUrl`, `clipProxyUrl`, `clipPreviewUrl`, `clipThumbUrl`, `clipDuration`, `setClipField` | none | **clip data (DOM as backing store)** | read-only; writes stay caller-owned | `tests/js/clip_model.test.js`; fake datasets | network, persistence, preview, save scheduler, shadow state |
 | `studio/settings.js` | **Implemented (Detail).** Serialized saves with optional debounce | `createSaver({url, method, payload, apply, refresh, errorMessage, onError, fetchImpl, readJson, debounceMs})` | none; fetch/JSON/timers are injected | save chains, pending keys, debounce timer | `/detail` (first); remaining endpoints move with their chains | `tests/js/settings.test.js`; fake fetch/timers | foreign DOM; other savers |
 | `studio/format.js` | **Implemented.** Shared pure formatting | `formatTemplate`, `formatTime`, `formatLaneTime`, `formatExportDuration` | none | none | none | `tests/js/format.test.js` | DOM, network, state |
 | `studio/proxy-policy.js` | **Implemented.** Pure LUT proxy policy | `evaluateLutProxyEligibility`, `evaluateLutWebglHandling`, `lutProxyPrepareKey` | none | none | none | `tests/js/proxy_policy.test.js`; existing proxy harnesses | DOM, fetch, timers, preview state, cache access |
@@ -125,7 +130,7 @@ api, format, state ─> no internal Studio modules
 | State | Owner | Readers |
 |---|---|---|
 | `projectId`, `title`, `selected` | `state.js` | entry, inspector, export, timeline |
-| Clip data (duration, source, effects) | `clip-model.js` (DOM) | preview, timeline, inspector, playback |
+| Clip data (duration, source, effects) | `clip-model.js` + DOM dataset (still authoritative) | preview, timeline, inspector, playback |
 | `projectTimeS`, `playing` | `playback.js` | preview, timeline, music, stills |
 | `timelineMode`, `zoomIndex` | `timeline.js` | entry, playback (read only) |
 | `tracks`, `musicStartS` | `music.js` | timeline spans, preview audio |
@@ -133,8 +138,10 @@ api, format, state ─> no internal Studio modules
 | Export dialog/poll state | `export.js` | entry open button |
 | Project dialog state | `project-browser.js` | entry open button |
 
-No module sets `projectTimeS` outside `playback.js`. No module writes clip
-`dataset` outside `clip-model.js`. No module manipulates another panel's DOM.
+Target rule after migration: no module sets `projectTimeS` outside
+`playback.js`, no module writes clip `dataset` outside `clip-model.js`, and no
+module manipulates another panel's DOM. Until then, legacy direct writes remain
+documented in the entry file.
 
 ## ES modules vs the current script
 
@@ -170,6 +177,7 @@ written. Prefer function names over line numbers.
 |---|---|---|
 | Export dialog, polling, cancel, success banner | `studio/export.js` | `studio/export.js` (implemented) |
 | Project gallery/switcher actions | `studio/project-browser.js` | `studio/project-browser.js` (implemented) |
+| Clip identity, type, display text, title-card writes | `studio/clip-model.js` | `studio/clip-model.js` (implemented) |
 | Sharpen/denoise panel | `studio/inspector/detail.js` | `studio/inspector/detail.js` (implemented) |
 | Time/template formatting | `studio/format.js` | `studio/format.js` (implemented) |
 | Frame zoom formatting | `studio.js` (`formatZoom`) | stays in the entry because it uses the frame clamp |
@@ -183,10 +191,41 @@ written. Prefer function names over line numbers.
 | Title cards, transitions, reuse, loops | `studio.js:7800-9080, 9689-10200` | `studio/timeline.js`, feature modules |
 | Overlays, HUD, map | `studio.js:10368-12100` | `studio/inspector/overlays.js`, `hud.js`, `map.js` |
 
+## Clip model boundaries
+
+`studio/clip-model.js` currently supports these clip dataset fields:
+
+- Identity/type: `studioId`, `kind`, `available`, `canPlay`, `hasProxy`, `mediaId`
+- Media text/URLs: `filename`, `displayTitle`, `displaySubtitle`, `streamUrl`, `proxyUrl`, `previewUrl`, `thumb`
+- Timing values: `effectiveDuration`, `sourceIn`, `sourceOut`, `mediaDuration`, `playbackSpeed`, `photoDuration`
+
+Writes are intentionally narrow: `setClipField` accepts only `photoDuration`,
+`effectiveDuration`, `title`, `subtitle`, `background`, `displayTitle`, and
+`displaySubtitle`. It changes the dataset only; callers still own persistence,
+layout, and preview refreshes.
+
+Migrated callers include clip enumeration, ordered ids, display names, playhead
+identity checks, adjustable clip selection, active-clip checks, clip selection
+identity/type/filename, title-card remove identity, and title-card display/field
+writes. This step routed 34 direct field accesses through the model; 269 remain
+in the entry. `studio.js` changed from 11,388 to 11,399 lines; the small increase
+is the import block.
+
+Remaining direct dataset access stays in the legacy entry for areas that are
+still tightly coupled: playback clock and audio sync, source/timing readers,
+proxy eligibility and cache invalidation, WebGL decisions, HSL/color-wheel save
+chains, timeline drag and transition math, forward-loop state,
+masks/overlays/map/HUD, export, and non-migrated title-card field reads. These
+areas must not be migrated as part of this clip-model step.
+
+New modules should use the clip API. Existing legacy access is allowed until
+the relevant area is migrated. There is no lint rule enforcing the boundary yet;
+enforce it only after the migration is complete.
+
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
-- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`, `proxy_policy.test.js`.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`, `proxy_policy.test.js`, `clip_model.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -205,7 +244,7 @@ Each step is independently mergeable and behavior-neutral.
 2. **PR 3 (done):** one ES-module entry point; no code moved.
 3. **PR 4 (done):** export UI extracted to `studio/export.js`; no app state dependencies.
 4. **PR 5 (done):** project browser and shared formatting extracted; server-rendered list stays server-rendered.
-5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
+5. **Clip model (done):** read facade plus narrow writes; DOM dataset remains authoritative; playback, proxy, and effect save chains stay legacy.
 6. **Settings scheduler (started):** `studio/settings.js` with serialized and optional debounced saves; Detail is migrated first. Image/HSL/wheels chains follow.
 7. **Inspector detail (done):** `studio/inspector/detail.js` with direct module tests.
 8. **Proxy policy (done):** pure LUT proxy eligibility, WebGL gate, and cache key; scheduling stays in the entry.

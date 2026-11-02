@@ -4,6 +4,15 @@ import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
 import { createDetailControls } from "./studio/inspector/detail.js";
 import {
+  clipDisplayTitle,
+  clipFilename,
+  clipId,
+  clipKind,
+  findClip,
+  listClipElements,
+  setClipField,
+} from "./studio/clip-model.js";
+import {
   evaluateLutProxyEligibility,
   evaluateLutWebglHandling,
   lutProxyPrepareKey as proxyPrepareKey,
@@ -354,20 +363,20 @@ import {
   let syncToken = 0;
 
   function clips() {
-    return Array.from(grid.querySelectorAll(".studio-clip"));
+    return listClipElements(grid);
   }
 
   function orderedIds() {
-    return clips().map((el) => Number(el.dataset.studioId));
+    return clips().map((el) => Number(clipId(el)));
   }
 
   function clipDisplayName(clip) {
     if (!clip) return "—";
-    if (clip.dataset.kind === "title_card") {
-      const title = (clip.dataset.displayTitle || "").trim();
+    if (clipKind(clip) === "title_card") {
+      const title = clipDisplayTitle(clip).trim();
       return title || kindLabels.title_card;
     }
-    const name = (clip.dataset.filename || "").trim();
+    const name = clipFilename(clip).trim();
     return name || kindLabels.unknown;
   }
 
@@ -375,9 +384,9 @@ import {
     if (!clip) return false;
     const hit = resolveAt(state.projectTimeS);
     if (!hit) return false;
-    const id = String(clip.dataset.studioId);
-    if (String(hit.clip.dataset.studioId) === id) return true;
-    return !!(hit.overlapClip && String(hit.overlapClip.dataset.studioId) === id);
+    const id = clipId(clip);
+    if (clipId(hit.clip) === id) return true;
+    return !!(hit.overlapClip && clipId(hit.overlapClip) === id);
   }
 
   function markActiveClips(primary, overlap) {
@@ -2650,7 +2659,7 @@ import {
 
   function isActiveClip(clip) {
     if (!clip || state.activeStudioId == null) return false;
-    return String(state.activeStudioId) === String(clip.dataset.studioId);
+    return String(state.activeStudioId) === clipId(clip);
   }
 
   function dropLutProxyPrepare(id) {
@@ -2799,8 +2808,9 @@ import {
 
   function selectedAdjustableClip() {
     if (!state.selected || state.selected.type !== "clip") return null;
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.selected.id));
-    if (!clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) return null;
+    const clip = findClip(grid, state.selected.id);
+    const kind = clipKind(clip);
+    if (!clip || (kind !== "video" && kind !== "photo")) return null;
     return clip;
   }
 
@@ -5644,7 +5654,7 @@ import {
       return;
     }
     const { clip, localS, atEnd } = hit;
-    state.activeStudioId = clip.dataset.studioId || null;
+    state.activeStudioId = clipId(clip) || null;
     markActiveClips(clip, hit.overlapClip);
 
     const kind = clip.dataset.kind || "unknown";
@@ -5702,7 +5712,7 @@ import {
     } else {
       const hit = resolveAt(state.projectTimeS);
       if (hit) {
-        state.activeStudioId = hit.clip.dataset.studioId || null;
+        state.activeStudioId = clipId(hit.clip) || null;
         markActiveClips(hit.clip, hit.overlapClip);
         applyTransitionPreview(hit);
       }
@@ -6680,16 +6690,17 @@ import {
 
   function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
     if (reuseDraft) {
-      const draftClipId = reuseDraft.clip && reuseDraft.clip.dataset.studioId;
+      const draftClipId = reuseDraft.clip && clipId(reuseDraft.clip);
       if (draftClipId == null || String(draftClipId) !== String(id)) cancelReuseDraft();
       else return;
     }
     state.selected = { type: "clip", id: String(id) };
-    const clip = clips().find((c) => String(c.dataset.studioId) === String(id));
+    const clip = findClip(grid, id);
     if (!clip) {
       updateRemoveEnabled();
       return;
     }
+    const kind = clipKind(clip);
     clips().forEach((c) => {
       c.classList.toggle("is-selected", c === clip);
       if (c === clip) c.setAttribute("aria-selected", "true");
@@ -6698,18 +6709,18 @@ import {
     grid.querySelectorAll(".studio-transition").forEach((el) => el.classList.remove("is-selected"));
     layoutMusicSpans();
 
-    if (clip.dataset.kind === "title_card") {
+    if (kind === "title_card") {
       showInspector("inspector-titlecard");
       setInspectorHeading(kindLabels.title_card);
       fillTitlecardInspector(clip);
     } else {
       showInspector("inspector-clip");
-      setInspectorHeading(kindLabels[clip.dataset.kind] || kindLabels.unknown);
+      setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
       const panel = document.getElementById("inspector-clip");
       if (!panel) return;
       panel.querySelector('[data-field="kind"]').textContent =
-        kindLabels[clip.dataset.kind] || kindLabels.unknown;
-      panel.querySelector('[data-field="filename"]').textContent = clip.dataset.filename || "";
+        kindLabels[kind] || kindLabels.unknown;
+      panel.querySelector('[data-field="filename"]').textContent = clipFilename(clip);
       panel.querySelector('[data-field="recorded"]').textContent = clip.dataset.recordedAt || "—";
       const dur = clipDuration(clip);
       const durationLine = panel.querySelector('[data-field="duration-line"]');
@@ -6723,8 +6734,8 @@ import {
       const photoReset = document.getElementById("inspector-photo-reset");
       const videoTiming = document.getElementById("inspector-video-timing");
       const removeForm = document.getElementById("inspector-remove-form");
-      const isPhoto = clip.dataset.kind === "photo";
-      const isVideo = clip.dataset.kind === "video";
+      const isPhoto = kind === "photo";
+      const isVideo = kind === "video";
       if (photoWrap) photoWrap.hidden = !isPhoto;
       if (photoReset) {
         photoReset.hidden = !isPhoto;
@@ -6782,7 +6793,8 @@ import {
       const hudWrap = document.getElementById("inspector-hud");
       if (hudWrap) hudWrap.hidden = !isVideo;
       if (isVideo) fillHud(clip);
-      setClipRemoveAction(removeForm, clip.dataset.studioId);
+      setClipRemoveAction(removeForm, clipId(clip));
+
       let storedTab = "clip";
       try {
         storedTab = sessionStorage.getItem("orga-drone.studio.inspectorTab") || "clip";
@@ -8983,10 +8995,9 @@ import {
   document.getElementById("studio-add-title-card-empty")?.addEventListener("click", addTitleCard);
 
   async function persistTitlecard() {
-    const clip = clips().find(
-      (c) => state.selected.type === "clip" && String(c.dataset.studioId) === String(state.selected.id)
-    );
-    if (!clip || clip.dataset.kind !== "title_card") return;
+    if (!state.selected || state.selected.type !== "clip") return;
+    const clip = findClip(grid, state.selected.id);
+    if (!clip || clipKind(clip) !== "title_card") return;
     const titleEl = document.getElementById("inspector-titlecard-title");
     const subEl = document.getElementById("inspector-titlecard-subtitle");
     const durEl = document.getElementById("inspector-titlecard-duration");
@@ -8998,24 +9009,24 @@ import {
       background: bgEl ? bgEl.value : "dark",
     };
     try {
-      const res = await fetch(`/api/studio/${clip.dataset.studioId}/title-card`, {
+      const res = await fetch(`/api/studio/${clipId(clip)}/title-card`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(payload),
       });
       const body = await readJson(res);
       if (!res.ok) throw new Error((body && body.detail) || msgTitleCardFailed);
-      clip.dataset.title = payload.title;
-      clip.dataset.subtitle = payload.subtitle;
-      clip.dataset.background = payload.background;
+      setClipField(clip, "title", payload.title);
+      setClipField(clip, "subtitle", payload.subtitle);
+      setClipField(clip, "background", payload.background);
       const durationS =
         body.duration_s != null ? Number(body.duration_s) : Number(payload.duration_s);
-      clip.dataset.effectiveDuration = String(durationS);
+      setClipField(clip, "effectiveDuration", durationS);
       clip.style.setProperty("--clip-flex", durationS.toFixed(4));
-      clip.dataset.displayTitle = body.display_title || payload.title;
-      clip.dataset.displaySubtitle = body.display_subtitle || payload.subtitle;
+      setClipField(clip, "displayTitle", body.display_title || payload.title);
+      setClipField(clip, "displaySubtitle", body.display_subtitle || payload.subtitle);
       const caption = clip.querySelector(".studio-clip-caption strong");
-      if (caption) caption.textContent = clip.dataset.displayTitle || "";
+      if (caption) caption.textContent = clipDisplayTitle(clip);
       const swatch = clip.querySelector(".studio-titlecard-swatch");
       if (swatch) swatch.setAttribute("data-bg", payload.background);
       const durLabel = clip.querySelector("[data-clip-duration]");
@@ -9023,11 +9034,11 @@ import {
         durLabel.textContent = `${durationS.toFixed(1)}s`;
       }
       const browserRow = document.querySelector(
-        `#studio-browser-story [data-studio-id="${clip.dataset.studioId}"]`
+        `#studio-browser-story [data-studio-id="${clipId(clip)}"]`
       );
       if (browserRow) {
         const browserCaption = browserRow.querySelector(".studio-browser-meta strong");
-        if (browserCaption) browserCaption.textContent = clip.dataset.displayTitle || "";
+        if (browserCaption) browserCaption.textContent = clipDisplayTitle(clip);
         const browserSwatch = browserRow.querySelector(".studio-titlecard-swatch");
         if (browserSwatch) browserSwatch.setAttribute("data-bg", payload.background);
       }
