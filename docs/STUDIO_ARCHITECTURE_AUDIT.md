@@ -1,18 +1,20 @@
 # Studio Architecture Audit
 
-Status: **checkpoint after PR #247.** This document describes the current
-implementation, not the target architecture. Product behavior is unchanged by
-PR 8.
+Status: **checkpoint after PR #248 and the PR 9 image-save migration.** This
+document describes the current implementation, not the target architecture.
+Product behavior is unchanged by PR 9: the image-adjust save chain now delegates
+to `studio/settings.js`, while saturation-ramp saves still share the existing
+`imageSaveChain`.
 
 ## 1. Current architecture state
 
 The Studio UI still boots from one large entry module:
 
-- `src/orga_drone/static/js/studio.js` (11,399 lines, 466 function declarations)
+- `src/orga_drone/static/js/studio.js` (11,398 lines, 465 function declarations)
 - `src/orga_drone/static/js/studio-lut-webgl.js` (side-effect module; exposes
   `window.OrgaLutPreview`)
 
-Seven modules are extracted under `src/orga_drone/static/js/studio/`:
+Eight modules are extracted under `src/orga_drone/static/js/studio/`:
 
 | Module | Lines | Responsibility |
 |---|---:|---|
@@ -21,8 +23,9 @@ Seven modules are extracted under `src/orga_drone/static/js/studio/`:
 | `format.js` | 28 | Shared time, lane-time, template, and export-clock formatting |
 | `project-browser.js` | 221 | Project create/open/rename/delete and dialog lifecycle |
 | `proxy-policy.js` | 51 | Pure LUT proxy eligibility, WebGL gate, cache-key shape |
-| `settings.js` | 104 | Serialized/debounced save scheduler with error callback |
+| `settings.js` | 114 | Serialized/debounced save scheduler with shared-chain hooks |
 | `inspector/detail.js` | 175 | Sharpen/denoise panel and its scheduled save |
+| `inspector/image-save.js` | 78 | Image-adjust save chain using the shared image chain |
 
 The entry remains the owner of the Story timeline, inspector wiring, playback,
 preview, proxy orchestration, music, history gestures, masks/overlays/map/HUD,
@@ -41,6 +44,9 @@ transitions, title cards, and most save chains.
 - `export.js` imports `format.js` for export-clock formatting.
 - `inspector/detail.js` imports `settings.js` and injects DOM, fetch, JSON, and
   timers.
+- `inspector/image-save.js` imports `settings.js`; its queue is wired to the
+  existing `imageSaveChain` in the entry, which is also used by saturation-ramp
+  saves.
 
 ### Still mixed
 
@@ -64,11 +70,13 @@ studio.js
   -> studio/format.js
   -> studio/project-browser.js
   -> studio/inspector/detail.js
+  -> studio/inspector/image-save.js
   -> studio/clip-model.js
   -> studio/proxy-policy.js
 
 studio/export.js -> studio/format.js
 studio/inspector/detail.js -> studio/settings.js
+studio/inspector/image-save.js -> studio/settings.js
 studio/clip-model.js -> (none)
 studio/format.js -> (none)
 studio/project-browser.js -> (none)
@@ -78,8 +86,8 @@ studio/settings.js -> (none)
 
 - Circular imports: **none detected**.
 - Modules importing the entry: **none**.
-- Feature-to-feature imports: only `inspector/detail.js -> settings.js`, which is
-  a core dependency, not another feature module.
+- Feature-to-feature imports: `inspector/detail.js` and
+  `inspector/image-save.js` depend only on the core `settings.js` module.
 - Hidden global surface: `window.OrgaLutPreview` (WebGL renderer) and the entry's
   `window.fetch` wrapper. No new `window.OrgaStudio*` objects.
 
@@ -93,9 +101,10 @@ The current tree has fewer internal imports than that target diagram.
 2. **Who may change dataset fields?** `clip-model.setClipField` for supported
    fields; legacy entry functions and `inspector/detail.js` still write selected
    fields directly.
-3. **Who decides when to save?** `settings.js` for the Detail chain; the entry for
-   all other chains. The entry still has eight save chains and thirteen `save*`
-   functions with repeated timer/chain/refresh logic.
+3. **Who decides when to save?** `settings.js` for the Detail and Image chains;
+   the entry for all other chains. Image saves use the existing `imageSaveChain`
+   as their serialization gate, so they stay ordered with saturation-ramp saves.
+   The entry still owns the remaining save chains and twelve `save*` functions.
 4. **Who triggers preview updates?** The entry. `inspector/detail.js` gets panel
    refresh through `fill` and save-state through `setSaved`; it does not own
    preview rendering.
@@ -116,8 +125,8 @@ The current tree has fewer internal imports than that target diagram.
 
 | Risk | Severity | Evidence |
 |---|---|---|
-| Monolithic entry remains the main change surface | High | 11,399 lines, 466 functions, 732 `.dataset.*` references |
-| Repeated save chains | High | 8 chains, 13 `save*` functions, duplicated timer/error/refresh patterns |
+| Monolithic entry remains the main change surface | High | 11,398 lines, 465 functions, 732 `.dataset.*` references |
+| Repeated save chains | High | Remaining entry chains plus the shared `imageSaveChain`; 12 `save*` functions |
 | Text-slicing JS tests | High | 9 `.cjs` harnesses read `studio.js` and slice source text |
 | Clip dataset writes are not yet centralized | Medium | `detail.js` writes `dataset.detail`; entry writes many fields |
 | Global renderer boundary | Medium | `studio-lut-webgl.js` sets `window.OrgaLutPreview` |
@@ -134,6 +143,8 @@ Direct module tests:
   payload, `apply` cancellation.
 - `inspector_detail.test.js`: clamps, read/write, fill, input/change/reset,
   save failure, listener lifecycle.
+- `image_save.test.js`: PATCH payload, serialization, stale responses, clip
+  replacement, failure/retry, debounce, and image/saturation-ramp ordering.
 - `proxy_policy.test.js`: eligibility truth table, WebGL fallback, cache-key
   shape.
 - `export_ui.test.js`: export dialog, polling, cancel, success, errors, retries.
@@ -211,17 +222,29 @@ owned and directly tested in `studio/format.js`.
 This is behavior-neutral: no runtime consumer imported the formatter through
 `export.js`, and `format.test.js` already covers the formatter's values.
 
+## PR 9 outcome
+
+The image-adjust save chain now lives in `studio/inspector/image-save.js` and
+uses `settings.js` for payload, request, apply, and refresh behavior. Its queue is
+wired to the existing `imageSaveChain`, which saturation-ramp saves also append
+to, so the shared serialization and save order are preserved without a second
+queue.
+
+Direct tests cover the PATCH payload, stale responses, clip replacement,
+failure/retry, debounce, and image/saturation-ramp interleaving.
+`lut_preview.cjs` exercises the real module and keeps its preview contract.
+
 ## Metrics
 
 | Metric | Value |
 |---|---:|
-| `studio.js` lines | 11,399 |
-| `studio.js` function declarations | 466 |
+| `studio.js` lines | 11,398 |
+| `studio.js` function declarations | 465 |
 | Direct `.dataset.*` references in `studio.js` | 732 |
 | Direct migrated clip-field dataset references | 269 |
-| Extracted Studio ES modules | 7 |
-| Direct Node module test files | 7 |
-| Direct Node test cases | 43 |
+| Extracted Studio ES modules | 8 |
+| Direct Node module test files | 8 |
+| Direct Node test cases | 52 |
 | Python-run `.cjs` harnesses | 9 |
 | Circular imports | 0 |
 | New global interfaces | 0 |

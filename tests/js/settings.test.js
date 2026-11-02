@@ -221,3 +221,67 @@ test("skips refresh when apply reports the clip is gone", async () => {
 
   assert.equal(refreshCount, 0);
 });
+
+test("can use an injected shared chain for serialization", async () => {
+  const calls = [];
+  const first = deferred();
+  let shared = Promise.resolve();
+  const saver = createSaver({
+    url: (key) => `/api/${key}`,
+    payload: (key) => ({ id: key }),
+    fetchImpl: async (url) => {
+      calls.push(url);
+      if (calls.length === 1) await first.promise;
+      return jsonResponse({ ok: true, saved: url });
+    },
+    serialize: (run) => {
+      const next = shared.then(run);
+      shared = next.catch(() => {});
+      return next;
+    },
+    getChain: () => shared,
+  });
+
+  saver.queue("1");
+  await tick();
+  assert.deepEqual(calls, ["/api/1"]);
+
+  saver.queue("2");
+  await tick();
+  assert.deepEqual(calls, ["/api/1"]);
+
+  first.resolve();
+  await saver.whenIdle();
+  assert.deepEqual(calls, ["/api/1", "/api/2"]);
+});
+
+test("keeps an injected shared chain alive after a failed save", async () => {
+  const calls = [];
+  const errors = [];
+  let shared = Promise.resolve();
+  const saver = createSaver({
+    url: (key) => `/api/${key}`,
+    payload: (key) => ({ id: key }),
+    fetchImpl: async (url) => {
+      calls.push(url);
+      if (url === "/api/1") {
+        return jsonResponse({ ok: false, detail: "bad shared save" }, { ok: false });
+      }
+      return jsonResponse({ ok: true, saved: url });
+    },
+    serialize: (run) => {
+      const next = shared.then(run);
+      shared = next.catch(() => {});
+      return next;
+    },
+    getChain: () => shared,
+    onError: (err) => errors.push(err.message),
+  });
+
+  saver.queue("1");
+  saver.queue("2");
+  await saver.whenIdle();
+
+  assert.deepEqual(calls, ["/api/1", "/api/2"]);
+  assert.deepEqual(errors, ["bad shared save"]);
+});

@@ -101,30 +101,45 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
   assert.equal(requests.length, 5, 'draft never schedules Story LUT frames');
   assert.equal(still.hidden, true);
   context.reuseDraft = null;
-  // Run the production image writer/save path, including an input held longer
-  // than debounce and a server response arriving after a newer input.
-  context.clampImageSlider = value => Number(value) || 0;
-  context.clips = () => [clip];
-  context.readJson = async response => response.body;
-  context.applyPreviewGrades = () => context.scheduleLutPreviewStill(clip, 4);
-  context.applyFramePreview = () => {};
-  context.setSaveState = () => {};
-  context.state.selected = null;
-  vm.runInContext('function writeImageAdjust' + section('function writeImageAdjust', 'function imageAdjustIsNeutral') +
-    'async function saveImageAdjust' + section('async function saveImageAdjust', 'let selectedMaskId'), context);
-  context.writeImageAdjust(clip, { exposure: 25 });
+  // The image save chain now lives in studio/inspector/image-save.js. Keep the
+  // preview contract here: a stale response cannot overwrite newer input, and
+  // the post-save refresh requests a fresh frame.
+  const { createImageAdjustSaver } = await import(
+    '../../src/orga_drone/static/js/studio/inspector/image-save.js'
+  );
+  const imageSaver = createImageAdjustSaver({
+    getClipById: studioId => (String(studioId) === '1' ? clip : null),
+    readAdjust: context.readImageAdjust,
+    writeAdjust: (target, adjust, persisted) => {
+      target.dataset.imageAdjust = JSON.stringify(adjust);
+      target.dataset.imagePreviewDirty = persisted ? '0' : '1';
+      context.clearLutPreviewStill();
+    },
+    isSelected: () => false,
+    refreshPreview: () => context.scheduleLutPreviewStill(clip, 4),
+    setSaved: () => {},
+    fetchImpl: (url, options) => context.fetch(url, options),
+    readJson: async response => response.body,
+  });
+  clip.dataset.imageAdjust = JSON.stringify({ exposure: 25 });
+  clip.dataset.imagePreviewDirty = '1';
   context.scheduleLutPreviewStill(clip, 4); await fire();
   assert.equal(requests.length, 5, 'held input does not read old persisted settings');
   let finishPatch;
   const getFrame = context.fetch;
   context.fetch = (url, options) => options.method === 'PATCH'
     ? new Promise(resolve => { finishPatch = resolve; }) : getFrame(url, options);
-  const saving = context.saveImageAdjust('1');
-  context.writeImageAdjust(clip, { exposure: 35 });
+  const saving = imageSaver.queue('1');
+  context.imageSaveChain = saving;
+  await tick();
+  clip.dataset.imageAdjust = JSON.stringify({ exposure: 35 });
+  clip.dataset.imagePreviewDirty = '1';
   finishPatch({ ok: true, body: { ok: true, image: { exposure: 25 } } }); await saving;
   assert.equal(context.readImageAdjust(clip).exposure, 35, 'save response cannot overwrite newer input');
   assert.equal(clip.dataset.imagePreviewDirty, '1');
-  const latestSave = context.saveImageAdjust('1');
+  const latestSave = imageSaver.queue('1');
+  context.imageSaveChain = latestSave;
+  await tick();
   finishPatch({ ok: true, body: { ok: true, image: { exposure: 35 } } }); await latestSave;
   assert.equal(clip.dataset.imagePreviewDirty, '0');
   await fire(); assert.equal(requests.length, 6, 'saved adjustment always requests fresh frame');

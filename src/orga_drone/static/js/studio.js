@@ -3,6 +3,7 @@ import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
 import { createDetailControls } from "./studio/inspector/detail.js";
+import { createImageAdjustSaver } from "./studio/inspector/image-save.js";
 import {
   clipDisplayTitle,
   clipFilename,
@@ -3658,41 +3659,39 @@ import {
 
   let imageSaveChain = Promise.resolve();
 
-  function queueImageAdjustSave(clip) {
-    const studioId = clip.dataset.studioId;
-    imageSaveChain = imageSaveChain
-      .then(() => saveImageAdjust(studioId))
-      .catch((err) => {
-        showFlash((err && err.message) || msgImageFailed);
-      });
-  }
+  const imageAdjustSaver = createImageAdjustSaver({
+    getClipById: (studioId) =>
+      clips().find((item) => String(item.dataset.studioId) === String(studioId)),
+    readAdjust: readImageAdjust,
+    writeAdjust: writeImageAdjust,
+    isSelected: (studioId) =>
+      Boolean(
+        state.selected &&
+          state.selected.type === "clip" &&
+          String(state.selected.id) === String(studioId)
+      ),
+    fill: fillImageAdjust,
+    refreshPreview: () => {
+      applyPreviewGrades(resolveAt(state.projectTimeS));
+      applyFramePreview(resolveAt(state.projectTimeS));
+    },
+    setSaved: setSaveState,
+    showError: showFlash,
+    errorMessage: msgImageFailed,
+    serialize: (run) => {
+      const next = imageSaveChain.then(run);
+      imageSaveChain = next.catch(() => {});
+      return next;
+    },
+    getSharedChain: () => imageSaveChain,
+  });
 
-  async function saveImageAdjust(studioId) {
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
-    if (!clip) return;
-    const adjust = readImageAdjust(clip);
-    const res = await fetch(`/api/studio/${studioId}/image`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(adjust),
+  function queueImageAdjustSave(clip) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    imageAdjustSaver.queue(studioId).catch((err) => {
+      showFlash((err && err.message) || msgImageFailed);
     });
-    const body = await readJson(res);
-    if (!res.ok || !body || !body.ok) {
-      throw new Error((body && body.detail) || msgImageFailed);
-    }
-    if (JSON.stringify(readImageAdjust(clip)) === JSON.stringify(adjust)) {
-      writeImageAdjust(clip, body.image || adjust, true);
-    }
-    if (
-      state.selected &&
-      state.selected.type === "clip" &&
-      String(state.selected.id) === String(studioId)
-    ) {
-      fillImageAdjust(clip);
-    }
-    applyPreviewGrades(resolveAt(state.projectTimeS));
-    applyFramePreview(resolveAt(state.projectTimeS));
-    setSaveState(true);
   }
 
   let hslSaveChain = Promise.resolve();

@@ -1,12 +1,12 @@
 # Studio Frontend Modules
 
-Status: **six modules extracted and the settings scheduler started;
-target architecture still in progress.** The Studio UI still boots from
-`src/orga_drone/static/js/studio.js` (~11.4k lines). The JavaScript tooling and
-CI from PR 1, the ES-module entry from PR 3, and the export UI, project browser,
-formatting, clip model, inspector detail, proxy policy, and settings modules are
-in place. Every other feature and the remaining save chains remain in the entry
-file.
+Status: **eight modules extracted and the settings scheduler now used by Detail
+and Image; target architecture still in progress.** The Studio UI still boots
+from `src/orga_drone/static/js/studio.js` (~11.4k lines). The JavaScript tooling
+and CI from PR 1, the ES-module entry from PR 3, and the export UI, project
+browser, formatting, clip model, inspector detail, image save, proxy policy, and
+settings modules are in place. Every other feature and the remaining save chains
+remain in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -35,20 +35,26 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   display text, and exposes one narrow `setClipField` writer. It does not cache,
   fetch, persist, or schedule work.
 - `studio/settings.js` owns serialized saves with optional debounce and one
-  error callback. The Detail module is the first migrated consumer; image, HSL,
+  error callback. The Detail and Image modules are migrated consumers; HSL,
   wheels, masks, overlays, map, HUD, frame, saturation ramp, audio, color
   animation, and effect-lane saves remain in the entry.
 - `studio/inspector/detail.js` owns the sharpen/denoise panel: read/write/clamp,
   fill, input/reset bindings, and its scheduled save. `studio.js` only creates
   it and calls `fill` during inspector refresh.
+- `studio/inspector/image-save.js` owns the image-adjust save chain: payload,
+  stale-response guard, dataset write, save-state, and preview refresh. It uses
+  `settings.js` and shares the existing `imageSaveChain` with saturation-ramp
+  saves, so both remain in one serialization order.
 - `studio/proxy-policy.js` owns the pure LUT proxy eligibility, WebGL handling
   gate, and cache-key rules. `studio.js` still reads clip state and owns the
   proxy scheduling, fetch, cache, and UI-chip orchestration.
 - The DOM is the clip data store. `studio/clip-model.js` is the read/write
   facade for migrated fields, but legacy functions still read and write
   `data-*` directly. There is no separate clip shadow state.
-- There are eight save chains and thirteen `save*` functions with repeated
-  debounce, snapshot, and refresh logic.
+- The entry still owns eight serialization chains and twelve `save*` functions
+  with repeated debounce, snapshot, and refresh logic. The Image chain delegates
+  to `studio/settings.js` while sharing `imageSaveChain` with saturation-ramp
+  saves.
 - Studio routes live in `app.py` (61 of 118 routes). `/studio` builds a large
   view model inline.
 - The Python side already has useful domain boundaries:
@@ -56,8 +62,8 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio_estimate.py`, `studio_effect_lane.py`, `studio_lut.py`,
   `studio_hsl.py`, `studio_color_wheels.py`, and the `export/` package.
 - Export, project browser, formatting, the settings scheduler, inspector detail,
-  and proxy policy now have direct module tests. Older areas still use
-  text-slicing tests; migrate those when their code moves.
+  image save, and proxy policy now have direct module tests. Older areas still
+  use text-slicing tests; migrate those when their code moves.
 
 Do not treat the current line count as a product goal. Module boundaries and
 testability matter more.
@@ -76,7 +82,7 @@ existing tests and the PyInstaller static path keep working.
 | `studio/api.js` | HTTP and error normalization | `getJson`, `postJson`, `patchJson`, `del`, `StudioApiError` | none | none | all `/api/studio/*` | Node fake-`fetch` tests, error matrix | DOM, clip state, UI copy |
 | `studio/state.js` | Project id/title, selection, UI preferences | `get`, `set`, `subscribe`, `persist` | `api`, `format` | `projectId`, `title`, `selected`, `volume` | `PATCH /api/studio/projects/{id}` | Node state/storage roundtrip | clip data, playback time |
 | `studio/clip-model.js` | **Implemented.** DOM-backed clip facade | `listClipElements`, `findClip`, `clipId`, `clipKind`, `clipIsAvailable`, `clipCanPlay`, `clipHasProxy`, `clipMediaId`, `clipFilename`, `clipDisplayTitle`, `clipDisplaySubtitle`, `clipEffectiveDuration`, `clipSourceIn`, `clipSourceOut`, `clipMediaDuration`, `clipPlaybackSpeed`, `clipPhotoDuration`, `clipStreamUrl`, `clipProxyUrl`, `clipPreviewUrl`, `clipThumbUrl`, `clipDuration`, `setClipField` | none | **clip data (DOM as backing store)** | read-only; writes stay caller-owned | `tests/js/clip_model.test.js`; fake datasets | network, persistence, preview, save scheduler, shadow state |
-| `studio/settings.js` | **Implemented (Detail).** Serialized saves with optional debounce | `createSaver({url, method, payload, apply, refresh, errorMessage, onError, fetchImpl, readJson, debounceMs})` | none; fetch/JSON/timers are injected | save chains, pending keys, debounce timer | `/detail` (first); remaining endpoints move with their chains | `tests/js/settings.test.js`; fake fetch/timers | foreign DOM; other savers |
+| `studio/settings.js` | **Implemented (Detail and Image).** Serialized saves with optional debounce | `createSaver({url, method, payload, apply, refresh, errorMessage, onError, headers, fetchImpl, readJson, debounceMs, setTimeoutImpl, clearTimeoutImpl, serialize, getChain})` | none; fetch/JSON/timers are injected | save chains, pending keys, debounce timer | `/detail`, `/image`; remaining endpoints move with their chains | `tests/js/settings.test.js`; fake fetch/timers | foreign DOM; other savers |
 | `studio/format.js` | **Implemented.** Shared pure formatting | `formatTemplate`, `formatTime`, `formatLaneTime`, `formatExportDuration` | none | none | none | `tests/js/format.test.js` | DOM, network, state |
 | `studio/proxy-policy.js` | **Implemented.** Pure LUT proxy policy | `evaluateLutProxyEligibility`, `evaluateLutWebglHandling`, `lutProxyPrepareKey` | none | none | none | `tests/js/proxy_policy.test.js`; existing proxy harnesses | DOM, fetch, timers, preview state, cache access |
 
@@ -87,6 +93,7 @@ existing tests and the PyInstaller static path keep working.
 | `studio/project-browser.js` | **Implemented.** Server-rendered project list actions: create/open/rename/delete, prompts, dialog lifecycle, errors | `createProjectBrowser({root, documentImpl, dialog, openButton, closeButton, defaultTitle, messages, fetchImpl, readJson, navigate, reload, prompt, confirm, showError, beforeOpen})` returns `{init, destroy}` | none; browser APIs and JSON reader are injected or defaulted | dialog/focus state, action errors | `/api/studio/projects*`, `/open`, `PATCH`, `DELETE` | `tests/js/project_browser.test.js`; Python route tests | Story grid, playback, export, client-side project list rendering |
 | `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | `format`; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
 | `studio/inspector/detail.js` | **Implemented.** Sharpen/denoise panel | `createDetailControls({getSelectedClip, getClipById, setSaved, showError, refresh, errorMessage, fetchImpl, readJson})`; returns `bind`, `destroy`, `fill`, `queueSave`, `read`, `write`, `neutral`, `clamp` | `settings`; DOM/fetch/timers injected | panel DOM and detail save | `PATCH /api/studio/{id}/detail` | `tests/js/inspector_detail.test.js`; Python roundtrip | other inspector panels |
+| `studio/inspector/image-save.js` | **Implemented.** Image-adjust save chain | `createImageAdjustSaver({getClipById, readAdjust, writeAdjust, isSelected, fill, refreshPreview, setSaved, showError, errorMessage, headers, fetchImpl, readJson, debounceMs, setTimeoutImpl, clearTimeoutImpl, serialize, getSharedChain})`; returns `queue`, `flush`, `whenIdle` | `settings`; clip/DOM/fetch/timers injected | pending clip capture for one save | `PATCH /api/studio/{id}/image` | `tests/js/image_save.test.js`; `tests/js/lut_preview.cjs` | other save chains, preview rendering |
 | `studio/inspector/image.js` | Image sliders and Quick Looks | `createImageControls({...})` | `clip-model`, `settings`, `preview` callback | panel state | `/image`, `/look` | Node neutral/clamp; pixel parity | playback, timeline |
 | `studio/inspector/color.js` | HSL, wheels, LUT, color points | `createColorControls({...})` | `clip-model`, `settings`, `preview` | panel state | `/hsl`, `/color-wheels`, `/color`, `/color-animation` | Node math; Python pixel parity | direct proxy-cache access |
 | `studio/inspector/masks.js` | Mask panel and handles | `createMasks({...})` | `clip-model`, `settings`, `preview` | `selectedMaskId` | `/masks` | Node geometry; Python pixel tests | foreign panels, playback |
@@ -119,7 +126,8 @@ api, format, state ─> no internal Studio modules
 
 The diagram is the target dependency shape. In the current tree,
 `settings.js` and `clip-model.js` import no internal Studio modules;
-`export.js` imports `format.js`; `inspector/detail.js` imports `settings.js`.
+`export.js` imports `format.js`; `inspector/detail.js` and
+`inspector/image-save.js` import `settings.js`.
 
 1. No module imports `studio.js`.
 2. Feature modules do not import other feature modules. Share through core
@@ -184,6 +192,7 @@ written. Prefer function names over line numbers.
 | Project gallery/switcher actions | `studio/project-browser.js` | `studio/project-browser.js` (implemented) |
 | Clip identity, type, display text, title-card writes | `studio/clip-model.js` | `studio/clip-model.js` (implemented) |
 | Sharpen/denoise panel | `studio/inspector/detail.js` | `studio/inspector/detail.js` (implemented) |
+| Image adjust save chain | `studio/inspector/image-save.js` | `studio/inspector/image-save.js` (implemented) |
 | Time/template formatting | `studio/format.js` | `studio/format.js` (implemented) |
 | Frame zoom formatting | `studio.js` (`formatZoom`) | stays in the entry because it uses the frame clamp |
 | Clip timing, transitions, section points | `studio.js:609-1830, 6708-6770` | `studio/clip-model.js` |
@@ -230,7 +239,7 @@ enforce it only after the migration is complete.
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
-- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`, `proxy_policy.test.js`, `clip_model.test.js`.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`, `image_save.test.js`, `proxy_policy.test.js`, `clip_model.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -250,7 +259,7 @@ Each step is independently mergeable and behavior-neutral.
 3. **PR 4 (done):** export UI extracted to `studio/export.js`; no app state dependencies.
 4. **PR 5 (done):** project browser and shared formatting extracted; server-rendered list stays server-rendered.
 5. **Clip model (done):** read facade plus narrow writes; DOM dataset remains authoritative; playback, proxy, and effect save chains stay legacy.
-6. **Settings scheduler (started):** `studio/settings.js` with serialized and optional debounced saves; Detail is migrated first. Image/HSL/wheels chains follow.
+6. **Settings scheduler (Detail and Image done):** `studio/settings.js` with serialized and optional debounced saves; Detail and Image are migrated. HSL/wheels chains follow.
 7. **Inspector detail (done):** `studio/inspector/detail.js` with direct module tests.
 8. **Proxy policy (done):** pure LUT proxy eligibility, WebGL gate, and cache key; scheduling stays in the entry.
 9. **Color controls:** HSL, wheels, LUT, color points.
