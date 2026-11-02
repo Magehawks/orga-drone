@@ -164,7 +164,7 @@ test("sends the image PATCH with the current adjustment payload", async () => {
   assert(harness.events.some((event) => event[0] === "preview" && event[1] === "1"));
 });
 
-test("serializes rapid saves and keeps newer input over a stale response", async () => {
+test("serializes rapid saves and keeps newer input dirty over a stale response", async () => {
   const control = deferredFetch();
   const harness = createHarness({ fetchImpl: control.fetchImpl });
   const clip = makeClip("1", { exposure: 25 });
@@ -182,7 +182,12 @@ test("serializes rapid saves and keeps newer input over a stale response", async
   await harness.saver.whenIdle();
   assert.equal(clip.adjust.exposure, 35);
   assert.equal(clip.dirty, true);
-  assert.deepEqual(harness.saved, [true]);
+  assert.deepEqual(harness.saved, []);
+  assert.equal(
+    harness.events.filter((event) => event[0] === "preview").length,
+    1,
+    "stale response still refreshes the preview"
+  );
 
   harness.saver.queue("1");
   await tick();
@@ -192,7 +197,7 @@ test("serializes rapid saves and keeps newer input over a stale response", async
   await harness.saver.whenIdle();
   assert.equal(clip.adjust.exposure, 35);
   assert.equal(clip.dirty, false);
-  assert.deepEqual(harness.saved, [true, true]);
+  assert.deepEqual(harness.saved, [true]);
 });
 
 test("does not transfer an in-flight save to a replacement clip", async () => {

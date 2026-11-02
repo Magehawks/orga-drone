@@ -35,25 +35,26 @@ export function createImageAdjustSaver({
     payload: (studioId) => {
       const clip = getClipById(studioId);
       if (!clip) return null;
-      pendingClips.set(keyOf(studioId), clip);
+      pendingClips.set(keyOf(studioId), { clip, wrote: false });
       return readAdjust(clip);
     },
     apply: (studioId, body, requestBody) => {
-      const clip = pendingClips.get(keyOf(studioId));
-      if (!clip) return false;
-      if (JSON.stringify(readAdjust(clip)) === JSON.stringify(requestBody)) {
-        writeAdjust(clip, body.image || requestBody, true);
+      const pending = pendingClips.get(keyOf(studioId));
+      if (!pending) return false;
+      if (JSON.stringify(readAdjust(pending.clip)) === JSON.stringify(requestBody)) {
+        writeAdjust(pending.clip, body.image || requestBody, true);
+        pending.wrote = true;
       }
       return true;
     },
     refresh: (studioId) => {
       const key = keyOf(studioId);
-      const clip = pendingClips.get(key);
-      if (!clip) return;
+      const pending = pendingClips.get(key);
+      if (!pending) return;
       pendingClips.delete(key);
-      if (isSelected(studioId)) fill(clip);
-      refreshPreview(clip);
-      setSaved(true);
+      if (isSelected(studioId)) fill(pending.clip);
+      refreshPreview(pending.clip);
+      if (pending.wrote) setSaved(true);
     },
     errorMessage,
     onError: (err, studioId) => {
