@@ -333,13 +333,13 @@ def _hud_filter_text(clip: StudioExportClip, height: int) -> str:
     )
 
 
-_COMPLEX_FILTER_FLAGS = frozenset({"-filter_complex", "-filter_complex_script"})
+_COMPLEX_FILTER_FLAGS = frozenset({"-filter_complex", "-/filter_complex"})
 
 
 def _uses_filter_graph(filters: list[str]) -> bool:
     """True when ffmpeg already maps the filtered ``[vout]`` stream.
 
-    A long HUD chain is written to ``-filter_complex_script``. That flag is
+    A long HUD chain is written to ``-/filter_complex``. That flag is
     the same graph as ``-filter_complex`` and must not be followed by a map
     of the raw input picture.
     """
@@ -347,13 +347,13 @@ def _uses_filter_graph(filters: list[str]) -> bool:
 
 
 def _complex_graph_body(filters: list[str]) -> str:
-    if filters[0] == "-filter_complex_script":
+    if filters[0] == "-/filter_complex":
         return Path(filters[1]).read_text(encoding="utf-8")
     return filters[1]
 
 
 def _linear_filter_body(filters: list[str]) -> str | None:
-    """Comma-separated chain from ``-vf`` or a spilled ``-filter_script:v`` file.
+    """Comma-separated chain from ``-vf`` or a spilled ``-/filter:v`` file.
 
     A telemetry HUD longer than the inline limit is the same chain as ``-vf``.
     The flight map has to read that file before it can sit on the picture.
@@ -362,7 +362,7 @@ def _linear_filter_body(filters: list[str]) -> str | None:
         return None
     if filters[0] == "-vf":
         return filters[1]
-    if filters[0] == "-filter_script:v":
+    if filters[0] == "-/filter:v":
         return Path(filters[1]).read_text(encoding="utf-8").rstrip("\r\n")
     return None
 

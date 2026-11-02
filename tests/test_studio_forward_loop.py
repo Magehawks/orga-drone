@@ -812,12 +812,12 @@ def _color_distance(
 def _filter_text(cmd: list[str]) -> str:
     if "-vf" in cmd:
         return cmd[cmd.index("-vf") + 1]
-    if "-filter_script:v" in cmd:
-        return Path(cmd[cmd.index("-filter_script:v") + 1]).read_text(encoding="utf-8")
+    if "-/filter:v" in cmd:
+        return Path(cmd[cmd.index("-/filter:v") + 1]).read_text(encoding="utf-8")
     if "-filter_complex" in cmd:
         return cmd[cmd.index("-filter_complex") + 1]
-    if "-filter_complex_script" in cmd:
-        return Path(cmd[cmd.index("-filter_complex_script") + 1]).read_text(encoding="utf-8")
+    if "-/filter_complex" in cmd:
+        return Path(cmd[cmd.index("-/filter_complex") + 1]).read_text(encoding="utf-8")
     return ""
 
 
