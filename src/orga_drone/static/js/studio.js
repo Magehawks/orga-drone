@@ -283,6 +283,12 @@ import {
   const msgColorLutAlready = root.dataset.colorLutAlready || 'This file is already in your library as "{name}".';
   const msgColorLutRestored = root.dataset.colorLutRestored || 'The color file was restored in your library as "{name}".';
   const msgColorLutMissingOption = root.dataset.colorLutMissingOption || "Unknown color file (missing)";
+  const msgColorProfileNone = root.dataset.colorProfileNone || "No camera profile detected";
+  const msgColorLutDuplicate =
+    root.dataset.colorLutDuplicate ||
+    "This file is already used in the other LUT stage. Choose a different file.";
+  const msgColorLutStageUsed =
+    root.dataset.colorLutStageUsed || "already used in the other stage";
   const msgColorFileMissingSuffix = root.dataset.colorFileMissingSuffix || "(file missing)";
   let lutCatalog = [];
   try {
@@ -362,6 +368,41 @@ import {
   let loadedVideoSrc = "";
   let loadedImageSrc = "";
   let syncToken = 0;
+
+  const COLOR_MODE_KEY = "orga-drone.studio.color-mode";
+
+  function readColorModePreference() {
+    try {
+      return window.localStorage.getItem(COLOR_MODE_KEY) === "expert" ? "expert" : "standard";
+    } catch (_) {
+      return "standard";
+    }
+  }
+
+  function applyColorModePreference(mode, { persist = false } = {}) {
+    const next = mode === "expert" ? "expert" : "standard";
+    const panel = document.getElementById("inspector-image-panel");
+    if (panel) panel.dataset.imageMode = next;
+    document.querySelectorAll("[data-image-mode]").forEach((button) => {
+      const active = button.dataset.imageMode === next;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (persist) {
+      try {
+        window.localStorage.setItem(COLOR_MODE_KEY, next);
+      } catch (_) {
+        /* UI preference only; private mode can refuse storage. */
+      }
+    }
+  }
+
+  applyColorModePreference(readColorModePreference());
+  document.querySelectorAll("[data-image-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyColorModePreference(button.dataset.imageMode, { persist: true });
+    });
+  });
 
   function clips() {
     return listClipElements(grid);
@@ -3390,7 +3431,11 @@ import {
     return msgColorLutMissingOption;
   }
 
-  function fillLutSelect(selectEl, selectedAsset, { includeNone, includePleaseChoose }) {
+  function fillLutSelect(
+    selectEl,
+    selectedAsset,
+    { includeNone, includePleaseChoose, blockedAsset = "" }
+  ) {
     if (!selectEl) return;
     const previous = selectedAsset || selectEl.value || "";
     selectEl.innerHTML = "";
@@ -3413,6 +3458,10 @@ import {
       opt.value = item.asset_name;
       let label = String(item.display_name || item.asset_name);
       if (item.file_present === false) label = `${label} ${msgColorFileMissingSuffix}`;
+      if (blockedAsset && item.asset_name === blockedAsset && item.asset_name !== previous) {
+        opt.disabled = true;
+        label = `${label} (${msgColorLutStageUsed})`;
+      }
       opt.textContent = label;
       selectEl.appendChild(opt);
     });
@@ -3451,22 +3500,22 @@ import {
     const isDlogHint = hintKey === "dlog_m";
     const conversionOn = Boolean(look.conversion_lut && look.conversion_confirmed);
     if (profileValue) {
-      if (token.trim()) {
-        profileValue.hidden = false;
-        profileValue.textContent = colorProfileDisplayLabel(token);
-      } else {
-        profileValue.hidden = true;
-        profileValue.textContent = "";
-      }
+      profileValue.hidden = false;
+      profileValue.textContent = token.trim()
+        ? colorProfileDisplayLabel(token)
+        : msgColorProfileNone;
     }
     if (suggest) suggest.hidden = !(isDlogHint && !conversionOn);
+    const conversionActiveAsset = conversionOn ? look.conversion_lut : "";
     fillLutSelect(conversionSelect, conversionOn ? "" : look.conversion_lut, {
       includeNone: false,
       includePleaseChoose: true,
+      blockedAsset: look.creative_lut,
     });
     fillLutSelect(creativeSelect, look.creative_lut, {
       includeNone: true,
       includePleaseChoose: false,
+      blockedAsset: conversionActiveAsset,
     });
     if (conversionStatus) {
       conversionStatus.hidden = !conversionOn;
@@ -9368,10 +9417,14 @@ import {
   document.getElementById("inspector-color-conversion-add")?.addEventListener("click", async () => {
     try {
       const asset = await chooseCubeAsset();
+      const clip = selectedAdjustableClip();
+      if (clip && asset && asset === readColorLook(clip).creative_lut) {
+        showFlash(msgColorLutDuplicate);
+        return;
+      }
       const select = document.getElementById("inspector-color-conversion-select");
       if (select) select.value = asset;
       syncConversionApplyEnabled();
-      const clip = selectedAdjustableClip();
       if (clip) fillColorLook(clip);
     } catch (err) {
       if (err && err.message === "cancelled") return;
@@ -9410,6 +9463,15 @@ import {
     try {
       const asset = await chooseCubeAsset();
       const look = readColorLook(clip);
+      if (
+        asset &&
+        look.conversion_lut &&
+        look.conversion_confirmed &&
+        asset === look.conversion_lut
+      ) {
+        showFlash(msgColorLutDuplicate);
+        return;
+      }
       look.creative_lut = asset;
       if (!look.creative_strength) look.creative_strength = 100;
       writeColorLook(clip, look);

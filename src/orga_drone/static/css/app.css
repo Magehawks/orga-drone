@@ -2077,6 +2077,50 @@ video.studio-preview-media.studio-preview-layer-b {
   gap: 0.15rem;
   min-width: 0;
 }
+.studio-image-mode {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+.studio-image-mode-btn {
+  flex: 1 1 0;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.studio-image-mode-btn.is-active {
+  border-color: var(--accent, currentColor);
+  background: color-mix(in srgb, var(--accent, currentColor) 12%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+.studio-image-mode-btn:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+}
+.studio-image-panel[data-image-mode="standard"] #inspector-image-section-hsl,
+.studio-image-panel[data-image-mode="standard"] #inspector-image-section-color-wheels,
+.studio-image-panel[data-image-mode="standard"] #inspector-image-section-advanced {
+  display: none;
+}
+.studio-image-panel[data-image-mode="standard"] #inspector-image-section-profile {
+  order: -1;
+}
+.studio-lut-stage {
+  margin-top: 0.55rem;
+}
+.studio-lut-stage-title {
+  margin: 0;
+  font-weight: 600;
+}
+.studio-lut-stage .hint {
+  margin-top: 0.1rem;
+}
 .studio-image-section {
   margin: 0.35rem 0 0;
   min-width: 0;
@@ -3430,6 +3474,10 @@ html.is-edge-drag * {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.85rem;
+}
+.studio-inspector-field.studio-frame-motion {
+  flex-direction: row;
+  align-items: center;
 }
 .studio-image-adjust-label {
   display: flex;

@@ -177,6 +177,9 @@
          data-color-lut-already="{{ _('This file is already in your library as \"{name}\".')|e }}"
          data-color-lut-restored="{{ _('The color file was restored in your library as \"{name}\".')|e }}"
          data-color-lut-missing-option="{{ _('Unknown color file (missing)')|e }}"
+         data-color-profile-none="{{ _('No camera profile detected')|e }}"
+         data-color-lut-duplicate="{{ _('This file is already used in the other LUT stage. Choose a different file.')|e }}"
+         data-color-lut-stage-used="{{ _('already used in the other stage')|e }}"
          data-color-file-missing-suffix="{{ _('(file missing)')|e }}"
          data-please-choose="{{ _('Please choose')|e }}"
          data-none-label="{{ _('None')|e }}"
@@ -888,7 +891,13 @@
           </label>
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
-        <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" hidden>
+        <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" data-image-mode="standard" hidden>
+          <div class="studio-image-mode" role="group" aria-label="{{ _('Color editing mode') }}">
+            <button type="button" class="studio-image-mode-btn is-active" data-image-mode="standard"
+                    aria-pressed="true">{{ _('Standard') }}</button>
+            <button type="button" class="studio-image-mode-btn" data-image-mode="expert"
+                    aria-pressed="false">{{ _('Expert') }}</button>
+          </div>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Look & color') }}</summary>
             <div id="inspector-image-adjust">
@@ -1143,54 +1152,66 @@
             </div>
           </details>
           <details id="inspector-image-section-profile" class="studio-image-section">
-            <summary>{{ _('Color profiles & LUTs') }}</summary>
+            <summary>{{ _('Camera profile & LUTs') }}</summary>
             <p class="meta-line" id="inspector-color-profile-value" hidden></p>
-            <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
-              <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
-              <label class="studio-inspector-field" for="inspector-color-conversion-select">
-                <span>{{ _('Conversion file') }}</span>
+            <div class="studio-lut-stage">
+              <p class="studio-lut-stage-title">{{ _('Convert camera profile') }}</p>
+              <p class="hint">{{ _('Technical LUT, for example D-Log M to Rec.709. Optional.') }}</p>
+              <div id="inspector-color-dlog-suggest" class="studio-color-suggest" hidden>
+                <p class="hint">{{ _('D-Log M detected in recording metadata. Conversion is optional and never automatic.') }}</p>
+                <label class="studio-inspector-field" for="inspector-color-conversion-select">
+                  <span>{{ _('Conversion file') }}</span>
+                  <span class="studio-color-file-row">
+                    <select id="inspector-color-conversion-select" aria-label="{{ _('Conversion file') }}"
+                            title="{{ _('Technical camera-profile conversion, for example D-Log M to Rec.709.')|e }}">
+                      <option value="">{{ _('Please choose') }}</option>
+                    </select>
+                    <button type="button" class="button ghost" id="inspector-color-conversion-add">{{ _('Add conversion file') }}</button>
+                  </span>
+                </label>
+                <label class="studio-inspector-field studio-frame-motion"
+                       title="{{ _('Orga Drone cannot verify the contents of the LUT file.')|e }}">
+                  <input type="checkbox" id="inspector-color-conversion-confirm">
+                  <span>{{ _('This file converts D-Log M to Rec.709.') }}</span>
+                </label>
+                <button type="button" class="button" id="inspector-color-dlog-apply" disabled>{{ _('Apply conversion') }}</button>
+              </div>
+              <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
+              <div class="studio-color-actions">
+                <button type="button" class="button ghost" id="inspector-color-conversion-change" hidden>{{ _('Change file') }}</button>
+                <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden
+                        title="{{ _('Removes the technical conversion file. The creative LUT stays selected.')|e }}">{{ _('Remove conversion') }}</button>
+              </div>
+            </div>
+            <div class="studio-lut-stage">
+              <p class="studio-lut-stage-title">{{ _('Creative look') }}</p>
+              <p class="hint">{{ _('Optional additional LUT for the picture.') }}</p>
+              <label class="studio-inspector-field" for="inspector-color-creative-select">
+                <span>{{ _('Look file (.cube)') }}</span>
                 <span class="studio-color-file-row">
-                  <select id="inspector-color-conversion-select" aria-label="{{ _('Conversion file') }}">
-                    <option value="">{{ _('Please choose') }}</option>
+                  <select id="inspector-color-creative-select" aria-label="{{ _('Look file (.cube)') }}"
+                          title="{{ _('Optional creative LUT. It is applied after the camera profile conversion.')|e }}">
+                    <option value="">{{ _('None') }}</option>
                   </select>
-                  <button type="button" class="button ghost" id="inspector-color-conversion-add">{{ _('Add file…') }}</button>
+                  <button type="button" class="button ghost" id="inspector-color-creative-pick">{{ _('Add look file') }}</button>
                 </span>
               </label>
-              <label class="studio-inspector-field studio-frame-motion">
-                <input type="checkbox" id="inspector-color-conversion-confirm">
-                <span>{{ _('This file converts D-Log M to Rec.709. Orga Drone cannot check this.') }}</span>
+              <p class="hint" id="inspector-color-export-honesty">{{ _('The look is applied in preview and export. Your source file stays unchanged.') }}</p>
+              <p class="hint" id="inspector-color-creative-missing" hidden role="alert"></p>
+              <label class="studio-inspector-field" id="inspector-color-strength-field" hidden
+                     title="{{ _('How strongly the file changes the picture. 0% = no effect.') }}">
+                <span class="studio-image-adjust-label">
+                  <span>{{ _('Look strength') }}</span>
+                  <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
+                </span>
+                <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
+                       aria-label="{{ _('Look strength') }}">
               </label>
-              <button type="button" class="button" id="inspector-color-dlog-apply" disabled>{{ _('Apply conversion') }}</button>
+              <p class="hint"><a href="/settings#settings-luts">{{ _('Manage color files') }}</a></p>
             </div>
-            <p class="meta-line" id="inspector-color-conversion-status" hidden></p>
-            <div class="studio-color-actions">
-              <button type="button" class="button ghost" id="inspector-color-conversion-change" hidden>{{ _('Change file') }}</button>
-              <button type="button" class="button ghost" id="inspector-color-conversion-clear" hidden
-                      title="{{ _('Removes the technical conversion file. The creative LUT stays selected.')|e }}">{{ _('Remove conversion') }}</button>
-            </div>
-            <label class="studio-inspector-field" for="inspector-color-creative-select">
-              <span>{{ _('Color file (.cube)') }}</span>
-              <span class="studio-color-file-row">
-                <select id="inspector-color-creative-select" aria-label="{{ _('Color file (.cube)') }}">
-                  <option value="">{{ _('None') }}</option>
-                </select>
-                <button type="button" class="button ghost" id="inspector-color-creative-pick">{{ _('Add file…') }}</button>
-              </span>
-            </label>
-            <p class="hint" id="inspector-color-export-honesty">{{ _('This clip uses a color file. While you scrub or pause, the preview shows a rendered still frame, which can take a moment. During playback the color file is not shown. Export applies it.') }}</p>
-            <p class="hint" id="inspector-color-creative-missing" hidden role="alert"></p>
-            <label class="studio-inspector-field" id="inspector-color-strength-field" hidden
-                   title="{{ _('How strongly the file changes the picture. 0% = no effect.') }}">
-              <span class="studio-image-adjust-label">
-                <span>{{ _('Strength') }}</span>
-                <span class="studio-image-adjust-value" id="inspector-color-strength-value">100</span>
-              </span>
-              <input type="range" id="inspector-color-strength" min="0" max="100" step="1" value="100"
-                     aria-label="{{ _('Strength') }}">
-            </label>
-            <p class="hint"><a href="/settings#settings-luts">{{ _('Manage color files') }}</a></p>
             <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
+
           <div id="inspector-frame" hidden>
             <p class="studio-inspector-kind">{{ _('Framing') }}</p>
             <label class="studio-inspector-field">
