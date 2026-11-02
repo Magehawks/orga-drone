@@ -1,23 +1,25 @@
-# Release candidate validation - 2.3.1
+# Release candidate validation - 2.3.2
 
 Date: 2026-11-02
 
-Status: **CONDITIONAL GO** for the manual Product Owner test. **NO-GO for
-publication** until the conditions in [Publication gates](#publication-gates)
-are met.
+Status: The published `v2.3.1` artifact is **NO-GO** for Studio LUT playback.
+The `2.3.2` candidate from `main` passes the automated validation below. The
+manual Mark-of-the-Web checklist is still **NOT TESTED**.
 
 ## Candidate
 
 | | |
 | --- | --- |
-| Version | 2.3.1 |
-| Audited `main` | `a1b485c51a49f37958006214eb90faad85c7c7a7` (merge of PR #250) |
-| Test-build commit | `b2875fa5549a51764ee102b0dcf79220c89a9b8e` (audited `main` + PR #251) |
-| Test-build branch | `fix/image-save-state-after-stale` |
-| Pull request containing the P2 fix | [#251](https://github.com/Magehawks/orga-drone/pull/251) (open, mergeable) |
+| Version | 2.3.2 |
+| Audited `main` | `42c7451` (merge of PR #252) |
+| Test-build commit | `b6267ff64d9ad225057496b25d86b71ca399f565` (2.3.2 version bump) |
+| Test-build branch | `fix/studio-lut-playback` |
+| Real-time LUT playback fix | PR #231, already in `main`; absent from tag `v2.3.1` |
 
-The test build includes the P2 save-state fix. `main` at `a1b485c` still has the
-bug until PR #251 is merged.
+The reported Studio LUT playback blocker reproduces on tag `v2.3.1` and does
+not reproduce on the `2.3.2` candidate. No new production code was needed for
+the playback fix because `main` already contains PR #231.
+
 
 ## Environment
 
@@ -86,6 +88,34 @@ The browser cannot complete the native Save dialog for an MP4. Export was
 therefore validated through the existing export API rather than the browser
 Save button.
 
+### Studio LUT playback blocker
+
+The release blocker was reproduced against a packaged EXE built from tag
+`v2.3.1` (`e25aefe`). The package has no WebGL LUT renderer, so pause shows a
+server-rendered LUT still while playback uses the ungraded video stream.
+
+| Check | `v2.3.1` tag EXE | `2.3.2` candidate EXE |
+| --- | --- | --- |
+| Paused LUT frame | `(201, 98, 31)` | `(255, 77, 0)` |
+| Playing frames at 3 times | `(34, 102, 204)` all three | `(255, 77, 0)` all three |
+| Max / mean color difference, pause vs play | `173` / `114.67` | `0.0` / `0.0` |
+| Pause after play / resume / seek while playing | LUT absent | `0.0` / `0.0` / `0.0` |
+| LUT switch during play | n/a | `101` max / `33.67` mean |
+| LUT deactivate during play | n/a | Original `(34, 102, 204)` |
+| LUT re-enable during play | n/a | `0.0` vs paused reference |
+| Clip switch, LUT active | n/a | Pause and play match |
+| Main-thread long tasks | n/a | None |
+| Frame gaps during playback | n/a | p95 `4.2 ms`, max `16.7 ms` |
+
+The Windows E2E launched the actual PyInstaller onefolder (`orga-drone.exe`
+plus `_internal`) and drove WebView2 over CDP. It captured visible
+`Page.captureScreenshot` frames, not internal LUT state. The color comparison
+uses a grid in the static background region so moving test objects cannot
+produce a false match.
+
+The candidate uses the original `/media/{id}/stream` source; it does not
+create an FFmpeg playback proxy for this LUT-only clip.
+
 ### Export validation
 
 | | |
@@ -103,37 +133,37 @@ Save button.
 
 ### Windows test build
 
-Built from `b2875fa` with the existing onefolder PyInstaller spec.
+Built from `b6267ff` with the existing onefolder PyInstaller spec.
 
 | | |
 | --- | --- |
-| Version | 2.3.1 |
-| Build commit | `b2875fa5549a51764ee102b0dcf79220c89a9b8e` |
+| Version | 2.3.2 |
+| Build commit | `b6267ff64d9ad225057496b25d86b71ca399f565` |
 | Bundle layout | `orga-drone.exe` plus `_internal/` |
 | Templates, static, locales | Present |
 | WebView2 Core assembly | Present |
 | `Python.Runtime.dll` | Present |
 | FFmpeg | GPL build copied over the imageio-ffmpeg binary |
 | Third-party verdict | `GO`, `verify-zip` exit 0 |
-| Zip size | 133,684,996 bytes |
-| Zip SHA256 | `0929cf436665acd97545b7afd29c0b6a6dd32dfd401ddf9d81d9e18c26c34ad2` |
-| Native launch | Window opened, title `orga-drone`, no `startup-crash.log` |
-| WebView2 processes | 18 child processes during launch |
+| Zip size | 133,686,418 bytes |
+| Zip SHA256 | `9fd9421f325b3a3de182a3c9c22d52c7575a6589d36aff0d5b1d91bd449faa7b` |
+| Native launch | WebView2 window opened under CDP; no `startup-crash.log` |
+| itch.io push | `magehawks/orga-drone:windows`, userversion `2.3.2` |
 
 Artifacts are outside the repository at:
 
 ```text
-C:\Users\Niwes\Projects\orga-drone-rc-artifacts\2.3.1-rc-pr250-fix251\
+C:\Users\Niwes\Projects\orga-drone-rc-artifacts\2.3.2\
   orga-drone-windows-x64.zip
   orga-drone-windows-x64.zip.sha256
   release-build.txt
 ```
 
-The native smoke test confirmed that the desktop shell starts with WebView2.
-It did **not** exercise the native folder picker, soundtrack picker, native
+The Windows E2E confirmed the desktop shell and WebView2 playback output. It
+did **not** exercise the native folder picker, soundtrack picker, native
 Export Save dialog, a 1080p export, close/relaunch persistence, or
-Mark-of-the-Web behavior. Those remain mandatory before publication and are
-listed in `packaging/README.md`.
+Mark-of-the-Web behavior. Those remain **NOT TESTED** and are listed in
+`packaging/README.md`.
 
 ### Data and source safety
 
@@ -156,13 +186,19 @@ None confirmed.
 
 ### P2
 
+**Studio LUT playback was missing from the published `v2.3.1` artifact.** The
+tag predates PR #231. Pause used the server-rendered LUT still; playback used
+the ungraded source video. The `2.3.2` candidate contains the WebGL playback
+path already merged in `main`, and the measured pause/play difference is
+`0.0`. No new production code change was required for this fix.
+
 **Save state can show "saved" after a stale PATCH response.** When two image
 adjustment writes interleave, a stale response kept `clip.dirty = true` but
 still called `setSaved(true)`. The UI could therefore claim the clip was saved
 while it was still dirty.
 
 - Reproduced in browser E2E on `a1b485c`.
-- Fixed in PR #251 at `b2875fa`.
+- Fixed in PR #251 at `b2875fa`; merged into `main` before the `2.3.2` build.
 - `pendingClips` now records `{ clip, wrote }`; `setSaved(true)` runs only when
   a write actually happened.
 - The stale response still triggers a preview refresh.
@@ -181,23 +217,26 @@ while it was still dirty.
 
 ## Publication gates
 
-The candidate is suitable for the manual Product Owner test. Do not publish a
-release until all of the following are true:
+The `2.3.2` candidate passed automated validation and was pushed to the
+Draft/Restricted itch.io test path at the maintainer's request. Do not publish
+a GitHub Release, tag, or public announcement until all of the following are
+true:
 
-1. Merge PR #251, or rebuild and re-test from `main` after the fix lands.
+1. PR #251 is merged in `main` (already required for the `2.3.2` build).
 2. Run the mandatory Mark-of-the-Web smoke test from `packaging/README.md`:
    MOTW-marked zip, Explorer extraction into a path with parentheses, native
    desktop launch, native folder and soundtrack pickers, native Export Save
    dialog, a 1080p export, and close/relaunch persistence.
-3. Record the final tested zip SHA256, commit, date, and outcome in the draft
+3. Record the final tested zip SHA256, commit, date, and outcome in the
    release notes.
 4. Keep the GitHub Release notes-only. Do not attach the zip to a GitHub
    Release.
 
 ## Recommendation
 
-**CONDITIONAL GO** for the manual Product Owner test using commit `b2875fa`.
+**CONDITIONAL GO** for the `2.3.2` candidate using commit `b6267ff`.
 
-The audited `main` commit is not publication-ready because PR #251 is still
-open and the native MOTW checklist has not been completed. Do not publish,
-tag, or merge automatically.
+The LUT playback blocker is fixed and proven on the real Windows EXE. The
+manual Mark-of-the-Web/native-dialog checklist is still **NOT TESTED**, so the
+release status stays conditional and must not be described as fully accepted.
+Do not merge, tag, or publish a GitHub Release automatically.
