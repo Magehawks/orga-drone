@@ -2,7 +2,7 @@ import "./studio-lut-webgl.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
-import { createSaver } from "./studio/settings.js";
+import { createDetailControls } from "./studio/inspector/detail.js";
 
 /**
  * Creator Studio UI.
@@ -3476,94 +3476,23 @@ import { createSaver } from "./studio/settings.js";
     }
   }
 
-  function neutralDetail() {
-    return { sharpen: 0, denoise: 0 };
-  }
-
-  function clampDetailSlider(value) {
-    const number = Number(value);
-    if (!Number.isFinite(number)) return 0;
-    return Math.max(0, Math.min(100, Math.round(number)));
-  }
-
-  function readDetail(clip) {
-    const neutral = neutralDetail();
-    if (!clip) return neutral;
-    try {
-      const parsed = JSON.parse(clip.dataset.detail || "");
-      if (!parsed || typeof parsed !== "object") return neutral;
-      return {
-        sharpen: clampDetailSlider(parsed.sharpen),
-        denoise: clampDetailSlider(parsed.denoise),
-      };
-    } catch (_) {
-      return neutral;
-    }
-  }
-
-  function writeDetail(clip, detail) {
-    if (!clip) return;
-    clip.dataset.detail = JSON.stringify(detail || neutralDetail());
-  }
-
-  function fillDetail(clip) {
-    const detail = readDetail(clip);
-    const sharpen = document.getElementById("inspector-detail-sharpen");
-    const denoise = document.getElementById("inspector-detail-denoise");
-    const sharpenValue = document.getElementById("inspector-detail-sharpen-value");
-    const denoiseValue = document.getElementById("inspector-detail-denoise-value");
-    if (sharpen) sharpen.value = String(detail.sharpen);
-    if (denoise) denoise.value = String(detail.denoise);
-    if (sharpenValue) sharpenValue.textContent = String(detail.sharpen);
-    if (denoiseValue) denoiseValue.textContent = String(detail.denoise);
-  }
-
   function detailClip(studioId) {
     return clips().find((item) => String(item.dataset.studioId) === String(studioId)) || null;
   }
 
-  const detailSaver = createSaver({
-    url: (studioId) => `/api/studio/${studioId}/detail`,
-    method: "PATCH",
-    payload: (studioId) => {
-      const clip = detailClip(studioId);
-      return clip ? readDetail(clip) : null;
-    },
-    apply: (studioId, body, requestBody) => {
-      const clip = detailClip(studioId);
-      if (!clip) return false;
-      writeDetail(clip, body.detail || requestBody);
-      return true;
-    },
-    refresh: (studioId) => {
-      const clip = detailClip(studioId);
-      if (!clip) return;
-      if (
-        state.selected &&
-        state.selected.type === "clip" &&
-        String(state.selected.id) === String(studioId)
-      ) {
-        fillDetail(clip);
-      }
-      setSaveState(true);
-    },
+  const detailControls = createDetailControls({
+    getSelectedClip: selectedAdjustableClip,
+    getClipById: detailClip,
+    setSaved: setSaveState,
+    showError: showFlash,
     errorMessage: msgDetailFailed,
-    onError: (err) => {
-      showFlash((err && err.message) || msgDetailFailed);
-    },
   });
-
-  function queueDetailSave(clip) {
-    const studioId = clip && clip.dataset.studioId;
-    if (!studioId) return;
-    detailSaver.queue(studioId);
-  }
 
   function fillImageInspectorSections(clip, isVideo) {
     // Accordion open/closed is owned by the HTML defaults and the user.
     // Do not write section.open or section.hidden here.
     fillColorLook(clip);
-    fillDetail(clip);
+    detailControls.fill(clip);
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
   }
@@ -9211,37 +9140,7 @@ import { createSaver } from "./studio/settings.js";
     applyPreviewGrades(resolveAt(state.projectTimeS));
   });
 
-  ["inspector-detail-sharpen", "inspector-detail-denoise"].forEach((inputId) => {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    input.addEventListener("input", () => {
-      const clip = selectedAdjustableClip();
-      if (!clip) return;
-      const sharpen = document.getElementById("inspector-detail-sharpen");
-      const denoise = document.getElementById("inspector-detail-denoise");
-      const detail = {
-        sharpen: clampDetailSlider(sharpen && sharpen.value),
-        denoise: clampDetailSlider(denoise && denoise.value),
-      };
-      writeDetail(clip, detail);
-      fillDetail(clip);
-      setSaveState(false);
-    });
-    input.addEventListener("change", () => {
-      const clip = selectedAdjustableClip();
-      if (!clip) return;
-      queueDetailSave(clip);
-    });
-  });
-
-  document.getElementById("inspector-detail-reset")?.addEventListener("click", () => {
-    const clip = selectedAdjustableClip();
-    if (!clip) return;
-    writeDetail(clip, neutralDetail());
-    fillDetail(clip);
-    setSaveState(false);
-    queueDetailSave(clip);
-  });
+  detailControls.bind();
 
   document.getElementById("mask-add-blur")?.addEventListener("click", () => addPrivacyMask("blur"));
   document.getElementById("mask-add-pixelate")?.addEventListener("click", () => {
