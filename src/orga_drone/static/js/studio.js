@@ -2,6 +2,7 @@ import "./studio-lut-webgl.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
+import { createSaver } from "./studio/settings.js";
 
 /**
  * Creator Studio UI.
@@ -3517,39 +3518,45 @@ import { createProjectBrowser } from "./studio/project-browser.js";
     if (denoiseValue) denoiseValue.textContent = String(detail.denoise);
   }
 
-  let detailSaveChain = Promise.resolve();
-
-  function queueDetailSave(clip) {
-    const studioId = clip.dataset.studioId;
-    detailSaveChain = detailSaveChain
-      .then(() => saveDetail(studioId))
-      .catch((err) => {
-        showFlash((err && err.message) || msgDetailFailed);
-      });
+  function detailClip(studioId) {
+    return clips().find((item) => String(item.dataset.studioId) === String(studioId)) || null;
   }
 
-  async function saveDetail(studioId) {
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
-    if (!clip) return;
-    const detail = readDetail(clip);
-    const res = await fetch(`/api/studio/${studioId}/detail`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(detail),
-    });
-    const body = await readJson(res);
-    if (!res.ok || !body || !body.ok) {
-      throw new Error((body && body.detail) || msgDetailFailed);
-    }
-    writeDetail(clip, body.detail || detail);
-    if (
-      state.selected &&
-      state.selected.type === "clip" &&
-      String(state.selected.id) === String(studioId)
-    ) {
-      fillDetail(clip);
-    }
-    setSaveState(true);
+  const detailSaver = createSaver({
+    url: (studioId) => `/api/studio/${studioId}/detail`,
+    method: "PATCH",
+    payload: (studioId) => {
+      const clip = detailClip(studioId);
+      return clip ? readDetail(clip) : null;
+    },
+    apply: (studioId, body, requestBody) => {
+      const clip = detailClip(studioId);
+      if (!clip) return false;
+      writeDetail(clip, body.detail || requestBody);
+      return true;
+    },
+    refresh: (studioId) => {
+      const clip = detailClip(studioId);
+      if (!clip) return;
+      if (
+        state.selected &&
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(studioId)
+      ) {
+        fillDetail(clip);
+      }
+      setSaveState(true);
+    },
+    errorMessage: msgDetailFailed,
+    onError: (err) => {
+      showFlash((err && err.message) || msgDetailFailed);
+    },
+  });
+
+  function queueDetailSave(clip) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    detailSaver.queue(studioId);
   }
 
   function fillImageInspectorSections(clip, isVideo) {
