@@ -31,6 +31,7 @@ const context = {
   readColorAnimation: () => null,
   readSaturationRamp: () => ({ enabled: false }),
   state: { selected: { type: 'clip', id: '1' }, activeStudioId: null },
+  clipId: clip => String(clip.dataset.studioId || ''),
   playheadDragging: false,
   window: {
     setTimeout: callback => { timers.push(callback); return timers.length; },
