@@ -15,9 +15,11 @@
 - Cut videos keep an **Original** entry so you can add another scene later.
 - Soundtrack can start later on the timeline (drag the music bed). Up to 8 local songs.
 - Preview approximates color and some effects; timing should match the MP4.
-  When a clip uses a `.cube` color file, scrub or pause to see a rendered still
-  with that file. Playback may hide the color file and shows a short status.
-  Export always applies it.
+  The image inspector has **Standard** and **Expert** views. Both use the same
+  clip settings, so switching views never changes the picture.
+- A `.cube` color file can be used during playback. When a clip combines a LUT
+  with HSL or color wheels, the app may prepare a short playback proxy and show
+  a rendered still until it is ready. Export always applies the saved settings.
 
 **Not a pro editor**
 

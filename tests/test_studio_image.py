@@ -346,13 +346,15 @@ def test_http_image_adjust_validation_and_inspector(
     # Jinja escapes & as &amp; in HTML text nodes.
     assert ("Look &amp; Farben" in page.text) or ("Look &amp; color" in page.text)
     assert ("Feinabstimmung" in page.text) or ("Fine-tune" in page.text)
-    assert ("Farbprofile &amp; LUTs" in page.text) or (
-        "Color profiles &amp; LUTs" in page.text
+    assert ("Kameraprofil &amp; LUTs" in page.text) or (
+        "Camera profile &amp; LUTs" in page.text
     )
+    assert 'data-image-mode="standard"' in page.text
+    assert 'data-image-mode="expert"' in page.text
     assert ("Original zum Vergleichen anzeigen" in page.text) or (
         "Show original for comparison" in page.text
     )
-    assert ("Farbdatei (.cube)" in page.text) or ("Color file (.cube)" in page.text)
+    assert ("Look-Datei (.cube)" in page.text) or ("Look file (.cube)" in page.text)
     assert 'id="inspector-color-creative-select"' in page.text
     assert 'data-image-adjust=' in page.text
     assert 'data-color-profile=' in page.text

@@ -555,3 +555,63 @@ msgstr "Color preview unavailable; try pausing or seeking again"
 
 msgid "Color still; transition colors approximate"
 msgstr "Color still; transition colors approximate"
+
+msgid "Standard"
+msgstr "Standard"
+
+msgid "Expert"
+msgstr "Expert"
+
+msgid "Color editing mode"
+msgstr "Color editing mode"
+
+msgid "Camera profile & LUTs"
+msgstr "Camera profile & LUTs"
+
+msgid "Convert camera profile"
+msgstr "Convert camera profile"
+
+msgid "Technical LUT, for example D-Log M to Rec.709. Optional."
+msgstr "Technical LUT, for example D-Log M to Rec.709. Optional."
+
+msgid "Technical camera-profile conversion, for example D-Log M to Rec.709."
+msgstr "Technical camera-profile conversion, for example D-Log M to Rec.709."
+
+msgid "This file converts D-Log M to Rec.709."
+msgstr "This file converts D-Log M to Rec.709."
+
+msgid "Orga Drone cannot verify the contents of the LUT file."
+msgstr "Orga Drone cannot verify the contents of the LUT file."
+
+msgid "Creative look"
+msgstr "Creative look"
+
+msgid "Optional additional LUT for the picture."
+msgstr "Optional additional LUT for the picture."
+
+msgid "Look file (.cube)"
+msgstr "Look file (.cube)"
+
+msgid "Optional creative LUT. It is applied after the camera profile conversion."
+msgstr "Optional creative LUT. It is applied after the camera profile conversion."
+
+msgid "Add conversion file"
+msgstr "Add conversion file"
+
+msgid "Add look file"
+msgstr "Add look file"
+
+msgid "Look strength"
+msgstr "Look strength"
+
+msgid "The look is applied in preview and export. Your source file stays unchanged."
+msgstr "The look is applied in preview and export. Your source file stays unchanged."
+
+msgid "No camera profile detected"
+msgstr "No camera profile detected"
+
+msgid "This file is already used in the other LUT stage. Choose a different file."
+msgstr "This file is already used in the other LUT stage. Choose a different file."
+
+msgid "already used in the other stage"
+msgstr "already used in the other stage"
