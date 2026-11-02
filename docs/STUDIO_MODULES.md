@@ -1,10 +1,11 @@
 # Studio Frontend Modules
 
-Status: **three modules extracted, target architecture still in progress.** The
-Studio UI still boots from `src/orga_drone/static/js/studio.js` (~11.5k lines).
-The JavaScript tooling and CI from PR 1, the ES-module entry from PR 3, and the
-export UI, project browser, and formatting modules are in place. Every other
-feature remains in the entry file.
+Status: **three feature modules extracted and the settings scheduler started;
+target architecture still in progress.** The Studio UI still boots from
+`src/orga_drone/static/js/studio.js` (~11.5k lines). The JavaScript tooling and
+CI from PR 1, the ES-module entry from PR 3, and the export UI, project browser,
+formatting, and settings modules are in place. Every other feature and the
+remaining save chains remain in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -28,9 +29,13 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/format.js` owns the shared time, lane-time, template, and export-clock
   formatters. Frame zoom formatting remains in the entry because it depends on
   the frame clamp.
+- `studio/settings.js` owns serialized saves with optional debounce and one
+  error callback. The Detail save chain is the first migrated consumer; image,
+  HSL, wheels, masks, overlays, map, HUD, frame, saturation ramp, audio, color
+  animation, and effect-lane saves remain in the entry.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
-- There are nine save chains and fourteen `save*` functions with repeated
+- There are eight save chains and thirteen `save*` functions with repeated
   debounce, snapshot, and refresh logic.
 - Studio routes live in `app.py` (61 of 118 routes). `/studio` builds a large
   view model inline.
@@ -38,8 +43,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio_cut.py`, `studio_speed.py`, `studio_transition.py`,
   `studio_estimate.py`, `studio_effect_lane.py`, `studio_lut.py`,
   `studio_hsl.py`, `studio_color_wheels.py`, and the `export/` package.
-- Export, project browser, and formatting now have direct module tests. Older
-  areas still use text-slicing tests; migrate those when their code moves.
+- Export, project browser, formatting, and the settings scheduler now have direct
+  module tests. Older areas still use text-slicing tests; migrate those when
+  their code moves.
 
 Do not treat the current line count as a product goal. Module boundaries and
 testability matter more.
@@ -58,7 +64,7 @@ existing tests and the PyInstaller static path keep working.
 | `studio/api.js` | HTTP and error normalization | `getJson`, `postJson`, `patchJson`, `del`, `StudioApiError` | none | none | all `/api/studio/*` | Node fake-`fetch` tests, error matrix | DOM, clip state, UI copy |
 | `studio/state.js` | Project id/title, selection, UI preferences | `get`, `set`, `subscribe`, `persist` | `api`, `format` | `projectId`, `title`, `selected`, `volume` | `PATCH /api/studio/projects/{id}` | Node state/storage roundtrip | clip data, playback time |
 | `studio/clip-model.js` | One API over clip `data-*` values | `list`, `get`, `duration`, `sourceRange`, `speed`, `sectionPoint`, `resolveAt`, `read*`, `write*` | `format` | **clip data (DOM as backing store)** | read-only; writes via `settings` | Node fake datasets, timing/transition fixtures | network, preview, save scheduler |
-| `studio/settings.js` | Serialized, debounced saves per clip setting | `createSaver({url, method, payload, apply, refresh})` | `api`, `clip-model` | save chains and pending ids | `/image`, `/hsl`, `/color-wheels`, `/detail`, `/frame`, `/masks`, `/overlays`, `/map`, `/hud`, `/saturation-ramp`, `/clip-audio`, `/color-animation`, `/effect-lane` | Node out-of-order/burst tests | foreign DOM; other savers |
+| `studio/settings.js` | **Implemented (Detail).** Serialized saves with optional debounce | `createSaver({url, method, payload, apply, refresh, errorMessage, onError, fetchImpl, readJson, debounceMs})` | none; fetch/JSON/timers are injected | save chains, pending keys, debounce timer | `/detail` (first); remaining endpoints move with their chains | `tests/js/settings.test.js`; fake fetch/timers | foreign DOM; other savers |
 | `studio/format.js` | **Implemented.** Shared pure formatting | `formatTemplate`, `formatTime`, `formatLaneTime`, `formatExportDuration` | none | none | none | `tests/js/format.test.js` | DOM, network, state |
 
 ### Feature modules
@@ -171,7 +177,7 @@ written. Prefer function names over line numbers.
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
-- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -191,7 +197,7 @@ Each step is independently mergeable and behavior-neutral.
 3. **PR 4 (done):** export UI extracted to `studio/export.js`; no app state dependencies.
 4. **PR 5 (done):** project browser and shared formatting extracted; server-rendered list stays server-rendered.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
-6. **Settings scheduler:** one save pipeline for image/HSL/wheels first.
+6. **Settings scheduler (started):** `studio/settings.js` with serialized and optional debounced saves; Detail is migrated first. Image/HSL/wheels chains follow.
 7. **Inspector detail:** first feature module with real module tests.
 8. **Color controls:** HSL, wheels, LUT, color points.
 9. **Timeline, music, preview/playback.**
