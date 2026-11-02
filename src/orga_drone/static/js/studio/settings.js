@@ -29,6 +29,8 @@ export function createSaver({
   debounceMs = 0,
   setTimeoutImpl = globalThis.setTimeout,
   clearTimeoutImpl = globalThis.clearTimeout,
+  serialize,
+  getChain,
 }) {
   const waitMs = Math.max(0, Number(debounceMs) || 0);
   let chain = Promise.resolve();
@@ -62,8 +64,15 @@ export function createSaver({
   }
 
   function enqueue(key) {
-    const run = chain.then(() => save(key));
-    chain = run.catch((err) => {
+    const run = () => save(key);
+    if (serialize) {
+      const queued = Promise.resolve(serialize(run));
+      return queued.catch((err) => {
+        if (onError) onError(err, key);
+      });
+    }
+    const next = chain.then(run);
+    chain = next.catch((err) => {
       if (onError) onError(err, key);
     });
     return chain;
@@ -81,6 +90,7 @@ export function createSaver({
       timer = 0;
     }
     if (pendingKeys.size) drainPending();
+    if (serialize && getChain) return getChain();
     return chain;
   }
 
