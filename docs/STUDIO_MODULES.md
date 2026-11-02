@@ -1,11 +1,11 @@
 # Studio Frontend Modules
 
-Status: **four modules extracted and the settings scheduler started;
+Status: **five modules extracted and the settings scheduler started;
 target architecture still in progress.** The Studio UI still boots from
 `src/orga_drone/static/js/studio.js` (~11.5k lines). The JavaScript tooling and
 CI from PR 1, the ES-module entry from PR 3, and the export UI, project browser,
-formatting, inspector detail, and settings modules are in place. Every other
-feature and the remaining save chains remain in the entry file.
+formatting, inspector detail, proxy policy, and settings modules are in place.
+Every other feature and the remaining save chains remain in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -36,6 +36,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/inspector/detail.js` owns the sharpen/denoise panel: read/write/clamp,
   fill, input/reset bindings, and its scheduled save. `studio.js` only creates
   it and calls `fill` during inspector refresh.
+- `studio/proxy-policy.js` owns the pure LUT proxy eligibility, WebGL handling
+  gate, and cache-key rules. `studio.js` still reads clip state and owns the
+  proxy scheduling, fetch, cache, and UI-chip orchestration.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
 - There are eight save chains and thirteen `save*` functions with repeated
@@ -46,9 +49,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio_cut.py`, `studio_speed.py`, `studio_transition.py`,
   `studio_estimate.py`, `studio_effect_lane.py`, `studio_lut.py`,
   `studio_hsl.py`, `studio_color_wheels.py`, and the `export/` package.
-- Export, project browser, formatting, the settings scheduler, and inspector
-  detail now have direct module tests. Older areas still use text-slicing tests;
-  migrate those when their code moves.
+- Export, project browser, formatting, the settings scheduler, inspector detail,
+  and proxy policy now have direct module tests. Older areas still use
+  text-slicing tests; migrate those when their code moves.
 
 Do not treat the current line count as a product goal. Module boundaries and
 testability matter more.
@@ -69,6 +72,7 @@ existing tests and the PyInstaller static path keep working.
 | `studio/clip-model.js` | One API over clip `data-*` values | `list`, `get`, `duration`, `sourceRange`, `speed`, `sectionPoint`, `resolveAt`, `read*`, `write*` | `format` | **clip data (DOM as backing store)** | read-only; writes via `settings` | Node fake datasets, timing/transition fixtures | network, preview, save scheduler |
 | `studio/settings.js` | **Implemented (Detail).** Serialized saves with optional debounce | `createSaver({url, method, payload, apply, refresh, errorMessage, onError, fetchImpl, readJson, debounceMs})` | none; fetch/JSON/timers are injected | save chains, pending keys, debounce timer | `/detail` (first); remaining endpoints move with their chains | `tests/js/settings.test.js`; fake fetch/timers | foreign DOM; other savers |
 | `studio/format.js` | **Implemented.** Shared pure formatting | `formatTemplate`, `formatTime`, `formatLaneTime`, `formatExportDuration` | none | none | none | `tests/js/format.test.js` | DOM, network, state |
+| `studio/proxy-policy.js` | **Implemented.** Pure LUT proxy policy | `evaluateLutProxyEligibility`, `evaluateLutWebglHandling`, `lutProxyPrepareKey` | none | none | none | `tests/js/proxy_policy.test.js`; existing proxy harnesses | DOM, fetch, timers, preview state, cache access |
 
 ### Feature modules
 
@@ -170,6 +174,7 @@ written. Prefer function names over line numbers.
 | Time/template formatting | `studio/format.js` | `studio/format.js` (implemented) |
 | Frame zoom formatting | `studio.js` (`formatZoom`) | stays in the entry because it uses the frame clamp |
 | Clip timing, transitions, section points | `studio.js:609-1830, 6708-6770` | `studio/clip-model.js` |
+| LUT proxy eligibility, WebGL gate, cache key | `studio/proxy-policy.js` | `studio/proxy-policy.js` (implemented) |
 | Preview layers, stills, proxy scheduling | `studio.js:1825-2920, 5318-6170` | `studio/preview.js` |
 | Playback clock and audio sync | `studio.js:5830-6170` | `studio/playback.js` |
 | Image/HSL/wheels/color controls | `studio.js:2100-3980` | `studio/inspector/*.js` |
@@ -181,7 +186,7 @@ written. Prefer function names over line numbers.
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
-- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`, `proxy_policy.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -203,10 +208,11 @@ Each step is independently mergeable and behavior-neutral.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
 6. **Settings scheduler (started):** `studio/settings.js` with serialized and optional debounced saves; Detail is migrated first. Image/HSL/wheels chains follow.
 7. **Inspector detail (done):** `studio/inspector/detail.js` with direct module tests.
-8. **Color controls:** HSL, wheels, LUT, color points.
-9. **Timeline, music, preview/playback.**
-10. **Masks, overlays, map, HUD, frame.**
-11. **Entry slim-down:** target 500–1,000 lines.
+8. **Proxy policy (done):** pure LUT proxy eligibility, WebGL gate, and cache key; scheduling stays in the entry.
+9. **Color controls:** HSL, wheels, LUT, color points.
+10. **Timeline, music, preview/playback.**
+11. **Masks, overlays, map, HUD, frame.**
+12. **Entry slim-down:** target 500–1,000 lines.
 
 ## Non-goals
 
