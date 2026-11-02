@@ -1,11 +1,11 @@
 # Studio Frontend Modules
 
-Status: **three feature modules extracted and the settings scheduler started;
+Status: **four modules extracted and the settings scheduler started;
 target architecture still in progress.** The Studio UI still boots from
 `src/orga_drone/static/js/studio.js` (~11.5k lines). The JavaScript tooling and
 CI from PR 1, the ES-module entry from PR 3, and the export UI, project browser,
-formatting, and settings modules are in place. Every other feature and the
-remaining save chains remain in the entry file.
+formatting, inspector detail, and settings modules are in place. Every other
+feature and the remaining save chains remain in the entry file.
 
 This document is the canonical map for Studio frontend work. It separates:
 
@@ -30,9 +30,12 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   formatters. Frame zoom formatting remains in the entry because it depends on
   the frame clamp.
 - `studio/settings.js` owns serialized saves with optional debounce and one
-  error callback. The Detail save chain is the first migrated consumer; image,
-  HSL, wheels, masks, overlays, map, HUD, frame, saturation ramp, audio, color
+  error callback. The Detail module is the first migrated consumer; image, HSL,
+  wheels, masks, overlays, map, HUD, frame, saturation ramp, audio, color
   animation, and effect-lane saves remain in the entry.
+- `studio/inspector/detail.js` owns the sharpen/denoise panel: read/write/clamp,
+  fill, input/reset bindings, and its scheduled save. `studio.js` only creates
+  it and calls `fill` during inspector refresh.
 - The DOM is the clip data store. Server-rendered `data-*` JSON is read and
   written directly by many functions; there is no clip API.
 - There are eight save chains and thirteen `save*` functions with repeated
@@ -43,9 +46,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio_cut.py`, `studio_speed.py`, `studio_transition.py`,
   `studio_estimate.py`, `studio_effect_lane.py`, `studio_lut.py`,
   `studio_hsl.py`, `studio_color_wheels.py`, and the `export/` package.
-- Export, project browser, formatting, and the settings scheduler now have direct
-  module tests. Older areas still use text-slicing tests; migrate those when
-  their code moves.
+- Export, project browser, formatting, the settings scheduler, and inspector
+  detail now have direct module tests. Older areas still use text-slicing tests;
+  migrate those when their code moves.
 
 Do not treat the current line count as a product goal. Module boundaries and
 testability matter more.
@@ -73,7 +76,7 @@ existing tests and the PyInstaller static path keep working.
 |---|---|---|---|---|---|---|---|
 | `studio/project-browser.js` | **Implemented.** Server-rendered project list actions: create/open/rename/delete, prompts, dialog lifecycle, errors | `createProjectBrowser({root, documentImpl, dialog, openButton, closeButton, defaultTitle, messages, fetchImpl, readJson, navigate, reload, prompt, confirm, showError, beforeOpen})` returns `{init, destroy}` | none; browser APIs and JSON reader are injected or defaulted | dialog/focus state, action errors | `/api/studio/projects*`, `/open`, `PATCH`, `DELETE` | `tests/js/project_browser.test.js`; Python route tests | Story grid, playback, export, client-side project list rendering |
 | `studio/export.js` | **Implemented.** Export dialog, options, progress, cancel, success banner | `createExportUi({projectId, documentImpl, root, messages, fetchImpl, now, setTimeoutImpl, clearTimeoutImpl, setIntervalImpl, clearIntervalImpl, elements})` | none; browser APIs are injected or defaulted | dialog, poll, timer, filename, and success state | `/api/studio/export*`, `/api/desktop/pick-save-file` | `tests/js/export_ui.test.js`; `test_export_*` | `state`, `clip-model`, Story DOM, playback, export backend |
-| `studio/inspector/detail.js` | Sharpen/denoise panel | `createDetailControls({getSelectedClip, refresh, showError, setSaved})` | `clip-model`, `settings`, `format` | panel state | `PATCH /api/studio/{id}/detail` | Node clamp/read/write; Python roundtrip | other inspector panels |
+| `studio/inspector/detail.js` | **Implemented.** Sharpen/denoise panel | `createDetailControls({getSelectedClip, getClipById, setSaved, showError, refresh, errorMessage, fetchImpl, readJson})`; returns `bind`, `destroy`, `fill`, `queueSave`, `read`, `write`, `neutral`, `clamp` | `settings`; DOM/fetch/timers injected | panel DOM and detail save | `PATCH /api/studio/{id}/detail` | `tests/js/inspector_detail.test.js`; Python roundtrip | other inspector panels |
 | `studio/inspector/image.js` | Image sliders and Quick Looks | `createImageControls({...})` | `clip-model`, `settings`, `preview` callback | panel state | `/image`, `/look` | Node neutral/clamp; pixel parity | playback, timeline |
 | `studio/inspector/color.js` | HSL, wheels, LUT, color points | `createColorControls({...})` | `clip-model`, `settings`, `preview` | panel state | `/hsl`, `/color-wheels`, `/color`, `/color-animation` | Node math; Python pixel parity | direct proxy-cache access |
 | `studio/inspector/masks.js` | Mask panel and handles | `createMasks({...})` | `clip-model`, `settings`, `preview` | `selectedMaskId` | `/masks` | Node geometry; Python pixel tests | foreign panels, playback |
@@ -163,6 +166,7 @@ written. Prefer function names over line numbers.
 |---|---|---|
 | Export dialog, polling, cancel, success banner | `studio/export.js` | `studio/export.js` (implemented) |
 | Project gallery/switcher actions | `studio/project-browser.js` | `studio/project-browser.js` (implemented) |
+| Sharpen/denoise panel | `studio/inspector/detail.js` | `studio/inspector/detail.js` (implemented) |
 | Time/template formatting | `studio/format.js` | `studio/format.js` (implemented) |
 | Frame zoom formatting | `studio.js` (`formatZoom`) | stays in the entry because it uses the frame clamp |
 | Clip timing, transitions, section points | `studio.js:609-1830, 6708-6770` | `studio/clip-model.js` |
@@ -177,7 +181,7 @@ written. Prefer function names over line numbers.
 ## Test strategy
 
 - New modules get `tests/js/<module>.test.js` and import the real API.
-- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`.
+- Current direct module tests: `export_ui.test.js`, `project_browser.test.js`, `format.test.js`, `settings.test.js`, `inspector_detail.test.js`.
 - Pure functions are tested directly; DOM-heavy modules use a small fake DOM
   helper. Do not add jsdom for this.
 - Existing text-slicing tests are migrated when their function moves. Do not
@@ -198,7 +202,7 @@ Each step is independently mergeable and behavior-neutral.
 4. **PR 5 (done):** project browser and shared formatting extracted; server-rendered list stays server-rendered.
 5. **Clip model (read facade):** wrap existing DOM reads; no behavior change.
 6. **Settings scheduler (started):** `studio/settings.js` with serialized and optional debounced saves; Detail is migrated first. Image/HSL/wheels chains follow.
-7. **Inspector detail:** first feature module with real module tests.
+7. **Inspector detail (done):** `studio/inspector/detail.js` with direct module tests.
 8. **Color controls:** HSL, wheels, LUT, color points.
 9. **Timeline, music, preview/playback.**
 10. **Masks, overlays, map, HUD, frame.**
