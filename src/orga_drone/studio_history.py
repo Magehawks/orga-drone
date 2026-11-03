@@ -13,6 +13,7 @@ edit clears Redo.
 from __future__ import annotations
 
 import threading
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -57,7 +58,27 @@ class Snapshot:
     clips: ClipSnapshot
     music_start_s: float
 
-_lock = threading.Lock()
+_lock = threading.RLock()
+_revision = 0
+
+
+@contextmanager
+def history_guard() -> Iterator[None]:
+    """Serialize control validation with ordinary Story history operations."""
+    with _lock:
+        yield
+
+
+def history_revision() -> int:
+    with _lock:
+        return _revision
+
+
+def invalidate_control_revision() -> None:
+    """Conservatively invalidate control on a manual Studio mutation request."""
+    global _revision
+    with _lock:
+        _revision += 1
 
 
 @dataclass
@@ -86,20 +107,35 @@ def history_flags(project_id: int | None) -> dict[str, bool]:
         return {"can_undo": bool(hist.undo), "can_redo": bool(hist.redo)}
 
 
+def guarded_undo_values(db: Database, project_id: int, clip_id: int) -> str:
+    """Read target values from the existing latest Story step before restoring."""
+    with _lock:
+        hist = _projects.get(project_id)
+        if hist and hist.undo:
+            for row in hist.undo[-1].clips:
+                if row[0] == clip_id:
+                    return str(row[_CLIP_COLUMNS.index("effect_settings")])
+        raise ValueError("No matching Undo step")
+
+
 def capture_story(db: Database, project_id: int) -> Snapshot:
-    columns = ", ".join(_CLIP_COLUMNS)
     with db.connect() as conn:
-        rows = conn.execute(
-            f"""SELECT {columns}
+        return _capture_story(conn, project_id)
+
+
+def _capture_story(conn: sqlite3.Connection, project_id: int) -> Snapshot:
+    columns = ", ".join(_CLIP_COLUMNS)
+    rows = conn.execute(
+        f"""SELECT {columns}
                 FROM studio_clips
                 WHERE project_id = ?
                 ORDER BY position ASC, id ASC""",
-            (project_id,),
-        ).fetchall()
-        project = conn.execute(
-            "SELECT music_start_s FROM studio_projects WHERE id = ?",
-            (project_id,),
-        ).fetchone()
+        (project_id,),
+    ).fetchall()
+    project = conn.execute(
+        "SELECT music_start_s FROM studio_projects WHERE id = ?",
+        (project_id,),
+    ).fetchone()
     return Snapshot(
         clips=tuple(tuple(row[name] for name in _CLIP_COLUMNS) for row in rows),
         music_start_s=(
@@ -173,6 +209,7 @@ def undo_story(db: Database, project_id: int) -> bool:
             hist.undo.append(before)
             raise
         hist.redo.append(current)
+        invalidate_control_revision()
         return True
 
 
@@ -190,6 +227,7 @@ def redo_story(db: Database, project_id: int) -> bool:
             hist.redo.append(after)
             raise
         hist.undo.append(current)
+        invalidate_control_revision()
         return True
 
 
@@ -226,6 +264,7 @@ def story_edit(
             if not grouped:
                 hist.redo[:] = saved_redo
             return
+        invalidate_control_revision()
         if not grouped:
             hist.undo.append(before)
             extra = len(hist.undo) - MAX_STORY_HISTORY
@@ -234,3 +273,25 @@ def story_edit(
             hist.open_group = group or None
         if not group:
             hist.open_group = None
+
+
+@contextmanager
+def transactional_story_edit(db: Database, project_id: int) -> Iterator[sqlite3.Connection]:
+    """Prepare snapshots inside the write transaction; publish only after commit.
+
+    No database access follows commit. A failed write, snapshot, or commit leaves
+    the existing Undo/Redo stacks untouched.
+    """
+    with _lock:
+        hist = _projects.setdefault(project_id, _ProjectHistory())
+        with db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            before = _capture_story(conn, project_id)
+            yield conn
+            after = _capture_story(conn, project_id)
+        if before != after:
+            hist.undo.append(before)
+            del hist.undo[:-MAX_STORY_HISTORY]
+            hist.redo.clear()
+            hist.open_group = None
+            invalidate_control_revision()

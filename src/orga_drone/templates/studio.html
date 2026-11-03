@@ -282,6 +282,32 @@
     </button>
   </header>
 
+  {% if studio_mode == 'editor' and project %}
+  <section id="studio-control" class="studio-control"
+    data-messages='{{ {
+      "off": _("External control is off."),
+      "ready": _("Ready for external changes."),
+      "playing": _("Pause playback to allow external changes."),
+      "busy": _("Wait until your changes are saved."),
+      "save_failed": _("A change could not be saved. Reopen Studio before using external control."),
+      "unsupported": _("Select an available video without animated color settings."),
+      "conflict": _("Another editor is active. Close it and try again."),
+      "disconnected": _("Connection lost. Reopen Studio and enable external control again."),
+      "enable_failed": _("Could not enable external control. Check the pairing key."),
+      "applied": _("Inspector updated. Preview refresh requested.")
+    } | tojson }}'>
+    <details>
+      <summary>{{ _('External control') }}</summary>
+      <p class="hint">{{ _('Allow a local client to adjust the selected paused video.') }}</p>
+      <label for="studio-control-key">{{ _('Pairing key') }}</label>
+      <input id="studio-control-key" type="password" autocomplete="off" spellcheck="false" maxlength="64">
+      <button type="button" class="button" data-control-enable>{{ _('Enable external control') }}</button>
+      <button type="button" class="button ghost" data-control-disable>{{ _('Disable external control') }}</button>
+    </details>
+    <p class="hint" data-control-status role="status" aria-live="polite">{{ _('External control is off.') }}</p>
+  </section>
+  {% endif %}
+
   {% if flash_msg == 'studio_removed' %}
     <div class="flash ok studio-flash-inline" role="status">{{ _('Removed from Studio.') }}</div>
   {% elif flash_msg == 'studio_cleared' %}

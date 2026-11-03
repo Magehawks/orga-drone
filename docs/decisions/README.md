@@ -59,3 +59,5 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0028](0028-studio-lut-preview-stills.md) | Studio LUT preview via shared FFmpeg stills | Accepted |
 | [0029](0029-studio-hsl-color-mixer.md) | Studio HSL colour mixer as a generated 3D LUT | Accepted |
 | [0030](0030-studio-color-wheels.md) | Studio colour wheels as a generated 3D LUT | Accepted |
+
+| [0031](0031-control-api-v1.md) | Opt-in local Studio Control API v1 | Accepted |

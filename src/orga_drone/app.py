@@ -25,7 +25,7 @@ from orga_drone.local_cache import (
     clear_regenerable_cache,
     format_bytes as format_cache_bytes,
 )
-from orga_drone.local_http import LoopbackOriginMiddleware
+from orga_drone.local_http import LoopbackOriginMiddleware, write_is_allowed
 from orga_drone.updates import OFFICIAL_DOWNLOAD_URL, UpdateChecker, installed_version
 from orga_drone.browse_timeline import (
     build_timeline_nav,
@@ -327,6 +327,10 @@ def browse_filter_query(filters: dict[str, Any], *, page: int | None = None) -> 
 
 
 def create_app() -> FastAPI:
+    from orga_drone.control import ControlError, ControlService
+    from orga_drone.control_routes import control_router
+    from orga_drone.studio_history import invalidate_control_revision
+
     settings.ensure_dirs()
     clear_studio_history()
     db = Database(settings.db_path)
@@ -334,9 +338,22 @@ def create_app() -> FastAPI:
     app = FastAPI(title="orga-drone", version=__version__)
     app.add_middleware(LoopbackOriginMiddleware)
     app.state.db = db
+    control = ControlService(db, settings.data_dir)
+    app.state.control = control
+    app.include_router(control_router(control, settings.host))
+
+    @app.exception_handler(ControlError)
+    async def control_error(request: Request, exc: ControlError) -> JSONResponse:
+        return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status,
+                            headers={"Cache-Control": "no-store"})
 
     @app.middleware("http")
     async def attach_story_history_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        # Invalidate before manual requests, including setters outside Story history.
+        # Failed/no-op manual requests conservatively invalidate as well.
+        manual = request.url.path.startswith(("/api/studio", "/studio/")) and not request.url.path.startswith("/api/studio/control/") and not request.url.path.endswith("/playback-proxy")
+        if manual and request.method not in {"GET", "HEAD", "OPTIONS"} and write_is_allowed(request):
+            invalidate_control_revision()
         response = await call_next(request)
         path = request.url.path
         if request.method in {"GET", "HEAD", "OPTIONS"}:
@@ -2804,7 +2821,8 @@ def create_app() -> FastAPI:
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="JSON body must include map")
         try:
-            item = db.set_studio_map(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_map(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -2835,7 +2853,8 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include enabled"
             )
         try:
-            item = db.set_studio_hud(studio_item_id, payload)
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_hud(studio_item_id, payload)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
