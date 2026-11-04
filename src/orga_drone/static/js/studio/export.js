@@ -4,6 +4,9 @@ const DEFAULT_MESSAGES = {
   failed: "Export failed.",
   cancelled: "Export cancelled.",
   cancelling: "Cancelling export…",
+  emptyStory: "The Story is empty. Add a photo, video, or title card before exporting.",
+  unavailableSource:
+    'Original source unavailable for "{clip}". Reconnect its library or restore the file, then try again.',
   noResolution: "No exportable video resolution in this project.",
   running: "Exporting…",
   done: "Export finished.",
@@ -26,6 +29,8 @@ const MESSAGE_DATASET_KEYS = {
   failed: "exportFailed",
   cancelled: "exportCancelled",
   cancelling: "exportCancelling",
+  emptyStory: "exportEmptyStory",
+  unavailableSource: "exportUnavailableSource",
   noResolution: "exportNoResolution",
   running: "exportRunning",
   done: "exportDone",
@@ -405,6 +410,7 @@ export function createExportUi(options = {}) {
     setExportRunningUi(false);
     if (elements.runButton) elements.runButton.disabled = true;
     if (elements.resolution) elements.resolution.innerHTML = "";
+    state.optionsCache = null;
     state.filenameAuto = "";
     if (elements.filename) elements.filename.value = "";
     elements.dialog.showModal();
@@ -420,6 +426,17 @@ export function createExportUi(options = {}) {
       }
       state.optionsCache = data;
       const optionRows = Array.isArray(data.options) ? data.options : [];
+      if (data.readiness === "empty" || data.readiness === "unavailable_sources") {
+        const missing = Array.isArray(data.unavailable_sources) ? data.unavailable_sources : [];
+        const message =
+          data.readiness === "empty"
+            ? messages.emptyStory
+            : missing
+                .map((clip) => messages.unavailableSource.replace("{clip}", clip.filename))
+                .join("\n") || messages.failed;
+        setExportStatus(message, { error: true });
+        return;
+      }
       if (!optionRows.length) {
         setExportStatus(messages.noResolution, { error: true });
         if (elements.hint) elements.hint.textContent = messages.noResolution;
@@ -457,6 +474,7 @@ export function createExportUi(options = {}) {
 
   async function runStudioExport() {
     if (!state.optionsCache || !elements.resolution || !elements.runButton) return;
+    if (state.optionsCache.readiness && state.optionsCache.readiness !== "ready") return;
     const height = Number(elements.resolution.value);
     if (!Number.isFinite(height) || height <= 0) {
       setExportStatus(messages.noResolution, { error: true });

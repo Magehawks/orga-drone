@@ -463,3 +463,55 @@ test("can retry a failed cancel and cleans timers on destroy", async () => {
   assert.equal(scheduler.timeoutCount, 0);
   assert.equal(scheduler.intervalCount, 0);
 });
+
+for (const readiness of ["empty", "unavailable_sources", "no_resolution"]) {
+  test(`blocks export for ${readiness}`, async () => {
+    const harness = makeHarness(() =>
+      jsonResponse({
+        ...OPTIONS,
+        readiness,
+        options: [],
+        unavailable_sources: [{ filename: "missing.jpg" }],
+      })
+    );
+    await harness.ui.openExportDialog();
+    assert.equal(harness.elements["studio-export-run"].disabled, true);
+    const message = harness.elements["studio-export-status"].textContent;
+    if (readiness === "empty") assert.match(message, /Story is empty/);
+    if (readiness === "unavailable_sources") assert.match(message, /missing.jpg/);
+    if (readiness === "no_resolution") assert.equal(message, "No resolution");
+    await harness.ui.runStudioExport();
+    assert.equal(harness.calls.length, 1);
+    harness.ui.destroy();
+  });
+}
+
+for (const story of ["photos", "mixed media", "title cards"]) {
+  test(`enables export for ready ${story}`, async () => {
+    const harness = makeHarness(() => jsonResponse({ ...OPTIONS, readiness: "ready" }));
+    await harness.ui.openExportDialog();
+    assert.equal(harness.elements["studio-export-run"].disabled, false);
+    harness.ui.destroy();
+  });
+}
+
+test("shows a source lost after dialog opening without starting polling", async () => {
+  const harness = makeHarness((url) => {
+    if (url.startsWith("/api/studio/export/options")) {
+      return jsonResponse({ ...OPTIONS, readiness: "ready" });
+    }
+    if (url === "/api/desktop/pick-save-file") {
+      return jsonResponse({ status: "ok", path: "C:\\Out\\story.mp4" });
+    }
+    return jsonResponse(
+      { detail: 'Original source unavailable for "lost.jpg".' },
+      { status: 400, ok: false }
+    );
+  });
+  await harness.ui.openExportDialog();
+  await harness.ui.runStudioExport();
+  assert.match(harness.elements["studio-export-status"].textContent, /lost.jpg/);
+  assert.equal(harness.calls.length, 3);
+  assert.equal(harness.elements["studio-export-run"].disabled, false);
+  harness.ui.destroy();
+});

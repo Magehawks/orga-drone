@@ -873,5 +873,7 @@
   "Neutral": "Neutral",
   "Could not save color grading.": "Farbkorrektur konnte nicht gespeichert werden.",
   "Playing without color grading preview; pause or seek to see it": "Wiedergabe ohne Farbkorrektur-Vorschau; pausiere oder spule, um sie zu sehen",
-  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Ziehe den Punkt in jedem Rad. Die Mitte ist neutral; der Winkel bestimmt die Farbtonrichtung und der Abstand die Stärke."
+  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Ziehe den Punkt in jedem Rad. Die Mitte ist neutral; der Winkel bestimmt die Farbtonrichtung und der Abstand die Stärke.",
+  "The Story is empty. Add a photo, video, or title card before exporting.": "Die Story ist leer. Füge vor dem Export ein Foto, Video oder eine Titelkarte hinzu.",
+  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut."
 }
