@@ -34,13 +34,13 @@ jobs:
           $ErrorActionPreference = "Stop"
           $head = "${{ github.event.pull_request.head.sha }}"
           $base = "${{ github.event.pull_request.base.sha }}"
-          $merge = "${{ github.event.pull_request.merge_commit_sha }}"
           $tested = (git rev-parse HEAD).Trim()
           $tree = (git rev-parse "HEAD^{tree}").Trim()
-          if (-not $merge) { $merge = $tested }
-          if ($tested -ne $merge) {
-            throw "Checked-out commit $tested does not match PR merge commit $merge"
-          }
+          # The event payload's merge_commit_sha can lag the merge ref that was
+          # actually checked out. Bind evidence to the tested commit and let the
+          # live admission policy compare it to the current PR merge SHA.
+          if (-not $tested) { throw "Checked-out commit SHA is unavailable" }
+          $merge = $tested
           "head_sha=$head" >> $env:GITHUB_OUTPUT
           "base_sha=$base" >> $env:GITHUB_OUTPUT
           "merge_sha=$merge" >> $env:GITHUB_OUTPUT
