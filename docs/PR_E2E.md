@@ -11,9 +11,14 @@ session on the Ubuntu pull-request runner.
 
 The **CI** workflow (`.github/workflows/ci.yml`) runs on `pull_request`:
 
+It also runs these same checks on pushes to `main` and `develop`. The separate
+**Main admission policy** check denies PR admission to `main` pending #262; it
+does not turn this FastAPI journey into packaged Windows/WebView2 validation or
+configure branch protection. See the [branch migration runbook](BRANCH_MIGRATION.md#pr-b-implemented-pre-cutover-guard-and-administrator-configuration).
+
 | Check | What it does |
 | --- | --- |
-| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
+| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
 | **JavaScript lint, format and tests** | `npm ci`, `npm run lint:js`, `npm run format:check`, `npm run test:js` on Node 22. No browser and no product data. |
 | **App journey smoke** | `pytest tests/test_pr_journey_smoke.py` |
 
