@@ -39,23 +39,37 @@ def evidence():
         "body": f"Main admission candidate: {HEAD} {BASE}",
     }
     workflow = {
+        "id": 123,
+        "run_attempt": 1,
+        "check_suite_id": 999,
         "path": ".github/workflows/ci.yml",
         "event": "pull_request",
         "head_sha": HEAD,
         "repository": {"full_name": REPO},
+        "status": "completed",
+        "conclusion": "success",
+        "pull_requests": [
+            {
+                "number": 42,
+                "head": copy.deepcopy(pr["head"]),
+                "base": copy.deepcopy(pr["base"]),
+            }
+        ],
     }
     checks = [
         {
+            "id": 456 + index,
+            "check_suite": {"id": 999},
             "name": name,
             "head_sha": HEAD,
             "status": "completed",
             "conclusion": "success",
             "app": {"slug": "github-actions"},
-            "pull_requests": [{"number": 42}],
+            "pull_requests": copy.deepcopy(workflow["pull_requests"]),
             "workflow": copy.deepcopy(workflow),
-            "details_url": f"https://github.com/{REPO}/actions/runs/123/job/456",
+            "details_url": f"https://github.com/{REPO}/actions/runs/123/job/{456 + index}",
         }
-        for name in policy.REQUIRED_CHECKS
+        for index, name in enumerate(policy.REQUIRED_CHECKS)
     ]
     return {
         "expected": copy.deepcopy(pr),
@@ -82,6 +96,9 @@ def hotfix(evidence):
         "Emergency issue: #12\nEmergency reason: Broken export\nEmergency scope: Export fix"
     )
     evidence["emergency_issue"] = {"body": "Urgent regression; export-only scope."}
+    for check in evidence["checks"]:
+        check["workflow"]["pull_requests"][0]["head"]["ref"] = "hotfix/export"
+        check["pull_requests"][0]["head"]["ref"] = "hotfix/export"
 
 
 @pytest.mark.parametrize("use_hotfix", [False, True])
@@ -208,36 +225,65 @@ def test_candidate_movement_rejected(evidence, which):
 
 
 class FakeAPI:
+    root = f"https://api.github.com/repos/{REPO}"
+
     def __init__(self, evidence):
         self.evidence = evidence
         self.calls = []
+        self.runs = [copy.deepcopy(evidence["checks"][0]["workflow"])]
+        self.checks = copy.deepcopy(evidence["checks"])
+        self.jobs = [
+            {
+                "id": c["id"],
+                "name": c["name"],
+                "run_id": 123,
+                "run_attempt": 1,
+                "head_sha": HEAD,
+                "status": c["status"],
+                "conclusion": c["conclusion"],
+                "check_run_url": f"{self.root}/check-runs/{c['id']}",
+            }
+            for c in self.checks
+        ]
 
     def get(self, path):
         self.calls.append(path)
         data = self.evidence
+        if path.startswith("/actions/runs/"):
+            return copy.deepcopy(
+                next(r for r in self.runs if str(r["id"]) == path.rsplit("/", 1)[1])
+            )
+        if path.startswith("/check-runs/"):
+            return copy.deepcopy(
+                next(c for c in self.checks if str(c["id"]) == path.rsplit("/", 1)[1])
+            )
         return copy.deepcopy(
             {
                 "/pulls/42": data["current"],
                 "/collaborators/maintainer/permission": {"permission": "write"},
                 "/branches/develop": {"commit": {"sha": data["live_head"]}},
                 "/branches/main": {"commit": {"sha": data["live_base"]}},
-                "/actions/runs/123": data["checks"][0]["workflow"],
             }[path]
         )
 
     def pages(self, path, key=None):
-        return copy.deepcopy(
-            self.evidence["reviews"]
-            if path.endswith("reviews")
-            else self.evidence["checks"]
-        )
+        self.calls.append(path)
+        if path.endswith("reviews"):
+            return copy.deepcopy(self.evidence["reviews"])
+        if key == "workflow_runs":
+            assert "event=pull_request&head_sha=" in path
+            return copy.deepcopy(self.runs)
+        assert key == "jobs" and "/attempts/" in path
+        return copy.deepcopy(self.jobs)
 
 
 def test_collector_requeries_candidate_and_fetches_real_workflow(evidence):
     api = FakeAPI(evidence)
     assert policy.evaluate(api, evidence["expected"]) == [policy.PACKAGED_GATE_HOLD]
     assert api.calls.count("/pulls/42") == 2
-    assert api.calls.count("/actions/runs/123") == 1
+    assert api.calls.count("/actions/runs/123") == 2
+    assert "/actions/runs/123/attempts/1/jobs" in api.calls
+    assert not any("/commits/" in call for call in api.calls)
 
 
 def test_collector_detects_metadata_change(evidence, monkeypatch):
@@ -252,6 +298,189 @@ def test_collector_detects_metadata_change(evidence, monkeypatch):
 
     monkeypatch.setattr(api, "get", moving_get)
     assert "changed during evaluation" in policy.evaluate(api, evidence["expected"])[0]
+
+
+def test_collector_ignores_same_sha_push_run(evidence):
+    api = FakeAPI(evidence)
+    api.runs.append(
+        {
+            **copy.deepcopy(api.runs[0]),
+            "id": 124,
+            "event": "push",
+            "conclusion": "failure",
+        }
+    )
+    assert policy.evaluate(api, evidence["expected"]) == [policy.PACKAGED_GATE_HOLD]
+
+
+@pytest.mark.parametrize("state", ["queued", "in_progress", "failure", "stale_base"])
+def test_newest_run_cannot_fall_back_to_old_green(evidence, state):
+    api = FakeAPI(evidence)
+    newer = copy.deepcopy(api.runs[0])
+    newer["id"] = 124
+    api.runs.append(newer)
+    if state == "stale_base":
+        newer["pull_requests"][0]["base"]["sha"] = "c" * 40
+        with pytest.raises(ValueError, match="candidate"):
+            policy.collect_checks(api, evidence["expected"])
+    else:
+        newer["status"] = state if state != "failure" else "completed"
+        newer["conclusion"] = state if state == "failure" else None
+        # No jobs in a newly queued run; no fallback to run 123's green checks.
+        api.jobs = []
+        checks = policy.collect_checks(api, evidence["expected"])
+        evidence["checks"] = checks
+        assert len(errors(evidence)) == 3
+
+
+@pytest.mark.parametrize(
+    "bad", ["attempt", "run", "suite", "check_id", "url", "check_base", "check_status"]
+)
+def test_collector_rejects_job_check_identity_mismatch(evidence, bad):
+    api = FakeAPI(evidence)
+    if bad == "attempt":
+        api.jobs[0]["run_attempt"] = 2
+    elif bad == "run":
+        api.jobs[0]["run_id"] = 999
+    elif bad == "suite":
+        api.checks[0]["check_suite"]["id"] = 888
+    elif bad == "check_id":
+        api.jobs[0]["check_run_url"] = api.root + "/check-runs/not-an-id"
+    elif bad == "url":
+        api.jobs[0]["check_run_url"] = "https://other.invalid/check-runs/456"
+    elif bad == "check_base":
+        api.checks[0]["pull_requests"][0]["base"]["sha"] = "c" * 40
+    else:
+        api.checks[0]["status"] = "queued"
+    with pytest.raises(ValueError):
+        policy.collect_checks(api, evidence["expected"])
+
+
+def test_partial_rerun_cannot_borrow_prior_attempt_jobs(evidence):
+    api = FakeAPI(evidence)
+    api.runs[0]["run_attempt"] = 2
+    api.jobs = api.jobs[:1]
+    api.jobs[0]["run_attempt"] = 2
+    evidence["checks"] = policy.collect_checks(api, evidence["expected"])
+    assert len(errors(evidence)) == 2
+    assert "/actions/runs/123/attempts/2/jobs" in api.calls
+
+
+@pytest.mark.parametrize("movement", ["attempt", "new_run", "review"])
+def test_collector_detects_evidence_movement(evidence, monkeypatch, movement):
+    api = FakeAPI(evidence)
+    get, pages = api.get, api.pages
+
+    def moving_get(path):
+        result = get(path)
+        if (
+            path == "/actions/runs/123"
+            and api.calls.count(path) == 2
+            and movement == "attempt"
+        ):
+            result["run_attempt"] = 2
+        return result
+
+    def moving_pages(path, key=None):
+        result = pages(path, key)
+        if (
+            key == "workflow_runs"
+            and api.calls.count(path) == 2
+            and movement == "new_run"
+        ):
+            result.append({**copy.deepcopy(result[0]), "id": 124})
+        if (
+            path.endswith("reviews")
+            and api.calls.count(path) == 2
+            and movement == "review"
+        ):
+            result[0]["state"] = "DISMISSED"
+        return result
+
+    monkeypatch.setattr(api, "get", moving_get)
+    monkeypatch.setattr(api, "pages", moving_pages)
+    if movement == "review":
+        assert (
+            "changed during evaluation" in policy.evaluate(api, evidence["expected"])[0]
+        )
+    else:
+        with pytest.raises(ValueError, match="changed"):
+            policy.collect_checks(api, evidence["expected"])
+
+
+def test_real_github_snapshot_run_attempt_linkage():
+    snapshot = json.loads(
+        (ROOT / "tests/fixtures/main_admission_github.json").read_text(encoding="utf-8")
+    )
+    run = snapshot["run"]
+    link = run["pull_requests"][0]
+    pr = {
+        "number": link["number"],
+        "head": link["head"],
+        "base": {**link["base"], "repo": run["repository"]},
+    }
+
+    class SnapshotAPI:
+        root = "https://api.github.com/repos/Magehawks/orga-drone"
+
+        def pages(self, path, key):
+            if key == "workflow_runs":
+                return [copy.deepcopy(run)]
+            assert path == f"/actions/runs/{run['id']}/attempts/1/jobs"
+            return copy.deepcopy(snapshot["jobs"])
+
+        def get(self, path):
+            if path == f"/actions/runs/{run['id']}":
+                return copy.deepcopy(run)
+            return copy.deepcopy(
+                next(c for c in snapshot["checks"] if path == f"/check-runs/{c['id']}")
+            )
+
+    checks = policy.collect_checks(SnapshotAPI(), pr)
+    assert {c["name"] for c in checks} == set(policy.REQUIRED_CHECKS)
+    assert all(c["conclusion"] == "success" for c in checks)
+
+
+@pytest.mark.parametrize(
+    "labels", [[], [{"name": "admission:recheck"}], [{"name": "approved"}]]
+)
+def test_recheck_labels_never_authorize_admission(evidence, labels):
+    evidence["current"]["labels"] = labels
+    assert policy.admission_errors(**evidence) == [policy.PACKAGED_GATE_HOLD]
+
+
+def test_query_pagination_preserves_filter_parameters(monkeypatch):
+    api = policy.GitHub(REPO, "synthetic")
+    paths = []
+
+    def get(path):
+        paths.append(path)
+        return {
+            "workflow_runs": [{}] * 100 if path.endswith("&page=1") else [],
+            "total_count": 100,
+        }
+
+    monkeypatch.setattr(api, "get", get)
+    assert (
+        len(api.pages("/runs?event=pull_request&head_sha=abc", "workflow_runs")) == 100
+    )
+    assert paths == [
+        "/runs?event=pull_request&head_sha=abc&per_page=100&page=1",
+        "/runs?event=pull_request&head_sha=abc&per_page=100&page=2",
+    ]
+
+
+def test_counted_pagination_cannot_silently_truncate(monkeypatch):
+    api = policy.GitHub(REPO, "synthetic")
+    monkeypatch.setattr(api, "get", lambda path: {"total_count": 3, "jobs": []})
+    with pytest.raises(ValueError, match="Incomplete metadata count"):
+        api.pages("/jobs", "jobs")
+
+
+def test_recheck_label_cannot_replace_approval(evidence):
+    evidence["current"]["labels"] = [{"name": "admission:recheck"}]
+    evidence["reviews"] = []
+    assert any("approval" in message for message in errors(evidence))
 
 
 @pytest.mark.parametrize("bad", ["api", "malformed"])
@@ -300,6 +529,8 @@ def test_workflow_uses_base_policy_and_ci_preserves_pr_checks():
     assert "persist-credentials: false" in workflow
     assert "name: Main admission policy" in workflow
     assert "python packaging/main_admission.py" in workflow
+    assert "ready_for_review, labeled, unlabeled]" in workflow
+    assert "\n    if:" not in workflow and "continue-on-error:" not in workflow
     assert ": write" not in workflow
     ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "  pull_request:\n  push:\n    branches: [main, develop]" in ci

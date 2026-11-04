@@ -95,6 +95,7 @@ def admission_errors(
     ):
         errors.append(
             "Missing independent human approval for this exact head/base from a maintainer with write access."
+            " Solo-owner PRs need the approval-profile decision documented in BRANCH_MIGRATION.md before activation."
         )
 
     for name in REQUIRED_CHECKS:
@@ -116,6 +117,9 @@ def admission_errors(
             and check["workflow"]["event"] == "pull_request"
             and check["workflow"]["head_sha"] == head
             and check["workflow"]["repository"]["full_name"] == repo
+            and check["workflow"]["status"] == "completed"
+            and check["workflow"]["conclusion"] == "success"
+            and linked_candidate(check["workflow"], current)
             for check in matching
         ):
             errors.append(
@@ -148,20 +152,118 @@ class GitHub:
 
     def pages(self, path: str, key: str | None = None) -> list[dict[str, Any]]:
         result = []
+        total = None
         for page in range(1, 11):
-            data = self.get(f"{path}?per_page=100&page={page}")
+            separator = "&" if "?" in path else "?"
+            data = self.get(f"{path}{separator}per_page=100&page={page}")
             items = data[key] if key else data
+            if key:
+                reported = data["total_count"]
+                if (
+                    not isinstance(reported, int)
+                    or reported < 0
+                    or total not in (None, reported)
+                ):
+                    raise ValueError("Changing or invalid metadata count")
+                total = reported
             if not isinstance(items, list):
                 raise ValueError("Invalid paginated metadata")
             result.extend(items)
             if len(items) < 100:
+                if total is not None and len(result) != total:
+                    raise ValueError("Incomplete metadata count")
                 return result
         raise ValueError("Incomplete metadata: pagination limit reached")
 
 
+def linked_candidate(run: dict[str, Any], pr: dict[str, Any]) -> bool:
+    return any(
+        link["number"] == pr["number"]
+        and link["head"]["sha"] == pr["head"]["sha"]
+        and link["head"]["ref"] == pr["head"]["ref"]
+        and link["base"]["sha"] == pr["base"]["sha"]
+        and link["base"]["ref"] == "main"
+        for link in run["pull_requests"]
+    )
+
+
+def newest_ci_run(api: GitHub, pr: dict[str, Any]) -> dict[str, Any]:
+    head = pr["head"]["sha"]
+    runs = api.pages(
+        f"/actions/workflows/ci.yml/runs?event=pull_request&head_sha={head}",
+        "workflow_runs",
+    )
+    # Choose before validating base/status. A newer stale/incomplete/failed run
+    # must not cause fallback to an older green run for the same PR/head.
+    matching = [
+        run
+        for run in runs
+        if run["event"] == "pull_request"
+        and run["head_sha"] == head
+        and any(link["number"] == pr["number"] for link in run["pull_requests"])
+    ]
+    if not matching:
+        raise ValueError("Missing PR CI run")
+    return max(matching, key=lambda run: run["id"])
+
+
+def collect_checks(api: GitHub, pr: dict[str, Any]) -> list[dict[str, Any]]:
+    """Use one explicit workflow run/attempt, never commit-wide filter=latest."""
+    selected = newest_ci_run(api, pr)
+    run = api.get(f"/actions/runs/{selected['id']}")
+    repo = pr["base"]["repo"]["full_name"]
+    if (
+        run["id"] != selected["id"]
+        or run["path"] != ".github/workflows/ci.yml"
+        or run["event"] != "pull_request"
+        or run["head_sha"] != pr["head"]["sha"]
+        or run["repository"]["full_name"] != repo
+        or not linked_candidate(run, pr)
+        or not isinstance(run["run_attempt"], int)
+        or run["run_attempt"] < 1
+    ):
+        raise ValueError("Unverified CI run/candidate")
+    attempt = run["run_attempt"]
+    jobs = api.pages(f"/actions/runs/{run['id']}/attempts/{attempt}/jobs", "jobs")
+    checks = []
+    for job in jobs:
+        if job["name"] not in REQUIRED_CHECKS:
+            continue
+        prefix = f"{api.root}/check-runs/"
+        if not job["check_run_url"].startswith(prefix):
+            raise ValueError("Untrusted check URL")
+        check_id = job["check_run_url"][len(prefix) :]
+        if not check_id.isdecimal():
+            raise ValueError("Invalid check ID")
+        check = api.get(f"/check-runs/{check_id}")
+        if (
+            job["run_id"] != run["id"]
+            or job["run_attempt"] != attempt
+            or job["head_sha"] != run["head_sha"]
+            or check["id"] != int(check_id)
+            or check["check_suite"]["id"] != run["check_suite_id"]
+            or check["name"] != job["name"]
+            or check["status"] != job["status"]
+            or check["conclusion"] != job["conclusion"]
+            or check["details_url"]
+            != f"https://github.com/{repo}/actions/runs/{run['id']}/job/{job['id']}"
+            or not linked_candidate(check, pr)
+        ):
+            raise ValueError("Unverified CI job/check linkage")
+        check["workflow"] = run
+        checks.append(check)
+    # A partial rerun cannot borrow successes from an earlier attempt. Also
+    # reject a run/attempt or newest-run change while collecting its evidence.
+    if (
+        api.get(f"/actions/runs/{run['id']}") != run
+        or newest_ci_run(api, pr)["id"] != run["id"]
+    ):
+        raise ValueError("CI run/attempt changed during collection")
+    return checks
+
+
 def evaluate(api: GitHub, expected: dict[str, Any]) -> list[str]:
     number = expected["number"]
-    head, _ = candidate(expected)
     current = api.get(f"/pulls/{number}")
     reviews = api.pages(f"/pulls/{number}/reviews")
     permissions = {
@@ -174,24 +276,7 @@ def evaluate(api: GitHub, expected: dict[str, Any]) -> list[str]:
             if r["state"] == "APPROVED" and r["user"]["type"] == "User"
         }
     }
-    checks = api.pages(f"/commits/{head}/check-runs", "check_runs")
-    runs = {}
-    for check in checks:
-        if check["name"] not in REQUIRED_CHECKS:
-            continue
-        match = re.fullmatch(
-            re.escape(
-                f"https://github.com/{expected['base']['repo']['full_name']}/actions/runs/"
-            )
-            + r"([0-9]+)/job/[0-9]+",
-            check.get("details_url") or "",
-        )
-        if not match:
-            raise ValueError("Cannot verify check workflow provenance")
-        run_id = match[1]
-        if run_id not in runs:
-            runs[run_id] = api.get(f"/actions/runs/{run_id}")
-        check["workflow"] = runs[run_id]
+    checks = collect_checks(api, expected)
     issue_match = re.search(
         r"(?m)^Emergency issue: #([1-9][0-9]*)\s*$", current.get("body") or ""
     )
@@ -199,8 +284,11 @@ def evaluate(api: GitHub, expected: dict[str, Any]) -> list[str]:
     # Re-read after collecting evidence, including real branch tips: PR base.sha
     # can lag the live branch. Any movement or metadata/API failure denies.
     final = api.get(f"/pulls/{number}")
-    if current != final:
-        return ["PR metadata changed during evaluation; rerun.", PACKAGED_GATE_HOLD]
+    if current != final or api.pages(f"/pulls/{number}/reviews") != reviews:
+        return [
+            "PR/review metadata changed during evaluation; rerun.",
+            PACKAGED_GATE_HOLD,
+        ]
     live_head = api.get(f"/branches/{quote(expected['head']['ref'], safe='')}")[
         "commit"
     ]["sha"]

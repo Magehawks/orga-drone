@@ -3,7 +3,9 @@ name: Main admission
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, edited, ready_for_review]
+    # Label changes are an explicit fresh-candidate recheck after CI/review changes.
+    # No label value authorizes admission, and no conditional job can skip this gate.
+    types: [opened, synchronize, reopened, edited, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
