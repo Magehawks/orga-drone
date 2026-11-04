@@ -1,9 +1,10 @@
 # Proposed develop/main strategy and migration runbook
 
-**Status: proposed; not activated.** This is the documentation-only PR A for
-[#261](https://github.com/Magehawks/orga-drone/issues/261). It does not complete
-that issue or authorize the operational steps below. `main` remains the default
-branch and current contribution target until a separately approved cutover.
+**Status: branch cutover proposed; not activated.** PR A documented the strategy
+for [#261](https://github.com/Magehawks/orga-drone/issues/261). PR B adds push CI
+and the pre-cutover denial guard described below; neither completes that issue
+or authorizes the operational steps. `main` remains the default branch and
+current contribution target until a separately approved cutover.
 
 The goal is rapid integration without treating unverified changes as release-ready.
 No application architecture, source media, project format, or database changes
@@ -72,7 +73,7 @@ Development assumptions to update at cutover:
 - Become the default branch and normal feature/fix PR target after cutover.
 - Require PRs and human merge decisions; prohibit deletion and force pushes.
 - Run the three existing CI checks on PRs and pushes to `develop`. This push
-  coverage is a later workflow change, not behavior implemented by this document.
+  coverage is configured by PR B for both `main` and `develop`; it creates no branch.
 - Treat those checks as informational for integration. A maintainer may merge
   failing checks with an explicit reason and linked repair issue. `develop` may
   temporarily be broken and must not be described as release-ready.
@@ -93,11 +94,11 @@ Development assumptions to update at cutover:
   promotions. Normal feature PR merge style need not change.
 - Require the existing check names exactly: **Ruff, MyPy and unit tests**,
   **JavaScript lint, format and tests**, and **App journey smoke**.
-- Also require two **proposed, not yet available** check contracts:
-  **Main admission policy** for promotion/hotfix eligibility and human evidence;
-  **Release candidate gate** for packaged validation and remaining manual checks.
-  Later implementation must verify their actual GitHub contexts and producing
-  app before configuring required checks.
+- **Main admission policy** is PR B's pre-cutover guard for promotion/hotfix
+  prerequisites. It always denies admission while #262 is unavailable.
+  **Release candidate gate** remains proposed and unavailable, for packaged
+  validation and remaining manual checks. Verify actual GitHub contexts and
+  producing app before configuring required checks.
 
 The aggregate gate must explicitly require successful component results. Missing,
 skipped, cancelled, timed-out, expired, or failed evidence is not success. Do not
@@ -109,6 +110,81 @@ an eligible independent approver or explicitly approved alternative exists.
 Protect that mechanism from routine bypass. Until #262 delivers and demonstrates
 the gate, **keep promotions blocked**; do not substitute the current journey
 smoke or claim that copying `main` to `develop` validates the starting baseline.
+
+### PR B: implemented pre-cutover guard and administrator configuration
+
+[`main-admission.yml`](../.github/workflows/main-admission.yml) runs on ordinary
+PR events targeting `main` (open, synchronize, reopen, edit, ready for review).
+It uses read-only contents/PR/check/Actions/issue permissions, no persisted checkout
+credential, and executes [`packaging/main_admission.py`](../packaging/main_admission.py) from
+the event's immutable **base SHA**, never from PR-head code. No dependency install,
+artifact execution, release credential, or publication is involved.
+The existing CI quality job type-checks the policy and runs its regression tests
+with the ordinary Python suite; the three existing PR check names are unchanged.
+
+The script reads live GitHub metadata, rechecks the PR after evidence collection,
+and compares event head/base to live PR and branch tips. It diagnoses invalid or
+forked sources, missing emergency documentation, stale/missing human approval,
+and unsuccessful/missing checks. It requires all three named checks to be unique,
+completed with `success`, associated with this PR/head, and produced by GitHub
+Actions' PR run of `ci.yml` in this repository. Skipped/neutral results do not pass.
+API, permission, malformed-data, and incomplete-pagination failures deny admission.
+These prerequisites do not certify a tested merge tree or packaged artifact.
+Before removing the #262 hold, exercise live check-run API filtering when push
+and PR runs share a SHA (including GitHub's default `filter=latest`), rather than
+assuming mocked metadata proves that the qualifying PR run is always returned.
+
+For a future hotfix candidate, document these lines in its PR body, linking an
+existing issue with a nonempty problem statement in the same repository:
+
+```text
+Emergency issue: #123
+Emergency reason: Explain the urgent regression.
+Emergency scope: Describe the narrow fix.
+```
+
+An independent human with write/maintain/admin access must submit an approving
+review on the exact head, with this exact line using full SHAs:
+
+```text
+Main admission candidate: <head SHA> <base SHA>
+```
+
+The latest decisive review from that person must still approve; bots, self-review,
+dismissals, changes requested, and old head/base approvals do not qualify. This
+marker binds approval to a candidate; it is not MOTW/product evidence and does not
+authorize merge or publication. After new evidence or reviews, rerun the admission
+job; it does not poll or automatically rerun on review/check completion.
+
+**Every result still fails with the #262 hold**, including an otherwise eligible
+develop promotion or documented hotfix. No input, environment flag, branch name,
+label, or fabricated artifact metadata enables a pass. #262 must implement and
+review real packaged/manual evidence before replacing this deliberate hold.
+
+Bootstrap and enforcement are distinct:
+
+- PR B's base predates the script, so its new job is expected to fail because the
+  trusted base script is absent. Later eligible PRs fail the explicit #262 hold.
+  There is no bootstrap exception. B and #262 preparation use the current human
+  repository process before cutover; no automatic admission is claimed.
+- An administrator must later require **Main admission policy** on explicit
+  `refs/heads/main`, alongside the three existing CI contexts and the implemented
+  #262 gate. Verify contexts and producing app on a real PR first. Do not activate
+  the final rules prematurely and then add a hidden bypass to land #262.
+- The workflow definition itself remains PR-controlled. A required check name or
+  GitHub Actions app identity alone does not prevent a PR replacing that workflow.
+  Before activation, the administrator must enforce trusted workflow provenance
+  or protected independent review of workflow/policy changes, and verify this
+  cannot be bypassed. PR B does not make unprotected `main` protected.
+- Configure PR-only updates, latest-base validation, current independent approval,
+  resolved conversations, deletion/force-push prevention, and no routine admin/bot
+  bypass. Confirm eligible approvers and actual permission/API access. Keep
+  auto-merge off; do not add a merge queue. Leave #256 and all branch settings alone
+  until separately authorized.
+
+Use `pull_request`, not `pull_request_target`: GitHub documents that checks from
+the latter do not satisfy branch-ruleset required checks. See
+[GitHub's required-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 
 ## Promotion and emergency hotfix process
 
@@ -203,9 +279,9 @@ decision records. This runbook records the conflict; it does not resolve it.
 
 1. **PR A (#261):** this proposed policy, dated audit, and migration/rollback
    runbook, with links from existing contributor/workflow docs. Documentation only.
-2. **Later #261 PR:** minimal CI/admission safeguards and their focused tests.
-   Preserve existing checks and release behavior; deny promotions until #262 is
-   available. Do not rewrite all workflows in the same PR.
+2. **PR B (#261):** minimal push CI/admission guard and focused tests, described
+   above. Preserve existing checks and release behavior; deny promotions and
+   hotfixes until #262 is available. GitHub enforcement/cutover remain separate.
 3. **#262 PR(s):** packaged validation, evidence, and an enforceable main gate,
    without release creation or distribution uploads. Demonstrate actual execution.
 4. **Separate maintainer-approved cutover:** perform and record the runbook below.
