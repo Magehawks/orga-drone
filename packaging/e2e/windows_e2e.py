@@ -710,6 +710,7 @@ def main() -> int:
             background.append(restarted)
             restarted.start()
             restarted_cdp = restarted.require_cdp()
+            navigate(restarted_cdp, restarted.app_port, "/")
             expect_ok(
                 fetch_json(
                     restarted_cdp,
