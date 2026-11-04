@@ -76,3 +76,12 @@ Leave these for a follow-up. They are not required to see a failure on a pull re
 
 - A browser driver (for example Playwright) against the local server, for clicks the `TestClient` never makes.
 - A Windows job that launches the unpackaged app. WebView2 still needs a person for the native dialogs and for the Mark-of-the-Web zip.
+
+## Studio export integrity journey
+
+`test_scan_story_export_real_mp4` extends the HTTP journey with two synthetic
+photos (JPEG and PNG), a Studio timeline, resolution options, preparation, and
+an asynchronous real FFmpeg export. It decodes the complete MP4 to verify six
+seconds and the red/blue clip order, and checks that source bytes are unchanged.
+This test skips explicitly when FFmpeg is unavailable. It does not verify
+Windows/WebView2, native save dialogs, or visual playback in the packaged app.

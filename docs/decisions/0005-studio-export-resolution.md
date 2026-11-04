@@ -53,3 +53,15 @@ only an export UI stub (no render path).
   project has no video heights (ADR 0009).
   Determinate export progress with elapsed/ETA/current clip label is Available now.
   Segment encodes force CFR 30fps + yuv420p so photo/video concat stays timeline-safe.
+
+## Source readiness and integrity
+
+Resolution options do not imply source availability in the media index. Studio
+checks every media clip against its original file under a configured library
+root before offering export options and again during preparation. A missing or
+orphaned source blocks the complete Story, identifies the affected clip, and
+leaves the project unchanged. Export never silently skips missing clips.
+The options response distinguishes `empty`, `unavailable_sources`,
+`no_resolution`, and `ready`; valid photo-only and Title Card Stories retain
+the existing 720/1080 policy. Encoder failures after preparation do not publish
+a partial Story.

@@ -873,5 +873,7 @@
   "Neutral": "Neutral",
   "Could not save color grading.": "Could not save color grading.",
   "Playing without color grading preview; pause or seek to see it": "Playing without color grading preview; pause or seek to see it",
-  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength."
+  "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.": "Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.",
+  "The Story is empty. Add a photo, video, or title card before exporting.": "The Story is empty. Add a photo, video, or title card before exporting.",
+  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
 }

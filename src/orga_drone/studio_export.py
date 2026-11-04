@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from collections.abc import Callable
 from pathlib import Path
 
 from orga_drone.app_prefs import (
@@ -227,6 +228,50 @@ def collect_project_video_heights(
     return heights
 
 
+def _require_clip_source(db: Database, clip: StudioClip) -> tuple[MediaRow, Path]:
+    media = db.get_media(clip.media_id) if clip.media_id is not None else None
+    try:
+        path = resolve_media_file(db, media) if media is not None else None
+    except OSError:
+        path = None
+    if path is None or media is None:
+        raise UnavailableStudioSource(clip.filename or clip.filename_snapshot)
+    return media, path
+
+
+class UnavailableStudioSource(StudioExportError):
+    message_template = 'Original source unavailable for "{clip}". Reconnect its library or restore the file, then try again.'
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        super().__init__(self.message_template.format(clip=filename))
+
+
+def translate_export_error(
+    exc: StudioExportError, translate: Callable[[str], str]
+) -> str:
+    if isinstance(exc, UnavailableStudioSource):
+        return translate(exc.message_template).format(clip=exc.filename)
+    return translate(str(exc))
+
+
+def _unavailable_sources(db: Database, clips: list[StudioClip]) -> list[dict]:
+    missing = []
+    for clip in clips:
+        if clip.item_kind == TITLE_CARD_KIND:
+            continue
+        try:
+            _require_clip_source(db, clip)
+        except UnavailableStudioSource:
+            missing.append(
+                {
+                    "clip_id": clip.id,
+                    "filename": clip.filename or clip.filename_snapshot,
+                }
+            )
+    return missing
+
+
 def _project_has_title_cards(db: Database, project_id: int) -> bool:
     return any(
         clip.item_kind == TITLE_CARD_KIND for clip in db.list_studio_items(project_id)
@@ -235,7 +280,10 @@ def _project_has_title_cards(db: Database, project_id: int) -> bool:
 
 def _project_has_available_photos(db: Database, project_id: int) -> bool:
     return any(
-        clip.kind == "photo" and clip.available and clip.media_id is not None
+        clip.kind == "photo"
+        and clip.media_id is not None
+        and (media := db.get_media(clip.media_id)) is not None
+        and resolve_media_file(db, media) is not None
         for clip in db.list_studio_items(project_id)
     )
 
@@ -249,10 +297,16 @@ def _unlock_generated_only_resolutions(db: Database, project_id: int) -> bool:
 
 def build_export_options_payload(db: Database, project_id: int | None = None) -> dict:
     project = _resolve_export_project(db, project_id)
-    heights = collect_project_video_heights(db, project.id)
+    source_rows = db.list_studio_items(project.id)
+    missing = _unavailable_sources(db, source_rows)
+    heights = collect_project_video_heights(db, project.id) if not missing else []
     options = available_export_resolutions(heights)
     default_h = default_export_height(heights)
-    if not options and _unlock_generated_only_resolutions(db, project.id):
+    if (
+        not missing
+        and not options
+        and _unlock_generated_only_resolutions(db, project.id)
+    ):
         options = generated_only_export_resolutions()
         default_h = generated_only_default_height()
     last_dir = get_last_export_directory()
@@ -272,6 +326,16 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
         project.title, height=default_h if default_h is not None else None
     )
     return {
+        "readiness": (
+            "empty"
+            if not source_rows
+            else "unavailable_sources"
+            if missing
+            else "ready"
+            if options
+            else "no_resolution"
+        ),
+        "unavailable_sources": missing,
         "project_id": project.id,
         "project_title": project.title,
         "suggested_filename": suggested,
@@ -313,14 +377,7 @@ def _clip_to_export_clip(
             locale=locale,
             label=primary or secondary or "Title card",
         )
-    if not clip.available or clip.media_id is None:
-        return None
-    media = db.get_media(clip.media_id)
-    if media is None:
-        return None
-    path = resolve_media_file(db, media)
-    if path is None:
-        return None
+    media, path = _require_clip_source(db, clip)
     kind = clip.kind if clip.kind in {"photo", "video"} else media.kind
     from orga_drone.studio_speed import coerce_playback_speed
     from orga_drone.studio_cut import section_repeats_from_effect_settings
@@ -626,6 +683,14 @@ def prepare_studio_export(
 ) -> StudioExportConfig:
     """Validate export request and build a codec-agnostic config (no render)."""
     project = _resolve_export_project(db, project_id)
+    source_rows = db.list_studio_items(project.id)
+    if not source_rows:
+        raise StudioExportError(
+            "The Story is empty. Add a photo, video, or title card before exporting."
+        )
+    for clip in source_rows:
+        if clip.item_kind != TITLE_CARD_KIND:
+            _require_clip_source(db, clip)
     heights = collect_project_video_heights(db, project.id)
     options = available_export_resolutions(heights)
     if not options and _unlock_generated_only_resolutions(db, project.id):
@@ -651,7 +716,6 @@ def prepare_studio_export(
 
     export_clips: list[StudioExportClip] = []
     source_items: list[StudioClip] = []
-    source_rows = db.list_studio_items(project.id)
     forward = resolve_forward_loop(
         source_rows, soundtrack_once_s(db.list_studio_music(project.id))
     )

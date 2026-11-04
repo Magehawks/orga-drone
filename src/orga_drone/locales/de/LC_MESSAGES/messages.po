@@ -615,3 +615,9 @@ msgstr "Diese Datei wird bereits in der anderen LUT-Stufe verwendet. Wählen Sie
 
 msgid "already used in the other stage"
 msgstr "bereits in der anderen Stufe verwendet"
+
+msgid "The Story is empty. Add a photo, video, or title card before exporting."
+msgstr "Die Story ist leer. Füge vor dem Export ein Foto, Video oder eine Titelkarte hinzu."
+
+msgid "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
+msgstr "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut."

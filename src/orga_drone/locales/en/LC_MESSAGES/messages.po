@@ -615,3 +615,9 @@ msgstr "This file is already used in the other LUT stage. Choose a different fil
 
 msgid "already used in the other stage"
 msgstr "already used in the other stage"
+
+msgid "The Story is empty. Add a photo, video, or title card before exporting."
+msgstr "The Story is empty. Add a photo, video, or title card before exporting."
+
+msgid "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
+msgstr "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
