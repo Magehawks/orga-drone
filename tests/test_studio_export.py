@@ -503,6 +503,231 @@ def test_materialize_photo_still_heic_like(tmp_path: Path) -> None:
         assert img.size == (64, 48)
 
 
+def _quadrant_photo(size=(80, 40), mode="RGB"):  # type: ignore[no-untyped-def]
+    from PIL import Image
+
+    image = Image.new(mode, size)
+    w, h = size
+    for box, color in zip(
+        (
+            (0, 0, w // 2, h // 2),
+            (w // 2, 0, w, h // 2),
+            (0, h // 2, w // 2, h),
+            (w // 2, h // 2, w, h),
+        ),
+        ((240, 20, 20), (20, 240, 20), (20, 20, 240), (240, 240, 20)),
+    ):
+        image.paste(color + (128,) if mode == "RGBA" else color, box)
+    return image
+
+
+def _assert_quadrants(image, expected: str, *, tolerance: int = 35) -> None:  # type: ignore[no-untyped-def]
+    colors = {
+        "R": (240, 20, 20),
+        "G": (20, 240, 20),
+        "B": (20, 20, 240),
+        "Y": (240, 240, 20),
+    }
+    w, h = image.size
+    for (x, y), label in zip(
+        (
+            (w // 4, h // 4),
+            (3 * w // 4, h // 4),
+            (w // 4, 3 * h // 4),
+            (3 * w // 4, 3 * h // 4),
+        ),
+        expected,
+    ):
+        assert image.getpixel((x, y)) == pytest.approx(colors[label], abs=tolerance)
+
+
+@pytest.mark.parametrize(
+    ("orientation", "size", "corners"),
+    [
+        (1, (80, 40), "RGBY"),
+        (2, (80, 40), "GRYB"),
+        (3, (80, 40), "YBGR"),
+        (4, (80, 40), "BYRG"),
+        (5, (40, 80), "RBGY"),
+        (6, (40, 80), "BRYG"),
+        (7, (40, 80), "YGBR"),
+        (8, (40, 80), "GYRB"),
+    ],
+)
+def test_materialize_photo_exif_pixels(
+    tmp_path: Path,
+    orientation: int,
+    size: tuple[int, int],
+    corners: str,
+) -> None:
+    from PIL import Image
+
+    from orga_drone.export.studio_encoder import _materialize_photo_still
+
+    source = tmp_path / "oriented.jpg"
+    image = _quadrant_photo()
+    exif = Image.Exif()
+    exif[274] = orientation
+    image.save(source, quality=100, subsampling=0, exif=exif)
+    original = source.read_bytes()
+    output = _materialize_photo_still(source, tmp_path / "still.jpg")
+    with Image.open(output) as result:
+        assert result.size == size
+        assert result.mode == "RGB"
+        assert 274 not in result.getexif()
+        _assert_quadrants(result, corners)
+    # Re-materializing normalized pixels must not rotate them a second time.
+    with Image.open(_materialize_photo_still(output, tmp_path / "again.jpg")) as again:
+        assert again.size == size
+        _assert_quadrants(again, corners)
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    ("format", "size", "mode", "orientation", "with_icc"),
+    [
+        ("JPEG", (80, 40), "RGB", None, False),
+        ("JPEG", (40, 80), "RGB", None, False),
+        ("JPEG", (80, 40), "RGB", 6, True),
+        ("PNG", (80, 40), "RGB", None, False),
+        ("PNG", (80, 40), "RGBA", 6, False),
+    ],
+)
+def test_materialize_photo_formats(
+    tmp_path: Path,
+    format: str,
+    size: tuple[int, int],
+    mode: str,
+    orientation: int | None,
+    with_icc: bool,
+) -> None:
+    from PIL import Image, ImageCms
+
+    from orga_drone.export.studio_encoder import _materialize_photo_still
+
+    source = tmp_path / f"source.{format.lower()}"
+    options = {}
+    if orientation is not None:
+        exif = Image.Exif()
+        exif[274] = orientation
+        options["exif"] = exif
+    if with_icc:
+        options["icc_profile"] = ImageCms.ImageCmsProfile(
+            ImageCms.createProfile("sRGB")
+        ).tobytes()
+    _quadrant_photo(size, mode).save(source, format, **options)
+    original = source.read_bytes()
+    with Image.open(_materialize_photo_still(source, tmp_path / "still.jpg")) as result:
+        assert result.size == (size[::-1] if orientation == 6 else size)
+        assert result.mode == "RGB"
+        assert 274 not in result.getexif()
+        _assert_quadrants(result, "BRYG" if orientation == 6 else "RGBY")
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("format", ["HEIC", "HEIF"])
+def test_materialize_photo_real_heif(tmp_path: Path, format: str) -> None:
+    from PIL import Image
+
+    from orga_drone.export.studio_encoder import _materialize_photo_still
+
+    heif = pytest.importorskip("pillow_heif")
+    if not heif.libheif_info().get("HEIF"):
+        pytest.skip("existing libheif has no HEIF encoder")
+    source = tmp_path / f"source.{format.lower()}"
+    exif = Image.Exif()
+    exif[274] = 6
+    image = _quadrant_photo()
+    # Feed unrotated pixels directly: from_pillow itself normalizes EXIF.
+    encoded = heif.from_bytes(image.mode, image.size, image.tobytes())
+    encoded.info["exif"] = exif.tobytes()
+    encoded.save(source, quality=95)
+    original = source.read_bytes()
+    with Image.open(_materialize_photo_still(source, tmp_path / "still.jpg")) as result:
+        assert result.size == (40, 80)
+        assert 274 not in result.getexif()
+        _assert_quadrants(result, "BRYG")
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("mixed", [False, True], ids=["photo-only", "mixed"])
+def test_export_exif_photo_mp4(tmp_path: Path, mixed: bool) -> None:
+    from PIL import Image
+
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg not available")
+    source = tmp_path / "orientation6.jpg"
+    exif = Image.Exif()
+    exif[274] = 6
+    _quadrant_photo().save(source, quality=100, subsampling=0, exif=exif)
+    original = source.read_bytes()
+    clips = [StudioExportClip(source_path=source, kind="photo", duration_s=0.5)]
+    if mixed:
+        video = tmp_path / "video.mp4"
+        generated = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=white:s=160x90:r=30:d=0.5",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(video),
+            ],
+            capture_output=True,
+            check=False,
+        )
+        assert generated.returncode == 0, generated.stderr
+        clips.append(StudioExportClip(source_path=video, kind="video", duration_s=0.5))
+    output = tmp_path / "oriented.mp4"
+    FfmpegStudioEncoder().render(
+        StudioExportConfig(output_path=output, width=160, height=90, clips=tuple(clips))
+    )
+    # Decode every frame without autorotation: correctness must be in the pixels.
+    decoded = subprocess.run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-noautorotate",
+            "-i",
+            str(output),
+            "-map",
+            "0:v:0",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "pipe:1",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert decoded.returncode == 0, decoded.stderr.decode(errors="replace")
+    banner = decoded.stderr.decode(errors="replace")
+    assert "160x90" in banner and "DAR 16:9" in banner
+    assert "displaymatrix" not in banner.lower()
+    assert "rotate" not in banner.lower()
+    frame_bytes = 160 * 90 * 3
+    assert len(decoded.stdout) % frame_bytes == 0
+    assert len(decoded.stdout) // frame_bytes >= (28 if mixed else 14)
+    frame = Image.frombytes("RGB", (160, 90), decoded.stdout[:frame_bytes])
+    # A normalized 1:2 photo fits to 44x90 with symmetric side padding.
+    _assert_quadrants(frame.crop((58, 0, 102, 90)), "BRYG", tolerance=45)
+    for x in (20, 55, 105, 140):
+        assert max(frame.getpixel((x, 45))) < 15
+    for x in (60, 99):
+        assert max(frame.getpixel((x, 20))) > 150
+    if mixed:
+        last = Image.frombytes("RGB", (160, 90), decoded.stdout[-frame_bytes:])
+        assert min(last.getpixel((80, 45))) > 220
+    assert source.read_bytes() == original
+
+
 def test_run_ffmpeg_progress_does_not_pipe_stderr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

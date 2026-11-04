@@ -2282,14 +2282,16 @@ class FfmpegStudioEncoder:
 
 def _materialize_photo_still(source: Path, dest: Path) -> Path:
     """Decode any library photo (incl. HEIC) to a JPEG ffmpeg can loop."""
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     from orga_drone.parse import ensure_heif_support
 
     ensure_heif_support()
     try:
         with Image.open(source) as img:
-            rgb = img.convert("RGB")
+            # Normalize pixels before RGB conversion; the temporary JPEG has no
+            # orientation tag for downstream decoders to apply a second time.
+            rgb = ImageOps.exif_transpose(img).convert("RGB")
             dest.parent.mkdir(parents=True, exist_ok=True)
             rgb.save(dest, "JPEG", quality=95, optimize=True)
     except OSError as exc:
