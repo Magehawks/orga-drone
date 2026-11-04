@@ -74,7 +74,7 @@ class CDP:
 
         self._next_id = 1
         self._ws = websocket.create_connection(
-            websocket_url, timeout=20, origin="http://127.0.0.1"
+            websocket_url, timeout=20, suppress_origin=True
         )
         self._ws.settimeout(30)
 
@@ -118,13 +118,27 @@ def read_text(path: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exe", required=True, type=Path)
+    parser.add_argument("--exe", type=Path)
+    parser.add_argument("--command", nargs=argparse.REMAINDER)
     parser.add_argument("--data-dir", required=True, type=Path)
     args = parser.parse_args()
 
-    exe = args.exe.resolve()
-    if not exe.is_file():
-        raise SystemExit(f"packaged executable is missing: {exe}")
+    if args.exe is None and not args.command:
+        raise SystemExit("pass --exe or --command")
+    if args.exe is not None and args.command:
+        raise SystemExit("pass only one of --exe or --command")
+
+    if args.exe is not None:
+        exe = args.exe.resolve()
+        if not exe.is_file():
+            raise SystemExit(f"packaged executable is missing: {exe}")
+        launch = [str(exe)]
+        launch_cwd = str(exe.parent)
+        launch_label = str(exe)
+    else:
+        launch = list(args.command)
+        launch_cwd = str(Path.cwd())
+        launch_label = " ".join(launch)
 
     data_dir = args.data_dir.resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -137,16 +151,15 @@ def main() -> int:
     env["ORGA_DRONE_HOST"] = "127.0.0.1"
     env["ORGA_DRONE_PORT"] = str(app_port)
     env["ORGA_DRONE_GEOCODE"] = "off"
-    env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (
-        f"--remote-debugging-port={cdp_port} --remote-allow-origins=*"
-    )
+    env["ORGA_DRONE_E2E"] = "1"
+    env["ORGA_DRONE_CDP_PORT"] = str(cdp_port)
 
     stdout_path = data_dir / "spike-stdout.log"
-    print(f"launching {exe} (app_port={app_port}, cdp_port={cdp_port})")
+    print(f"launching {launch_label} (app_port={app_port}, cdp_port={cdp_port})")
     with stdout_path.open("wb") as stdout:
         process = subprocess.Popen(
-            [str(exe)],
-            cwd=str(exe.parent),
+            launch,
+            cwd=launch_cwd,
             env=env,
             stdout=stdout,
             stderr=subprocess.STDOUT,
