@@ -370,3 +370,50 @@ def test_source_error_translates_filename_without_losing_unicode():
     assert "photo.jpg" in message
     assert "Originaldatei" in message
     assert message != str(error)
+
+
+@pytest.mark.parametrize("operation", ["options", "prepare"])
+@pytest.mark.parametrize("failure", ["deleted", "oserror"])
+def test_photo_source_lost_between_validation_and_resolution_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str, failure: str
+) -> None:
+    from orga_drone import studio_export
+
+    monkeypatch.setattr(
+        "orga_drone.app_prefs.settings", Settings(data_dir=tmp_path / "data")
+    )
+    db = Database(tmp_path / "db.sqlite3")
+    project = db.create_studio_project("Source race")
+    mid = _add_photo(db, tmp_path / "lib", "lost.jpg")
+    clip_id = _studio_add(db, mid, project.id)
+    before = db.list_studio_items(project.id)
+    original_resolve = studio_export.resolve_media_file
+    calls = 0
+
+    def lose_source_on_second_check(db_arg, media):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            if failure == "oserror":
+                raise PermissionError("Synthetic filesystem failure")
+            Path(media.path).unlink()
+        return original_resolve(db_arg, media)
+
+    monkeypatch.setattr(studio_export, "resolve_media_file", lose_source_on_second_check)
+    output = tmp_path / "out.mp4"
+    if operation == "options":
+        payload = studio_export.build_export_options_payload(db, project.id)
+        assert payload["readiness"] == "unavailable_sources"
+        assert payload["options"] == []
+        assert payload["default_height"] is None
+        assert payload["unavailable_sources"] == [
+            {"clip_id": clip_id, "filename": "lost.jpg"}
+        ]
+    else:
+        with pytest.raises(StudioExportError, match="Original source unavailable.*lost.jpg"):
+            prepare_studio_export(
+                db, height=720, output_path=output, project_id=project.id
+            )
+    assert calls == 2
+    assert db.list_studio_items(project.id) == before
+    assert not output.exists()

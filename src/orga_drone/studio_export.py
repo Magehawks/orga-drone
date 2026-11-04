@@ -235,14 +235,17 @@ def _require_clip_source(db: Database, clip: StudioClip) -> tuple[MediaRow, Path
     except OSError:
         path = None
     if path is None or media is None:
-        raise UnavailableStudioSource(clip.filename or clip.filename_snapshot)
+        raise UnavailableStudioSource(
+            clip.filename or clip.filename_snapshot, clip_id=clip.id
+        )
     return media, path
 
 
 class UnavailableStudioSource(StudioExportError):
     message_template = 'Original source unavailable for "{clip}". Reconnect its library or restore the file, then try again.'
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self, filename: str, *, clip_id: int | None = None) -> None:
+        self.clip_id = clip_id
         self.filename = filename
         super().__init__(self.message_template.format(clip=filename))
 
@@ -279,13 +282,12 @@ def _project_has_title_cards(db: Database, project_id: int) -> bool:
 
 
 def _project_has_available_photos(db: Database, project_id: int) -> bool:
-    return any(
-        clip.kind == "photo"
-        and clip.media_id is not None
-        and (media := db.get_media(clip.media_id)) is not None
-        and resolve_media_file(db, media) is not None
-        for clip in db.list_studio_items(project_id)
-    )
+    for clip in db.list_studio_items(project_id):
+        if clip.kind == "photo":
+            # Reuse the same unavailable-source error, including filesystem errors.
+            _require_clip_source(db, clip)
+            return True
+    return False
 
 
 def _unlock_generated_only_resolutions(db: Database, project_id: int) -> bool:
@@ -302,13 +304,17 @@ def build_export_options_payload(db: Database, project_id: int | None = None) ->
     heights = collect_project_video_heights(db, project.id) if not missing else []
     options = available_export_resolutions(heights)
     default_h = default_export_height(heights)
-    if (
-        not missing
-        and not options
-        and _unlock_generated_only_resolutions(db, project.id)
-    ):
-        options = generated_only_export_resolutions()
-        default_h = generated_only_default_height()
+    try:
+        if (
+            not missing
+            and not options
+            and _unlock_generated_only_resolutions(db, project.id)
+        ):
+            options = generated_only_export_resolutions()
+            default_h = generated_only_default_height()
+    except UnavailableStudioSource as exc:
+        # A source can disappear between the initial check and photo fallback.
+        missing.append({"clip_id": exc.clip_id, "filename": exc.filename})
     last_dir = get_last_export_directory()
     directory = resolve_export_directory(last_dir)
     try:
