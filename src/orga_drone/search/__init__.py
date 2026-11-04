@@ -7,6 +7,8 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from orga_drone.parse import PHOTO_EXTS, VIDEO_EXTS
+
 _MONTHS: dict[str, int] = {
     "jan": 1,
     "january": 1,
@@ -247,6 +249,10 @@ def parse_natural_query(text: str) -> MediaSearch:
     raw = (text or "").strip()
     if not raw:
         return MediaSearch()
+
+    # Complete media filenames take precedence over natural-language keywords.
+    if raw.lower().endswith(tuple(PHOTO_EXTS | VIDEO_EXTS)):
+        return MediaSearch(q=raw)
 
     lowered = raw.lower()
     # Pull out ISO-like dates first so tokenization stays simple.
