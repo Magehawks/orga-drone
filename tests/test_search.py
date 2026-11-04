@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
 from orga_drone.db import Database
+from orga_drone.parse import PHOTO_EXTS, VIDEO_EXTS
 from orga_drone.search import parse_natural_query
 
 
@@ -84,6 +85,31 @@ def test_parse_natural_query_examples() -> None:
     assert year.date_to == "2024-12-31"
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "Video Thumbnail.jpg",
+        "ATOM HD Video_1080x1920.mp4",
+        "IMG_0185.jpeg",
+        "show photos November 2025.jpg",
+        "Urlaub-Favoriten_2024_Grüße.JpG",
+    ] + [f"Video photos favorites November 2025{ext.upper()}" for ext in sorted(PHOTO_EXTS | VIDEO_EXTS)],
+)
+def test_filename_query_stays_literal(filename: str) -> None:
+    search = parse_natural_query(f"  {filename}  ")
+    assert search.to_dict() == {
+        "kind": None,
+        "date_from": None,
+        "date_to": None,
+        "q": filename,
+        "place": None,
+        "tags": [],
+        "favorite": None,
+        "limit": None,
+        "effective_q": filename,
+    }
+
+
 def test_list_media_date_range_and_token_and(tmp_path: Path) -> None:
     db = Database(tmp_path / "t.sqlite3")
     lib = tmp_path / "lib"
@@ -145,6 +171,49 @@ def test_browse_ask_and_api_search(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
     assert ranged.json()["count"] == 1
     assert ranged.json()["items"][0]["filename"] == "nov.JPG"
+
+
+@pytest.mark.parametrize(
+    ("filename", "kind"),
+    [
+        ("Video Thumbnail.jpg", "photo"),
+        ("ATOM HD Video_1080x1920.mp4", "video"),
+        ("IMG_0185.jpeg", "photo"),
+        ("Video favorites November 2025.JPG", "photo"),
+    ],
+)
+def test_filename_search_browse_and_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str, kind: str
+) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    lib = tmp_path / "lib"
+    mid = _seed(
+        app.state.db, lib, filename=filename, kind=kind, recorded_at="2023-09-15T12:00:00"
+    )
+    other_id = _seed(
+        app.state.db, lib, filename="unrelated.JPG", kind="photo", recorded_at="2023-09-15T12:00:00"
+    )
+    client = TestClient(app)
+    for filters, expected in [
+        ({}, True),
+        ({"kind": kind}, True),
+        ({"kind": "video" if kind == "photo" else "photo"}, False),
+        ({"date_from": "2024-01-01"}, False),
+        ({"favorite": "yes"}, False),
+    ]:
+        browse = client.get("/browse", params={"ask": filename, "view": "list", **filters})
+        assert browse.status_code == 200
+        assert (f'href="/media/{mid}?' in browse.text) is expected
+        assert f'href="/media/{other_id}?' not in browse.text
+        api_filters = {**filters}
+        if "favorite" in api_filters:
+            api_filters["favorite"] = True
+        api = client.post("/api/search", json={"ask": filename, **api_filters})
+        assert api.status_code == 200
+        assert [item["id"] for item in api.json()["items"]] == ([mid] if expected else [])
 
 
 def test_browse_without_gps_respects_kind(
