@@ -94,22 +94,21 @@ Development assumptions to update at cutover:
   promotions. Normal feature PR merge style need not change.
 - Require the existing check names exactly: **Ruff, MyPy and unit tests**,
   **JavaScript lint, format and tests**, and **App journey smoke**.
-- **Main admission policy** is PR B's pre-cutover guard for promotion/hotfix
-  prerequisites. It always denies admission while #262 is unavailable.
-  **Release candidate gate** remains proposed and unavailable, for packaged
-  validation and remaining manual checks. Verify actual GitHub contexts and
-  producing app before configuring required checks.
+- **Main admission policy** is the pre-cutover guard for promotion/hotfix
+  prerequisites. It requires the three CI checks and the packaged **Windows
+  packaged E2E** evidence implemented by #262. A release-candidate/MOTW gate
+  still does not exist; manual release checks stay separate. Verify actual
+  GitHub contexts and producing app before configuring required checks.
 
 The aggregate gate must explicitly require successful component results. Missing,
 skipped, cancelled, timed-out, expired, or failed evidence is not success. Do not
 use a skipped conditional job as proof of validation. Changes to gate workflows
 need independent review; gate code in a PR is not its own authorization.
 
-The maintainer must select an enforceable human approval mechanism and confirm
-an eligible independent approver or explicitly approved alternative exists.
-Protect that mechanism from routine bypass. Until #262 delivers and demonstrates
-the gate, **keep promotions blocked**; do not substitute the current journey
-smoke or claim that copying `main` to `develop` validates the starting baseline.
+The approval mechanism is either an independent qualified review or the explicit
+owner-authorization comment profile adopted for the solo maintainer by #262.
+Protect that mechanism from routine bypass. The packaged E2E check validates the
+built Windows artifact, not the manual MOTW checklist or release approval.
 
 ### PR B: implemented pre-cutover guard and administrator configuration
 
@@ -214,35 +213,55 @@ the entire **CI** run first, then request admission reevaluation. Do not dispatc
 a Windows build or use `workflow_dispatch` to manufacture an admission context.
 
 Manual reevaluation is an explicit pre-cutover procedure, not automatic review
-revocation enforcement. Before #262 removes the hold, demonstrate that revoked
-approval, a newer CI run, and changed candidates cannot leave an old passing
-admission usable; combine the selected native approval rules and fresh gate
-evaluation accordingly. Until that integration is proven, admission stays denied.
+revocation enforcement. Admission re-reads the PR, reviews, comments, workflow
+runs, artifacts, and branch tips after collection; any movement fails closed.
+A changed head/base invalidates the old evidence and approval.
 
-**Every result still fails with the #262 hold**, including an otherwise eligible
-develop promotion or documented hotfix. No input, environment flag, branch name,
-label, or fabricated artifact metadata enables a pass. #262 must implement and
-review real packaged/manual evidence before replacing this deliberate hold.
+#### Packaged Windows E2E gate (implemented by #262)
+
+[`windows-e2e.yml`](../.github/workflows/windows-e2e.yml) runs on every
+`opened`, `synchronize`, `reopened`, or `ready_for_review` PR to `main`,
+including non-promotion PRs so a skipped E2E cannot satisfy a required check. It
+checks out the PR merge commit, builds the existing onefolder app once, tests the
+extracted ZIP with the real WebView2 runtime, and uploads the candidate ZIP plus
+a small `evidence.json` artifact for 30 days. It has no release credentials and
+never publishes.
+
+The E2E job is named exactly **Windows packaged E2E**. Admission selects the
+newest run for the exact head and PR, verifies its current attempt, suite, and
+job/check identity, then verifies both artifact names
+`orga-drone-windows-e2e-<attempt>-<head>` and
+`windows-e2e-evidence-<attempt>-<head>`, GitHub's artifact digest, non-expiry,
+and run/head linkage. It downloads only the bounded evidence artifact and checks
+the exact head, base, merge SHA, Git tree, run/attempt, artifact name/size/digest,
+required journey set, and pass result. The E2E workflow and harness files must be
+byte-identical between the PR head and base. Missing, failed, cancelled,
+skipped, expired, malformed, partial-rerun, older-green, or mismatched evidence
+denies admission; there is no fallback run, label, or enable flag.
+
+The automated evidence covers startup, synthetic media import, library
+navigation, Studio open, WebView2 playback, edit persistence after reload and
+relaunch, a 720p packaged export with MP4 decode/order checks, and source
+integrity. It does not replace the manual MOTW/native-dialog checklist in
+[`packaging/README.md`](../packaging/README.md#windows-pre-release-smoke-test-mandatory)
+or release approval.
 
 #### Safe bootstrap order
 
-1. Keep #265 draft while findings and owner approval are pending. Do not enable
-   required admission checks yet. Its base predates the script, so its new job
-   fails because the trusted script is absent; this is not a policy pass.
-2. Only after review and an explicit human decision may the owner mark it ready
-   and merge under the current repository process. This runbook does not perform
-   or authorize that merge. No special branch/label/flag may return success.
-3. Implement #262 through reviewed preparatory PRs while final promotion rules
-   remain inactive. Installed admission jobs continue failing the #262 hold.
-   Because policy executes from the base, the PR first adding #262 cannot certify
-   itself. Its implementation must land before a subsequent candidate can use it.
-4. After that implementation lands, demonstrate on a subsequent pinned candidate
-   real packaged/manual evidence, complete artifact identities, newest-run and
-   rerun behavior, approval staffing/profile, and anti-tampering controls. Do not
-   count the first missing-script failure or mocked evidence as this demonstration.
-5. Only then request separate administrator authorization for the final main rules
-   and branch cutover. No temporary passing check, synthetic approval, general admin
-   bypass, or early required-rule activation is part of bootstrap.
+1. #265 is already merged and deliberately pre-cutover. `main` remains
+   unprotected while #262 is reviewed.
+2. Land #262 through a reviewed PR under the current human repository process.
+   Its own admission job still uses the old base policy and therefore cannot
+   certify itself; that is a bootstrap limitation, not a bypass.
+3. Before any cutover, confirm a real main-targeted PR produces a successful
+   **Windows packaged E2E** check and inspect both Actions artifacts. Use a
+   separate test PR or the #262 PR itself, not a synthetic check.
+4. Only then perform the separately authorized `develop` creation/default/rules
+   cutover below. Do not enable required checks before the contexts and
+   producing app are verified on a real PR.
+5. Keep release/itch automation disabled until a separate explicit decision.
+   No temporary passing check, synthetic approval, general admin bypass, or
+   early required-rule activation is part of bootstrap.
 
 #### Exact administrator enforcement (not active)
 
@@ -252,12 +271,15 @@ the workflow contents: a PR can replace its workflow despite the honest workflow
 base-SHA checkout. Before activation, the administrator must:
 
 - Target explicit `refs/heads/main`; require PRs, latest-base validation, the three
-  existing CI contexts, **Main admission policy**, and the implemented #262 gate,
-  with verified producing app. Prevent deletion/force pushes and routine bypass.
+  existing CI contexts, **Windows packaged E2E**, **Main admission policy**,
+  with verified producing app. Require merge commits for promotions. Prevent
+  deletion/force pushes and routine bypass.
 - Protect `/.github/workflows/**`, `/packaging/main_admission.py`,
-  `/tests/test_main_admission.py`, `/tests/fixtures/main_admission_github.json`,
-  and every future #262 evidence/approval helper. Protect `/.github/CODEOWNERS`
-  itself and any replacement ownership/protection configuration.
+  `/packaging/packaged_e2e.py`, `/packaging/e2e/windows_e2e.py`,
+  `/tests/test_main_admission.py`, `/tests/test_packaged_e2e.py`,
+  `/tests/fixtures/main_admission_github.json`, and every future #262
+  evidence/approval helper. Protect `/.github/CODEOWNERS` itself and any
+  replacement ownership/protection configuration.
 - With multiple eligible maintainers, install matching CODEOWNERS entries on both
   permanent branches, require code-owner approval in the base branch's rules,
   dismiss stale approvals, and require approval of the latest reviewable push.
@@ -276,30 +298,31 @@ Keep auto-merge disabled; add no merge queue. Do not modify #256 or branch setti
 as part of this draft. The administrator must confirm plan/permission support and
 test enforcement rather than treating these instructions as installed rules.
 
-#### Single-maintainer decision before activation
+#### Single-maintainer approval profile (adopted by #262)
 
-GitHub does not let a PR author approve their own PR review. The existing
-independent-human prerequisite therefore deliberately fails an owner-authored
-promotion without another eligible reviewer; do not create a second identity or
-mislabel an agent review to evade it.
+GitHub does not let a PR author approve their own PR review. #262 therefore
+adopts an explicit **owner-authorization** profile alongside independent review:
+a PR comment by a user with `admin` permission containing these exact lines,
+created after the packaged E2E evidence was generated:
 
-For a continuing solo maintainer, recommend that #262 implement an explicitly
-approved **owner authorization** profile instead of an impossible self-review:
-zero required self-PR approvals, an owner-only manual checkpoint tied to exact
-head/base, tested artifact ID/SHA-256 and test outcome, then the owner's manual
-merge decision. A protected `main-candidate` environment with the owner as required
-reviewer, self-review prevention deliberately off, and admin bypass disabled is
-a native option to verify. It is human owner authorization, not independent human
-review. Native required-deployment rules for that exact environment should also
-be tested, so removing the approval job cannot be replaced by a green check name.
-[GitHub documents environment reviewer/self-review controls](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#required-reviewers).
+```text
+Main admission owner authorization: <head SHA> <base SHA>
+Main admission artifact: sha256:<ZIP SHA-256>
+```
 
-This is a recommendation, not an adopted profile or a new passing path in #265.
-Workflow-content provenance remains a separate requirement: verify trusted workflow
-enforcement, or protected review by a second eligible maintainer, before claiming
-tamper resistance. If neither can be enforced with the available repository/plan,
-keep final cutover blocked and either add a second trusted reviewer or approve a
-supported trust-control design in #262. Do not use a blanket admin bypass.
+Labels and PR authorship never grant authority. This is owner authorization, not
+independent human review; the chosen profile must be stated when it is used.
+Because issue comments do not trigger this workflow, add or remove
+`admission:recheck` after posting the authorization comment. If a second
+eligible maintainer is available, independent review remains the stronger option.
+A protected `main-candidate` environment with required reviewers is a native
+future alternative; it is not activated by this runbook.
+
+Workflow-content provenance remains a separate requirement: verify trusted
+workflow enforcement, or protected review by a second eligible maintainer, before
+claiming tamper resistance. If neither can be enforced with the available
+repository/plan, keep final cutover blocked and approve a supported trust-control
+design. Do not use a blanket admin bypass.
 
 The ordinary PR workflow is retained. The previous claim that `pull_request_target`
 cannot satisfy required checks was incorrect: current
@@ -315,8 +338,9 @@ No privileged event or new permission is needed for the explicit label recheck.
 2. Record the head and base SHAs, tested commit and tree, workflow run/attempt,
    artifact ID, ZIP SHA-256, version, automated coverage/results, and human smoke
    evidence. Any changed head/base invalidates approval for the old candidate.
-3. Under #262, build the packaged app once and test that artifact. Complete the
-   mandatory Windows/MOTW and remaining product checks on the same ZIP identity.
+3. #262 builds and tests the packaged ZIP automatically (see above). Complete
+   the mandatory Windows/MOTW and remaining product checks on the same ZIP
+   identity for release; those manual checks are not part of merge admission.
    The human Product Owner still decides whether to merge.
 4. Use a merge commit. GitHub's temporary PR merge SHA may differ from the final
    `main` SHA: #262 must verify and record their exact tree/commit mapping. A tree
@@ -401,8 +425,8 @@ decision records. This runbook records the conflict; it does not resolve it.
 1. **PR A (#261):** this proposed policy, dated audit, and migration/rollback
    runbook, with links from existing contributor/workflow docs. Documentation only.
 2. **PR B (#261):** minimal push CI/admission guard and focused tests, described
-   above. Preserve existing checks and release behavior; deny promotions and
-   hotfixes until #262 is available. GitHub enforcement/cutover remain separate.
+   above. Preserve existing checks and release behavior; the #262 packaged gate
+   is implemented separately. GitHub enforcement/cutover remain separate.
 3. **#262 PR(s):** packaged validation, evidence, and an enforceable main gate,
    without release creation or distribution uploads. Demonstrate actual execution.
 4. **Separate maintainer-approved cutover:** perform and record the runbook below.
