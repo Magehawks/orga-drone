@@ -3,6 +3,11 @@
 This document defines the human-gated development loop used for Orga Drone.
 GitHub issues and pull requests are the source of truth between roles.
 
+The [proposed develop/main strategy and migration runbook](BRANCH_MIGRATION.md)
+records issue #261's future branch rules, release-gate dependencies, and rollback.
+It is not activated: `main` remains the current default/PR target. The role gates
+and human merge decision below continue to apply throughout any later cutover.
+
 ## Principle
 
 **Limit the current scope, not the long-term vision.**
