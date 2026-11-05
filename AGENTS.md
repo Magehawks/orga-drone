@@ -198,6 +198,7 @@ to repository artifacts.
 | Roadmap and status labels | `docs/ROADMAP.md` |
 | Current architecture | `docs/ARCHITECTURE.md` |
 | Studio frontend target modules | `docs/STUDIO_MODULES.md` |
+| Studio action inventory and Control API contract | `docs/architecture/STUDIO_ACTIONS.md` |
 | Agent workflow and roles | `docs/AGENT_WORKFLOW.md` |
 | PR end-to-end checks | `docs/PR_E2E.md` |
 | Decisions | `docs/decisions/` |
