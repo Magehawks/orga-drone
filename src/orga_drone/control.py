@@ -9,10 +9,12 @@ import secrets
 import sqlite3
 import time
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from orga_drone.timeline_actions import TimelineActionError, apply_timeline, timeline_view
+from orga_drone.studio_history import transactional_story_undo, capture_story
 from orga_drone.project_actions import (
     ProjectActionError, create_project, open_project, rename_project, delete_project,
     project_view, project_transaction, read_projects,
@@ -59,7 +61,7 @@ class ControlError(Exception):
 class ExternalOperation:
     session_id: str
     project_id: int
-    clip_id: int
+    clip_id: int | None
     command_id: str
     revision: int
     fingerprint: str
@@ -98,6 +100,9 @@ class ControlService:
         self.session: dict[str, Any] | None = None
         self.commands: dict[str, dict[str, Any]] = {}
         self.latest_external: ExternalOperation | None = None
+        self.reload_ticket: dict[str, Any] | None = None
+        self.timeline_anchor: int | None = None
+        self.timeline_anchor_revision = 0
         self.clock = time.monotonic
 
     @property
@@ -137,6 +142,7 @@ class ControlService:
 
     def disable(self) -> dict[str, Any]:
         with history_guard():
+            self.reload_ticket = None
             self.digest = None
             self.session = None
             self.latest_external = None
@@ -264,7 +270,7 @@ class ControlService:
                 raise ControlError("STALE_SELECTION")
             session.update(seen=self.clock(), state=state)
             pending = [
-                self.result(cid)
+                self.bridge_result(cid)
                 for cid, cmd in self.commands.items()
                 if cmd["payload"]["session_id"] == sid
                 and (
@@ -369,14 +375,47 @@ class ControlService:
         except ActionValidationError as exc:
             raise ControlError(exc.code, 400) from None
 
+    def _timeline_command(self, body: dict[str, Any]) -> dict[str, Any] | None:
+        if body["type"] == "timeline_action":
+            return body
+        if body["type"] != "undo_last_change":
+            return None
+        original = self.commands.get(body.get("undo_command_id", ""))
+        if original and original["payload"].get("type") == "timeline_action":
+            return original["payload"]
+        return None
+
+    def _expire_reload_ticket(self) -> None:
+        ticket = self.reload_ticket
+        if ticket is not None and self.clock() > ticket["deadline"]:
+            self.reload_ticket = None
+
     def _check(self, body: dict[str, Any], state: dict[str, Any]) -> None:
         self._session(body["session_id"])
         project_action = body["type"] == "project_action"
-        if (
-            body["project_id"] != state["project_id"]
-            or (not project_action and body["clip_id"] != state["clip_id"])
-        ):
+        timeline_command = self._timeline_command(body)
+        timeline_undo = (
+            body["type"] == "undo_last_change" and timeline_command is not None
+        )
+        timeline = timeline_command is not None
+        if timeline:
+            self._expire_reload_ticket()
+        action = timeline_command["action"] if timeline_command else ""
+        selection_bound = action in {"timeline.remove", "timeline.trim"}
+        expected_clip = self.timeline_anchor if timeline_undo else body["clip_id"]
+        if timeline_undo and expected_clip != state["clip_id"]:
+            raise ControlError("UNDO_CONFLICT")
+        if body["project_id"] != state["project_id"]:
             raise ControlError("STALE_SELECTION")
+        if timeline and not timeline_undo and not selection_bound:
+            # Story-scoped add/reorder may omit clip identity; if supplied, it
+            # must still match the editor's current selection.
+            if body["clip_id"] is not None and body["clip_id"] != state["clip_id"]:
+                raise ControlError("STALE_SELECTION")
+        elif not project_action and expected_clip != state["clip_id"]:
+            raise ControlError("STALE_SELECTION")
+        if timeline_undo and self.timeline_anchor is None and state["selection_revision"] != self.timeline_anchor_revision:
+            raise ControlError("UNDO_CONFLICT")
         if body["type"] == "undo_last_change":
             operation = self.latest_external
             if operation != ExternalOperation(
@@ -390,12 +429,14 @@ class ControlService:
                 raise ControlError("UNDO_CONFLICT")
         if body["expected_state_token"] != self._token(state):
             raise ControlError("STALE_STATE")
-        if state["playing"] or state["busy"] or (not project_action and not state["ready"]):
+        if state["playing"] or state["busy"] or (not project_action and not timeline and not state["ready"]):
             raise ControlError("EDITOR_BUSY")
-        if project_action:
+        if project_action or timeline:
             opened = self.db.get_open_studio_project()
             if opened is None or opened.id != body["project_id"]:
                 raise ControlError("STALE_STATE")
+            if timeline and self.reload_ticket is not None:
+                raise ControlError("EDITOR_BUSY")
         else:
             self._clip(body["project_id"], body["clip_id"])
 
@@ -429,7 +470,9 @@ class ControlService:
         cid = identifier(body["command_id"])
         identifier(body["session_id"])
         positive_id(body["project_id"])
-        if body["type"] == "project_action":
+        if body["type"] in {"timeline_action", "undo_last_change"} and body["clip_id"] is None:
+            pass
+        elif body["type"] == "project_action":
             if body["clip_id"] is not None:
                 raise ControlError("INVALID_TARGET", 400)
         else:
@@ -444,6 +487,7 @@ class ControlService:
             "undo_last_change",
             "apply_action",
             "project_action",
+            "timeline_action",
         ):
             raise ControlError("UNKNOWN_COMMAND", 400)
         if body["type"] == "set_clip_properties":
@@ -454,7 +498,7 @@ class ControlService:
             }:
                 raise ControlError("INVALID_PAYLOAD", 400)
             self._patch(body.get("properties"))
-        elif body["type"] in {"apply_action", "project_action"}:
+        elif body["type"] in {"apply_action", "project_action", "timeline_action"}:
             if "properties" in body or "undo_command_id" in body:
                 raise ControlError("INVALID_PAYLOAD", 400)
             if not {"action", "action_version", "params"} <= set(body):
@@ -463,10 +507,12 @@ class ControlService:
                 spec = resolve_action_spec(
                     body["action"], body["action_version"]
                 )
-                expected_scope = "project" if body["type"] == "project_action" else "clip"
+                expected_scope = {"project_action": "project", "timeline_action": "timeline"}.get(body["type"], "clip")
                 if spec.scope != expected_scope:
                     raise ControlError("INVALID_ACTION_SCOPE", 400)
                 validate_action_params(spec, body["params"])
+                if spec.name in {"timeline.remove", "timeline.trim"}:
+                    positive_id(body["clip_id"])
             except ActionValidationError as exc:
                 raise ControlError(exc.code, 400) from None
         else:
@@ -498,6 +544,12 @@ class ControlService:
             if session["state"] is None:
                 raise ControlError("EDITOR_NOT_READY")
             self._check(body, session["state"])
+            timeline_scope = self._timeline_command(body) is not None
+            scope = (
+                "timeline"
+                if timeline_scope
+                else "project" if body["type"] == "project_action" else None
+            )
             self.commands[cid] = {
                 "payload": dict(body),
                 "deadline": self.clock() + expiry - time.time(),
@@ -507,13 +559,13 @@ class ControlService:
                     "persisted": False,
                     "ui_applied": False,
                     "preview_status": "not_requested",
-                    **({"scope": "project"} if body["type"] == "project_action" else {}),
+                    **({"scope": scope} if scope else {}),
                     **(
                         {
                             "action": body["action"],
                             "action_version": body["action_version"],
                         }
-                        if body["type"] in {"apply_action", "project_action"}
+                        if body["type"] in {"apply_action", "project_action", "timeline_action"}
                         else {}
                     ),
                 },
@@ -553,7 +605,7 @@ class ControlService:
             cmd = self.commands.get(cid)
             if cmd is None or cmd["payload"]["session_id"] != sid:
                 raise ControlError("COMMAND_NOT_FOUND", 404)
-            return self.result(cid)
+            return self.bridge_result(cid)
 
     def execute(self, payload: Any) -> dict[str, Any]:
         body = shape(
@@ -569,12 +621,17 @@ class ControlService:
                 raise ControlError("COMMAND_NOT_FOUND", 404)
             result = self.result(body["command_id"])
             if result["status"] != "queued":
-                return result
+                return self.bridge_result(body["command_id"])
             target = cmd["payload"]
             try:
                 self._check(target, state)
                 if target["type"] == "project_action":
                     return self._execute_project(cmd, state)
+                if target["type"] == "timeline_action" or (
+                    target["type"] == "undo_last_change"
+                    and self._timeline_command(target) is not None
+                ):
+                    return self._execute_timeline(cmd, state)
                 expected_fingerprint = self._fingerprint(target["project_id"])
                 clip = self._clip(target["project_id"], target["clip_id"])
                 available_luts = lut_catalog(self.db, self.data_dir)
@@ -670,11 +727,161 @@ class ControlService:
                 cmd["ui_revision"] = history_revision()
             except ControlError as exc:
                 cmd["result"].update(status="rejected", error_code=exc.code)
-            except (ActionValidationError, ProjectActionError) as exc:
+            except (ActionValidationError, ProjectActionError, TimelineActionError) as exc:
                 cmd["result"].update(status="rejected", error_code=exc.code)
             except Exception:
                 cmd["result"].update(status="rejected", error_code="DATABASE_ERROR")
             return dict(cmd["result"])
+
+    def _execute_timeline(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+        target = cmd["payload"]
+        pid = target["project_id"]
+        undo = target["type"] == "undo_last_change"
+
+        def validate(conn: sqlite3.Connection) -> None:
+            if self._token(state, conn) != target["expected_state_token"]:
+                raise ControlError("STALE_STATE")
+
+        context = (
+            transactional_story_undo(self.db, pid, validate=validate)
+            if undo
+            else transactional_story_edit(self.db, pid)
+        )
+        # Generate fallible/random material before committing.
+        ticket = secrets.token_hex(32)
+        with context as conn:
+            if conn is None:
+                raise ControlError("UNDO_CONFLICT")
+            if not undo and self._token(state, conn) != target["expected_state_token"]:
+                raise ControlError("STALE_STATE")
+            before = capture_story(self.db, pid, connection=conn)
+            affected = target["clip_id"]
+            try:
+                if not undo:
+                    affected = apply_timeline(
+                        self.db,
+                        pid,
+                        affected,
+                        target["action"],
+                        target["params"],
+                        connection=conn,
+                    )
+            except TimelineActionError:
+                raise
+            except (ValueError, OverflowError):
+                raise TimelineActionError("INVALID_PARAMS") from None
+            canonical = timeline_view(self.db, pid, conn)
+            fingerprint = self._fingerprint(pid, conn)
+            no_op = not undo and before == capture_story(
+                self.db, pid, connection=conn
+            )
+            if no_op:
+                anchor = (
+                    state["clip_id"]
+                    if state["clip_id"] in canonical["ordered_ids"]
+                    else None
+                )
+            else:
+                anchor = (
+                    target["clip_id"]
+                    if target["clip_id"] in canonical["ordered_ids"]
+                    else None
+                )
+            self._session(target["session_id"])
+            if self.clock() > cmd["deadline"]:
+                raise ControlError("COMMAND_EXPIRED")
+        if undo:
+            self.latest_external = None
+        elif not no_op:
+            self.latest_external = ExternalOperation(
+                session_id=target["session_id"],
+                project_id=pid,
+                clip_id=target["clip_id"],
+                command_id=target["command_id"],
+                revision=history_revision(),
+                fingerprint=fingerprint,
+            )
+        elif self.latest_external is not None and self.latest_external.project_id == pid:
+            # A no-op timeline helper may still bump project updated_at. Keep
+            # the previous guarded-Undo association valid.
+            self.latest_external = replace(
+                self.latest_external,
+                revision=history_revision(),
+                fingerprint=fingerprint,
+            )
+        if not no_op:
+            self.timeline_anchor = anchor
+            self.timeline_anchor_revision = state["selection_revision"]
+        reload_required = not no_op
+        cmd["timeline_fingerprint"] = fingerprint
+        cmd["result"].update(
+            status="persisted",
+            persisted=True,
+            scope="timeline",
+            project_id=pid,
+            clip_id=target["clip_id"],
+            affected_clip_id=affected,
+            canonical=canonical,
+            no_op=no_op,
+            reload_required=reload_required,
+            selection_clip_id=anchor,
+            **history_flags(pid),
+        )
+        if undo:
+            cmd["result"]["undone_command_id"] = target["undo_command_id"]
+        cmd["ui_revision"] = history_revision()
+        if reload_required:
+            self.reload_ticket = {
+                "ticket": ticket,
+                "command_id": target["command_id"],
+                "session_id": target["session_id"],
+                "project_id": pid,
+                "fingerprint": fingerprint,
+                "anchor": anchor,
+                "revision": state["selection_revision"],
+                "deadline": self.clock() + 30,
+            }
+        return self.bridge_result(target["command_id"])
+
+    def bridge_result(self, cid: str) -> dict[str, Any]:
+        self._expire_reload_ticket()
+        result = self.result(cid)
+        ticket = self.reload_ticket
+        if ticket and ticket["command_id"] == cid:
+            result["resume_ticket"] = ticket["ticket"]
+        return result
+
+    def resume(self, payload: Any) -> dict[str, Any]:
+        body = shape(payload, {"ticket", "project_id"}, {"ticket", "project_id"})
+        with history_guard():
+            self._expire_reload_ticket()
+            ticket = self.reload_ticket
+            if (
+                not self.enabled
+                or ticket is None
+                or not isinstance(body["ticket"], str)
+                or not hmac.compare_digest(body["ticket"], ticket["ticket"])
+            ):
+                raise ControlError("INVALID_RESUME_TICKET")
+            if (
+                body["project_id"] != ticket["project_id"]
+                or self._fingerprint(ticket["project_id"])
+                != ticket["fingerprint"]
+            ):
+                self.reload_ticket = None
+                raise ControlError("STALE_STATE")
+            opened = self.db.get_open_studio_project()
+            if opened is None or opened.id != ticket["project_id"]:
+                raise ControlError("STALE_STATE")
+            assert self.session is not None
+            self.reload_ticket = None
+            self.session.update(seen=self.clock(), state=None)
+            return {
+                "session_id": ticket["session_id"],
+                "selection_revision": ticket["revision"],
+                "selection_clip_id": ticket["anchor"],
+                "command_id": ticket["command_id"],
+            }
 
     def _execute_project(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
         target = cmd["payload"]
@@ -714,6 +921,7 @@ class ControlService:
                              navigation_required=navigation, **flags)
         cmd["ui_revision"] = history_revision()
         if navigation:
+            self.reload_ticket = None
             assert self.session is not None
             self.session["fenced"] = True
             for other in self.commands.values():
@@ -753,6 +961,21 @@ class ControlService:
             if cmd["result"].get("navigation_required"):
                 # Requesting a page switch is not proof the next editor loaded.
                 return self.result(body["command_id"])
+            if cmd["result"].get("scope") == "timeline":
+                state = self.session["state"] if self.session else None
+                fingerprint = cmd.get("timeline_fingerprint")
+                if (
+                    self.reload_ticket is not None
+                    or state is None
+                    or state["project_id"] != cmd["payload"]["project_id"]
+                    or state["clip_id"] != cmd["result"]["selection_clip_id"]
+                    or (
+                        fingerprint is not None
+                        and self._fingerprint(cmd["payload"]["project_id"])
+                        != fingerprint
+                    )
+                ):
+                    raise ControlError("STALE_STATE")
             if cmd["result"]["persisted"]:
                 cmd["result"].update(
                     status="ui_applied",

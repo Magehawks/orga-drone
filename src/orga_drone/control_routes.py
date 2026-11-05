@@ -92,6 +92,7 @@ def control_router(service: ControlService, bind_host: str) -> APIRouter:
             return response(service.disable())
         operations = {
             "poll": service.poll,
+            "resume": service.resume,
             "execute": service.execute,
             "recover": service.recover,
             "ack": service.acknowledge,

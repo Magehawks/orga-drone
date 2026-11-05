@@ -2362,8 +2362,8 @@ class Database:
                 (position, int(row["id"]), project_id),
             )
 
-    def list_studio_music(self, project_id: int) -> list[StudioAudioClip]:
-        with self.connect() as conn:
+    def list_studio_music(self, project_id: int, *, connection: sqlite3.Connection | None = None) -> list[StudioAudioClip]:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             rows = conn.execute(
                 """SELECT id, project_id, lane, position, file_path, display_name,
                           volume, fade_in_s, fade_out_s, loop, duration_s, added_at
@@ -2598,6 +2598,7 @@ class Database:
         kind: str,
         project_id: int | None = None,
         source_media_id: int | None = None,
+        connection: sqlite3.Connection | None = None,
     ) -> tuple[int, bool]:
         """Add a clip to a Studio project. Returns ``(clip_id, created)``.
 
@@ -2608,14 +2609,14 @@ class Database:
         kind_snapshot = kind if kind in {"photo", "video"} else "photo"
         now = datetime.now().isoformat(timespec="seconds")
         project = (
-            self.get_studio_project(project_id)
+            self.get_studio_project(project_id, connection=connection)
             if project_id is not None
             else self.ensure_default_studio_project()
         )
         if project is None:
             raise ValueError("studio project not found")
         pid = project.id
-        with self.connect() as conn:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             if source_media_id is None:
                 media_row = conn.execute(
                     "SELECT id FROM media WHERE path = ?",
@@ -2855,10 +2856,10 @@ class Database:
             raise ValueError("studio item not found")
         return clip
 
-    def remove_studio_item(self, studio_item_id: int) -> bool:
+    def remove_studio_item(self, studio_item_id: int, *, connection: sqlite3.Connection | None = None) -> bool:
         """Remove one Studio clip. Never deletes media assets."""
         now = datetime.now().isoformat(timespec="seconds")
-        with self.connect() as conn:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             row = conn.execute(
                 "SELECT project_id FROM studio_clips WHERE id = ?",
                 (studio_item_id,),
@@ -2932,18 +2933,18 @@ class Database:
         return {str(r["media_path"]) for r in rows}
 
     def list_studio_items(
-        self, project_id: int | None = None
+        self, project_id: int | None = None, *, connection: sqlite3.Connection | None = None
     ) -> list[StudioClip]:
         from orga_drone.studio_estimate import effective_kind
 
         project = (
-            self.get_studio_project(project_id)
+            self.get_studio_project(project_id, connection=connection)
             if project_id is not None
             else self.ensure_default_studio_project()
         )
         if project is None:
             return []
-        with self.connect() as conn:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             rows = conn.execute(
                 """SELECT s.id, s.project_id, s.item_kind, s.media_path, s.identity_key,
                           s.position, s.filename_snapshot, s.recorded_at_snapshot, s.added_at,
@@ -3076,17 +3077,17 @@ class Database:
         return out
 
     def reorder_studio_items(
-        self, ordered_ids: list[int], project_id: int | None = None
+        self, ordered_ids: list[int], project_id: int | None = None, *, connection: sqlite3.Connection | None = None
     ) -> list[int]:
         """Set ``position`` to 1..n for an exact permutation of project clip IDs."""
         project = (
-            self.get_studio_project(project_id)
+            self.get_studio_project(project_id, connection=connection)
             if project_id is not None
             else self.ensure_default_studio_project()
         )
         if project is None:
             raise ValueError("studio project not found")
-        with self.connect() as conn:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             existing = {
                 int(r["id"])
                 for r in conn.execute(
@@ -4531,6 +4532,7 @@ class Database:
         source_in_s: float,
         source_out_s: float,
         repeats: object,
+        connection: sqlite3.Connection | None = None,
     ) -> StudioClip:
         """Set a video in/out range and how many times that range plays.
 
@@ -4554,12 +4556,12 @@ class Database:
             raise ValueError("source out must be a number")
         start = float(source_in_s)
         end = float(source_out_s)
-        if start < 0 or end <= start:
+        if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
             raise ValueError("source out must be after source in")
         if end - start < MIN_SEGMENT_S:
             raise ValueError("section is too short")
 
-        with self.connect() as conn:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
             row = conn.execute(
                 """SELECT s.id, s.project_id, s.item_kind, s.kind_snapshot,
                           s.effect_settings, s.media_path, s.filename_snapshot,
@@ -4631,7 +4633,7 @@ class Database:
                 "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
                 (now, project_id),
             )
-        items = {i.id: i for i in self.list_studio_items(project_id)}
+        items = {i.id: i for i in self.list_studio_items(project_id, connection=connection)}
         return items[studio_item_id]
 
     def set_studio_forward_loop(
