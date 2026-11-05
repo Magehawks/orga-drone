@@ -415,4 +415,3 @@ def test_color_animation_api(
     )
     assert deleted.status_code == 200
     assert deleted.json()["effect_lane"]["color_animation"] is None
-
