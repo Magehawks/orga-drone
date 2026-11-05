@@ -69,6 +69,11 @@ def control_router(service: ControlService, bind_host: str) -> APIRouter:
         check(request, external=True)
         return response(service.submit(await body(request)))
 
+    @router.post("/api/control/v1/read-actions")
+    async def read_actions(request: Request) -> JSONResponse:
+        check(request, external=True)
+        return response(service.read_action(await body(request)))
+
     @router.get("/api/control/v1/commands/{command_id}")
     async def command_result(command_id: str, request: Request) -> JSONResponse:
         check(request, external=True)

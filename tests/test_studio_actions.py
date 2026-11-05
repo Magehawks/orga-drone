@@ -27,7 +27,9 @@ def test_catalog_is_versioned_and_path_free() -> None:
     assert catalog["contract_version"] == CONTRACT_VERSION == 1
     actions = catalog["actions"]
     assert actions[0]["name"] == "clip.color.properties"
-    assert len(actions) == 6
+    assert {a["name"] for a in actions if a["scope"] == "library"} == {
+        "library.media.list", "library.media.search", "library.media.get",
+    }
     action = actions[0]
     assert action["version"] == 1
     assert action["scope"] == "clip"
@@ -148,7 +150,7 @@ def test_validate_clip_effect_settings_rejects_unsafe_state(
     assert exc.value.code == code
 def test_catalog_lists_only_implemented_color_and_effect_actions() -> None:
     actions = action_catalog()["actions"]
-    assert [entry["name"] for entry in actions] == [
+    assert [entry["name"] for entry in actions if entry["scope"] == "clip"] == [
         "clip.color.properties",
         "clip.color.image",
         "clip.color.look",

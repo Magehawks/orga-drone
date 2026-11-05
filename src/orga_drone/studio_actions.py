@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from orga_drone.db import Database
+from orga_drone.library_actions import LIST_PARAMETERS, LibraryActionError, validate_params
 from orga_drone.lut_library import list_catalog
 from orga_drone.studio_color_wheels import (
     POINT_MAX,
@@ -217,6 +218,12 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         description="Update the existing sharpen and denoise effect.",
         parameters=DETAIL_PARAMETERS,
     ),
+    *(ActionSpec(
+        name=f"library.media.{operation}", version=1, scope="library",
+        target="media" if operation == "get" else "library", reversible=False,
+        description="Read imported media metadata without filesystem paths.",
+        parameters={} if operation == "get" else LIST_PARAMETERS,
+    ) for operation in ("list", "search", "get")),
 )
 
 _ACTION_SPECS_BY_KEY = {(spec.name, spec.version): spec for spec in ACTION_SPECS}
@@ -381,6 +388,11 @@ def _validate_look_params(params: Any) -> dict[str, Any]:
 
 def validate_action_params(spec: ActionSpec, params: Any) -> dict[str, Any]:
     """Validate action parameters without touching the database or disk."""
+    if spec.scope == "library":
+        try:
+            return validate_params(spec.name, params)
+        except LibraryActionError as exc:
+            raise ActionValidationError(exc.code) from None
     validators = {
         "clip.color.properties": _validate_properties_params,
         "clip.color.image": _validate_image_params,
