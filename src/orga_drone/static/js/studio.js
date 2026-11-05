@@ -11531,6 +11531,19 @@ import {
         imageSaveChain, hslSaveChain, colorWheelsSaveChain, maskSaveChain, frameSaveChain,
         overlaySaveChain, mapSaveChain]);
     },
+    applyProject: (result) => {
+      if (result.project_id !== projectId) throw new Error("Project context changed");
+      if (result.navigation_required) {
+        window.location.assign("/studio");
+        return;
+      }
+      const title = result.canonical?.project?.title;
+      if (typeof title !== "string") throw new Error("Project title unavailable");
+      state.title = title;
+      if (titleInput) titleInput.value = title;
+      const emptyTitle = document.getElementById("inspector-empty-title");
+      if (emptyTitle) emptyTitle.textContent = title;
+    },
     applyCanonical: createCanonicalApplier({
       snapshot: controlSnapshot,
       getClip: (id) => findClip(grid, id),

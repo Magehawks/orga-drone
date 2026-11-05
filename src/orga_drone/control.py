@@ -13,6 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from orga_drone.project_actions import (
+    ProjectActionError, create_project, open_project, rename_project, delete_project,
+    project_view, project_transaction, read_projects,
+)
 from orga_drone.db import Database
 from orga_drone.lut_library import list_catalog
 from orga_drone.library_actions import LibraryActionError, read_media
@@ -122,6 +126,7 @@ class ControlService:
                 self.enabled
                 and self.session
                 and self.clock() - self.session["seen"] <= LEASE_SECONDS
+                and not self.session.get("fenced")
                 and self.session["session_id"] != sid
             ):
                 raise ControlError("EDITOR_SESSION_CONFLICT")
@@ -145,7 +150,7 @@ class ControlService:
                     )
             return {"enabled": False}
 
-    def _session(self, sid: str | None = None) -> dict[str, Any]:
+    def _session(self, sid: str | None = None, *, allow_fenced: bool = False) -> dict[str, Any]:
         if not self.enabled:
             raise ControlError("CONTROL_DISABLED", 403)
         session = self.session
@@ -153,6 +158,8 @@ class ControlService:
             raise ControlError("EDITOR_DISCONNECTED")
         if sid is not None and sid != session["session_id"]:
             raise ControlError("EDITOR_SESSION_CONFLICT")
+        if session.get("fenced") and not allow_fenced:
+            raise ControlError("STALE_STATE")
         return session
 
     def _state(self, payload: Any) -> dict[str, Any]:
@@ -217,7 +224,7 @@ class ControlService:
         with self.db.connect() as conn:
             return read(conn)
 
-    def _token(self, state: dict[str, Any]) -> str:
+    def _token(self, state: dict[str, Any], connection: sqlite3.Connection | None = None) -> str:
         session = self._session()
         material = [
             self.instance,
@@ -226,7 +233,7 @@ class ControlService:
             state["clip_id"],
             state["selection_revision"],
             history_revision(),
-            self._fingerprint(state["project_id"]),
+            self._fingerprint(state["project_id"], connection),
         ]
         return hashlib.sha256(repr(material).encode()).hexdigest()
 
@@ -237,6 +244,17 @@ class ControlService:
         with history_guard():
             if not self.enabled:
                 return {"enabled": False}
+            # A committed context change retires this editor. Recovery only:
+            # ignore its old state and return terminal navigation outcomes even
+            # after its editing lease expires; never renew or revive the lease.
+            retired = self.session
+            if retired is not None and retired["session_id"] == sid and retired.get("fenced"):
+                return {"enabled": True, "commands": [
+                    self.result(cid) for cid, cmd in self.commands.items()
+                    if cmd["payload"]["session_id"] == sid
+                    and cmd["result"].get("navigation_required")
+                    and cmd["result"]["persisted"]
+                ]}
             session = self._session(sid)
             previous = session["state"]
             if (
@@ -256,7 +274,7 @@ class ControlService:
                         and not cmd["result"]["ui_applied"]
                         and cmd.get("ui_revision") == history_revision()
                         and cmd["payload"]["project_id"] == state["project_id"]
-                        and cmd["payload"]["clip_id"] == state["clip_id"]
+                        and (cmd["payload"]["type"] == "project_action" or cmd["payload"]["clip_id"] == state["clip_id"])
                     )
                 )
             ]
@@ -330,20 +348,20 @@ class ControlService:
             self._session(identifier(body["session_id"]))
             try:
                 spec = resolve_action_spec(body["action"], body["action_version"])
-                if spec.scope != "library":
+                if spec.scope == "library":
+                    result = read_media(self.db, spec.name, body["target"], body["params"])
+                elif spec.scope == "project_read":
+                    validate_action_params(spec, body["params"])
+                    result = read_projects(self.db, spec.name, body["target"])
+                else:
                     raise ControlError("INVALID_ACTION_SCOPE", 400)
-                result = read_media(self.db, spec.name, body["target"], body["params"])
-            except (ActionValidationError, LibraryActionError) as exc:
-                status = {"TARGET_NOT_FOUND": 404, "MEDIA_UNAVAILABLE": 409}.get(
-                    exc.code, 400
-                )
+            except (ActionValidationError, LibraryActionError, ProjectActionError) as exc:
+                status = {"TARGET_NOT_FOUND": 404, "MEDIA_UNAVAILABLE": 409}.get(exc.code, 400)
                 raise ControlError(exc.code, status) from None
             except (sqlite3.Error, ValueError, TypeError, OverflowError):
                 raise ControlError("DATABASE_ERROR", 500) from None
-            return {
-                "action": spec.name, "action_version": spec.version,
-                "session_id": body["session_id"], "result": result,
-            }
+            return {"action": spec.name, "action_version": spec.version,
+                    "session_id": body["session_id"], "result": result}
 
     def _patch(self, payload: Any) -> dict[str, Any]:
         try:
@@ -353,9 +371,10 @@ class ControlService:
 
     def _check(self, body: dict[str, Any], state: dict[str, Any]) -> None:
         self._session(body["session_id"])
+        project_action = body["type"] == "project_action"
         if (
             body["project_id"] != state["project_id"]
-            or body["clip_id"] != state["clip_id"]
+            or (not project_action and body["clip_id"] != state["clip_id"])
         ):
             raise ControlError("STALE_SELECTION")
         if body["type"] == "undo_last_change":
@@ -371,9 +390,14 @@ class ControlService:
                 raise ControlError("UNDO_CONFLICT")
         if body["expected_state_token"] != self._token(state):
             raise ControlError("STALE_STATE")
-        if state["playing"] or state["busy"] or not state["ready"]:
+        if state["playing"] or state["busy"] or (not project_action and not state["ready"]):
             raise ControlError("EDITOR_BUSY")
-        self._clip(body["project_id"], body["clip_id"])
+        if project_action:
+            opened = self.db.get_open_studio_project()
+            if opened is None or opened.id != body["project_id"]:
+                raise ControlError("STALE_STATE")
+        else:
+            self._clip(body["project_id"], body["clip_id"])
 
     def submit(self, payload: Any) -> dict[str, Any]:
         body = shape(
@@ -405,7 +429,11 @@ class ControlService:
         cid = identifier(body["command_id"])
         identifier(body["session_id"])
         positive_id(body["project_id"])
-        positive_id(body["clip_id"])
+        if body["type"] == "project_action":
+            if body["clip_id"] is not None:
+                raise ControlError("INVALID_TARGET", 400)
+        else:
+            positive_id(body["clip_id"])
         if (
             not isinstance(body["expected_state_token"], str)
             or len(body["expected_state_token"]) != 64
@@ -415,6 +443,7 @@ class ControlService:
             "set_clip_properties",
             "undo_last_change",
             "apply_action",
+            "project_action",
         ):
             raise ControlError("UNKNOWN_COMMAND", 400)
         if body["type"] == "set_clip_properties":
@@ -425,7 +454,7 @@ class ControlService:
             }:
                 raise ControlError("INVALID_PAYLOAD", 400)
             self._patch(body.get("properties"))
-        elif body["type"] == "apply_action":
+        elif body["type"] in {"apply_action", "project_action"}:
             if "properties" in body or "undo_command_id" in body:
                 raise ControlError("INVALID_PAYLOAD", 400)
             if not {"action", "action_version", "params"} <= set(body):
@@ -434,7 +463,8 @@ class ControlService:
                 spec = resolve_action_spec(
                     body["action"], body["action_version"]
                 )
-                if spec.scope != "clip":
+                expected_scope = "project" if body["type"] == "project_action" else "clip"
+                if spec.scope != expected_scope:
                     raise ControlError("INVALID_ACTION_SCOPE", 400)
                 validate_action_params(spec, body["params"])
             except ActionValidationError as exc:
@@ -477,12 +507,13 @@ class ControlService:
                     "persisted": False,
                     "ui_applied": False,
                     "preview_status": "not_requested",
+                    **({"scope": "project"} if body["type"] == "project_action" else {}),
                     **(
                         {
                             "action": body["action"],
                             "action_version": body["action_version"],
                         }
-                        if body["type"] == "apply_action"
+                        if body["type"] in {"apply_action", "project_action"}
                         else {}
                     ),
                 },
@@ -510,6 +541,20 @@ class ControlService:
                 raise ControlError("EDITOR_SESSION_CONFLICT")
             return self.result(cid)
 
+    def recover(self, payload: Any) -> dict[str, Any]:
+        """Read an uncertain bridge outcome without renewing an editing lease."""
+        body = shape(payload, {"session_id", "command_id"}, {"session_id", "command_id"})
+        sid, cid = identifier(body["session_id"]), identifier(body["command_id"])
+        with history_guard():
+            if not self.enabled:
+                raise ControlError("CONTROL_DISABLED", 403)
+            if self.session is None or self.session["session_id"] != sid:
+                raise ControlError("EDITOR_SESSION_CONFLICT")
+            cmd = self.commands.get(cid)
+            if cmd is None or cmd["payload"]["session_id"] != sid:
+                raise ControlError("COMMAND_NOT_FOUND", 404)
+            return self.result(cid)
+
     def execute(self, payload: Any) -> dict[str, Any]:
         body = shape(
             payload,
@@ -518,7 +563,7 @@ class ControlService:
         )
         state = self._state(body["state"])
         with history_guard():
-            self._session(identifier(body["session_id"]))
+            self._session(identifier(body["session_id"]), allow_fenced=True)
             cmd = self.commands.get(identifier(body["command_id"]))
             if cmd is None or cmd["payload"]["session_id"] != body["session_id"]:
                 raise ControlError("COMMAND_NOT_FOUND", 404)
@@ -528,6 +573,8 @@ class ControlService:
             target = cmd["payload"]
             try:
                 self._check(target, state)
+                if target["type"] == "project_action":
+                    return self._execute_project(cmd, state)
                 expected_fingerprint = self._fingerprint(target["project_id"])
                 clip = self._clip(target["project_id"], target["clip_id"])
                 available_luts = lut_catalog(self.db, self.data_dir)
@@ -623,11 +670,56 @@ class ControlService:
                 cmd["ui_revision"] = history_revision()
             except ControlError as exc:
                 cmd["result"].update(status="rejected", error_code=exc.code)
-            except ActionValidationError as exc:
+            except (ActionValidationError, ProjectActionError) as exc:
                 cmd["result"].update(status="rejected", error_code=exc.code)
             except Exception:
                 cmd["result"].update(status="rejected", error_code="DATABASE_ERROR")
             return dict(cmd["result"])
+
+    def _execute_project(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+        target = cmd["payload"]
+        pid, action, params = target["project_id"], target["action"], target["params"]
+        with project_transaction(self.db) as conn:
+            opened = conn.execute("SELECT value FROM app_state WHERE key = ?",
+                                  ("studio_last_opened_project_id",)).fetchone()
+            if opened is None or str(opened[0]) != str(pid) or self._token(state, conn) != target["expected_state_token"]:
+                raise ControlError("STALE_STATE")
+            before = self.db.get_studio_project(pid, connection=conn)
+            if before is None:
+                raise ControlError("TARGET_NOT_FOUND", 404)
+            if action == "project.create":
+                project = create_project(self.db, params["title"], open_created=True, connection=conn)
+            elif action == "project.open":
+                project = open_project(self.db, params["project_id"], connection=conn)
+            elif action == "project.rename":
+                project = rename_project(self.db, pid, params["title"], connection=conn)
+            elif action == "project.delete":
+                if not delete_project(self.db, pid, connection=conn):
+                    raise ControlError("TARGET_NOT_FOUND", 404)
+                project = None
+            else:
+                raise ControlError("UNKNOWN_ACTION", 400)
+            self._session(target["session_id"])
+            if self.clock() > cmd["deadline"]:
+                raise ControlError("COMMAND_EXPIRED")
+            flags = history_flags(pid) if action == "project.rename" else {"can_undo": False, "can_redo": False}
+            canonical = {"project": project_view(project) if project else None}
+            no_op = action == "project.rename" and project is not None and project.title == before.title
+        # Everything below uses committed values; no fallible DB read follows commit.
+        self.latest_external = None
+        navigation = action != "project.rename"
+        cmd["result"].update(status="persisted", persisted=True, ui_applied=False,
+                             scope="project", project_id=pid, clip_id=None,
+                             canonical=canonical, no_op=no_op,
+                             navigation_required=navigation, **flags)
+        cmd["ui_revision"] = history_revision()
+        if navigation:
+            assert self.session is not None
+            self.session["fenced"] = True
+            for other in self.commands.values():
+                if other is not cmd and other["result"]["status"] == "queued":
+                    other["result"].update(status="rejected", error_code="STALE_STATE")
+        return dict(cmd["result"])
 
     def _merge(
         self,
@@ -652,12 +744,15 @@ class ControlService:
             {"command_id", "session_id", "preview_status"},
         )
         with history_guard():
-            self._session(identifier(body["session_id"]))
+            self._session(identifier(body["session_id"]), allow_fenced=True)
             cmd = self.commands.get(identifier(body["command_id"]))
             if cmd is None or cmd["payload"]["session_id"] != body["session_id"]:
                 raise ControlError("COMMAND_NOT_FOUND", 404)
             if body["preview_status"] not in ("refresh_requested", "unavailable"):
                 raise ControlError("INVALID_PAYLOAD", 400)
+            if cmd["result"].get("navigation_required"):
+                # Requesting a page switch is not proof the next editor loaded.
+                return self.result(body["command_id"])
             if cmd["result"]["persisted"]:
                 cmd["result"].update(
                     status="ui_applied",

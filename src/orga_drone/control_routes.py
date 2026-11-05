@@ -93,6 +93,7 @@ def control_router(service: ControlService, bind_host: str) -> APIRouter:
         operations = {
             "poll": service.poll,
             "execute": service.execute,
+            "recover": service.recover,
             "ack": service.acknowledge,
         }
         if action not in operations:

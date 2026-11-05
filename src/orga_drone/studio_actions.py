@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from orga_drone.project_actions import PROJECT_PARAMETERS, ProjectActionError, validate_project_params
 from orga_drone.db import Database
 from orga_drone.library_actions import LIST_PARAMETERS, LibraryActionError, validate_params
 from orga_drone.lut_library import list_catalog
@@ -226,6 +227,13 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
     ) for operation in ("list", "search", "get")),
 )
 
+ACTION_SPECS += tuple(
+    ActionSpec(name=name, version=1, scope="project_read" if name in {"project.list", "project.get"} else "project",
+               target="project", reversible=False,
+               description="Use existing persisted Studio project lifecycle.", parameters=params)
+    for name, params in PROJECT_PARAMETERS.items()
+)
+
 _ACTION_SPECS_BY_KEY = {(spec.name, spec.version): spec for spec in ACTION_SPECS}
 
 
@@ -392,6 +400,11 @@ def validate_action_params(spec: ActionSpec, params: Any) -> dict[str, Any]:
         try:
             return validate_params(spec.name, params)
         except LibraryActionError as exc:
+            raise ActionValidationError(exc.code) from None
+    if spec.name in PROJECT_PARAMETERS:
+        try:
+            return validate_project_params(spec.name, params)
+        except ProjectActionError as exc:
             raise ActionValidationError(exc.code) from None
     validators = {
         "clip.color.properties": _validate_properties_params,

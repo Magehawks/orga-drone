@@ -4,7 +4,8 @@ Issue #255 adds an optional application API for one running Studio editor.
 It has no MCP adapter or AI-provider dependency. All source media stays on disk
 unchanged. Clip mutations support a paused, available video with static color
 settings. Read-only library actions also support imported photos and offline
-catalog listings, independently of the selected clip.
+catalog listings, independently of the selected clip. Project lifecycle commands
+also support paused, idle empty/photo-only Stories with an explicit project context.
 
 ## Pairing and lifecycle
 
@@ -326,3 +327,68 @@ The separate `orga-drone-mcp` repository still needs its MCP tools, client-side
 pairing-key handling, exact Origin/bearer transport, state/readiness checks,
 idempotent command polling and honest outcome translation. It must expose only
 these supported operations and must never return credentials in tool responses.
+
+
+## Project lifecycle actions (#278)
+
+The shared registry also advertises version 1 `project.list` and `project.get`
+with scope `project_read`, and `project.create`, `project.open`, `project.rename`
+and `project.delete` with scope `project`. Studio form/JSON project routes use
+`project_actions.py` and the same existing database helpers. There is no new
+project format or explicit save action: existing edits commit immediately.
+
+Use `POST /api/control/v1/read-actions` for project reads, with the same
+session/action/version/target/params envelope as library reads. List uses empty
+`target` and `params`; get uses `target: {"project_id": 1}` and empty `params`.
+The result contains project identity, title, timestamps, soundtrack start and
+clip count. Get also returns clip/media IDs and types, without source paths,
+soundtrack paths or raw effects. These reads require the authenticated live
+editor session, but not a selected clip or state token.
+
+Project writes use a separate additive command type, leaving `apply_action`
+clip-only:
+
+```json
+{"command_id":"rename-story","type":"project_action",
+ "action":"project.rename","action_version":1,"params":{"title":"Lake story"},
+ "session_id":"editor","project_id":1,"clip_id":null,
+ "expected_state_token":"opaque-64-character-token","expires_at":1780000000}
+```
+
+`project_id` is always the explicit **source/current** project. `clip_id` must
+be null even when a video is selected. Create and rename require a nonempty
+`title` of at most 120 characters; open requires the destination in
+`params: {"project_id": 2}`; delete requires empty params and only removes the
+source project and its references. Source media is never deleted. Creation
+atomically creates and opens the new project. Reads do not alter context.
+
+Project commands use existing command IDs, exact replay, capacity, expiry and
+editor input exclusion. They require a paused, idle editor and a current project,
+including empty/photo-only projects; color/video eligibility is not required.
+Execution checks the source project, token and current open-project identity
+inside the write transaction, and checks lease/deadline again before commit.
+A failed write or commit does not report persistence or switch project context.
+
+Rename keeps existing Story Undo/Redo and reports its truthful history flags;
+project lifecycle itself does not add Story Undo steps. Lifecycle writes clear
+the guarded external-Undo association, so an old color command cannot undo across
+a project change. Create/open/delete fence the old session and pending commands.
+The bridge keeps the old UI locked, stops processing commands and navigates only
+to the fixed `/studio` route after the committed result. Navigation needs no
+acknowledgement, avoiding an acknowledgement-loss trap. The result remains
+`persisted_ui_unconfirmed`: requesting navigation does not prove the new page
+loaded. Enable external control again in the new editor; credentials are not
+transferred into a new browser session. A fenced editor poll ignores incoming
+state and returns only committed navigation outcomes, without renewing its lease.
+If the execute response is lost, the bridge retains input exclusion until this
+same-origin bridge `recover` request supplies the original outcome. Recovery is
+read-only and session-owned: it never executes commands or renews an expired lease.
+A recovered rejection releases input exclusion without changing project context. Existing result polling and exact replay
+remain available for the prior session until a new session is enabled.
+
+Manual checks before release: create, rename and switch projects in Windows
+WebView2, including empty and photo-only Stories; re-enable after a switch;
+verify title persistence after reopen, per-project Undo/Redo and unchanged media.
+Synthetic API/bridge tests do not certify real-media preview or packaged UX.
+The packaged Windows E2E workflow currently targets PRs to `main`, not `develop`;
+these module PRs leave that packaged gate and realistic human media checks pending.
