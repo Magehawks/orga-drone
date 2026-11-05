@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import re
 import secrets
 import sqlite3
@@ -17,6 +16,17 @@ from typing import Any
 from orga_drone.db import Database
 from orga_drone.lut_library import list_catalog
 from orga_drone.media_files import resolve_media_file
+from orga_drone.studio_actions import (
+    LIMITS,
+    ActionValidationError,
+    action_catalog,
+    canonical as action_canonical,
+    lut_catalog,
+    merge_properties,
+    parse_properties_patch,
+    properties,
+    validate_clip_effect_settings,
+)
 from orga_drone.studio_history import (
     history_flags,
     history_guard,
@@ -24,25 +34,11 @@ from orga_drone.studio_history import (
     transactional_story_edit,
     undo_story,
 )
-from orga_drone.studio_image import (
-    image_adjust_from_effect_settings,
-    parse_image_adjust_patch,
-)
-from orga_drone.studio_lut import (
-    color_look_from_effect_settings,
-    parse_color_look_payload,
-    require_lut_asset,
-)
 
 LEASE_SECONDS = 3.0
 MAX_COMMANDS = 1024
 MAX_SAFE_INTEGER = 2**53 - 1
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
-LIMITS = {
-    "contrast": (-100, 100),
-    "saturation_percent": (0, 200),
-    "creative_lut_strength_percent": (0, 100),
-}
 
 
 class ControlError(Exception):
@@ -278,30 +274,10 @@ class ControlService:
         if media is None or resolve_media_file(self.db, media) is None:
             raise ControlError("MEDIA_UNAVAILABLE")
         try:
-            stored = json.loads(clip.effect_settings or "{}")
-            if not isinstance(stored, dict):
-                raise ValueError
-            if stored.get("color_animation") or stored.get("saturation_ramp"):
-                raise ControlError("ANIMATED_SETTINGS_UNSUPPORTED")
-            neutral = image_adjust_from_effect_settings("{}")
-            parse_image_adjust_patch(
-                dict(neutral.as_dict(), **stored.get("image", {})), neutral
-            )
-            parse_color_look_payload(stored.get("color", {}))
-        except (ValueError, TypeError, AttributeError):
-            raise ControlError("INVALID_CLIP_SETTINGS") from None
+            validate_clip_effect_settings(clip.effect_settings)
+        except ActionValidationError as exc:
+            raise ControlError(exc.code) from None
         return clip
-
-    @staticmethod
-    def properties(raw: str) -> dict[str, Any]:
-        image = image_adjust_from_effect_settings(raw)
-        color = color_look_from_effect_settings(raw)
-        return {
-            "contrast": image.contrast,
-            "saturation_percent": image.saturation + 100,
-            "creative_lut_id": color.creative_lut or None,
-            "creative_lut_strength_percent": color.creative_strength,
-        }
 
     def editor_state(self) -> dict[str, Any]:
         with history_guard():
@@ -314,7 +290,7 @@ class ControlService:
             )
             try:
                 clip = self._clip(state["project_id"], state["clip_id"])
-                result["properties"] = self.properties(clip.effect_settings)
+                result["properties"] = properties(clip.effect_settings)
             except ControlError as exc:
                 result.update(ready=False, error_code=exc.code, properties=None)
             return result
@@ -334,23 +310,18 @@ class ControlService:
                 for e in list_catalog(self.db, self.data_dir)
                 if e.file_present
             ],
+            **action_catalog(),
         }
 
+    def available_actions(self) -> dict[str, Any]:
+        self._session()
+        return action_catalog()
+
     def _patch(self, payload: Any) -> dict[str, Any]:
-        patch = shape(payload, set(LIMITS) | {"creative_lut_id"})
-        if not patch:
-            raise ControlError("INVALID_PROPERTIES", 400)
-        for key, value in patch.items():
-            if key in LIMITS:
-                low, high = LIMITS[key]
-                if type(value) is not int or not low <= value <= high:
-                    raise ControlError("INVALID_PROPERTIES", 400)
-            elif value is not None and (
-                not isinstance(value, str)
-                or not re.fullmatch(r"[a-f0-9]{32}\.cube", value)
-            ):
-                raise ControlError("INVALID_PROPERTIES", 400)
-        return patch
+        try:
+            return parse_properties_patch(payload)
+        except ActionValidationError as exc:
+            raise ControlError(exc.code, 400) from None
 
     def _check(self, body: dict[str, Any], state: dict[str, Any]) -> None:
         self._session(body["session_id"])
@@ -496,13 +467,18 @@ class ControlService:
                 self._check(target, state)
                 expected_fingerprint = self._fingerprint(target["project_id"])
                 clip = self._clip(target["project_id"], target["clip_id"])
+                available_luts = lut_catalog(self.db, self.data_dir)
                 if target["type"] == "undo_last_change":
                     # Capture canonical values from the existing undo snapshot before commit.
                     from orga_drone.studio_history import guarded_undo_values
 
                     raw = guarded_undo_values(self.db, target["project_id"], clip.id)
-                    self._merge(raw, {"contrast": self.properties(raw)["contrast"]})
-                    canonical = self._canonical(raw)
+                    self._merge(
+                        raw,
+                        {"contrast": properties(raw)["contrast"]},
+                        available_luts,
+                    )
+                    canonical = action_canonical(raw)
                     self._session(body["session_id"])
                     if self.clock() > cmd["deadline"]:
                         raise ControlError("COMMAND_EXPIRED")
@@ -511,11 +487,11 @@ class ControlService:
                     self.latest_external = None
                     no_op = False
                 else:
-                    raw = self._merge(clip.effect_settings, target["properties"])
-                    canonical = self._canonical(raw)
-                    no_op = self.properties(raw) == self.properties(
-                        clip.effect_settings
+                    raw = self._merge(
+                        clip.effect_settings, target["properties"], available_luts
                     )
+                    canonical = action_canonical(raw)
+                    no_op = properties(raw) == properties(clip.effect_settings)
                     self._session(body["session_id"])
                     if self.clock() > cmd["deadline"]:
                         raise ControlError("COMMAND_EXPIRED")
@@ -566,50 +542,21 @@ class ControlService:
                 cmd["result"].update(status="rejected", error_code="DATABASE_ERROR")
             return dict(cmd["result"])
 
-    def _canonical(self, raw: str) -> dict[str, Any]:
-        return {
-            "properties": self.properties(raw),
-            "image": image_adjust_from_effect_settings(raw).as_dict(),
-            "color_look": color_look_from_effect_settings(raw).as_dict(),
-        }
-
-    def _merge(self, raw: str, patch: dict[str, Any]) -> str:
-        data = json.loads(raw or "{}")
-        image_patch = {}
-        if "contrast" in patch:
-            image_patch["contrast"] = patch["contrast"]
-        if "saturation_percent" in patch:
-            image_patch["saturation"] = patch["saturation_percent"] - 100
-        current_image = image_adjust_from_effect_settings(raw)
-        image = (
-            parse_image_adjust_patch(image_patch, current_image)
-            if image_patch
-            else current_image
+    def _merge(
+        self,
+        raw: str,
+        patch: dict[str, Any],
+        available_luts: set[str] | None = None,
+    ) -> str:
+        catalog = (
+            available_luts
+            if available_luts is not None
+            else lut_catalog(self.db, self.data_dir)
         )
-        color_data = color_look_from_effect_settings(raw).as_dict()
-        if "creative_lut_id" in patch:
-            color_data["creative_lut"] = patch["creative_lut_id"] or ""
-        if "creative_lut_strength_percent" in patch:
-            color_data["creative_strength"] = patch["creative_lut_strength_percent"]
-        color = parse_color_look_payload(color_data)
-        catalog = {
-            entry.asset_name
-            for entry in list_catalog(self.db, self.data_dir)
-            if entry.file_present
-        }
-        for name in (color.creative_lut, color.conversion_lut):
-            if name:
-                try:
-                    if name not in catalog:
-                        raise ValueError
-                    require_lut_asset(self.data_dir, name)
-                except Exception:
-                    raise ControlError("LUT_UNAVAILABLE", 400) from None
-        if image_patch:
-            data["image"] = dict(data.get("image", {}), **image.as_dict())
-        if "creative_lut_id" in patch or "creative_lut_strength_percent" in patch:
-            data["color"] = dict(data.get("color", {}), **color.as_dict())
-        return json.dumps(data, separators=(",", ":"), sort_keys=True)
+        try:
+            return merge_properties(raw, patch, catalog, self.data_dir)
+        except ActionValidationError as exc:
+            raise ControlError(exc.code, 400) from None
 
     def acknowledge(self, payload: Any) -> dict[str, Any]:
         body = shape(

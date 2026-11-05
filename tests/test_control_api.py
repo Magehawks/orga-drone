@@ -661,3 +661,38 @@ def test_rejected_requests_preserve_token_and_guarded_undo(control, foreign):
     assert service.editor_state()["state_token"] == token
     undo = command(service, sid, state, kind="undo_last_change")
     assert execute(service, sid, state, undo)["persisted"]
+
+
+def test_action_discovery_is_versioned_and_authenticated(control):
+    client, _, _, _, _, headers = control
+    actions = client.get("/api/control/v1/actions", headers=headers)
+    assert actions.status_code == 200
+    payload = actions.json()
+    assert payload["contract_version"] == 1
+    assert payload["actions"][0]["name"] == "clip.color.properties"
+    controls = client.get("/api/control/v1/available-controls", headers=headers)
+    assert controls.json()["contract_version"] == 1
+    assert controls.json()["actions"] == payload["actions"]
+    assert client.get("/api/control/v1/actions").status_code == 401
+
+
+def test_control_and_ui_use_the_same_color_domain_result(control, tmp_path):
+    client, db, service, sid, state, headers = control
+    pid = state["project_id"]
+    clip_b = _seed(db, tmp_path / "second-media", "B.MP4", 10, project_id=pid)
+    edit = command(
+        service,
+        sid,
+        state,
+        {"contrast": 15, "saturation_percent": 120},
+    )
+    assert execute(service, sid, state, edit)["persisted"]
+    response = client.patch(
+        f"/api/studio/{clip_b}/image",
+        json={"contrast": 15, "saturation": 20},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    stored_a = json.loads(raw(db, pid, state["clip_id"]))
+    stored_b = json.loads(raw(db, pid, clip_b))
+    assert stored_a["image"] == stored_b["image"]
