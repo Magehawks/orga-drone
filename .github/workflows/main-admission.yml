@@ -25,7 +25,6 @@ jobs:
     timeout-minutes: 5
     steps:
       # The PR may change policy code; evaluate only the immutable base version.
-      # PR B itself has no base policy yet and must fail, not bootstrap a pass.
       - name: Checkout base policy
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -37,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Evaluate candidate (blocked pending issue 262)
+      - name: Evaluate candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: python packaging/main_admission.py

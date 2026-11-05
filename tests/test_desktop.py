@@ -611,3 +611,37 @@ def test_unpackaged_desktop_failure_falls_back_to_browser(
     mainmod.main()
     assert browser_calls == [1]
 
+
+def test_test_remote_debugging_requires_both_env_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import types
+
+    fake_webview = types.SimpleNamespace(settings={})
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)  # type: ignore[arg-type]
+    monkeypatch.delenv("ORGA_DRONE_E2E", raising=False)
+    monkeypatch.setenv("ORGA_DRONE_CDP_PORT", "9333")
+    desktop.configure_test_remote_debugging()
+    assert fake_webview.settings == {}
+
+    monkeypatch.setenv("ORGA_DRONE_E2E", "1")
+    monkeypatch.delenv("ORGA_DRONE_CDP_PORT", raising=False)
+    desktop.configure_test_remote_debugging()
+    assert fake_webview.settings == {}
+
+    monkeypatch.setenv("ORGA_DRONE_CDP_PORT", "9333")
+    desktop.configure_test_remote_debugging()
+    assert fake_webview.settings["REMOTE_DEBUGGING_PORT"] == 9333
+
+
+@pytest.mark.parametrize("port", ["not-a-port", "0", "65536"])
+def test_test_remote_debugging_rejects_invalid_ports(
+    monkeypatch: pytest.MonkeyPatch, port: str
+) -> None:
+    import types
+
+    monkeypatch.setitem(sys.modules, "webview", types.SimpleNamespace(settings={}))  # type: ignore[arg-type]
+    monkeypatch.setenv("ORGA_DRONE_E2E", "1")
+    monkeypatch.setenv("ORGA_DRONE_CDP_PORT", port)
+    with pytest.raises(RuntimeError):
+        desktop.configure_test_remote_debugging()
