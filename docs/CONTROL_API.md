@@ -49,9 +49,31 @@ This is not isolation from a malicious process already controlling the local app
 - `GET /api/control/v1/editor-state`: session/project/clip IDs, playhead, playback,
   readiness, busy flag, opaque state token, and supported current properties.
 - `GET /api/control/v1/available-controls`: ranges and available imported creative
-  LUT IDs/display names. No filesystem paths or media URLs are returned.
+  LUT IDs/display names. No filesystem paths or media URLs are returned. Also
+  includes the shared action catalog and contract version.
+- `GET /api/control/v1/actions`: versioned shared action catalog without paths or
+  credentials.
 - `POST /api/control/v1/commands`: admit an expiring command; it initially queues.
 - `GET /api/control/v1/commands/{command_id}`: retrieve its original outcome.
+
+## Shared action contract
+
+`studio_actions.py` is the transport-neutral action boundary. The Studio UI
+routes and this Control API use the same image/color validators, merge rules,
+and canonical values; the Control API does not own a second editor. The
+capability response exposes only implemented actions:
+
+```json
+{"contract_version":1,
+ "actions":[{"name":"clip.color.properties","version":1,"scope":"clip",
+ "target":"video_clip","reversible":true,
+ "parameters":{"contrast":{"type":"integer","minimum":-100,"maximum":100}}}]}
+```
+
+Additive actions and parameters keep `/api/control/v1`. Removing or renaming a
+field, changing units or target meaning, or changing existing validation
+requires `/api/control/v2`. The existing `set_clip_properties` command keeps its
+v1 payload and meaning.
 
 Strict JSON bodies are limited to 8192 bytes. Unknown fields and command types
 are rejected. Integers exclude booleans and fractions. Omitted properties stay
