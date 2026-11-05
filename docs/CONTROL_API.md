@@ -32,6 +32,11 @@ rejects pending commands; committed outcomes remain committed. Closing the edito
 expires its lease after three seconds; reopen and explicitly enable again.
 A second live editor is rejected and cannot take over the first editor's session.
 
+Original/reuse previews are temporary source previews, not editable Story clips.
+While one is open, editor state reports `clip_id: null` and `ready: false`.
+Cancelling restores the previous selection if it is still present. Selection
+revision also advances for local interactions; it is not a count of clip changes.
+
 Activation requires a configured loopback bind and a loopback peer. Existing Host
 and Origin protection is unchanged. A local client must send both a bearer token
 and the exact application Origin on writes (scheme, host, and port must match).
