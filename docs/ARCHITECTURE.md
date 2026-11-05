@@ -215,7 +215,7 @@ media writes. Map/HUD writes now participate in the existing Story history guard
 Manual mutation requests conservatively invalidate control tokens; project
 fingerprints also protect against changes outside Story snapshots.
 
-See [Control API v1](CONTROL_API.md) and ADR 0031. This is the application boundary
+See [Control API v1](CONTROL_API.md) and ADR 0032. This is the application boundary
 for a future separate MCP adapter; no MCP server or provider connectivity ships here.
 
 ## Related docs

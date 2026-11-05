@@ -169,3 +169,77 @@ def test_pr_journey_import_browse_and_studio(
     still_indexed = client.get("/browse")
     assert _FILENAME in still_indexed.text
     assert photo.is_file()
+
+
+def test_scan_story_export_real_mp4(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """HTTP scan through MP4 publication; decode both clips to prove completeness."""
+    import subprocess
+
+    from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg not available")
+    isolated = Settings(data_dir=tmp_path / "data")
+    monkeypatch.setattr("orga_drone.app_prefs.settings", isolated)
+    monkeypatch.setattr("orga_drone.studio_export.settings", isolated)
+    client = _client(tmp_path, monkeypatch)
+    client.get("/lang/en")
+    lib = tmp_path / "library"
+    lib.mkdir()
+    for name, color in (("first.jpg", "red"), ("second.png", "blue")):
+        Image.new("RGB", (160, 120), color).save(lib / name)
+    originals = {p.name: p.read_bytes() for p in lib.iterdir()}
+    response = client.post("/library/add", data={"path": str(lib), "label": "Export journey"}, follow_redirects=False)
+    job_id = response.headers["location"].split("scan_job=", 1)[1].split("&", 1)[0]
+    assert _wait_scan(client, job_id)["state"] == "completed"
+    project_id = client.post("/api/studio/projects", json={"title": "Export journey"}).json()["id"]
+    assert client.post(f"/api/studio/projects/{project_id}/open").status_code == 200
+    for name in originals:
+        media = client.post("/api/search", json={"q": name}).json()["items"][0]
+        assert client.post(f"/media/{media['id']}/studio/add", follow_redirects=False).status_code == 303
+    studio = client.get("/studio")
+    assert studio.status_code == 200
+    assert 'data-filename="first.jpg"' in studio.text
+    assert 'data-filename="second.png"' in studio.text
+    options = client.get("/api/studio/export/options", params={"project_id": project_id}).json()
+    assert options["readiness"] == "ready"
+    assert [o["height"] for o in options["options"]] == [720, 1080]
+    out = tmp_path / "journey.mp4"
+    response = client.post("/api/studio/export", json={"project_id": project_id, "height": 720, "output_path": str(out)})
+    assert response.status_code == 200, response.text
+    export_id = response.json()["job_id"]
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        job = client.get(f"/api/studio/export/jobs/{export_id}").json()
+        if job["state"] in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(0.05)
+    assert job["state"] == "completed", job
+    assert out.is_file() and out.stat().st_size > 0
+    info = subprocess.run([ffmpeg, "-hide_banner", "-i", str(out)], capture_output=True, text=True, timeout=30, **subprocess_no_window_kwargs())
+    duration = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", info.stderr)
+    assert duration is not None, info.stderr
+    hours, minutes, seconds = map(float, duration.groups())
+    assert hours * 3600 + minutes * 60 + seconds == pytest.approx(6.0, abs=0.1)
+    # Decode the entire MP4. At 1 fps, two default 3-second photos yield six frames.
+    decoded = subprocess.run([ffmpeg, "-v", "error", "-i", str(out), "-vf", "fps=1,scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, timeout=30, **subprocess_no_window_kwargs())
+    assert decoded.returncode == 0, decoded.stderr
+    frames = list(zip(*[iter(decoded.stdout)] * 3))
+    assert len(frames) == 6
+    assert all(r > b + 100 for r, g, b in frames[:3])
+    assert all(b > r + 100 for r, g, b in frames[3:])
+    assert {p.name: p.read_bytes() for p in lib.iterdir() if p.name in originals} == originals
+
+    # A source lost after options were loaded must be rejected before a new job.
+    (lib / "second.png").unlink()
+    unavailable = client.get("/api/studio/export/options", params={"project_id": project_id}).json()
+    assert unavailable["readiness"] == "unavailable_sources"
+    assert unavailable["options"] == []
+    client.get("/lang/de")
+    rejected = client.post("/api/studio/export", json={"project_id": project_id, "height": 720, "output_path": str(tmp_path / "rejected.mp4")})
+    assert rejected.status_code == 400
+    assert "second.png" in rejected.json()["detail"]
+    assert "Originaldatei" in rejected.json()["detail"]
+    assert not (tmp_path / "rejected.mp4").exists()
+    assert 'data-filename="second.png"' in client.get("/studio").text

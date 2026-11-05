@@ -3443,7 +3443,11 @@ def create_app() -> FastAPI:
     @app.post("/api/studio/export")
     async def api_studio_export(request: Request) -> JSONResponse:
         from orga_drone.export.studio_encoder import StudioExportError
-        from orga_drone.studio_export import prepare_studio_export, run_studio_export
+        from orga_drone.studio_export import (
+            prepare_studio_export,
+            run_studio_export,
+            translate_export_error,
+        )
 
         try:
             payload = await request.json()
@@ -3478,7 +3482,7 @@ def create_app() -> FastAPI:
                 quality=quality,
             )
         except StudioExportError as exc:
-            msg = translate(str(exc))
+            msg = translate_export_error(exc, translate)
             status = 409 if "already exists" in str(exc).lower() else 400
             raise HTTPException(status_code=status, detail=msg) from exc
 
@@ -3504,6 +3508,8 @@ def create_app() -> FastAPI:
         translate: Callable[[str], str],
     ) -> JSONResponse:
         from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+
+        from orga_drone.studio_export import translate_export_error
 
         store: ExportJobStore = app.state.export_jobs
         job = store.try_create()
@@ -3533,7 +3539,7 @@ def create_app() -> FastAPI:
                 if cancel_event is not None and cancel_event.is_set():
                     store.finish_cancelled(job.id)
                 else:
-                    store.fail(job.id, translate(str(exc)))
+                    store.fail(job.id, translate_export_error(exc, translate))
             except Exception as exc:  # noqa: BLE001
                 if cancel_event is not None and cancel_event.is_set():
                     store.finish_cancelled(job.id)

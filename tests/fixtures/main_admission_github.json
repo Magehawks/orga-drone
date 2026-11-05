@@ -1,0 +1,192 @@
+{
+  "source": "GitHub REST read-only snapshot, 2026-11-04; PR #265 before hardening",
+  "run": {
+    "id": 41916224480,
+    "run_attempt": 1,
+    "path": ".github/workflows/ci.yml",
+    "event": "pull_request",
+    "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+    "status": "completed",
+    "conclusion": "success",
+    "check_suite_id": 113586341896,
+    "pull_requests": [
+      {
+        "url": "https://api.github.com/repos/Magehawks/orga-drone/pulls/265",
+        "id": 5161887778,
+        "number": 265,
+        "head": {
+          "ref": "codex/261-main-admission-policy",
+          "sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+          "repo": {
+            "id": 1306027045,
+            "url": "https://api.github.com/repos/Magehawks/orga-drone",
+            "name": "orga-drone"
+          }
+        },
+        "base": {
+          "ref": "main",
+          "sha": "7b3ba3a5871314decba592a1fc835d8b103d187f",
+          "repo": {
+            "id": 1306027045,
+            "url": "https://api.github.com/repos/Magehawks/orga-drone",
+            "name": "orga-drone"
+          }
+        }
+      }
+    ],
+    "repository": {
+      "full_name": "Magehawks/orga-drone"
+    }
+  },
+  "jobs": [
+    {
+      "id": 126876499177,
+      "name": "JavaScript lint, format and tests",
+      "run_id": 41916224480,
+      "run_attempt": 1,
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "check_run_url": "https://api.github.com/repos/Magehawks/orga-drone/check-runs/126876499177"
+    },
+    {
+      "id": 126876499546,
+      "name": "Ruff, MyPy and unit tests",
+      "run_id": 41916224480,
+      "run_attempt": 1,
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "check_run_url": "https://api.github.com/repos/Magehawks/orga-drone/check-runs/126876499546"
+    },
+    {
+      "id": 126876499740,
+      "name": "App journey smoke",
+      "run_id": 41916224480,
+      "run_attempt": 1,
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "check_run_url": "https://api.github.com/repos/Magehawks/orga-drone/check-runs/126876499740"
+    }
+  ],
+  "checks": [
+    {
+      "id": 126876499740,
+      "name": "App journey smoke",
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113586341896
+      },
+      "pull_requests": [
+        {
+          "url": "https://api.github.com/repos/Magehawks/orga-drone/pulls/265",
+          "id": 5161887778,
+          "number": 265,
+          "head": {
+            "ref": "codex/261-main-admission-policy",
+            "sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          },
+          "base": {
+            "ref": "main",
+            "sha": "7b3ba3a5871314decba592a1fc835d8b103d187f",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          }
+        }
+      ],
+      "details_url": "https://github.com/Magehawks/orga-drone/actions/runs/41916224480/job/126876499740"
+    },
+    {
+      "id": 126876499546,
+      "name": "Ruff, MyPy and unit tests",
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113586341896
+      },
+      "pull_requests": [
+        {
+          "url": "https://api.github.com/repos/Magehawks/orga-drone/pulls/265",
+          "id": 5161887778,
+          "number": 265,
+          "head": {
+            "ref": "codex/261-main-admission-policy",
+            "sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          },
+          "base": {
+            "ref": "main",
+            "sha": "7b3ba3a5871314decba592a1fc835d8b103d187f",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          }
+        }
+      ],
+      "details_url": "https://github.com/Magehawks/orga-drone/actions/runs/41916224480/job/126876499546"
+    },
+    {
+      "id": 126876499177,
+      "name": "JavaScript lint, format and tests",
+      "head_sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113586341896
+      },
+      "pull_requests": [
+        {
+          "url": "https://api.github.com/repos/Magehawks/orga-drone/pulls/265",
+          "id": 5161887778,
+          "number": 265,
+          "head": {
+            "ref": "codex/261-main-admission-policy",
+            "sha": "39d58883a3ce6eae97fbbf3c5dd7b15b2af2dc25",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          },
+          "base": {
+            "ref": "main",
+            "sha": "7b3ba3a5871314decba592a1fc835d8b103d187f",
+            "repo": {
+              "id": 1306027045,
+              "url": "https://api.github.com/repos/Magehawks/orga-drone",
+              "name": "orga-drone"
+            }
+          }
+        }
+      ],
+      "details_url": "https://github.com/Magehawks/orga-drone/actions/runs/41916224480/job/126876499177"
+    }
+  ]
+}

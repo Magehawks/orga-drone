@@ -147,9 +147,11 @@ are not part of the app and the workflow fails if they appear in `dist/orga-dron
 
 Merging a pull request does **not** build or publish a release. Pull requests
 run `.github/workflows/ci.yml` (Ruff, MyPy, pytest, and the App journey smoke
-in `docs/PR_E2E.md`). The release workflow calls that same workflow and **does
-not package** if it fails. The journey smoke is a synthetic library path. It
-does not replace the Mark-of-the-Web checklist below.
+in `docs/PR_E2E.md`). PRs targeting `main` also run **Windows packaged E2E**,
+which builds the onefolder ZIP and tests the extracted EXE with WebView2. The
+release workflow calls the CI workflow and **does not package** if it fails.
+The journey smoke and packaged E2E are synthetic paths. Neither replaces the
+Mark-of-the-Web checklist below.
 
 ### When it runs
 
@@ -184,7 +186,55 @@ tag `v1.9.0`. Do not create the tag from an open pull request if you expect
 the workflow to publish; the workflow refuses a mismatch and never publishes
 on merge alone.
 
-### Artifacts
+### Packaged Windows E2E (promotion gate)
+
+Workflow: `.github/workflows/windows-e2e.yml`. It runs on PRs to `main` and
+never publishes. It builds `dist/orga-drone` once, zips it, extracts the ZIP to
+a temporary directory, and launches the extracted `orga-drone.exe` with the
+Evergreen WebView2 Runtime. The harness in `packaging/e2e/windows_e2e.py` uses
+synthetic media and CDP (enabled only by `ORGA_DRONE_E2E=1` plus
+`ORGA_DRONE_CDP_PORT`) to check startup, import, Browse/detail, Studio open,
+playback, edit persistence after reload/relaunch, a 720p export decoded from
+the packaged FFmpeg, and unchanged source files.
+
+Artifacts, kept 30 days:
+
+| Name | Contents |
+| --- | --- |
+| `orga-drone-windows-e2e-<attempt>-<head>` | The tested ZIP (`orga-drone-windows-x64.zip`) |
+| `windows-e2e-evidence-<attempt>-<head>` | Only `evidence.json` (the admission input) |
+| `windows-e2e-diagnostics-<attempt>-<head>` | Screenshots and app logs (not admission input) |
+
+`evidence.json` records the PR head/base, merge SHA and Git tree, run/attempt,
+ZIP SHA-256/size, app/WebView2 versions, runner image, and per-journey results.
+Admission rejects missing, failed, expired, stale, partial-rerun, or mismatched
+evidence. The workflow and harness files must be unchanged between the PR base
+and head.
+
+After a head or base change, push/update the PR (a fresh `synchronize`,
+`ready_for_review`, or `reopened` event) or open a fresh PR event; a native
+workflow re-run keeps the original event/merge SHA and will fail the live
+binding. If a partial CI rerun lost jobs, rerun the whole E2E run first. Do not
+reuse an older green E2E artifact for a different candidate. Download the
+evidence artifact and app logs for diagnosis; the job summary prints the
+evidence result and ZIP SHA-256. This automation does **not** replace the
+MOTW/native-dialog smoke test below.
+
+#### Runner decision
+
+The gate uses a standard GitHub-hosted `windows-latest` runner. Standard
+GitHub-hosted runners are free for public repositories; no paid larger runner,
+self-hosted runner, or persistent credential is used. Self-hosting would add
+runner maintenance, credential/network exposure, and a separate security review,
+so it is not used for this slice. The Phase 0 spike proved the packaged
+WebView2/CDP path on `windows-latest` ([run 41923788646](https://github.com/Magehawks/orga-drone/actions/runs/41923788646)),
+and the full E2E passed on PR #266 ([run 41989019385](https://github.com/Magehawks/orga-drone/actions/runs/41989019385)).
+The job installs the Microsoft-signed Evergreen WebView2 Runtime when absent and
+records its version in `evidence.json`. If hosted Windows runners or WebView2
+become unavailable, keep admission fail-closed and use the local PyInstaller
+build plus the human MOTW checklist; do not bypass the gate.
+
+### Release artifacts
 
 | Name | Where | What it is |
 | --- | --- | --- |

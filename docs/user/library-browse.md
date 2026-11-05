@@ -12,4 +12,5 @@
 
 - Page size can be 50, 100, or 200. You can add the current page to Studio in bulk.
 - Timeline in Browse groups by recording date. It is not the Studio story editor.
+- In **Ask the library**, a whole query ending in a supported photo or video extension is treated as literal search text. For example, `Video Thumbnail.jpg` does not select the Videos filter. This also applies to sentence-like queries ending in an extension; selected filters still restrict the results. Text matching remains token-based, not an exact-filename match.
 - Likely duplicates are listed for review; nothing is deleted automatically.

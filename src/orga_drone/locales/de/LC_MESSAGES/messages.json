@@ -888,5 +888,7 @@
   "Connection lost. Reopen Studio and enable external control again.": "Verbindung unterbrochen. Öffne Studio erneut und aktiviere die externe Steuerung.",
   "Could not enable external control. Check the pairing key.": "Externe Steuerung konnte nicht aktiviert werden. Prüfe den Kopplungsschlüssel.",
   "Inspector updated. Preview refresh requested.": "Inspektor aktualisiert. Vorschau wird neu angefordert.",
-  "A change could not be saved. Reopen Studio before using external control.": "Eine Änderung konnte nicht gespeichert werden. Öffne Studio erneut, bevor du die externe Steuerung verwendest."
+  "A change could not be saved. Reopen Studio before using external control.": "Eine Änderung konnte nicht gespeichert werden. Öffne Studio erneut, bevor du die externe Steuerung verwendest.",
+  "The Story is empty. Add a photo, video, or title card before exporting.": "Die Story ist leer. Füge vor dem Export ein Foto, Video oder eine Titelkarte hinzu.",
+  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut."
 }

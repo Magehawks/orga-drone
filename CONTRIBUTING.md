@@ -150,6 +150,10 @@ rollback: [`packaging/README.md`](packaging/README.md).
 
 ## Pull requests
 
+The [proposed develop/main strategy and migration runbook](docs/BRANCH_MIGRATION.md)
+is documentation for issue #261, not an activated branch policy. Until a separately
+approved cutover, `main` remains the default and the target for new PRs.
+
 1. Branch from `main` (default branch).
 2. Keep commits readable; squash locally if you prefer one commit per PR.
 3. Update docs when behavior or setup changes.

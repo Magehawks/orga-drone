@@ -1,0 +1,42 @@
+name: Main admission
+
+on:
+  pull_request:
+    branches: [main]
+    # Label changes are an explicit fresh-candidate recheck after CI/review changes.
+    # No label value authorizes admission, and no conditional job can skip this gate.
+    types: [opened, synchronize, reopened, edited, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  actions: read
+  issues: read
+
+concurrency:
+  group: main-admission-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  admission:
+    name: Main admission policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The PR may change policy code; evaluate only the immutable base version.
+      - name: Checkout base policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Evaluate candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python packaging/main_admission.py

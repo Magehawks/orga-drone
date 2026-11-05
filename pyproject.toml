@@ -30,6 +30,7 @@ dev = [
   "ruff>=0.8",
   "mypy>=1.13",
   "httpx2>=2.0",
+  "websocket-client>=1.8,<2",
 ]
 
 [project.scripts]
@@ -69,5 +70,6 @@ module = [
   "imageio_ffmpeg",
   "pillow_heif",
   "pythonnet",
+  "websocket",
 ]
 ignore_missing_imports = true

@@ -1,4 +1,4 @@
-# ADR 0031: Opt-in local Studio Control API v1
+# ADR 0032: Opt-in local Studio Control API v1
 
 Status: Accepted for issue #255 (PM/UX/CTO approved).
 

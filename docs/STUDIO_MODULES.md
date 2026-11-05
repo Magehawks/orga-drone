@@ -27,7 +27,7 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   imports the entry, saves clip properties itself, or simulates editing clicks.
   Canonical values use existing image/color writers and invalidate existing
   preview/proxy caches. Preview acknowledgement means refresh requested, not
-  confirmed rendering. See `docs/CONTROL_API.md` and ADR 0031.
+  confirmed rendering. See `docs/CONTROL_API.md` and ADR 0032.
 
 - `studio.js` is an ES module entry (IIFE internally) with roughly 465 function
   declarations.

@@ -626,6 +626,34 @@ def wait_server_ready(host: str, port: int, timeout_s: float = 25.0) -> bool:
     return wait_http(f"http://{host}:{port}/", timeout_s=2.0)
 
 
+def configure_test_remote_debugging() -> None:
+    """Expose a loopback CDP port only for an explicit packaged E2E run.
+
+    Requires both ``ORGA_DRONE_E2E=1`` and ``ORGA_DRONE_CDP_PORT``. This is test
+    instrumentation for the Windows packaged E2E workflow; normal launches never
+    set either variable, so no debugging port is opened.
+    """
+    enabled = os.getenv("ORGA_DRONE_E2E", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    raw_port = os.getenv("ORGA_DRONE_CDP_PORT", "").strip()
+    if not enabled or not raw_port:
+        return
+    try:
+        cdp_port = int(raw_port)
+    except ValueError as exc:
+        raise RuntimeError("ORGA_DRONE_CDP_PORT must be an integer") from exc
+    if not 1 <= cdp_port <= 65535:
+        raise RuntimeError("ORGA_DRONE_CDP_PORT must be between 1 and 65535")
+    import webview
+
+    webview.settings["REMOTE_DEBUGGING_PORT"] = cdp_port
+    _LOG.info("packaged E2E remote debugging enabled on 127.0.0.1:%s", cdp_port)
+
+
 def run_desktop(
     app: Any,
     *,
@@ -639,6 +667,7 @@ def run_desktop(
     """Serve FastAPI in a background thread and open a native webview window."""
     import webview
 
+    configure_test_remote_debugging()
     log_path = configure_stdio_and_logging()
     _LOG.info("desktop shell starting (host=%s preferred_port=%s)", host, port)
 
