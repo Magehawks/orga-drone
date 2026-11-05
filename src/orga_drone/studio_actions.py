@@ -14,6 +14,7 @@ changing an existing command.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -342,11 +343,11 @@ def _validate_wheel_params(params: Any) -> dict[str, Any]:
         if not value or set(value) - {"x", "y"}:
             raise ActionValidationError("INVALID_PARAMS")
         for number in value.values():
-            if (
-                isinstance(number, bool)
-                or not isinstance(number, (int, float))
-                or not POINT_MIN <= float(number) <= POINT_MAX
-            ):
+            if isinstance(number, bool) or not isinstance(number, (int, float)):
+                raise ActionValidationError("INVALID_PARAMS")
+            if isinstance(number, float) and not math.isfinite(number):
+                raise ActionValidationError("INVALID_PARAMS")
+            if not POINT_MIN <= number <= POINT_MAX:
                 raise ActionValidationError("INVALID_PARAMS")
     return dict(params)
 

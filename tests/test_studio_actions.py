@@ -311,6 +311,7 @@ def test_properties_action_is_validated_by_the_shared_registry() -> None:
         ("clip.color.wheels", {"wheels": {"bogus": {"x": 0}}}, "INVALID_PARAMS"),
         ("clip.color.wheels", {"wheels": {"shadows": {"x": 2}}}, "INVALID_PARAMS"),
         ("clip.color.wheels", {"wheels": {"shadows": {"x": True}}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", {"wheels": {"shadows": {"x": 10**400}}}, "INVALID_PARAMS"),
         ("clip.effects.detail", {"sharpen": 1.5}, "INVALID_PARAMS"),
         ("clip.effects.detail", {"sharpen": 1, "unknown": 2}, "INVALID_PARAMS"),
         ("clip.color.look", {"conversion_confirmed": "yes"}, "INVALID_PARAMS"),

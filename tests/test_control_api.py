@@ -855,7 +855,13 @@ def test_color_look_action_and_ui_routes_share_the_same_domain_result(control, t
         ("clip.color.image", 1, {"unknown": 1}, "INVALID_PARAMS"),
         ("clip.color.look", 1, {"input_profile": "bad"}, "INVALID_PARAMS"),
         ("clip.color.hsl", 1, {"ranges": {}}, "INVALID_PARAMS"),
-        ("clip.color.wheels", 1, {"wheels": {}}, "INVALID_PARAMS"),
+("clip.color.wheels", 1, {"wheels": {}}, "INVALID_PARAMS"),
+        (
+            "clip.color.wheels",
+            1,
+            {"wheels": {"shadows": {"x": 10**400}}},
+            "INVALID_PARAMS",
+        ),
         ("clip.effects.detail", 1, {"sharpen": 101}, "INVALID_PARAMS"),
     ],
 )
