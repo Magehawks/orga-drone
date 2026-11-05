@@ -211,11 +211,14 @@ Admission rejects missing, failed, expired, stale, partial-rerun, or mismatched
 evidence. The workflow and harness files must be unchanged between the PR base
 and head.
 
-Re-run the **Windows packaged E2E** workflow after changing the head or base, or
-after a partial rerun that lost jobs. Do not reuse an older green E2E artifact
-for a different candidate. Download the evidence artifact and app logs for
-diagnosis; the job summary prints the evidence result and ZIP SHA-256. This
-automation does **not** replace the MOTW/native-dialog smoke test below.
+After a head or base change, push/update the PR (a fresh `synchronize`,
+`ready_for_review`, or `reopened` event) or open a fresh PR event; a native
+workflow re-run keeps the original event/merge SHA and will fail the live
+binding. If a partial CI rerun lost jobs, rerun the whole E2E run first. Do not
+reuse an older green E2E artifact for a different candidate. Download the
+evidence artifact and app logs for diagnosis; the job summary prints the
+evidence result and ZIP SHA-256. This automation does **not** replace the
+MOTW/native-dialog smoke test below.
 
 #### Runner decision
 

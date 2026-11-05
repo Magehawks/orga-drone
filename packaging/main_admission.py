@@ -466,6 +466,8 @@ def collect_packaged_e2e(
     try:
         selected = newest_workflow_run(api, pr, E2E_WORKFLOW_FILE)
         run = validated_run(api, pr, selected, E2E_WORKFLOW_PATH)
+        if run.get("status") != "completed" or run.get("conclusion") != "success":
+            raise ValueError("Packaged E2E workflow run was not successful")
         attempt = run["run_attempt"]
         head = pr["head"]["sha"]
         repo = pr["base"]["repo"]["full_name"]
