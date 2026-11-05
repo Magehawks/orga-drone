@@ -6753,9 +6753,9 @@ import {
     setClipRemoveAction(removeForm, clip.dataset.studioId);
   }
 
-  function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
+  function selectClip(id, { movePlayhead = true, seekTimeS = null, controlRestore = false } = {}) {
     if (reuseDraft) cancelReuseDraft();
-    controlBridge?.noteLocalChange();
+    if (!controlRestore) controlBridge?.noteLocalChange();
     state.selected = { type: "clip", id: String(id) };
     const clip = findClip(grid, id);
     if (!clip) {
@@ -11530,6 +11530,22 @@ import {
       await Promise.all([imageAdjustSaver.whenIdle(), detailControls.whenIdle(), colorSaveChain,
         imageSaveChain, hslSaveChain, colorWheelsSaveChain, maskSaveChain, frameSaveChain,
         overlaySaveChain, mapSaveChain]);
+    },
+    resumeSelection: (id) => {
+      if (id !== null) {
+        if (!findClip(grid, id)) throw new Error("Timeline selection unavailable");
+        selectClip(String(id), { movePlayhead: false, controlRestore: true });
+      } else {
+        state.selected = { type: "none", id: null };
+        clips().forEach((clip) => {
+          clip.classList.remove("is-selected");
+          clip.removeAttribute("aria-selected");
+        });
+        showPlaceholder();
+        updateCutEnabled();
+        showInspector("inspector-empty");
+        updateRemoveEnabled();
+      }
     },
     applyProject: (result) => {
       if (result.project_id !== projectId) throw new Error("Project context changed");

@@ -17,6 +17,11 @@ export function createControlBridge({
   snapshot,
   whenIdle,
   applyCanonical,
+  resumeTicket = null,
+  resumeSelection = () => {},
+  reloadTimeline = () => {
+    throw new Error("Timeline reload unavailable");
+  },
   applyProject = () => {
     throw new Error("Project application unavailable");
   },
@@ -31,6 +36,7 @@ export function createControlBridge({
   let settling = null;
   let stopped = false;
   let uncertainProject = null;
+  let resumedCommand = null;
 
   function noteLocalChange() {
     revision += 1;
@@ -72,6 +78,44 @@ export function createControlBridge({
     if (running || stopped) return;
     running = true;
     try {
+      if (resumeTicket || resumedCommand) {
+        lockInput(true);
+        try {
+          if (resumeTicket) {
+            if (dirty) throw new Error("Local selection changed before resume");
+            const resumed = await request("resume", {
+              ticket: resumeTicket,
+              project_id: snapshot().project_id,
+            });
+            resumeTicket = null;
+            sessionId = resumed.session_id;
+            revision = resumed.selection_revision;
+            resumeSelection(resumed.selection_clip_id);
+            resumedCommand = resumed.command_id;
+            enabled = true;
+          }
+          await request("poll", { session_id: sessionId, state: readState() });
+          await request("ack", {
+            session_id: sessionId,
+            command_id: resumedCommand,
+            preview_status: "refresh_requested",
+          });
+          resumedCommand = null;
+          lockInput(false);
+        } catch (error) {
+          // Keep a one-use ticket on a network failure so the next tick can
+          // retry. A server rejection means the ticket is dead.
+          if (!error.code && resumeTicket) {
+            status("disconnected");
+            return;
+          }
+          resumeTicket = null;
+          if (error.code) resumedCommand = null;
+          if (!resumedCommand) lockInput(false);
+          status(error.code === "EDITOR_SESSION_CONFLICT" ? "conflict" : "disconnected");
+          return;
+        }
+      }
       if (enabled) void settle().catch(() => status("busy"));
       const polled = uncertainProject
         ? {
@@ -120,11 +164,30 @@ export function createControlBridge({
             } catch (error) {
               // This request may have committed a project switch. Retain the
               // lock until a recovery poll returns the original outcome.
-              if (command.scope === "project") uncertainProject = command.command_id;
+              if (["project", "timeline"].includes(command.scope))
+                uncertainProject = command.command_id;
               throw error;
             }
           }
           if (result.persisted && !result.ui_applied) {
+            if (result.scope === "timeline" && result.reload_required) {
+              if (!result.resume_ticket) throw new Error("Timeline resume unavailable");
+              stopped = true;
+              navigationCommitted = true;
+              reloadTimeline(result);
+              return;
+            }
+            if (result.scope === "timeline") {
+              const fresh = readState();
+              if (fresh.busy || fresh.playing) continue;
+              await request("ack", {
+                session_id: sessionId,
+                command_id: result.command_id,
+                preview_status: "unavailable",
+              });
+              status("applied");
+              continue;
+            }
             const projectAction = result.scope === "project";
             if (projectAction && result.navigation_required) {
               // The committed context is authoritative. A lost acknowledgement
@@ -246,6 +309,7 @@ export function mountControlUi({
   whenIdle,
   applyCanonical,
   applyProject,
+  resumeSelection,
   fetchImpl,
   hasWriteFailure = () => false,
 }) {
@@ -302,8 +366,31 @@ export function mountControlUi({
     pointerActive = false;
     keyActive = false;
   });
+  let resumeTicket;
+  const resumeKey = "orga-drone.timeline-resume";
+  try {
+    resumeTicket = window.sessionStorage.getItem(resumeKey);
+    window.sessionStorage.removeItem(resumeKey);
+  } catch {
+    resumeTicket = null;
+  }
+  const fallbackPrefix = resumeKey + ":";
+  if (!resumeTicket && window.name.startsWith(fallbackPrefix)) {
+    resumeTicket = window.name.slice(fallbackPrefix.length);
+    window.name = "";
+  }
   const bridge = createControlBridge({
     sessionId: crypto.randomUUID(),
+    resumeTicket,
+    resumeSelection,
+    reloadTimeline: (result) => {
+      try {
+        window.sessionStorage.setItem(resumeKey, result.resume_ticket);
+      } catch {
+        window.name = resumeKey + ":" + result.resume_ticket;
+      }
+      window.location.reload();
+    },
     request: createBridgeRequest(fetchImpl),
     snapshot: () => {
       const state = snapshot();

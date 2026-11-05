@@ -466,3 +466,241 @@ test("recovery of a rejected project command unlocks without changing context", 
   assert.deepEqual(calls, ["poll", "execute", "recover"]);
   assert.deepEqual(locks, [true, true, false]);
 });
+
+function timelineHarness(executeResult, { resumeTicket = null, resumeSelection = () => {} } = {}) {
+  const state = {
+    project_id: 1,
+    clip_id: 2,
+    playhead_s: 0,
+    playing: false,
+    busy: false,
+    ready: true,
+  };
+  const calls = [];
+  const reloads = [];
+  const statuses = [];
+  const bridge = createControlBridge({
+    sessionId: "old-editor",
+    resumeTicket,
+    resumeSelection,
+    reloadTimeline: (result) => reloads.push(result),
+    snapshot: () => state,
+    whenIdle: async () => {},
+    applyCanonical: () => "refresh_requested",
+    lockInput: () => {},
+    status: (value) => statuses.push(value),
+    request: async (action, body) => {
+      calls.push({ action, body });
+      if (action === "poll")
+        return {
+          enabled: true,
+          commands: [
+            {
+              command_id: "timeline-1",
+              status: "queued",
+              persisted: false,
+              scope: "timeline",
+            },
+          ],
+        };
+      if (action === "execute") return executeResult;
+      return {};
+    },
+  });
+  return { bridge, calls, reloads, statuses, state };
+}
+
+test("timeline commit with reload ticket reloads instead of acknowledging", async () => {
+  const h = timelineHarness({
+    command_id: "timeline-1",
+    persisted: true,
+    ui_applied: false,
+    scope: "timeline",
+    reload_required: true,
+    resume_ticket: "resume-ticket",
+    canonical: {},
+  });
+  await h.bridge.tick();
+  assert.deepEqual(
+    h.calls.map((call) => call.action),
+    ["poll", "execute"]
+  );
+  assert.equal(h.reloads.length, 1);
+  assert.equal(h.reloads[0].resume_ticket, "resume-ticket");
+});
+
+test("no-op timeline commit acknowledges without reloading or applying clip canonical", async () => {
+  let applied = 0;
+  const calls = [];
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    snapshot: () => ({
+      project_id: 1,
+      clip_id: 2,
+      playhead_s: 0,
+      playing: false,
+      busy: false,
+      ready: true,
+    }),
+    whenIdle: async () => {},
+    applyCanonical: () => {
+      applied += 1;
+      return "refresh_requested";
+    },
+    reloadTimeline: () => {
+      throw new Error("no reload expected");
+    },
+    lockInput: () => {},
+    status: () => {},
+    request: async (action) => {
+      calls.push(action);
+      if (action === "poll")
+        return {
+          enabled: true,
+          commands: [
+            {
+              command_id: "timeline-1",
+              status: "queued",
+              persisted: false,
+              scope: "timeline",
+            },
+          ],
+        };
+      if (action === "execute")
+        return {
+          command_id: "timeline-1",
+          persisted: true,
+          ui_applied: false,
+          scope: "timeline",
+          reload_required: false,
+          selection_clip_id: 2,
+          canonical: {},
+        };
+      return {};
+    },
+  });
+  await bridge.tick();
+  assert.equal(applied, 0);
+  assert.equal(calls.includes("ack"), true);
+  assert.equal(calls.includes("resume"), false);
+});
+
+test("resume ticket restores session and selection before acknowledging timeline commit", async () => {
+  const calls = [];
+  const resumed = [];
+  const bridge = createControlBridge({
+    sessionId: "fresh-editor",
+    resumeTicket: "resume-ticket",
+    resumeSelection: (id) => resumed.push(id),
+    snapshot: () => ({
+      project_id: 1,
+      clip_id: 2,
+      playhead_s: 0,
+      playing: false,
+      busy: false,
+      ready: true,
+    }),
+    whenIdle: async () => {},
+    applyCanonical: () => "refresh_requested",
+    reloadTimeline: () => {
+      throw new Error("no reload expected");
+    },
+    lockInput: () => {},
+    status: () => {},
+    request: async (action, body) => {
+      calls.push({ action, body });
+      if (action === "resume")
+        return {
+          session_id: "restored-editor",
+          selection_revision: 5,
+          selection_clip_id: 2,
+          command_id: "timeline-1",
+        };
+      if (action === "poll") return { enabled: true, commands: [] };
+      return {};
+    },
+  });
+  await bridge.tick();
+  assert.deepEqual(calls.map((call) => call.action).slice(0, 4), ["resume", "poll", "ack", "poll"]);
+  assert.deepEqual(resumed, [2]);
+  assert.equal(calls[1].body.session_id, "restored-editor");
+  assert.equal(calls[2].body.command_id, "timeline-1");
+  assert.equal(
+    calls.some((call) => call.action === "execute"),
+    false
+  );
+});
+
+test("transient resume failure keeps the ticket for retry and a rejection clears it", async () => {
+  let attempts = 0;
+  let resumed = false;
+  const resumedIds = [];
+  const bridge = createControlBridge({
+    sessionId: "fresh-editor",
+    resumeTicket: "resume-ticket",
+    resumeSelection: (id) => resumedIds.push(id),
+    snapshot: () => ({
+      project_id: 1,
+      clip_id: 2,
+      playhead_s: 0,
+      playing: false,
+      busy: false,
+      ready: true,
+    }),
+    whenIdle: async () => {},
+    applyCanonical: () => "refresh_requested",
+    lockInput: () => {},
+    status: () => {},
+    request: async (action) => {
+      if (action === "resume") {
+        attempts += 1;
+        if (attempts === 1) throw new Error("network down");
+        resumed = true;
+        return {
+          session_id: "restored-editor",
+          selection_revision: 1,
+          selection_clip_id: 2,
+          command_id: "timeline-1",
+        };
+      }
+      if (action === "poll") return { enabled: true, commands: [] };
+      return {};
+    },
+  });
+  await bridge.tick();
+  assert.equal(resumed, false);
+  await bridge.tick();
+  assert.equal(attempts, 2);
+  assert.equal(resumed, true);
+  assert.deepEqual(resumedIds, [2]);
+
+  let rejectedAttempts = 0;
+  const rejected = createControlBridge({
+    sessionId: "fresh-editor",
+    resumeTicket: "dead-ticket",
+    snapshot: () => ({
+      project_id: 1,
+      clip_id: 2,
+      playhead_s: 0,
+      playing: false,
+      busy: false,
+      ready: true,
+    }),
+    whenIdle: async () => {},
+    applyCanonical: () => "refresh_requested",
+    lockInput: () => {},
+    status: () => {},
+    request: async (action) => {
+      if (action === "resume") {
+        rejectedAttempts += 1;
+        const error = new Error("expired");
+        error.code = "INVALID_RESUME_TICKET";
+        throw error;
+      }
+      return { enabled: true, commands: [] };
+    },
+  });
+  await rejected.tick();
+  await rejected.tick();
+  assert.equal(rejectedAttempts, 1);
+});

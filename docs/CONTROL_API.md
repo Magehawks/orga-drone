@@ -250,6 +250,9 @@ api("commands", undo)
 canonical application. `ui_applied` confirms inspector/dataset application.
 `preview_status: refresh_requested` means existing preview callbacks were called;
 it does not certify a rendered frame or improve existing color fidelity.
+Timeline edits report `reload_required`; their canonical summary is not proof the
+reloaded WebView2 DOM or playback clock is correct. Timeline no-ops use
+`preview_status: unavailable` because no media preview is applied.
 Loss of UI acknowledgement does not turn a committed edit into a failed save.
 Unconfirmed changes can resynchronize without reexecution while still current;
 later manual edits suppress stale canonical replay. Reopen Studio to reload
@@ -258,7 +261,8 @@ canonical settings if synchronization cannot be confirmed.
 Errors from the control routes use `{"error":{"code":"STALE_STATE"}}`.
 Important codes: `CONTROL_DISABLED`, `INVALID_CREDENTIAL`, `LOOPBACK_REQUIRED`,
 `INVALID_JSON`, `INVALID_PAYLOAD`, `PAYLOAD_TOO_LARGE`, `INVALID_PROPERTIES`,
-`INVALID_ACTION`, `INVALID_PARAMS`, `UNKNOWN_ACTION`, `UNKNOWN_COMMAND`,
+`INVALID_ACTION`, `INVALID_PARAMS`, `INVALID_ACTION_SCOPE`, `INVALID_TARGET`,
+`UNKNOWN_ACTION`, `UNKNOWN_COMMAND`, `INVALID_RESUME_TICKET`,
 `LUT_UNAVAILABLE`, `MEDIA_UNAVAILABLE`, `UNSUPPORTED_CLIP`,
 `ANIMATED_SETTINGS_UNSUPPORTED`, `EDITOR_BUSY`, `EDITOR_NOT_READY`,
 `EDITOR_DISCONNECTED`, `EDITOR_SESSION_CONFLICT`, `STALE_SELECTION`, `STALE_STATE`,
@@ -385,6 +389,68 @@ same-origin bridge `recover` request supplies the original outcome. Recovery is
 read-only and session-owned: it never executes commands or renews an expired lease.
 A recovered rejection releases input exclusion without changing project context. Existing result polling and exact replay
 remain available for the prior session until a new session is enabled.
+
+## Timeline actions (#279)
+
+Timeline edits use a third additive command type, `timeline_action`. The shared
+registry advertises version 1 actions with scope `timeline`:
+
+| Action | Target | Parameters | Existing UI path |
+|---|---|---|---|
+| `timeline.add` | Story | `media_id` | Add to Studio from Browse/detail |
+| `timeline.remove` | selected Story clip | empty | Remove selected clip |
+| `timeline.reorder` | Story | `ordered_ids` exact permutation of the project's clip IDs | Story drag reorder |
+| `timeline.trim` | selected video clip | `source_in_s`, `source_out_s` in source seconds | Section trim in the inspector |
+
+```json
+{"command_id":"trim-clip-2","type":"timeline_action",
+ "action":"timeline.trim","action_version":1,
+ "params":{"source_in_s":1.5,"source_out_s":4.0},
+ "session_id":"editor","project_id":1,"clip_id":2,
+ "expected_state_token":"opaque-64-character-token","expires_at":1780000000}
+```
+
+`timeline.add` and `timeline.reorder` are Story-scoped: `clip_id` may be null or
+may name the currently selected clip as the post-reload selection anchor.
+`timeline.remove` and `timeline.trim` require the selected clip ID. Add accepts
+an imported catalog media ID, including an offline library row, and preserves the
+existing reference behavior without touching the source file. Trim uses the same
+source-second units, minimum span and media-duration clamping as the existing
+section route. Reorder requires the exact current project clip set; missing,
+duplicate or foreign IDs are rejected before any write.
+
+Execution uses one caller-owned SQLite transaction and the existing Story history
+snapshot. A failure in validation, persistence, summary generation or commit
+rolls back both rows and the Undo/Redo publication. The result includes
+`affected_clip_id`, `selection_clip_id`, ordered clips with media IDs, source
+ranges and effective durations, the summary, truthful `can_undo`/`can_redo`, and
+`no_op`. A no-op edit commits no Story step, creates no reload ticket and is
+acknowledged without a page reload. A real edit returns `reload_required: true`
+because the Story DOM and rendered durations must be rebuilt.
+
+Timeline reloads use a one-use same-origin bridge ticket:
+
+- The commit result includes `resume_ticket` only in bridge responses, not in the
+  public command-result endpoint.
+- `POST /api/studio/control/resume` with `ticket` and `project_id` restores the
+  same session/selection after the fixed `/studio` reload, without re-enabling
+  control and without returning credentials.
+- The ticket expires after 30 seconds, is bound to the committed project
+  fingerprint, is cleared by disable/project navigation and cannot be replayed.
+  Expired tickets do not block later timeline commands; the editor can poll a
+  fresh state token and retry.
+
+Guarded Undo uses the original project/clip/command identity and the timeline
+selection anchor. A wrong-clip Undo returns `UNDO_CONFLICT` without changing rows
+or history. Removing the selected clip reloads with no selection; the Undo command
+must still name the removed clip ID, never a substitute. Ordinary Studio Redo
+continues through the existing `/api/studio/history/redo` route.
+
+Manual checks before release: add/remove/reorder/trim real Windows media,
+including two clips where one is selected, an offline library row, a trim near
+the media boundary, guarded Undo/Redo, and a reload during slow saves. Verify
+ordered durations and unchanged source hashes. Synthetic API/bridge tests do not
+certify WebView2 reload behavior or real-media playback.
 
 Manual checks before release: create, rename and switch projects in Windows
 WebView2, including empty and photo-only Stories; re-enable after a switch;

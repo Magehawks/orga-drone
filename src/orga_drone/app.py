@@ -16,6 +16,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from orga_drone.timeline_actions import apply_timeline
+from orga_drone.studio_history import transactional_story_edit
 from orga_drone.project_actions import (
     ProjectActionError, create_project, open_project, rename_project, delete_project,
     read_projects,
@@ -1874,10 +1876,10 @@ def create_app() -> FastAPI:
         if open_project is None:
             raise HTTPException(status_code=400, detail="no studio project open")
         try:
-            with story_edit(db, open_project.id, group=_history_group(request)):
-                ordered = db.reorder_studio_items(
-                    [int(x) for x in raw_ids], project_id=open_project.id
-                )
+            with transactional_story_edit(db, open_project.id, group=_history_group(request)) as conn:
+                apply_timeline(db, open_project.id, None, "timeline.reorder",
+                               {"ordered_ids": raw_ids}, connection=conn)
+                ordered = list(raw_ids)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         items = db.list_studio_items(open_project.id)
@@ -2880,13 +2882,14 @@ def create_app() -> FastAPI:
                 status_code=400, detail="repeat count must be a whole number from 1 to 8"
             )
         try:
-            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_section(
-                    studio_item_id,
-                    source_in_s=float(raw_in),
-                    source_out_s=float(raw_out),
-                    repeats=raw_repeats,
-                )
+            pid = _clip_project_id(studio_item_id)
+            if pid is None:
+                raise ValueError("studio item not found")
+            with transactional_story_edit(db, pid, group=_history_group(request)) as conn:
+                apply_timeline(db, pid, studio_item_id, "timeline.trim",
+                    {"source_in_s": raw_in, "source_out_s": raw_out},
+                    connection=conn, repeats=raw_repeats)
+                item = next(c for c in db.list_studio_items(pid, connection=conn) if c.id == studio_item_id)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -3813,17 +3816,9 @@ def create_app() -> FastAPI:
         open_project = db.resolve_studio_page_project()
         if open_project is None:
             return RedirectResponse(url="/studio?msg=studio_need_project", status_code=303)
-        _sid, _created = db.add_studio_item(
-            item.path,
-            identity_key=make_identity_key(
-                item.filename, item.size_bytes, item.recorded_at
-            ),
-            filename=item.filename,
-            recorded_at=item.recorded_at,
-            kind=item.kind,
-            project_id=open_project.id,
-            source_media_id=item.id,
-        )
+        with transactional_story_edit(db, open_project.id) as conn:
+            apply_timeline(db, open_project.id, None, "timeline.add",
+                           {"media_id": media_id}, connection=conn)
         base = studio_add_return_url(media_id, return_to)
         msg = "studio_added"
         if base == "/browse" or base.startswith("/browse?"):
@@ -3887,8 +3882,10 @@ def create_app() -> FastAPI:
 
     @app.post("/studio/{studio_item_id}/remove")
     async def studio_remove(studio_item_id: int, request: Request) -> RedirectResponse:
-        with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-            db.remove_studio_item(studio_item_id)
+        pid = _clip_project_id(studio_item_id)
+        if pid is not None:
+            with transactional_story_edit(db, pid, group=_history_group(request)) as conn:
+                apply_timeline(db, pid, studio_item_id, "timeline.remove", {}, connection=conn)
         return RedirectResponse(url="/studio?msg=studio_removed", status_code=303)
 
     @app.post("/studio/clear")

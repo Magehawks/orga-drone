@@ -261,7 +261,8 @@ contract:
   by #277 tests; no additional metadata extraction is implied.
 - Project lifecycle stale-context, concurrent requests, transaction rollback and
   lost-response navigation recovery are covered by #278 contracts.
-- Timeline actions lack a two-clip wrong-target Undo contract at API level.
+- Timeline add/remove/reorder/trim, two-clip wrong-target Undo, invalid trims,
+  save/reopen and UI/API parity are covered by #279 contracts.
 - Audio/overlay actions have route tests but no API persistence/Undo contract.
 - Export jobs have job tests but no non-blocking Control API contract.
 - No privacy-safe fixture manifest separates synthetic MP4/JPG/PNG, optional
@@ -304,13 +305,38 @@ Project switches fence the previous editor, preserve project-scoped Story histor
 and request fixed `/studio` navigation; the next editor explicitly re-enables
 control. Committed navigation remains UI-unconfirmed. See `../CONTROL_API.md`.
 
+## Timeline implementation (#279)
+
+`timeline_actions.py` now owns the reusable add/remove/reorder/trim operations
+used by both the existing Studio routes and the Control API. It calls the same
+`Database.add_studio_item`, `remove_studio_item`, `reorder_studio_items` and
+`set_studio_section` helpers inside one caller-owned Story transaction. No
+second timeline model, time unit or persistence path exists.
+
+The UI add, remove, section-trim and reorder routes delegate to `apply_timeline`.
+`timeline.add`/`timeline.remove` keep the existing offline library-row behavior
+and never modify source media. `timeline.trim` uses source seconds and the same
+`resolve_source_range` clamping and minimum span as the UI. `timeline.reorder`
+requires an exact permutation of the project's clip IDs.
+
+Control API timeline commands use the additive `timeline_action` type with
+explicit project, session, state token, and clip/media identity. The result
+carries ordered IDs, media IDs, source ranges, effective durations, summary,
+`no_op`, and history flags. Real edits publish one Story history step and request
+a fixed `/studio` reload; no-ops publish no step and no reload. The bridge resumes
+the same session through a one-use, project-fingerprint-bound `resume` ticket.
+Invalid trims, stale selections, wrong-clip Undo and all transaction failures
+leave rows and history unchanged.
+
+Remaining risk for #283/#284: the reload/resume path is covered by synthetic
+Python/Node tests but still needs real Windows WebView2 and creator-footage
+validation.
+
 Recommended next batch, without implementing these issues here:
 
-- **#279 timeline/clip owner:** build project-scoped editing actions first,
-  using #277 media IDs and #278 session/project targeting. Reuse existing timing
-  modules and transactional Story history; prove wrong-clip/two-clip Undo,
-  persistence and stale requests. Own timeline actions and focused Python/JS
-  tests. Serialize registry/control changes through one integration owner.
+- **#279 timeline/clip owner (implemented):** project-scoped add/remove/reorder/
+  trim actions reuse existing timing modules and transactional Story history,
+  including wrong-clip/two-clip Undo, persistence and stale requests.
 - **#281 audio/overlay owner:** follow stable project/clip contracts and reuse
   existing audio/overlay validators. Expose approved asset IDs; never accept an
   unrestricted path. ADR 0008's soundtrack exception stays read-only and does not

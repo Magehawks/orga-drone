@@ -15,10 +15,10 @@ from __future__ import annotations
 import threading
 import sqlite3
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from orga_drone.db import Database
 
@@ -118,8 +118,8 @@ def guarded_undo_values(db: Database, project_id: int, clip_id: int) -> str:
         raise ValueError("No matching Undo step")
 
 
-def capture_story(db: Database, project_id: int) -> Snapshot:
-    with db.connect() as conn:
+def capture_story(db: Database, project_id: int, *, connection: sqlite3.Connection | None = None) -> Snapshot:
+    with (nullcontext(connection) if connection is not None else db.connect()) as conn:
         return _capture_story(conn, project_id)
 
 
@@ -144,11 +144,11 @@ def _capture_story(conn: sqlite3.Connection, project_id: int) -> Snapshot:
     )
 
 
-def restore_story(db: Database, project_id: int, snapshot: Snapshot) -> None:
+def restore_story(db: Database, project_id: int, snapshot: Snapshot, *, connection: sqlite3.Connection | None = None) -> None:
     """Replace one project's clip rows. Media files and other tables stay."""
     now = datetime.now().isoformat(timespec="seconds")
     keep_ids = [int(row[0]) for row in snapshot.clips]
-    with db.connect() as conn:
+    with (nullcontext(connection) if connection is not None else db.connect()) as conn:
         if keep_ids:
             placeholders = ",".join("?" for _ in keep_ids)
             conn.execute(
@@ -195,22 +195,31 @@ def restore_story(db: Database, project_id: int, snapshot: Snapshot) -> None:
         )
 
 
-def undo_story(db: Database, project_id: int) -> bool:
+@contextmanager
+def transactional_story_undo(db: Database, project_id: int, *, validate: Callable[[sqlite3.Connection], None] | None = None) -> Iterator[sqlite3.Connection | None]:
+    """Restore the existing latest snapshot and publish stacks only after commit."""
     with _lock:
         hist = _projects.get(project_id)
         if hist is None or not hist.undo:
-            return False
-        current = capture_story(db, project_id)
-        before = hist.undo.pop()
-        hist.open_group = None
-        try:
-            restore_story(db, project_id, before)
-        except Exception:
-            hist.undo.append(before)
-            raise
+            yield None
+            return
+        before = hist.undo[-1]
+        with db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = _capture_story(conn, project_id)
+            if validate is not None:
+                validate(conn)
+            restore_story(db, project_id, before, connection=conn)
+            yield conn
+        hist.undo.pop()
         hist.redo.append(current)
+        hist.open_group = None
         invalidate_control_revision()
-        return True
+
+
+def undo_story(db: Database, project_id: int) -> bool:
+    with transactional_story_undo(db, project_id) as conn:
+        return conn is not None
 
 
 def redo_story(db: Database, project_id: int) -> bool:
@@ -276,7 +285,7 @@ def story_edit(
 
 
 @contextmanager
-def transactional_story_edit(db: Database, project_id: int) -> Iterator[sqlite3.Connection]:
+def transactional_story_edit(db: Database, project_id: int, *, group: str | None = None) -> Iterator[sqlite3.Connection]:
     """Prepare snapshots inside the write transaction; publish only after commit.
 
     No database access follows commit. A failed write, snapshot, or commit leaves
@@ -290,8 +299,9 @@ def transactional_story_edit(db: Database, project_id: int) -> Iterator[sqlite3.
             yield conn
             after = _capture_story(conn, project_id)
         if before != after:
-            hist.undo.append(before)
-            del hist.undo[:-MAX_STORY_HISTORY]
+            if not group or group != hist.open_group:
+                hist.undo.append(before)
+                del hist.undo[:-MAX_STORY_HISTORY]
             hist.redo.clear()
-            hist.open_group = None
+            hist.open_group = group or None
             invalidate_control_revision()
