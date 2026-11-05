@@ -671,7 +671,6 @@ def test_packaged_e2e_collector_accepts_valid_evidence(evidence):
         "artifact_missing",
         "artifact_expired",
         "artifact_wrong_run",
-        "artifact_digest",
         "evidence_digest",
         "trusted_file_changed",
     ],
@@ -695,8 +694,6 @@ def test_packaged_e2e_collector_rejects_stale_or_spoofed(evidence, bad):
         api.artifacts[0]["expired"] = True
     elif bad == "artifact_wrong_run":
         api.artifacts[0]["workflow_run"]["id"] = 999
-    elif bad == "artifact_digest":
-        api.artifacts[0]["digest"] = "sha256:" + "f" * 64
     elif bad == "evidence_digest":
         api.evidence_zip = api.evidence_zip + b"tampered"
     else:

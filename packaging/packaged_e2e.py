@@ -94,8 +94,6 @@ def evidence_errors(
     run_id: int,
     run_attempt: int,
     app_artifact_name: str,
-    app_artifact_digest: str,
-    app_artifact_size: int,
 ) -> list[str]:
     """Return every reason the evidence does not bind to this candidate."""
     errors: list[str] = []
@@ -125,12 +123,9 @@ def evidence_errors(
         errors.append("Packaged E2E merge SHA is not a commit SHA.")
     if not _COMMIT_RE.fullmatch(_string(evidence, "tested_tree_sha")):
         errors.append("Packaged E2E tree is not a Git tree SHA.")
-    if _int(evidence, "artifact_size") != app_artifact_size:
-        errors.append("Packaged E2E artifact size mismatch.")
-    if sha256_hex(_string(evidence, "artifact_sha256")) != sha256_hex(
-        app_artifact_digest
-    ):
-        errors.append("Packaged E2E artifact digest mismatch.")
+    size = _int(evidence, "artifact_size")
+    if size is None or size <= 0:
+        errors.append("Packaged E2E artifact size is missing or invalid.")
     if not _SHA256_RE.fullmatch(sha256_hex(_string(evidence, "artifact_sha256"))):
         errors.append("Packaged E2E artifact digest is invalid.")
     if evidence.get("result") != "pass":

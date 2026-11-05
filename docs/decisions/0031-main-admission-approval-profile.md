@@ -23,8 +23,9 @@ runs, partial reruns, or PR-authored evidence.
    builds the existing onefolder app once and tests the extracted ZIP with the
    real WebView2 runtime. The workflow uploads the candidate ZIP and a bounded
    `evidence.json` artifact. Admission verifies the newest run for the exact
-   head, the current attempt/suite/job/check identity, both artifact names and
-   GitHub artifact digests, non-expiry, the tested merge SHA and tree, the
+   head, the current attempt/suite/job/check identity, both artifact names,
+   run/head/expiry linkage, and the downloaded evidence artifact's digest. The
+   evidence binds the tested ZIP SHA-256, the tested merge SHA and tree, the
    current PR head/base, the required journey set, and a pass result. Missing,
    failed, stale, expired, partial-rerun, older-green, or mismatched evidence
    denies admission.

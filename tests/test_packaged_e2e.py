@@ -74,8 +74,6 @@ def _check(evidence: dict[str, object]) -> list[str]:
         run_id=900,
         run_attempt=1,
         app_artifact_name=packaged_e2e.artifact_names(1, HEAD)[0],
-        app_artifact_digest=DIGEST,
-        app_artifact_size=1234,
     )
 
 
