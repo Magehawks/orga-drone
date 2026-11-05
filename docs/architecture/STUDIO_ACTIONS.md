@@ -256,10 +256,11 @@ second implementation risk, not a SOLID exercise.
 Existing coverage is strong for routes and effect math. Gaps for the shared
 contract:
 
-- No single contract test proves an action validates and persists identically
-  through the UI route and the Control API.
-- Library/read actions have route tests but no stable read-only contract.
-- Project actions lack an explicit stale-project-context test.
+- Color action parity between UI and Control API is covered by #287 contracts.
+- Library/read contracts, filter parity, availability and path privacy are covered
+  by #277 tests; no additional metadata extraction is implied.
+- Project lifecycle stale-context, concurrent requests, transaction rollback and
+  lost-response navigation recovery are covered by #278 contracts.
 - Timeline actions lack a two-clip wrong-target Undo contract at API level.
 - Audio/overlay actions have route tests but no API persistence/Undo contract.
 - Export jobs have job tests but no non-blocking Control API contract.
@@ -289,3 +290,42 @@ discovery and reject its command type; do not leave a partially working path.
 
 No release is published automatically. #283 and #284 decide the RC evidence;
 a human maintainer makes the final release decision.
+
+
+## Project lifecycle implementation and next ownership batch (#278)
+
+`project_actions.py` now shares existing create/open/rename/delete operations
+between form routes, JSON routes and versioned Control API project actions.
+Project reads use an allowlisted DTO and the common `read-actions` transport;
+mutations use `project_action` with explicit source project/session/token and a
+null clip target. Existing persistence helpers may join one caller-owned
+transaction. Create+open is atomic; no schema or project format changes occur.
+Project switches fence the previous editor, preserve project-scoped Story history
+and request fixed `/studio` navigation; the next editor explicitly re-enables
+control. Committed navigation remains UI-unconfirmed. See `../CONTROL_API.md`.
+
+Recommended next batch, without implementing these issues here:
+
+- **#279 timeline/clip owner:** build project-scoped editing actions first,
+  using #277 media IDs and #278 session/project targeting. Reuse existing timing
+  modules and transactional Story history; prove wrong-clip/two-clip Undo,
+  persistence and stale requests. Own timeline actions and focused Python/JS
+  tests. Serialize registry/control changes through one integration owner.
+- **#281 audio/overlay owner:** follow stable project/clip contracts and reuse
+  existing audio/overlay validators. Expose approved asset IDs; never accept an
+  unrestricted path. ADR 0008's soundtrack exception stays read-only and does not
+  justify incoming arbitrary paths. Own audio/overlay domain actions and tests.
+- **#282 export/job owner:** follow stable targeting and explicit job ownership.
+  Adapt existing nonblocking export/progress/cancel/publication with an explicit
+  project snapshot. Use generated output identifiers instead of arbitrary output
+  paths. Preserve cancellation/publication safety and encoder filter order.
+- **#275/#283 QA owner:** maintain synthetic privacy-safe MP4/JPG/PNG and optional
+  DJI fixture matrices plus packaged Windows WebView2 E2E evidence. Real-media
+  visual/playback checks remain opt-in and human-owned.
+- **External MCP adapter owner:** consume discovery and these versioned contracts
+  from Magehawks/orga-drone-mcp. No provider/MCP transport enters this repository.
+
+Each batch gets a focused PR and independent technical review. Shared registry,
+Control API, route and documentation changes have one owner at a time. Windows
+WebView2 and private real-media testing remain release evidence requirements;
+this work does not publish 2.4.0 or claim those checks have passed.

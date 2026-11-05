@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import sqlite3
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -2143,13 +2143,13 @@ class Database:
                 id=int(pid), title=title, created_at=now, updated_at=now
             )
 
-    def create_studio_project(self, title: str = "Your story") -> StudioProject:
+    def create_studio_project(self, title: str = "Your story", *, connection: sqlite3.Connection | None = None) -> StudioProject:
         """Create a new Studio project (does not touch media)."""
         clean = (title or "").strip() or "Your story"
         if len(clean) > 120:
             clean = clean[:120]
         now = datetime.now().isoformat(timespec="seconds")
-        with self.connect() as conn:
+        with nullcontext(connection) if connection is not None else self.connect() as conn:
             cur = conn.execute(
                 """INSERT INTO studio_projects(title, created_at, updated_at)
                    VALUES (?, ?, ?)""",
@@ -2161,8 +2161,8 @@ class Database:
                 id=int(pid), title=clean, created_at=now, updated_at=now
             )
 
-    def get_studio_project(self, project_id: int) -> StudioProject | None:
-        with self.connect() as conn:
+    def get_studio_project(self, project_id: int, *, connection: sqlite3.Connection | None = None) -> StudioProject | None:
+        with nullcontext(connection) if connection is not None else self.connect() as conn:
             row = conn.execute(
                 """SELECT id, title, music_start_s, created_at, updated_at
                    FROM studio_projects WHERE id = ?""",
@@ -2188,8 +2188,8 @@ class Database:
             return None
         return str(row["value"])
 
-    def set_app_state(self, key: str, value: str) -> None:
-        with self.connect() as conn:
+    def set_app_state(self, key: str, value: str, *, connection: sqlite3.Connection | None = None) -> None:
+        with nullcontext(connection) if connection is not None else self.connect() as conn:
             conn.execute(
                 """INSERT INTO app_state(key, value) VALUES (?, ?)
                    ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
@@ -2207,11 +2207,12 @@ class Database:
             return None
         return self.get_studio_project(project_id)
 
-    def set_open_studio_project_id(self, project_id: int | None) -> None:
+    def set_open_studio_project_id(self, project_id: int | None, *, connection: sqlite3.Connection | None = None) -> None:
         """Remember the open Studio project. ``None`` means browser mode."""
         self.set_app_state(
             STUDIO_LAST_OPENED_KEY,
             "" if project_id is None else str(int(project_id)),
+            connection=connection,
         )
 
     def resolve_studio_page_project(self) -> StudioProject | None:
@@ -2252,7 +2253,7 @@ class Database:
             for r in rows
         ]
 
-    def set_studio_project_title(self, project_id: int, title: str) -> StudioProject:
+    def set_studio_project_title(self, project_id: int, title: str, *, connection: sqlite3.Connection | None = None) -> StudioProject:
         """Persist an editable project title. Never renames source media."""
         clean = (title or "").strip()
         if not clean:
@@ -2260,7 +2261,7 @@ class Database:
         if len(clean) > 120:
             clean = clean[:120]
         now = datetime.now().isoformat(timespec="seconds")
-        with self.connect() as conn:
+        with nullcontext(connection) if connection is not None else self.connect() as conn:
             cur = conn.execute(
                 """UPDATE studio_projects
                    SET title = ?, updated_at = ?
@@ -2269,7 +2270,7 @@ class Database:
             )
             if cur.rowcount == 0:
                 raise ValueError("studio project not found")
-        project = self.get_studio_project(project_id)
+        project = self.get_studio_project(project_id, connection=connection)
         assert project is not None
         return project
 
@@ -2295,9 +2296,9 @@ class Database:
         assert project is not None
         return project
 
-    def delete_studio_project(self, project_id: int) -> bool:
+    def delete_studio_project(self, project_id: int, *, connection: sqlite3.Connection | None = None) -> bool:
         """Delete a project and its clips. Never deletes media assets or files."""
-        with self.connect() as conn:
+        with nullcontext(connection) if connection is not None else self.connect() as conn:
             cur = conn.execute(
                 "DELETE FROM studio_projects WHERE id = ?",
                 (project_id,),

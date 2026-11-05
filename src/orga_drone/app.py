@@ -16,6 +16,10 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from orga_drone.project_actions import (
+    ProjectActionError, create_project, open_project, rename_project, delete_project,
+    read_projects,
+)
 from orga_drone import __version__
 from orga_drone.app_prefs import get_check_updates, set_check_updates
 from orga_drone.config import settings
@@ -1307,13 +1311,12 @@ def create_app() -> FastAPI:
     async def studio_project_create(request: Request) -> RedirectResponse:
         """Create an empty project and open it. Never reuses another project."""
         title = get_translator(lang_from_request(request))("Your story")
-        project = db.create_studio_project(title)
-        db.set_open_studio_project_id(project.id)
+        create_project(db, title, open_created=True)
         return RedirectResponse(url="/studio", status_code=303)
 
     @app.post("/studio/projects/{project_id}/delete")
     async def studio_project_delete(project_id: int) -> RedirectResponse:
-        deleted = db.delete_studio_project(project_id)
+        deleted = delete_project(db, project_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="studio project not found")
         return RedirectResponse(url="/studio/projects", status_code=303)
@@ -1327,10 +1330,10 @@ def create_app() -> FastAPI:
         focus: str | None = None,
     ) -> Response:
         if project_id is not None:
-            target = db.get_studio_project(project_id)
-            if target is None:
-                raise HTTPException(status_code=404, detail="studio project not found")
-            db.set_open_studio_project_id(target.id)
+            try:
+                open_project(db, project_id)
+            except ProjectActionError:
+                raise HTTPException(status_code=404, detail="studio project not found") from None
             suffix = f"?msg={msg}" if msg else ""
             return RedirectResponse(url=f"/studio{suffix}", status_code=303)
 
@@ -1638,37 +1641,17 @@ def create_app() -> FastAPI:
             focus_field=focus,
         )
 
-    def _studio_project_json(project: Any) -> dict[str, Any]:
-        return {
-            "id": project.id,
-            "title": project.title,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-            "music_start_s": project.music_start_s,
-            "clip_count": getattr(project, "clip_count", 0),
-        }
-
     @app.get("/api/studio/projects")
     async def api_studio_projects_list() -> JSONResponse:
-        projects = db.list_studio_projects()
-        opened = db.get_open_studio_project()
-        return JSONResponse(
-            {
-                "ok": True,
-                "current_id": opened.id if opened is not None else None,
-                "projects": [_studio_project_json(p) for p in projects],
-            }
-        )
+        return JSONResponse({"ok": True, **read_projects(db, "project.list", {})})
 
     @app.post("/api/studio/projects/{project_id}/open")
     async def api_studio_project_open(project_id: int) -> JSONResponse:
-        project = db.get_studio_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="studio project not found")
-        db.set_open_studio_project_id(project.id)
-        return JSONResponse(
-            {"ok": True, "id": project.id, "title": project.title}
-        )
+        try:
+            project = open_project(db, project_id)
+        except ProjectActionError:
+            raise HTTPException(status_code=404, detail="studio project not found") from None
+        return JSONResponse({"ok": True, "id": project.id, "title": project.title})
 
     def _require_studio_project(project_id: int):
         project = db.get_studio_project(project_id)
@@ -1822,7 +1805,7 @@ def create_app() -> FastAPI:
         if not isinstance(raw_title, str):
             raise HTTPException(status_code=400, detail="title must be a string")
         try:
-            project = db.set_studio_project_title(project_id, raw_title)
+            project = rename_project(db, project_id, raw_title)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
@@ -1850,8 +1833,8 @@ def create_app() -> FastAPI:
         raw_title = payload.get("title", "Your story")
         if raw_title is not None and not isinstance(raw_title, str):
             raise HTTPException(status_code=400, detail="title must be a string")
-        project = db.create_studio_project(
-            raw_title if isinstance(raw_title, str) else "Your story"
+        project = create_project(
+            db, raw_title if isinstance(raw_title, str) else "Your story"
         )
         return JSONResponse(
             {
@@ -1867,7 +1850,7 @@ def create_app() -> FastAPI:
     @app.delete("/api/studio/projects/{project_id}")
     async def api_studio_project_delete(project_id: int) -> JSONResponse:
         """Delete a project and its clips. Never deletes media assets."""
-        deleted = db.delete_studio_project(project_id)
+        deleted = delete_project(db, project_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="studio project not found")
         return JSONResponse({"ok": True, "deleted": True})

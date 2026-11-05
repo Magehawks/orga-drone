@@ -17,6 +17,9 @@ export function createControlBridge({
   snapshot,
   whenIdle,
   applyCanonical,
+  applyProject = () => {
+    throw new Error("Project application unavailable");
+  },
   lockInput,
   status = () => {},
   request,
@@ -27,6 +30,7 @@ export function createControlBridge({
   let dirty = false;
   let settling = null;
   let stopped = false;
+  let uncertainProject = null;
 
   function noteLocalChange() {
     revision += 1;
@@ -69,7 +73,17 @@ export function createControlBridge({
     running = true;
     try {
       if (enabled) void settle().catch(() => status("busy"));
-      const polled = await request("poll", { session_id: sessionId, state: readState() });
+      const polled = uncertainProject
+        ? {
+            enabled: true,
+            commands: [
+              await request("recover", {
+                session_id: sessionId,
+                command_id: uncertainProject,
+              }),
+            ],
+          }
+        : await request("poll", { session_id: sessionId, state: readState() });
       enabled = polled.enabled;
       if (!enabled) {
         status("off");
@@ -88,19 +102,43 @@ export function createControlBridge({
       for (const command of polled.commands || []) {
         // Input exclusion begins before the final synchronous local state read.
         lockInput(true);
+        let navigationCommitted = false;
         try {
           let result = command;
+          if (result.status === "rejected") {
+            uncertainProject = null;
+            continue;
+          }
           if (!result.persisted) {
-            result = await request("execute", {
-              session_id: sessionId,
-              command_id: command.command_id,
-              state: readState(),
-            });
+            try {
+              result = await request("execute", {
+                session_id: sessionId,
+                command_id: command.command_id,
+                state: readState(),
+              });
+              uncertainProject = null;
+            } catch (error) {
+              // This request may have committed a project switch. Retain the
+              // lock until a recovery poll returns the original outcome.
+              if (command.scope === "project") uncertainProject = command.command_id;
+              throw error;
+            }
           }
           if (result.persisted && !result.ui_applied) {
+            const projectAction = result.scope === "project";
+            if (projectAction && result.navigation_required) {
+              // The committed context is authoritative. A lost acknowledgement
+              // must never strand the old editor on another project's context.
+              stopped = true;
+              navigationCommitted = true;
+              applyProject(result);
+              return;
+            }
             const fresh = readState();
             if (fresh.busy || fresh.playing) continue;
-            const previewStatus = applyCanonical(result);
+            uncertainProject = null;
+            const previewStatus = projectAction ? "unavailable" : applyCanonical(result);
+            if (projectAction) applyProject(result);
             await request("ack", {
               session_id: sessionId,
               command_id: result.command_id,
@@ -109,7 +147,7 @@ export function createControlBridge({
             status("applied");
           }
         } finally {
-          lockInput(false);
+          if (!navigationCommitted && !uncertainProject) lockInput(false);
         }
       }
     } catch (error) {
@@ -207,6 +245,7 @@ export function mountControlUi({
   snapshot,
   whenIdle,
   applyCanonical,
+  applyProject,
   fetchImpl,
   hasWriteFailure = () => false,
 }) {
@@ -275,6 +314,7 @@ export function mountControlUi({
     },
     whenIdle,
     applyCanonical,
+    applyProject,
     lockInput: (value) => {
       locked = value;
     },

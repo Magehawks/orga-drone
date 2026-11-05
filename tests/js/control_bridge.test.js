@@ -262,3 +262,207 @@ test("extended color/effect canonical values update only the selected clip", () 
   assert.deepEqual(previews, [7]);
   assert.throws(() => apply({ ...result, clip_id: 8 }), /target/);
 });
+
+test("committed project navigation keeps the old editor locked and needs no acknowledgement", async () => {
+  const calls = [];
+  const locks = [];
+  const projects = [];
+  let clipWrites = 0;
+  const result = {
+    command_id: "open",
+    persisted: true,
+    ui_applied: false,
+    scope: "project",
+    action: "project.open",
+    project_id: 1,
+    clip_id: null,
+    navigation_required: true,
+    canonical: { project: { id: 3, title: "Other" } },
+  };
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    snapshot: () => ({ project_id: 1, clip_id: 2, ready: true, busy: false, playing: false }),
+    whenIdle: async () => {},
+    lockInput: (value) => locks.push(value),
+    applyCanonical: () => {
+      clipWrites += 1;
+    },
+    applyProject: (value) => {
+      calls.push("navigate");
+      projects.push(value);
+    },
+    request: async (action) => {
+      calls.push(action);
+      if (action === "poll") return { enabled: true, commands: [{ command_id: "open" }] };
+      if (action === "execute") return result;
+      return result;
+    },
+  });
+  await bridge.tick();
+  assert.deepEqual(calls, ["poll", "execute", "navigate"]);
+  assert.equal(clipWrites, 0);
+  assert.deepEqual(locks, [true]);
+  assert.deepEqual(projects, [result]);
+  await bridge.tick();
+  assert.equal(calls.length, 3); // old editor remains stopped after navigation request
+});
+
+test("project rename applies title before acknowledgement without clip canonical", async () => {
+  const calls = [];
+  const result = {
+    command_id: "rename",
+    persisted: true,
+    ui_applied: false,
+    scope: "project",
+    action: "project.rename",
+    project_id: 1,
+    clip_id: null,
+    navigation_required: false,
+    canonical: { project: { id: 1, title: "Renamed" } },
+  };
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    snapshot: () => ({ project_id: 1, clip_id: null, ready: false, busy: false, playing: false }),
+    whenIdle: async () => {},
+    lockInput: () => {},
+    applyCanonical: () => {
+      throw new Error("clip writer called");
+    },
+    applyProject: () => calls.push("title"),
+    request: async (action, body) => {
+      calls.push(action);
+      if (action === "poll") return { enabled: true, commands: [{ command_id: "rename" }] };
+      if (action === "ack") assert.equal(body.preview_status, "unavailable");
+      return result;
+    },
+  });
+  await bridge.tick();
+  assert.deepEqual(calls, ["poll", "execute", "title", "ack"]);
+});
+
+test("lost project execute response retains input lock until recovery navigation", async () => {
+  const locks = [];
+  const calls = [];
+  let committed = false;
+  let busy = false;
+  const result = {
+    command_id: "switch",
+    scope: "project",
+    persisted: true,
+    ui_applied: false,
+    navigation_required: true,
+    project_id: 1,
+    clip_id: null,
+  };
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    whenIdle: async () => {},
+    snapshot: () => ({ project_id: 1, clip_id: 2, busy, playing: busy, ready: true }),
+    lockInput: (value) => locks.push(value),
+    applyCanonical: () => {
+      throw new Error("clip writer called");
+    },
+    applyProject: () => calls.push("navigate"),
+    request: async (action) => {
+      calls.push(action);
+      if (action === "poll")
+        return {
+          enabled: true,
+          commands: [
+            committed ? result : { command_id: "switch", scope: "project", persisted: false },
+          ],
+        };
+      if (action === "execute") {
+        committed = true;
+        busy = true;
+        throw new Error("lost response");
+      }
+      if (action === "recover") return result;
+      throw new Error("acknowledgement should not be needed");
+    },
+  });
+  await bridge.tick();
+  assert.deepEqual(locks, [true]);
+  await bridge.tick();
+  assert.deepEqual(calls, ["poll", "execute", "recover", "navigate"]);
+  assert.deepEqual(locks, [true, true]);
+});
+
+test("committed navigation proceeds even if fresh editor state becomes busy", async () => {
+  let busy = false;
+  let navigated = false;
+  const locks = [];
+  const result = {
+    command_id: "switch",
+    scope: "project",
+    persisted: true,
+    ui_applied: false,
+    navigation_required: true,
+  };
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    whenIdle: async () => {},
+    snapshot: () => ({ project_id: 1, clip_id: 2, busy, playing: busy, ready: true }),
+    lockInput: (value) => locks.push(value),
+    applyCanonical: () => {
+      throw new Error("clip writer called");
+    },
+    applyProject: () => {
+      navigated = true;
+    },
+    request: async (action) => {
+      if (action === "poll")
+        return { enabled: true, commands: [{ command_id: "switch", scope: "project" }] };
+      if (action === "execute") {
+        busy = true;
+        return result;
+      }
+      throw new Error("acknowledgement should not be needed");
+    },
+  });
+  await bridge.tick();
+  assert.equal(navigated, true);
+  assert.deepEqual(locks, [true]);
+});
+
+test("recovery of a rejected project command unlocks without changing context", async () => {
+  const calls = [];
+  const locks = [];
+  const bridge = createControlBridge({
+    sessionId: "editor",
+    whenIdle: async () => {},
+    snapshot: () => ({ project_id: 1, clip_id: 2, ready: true, busy: false, playing: false }),
+    lockInput: (value) => locks.push(value),
+    applyCanonical: () => {
+      throw new Error("clip writer called");
+    },
+    applyProject: () => {
+      throw new Error("project application called");
+    },
+    request: async (action) => {
+      calls.push(action);
+      if (action === "poll")
+        return {
+          enabled: true,
+          commands: [
+            { command_id: "rejected", scope: "project", persisted: false, status: "queued" },
+          ],
+        };
+      if (action === "execute") throw new Error("lost response");
+      if (action === "recover")
+        return {
+          command_id: "rejected",
+          scope: "project",
+          persisted: false,
+          status: "rejected",
+          error_code: "STALE_STATE",
+        };
+      throw new Error("unexpected acknowledgement");
+    },
+  });
+  await bridge.tick();
+  assert.deepEqual(locks, [true]);
+  await bridge.tick();
+  assert.deepEqual(calls, ["poll", "execute", "recover"]);
+  assert.deepEqual(locks, [true, true, false]);
+});
