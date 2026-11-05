@@ -276,3 +276,73 @@ def test_unknown_action_and_version_are_rejected() -> None:
     with pytest.raises(ActionValidationError) as exc:
         resolve_action_spec("clip.color.image", "1")
     assert exc.value.code == "INVALID_ACTION"
+
+def test_properties_action_is_validated_by_the_shared_registry() -> None:
+    spec = resolve_action_spec("clip.color.properties", 1)
+    params = validate_action_params(
+        spec, {"contrast": 15, "saturation_percent": 120}
+    )
+    assert params == {"contrast": 15, "saturation_percent": 120}
+    prepared = prepare_action(
+        spec,
+        "{}",
+        params,
+        set(),
+        Path(),
+    )
+    stored = json.loads(prepared)
+    assert stored["image"] == {
+        "exposure": 0,
+        "contrast": 15,
+        "saturation": 20,
+        "warmth": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "blacks": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    "name,params,code",
+    [
+        ("clip.color.hsl", {"ranges": {"bogus": {"hue": 1}}}, "INVALID_PARAMS"),
+        ("clip.color.hsl", {"ranges": {"blue": {"hue": 1.5}}}, "INVALID_PARAMS"),
+        ("clip.color.hsl", {"ranges": {"blue": {"hue": 1, "x": 2}}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", {"wheels": {"bogus": {"x": 0}}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", {"wheels": {"shadows": {"x": 2}}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", {"wheels": {"shadows": {"x": True}}}, "INVALID_PARAMS"),
+        ("clip.effects.detail", {"sharpen": 1.5}, "INVALID_PARAMS"),
+        ("clip.effects.detail", {"sharpen": 1, "unknown": 2}, "INVALID_PARAMS"),
+        ("clip.color.look", {"conversion_confirmed": "yes"}, "INVALID_PARAMS"),
+        ("clip.color.look", {"creative_strength": 1.5}, "INVALID_PARAMS"),
+    ],
+)
+def test_strict_action_parameter_validation(
+    name: str, params: dict[str, object], code: str
+) -> None:
+    spec = resolve_action_spec(name, 1)
+    with pytest.raises(ActionValidationError) as exc:
+        validate_action_params(spec, params)
+    assert exc.value.code == code
+
+
+def test_look_action_reports_merged_current_conflict_as_invalid_params() -> None:
+    spec = resolve_action_spec("clip.color.look", 1)
+    raw = json.dumps(
+        {
+            "color": {
+                "input_profile": "dlog_m",
+                "conversion_lut": "e" * 32 + ".cube",
+                "conversion_confirmed": True,
+            }
+        }
+    )
+    with pytest.raises(ActionValidationError) as exc:
+        prepare_action(
+            spec,
+            raw,
+            {"conversion_confirmed": False},
+            set(),
+            Path(),
+        )
+    assert exc.value.code == "INVALID_PARAMS"

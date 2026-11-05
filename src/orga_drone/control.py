@@ -21,7 +21,6 @@ from orga_drone.studio_actions import (
     ActionValidationError,
     action_catalog,
     canonical as action_canonical,
-    effect_settings_equal,
     lut_catalog,
     merge_properties,
     parse_properties_patch,
@@ -535,8 +534,8 @@ class ControlService:
                             available_luts,
                             self.data_dir,
                         )
-                        no_op = effect_settings_equal(
-                            raw, clip.effect_settings
+                        no_op = action_canonical(raw) == action_canonical(
+                            clip.effect_settings
                         )
                     else:
                         raw = self._merge(

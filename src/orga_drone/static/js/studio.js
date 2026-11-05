@@ -11542,8 +11542,6 @@ import {
       fillInspector: (clip) => {
         fillImageAdjust(clip);
         fillColorLook(clip);
-        fillHsl(clip);
-        fillColorWheels(clip);
         detailControls.fill(clip);
       },
       syncHistory: syncHistoryButtons,

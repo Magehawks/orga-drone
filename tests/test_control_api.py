@@ -885,3 +885,83 @@ def test_apply_action_wrong_clip_target_is_rejected(control, tmp_path):
     assert wrong["error_code"] == "STALE_SELECTION"
     assert raw(db, pid, state["clip_id"]) == before_a
     assert raw(db, pid, clip_b) == "{}"
+
+
+def test_apply_action_properties_alias_and_noop_history(control):
+    _, db, service, sid, state, _ = control
+    pid = state["project_id"]
+    before = raw(db, pid, state["clip_id"])
+    noop = execute(
+        service,
+        sid,
+        state,
+        action_command(service, sid, state, "clip.effects.detail", {"sharpen": 0}),
+    )
+    assert noop["persisted"] and noop["no_op"]
+    assert not history_flags(pid)["can_undo"]
+    assert raw(db, pid, state["clip_id"]) == before
+    result = execute(
+        service,
+        sid,
+        state,
+        action_command(
+            service,
+            sid,
+            state,
+            "clip.color.properties",
+            {"contrast": 15, "saturation_percent": 120},
+        ),
+    )
+    assert result["persisted"] and not result["no_op"]
+    assert result["action"] == "clip.color.properties"
+    stored = json.loads(raw(db, pid, state["clip_id"]))
+    assert stored["image"]["contrast"] == 15
+    assert stored["image"]["saturation"] == 20
+
+
+def test_apply_action_look_conflict_and_missing_lut_are_rejected(control):
+    _, db, service, sid, state, _ = control
+    pid = state["project_id"]
+    before = raw(db, pid, state["clip_id"])
+    missing = action_command(
+        service,
+        sid,
+        state,
+        "clip.color.look",
+        {"creative_lut": "f" * 32 + ".cube"},
+    )
+    service.submit(missing)
+    result = service.execute(
+        {"session_id": sid, "state": state, "command_id": missing["command_id"]}
+    )
+    assert result["error_code"] == "LUT_UNAVAILABLE"
+    assert raw(db, pid, state["clip_id"]) == before
+
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE studio_clips SET effect_settings=? WHERE id=?",
+            (
+                json.dumps(
+                    {
+                        "color": {
+                            "input_profile": "dlog_m",
+                            "conversion_lut": "a" * 32 + ".cube",
+                            "conversion_confirmed": True,
+                        }
+                    }
+                ),
+                state["clip_id"],
+            ),
+        )
+    conflict = action_command(
+        service, sid, state, "clip.color.look", {"conversion_confirmed": False}
+    )
+    service.submit(conflict)
+    result = service.execute(
+        {"session_id": sid, "state": state, "command_id": conflict["command_id"]}
+    )
+    assert result["error_code"] == "INVALID_PARAMS"
+    assert (
+        json.loads(raw(db, pid, state["clip_id"]))["color"]["conversion_confirmed"]
+        is True
+    )

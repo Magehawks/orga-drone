@@ -263,12 +263,11 @@ def canonical(raw: str | None) -> dict[str, Any]:
     }
 
 
-def effect_settings_equal(left: str | None, right: str | None) -> bool:
-    """Semantic effect-settings equality for action no-op detection."""
+def _validate_properties_params(params: Any) -> dict[str, Any]:
     try:
-        return json.loads(left or "{}") == json.loads(right or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return False
+        return parse_properties_patch(params)
+    except ActionValidationError:
+        raise ActionValidationError("INVALID_PARAMS") from None
 
 
 def parse_properties_patch(payload: Any) -> dict[str, Any]:
@@ -309,34 +308,46 @@ def _validate_image_params(params: Any) -> dict[str, int]:
 
 
 def _validate_detail_params(params: Any) -> dict[str, int]:
-    if not isinstance(params, Mapping) or not params:
-        raise ActionValidationError("INVALID_PARAMS")
-    try:
-        parse_detail_patch(params, detail_from_effect_settings("{}"))
-    except (ValueError, TypeError, AttributeError):
-        raise ActionValidationError("INVALID_PARAMS") from None
-    return dict(params)
+    return _validate_slider_map(
+        params, {"sharpen", "denoise"}, DETAIL_MIN, DETAIL_MAX
+    )
 
 
 def _validate_hsl_params(params: Any) -> dict[str, Any]:
-    if not isinstance(params, Mapping) or not params:
+    if not isinstance(params, Mapping) or set(params) != {"ranges"}:
         raise ActionValidationError("INVALID_PARAMS")
-    try:
-        parse_hsl_payload(params, hsl_adjust_from_effect_settings("{}"))
-    except (ValueError, TypeError, AttributeError):
-        raise ActionValidationError("INVALID_PARAMS") from None
+    ranges = params["ranges"]
+    if not isinstance(ranges, Mapping) or not ranges:
+        raise ActionValidationError("INVALID_PARAMS")
+    for range_id, values in ranges.items():
+        if range_id not in RANGE_IDS or not isinstance(values, Mapping):
+            raise ActionValidationError("INVALID_PARAMS")
+        if not values or set(values) - {"hue", "saturation", "luminance"}:
+            raise ActionValidationError("INVALID_PARAMS")
+        for value in values.values():
+            if type(value) is not int or not HSL_MIN <= value <= HSL_MAX:
+                raise ActionValidationError("INVALID_PARAMS")
     return dict(params)
 
 
 def _validate_wheel_params(params: Any) -> dict[str, Any]:
-    if not isinstance(params, Mapping) or not params:
+    if not isinstance(params, Mapping) or set(params) != {"wheels"}:
         raise ActionValidationError("INVALID_PARAMS")
-    try:
-        parse_color_wheels_payload(
-            params, color_wheels_from_effect_settings("{}")
-        )
-    except (ValueError, TypeError, AttributeError):
-        raise ActionValidationError("INVALID_PARAMS") from None
+    wheels = params["wheels"]
+    if not isinstance(wheels, Mapping) or not wheels:
+        raise ActionValidationError("INVALID_PARAMS")
+    for wheel_id, value in wheels.items():
+        if wheel_id not in WHEEL_IDS or not isinstance(value, Mapping):
+            raise ActionValidationError("INVALID_PARAMS")
+        if not value or set(value) - {"x", "y"}:
+            raise ActionValidationError("INVALID_PARAMS")
+        for number in value.values():
+            if (
+                isinstance(number, bool)
+                or not isinstance(number, (int, float))
+                or not POINT_MIN <= float(number) <= POINT_MAX
+            ):
+                raise ActionValidationError("INVALID_PARAMS")
     return dict(params)
 
 
@@ -344,6 +355,19 @@ def _validate_look_params(params: Any) -> dict[str, Any]:
     if not isinstance(params, Mapping) or not params:
         raise ActionValidationError("INVALID_PARAMS")
     if set(params) - set(LOOK_PARAMETERS):
+        raise ActionValidationError("INVALID_PARAMS")
+    if "input_profile" in params and not isinstance(params["input_profile"], str):
+        raise ActionValidationError("INVALID_PARAMS")
+    for key in ("conversion_lut", "creative_lut"):
+        if key in params and not isinstance(params[key], str):
+            raise ActionValidationError("INVALID_PARAMS")
+    if "creative_strength" in params:
+        strength = params["creative_strength"]
+        if type(strength) is not int or not 0 <= strength <= 100:
+            raise ActionValidationError("INVALID_PARAMS")
+    if "conversion_confirmed" in params and type(
+        params["conversion_confirmed"]
+    ) is not bool:
         raise ActionValidationError("INVALID_PARAMS")
     data = color_look_from_effect_settings("{}").as_dict()
     data.update(params)
@@ -357,6 +381,7 @@ def _validate_look_params(params: Any) -> dict[str, Any]:
 def validate_action_params(spec: ActionSpec, params: Any) -> dict[str, Any]:
     """Validate action parameters without touching the database or disk."""
     validators = {
+        "clip.color.properties": _validate_properties_params,
         "clip.color.image": _validate_image_params,
         "clip.color.look": _validate_look_params,
         "clip.color.hsl": _validate_hsl_params,
@@ -456,6 +481,9 @@ def prepare_action(
     data = json.loads(raw or "{}")
     if not isinstance(data, dict):
         raise ActionValidationError("INVALID_CLIP_SETTINGS")
+    if spec.name == "clip.color.properties":
+        patch = parse_properties_patch(params)
+        return merge_properties(raw, patch, available_luts, data_dir)
     if spec.name == "clip.color.image":
         _validate_image_params(params)
         image = parse_image_adjust_patch(
@@ -466,7 +494,10 @@ def prepare_action(
         _validate_look_params(params)
         look_data = color_look_from_effect_settings(raw).as_dict()
         look_data.update(params)
-        look = parse_color_look_payload(look_data)
+        try:
+            look = parse_color_look_payload(look_data)
+        except (ValueError, TypeError, AttributeError):
+            raise ActionValidationError("INVALID_PARAMS") from None
         _require_available_luts(look, available_luts, data_dir)
         return dump_color_look(raw, look)
     if spec.name == "clip.color.hsl":
@@ -481,8 +512,6 @@ def prepare_action(
         return dump_color_wheels(raw, wheels)
     if spec.name == "clip.effects.detail":
         _validate_detail_params(params)
-        detail = parse_detail_patch(
-            params, detail_from_effect_settings(raw)
-        )
+        detail = parse_detail_patch(params, detail_from_effect_settings(raw))
         return dump_detail(raw, detail)
     raise ActionValidationError("UNKNOWN_ACTION")
