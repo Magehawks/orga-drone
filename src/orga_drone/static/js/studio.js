@@ -3,7 +3,7 @@ import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from 
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
-import { createDetailControls } from "./studio/inspector/detail.js";
+import { createDetailControls, writeDetail } from "./studio/inspector/detail.js";
 import { createImageAdjustSaver } from "./studio/inspector/image-save.js";
 import {
   clipDisplayTitle,
@@ -11536,9 +11536,15 @@ import {
       getClip: (id) => findClip(grid, id),
       writeImage: writeImageAdjust,
       writeColor: writeColorLook,
+      writeHsl,
+      writeWheels: writeColorWheels,
+      writeDetail,
       fillInspector: (clip) => {
         fillImageAdjust(clip);
         fillColorLook(clip);
+        fillHsl(clip);
+        fillColorWheels(clip);
+        detailControls.fill(clip);
       },
       syncHistory: syncHistoryButtons,
       refreshPreview: () => {

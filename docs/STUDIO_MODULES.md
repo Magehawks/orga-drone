@@ -23,11 +23,12 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 - `studio/control-bridge.js` owns the opt-in local control polling handshake and
   compact Studio disclosure. The entry injects snapshots, queued-save settling,
-  and canonical image/color/inspector/history/preview callbacks. The bridge never
-  imports the entry, saves clip properties itself, or simulates editing clicks.
-  Canonical values use existing image/color writers and invalidate existing
-  preview/proxy caches. Preview acknowledgement means refresh requested, not
-  confirmed rendering. See `docs/CONTROL_API.md` and ADR 0032.
+  and canonical image/color/HSL/wheels/detail/inspector/history/preview callbacks.
+  The bridge never imports the entry, saves clip properties itself, or simulates
+  editing clicks. Canonical values use existing image/color/HSL/wheel/detail
+  writers and invalidate existing preview/proxy caches. Preview acknowledgement
+  means refresh requested, not confirmed rendering. See `docs/CONTROL_API.md` and
+  ADR 0032.
 
 - `studio.js` is an ES module entry (IIFE internally) with roughly 465 function
   declarations.

@@ -14,7 +14,10 @@ from orga_drone.studio_actions import (
     canonical,
     merge_properties,
     parse_properties_patch,
+    prepare_action,
     properties,
+    resolve_action_spec,
+    validate_action_params,
     validate_clip_effect_settings,
 )
 
@@ -23,7 +26,8 @@ def test_catalog_is_versioned_and_path_free() -> None:
     catalog = action_catalog()
     assert catalog["contract_version"] == CONTRACT_VERSION == 1
     actions = catalog["actions"]
-    assert [entry["name"] for entry in actions] == ["clip.color.properties"]
+    assert actions[0]["name"] == "clip.color.properties"
+    assert len(actions) == 6
     action = actions[0]
     assert action["version"] == 1
     assert action["scope"] == "clip"
@@ -142,3 +146,133 @@ def test_validate_clip_effect_settings_rejects_unsafe_state(
     with pytest.raises(ActionValidationError) as exc:
         validate_clip_effect_settings(raw)
     assert exc.value.code == code
+def test_catalog_lists_only_implemented_color_and_effect_actions() -> None:
+    actions = action_catalog()["actions"]
+    assert [entry["name"] for entry in actions] == [
+        "clip.color.properties",
+        "clip.color.image",
+        "clip.color.look",
+        "clip.color.hsl",
+        "clip.color.wheels",
+        "clip.effects.detail",
+    ]
+    assert all(entry["version"] == 1 for entry in actions)
+
+
+def test_prepare_image_action_merges_sliders_and_preserves_other_settings() -> None:
+    spec = resolve_action_spec("clip.color.image", 1)
+    raw = json.dumps({"image": {"warmth": 4}, "frame": {"zoom": 1.1}})
+    prepared = prepare_action(
+        spec,
+        raw,
+        {"contrast": 15, "exposure": -10},
+        set(),
+        Path(),
+    )
+    stored = json.loads(prepared)
+    assert stored["image"]["contrast"] == 15
+    assert stored["image"]["exposure"] == -10
+    assert stored["image"]["warmth"] == 4
+    assert stored["frame"] == {"zoom": 1.1}
+
+
+def test_prepare_hsl_wheels_and_detail_share_existing_validators() -> None:
+    hsl_spec = resolve_action_spec("clip.color.hsl", 1)
+    wheels_spec = resolve_action_spec("clip.color.wheels", 1)
+    detail_spec = resolve_action_spec("clip.effects.detail", 1)
+    raw = json.dumps({"frame": {"zoom": 1.2}})
+    hsl = prepare_action(
+        hsl_spec,
+        raw,
+        {"ranges": {"blue": {"hue": 20, "saturation": -10}}},
+        set(),
+        Path(),
+    )
+    wheels = prepare_action(
+        wheels_spec,
+        hsl,
+        {"wheels": {"shadows": {"x": 0.2, "y": -0.1}}},
+        set(),
+        Path(),
+    )
+    prepared = prepare_action(
+        detail_spec,
+        wheels,
+        {"sharpen": 12, "denoise": 4},
+        set(),
+        Path(),
+    )
+    stored = json.loads(prepared)
+    assert stored["hsl"]["ranges"]["blue"]["hue"] == 20
+    assert stored["hsl"]["ranges"]["blue"]["saturation"] == -10
+    assert stored["color_wheels"]["wheels"]["shadows"] == {"x": 0.2, "y": -0.1}
+    assert stored["detail"] == {"sharpen": 12, "denoise": 4}
+    assert stored["frame"] == {"zoom": 1.2}
+    view = canonical(prepared)
+    assert view["hsl"] == stored["hsl"]
+    assert view["color_wheels"] == stored["color_wheels"]
+    assert view["detail"] == stored["detail"]
+
+
+def test_prepare_look_action_requires_imported_luts(tmp_path: Path) -> None:
+    spec = resolve_action_spec("clip.color.look", 1)
+    lut = "d" * 32 + ".cube"
+    with pytest.raises(ActionValidationError) as exc:
+        prepare_action(
+            spec,
+            "{}",
+            {"creative_lut": lut, "creative_strength": 70},
+            set(),
+            tmp_path,
+        )
+    assert exc.value.code == "LUT_UNAVAILABLE"
+    lut_dir = tmp_path / "luts"
+    lut_dir.mkdir()
+    (lut_dir / lut).write_text(
+        "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n",
+        encoding="utf-8",
+    )
+    prepared = prepare_action(
+        spec,
+        "{}",
+        {"creative_lut": lut, "creative_strength": 70},
+        {lut},
+        tmp_path,
+    )
+    stored = json.loads(prepared)
+    assert stored["color"]["creative_lut"] == lut
+    assert stored["color"]["creative_strength"] == 70
+
+
+@pytest.mark.parametrize(
+    "name,params,code",
+    [
+        ("clip.color.image", {"contrast": True}, "INVALID_PARAMS"),
+        ("clip.color.image", {"contrast": 101}, "INVALID_PARAMS"),
+        ("clip.color.image", {"unknown": 1}, "INVALID_PARAMS"),
+        ("clip.color.hsl", {"ranges": {}}, "INVALID_PARAMS"),
+        ("clip.color.hsl", {"ranges": {"blue": {"hue": 101}}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", {"wheels": {}}, "INVALID_PARAMS"),
+        ("clip.effects.detail", {"sharpen": 101}, "INVALID_PARAMS"),
+        ("clip.color.look", {"unknown": 1}, "INVALID_PARAMS"),
+    ],
+)
+def test_action_parameter_validation_is_stable(
+    name: str, params: dict[str, object], code: str
+) -> None:
+    spec = resolve_action_spec(name, 1)
+    with pytest.raises(ActionValidationError) as exc:
+        validate_action_params(spec, params)
+    assert exc.value.code == code
+
+
+def test_unknown_action_and_version_are_rejected() -> None:
+    with pytest.raises(ActionValidationError) as exc:
+        resolve_action_spec("clip.nope", 1)
+    assert exc.value.code == "UNKNOWN_ACTION"
+    with pytest.raises(ActionValidationError) as exc:
+        resolve_action_spec("clip.color.image", 2)
+    assert exc.value.code == "UNKNOWN_ACTION"
+    with pytest.raises(ActionValidationError) as exc:
+        resolve_action_spec("clip.color.image", "1")
+    assert exc.value.code == "INVALID_ACTION"

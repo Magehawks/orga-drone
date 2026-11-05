@@ -21,12 +21,41 @@ from typing import Any, Mapping
 
 from orga_drone.db import Database
 from orga_drone.lut_library import list_catalog
+from orga_drone.studio_color_wheels import (
+    POINT_MAX,
+    POINT_MIN,
+    WHEEL_IDS,
+    color_wheels_from_effect_settings,
+    dump_color_wheels,
+    parse_color_wheels_payload,
+)
+from orga_drone.studio_detail import (
+    SLIDER_MAX as DETAIL_MAX,
+    SLIDER_MIN as DETAIL_MIN,
+    detail_from_effect_settings,
+    dump_detail,
+    parse_detail_patch,
+)
+from orga_drone.studio_hsl import (
+    RANGE_IDS,
+    SLIDER_MAX as HSL_MAX,
+    SLIDER_MIN as HSL_MIN,
+    dump_hsl_adjust,
+    hsl_adjust_from_effect_settings,
+    parse_hsl_payload,
+)
 from orga_drone.studio_image import (
+    IMAGE_KEYS,
+    SLIDER_MAX as IMAGE_MAX,
+    SLIDER_MIN as IMAGE_MIN,
+    dump_effect_settings,
     image_adjust_from_effect_settings,
     parse_image_adjust_patch,
 )
 from orga_drone.studio_lut import (
+    INPUT_PROFILES,
     color_look_from_effect_settings,
+    dump_color_look,
     parse_color_look_payload,
     require_lut_asset,
 )
@@ -38,6 +67,42 @@ LIMITS = {
     "contrast": (-100, 100),
     "saturation_percent": (0, 200),
     "creative_lut_strength_percent": (0, 100),
+}
+IMAGE_PARAMETERS: dict[str, dict[str, Any]] = {
+    key: {
+        "type": "integer",
+        "minimum": IMAGE_MIN,
+        "maximum": IMAGE_MAX,
+    }
+    for key in IMAGE_KEYS
+}
+LOOK_PARAMETERS: dict[str, dict[str, Any]] = {
+    "input_profile": {"type": "string", "enum": list(INPUT_PROFILES)},
+    "conversion_lut": {"type": "string"},
+    "creative_lut": {"type": "string"},
+    "creative_strength": {"type": "integer", "minimum": 0, "maximum": 100},
+    "conversion_confirmed": {"type": "boolean"},
+}
+HSL_PARAMETERS: dict[str, dict[str, Any]] = {
+    "ranges": {
+        "type": "object",
+        "ranges": list(RANGE_IDS),
+        "sliders": ["hue", "saturation", "luminance"],
+        "minimum": HSL_MIN,
+        "maximum": HSL_MAX,
+    }
+}
+WHEEL_PARAMETERS: dict[str, dict[str, Any]] = {
+    "wheels": {
+        "type": "object",
+        "wheels": list(WHEEL_IDS),
+        "minimum": POINT_MIN,
+        "maximum": POINT_MAX,
+    }
+}
+DETAIL_PARAMETERS: dict[str, dict[str, Any]] = {
+    "sharpen": {"type": "integer", "minimum": DETAIL_MIN, "maximum": DETAIL_MAX},
+    "denoise": {"type": "integer", "minimum": DETAIL_MIN, "maximum": DETAIL_MAX},
 }
 
 
@@ -104,7 +169,56 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
             },
         },
     ),
+    ActionSpec(
+        name="clip.color.image",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description="Set one or more existing image-adjust sliders on the selected clip.",
+        parameters=IMAGE_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.color.look",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description=(
+            "Set the existing input profile, conversion LUT, creative LUT, and strength."
+        ),
+        parameters=LOOK_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.color.hsl",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description="Update the existing eight-range HSL mixer.",
+        parameters=HSL_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.color.wheels",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description="Update the existing shadow, midtone, and highlight colour wheels.",
+        parameters=WHEEL_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.effects.detail",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description="Update the existing sharpen and denoise effect.",
+        parameters=DETAIL_PARAMETERS,
+    ),
 )
+
+_ACTION_SPECS_BY_KEY = {(spec.name, spec.version): spec for spec in ACTION_SPECS}
 
 
 def action_catalog() -> dict[str, Any]:
@@ -113,6 +227,16 @@ def action_catalog() -> dict[str, Any]:
         "contract_version": CONTRACT_VERSION,
         "actions": [spec.as_dict() for spec in ACTION_SPECS],
     }
+
+
+def resolve_action_spec(name: Any, version: Any) -> ActionSpec:
+    """Return one implemented action or raise a stable action error."""
+    if not isinstance(name, str) or type(version) is not int:
+        raise ActionValidationError("INVALID_ACTION")
+    spec = _ACTION_SPECS_BY_KEY.get((name, version))
+    if spec is None:
+        raise ActionValidationError("UNKNOWN_ACTION")
+    return spec
 
 
 def properties(raw: str | None) -> dict[str, Any]:
@@ -133,7 +257,18 @@ def canonical(raw: str | None) -> dict[str, Any]:
         "properties": properties(raw),
         "image": image_adjust_from_effect_settings(raw).as_dict(),
         "color_look": color_look_from_effect_settings(raw).as_dict(),
+        "hsl": hsl_adjust_from_effect_settings(raw).as_dict(),
+        "color_wheels": color_wheels_from_effect_settings(raw).as_dict(),
+        "detail": detail_from_effect_settings(raw).as_dict(),
     }
+
+
+def effect_settings_equal(left: str | None, right: str | None) -> bool:
+    """Semantic effect-settings equality for action no-op detection."""
+    try:
+        return json.loads(left or "{}") == json.loads(right or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return False
 
 
 def parse_properties_patch(payload: Any) -> dict[str, Any]:
@@ -153,6 +288,85 @@ def parse_properties_patch(payload: Any) -> dict[str, Any]:
         ):
             raise ActionValidationError("INVALID_PROPERTIES")
     return patch
+
+
+def _validate_slider_map(
+    params: Any, allowed: set[str], minimum: int, maximum: int
+) -> dict[str, int]:
+    if not isinstance(params, Mapping) or not params:
+        raise ActionValidationError("INVALID_PARAMS")
+    patch = dict(params)
+    if set(patch) - allowed:
+        raise ActionValidationError("INVALID_PARAMS")
+    for value in patch.values():
+        if type(value) is not int or not minimum <= value <= maximum:
+            raise ActionValidationError("INVALID_PARAMS")
+    return patch
+
+
+def _validate_image_params(params: Any) -> dict[str, int]:
+    return _validate_slider_map(params, set(IMAGE_KEYS), IMAGE_MIN, IMAGE_MAX)
+
+
+def _validate_detail_params(params: Any) -> dict[str, int]:
+    if not isinstance(params, Mapping) or not params:
+        raise ActionValidationError("INVALID_PARAMS")
+    try:
+        parse_detail_patch(params, detail_from_effect_settings("{}"))
+    except (ValueError, TypeError, AttributeError):
+        raise ActionValidationError("INVALID_PARAMS") from None
+    return dict(params)
+
+
+def _validate_hsl_params(params: Any) -> dict[str, Any]:
+    if not isinstance(params, Mapping) or not params:
+        raise ActionValidationError("INVALID_PARAMS")
+    try:
+        parse_hsl_payload(params, hsl_adjust_from_effect_settings("{}"))
+    except (ValueError, TypeError, AttributeError):
+        raise ActionValidationError("INVALID_PARAMS") from None
+    return dict(params)
+
+
+def _validate_wheel_params(params: Any) -> dict[str, Any]:
+    if not isinstance(params, Mapping) or not params:
+        raise ActionValidationError("INVALID_PARAMS")
+    try:
+        parse_color_wheels_payload(
+            params, color_wheels_from_effect_settings("{}")
+        )
+    except (ValueError, TypeError, AttributeError):
+        raise ActionValidationError("INVALID_PARAMS") from None
+    return dict(params)
+
+
+def _validate_look_params(params: Any) -> dict[str, Any]:
+    if not isinstance(params, Mapping) or not params:
+        raise ActionValidationError("INVALID_PARAMS")
+    if set(params) - set(LOOK_PARAMETERS):
+        raise ActionValidationError("INVALID_PARAMS")
+    data = color_look_from_effect_settings("{}").as_dict()
+    data.update(params)
+    try:
+        parse_color_look_payload(data)
+    except (ValueError, TypeError, AttributeError):
+        raise ActionValidationError("INVALID_PARAMS") from None
+    return dict(params)
+
+
+def validate_action_params(spec: ActionSpec, params: Any) -> dict[str, Any]:
+    """Validate action parameters without touching the database or disk."""
+    validators = {
+        "clip.color.image": _validate_image_params,
+        "clip.color.look": _validate_look_params,
+        "clip.color.hsl": _validate_hsl_params,
+        "clip.color.wheels": _validate_wheel_params,
+        "clip.effects.detail": _validate_detail_params,
+    }
+    validator = validators.get(spec.name)
+    if validator is None:
+        raise ActionValidationError("UNKNOWN_ACTION")
+    return dict(validator(params))
 
 
 def validate_clip_effect_settings(raw: str | None) -> None:
@@ -183,6 +397,19 @@ def lut_catalog(db: Database, data_dir: Path) -> set[str]:
     }
 
 
+def _require_available_luts(
+    look: Any, available_luts: set[str], data_dir: Path
+) -> None:
+    for name in (look.creative_lut, look.conversion_lut):
+        if name:
+            try:
+                if name not in available_luts:
+                    raise ValueError
+                require_lut_asset(data_dir, name)
+            except Exception:
+                raise ActionValidationError("LUT_UNAVAILABLE") from None
+
+
 def merge_properties(
     raw: str | None,
     patch: Mapping[str, Any],
@@ -210,16 +437,52 @@ def merge_properties(
     if "creative_lut_strength_percent" in patch:
         color_data["creative_strength"] = patch["creative_lut_strength_percent"]
     color = parse_color_look_payload(color_data)
-    for name in (color.creative_lut, color.conversion_lut):
-        if name:
-            try:
-                if name not in available_luts:
-                    raise ValueError
-                require_lut_asset(data_dir, name)
-            except Exception:
-                raise ActionValidationError("LUT_UNAVAILABLE") from None
+    _require_available_luts(color, available_luts, data_dir)
     if image_patch:
         data["image"] = dict(data.get("image", {}), **image.as_dict())
     if "creative_lut_id" in patch or "creative_lut_strength_percent" in patch:
         data["color"] = dict(data.get("color", {}), **color.as_dict())
     return json.dumps(data, separators=(",", ":"), sort_keys=True)
+
+
+def prepare_action(
+    spec: ActionSpec,
+    raw: str | None,
+    params: Mapping[str, Any],
+    available_luts: set[str],
+    data_dir: Path,
+) -> str:
+    """Apply one validated action to effect settings without writing the DB."""
+    data = json.loads(raw or "{}")
+    if not isinstance(data, dict):
+        raise ActionValidationError("INVALID_CLIP_SETTINGS")
+    if spec.name == "clip.color.image":
+        _validate_image_params(params)
+        image = parse_image_adjust_patch(
+            params, image_adjust_from_effect_settings(raw)
+        )
+        return dump_effect_settings(raw, image)
+    if spec.name == "clip.color.look":
+        _validate_look_params(params)
+        look_data = color_look_from_effect_settings(raw).as_dict()
+        look_data.update(params)
+        look = parse_color_look_payload(look_data)
+        _require_available_luts(look, available_luts, data_dir)
+        return dump_color_look(raw, look)
+    if spec.name == "clip.color.hsl":
+        _validate_hsl_params(params)
+        hsl = parse_hsl_payload(params, hsl_adjust_from_effect_settings(raw))
+        return dump_hsl_adjust(raw, hsl)
+    if spec.name == "clip.color.wheels":
+        _validate_wheel_params(params)
+        wheels = parse_color_wheels_payload(
+            params, color_wheels_from_effect_settings(raw)
+        )
+        return dump_color_wheels(raw, wheels)
+    if spec.name == "clip.effects.detail":
+        _validate_detail_params(params)
+        detail = parse_detail_patch(
+            params, detail_from_effect_settings(raw)
+        )
+        return dump_detail(raw, detail)
+    raise ActionValidationError("UNKNOWN_ACTION")

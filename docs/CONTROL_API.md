@@ -75,6 +75,34 @@ field, changing units or target meaning, or changing existing validation
 requires `/api/control/v2`. The existing `set_clip_properties` command keeps its
 v1 payload and meaning.
 
+### Implemented actions
+
+| Action | Parameters | Existing UI path |
+|---|---|---|
+| `clip.color.properties` | `contrast`, `saturation_percent`, `creative_lut_id`, `creative_lut_strength_percent` | Control API v1 |
+| `clip.color.image` | any subset of `exposure`, `contrast`, `saturation`, `warmth`, `highlights`, `shadows`, `blacks` | Image inspector |
+| `clip.color.look` | `input_profile`, `conversion_lut`, `creative_lut`, `creative_strength`, `conversion_confirmed` | Color profiles & LUTs |
+| `clip.color.hsl` | `ranges` with the eight existing colour ranges | HSL mixer |
+| `clip.color.wheels` | `wheels` for shadows, midtones, highlights | Colour wheels |
+| `clip.effects.detail` | `sharpen`, `denoise` | Fine-tune |
+
+New actions use one additive command type:
+
+```json
+{"command_id":"client-id","type":"apply_action",
+ "action":"clip.color.image","action_version":1,
+ "params":{"exposure":10,"contrast":15},
+ "session_id":"editor","project_id":1,"clip_id":2,
+ "expected_state_token":"opaque-token","expires_at":1780000000}
+```
+
+`apply_action` keeps the same session/project/clip targeting, state token,
+expiry, idempotency, guarded Undo and canonical response as
+`set_clip_properties`. Animated clips (`saturation_ramp` or `color_animation`)
+remain unsupported. Unknown action names/versions and invalid parameter shapes
+are rejected before admission; a stored LUT that no longer exists returns
+`LUT_UNAVAILABLE` when executed.
+
 Strict JSON bodies are limited to 8192 bytes. Unknown fields and command types
 are rejected. Integers exclude booleans and fractions. Omitted properties stay
 unchanged. Contrast is the slider value; saturation percent minus 100 is the
@@ -182,7 +210,8 @@ canonical settings if synchronization cannot be confirmed.
 Errors from the control routes use `{"error":{"code":"STALE_STATE"}}`.
 Important codes: `CONTROL_DISABLED`, `INVALID_CREDENTIAL`, `LOOPBACK_REQUIRED`,
 `INVALID_JSON`, `INVALID_PAYLOAD`, `PAYLOAD_TOO_LARGE`, `INVALID_PROPERTIES`,
-`UNKNOWN_COMMAND`, `LUT_UNAVAILABLE`, `MEDIA_UNAVAILABLE`, `UNSUPPORTED_CLIP`,
+`INVALID_ACTION`, `INVALID_PARAMS`, `UNKNOWN_ACTION`, `UNKNOWN_COMMAND`,
+`LUT_UNAVAILABLE`, `MEDIA_UNAVAILABLE`, `UNSUPPORTED_CLIP`,
 `ANIMATED_SETTINGS_UNSUPPORTED`, `EDITOR_BUSY`, `EDITOR_NOT_READY`,
 `EDITOR_DISCONNECTED`, `EDITOR_SESSION_CONFLICT`, `STALE_SELECTION`, `STALE_STATE`,
 `COMMAND_EXPIRED`, `COMMAND_ID_CONFLICT`, `COMMAND_CAPACITY_REACHED`,

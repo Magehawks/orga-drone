@@ -696,3 +696,192 @@ def test_control_and_ui_use_the_same_color_domain_result(control, tmp_path):
     stored_a = json.loads(raw(db, pid, state["clip_id"]))
     stored_b = json.loads(raw(db, pid, clip_b))
     assert stored_a["image"] == stored_b["image"]
+
+
+def action_command(service, sid, state, action, params, cid=None):
+    return {
+        "command_id": cid or secrets.token_hex(8),
+        "type": "apply_action",
+        "action": action,
+        "action_version": 1,
+        "params": params,
+        "session_id": sid,
+        "project_id": state["project_id"],
+        "clip_id": state["clip_id"],
+        "expected_state_token": service.editor_state()["state_token"],
+        "expires_at": time.time() + 20,
+    }
+
+
+def test_color_effect_actions_persist_canonical_and_undo(control, tmp_path):
+    _, db, service, sid, state, _ = control
+    pid = state["project_id"]
+    steps = [
+        (
+            "clip.color.image",
+            {
+                "exposure": 10,
+                "contrast": 15,
+                "saturation": 20,
+                "warmth": 5,
+                "highlights": 3,
+                "shadows": -2,
+                "blacks": 1,
+            },
+        ),
+        (
+            "clip.color.hsl",
+            {"ranges": {"blue": {"hue": 20, "saturation": -10, "luminance": 5}}},
+        ),
+        (
+            "clip.color.wheels",
+            {"wheels": {"shadows": {"x": 0.2, "y": -0.1}}},
+        ),
+        ("clip.effects.detail", {"sharpen": 12, "denoise": 4}),
+    ]
+    last = None
+    for name, params in steps:
+        cmd = action_command(service, sid, state, name, params)
+        result = execute(service, sid, state, cmd)
+        assert result["persisted"], result
+        assert result["action"] == name and result["action_version"] == 1
+        assert result["canonical"]["hsl"] is not None
+        assert result["canonical"]["color_wheels"] is not None
+        assert result["canonical"]["detail"] is not None
+        last = cmd
+    stored = json.loads(raw(db, pid, state["clip_id"]))
+    assert stored["image"]["exposure"] == 10
+    assert stored["image"]["highlights"] == 3
+    assert stored["hsl"]["ranges"]["blue"] == {
+        "hue": 20,
+        "saturation": -10,
+        "luminance": 5,
+    }
+    assert stored["color_wheels"]["wheels"]["shadows"] == {"x": 0.2, "y": -0.1}
+    assert stored["detail"] == {"sharpen": 12, "denoise": 4}
+
+    undo = command(service, sid, state, kind="undo_last_change")
+    undone = execute(service, sid, state, undo)
+    assert undone["persisted"] and undone["canonical"]["detail"] == {
+        "sharpen": 0,
+        "denoise": 0,
+}
+    restored = json.loads(raw(db, pid, state["clip_id"]))
+    assert restored["image"]["exposure"] == 10
+    assert restored["hsl"]["ranges"]["blue"]["hue"] == 20
+    assert restored["color_wheels"]["wheels"]["shadows"]["x"] == 0.2
+    assert restored.get("detail", {"sharpen": 0, "denoise": 0}) == {
+        "sharpen": 0,
+        "denoise": 0,
+    }
+    assert service.submit(last)["persisted"]  # Duplicate ID returns the outcome.
+    assert history_flags(pid)["can_redo"]
+    assert redo_story(db, pid)
+    redone = json.loads(raw(db, pid, state["clip_id"]))
+    assert redone["detail"] == {"sharpen": 12, "denoise": 4}
+
+
+def test_color_look_action_and_ui_routes_share_the_same_domain_result(control, tmp_path):
+    client, db, service, sid, state, headers = control
+    from orga_drone.lut_library import import_lut_bytes
+
+    lut = import_lut_bytes(
+        db,
+        service.data_dir,
+        b"LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n",
+        source_label="synthetic.cube",
+    ).entry.asset_name
+    pid = state["project_id"]
+    clip_b = _seed(db, tmp_path / "second-media", "B.MP4", 10, project_id=pid)
+    steps = [
+        ("clip.color.image", {"contrast": 15, "exposure": 10}),
+        ("clip.color.look", {"creative_lut": lut, "creative_strength": 70}),
+        (
+            "clip.color.hsl",
+            {"ranges": {"blue": {"hue": 20, "saturation": -10}}},
+        ),
+        (
+            "clip.color.wheels",
+            {"wheels": {"midtones": {"x": -0.2, "y": 0.1}}},
+        ),
+        ("clip.effects.detail", {"sharpen": 9, "denoise": 3}),
+    ]
+    for name, params in steps:
+        assert execute(
+            service, sid, state, action_command(service, sid, state, name, params)
+        )["persisted"]
+
+    assert client.patch(
+        f"/api/studio/{clip_b}/image",
+        json={"contrast": 15, "exposure": 10},
+        headers=headers,
+    ).status_code == 200
+    assert client.patch(
+        f"/api/studio/{clip_b}/color",
+        json={"creative_lut": lut, "creative_strength": 70},
+        headers=headers,
+    ).status_code == 200
+    assert client.patch(
+        f"/api/studio/{clip_b}/hsl",
+        json={"ranges": {"blue": {"hue": 20, "saturation": -10}}},
+        headers=headers,
+    ).status_code == 200
+    assert client.patch(
+        f"/api/studio/{clip_b}/color-wheels",
+        json={"wheels": {"midtones": {"x": -0.2, "y": 0.1}}},
+        headers=headers,
+    ).status_code == 200
+    assert client.patch(
+        f"/api/studio/{clip_b}/detail",
+        json={"sharpen": 9, "denoise": 3},
+        headers=headers,
+    ).status_code == 200
+
+    stored_a = json.loads(raw(db, pid, state["clip_id"]))
+    stored_b = json.loads(raw(db, pid, clip_b))
+    for key in ("image", "color", "hsl", "color_wheels", "detail"):
+        assert stored_a[key] == stored_b[key]
+    canonical = service.editor_state()["properties"]
+    assert canonical["contrast"] == 15
+    assert canonical["creative_lut_id"] == lut
+
+
+@pytest.mark.parametrize(
+    "name,version,params,code",
+    [
+        ("clip.nope", 1, {}, "UNKNOWN_ACTION"),
+        ("clip.color.image", 2, {"contrast": 1}, "UNKNOWN_ACTION"),
+        ("clip.color.image", 1, {"contrast": True}, "INVALID_PARAMS"),
+        ("clip.color.image", 1, {"unknown": 1}, "INVALID_PARAMS"),
+        ("clip.color.look", 1, {"input_profile": "bad"}, "INVALID_PARAMS"),
+        ("clip.color.hsl", 1, {"ranges": {}}, "INVALID_PARAMS"),
+        ("clip.color.wheels", 1, {"wheels": {}}, "INVALID_PARAMS"),
+        ("clip.effects.detail", 1, {"sharpen": 101}, "INVALID_PARAMS"),
+    ],
+)
+def test_apply_action_rejects_unknown_or_invalid_requests(control, name, version, params, code):
+    _, _, service, sid, state, _ = control
+    payload = action_command(service, sid, state, name, params)
+    payload["action_version"] = version
+    with pytest.raises(ControlError) as exc:
+        service.submit(payload)
+    assert exc.value.code == code
+
+
+def test_apply_action_wrong_clip_target_is_rejected(control, tmp_path):
+    _, db, service, sid, state, _ = control
+    pid = state["project_id"]
+    clip_b = _seed(db, tmp_path / "second-media", "B.MP4", 10, project_id=pid)
+    before_a = raw(db, pid, state["clip_id"])
+    cmd = action_command(service, sid, state, "clip.color.image", {"contrast": 15})
+    service.submit(cmd)
+    wrong = service.execute(
+        {
+            "session_id": sid,
+            "state": dict(state, clip_id=clip_b, selection_revision=2),
+            "command_id": cmd["command_id"],
+        }
+    )
+    assert wrong["error_code"] == "STALE_SELECTION"
+    assert raw(db, pid, state["clip_id"]) == before_a
+    assert raw(db, pid, clip_b) == "{}"

@@ -213,3 +213,52 @@ test("native drag remains busy after pointer cancellation until dragend", async 
     gestures[key] = null;
   }
 });
+
+test("extended color/effect canonical values update only the selected clip", () => {
+  const clips = new Map([[7, {}]]);
+  const filled = [];
+  const previews = [];
+  const apply = createCanonicalApplier({
+    snapshot: () => ({ project_id: 3, clip_id: 7 }),
+    getClip: (id) => clips.get(id),
+    writeImage: (clip, image) => {
+      clip.image = image;
+    },
+    writeColor: (clip, color) => {
+      clip.color = color;
+    },
+    writeHsl: (clip, hsl) => {
+      clip.hsl = hsl;
+    },
+    writeWheels: (clip, wheels) => {
+      clip.wheels = wheels;
+    },
+    writeDetail: (clip, detail) => {
+      clip.detail = detail;
+    },
+    fillInspector: (clip) => filled.push(clip),
+    syncHistory: () => {},
+    refreshPreview: () => previews.push(7),
+    setSaved: () => {},
+  });
+  const result = {
+    project_id: 3,
+    clip_id: 7,
+    can_undo: true,
+    can_redo: false,
+    canonical: {
+      image: { contrast: 15 },
+      color_look: { creative_lut: "a".repeat(32) + ".cube" },
+      hsl: { ranges: { blue: { hue: 20, saturation: 0, luminance: 0 } } },
+      color_wheels: { wheels: { shadows: { x: 0.2, y: -0.1 } } },
+      detail: { sharpen: 12, denoise: 4 },
+    },
+  };
+  assert.equal(apply(result), "refresh_requested");
+  assert.deepEqual(clips.get(7).hsl, result.canonical.hsl);
+  assert.deepEqual(clips.get(7).wheels, result.canonical.color_wheels);
+  assert.deepEqual(clips.get(7).detail, result.canonical.detail);
+  assert.deepEqual(filled, [clips.get(7)]);
+  assert.deepEqual(previews, [7]);
+  assert.throws(() => apply({ ...result, clip_id: 8 }), /target/);
+});
