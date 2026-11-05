@@ -1,4 +1,5 @@
 import "./studio-lut-webgl.js";
+import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
@@ -39,6 +40,9 @@ import {
   const defaultProjectTitle = root.dataset.defaultTitle || "Your story";
   const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
   let historyGesture = "";
+  let controlBridge = null;
+  let controlPendingWrites = 0;
+  let controlWriteFailed = false;
   const nativeFetch = window.fetch.bind(window);
 
   function syncHistoryButtons(undoEnabled, redoEnabled) {
@@ -57,7 +61,16 @@ import {
       }
       init = Object.assign({}, init || {}, { headers: headers });
     }
+    const controlUrl = String(input);
+    const controlMutation = method !== "GET" && method !== "HEAD" &&
+      controlUrl.startsWith("/api/studio/") && !controlUrl.startsWith("/api/studio/control/") &&
+      !controlUrl.includes("/playback-proxy");
+    if (controlMutation) controlPendingWrites += 1;
     const response = nativeFetch(input, init);
+    if (controlMutation) response.then((res) => {
+      controlPendingWrites -= 1;
+      if (!res.ok) controlWriteFailed = true;
+    }, () => { controlPendingWrites -= 1; controlWriteFailed = true; });
     if (method !== "GET" && method !== "HEAD") {
       response.then((res) => {
         const canUndo = res.headers.get("X-Studio-Can-Undo");
@@ -6742,6 +6755,7 @@ import {
       if (draftClipId == null || String(draftClipId) !== String(id)) cancelReuseDraft();
       else return;
     }
+    controlBridge?.noteLocalChange();
     state.selected = { type: "clip", id: String(id) };
     const clip = findClip(grid, id);
     if (!clip) {
@@ -7159,6 +7173,7 @@ import {
 
   function selectTransition(el) {
     if (reuseDraft) cancelReuseDraft();
+    controlBridge?.noteLocalChange();
     state.selected = { type: "transition", id: el.dataset.transitionAfter || "" };
     clips().forEach((c) => {
       c.classList.remove("is-selected");
@@ -7234,6 +7249,7 @@ import {
     if (reuseDraft) cancelReuseDraft();
     const track = state.tracks.find((item) => String(item.id) === String(trackId));
     if (!track) return;
+    controlBridge?.noteLocalChange();
     state.selected = { type: "music", id: String(track.id) };
     updateRemoveEnabled();
     clips().forEach((c) => {
@@ -11457,4 +11473,46 @@ import {
     updateCutEnabled();
   }
   setSaveState(true);
+  const controlPanel = document.getElementById("studio-control");
+  if (controlPanel) controlBridge = mountControlUi({
+    panel: controlPanel,
+    fetchImpl: nativeFetch,
+    hasWriteFailure: () => controlWriteFailed,
+    snapshot: () => {
+      const clip = selectedAdjustableClip();
+      return {
+        project_id: projectId,
+        clip_id: state.selected.type === "clip" ? Number(state.selected.id) : null,
+        playhead_s: state.projectTimeS,
+        playing: state.playing,
+        busy: controlPendingWrites > 0 || controlWriteFailed || Boolean(historyGesture ||
+          titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer) || saveStateEl?.dataset.state === "dirty" ||
+          hasActiveControlGesture({ dragCard, musicDragCard, dragOriginalMediaId, edgeDrag, maskDragging, playheadDragging }),
+        ready: Boolean(clip && clip.dataset.kind === "video" && clip.dataset.available === "1" &&
+          !readColorAnimation(clip) && !readSaturationRamp(clip)?.enabled),
+      };
+    },
+    whenIdle: async () => {
+      await Promise.resolve();
+      await Promise.all([imageAdjustSaver.whenIdle(), detailControls.whenIdle(), colorSaveChain,
+        imageSaveChain, hslSaveChain, colorWheelsSaveChain, maskSaveChain, frameSaveChain,
+        overlaySaveChain, mapSaveChain]);
+    },
+    applyCanonical: createCanonicalApplier({
+      snapshot: () => ({ project_id: projectId, clip_id: state.selected.type === "clip" ? Number(state.selected.id) : null }),
+      getClip: (id) => findClip(grid, id),
+      writeImage: writeImageAdjust,
+      writeColor: writeColorLook,
+      fillInspector: (clip) => {
+        fillImageAdjust(clip);
+        fillColorLook(clip);
+      },
+      syncHistory: syncHistoryButtons,
+      refreshPreview: () => {
+        applyPreviewGrades(resolveAt(state.projectTimeS));
+        applyFramePreview(resolveAt(state.projectTimeS));
+      },
+      setSaved: setSaveState,
+    }),
+  });
 })();

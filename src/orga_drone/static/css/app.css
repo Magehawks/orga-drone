@@ -4815,3 +4815,7 @@ footer {
     transition-duration: 0.01ms !important;
   }
 }
+.studio-control { padding: 0.35rem 1rem; border-bottom: 1px solid var(--border); }
+.studio-control details > * { margin-block: 0.35rem; }
+.studio-control input { max-width: 18rem; width: 100%; }
+.studio-control [data-control-status] { margin: 0.25rem 0; }

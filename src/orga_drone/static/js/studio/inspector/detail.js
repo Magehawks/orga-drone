@@ -167,6 +167,7 @@ export function createDetailControls({
     destroy,
     fill,
     queueSave,
+    whenIdle: saver.whenIdle,
     read: readDetail,
     write: writeDetail,
     neutral: neutralDetail,

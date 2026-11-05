@@ -202,6 +202,22 @@ add folder → scan/parse (unchanged files skip extraction) → SQLite index →
    (ADR 0008).
 6. Record significant architecture choices in `docs/decisions/`.
 
+## Optional local Studio control
+
+Control API v1 is disabled on every launch. `control.py` owns process-local
+pairing digests, one editor lease, bounded idempotent commands and state tokens;
+`control_routes.py` owns strict HTTP admission and internal bridge endpoints.
+`studio/control-bridge.js` polls sequentially and receives narrow callbacks from
+the Studio entry for readiness and canonical inspector/preview application.
+Combined static image/creative-LUT changes use existing validators and one SQLite
+transaction plus the existing Story history stack. No schema change or source
+media writes. Map/HUD writes now participate in the existing Story history guard.
+Manual mutation requests conservatively invalidate control tokens; project
+fingerprints also protect against changes outside Story snapshots.
+
+See [Control API v1](CONTROL_API.md) and ADR 0032. This is the application boundary
+for a future separate MCP adapter; no MCP server or provider connectivity ships here.
+
 ## Related docs
 
 - Product: `docs/PRODUCT_VISION.md`
