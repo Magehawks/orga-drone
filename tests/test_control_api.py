@@ -77,6 +77,46 @@ def raw(db, pid, cid):
     return next(c.effect_settings for c in db.list_studio_items(pid) if c.id == cid)
 
 
+def test_original_preview_has_no_editable_target_and_rejects_old_write_and_undo(control):
+    client, db, service, sid, state, headers = control
+    edit = command(service, sid, state)
+    assert execute(service, sid, state, edit)["persisted"]
+    old_write = command(service, sid, state, cid="before-original-write")
+    old_undo = command(
+        service, sid, state, kind="undo_last_change", cid="before-original-undo"
+    )
+    queued = command(service, sid, state, cid="queued-before-original")
+    service.submit(queued)
+    before = raw(db, state["project_id"], state["clip_id"])
+    draft_state = dict(
+        state, clip_id=None, ready=False, selection_revision=state["selection_revision"] + 1
+    )
+    polled = client.post(
+        "/api/studio/control/poll",
+        json={"session_id": sid, "state": draft_state},
+        headers=headers,
+    )
+    assert polled.status_code == 200
+    observed = client.get("/api/control/v1/editor-state", headers=headers).json()
+    assert observed["clip_id"] is None
+    assert observed["ready"] is False
+    assert observed["properties"] is None
+    executed = client.post(
+        "/api/studio/control/execute",
+        json={"session_id": sid, "state": draft_state, "command_id": queued["command_id"]},
+        headers=headers,
+    ).json()
+    assert executed["persisted"] is False
+    assert executed["error_code"] == "STALE_SELECTION"
+    for stale in (old_write, old_undo):
+        rejected = client.post(
+            "/api/control/v1/commands", json=stale, headers=headers
+        )
+        assert rejected.status_code == 409
+        assert rejected.json()["error"]["code"] == "STALE_SELECTION"
+    assert raw(db, state["project_id"], state["clip_id"]) == before
+
+
 def test_combined_update_history_redo_and_preservation(control, tmp_path):
     client, db, service, sid, state, headers = control
     cid, pid = state["clip_id"], state["project_id"]

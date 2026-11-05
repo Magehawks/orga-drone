@@ -5242,6 +5242,7 @@ import {
 
   function seekVideoLocal(localS, clip) {
     if (!previewVideo) return;
+    const token = syncToken;
     const inS = clip ? loopPlayInS(clip) : 0;
     const outS = clip ? loopPlayOutS(clip) : null;
     const lutProxy = lutProxyActiveFor(clip);
@@ -5255,6 +5256,7 @@ import {
       : Math.max(0, point.offset) * speed;
     const target = clipMediaTarget(clip, mapped, inS);
     const apply = () => {
+      if (reuseDraft || token !== syncToken) return;
       try {
         applyClipPlayback(previewVideo, clip);
         let max = Number.isFinite(previewVideo.duration) ? previewVideo.duration : target;
@@ -5282,7 +5284,7 @@ import {
     const lutSrc = clip ? lutProxySrcFor(clip) : "";
     if (lutSrc && src === lutSrc) {
       previewVideo.addEventListener("error", () => {
-        if (!clip || loadedVideoSrc !== lutSrc) return;
+        if (reuseDraft || !clip || loadedVideoSrc !== lutSrc) return;
         delete clip.dataset.lutProxyUrl;
         loadedVideoSrc = "";
         showVideo(videoSrcFor(clip), localS, { play: state.playing, clip });
@@ -5324,7 +5326,9 @@ import {
     suppressVideoClock = true;
     seekVideoLocal(localS, clip);
     // Allow clock after seek settles.
+    const token = syncToken;
     window.setTimeout(() => {
+      if (reuseDraft || token !== syncToken) return;
       suppressVideoClock = false;
     }, 50);
     if (play && state.playing) {
@@ -6750,11 +6754,7 @@ import {
   }
 
   function selectClip(id, { movePlayhead = true, seekTimeS = null } = {}) {
-    if (reuseDraft) {
-      const draftClipId = reuseDraft.clip && clipId(reuseDraft.clip);
-      if (draftClipId == null || String(draftClipId) !== String(id)) cancelReuseDraft();
-      else return;
-    }
+    if (reuseDraft) cancelReuseDraft();
     controlBridge?.noteLocalChange();
     state.selected = { type: "clip", id: String(id) };
     const clip = findClip(grid, id);
@@ -8470,17 +8470,20 @@ import {
   }
   function seekCatalog(seconds) {
     if (!previewVideo || !reuseDraft) return;
+    const draft = reuseDraft;
     const src = reusePreviewSrc();
     if (!src) return;
+    const token = ++syncToken;
     const catalog = reuseDraft.catalog;
     const apply = () => {
-      if (!reuseDraft) return;
+      if (reuseDraft !== draft || token !== syncToken) return;
       let max = catalog;
       const known = Number(previewVideo.duration);
       if (Number.isFinite(known) && known > 0) max = Math.min(max, known);
       const target = Math.max(0, Math.min(Number(seconds) || 0, max));
       try {
         previewVideo.hidden = false;
+        revealPreviewMedia(previewVideo);
         if (previewImage) previewImage.hidden = true;
         if (previewPlaceholder) previewPlaceholder.hidden = true;
         previewVideo.playbackRate = 1;
@@ -8515,9 +8518,11 @@ import {
   }
   function cancelReuseDraft() {
     if (!reuseDraft) return;
-    const clip = reuseDraft.clip;
+    const previous = reuseDraft.previousSelection;
     const time = state.projectTimeS;
     reuseDraft = null;
+    syncToken += 1;
+    controlBridge?.noteLocalChange();
     suppressVideoClock = false;
     if (previewVideo) {
       try {
@@ -8535,7 +8540,20 @@ import {
       if (timing) timing.hidden = true;
       if (previewPlaceholder) previewPlaceholder.hidden = false;
     }
-    if (clip && clip.isConnected) selectClip(clip.dataset.studioId, { movePlayhead: false });
+    if (previous.type === "clip" && findClip(grid, previous.id)) {
+      selectClip(previous.id, { movePlayhead: false });
+    } else if (previous.type === "transition") {
+      const transition = [...grid.querySelectorAll(".studio-transition")].find(
+        (el) => el.dataset.transitionAfter === previous.id
+      );
+      if (transition) selectTransition(transition);
+      else showInspector("inspector-empty");
+    } else if (previous.type === "music" && state.tracks.some((track) => String(track.id) === previous.id)) {
+      selectMusic(previous.id);
+    } else {
+      showInspector("inspector-empty");
+    }
+    updateRemoveEnabled();
     setProjectTime(time);
   }
   function ensureOriginalRow(clip) {
@@ -8598,17 +8616,31 @@ import {
     li.appendChild(button);
     box.querySelector("ul").appendChild(li);
   }
-  function openOriginalDraft(row) {
-    if (!row || row.dataset.canPlay !== "1") return;
+  function beginReuseDraft(draft) {
+    const previousSelection = reuseDraft ? reuseDraft.previousSelection : { ...state.selected };
+    reuseDraft = { ...draft, previousSelection };
+    syncToken += 1;
+    controlBridge?.noteLocalChange();
+    state.selected = { type: null, id: null };
+    state.activeStudioId = null;
     clips().forEach((c) => {
       c.classList.remove("is-selected");
       c.removeAttribute("aria-selected");
     });
+    grid.querySelectorAll(".studio-transition").forEach((el) => el.classList.remove("is-selected"));
+    layoutMusicSpans();
+    markActiveClips(null, null);
+    updateRemoveEnabled();
+    hideOverlayLayers();
+    hideTitlecard();
+    clearLutPreviewStill();
+  }
+  function openOriginalDraft(row) {
+    if (!row || row.dataset.canPlay !== "1") return;
     const catalog = Number(row.dataset.mediaDuration);
     if (!Number.isFinite(catalog) || catalog <= 0) return;
     pausePlayback();
-    clearLutPreviewStill();
-    reuseDraft = {
+    beginReuseDraft({
       clip: null,
       mediaId: row.dataset.originalMediaId || "",
       filename: row.dataset.filename || "",
@@ -8620,7 +8652,7 @@ import {
       outS: catalog,
       whole: true,
       beforeId: null,
-    };
+    });
     suppressVideoClock = true;
     paintReuseDraft();
     seekCatalog(0);
@@ -8633,9 +8665,8 @@ import {
     if (clip.dataset.available !== "1" || clip.dataset.canPlay !== "1") return;
     hideClipMenu();
     pausePlayback();
-    clearLutPreviewStill();
     const range = defaultReuseRange(clip, catalog);
-    reuseDraft = {
+    beginReuseDraft({
       clip,
       mediaId: clip.dataset.mediaId || "",
       filename: clip.dataset.filename || "",
@@ -8646,7 +8677,7 @@ import {
       inS: range.inS,
       outS: range.outS,
       whole: range.whole,
-    };
+    });
     suppressVideoClock = true;
     paintReuseDraft();
     seekCatalog(range.inS);
@@ -11472,26 +11503,28 @@ import {
     showInspector("inspector-empty");
     updateCutEnabled();
   }
+  function controlSnapshot() {
+    const clip = selectedAdjustableClip();
+    return {
+      project_id: projectId,
+      clip_id: !reuseDraft && state.selected.type === "clip" ? Number(state.selected.id) : null,
+      playhead_s: state.projectTimeS,
+      playing: state.playing,
+      busy: controlPendingWrites > 0 || controlWriteFailed || Boolean(historyGesture ||
+        titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer) || saveStateEl?.dataset.state === "dirty" ||
+        hasActiveControlGesture({ dragCard, musicDragCard, dragOriginalMediaId, edgeDrag, maskDragging, playheadDragging }),
+      ready: Boolean(!reuseDraft && clip && clip.dataset.kind === "video" && clip.dataset.available === "1" &&
+        !readColorAnimation(clip) && !readSaturationRamp(clip)?.enabled),
+    };
+  }
+
   setSaveState(true);
   const controlPanel = document.getElementById("studio-control");
   if (controlPanel) controlBridge = mountControlUi({
     panel: controlPanel,
     fetchImpl: nativeFetch,
     hasWriteFailure: () => controlWriteFailed,
-    snapshot: () => {
-      const clip = selectedAdjustableClip();
-      return {
-        project_id: projectId,
-        clip_id: state.selected.type === "clip" ? Number(state.selected.id) : null,
-        playhead_s: state.projectTimeS,
-        playing: state.playing,
-        busy: controlPendingWrites > 0 || controlWriteFailed || Boolean(historyGesture ||
-          titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer) || saveStateEl?.dataset.state === "dirty" ||
-          hasActiveControlGesture({ dragCard, musicDragCard, dragOriginalMediaId, edgeDrag, maskDragging, playheadDragging }),
-        ready: Boolean(clip && clip.dataset.kind === "video" && clip.dataset.available === "1" &&
-          !readColorAnimation(clip) && !readSaturationRamp(clip)?.enabled),
-      };
-    },
+    snapshot: controlSnapshot,
     whenIdle: async () => {
       await Promise.resolve();
       await Promise.all([imageAdjustSaver.whenIdle(), detailControls.whenIdle(), colorSaveChain,
@@ -11499,7 +11532,7 @@ import {
         overlaySaveChain, mapSaveChain]);
     },
     applyCanonical: createCanonicalApplier({
-      snapshot: () => ({ project_id: projectId, clip_id: state.selected.type === "clip" ? Number(state.selected.id) : null }),
+      snapshot: controlSnapshot,
       getClip: (id) => findClip(grid, id),
       writeImage: writeImageAdjust,
       writeColor: writeColorLook,
