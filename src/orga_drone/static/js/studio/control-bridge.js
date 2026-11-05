@@ -154,6 +154,9 @@ export function createCanonicalApplier({
   getClip,
   writeImage,
   writeColor,
+  writeHsl,
+  writeWheels,
+  writeDetail,
   fillInspector,
   syncHistory,
   refreshPreview,
@@ -166,8 +169,31 @@ export function createCanonicalApplier({
     }
     const clip = getClip(result.clip_id);
     if (!clip) throw new Error("Control clip no longer present");
-    writeImage(clip, result.canonical.image, true);
-    writeColor(clip, result.canonical.color_look);
+    const canonical = result.canonical || {};
+    const changed = (raw, value) => {
+      if (!clip.dataset) return true;
+      try {
+        return JSON.stringify(JSON.parse(raw || "null")) !== JSON.stringify(value);
+      } catch {
+        return true;
+      }
+    };
+    writeImage(clip, canonical.image, true);
+    writeColor(clip, canonical.color_look);
+    if (canonical.hsl && writeHsl && changed(clip.dataset && clip.dataset.hsl, canonical.hsl))
+      writeHsl(clip, canonical.hsl, true);
+    if (
+      canonical.color_wheels &&
+      writeWheels &&
+      changed(clip.dataset && clip.dataset.colorWheels, canonical.color_wheels)
+    )
+      writeWheels(clip, canonical.color_wheels, true);
+    if (
+      canonical.detail &&
+      writeDetail &&
+      changed(clip.dataset && clip.dataset.detail, canonical.detail)
+    )
+      writeDetail(clip, canonical.detail);
     fillInspector(clip);
     syncHistory(result.can_undo, result.can_redo);
     refreshPreview();

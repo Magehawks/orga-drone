@@ -24,7 +24,10 @@ from orga_drone.studio_actions import (
     lut_catalog,
     merge_properties,
     parse_properties_patch,
+    prepare_action,
     properties,
+    resolve_action_spec,
+    validate_action_params,
     validate_clip_effect_settings,
 )
 from orga_drone.studio_history import (
@@ -360,6 +363,9 @@ class ControlService:
                 "expires_at",
                 "properties",
                 "undo_command_id",
+                "action",
+                "action_version",
+                "params",
             },
             {
                 "command_id",
@@ -380,14 +386,36 @@ class ControlService:
             or len(body["expected_state_token"]) != 64
         ):
             raise ControlError("INVALID_PAYLOAD", 400)
-        if body["type"] not in ("set_clip_properties", "undo_last_change"):
+        if body["type"] not in (
+            "set_clip_properties",
+            "undo_last_change",
+            "apply_action",
+        ):
             raise ControlError("UNKNOWN_COMMAND", 400)
         if body["type"] == "set_clip_properties":
-            if "undo_command_id" in body:
+            if "undo_command_id" in body or set(body) & {
+                "action",
+                "action_version",
+                "params",
+            }:
                 raise ControlError("INVALID_PAYLOAD", 400)
             self._patch(body.get("properties"))
+        elif body["type"] == "apply_action":
+            if "properties" in body or "undo_command_id" in body:
+                raise ControlError("INVALID_PAYLOAD", 400)
+            if not {"action", "action_version", "params"} <= set(body):
+                raise ControlError("INVALID_PAYLOAD", 400)
+            try:
+                spec = resolve_action_spec(
+                    body["action"], body["action_version"]
+                )
+                validate_action_params(spec, body["params"])
+            except ActionValidationError as exc:
+                raise ControlError(exc.code, 400) from None
         else:
             if "properties" in body or "undo_command_id" not in body:
+                raise ControlError("INVALID_PAYLOAD", 400)
+            if set(body) & {"action", "action_version", "params"}:
                 raise ControlError("INVALID_PAYLOAD", 400)
             identifier(body["undo_command_id"])
         expiry = body["expires_at"]
@@ -422,6 +450,14 @@ class ControlService:
                     "persisted": False,
                     "ui_applied": False,
                     "preview_status": "not_requested",
+                    **(
+                        {
+                            "action": body["action"],
+                            "action_version": body["action_version"],
+                        }
+                        if body["type"] == "apply_action"
+                        else {}
+                    ),
                 },
             }
             return self.result(cid)
@@ -487,11 +523,30 @@ class ControlService:
                     self.latest_external = None
                     no_op = False
                 else:
-                    raw = self._merge(
-                        clip.effect_settings, target["properties"], available_luts
-                    )
+                    if target["type"] == "apply_action":
+                        spec = resolve_action_spec(
+                            target["action"], target["action_version"]
+                        )
+                        raw = prepare_action(
+                            spec,
+                            clip.effect_settings,
+                            target["params"],
+                            available_luts,
+                            self.data_dir,
+                        )
+                        no_op = action_canonical(raw) == action_canonical(
+                            clip.effect_settings
+                        )
+                    else:
+                        raw = self._merge(
+                            clip.effect_settings,
+                            target["properties"],
+                            available_luts,
+                        )
+                        no_op = properties(raw) == properties(
+                            clip.effect_settings
+                        )
                     canonical = action_canonical(raw)
-                    no_op = properties(raw) == properties(clip.effect_settings)
                     self._session(body["session_id"])
                     if self.clock() > cmd["deadline"]:
                         raise ControlError("COMMAND_EXPIRED")
@@ -535,8 +590,13 @@ class ControlService:
                 )
                 if target["type"] == "undo_last_change":
                     cmd["result"]["undone_command_id"] = target["undo_command_id"]
+                elif target["type"] == "apply_action":
+                    cmd["result"]["action"] = target["action"]
+                    cmd["result"]["action_version"] = target["action_version"]
                 cmd["ui_revision"] = history_revision()
             except ControlError as exc:
+                cmd["result"].update(status="rejected", error_code=exc.code)
+            except ActionValidationError as exc:
                 cmd["result"].update(status="rejected", error_code=exc.code)
             except Exception:
                 cmd["result"].update(status="rejected", error_code="DATABASE_ERROR")
