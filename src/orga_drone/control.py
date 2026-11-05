@@ -15,6 +15,7 @@ from typing import Any
 
 from orga_drone.db import Database
 from orga_drone.lut_library import list_catalog
+from orga_drone.library_actions import LibraryActionError, read_media
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_actions import (
     LIMITS,
@@ -320,6 +321,30 @@ class ControlService:
         self._session()
         return action_catalog()
 
+    def read_action(self, payload: Any) -> dict[str, Any]:
+        fields = {"session_id", "action", "action_version", "target", "params"}
+        body = shape(payload, fields, fields)
+        if not isinstance(body["target"], dict):
+            raise ControlError("INVALID_TARGET", 400)
+        with history_guard():
+            self._session(identifier(body["session_id"]))
+            try:
+                spec = resolve_action_spec(body["action"], body["action_version"])
+                if spec.scope != "library":
+                    raise ControlError("INVALID_ACTION_SCOPE", 400)
+                result = read_media(self.db, spec.name, body["target"], body["params"])
+            except (ActionValidationError, LibraryActionError) as exc:
+                status = {"TARGET_NOT_FOUND": 404, "MEDIA_UNAVAILABLE": 409}.get(
+                    exc.code, 400
+                )
+                raise ControlError(exc.code, status) from None
+            except (sqlite3.Error, ValueError, TypeError, OverflowError):
+                raise ControlError("DATABASE_ERROR", 500) from None
+            return {
+                "action": spec.name, "action_version": spec.version,
+                "session_id": body["session_id"], "result": result,
+            }
+
     def _patch(self, payload: Any) -> dict[str, Any]:
         try:
             return parse_properties_patch(payload)
@@ -409,6 +434,8 @@ class ControlService:
                 spec = resolve_action_spec(
                     body["action"], body["action_version"]
                 )
+                if spec.scope != "clip":
+                    raise ControlError("INVALID_ACTION_SCOPE", 400)
                 validate_action_params(spec, body["params"])
             except ActionValidationError as exc:
                 raise ControlError(exc.code, 400) from None

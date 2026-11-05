@@ -187,6 +187,13 @@ and is not certified by API tests.
 
 ## 4. Module ownership and dependency order
 
+Issue #277 adds `library_actions.py`: read-only typed projections over the
+existing `search` and `Database.list_media/count_media/get_media` boundary used
+by the UI. Shared discovery advertises library-scoped version 1 reads through
+`POST /api/control/v1/read-actions`; clip command admission rejects that scope.
+Library reads require the paired editor lease but do not depend on a selected
+clip, and never return source paths or generate media/cache artifacts.
+
 ```text
 #272 docs (this file)
   └─> #276 studio_actions.py + control.py adapter + discovery

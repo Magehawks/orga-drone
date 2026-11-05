@@ -2,7 +2,9 @@
 
 Issue #255 adds an optional application API for one running Studio editor.
 It has no MCP adapter or AI-provider dependency. All source media stays on disk
-unchanged. Only a paused, available video with static color settings is supported.
+unchanged. Clip mutations support a paused, available video with static color
+settings. Read-only library actions also support imported photos and offline
+catalog listings, independently of the selected clip.
 
 ## Pairing and lifecycle
 
@@ -53,10 +55,55 @@ This is not isolation from a malicious process already controlling the local app
   includes the shared action catalog and contract version.
 - `GET /api/control/v1/actions`: versioned shared action catalog without paths or
   credentials.
+- `POST /api/control/v1/read-actions`: synchronous, authenticated library reads
+  scoped to the paired live `session_id`; no selected clip or state token needed.
 - `POST /api/control/v1/commands`: admit an expiring command; it initially queues.
 - `GET /api/control/v1/commands/{command_id}`: retrieve its original outcome.
 
 ## Shared action contract
+
+### Library reads (#277)
+
+`library.media.list`, `library.media.search`, and `library.media.get` are
+version 1 read-only actions. They use the same database listing, filtering,
+session/flow collapsing, and natural-language search helpers as Browse and
+`/api/search`. They do not scan, probe, import, write caches, or modify media.
+Read actions cannot be submitted as `apply_action` mutation commands.
+
+```json
+{"session_id":"editor","action":"library.media.search","action_version":1,
+ "target":{},"params":{"ask":"photos November 2025","limit":50,"offset":0}}
+```
+
+List/search support `q`, `ask`, `kind` (video/photo), `drone`, `source`
+(drone/camera/other), `favorite`, `has_gps`, `flows_only`, `sessions_only`,
+`date_from`/`date_to` (calendar dates YYYY-MM-DD), `sort`, and `order`.
+Sort uses the existing Browse fields: recorded_at, filename, size, duration,
+drone, flow, session, stars. Order is asc/desc. Limit defaults to 50 (1–100),
+offset to 0 (0–1,000,000); strings are bounded to 512 characters. Unknown fields
+and invalid types are rejected. Natural-language Ask uses the existing rule-based
+parser; explicit filters take precedence.
+
+The response contains `action`, `action_version`, `session_id`, and `result`.
+List/search result has `items`, `total`, `limit`, `offset`. Total includes
+offline rows; pages are separate reads and are not a catalog snapshot.
+Get uses `target:{"media_id":123}` and empty params; its result is `{"item":...}`.
+Media IDs are existing positive database IDs within the imported catalog,
+not filesystem paths or a promise of identity across deletion/reimport.
+
+Each item has integer `id`, `size_bytes`, `stars`; string `kind`, `filename`;
+boolean `available`, `has_srt`, `has_lrf`, `favorite`; nullable numeric
+`duration_s`, integer `width`/`height`; nullable strings `recorded_at`,
+`drone_model`, `camera_model`, `source_type`. Missing/invalid duration is null.
+Source availability requires a real file confined to its configured library root.
+Paths, root locations, raw telemetry, notes, and free-form place blobs are excluded.
+Offline catalog entries remain listed with `available:false`; get returns
+`MEDIA_UNAVAILABLE` (409) for missing/off-root files. Malformed IDs return
+`INVALID_IDENTIFIER` (400), absent/unsupported media `TARGET_NOT_FOUND` (404),
+invalid parameters `INVALID_PARAMS` (400), invalid target shape `INVALID_TARGET`
+(400), and invalid transport scope `INVALID_ACTION_SCOPE` (400). No server error
+includes a filesystem path. Existing opt-in, bearer, session lease, body-size,
+loopback and Origin requirements apply unchanged.
 
 `studio_actions.py` is the transport-neutral action boundary. The Studio UI
 routes and this Control API use the same image/color validators, merge rules,
