@@ -514,6 +514,8 @@ def collect_packaged_e2e(
             run_id=run["id"],
             run_attempt=attempt,
             app_artifact_name=app_name,
+            app_artifact_digest=str(app_artifact["digest"]),
+            app_artifact_size=int(app_artifact.get("size_in_bytes") or -1),
         )
         if errors:
             return None, errors

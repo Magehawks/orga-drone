@@ -23,6 +23,8 @@ HEAD, BASE = "a" * 40, "b" * 40
 MERGE, TREE = "c" * 40, "d" * 40
 REPO = "example/drone"
 APP_DIGEST = "e" * 64
+API_DIGEST = "1" * 64
+API_SIZE = 5678
 EVIDENCE_GENERATED_AT = "2026-11-04T11:00:00+00:00"
 OWNER_COMMENT_AT = "2026-11-04T12:00:00+00:00"
 
@@ -134,6 +136,8 @@ def evidence():
         "artifact_name": app_name,
         "artifact_sha256": APP_DIGEST,
         "artifact_size": 1234,
+        "artifact_api_digest": f"sha256:{API_DIGEST}",
+        "artifact_api_size": API_SIZE,
         "app_version": "2.3.3",
         "webview2_version": "156.0.4314.50",
         "runner_image": "Windows Server 2025",
@@ -162,7 +166,7 @@ def evidence():
         "e2e_run": e2e_run,
         "e2e_check": e2e_check,
         "artifacts": [
-            _artifact(app_name, APP_DIGEST, 1234),
+            _artifact(app_name, API_DIGEST, API_SIZE),
             _artifact(evidence_name, evidence_digest, len(evidence_zip)),
         ],
         "evidence_zip": evidence_zip,
@@ -671,6 +675,7 @@ def test_packaged_e2e_collector_accepts_valid_evidence(evidence):
         "artifact_missing",
         "artifact_expired",
         "artifact_wrong_run",
+        "artifact_digest",
         "evidence_digest",
         "trusted_file_changed",
     ],
@@ -694,6 +699,8 @@ def test_packaged_e2e_collector_rejects_stale_or_spoofed(evidence, bad):
         api.artifacts[0]["expired"] = True
     elif bad == "artifact_wrong_run":
         api.artifacts[0]["workflow_run"]["id"] = 999
+    elif bad == "artifact_digest":
+        api.artifacts[0]["digest"] = "sha256:" + "f" * 64
     elif bad == "evidence_digest":
         api.evidence_zip = api.evidence_zip + b"tampered"
     else:
@@ -876,7 +883,9 @@ def test_workflow_uses_base_policy_and_ci_preserves_pr_checks():
     assert "name: Windows packaged E2E" in e2e
     assert "run: python packaging/e2e/windows_e2e.py" in e2e or "packaging/e2e/windows_e2e.py" in e2e
     assert "if: always()" in e2e
-    assert "GH_TOKEN" not in e2e and "contents: write" not in e2e
+    assert "contents: write" not in e2e
+    assert "actions: write" not in e2e
+    assert "actions: read" in e2e
     assert "retention-days: 30" in e2e
     ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "  pull_request:\n  push:\n    branches: [main, develop]" in ci

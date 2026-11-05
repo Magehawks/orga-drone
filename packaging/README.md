@@ -217,6 +217,20 @@ for a different candidate. Download the evidence artifact and app logs for
 diagnosis; the job summary prints the evidence result and ZIP SHA-256. This
 automation does **not** replace the MOTW/native-dialog smoke test below.
 
+#### Runner decision
+
+The gate uses a standard GitHub-hosted `windows-latest` runner. Standard
+GitHub-hosted runners are free for public repositories; no paid larger runner,
+self-hosted runner, or persistent credential is used. Self-hosting would add
+runner maintenance, credential/network exposure, and a separate security review,
+so it is not used for this slice. The Phase 0 spike proved the packaged
+WebView2/CDP path on `windows-latest` ([run 41923788646](https://github.com/Magehawks/orga-drone/actions/runs/41923788646)),
+and the full E2E passed on PR #266 ([run 41989019385](https://github.com/Magehawks/orga-drone/actions/runs/41989019385)).
+The job installs the Microsoft-signed Evergreen WebView2 Runtime when absent and
+records its version in `evidence.json`. If hosted Windows runners or WebView2
+become unavailable, keep admission fail-closed and use the local PyInstaller
+build plus the human MOTW checklist; do not bypass the gate.
+
 ### Release artifacts
 
 | Name | Where | What it is |

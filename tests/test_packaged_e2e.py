@@ -26,6 +26,8 @@ MERGE = "c" * 40
 TREE = "d" * 40
 REPO = "example/drone"
 DIGEST = "e" * 64
+API_DIGEST = "1" * 64
+API_SIZE = 5678
 
 
 def _zip(evidence: dict[str, object]) -> bytes:
@@ -49,6 +51,8 @@ def _evidence() -> dict[str, object]:
         "artifact_name": packaged_e2e.artifact_names(1, HEAD)[0],
         "artifact_sha256": DIGEST,
         "artifact_size": 1234,
+        "artifact_api_digest": f"sha256:{API_DIGEST}",
+        "artifact_api_size": API_SIZE,
         "app_version": "2.3.3",
         "webview2_version": "156.0.4314.50",
         "runner_image": "Windows Server 2025",
@@ -74,6 +78,8 @@ def _check(evidence: dict[str, object]) -> list[str]:
         run_id=900,
         run_attempt=1,
         app_artifact_name=packaged_e2e.artifact_names(1, HEAD)[0],
+        app_artifact_digest=f"sha256:{API_DIGEST}",
+        app_artifact_size=API_SIZE,
     )
 
 
@@ -96,6 +102,8 @@ def test_valid_evidence_has_no_errors():
         "artifact_name",
         "artifact_sha256",
         "artifact_size",
+        "artifact_api_digest",
+        "artifact_api_size",
         "app_version",
         "webview2_version",
         "runner_image",
@@ -137,6 +145,16 @@ def test_digest_prefix_and_case_are_normalized():
     evidence = _evidence()
     evidence["artifact_sha256"] = "sha256:" + DIGEST.upper()
     assert _check(evidence) == []
+
+
+def test_uploaded_artifact_digest_must_match():
+    assert _check(_evidence()) == []
+    evidence = _evidence()
+    evidence["artifact_api_digest"] = "sha256:" + "f" * 64
+    assert any("Uploaded artifact digest" in error for error in _check(evidence))
+    evidence = _evidence()
+    evidence["artifact_api_size"] = API_SIZE + 1
+    assert any("Uploaded artifact size" in error for error in _check(evidence))
 
 
 def test_zip_must_contain_only_evidence_json():

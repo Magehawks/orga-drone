@@ -1,6 +1,6 @@
 # ADR 0031: Main admission packaged E2E and owner authorization
 
-- Status: Accepted
+- Status: Proposed (Product Owner selected the owner-authorization profile during #262 planning; adoption on merge)
 - Date: 2026-11-04
 - Issue: #262
 - Related: #261, #263, #265, `docs/BRANCH_MIGRATION.md`
@@ -25,8 +25,9 @@ runs, partial reruns, or PR-authored evidence.
    `evidence.json` artifact. Admission verifies the newest run for the exact
    head, the current attempt/suite/job/check identity, both artifact names,
    run/head/expiry linkage, and the downloaded evidence artifact's digest. The
-   evidence binds the tested ZIP SHA-256, the tested merge SHA and tree, the
-   current PR head/base, the required journey set, and a pass result. Missing,
+   evidence binds the tested ZIP SHA-256, the uploaded Actions artifact
+   digest/size, the tested merge SHA and tree, the current PR head/base, the
+   required journey set, and a pass result. Missing,
    failed, stale, expired, partial-rerun, older-green, or mismatched evidence
    denies admission.
 2. **Merge commits are required for promotions.** Evidence is bound to the PR

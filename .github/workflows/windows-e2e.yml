@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 concurrency:
   group: windows-packaged-e2e-${{ github.event.pull_request.number }}
@@ -110,6 +110,32 @@ jobs:
           "zip_sha256=$hash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           Expand-Archive -Path "orga-drone-windows-x64.zip" -DestinationPath "$env:RUNNER_TEMP\orga-e2e-extract" -Force
 
+      - name: Upload packaged candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          path: orga-drone-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Read uploaded artifact identity
+        id: artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $name = "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}"
+          $artifact = $null
+          for ($i = 0; $i -lt 10 -and -not $artifact; $i++) {
+            $payload = gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | ConvertFrom-Json
+            $artifact = $payload.artifacts | Where-Object { $_.name -eq $name } | Select-Object -First 1
+            if (-not $artifact) { Start-Sleep -Seconds 3 }
+          }
+          if (-not $artifact) { throw "Uploaded artifact $name is not visible" }
+          "api_digest=$($artifact.digest)" >> $env:GITHUB_OUTPUT
+          "api_size=$($artifact.size_in_bytes)" >> $env:GITHUB_OUTPUT
+
       - name: Run packaged WebView2 E2E
         shell: pwsh
         run: |
@@ -121,6 +147,8 @@ jobs:
             --zip "orga-drone-windows-x64.zip" `
             --zip-sha256 "${{ steps.package.outputs.sha256 }}" `
             --artifact-name "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}" `
+            --artifact-api-digest "${{ steps.artifact.outputs.api_digest }}" `
+            --artifact-api-size "${{ steps.artifact.outputs.api_size }}" `
             --output-dir "$env:RUNNER_TEMP\orga-e2e" `
             --ffmpeg "$ffmpeg" `
             --repository "${{ github.repository }}" `
@@ -132,14 +160,6 @@ jobs:
             --run-id "${{ github.run_id }}" `
             --run-attempt "${{ github.run_attempt }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Upload packaged candidate
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
-          path: orga-drone-windows-x64.zip
-          if-no-files-found: error
-          retention-days: 30
 
       - name: Upload E2E evidence
         if: always()

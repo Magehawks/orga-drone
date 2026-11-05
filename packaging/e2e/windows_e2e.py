@@ -19,6 +19,7 @@ import socket
 import subprocess
 import sys
 import time
+import tomllib
 import traceback
 import urllib.error
 import urllib.request
@@ -28,7 +29,15 @@ from typing import Any
 
 from PIL import Image
 
-from orga_drone import __version__ as APP_VERSION
+
+def _app_version() -> str:
+    try:
+        data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return ""
+    project = data.get("project")
+    version = project.get("version") if isinstance(project, dict) else None
+    return version if isinstance(version, str) else ""
 
 CDP_START_TIMEOUT_S = 120.0
 JOURNEY_TIMEOUT_S = 120.0
@@ -411,6 +420,8 @@ def main() -> int:
     parser.add_argument("--zip", required=True, type=Path)
     parser.add_argument("--zip-sha256", required=True)
     parser.add_argument("--artifact-name", required=True)
+    parser.add_argument("--artifact-api-digest", required=True)
+    parser.add_argument("--artifact-api-size", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--ffmpeg", required=True, type=Path)
     parser.add_argument("--repository", required=True)
@@ -445,7 +456,9 @@ def main() -> int:
         "artifact_name": args.artifact_name,
         "artifact_sha256": "",
         "artifact_size": 0,
-        "app_version": APP_VERSION,
+        "artifact_api_digest": args.artifact_api_digest,
+        "artifact_api_size": args.artifact_api_size,
+        "app_version": _app_version(),
         "webview2_version": webview2_version(),
         "runner_image": f"{os.environ.get('ImageOS', '')} {os.environ.get('ImageVersion', '')}".strip()
         or platform.platform(),
@@ -693,6 +706,67 @@ def main() -> int:
             return result
 
         journey("export", export)
+
+        def image_export() -> dict[str, Any]:
+            options = expect_ok(
+                fetch_json(
+                    cdp, f"/api/media/{state['photo_id']}/export/options"
+                ),
+                "Image export options",
+            )
+            presets = options.get("presets") if isinstance(options, dict) else None
+            if not isinstance(presets, list) or not presets:
+                raise E2EError(f"Image export presets are missing: {options!r}")
+            preset = next(
+                (
+                    item
+                    for item in presets
+                    if isinstance(item, dict) and item.get("id") == "instagram"
+                ),
+                presets[0],
+            )
+            if not isinstance(preset, dict):
+                raise E2EError(f"Image export preset is invalid: {preset!r}")
+            suggested = str(preset.get("suggested_filename") or "e2e-image.jpg")
+            output_path = output_dir / f"e2e-image{Path(suggested).suffix or '.jpg'}"
+            started = expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/media/{state['photo_id']}/export",
+                    method="POST",
+                    json_body={
+                        "preset": preset["id"],
+                        "output_path": str(output_path),
+                    },
+                ),
+                "Image export start",
+            )
+            job_id = str(started.get("job_id") or "")
+            if not job_id:
+                raise E2EError(f"Image export did not return a job id: {started!r}")
+            deadline = time.monotonic() + 120
+            job: dict[str, Any] = {}
+            while time.monotonic() < deadline:
+                job = expect_ok(
+                    fetch_json(cdp, f"/api/studio/export/jobs/{job_id}"),
+                    "Image export job status",
+                )
+                if job.get("state") in {"completed", "failed", "cancelled"}:
+                    break
+                time.sleep(0.25)
+            if job.get("state") != "completed":
+                raise E2EError(f"Image export did not complete: {job!r}")
+            if not output_path.is_file() or output_path.stat().st_size <= 0:
+                raise E2EError(f"Image export is missing or empty: {output_path}")
+            with Image.open(output_path) as image:
+                image.verify()
+            return {
+                "preset": preset["id"],
+                "bytes": output_path.stat().st_size,
+                "sha256": sha256_file(output_path),
+            }
+
+        journey("image_export", image_export)
 
         def source_integrity() -> dict[str, Any]:
             if {

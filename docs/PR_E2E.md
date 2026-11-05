@@ -63,14 +63,25 @@ WebView2 runtime. The harness:
 5. Plays the video preview and checks `currentTime` advances with no crash.
 6. Edits a photo clip, reloads, relaunches, and verifies the edit persists.
 7. Exports a 720p MP4, decodes it, checks duration/order, and verifies source files are unchanged.
-8. Writes `evidence.json` bound to the head/base, PR merge SHA/tree, run/attempt,
-   and ZIP SHA-256; uploads it separately from the candidate ZIP and diagnostic
-   screenshots/logs for 30 days.
+8. Exports the library photo through the packaged image-export API and verifies the image decodes.
+9. Writes `evidence.json` bound to the head/base, PR merge SHA/tree, run/attempt,
+   tested ZIP SHA-256/size, and the uploaded Actions artifact digest/size;
+   uploads it separately from the candidate ZIP and diagnostic screenshots/logs
+   for 30 days.
 
 Admission rejects missing, failed, cancelled, skipped, expired, malformed,
 partial-rerun, older-green, or mismatched evidence. The workflow and harness
 files must also be unchanged between the PR base and head. Native dialogs,
 MOTW/SmartScreen behavior, and release publication remain manual.
+
+## Deferred packaged coverage
+
+LUT preview/export parity is not yet part of the packaged E2E. It needs a
+deterministic `.cube` fixture and a declared pixel tolerance, and is tracked in
+[#267](https://github.com/Magehawks/orga-drone/issues/267). Native folder/open/save
+dialogs, 1080p real-media export review, and MOTW/SmartScreen remain manual
+release checks. A missing automated journey is a known gap, not a pass;
+admission requires the exact journey set.
 
 ## What stays manual
 

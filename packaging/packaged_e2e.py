@@ -24,6 +24,7 @@ REQUIRED_JOURNEYS = (
     "playback",
     "edit_persistence",
     "export",
+    "image_export",
     "source_integrity",
     "relaunch_persistence",
 )
@@ -94,6 +95,8 @@ def evidence_errors(
     run_id: int,
     run_attempt: int,
     app_artifact_name: str,
+    app_artifact_digest: str,
+    app_artifact_size: int,
 ) -> list[str]:
     """Return every reason the evidence does not bind to this candidate."""
     errors: list[str] = []
@@ -128,6 +131,12 @@ def evidence_errors(
         errors.append("Packaged E2E artifact size is missing or invalid.")
     if not _SHA256_RE.fullmatch(sha256_hex(_string(evidence, "artifact_sha256"))):
         errors.append("Packaged E2E artifact digest is invalid.")
+    if sha256_hex(_string(evidence, "artifact_api_digest")) != sha256_hex(
+        app_artifact_digest
+    ):
+        errors.append("Uploaded artifact digest mismatch.")
+    if _int(evidence, "artifact_api_size") != app_artifact_size:
+        errors.append("Uploaded artifact size mismatch.")
     if evidence.get("result") != "pass":
         errors.append("Packaged E2E did not report a pass.")
     if evidence.get("manual_checks_claimed") is not False:

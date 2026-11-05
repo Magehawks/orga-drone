@@ -234,7 +234,7 @@ job/check identity, then verifies both artifact names
 `windows-e2e-evidence-<attempt>-<head>`, non-expiry, and run/head linkage. It
 downloads only the bounded evidence artifact, verifies that artifact's GitHub
 digest, and checks the exact head, base, merge SHA, Git tree, run/attempt,
-evidence ZIP SHA-256/size, required journey set, and pass result. The E2E
+evidence ZIP SHA-256/size, uploaded Actions artifact digest/size, required journey set, and pass result. The E2E
 workflow and harness files must be
 byte-identical between the PR head and base. Missing, failed, cancelled,
 skipped, expired, malformed, partial-rerun, older-green, or mismatched evidence
