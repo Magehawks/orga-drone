@@ -90,7 +90,8 @@ reported a misleading 0.18 s outlier. The probe and its regression tests now
 reject that unready sample instead of treating it as clock drift.
 
 The only plateau above 53 ms after the fix is a **185-191 ms** pause while the
-primary video is seeking at crossfade entry (`readyState 1`, `seeking: true`).
+primary video is loading or seeking at crossfade entry (`readyState 0-1`; the
+outgoing layer is also seeking).
 Every other sampled plateau is below 53 ms. Treating a seeking video as a clock
 source would be wrong, so this is expected behavior rather than a remaining
 clock drift.
