@@ -1,0 +1,16 @@
+diff --git a/src/orga_drone/static/js/studio.js b/src/orga_drone/static/js/studio.js
+index 98a5364..38abe83 100644
+--- a/src/orga_drone/static/js/studio.js
++++ b/src/orga_drone/static/js/studio.js
+@@ -5699,6 +5699,11 @@ import {
+     if (previewBlitRaf) return;
+     previewBlitRaf = requestAnimationFrame(() => {
+       previewBlitRaf = 0;
++      if (state.playing && !reuseDraft && !suppressVideoClock && !wallClockRaf &&
++          previewVideo && !previewVideo.hidden && !previewVideo.paused &&
++          !previewVideo.seeking && previewVideo.readyState >= 2) {
++        onVideoTimeUpdate();
++      }
+       paintPreviewBlit();
+       const playing = [previewVideo, previewVideoB].some(
+         (video) => video && !video.hidden && !video.paused && !video.ended
