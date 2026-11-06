@@ -1,0 +1,2009 @@
+{
+  "decision": "NO-GO",
+  "criteria": {
+    "region_mean_rgb_max": 3.0,
+    "region_p95_max_channel_error_max": 6,
+    "alpha_profile_max_error": 0.03,
+    "midpoint_reveal_position_error_px_max": 2,
+    "source_clock_error_s_max": 0.03333333333333333,
+    "reference_frame_tolerance": 1
+  },
+  "samples": [
+    {
+      "time": 1.9661227786752828,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 1.966124,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 0,
+          "seeking": false,
+          "ready": 0,
+          "src": ""
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-0",
+      "moving": false,
+      "reference_frame": 58,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.779969618055556,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.805198863636363,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.99843295638126,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 1.998434,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 0,
+          "seeking": false,
+          "ready": 0,
+          "src": ""
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-1",
+      "moving": false,
+      "reference_frame": 59,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.780198206018518,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.805946969696969,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.0307431340872375,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.030745,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.030745,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-2",
+      "moving": false,
+      "reference_frame": 60,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.789911747685185,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.933622685185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.8159375,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.248836833602585,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.248838,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.248838,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-3",
+      "moving": false,
+      "reference_frame": 67,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.994772858796296,
+          "p95_max_channel_error": 14
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 6.842086226851852,
+          "p95_max_channel_error": 14
+        },
+        "center": {
+          "mean_rgb": 8.093315972222223,
+          "p95_max_channel_error": 15
+        },
+        "motion": {
+          "mean_rgb": 8.031647727272727,
+          "p95_max_channel_error": 14
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.4992407108239094,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.499242,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.499242,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-4",
+      "moving": false,
+      "reference_frame": 75,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.147109374999999,
+          "p95_max_channel_error": 16
+        },
+        "left_edge": {
+          "mean_rgb": 9.32064525462963,
+          "p95_max_channel_error": 16
+        },
+        "right_edge": {
+          "mean_rgb": 4.328284143518519,
+          "p95_max_channel_error": 12
+        },
+        "center": {
+          "mean_rgb": 6.26556712962963,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 8.723451704545454,
+          "p95_max_channel_error": 16
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.7496445880452343,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.749646,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.749646,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-5",
+      "moving": false,
+      "reference_frame": 83,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.7548828125,
+          "p95_max_channel_error": 12
+        },
+        "left_edge": {
+          "mean_rgb": 5.927445023148148,
+          "p95_max_channel_error": 14
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.5218750000000005,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 5.1725568181818184,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.959660743134087,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.959662,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.959662,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-6",
+      "moving": false,
+      "reference_frame": 89,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.7914004629629625,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.371889467592593,
+          "p95_max_channel_error": 11
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 5.215004734848486,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.991970920840065,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 0.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-7",
+      "moving": false,
+      "reference_frame": 89,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.661879340277777,
+          "p95_max_channel_error": 11
+        },
+        "left_edge": {
+          "mean_rgb": 4.866565393518519,
+          "p95_max_channel_error": 11
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 4.681306818181818,
+          "p95_max_channel_error": 11
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 3.0323586429725364,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": true,
+          "time": 1.03236,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "seek-8",
+      "moving": false,
+      "reference_frame": 90,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.640998263888888,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 4.66169981060606,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.6995638126009693,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.7015,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-00",
+      "moving": true,
+      "reference_frame": 51,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.780198206018518,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.805946969696969,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.6995638126009693,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.7591,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-01",
+      "moving": true,
+      "reference_frame": 52,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.780067997685186,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.8055208333333335,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.6995638126009693,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.8146,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-02",
+      "moving": true,
+      "reference_frame": 52,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.026248553240741,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 8.611202651515152,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.6995638126009693,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.8695,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-03",
+      "moving": true,
+      "reference_frame": 52,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.278485243055556,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 9.436704545454546,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.6995638126009693,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.9271,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-04",
+      "moving": true,
+      "reference_frame": 52,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.404620949074074,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 9.84951231060606,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.9636025848142165,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.9818,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-05",
+      "moving": true,
+      "reference_frame": 59,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.780198206018518,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 7.805946969696969,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.9636025848142165,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 2.0353,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-06",
+      "moving": true,
+      "reference_frame": 60,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.900384837962963,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 8.199285037878788,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.9636025848142165,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 2.0917,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-07",
+      "moving": true,
+      "reference_frame": 60,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.026248553240741,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 8.611202651515152,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.9636025848142165,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 2.1496,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-08",
+      "moving": true,
+      "reference_frame": 60,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.278485243055556,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 9.436704545454546,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 1.9636025848142165,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 2.2036,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.991972,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-09",
+      "moving": true,
+      "reference_frame": 60,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.530747974537038,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 7.835185185185185,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 10.262291666666666,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 2.226098546042003,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.2261,
+          "seeking": true,
+          "ready": 1,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.2261,
+          "seeking": true,
+          "ready": 1,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-10",
+      "moving": true,
+      "reference_frame": 66,
+      "regions": {
+        "full": {
+          "mean_rgb": 13.685516493055554,
+          "p95_max_channel_error": 60
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 33.440292245370365,
+          "p95_max_channel_error": 63
+        },
+        "center": {
+          "mean_rgb": 7.827633101851852,
+          "p95_max_channel_error": 13
+        },
+        "motion": {
+          "mean_rgb": 20.41831912878788,
+          "p95_max_channel_error": 155
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        1.4539579969163885e-06,
+        1.4539579971106775e-06
+      ]
+    },
+    {
+      "time": 2.226098546042003,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.2938,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.2261,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-11",
+      "moving": true,
+      "reference_frame": 67,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.077000868055556,
+          "p95_max_channel_error": 16
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 6.733579282407407,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 8.02427662037037,
+          "p95_max_channel_error": 16
+        },
+        "motion": {
+          "mean_rgb": 8.393385416666666,
+          "p95_max_channel_error": 16
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.06770145395799693,
+        1.4539579971106775e-06
+      ]
+    },
+    {
+      "time": 2.226098546042003,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.3633,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.2261,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-12",
+      "moving": true,
+      "reference_frame": 67,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.077000868055556,
+          "p95_max_channel_error": 16
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 6.733579282407407,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 8.02427662037037,
+          "p95_max_channel_error": 16
+        },
+        "motion": {
+          "mean_rgb": 8.393385416666666,
+          "p95_max_channel_error": 16
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.13720145395799693,
+        1.4539579971106775e-06
+      ]
+    },
+    {
+      "time": 2.226098546042003,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.4353,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.2261,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-13",
+      "moving": true,
+      "reference_frame": 67,
+      "regions": {
+        "full": {
+          "mean_rgb": 8.077000868055556,
+          "p95_max_channel_error": 16
+        },
+        "left_edge": {
+          "mean_rgb": 7.856423611111111,
+          "p95_max_channel_error": 13
+        },
+        "right_edge": {
+          "mean_rgb": 6.733579282407407,
+          "p95_max_channel_error": 13
+        },
+        "center": {
+          "mean_rgb": 8.02427662037037,
+          "p95_max_channel_error": 16
+        },
+        "motion": {
+          "mean_rgb": 8.393385416666666,
+          "p95_max_channel_error": 16
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.20920145395799694,
+        1.4539579971106775e-06
+      ]
+    },
+    {
+      "time": 2.4862035541195473,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.4956,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.4862,
+          "seeking": true,
+          "ready": 1,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-14",
+      "moving": true,
+      "reference_frame": 75,
+      "regions": {
+        "full": {
+          "mean_rgb": 7.100533854166667,
+          "p95_max_channel_error": 17
+        },
+        "left_edge": {
+          "mean_rgb": 9.278009259259258,
+          "p95_max_channel_error": 17
+        },
+        "right_edge": {
+          "mean_rgb": 3.690002893518518,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 6.16361400462963,
+          "p95_max_channel_error": 14
+        },
+        "motion": {
+          "mean_rgb": 8.928944128787878,
+          "p95_max_channel_error": 18
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.009396445880452686,
+        3.5541195471111564e-06
+      ]
+    },
+    {
+      "time": 2.4862035541195473,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.5664,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.4862,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-15",
+      "moving": true,
+      "reference_frame": 75,
+      "regions": {
+        "full": {
+          "mean_rgb": 6.415642361111111,
+          "p95_max_channel_error": 17
+        },
+        "left_edge": {
+          "mean_rgb": 9.278009259259258,
+          "p95_max_channel_error": 17
+        },
+        "right_edge": {
+          "mean_rgb": 3.690002893518518,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 6.16361400462963,
+          "p95_max_channel_error": 14
+        },
+        "motion": {
+          "mean_rgb": 6.687481060606061,
+          "p95_max_channel_error": 17
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.08019644588045272,
+        3.5541195471111564e-06
+      ]
+    },
+    {
+      "time": 2.4862035541195473,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.6354,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.4862,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-16",
+      "moving": true,
+      "reference_frame": 75,
+      "regions": {
+        "full": {
+          "mean_rgb": 6.430122974537038,
+          "p95_max_channel_error": 17
+        },
+        "left_edge": {
+          "mean_rgb": 9.278009259259258,
+          "p95_max_channel_error": 17
+        },
+        "right_edge": {
+          "mean_rgb": 3.690002893518518,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 6.16361400462963,
+          "p95_max_channel_error": 14
+        },
+        "motion": {
+          "mean_rgb": 6.7348721590909095,
+          "p95_max_channel_error": 17
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.14919644588045267,
+        3.5541195471111564e-06
+      ]
+    },
+    {
+      "time": 2.4862035541195473,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.6924,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.4862,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-17",
+      "moving": true,
+      "reference_frame": 75,
+      "regions": {
+        "full": {
+          "mean_rgb": 6.445668402777778,
+          "p95_max_channel_error": 17
+        },
+        "left_edge": {
+          "mean_rgb": 9.278009259259258,
+          "p95_max_channel_error": 17
+        },
+        "right_edge": {
+          "mean_rgb": 3.690002893518518,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 6.16361400462963,
+          "p95_max_channel_error": 14
+        },
+        "motion": {
+          "mean_rgb": 6.785748106060606,
+          "p95_max_channel_error": 17
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.20619644588045272,
+        3.5541195471111564e-06
+      ]
+    },
+    {
+      "time": 2.7486995153473344,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.7518,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": true,
+          "ready": 1,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-18",
+      "moving": true,
+      "reference_frame": 81,
+      "regions": {
+        "full": {
+          "mean_rgb": 31.315196759259262,
+          "p95_max_channel_error": 86
+        },
+        "left_edge": {
+          "mean_rgb": 37.064742476851855,
+          "p95_max_channel_error": 73
+        },
+        "right_edge": {
+          "mean_rgb": 3.2148871527777776,
+          "p95_max_channel_error": 9
+        },
+        "center": {
+          "mean_rgb": 42.44169560185185,
+          "p95_max_channel_error": 76
+        },
+        "motion": {
+          "mean_rgb": 32.96027462121212,
+          "p95_max_channel_error": 95
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.003100484652665658,
+        4.846526655555294e-07
+      ]
+    },
+    {
+      "time": 2.7486995153473344,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.8127,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-19",
+      "moving": true,
+      "reference_frame": 83,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.7531640625,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 5.928298611111111,
+          "p95_max_channel_error": 14
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.497193287037037,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 5.183082386363637,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.06400048465266561,
+        4.846526655555294e-07
+      ]
+    },
+    {
+      "time": 2.7486995153473344,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.8946,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-20",
+      "moving": true,
+      "reference_frame": 83,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.064224537037037,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 5.928298611111111,
+          "p95_max_channel_error": 14
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.497193287037037,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 6.201098484848484,
+          "p95_max_channel_error": 13
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.14590048465266559,
+        4.846526655555294e-07
+      ]
+    },
+    {
+      "time": 2.7486995153473344,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 0.9529,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-21",
+      "moving": true,
+      "reference_frame": 83,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.379638310185185,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 5.928298611111111,
+          "p95_max_channel_error": 14
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.497193287037037,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 7.2333617424242425,
+          "p95_max_channel_error": 14
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.2042004846526656,
+        4.846526655555294e-07
+      ]
+    },
+    {
+      "time": 2.7486995153473344,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.0121,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": false,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-22",
+      "moving": true,
+      "reference_frame": 83,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.70220630787037,
+          "p95_max_channel_error": 13
+        },
+        "left_edge": {
+          "mean_rgb": 5.928298611111111,
+          "p95_max_channel_error": 14
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.497193287037037,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 8.289038825757576,
+          "p95_max_channel_error": 18
+        }
+      },
+      "regions_pass": false,
+      "clock_errors_s": [
+        0.26340048465266563,
+        4.846526655555294e-07
+      ]
+    },
+    {
+      "time": 3.0149030694668824,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.0712,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-23",
+      "moving": true,
+      "reference_frame": 91,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.819780092592592,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 5.2468039772727275,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 3.0149030694668824,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.1352,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-24",
+      "moving": true,
+      "reference_frame": 91,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.001999421296296,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 5.843158143939394,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 3.0149030694668824,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.1919,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-25",
+      "moving": true,
+      "reference_frame": 91,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.366426504629629,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 7.035828598484848,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 3.0149030694668824,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.2504,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-26",
+      "moving": true,
+      "reference_frame": 91,
+      "regions": {
+        "full": {
+          "mean_rgb": 5.730789930555555,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 8.22829071969697,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    },
+    {
+      "time": 3.2831017770597737,
+      "videos": [
+        {
+          "id": "studio-preview-video",
+          "hidden": false,
+          "paused": false,
+          "time": 1.3059,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/2/stream"
+        },
+        {
+          "id": "studio-preview-video-b",
+          "hidden": true,
+          "paused": true,
+          "time": 2.7487,
+          "seeking": false,
+          "ready": 4,
+          "src": "http://127.0.0.1:52294/media/1/stream"
+        }
+      ],
+      "canvasHidden": false,
+      "width": 640,
+      "height": 360,
+      "label": "play-27",
+      "moving": true,
+      "reference_frame": 99,
+      "regions": {
+        "full": {
+          "mean_rgb": 4.638256655092593,
+          "p95_max_channel_error": 10
+        },
+        "left_edge": {
+          "mean_rgb": 4.650824652777778,
+          "p95_max_channel_error": 10
+        },
+        "right_edge": {
+          "mean_rgb": 4.645370370370371,
+          "p95_max_channel_error": 10
+        },
+        "center": {
+          "mean_rgb": 4.647092013888889,
+          "p95_max_channel_error": 10
+        },
+        "motion": {
+          "mean_rgb": 4.652727272727273,
+          "p95_max_channel_error": 10
+        }
+      },
+      "regions_pass": false
+    }
+  ],
+  "scope": "neutral 720p sources/export, 640x360 visible preview, no audio/other effects",
+  "errors": [
+    "Spatial parity criteria failed",
+    "Moving source clock differs by more than one output frame",
+    "Alpha/reveal position criteria failed"
+  ],
+  "exe_sha256": "48cfabbebd071551ad3cb0c41d74fd2e833e741904b5840d19307b00a318137c",
+  "ffmpeg_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/156.0.4314.58",
+    "revision": "@7806b68d20d1c1273d5b07b4f4de18e8f5852581",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+    "jsVersion": "15.6.12.10"
+  },
+  "export_sha256": "01b4d5501c4a6c7901fc2a6887ded6f6c0b99c2b65c57102cca3a68e7cbda570",
+  "export_frames": 150,
+  "source_unchanged": true,
+  "midpoint_alpha_max_error": 0.08551653535904424,
+  "midpoint_reveal_position_error_px": 19.0
+}

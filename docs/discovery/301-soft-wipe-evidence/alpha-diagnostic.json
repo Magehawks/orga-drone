@@ -1,0 +1,18 @@
+{
+  "note": "Derived from the existing captures only; preview endpoint normalization isolates mask geometry and does not waive preview/export pixel/color failure.",
+  "actual_midpoint_story_s": 2.4992407108239094,
+  "normalized_preview_endpoint_alpha_max_error": 0.008530553807101549,
+  "normalized_preview_endpoint_reveal_position_error_px": 0.9718901453959461,
+  "preview_endpoint_rgb": [
+    [
+      187,
+      105,
+      57
+    ],
+    [
+      49,
+      118,
+      189
+    ]
+  ]
+}
