@@ -1,0 +1,304 @@
+diff --git a/src/orga_drone/export/studio_encoder.py b/src/orga_drone/export/studio_encoder.py
+index e8a0959..f5d9ba9 100644
+--- a/src/orga_drone/export/studio_encoder.py
++++ b/src/orga_drone/export/studio_encoder.py
+@@ -764,7 +764,7 @@ def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list
+ 
+ def _has_crossfade(clips: tuple[StudioExportClip, ...]) -> bool:
+     for clip in clips[:-1]:
+-        if clip.transition_type == "crossfade" and float(clip.transition_s) > 0:
++        if clip.transition_type in {"crossfade", "soft_wipe_left"} and float(clip.transition_s) > 0:
+             return True
+     return False
+ 
+@@ -810,7 +810,12 @@ def _norm_audio_pad(src: str, alias: str) -> str:
+ XFADE_SMOOTH_EXPR = "B*(1-P*P*(3-2*P))+A*(P*P*(3-2*P))"
+ 
+ 
+-def _xfade_video(left: str, right: str, out: str, overlap: float, offset: float, curve: str) -> str:
++def _xfade_video(left: str, right: str, out: str, overlap: float, offset: float, curve: str, transition: str = "crossfade") -> str:
++    if transition == "soft_wipe_left":
++        return (
++            f"[{left}][{right}]xfade=transition=smoothleft:"
++            f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
++        )
+     if curve == "smooth":
+         return (
+             f"[{left}][{right}]xfade=transition=custom:expr={XFADE_SMOOTH_EXPR}:"
+@@ -846,7 +851,7 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
+         filters.append(_norm_audio_pad(current_a, left_a))
+         filters.append(_norm_audio_pad(next_a, right_a))
+         outgoing = clips[index]
+-        if outgoing.transition_type == "crossfade" and outgoing.transition_s > 0:
++        if outgoing.transition_type in {"crossfade", "soft_wipe_left"} and outgoing.transition_s > 0:
+             overlap = float(outgoing.transition_s)
+             offset = max(0.0, current_dur - overlap)
+             filters.append(
+@@ -857,6 +862,7 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
+                     overlap,
+                     offset,
+                     outgoing.transition_curve,
++                    outgoing.transition_type,
+                 )
+             )
+             a_keep = max(0.0, current_dur - overlap / 2.0)
+diff --git a/src/orga_drone/static/js/studio.js b/src/orga_drone/static/js/studio.js
+index 98a5364..4f6b521 100644
+--- a/src/orga_drone/static/js/studio.js
++++ b/src/orga_drone/static/js/studio.js
+@@ -1,3 +1,4 @@
++import { isOverlapTransition, createSoftWipeCompositor } from "./studio/soft-wipe.js";
+ import "./studio-lut-webgl.js";
+ import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
+ import { createExportUi } from "./studio/export.js";
+@@ -944,7 +945,7 @@ import {
+     let total = 0;
+     list.forEach((clip, index) => {
+       total += clipDuration(clip);
+-      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
++      if (index < list.length - 1 && isOverlapTransition((clip.dataset.appliedType || "cut"))) {
+         total -= Number(clip.dataset.appliedDuration) || 0;
+       }
+     });
+@@ -960,7 +961,7 @@ import {
+     let duration = clipDuration(clip);
+     if (
+       index < listLength - 1 &&
+-      (clip.dataset.appliedType || "cut") === "crossfade"
++      isOverlapTransition((clip.dataset.appliedType || "cut"))
+     ) {
+       duration -= Number(clip.dataset.appliedDuration) || 0;
+     }
+@@ -1485,7 +1486,7 @@ import {
+       el.style.left = `${Math.max(0, boundary - regionW / 2)}px`;
+       el.classList.toggle("is-cut", type === "cut" || dur <= 0);
+       el.classList.toggle("is-fade", type === "fade_black");
+-      el.classList.toggle("is-crossfade", type === "crossfade");
++      el.classList.toggle("is-crossfade", isOverlapTransition(type));
+       el.style.display = dragCard ? "none" : "";
+       const span = el.querySelector("[data-transition-span]");
+       if (span) {
+@@ -1627,7 +1628,7 @@ import {
+       const c = list[i];
+       if (c === clip) return cursor;
+       cursor += clipDuration(c);
+-      if (i < list.length - 1 && (c.dataset.appliedType || "cut") === "crossfade") {
++      if (i < list.length - 1 && isOverlapTransition((c.dataset.appliedType || "cut"))) {
+         cursor -= Number(c.dataset.appliedDuration) || 0;
+       }
+     }
+@@ -1646,7 +1647,7 @@ import {
+     list.forEach((clip, index) => {
+       starts.push(cursor);
+       cursor += clipDuration(clip);
+-      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
++      if (index < list.length - 1 && isOverlapTransition((clip.dataset.appliedType || "cut"))) {
+         cursor -= Number(clip.dataset.appliedDuration) || 0;
+       }
+     });
+@@ -1692,7 +1693,7 @@ import {
+         fadeBlackOpacity = Math.max(fadeBlackOpacity, 1 - localS / half);
+       }
+     }
+-    if (incoming && (incoming.dataset.appliedType || "cut") === "crossfade") {
++    if (incoming && isOverlapTransition((incoming.dataset.appliedType || "cut"))) {
+       const d = Number(incoming.dataset.appliedDuration) || 0;
+       const intoIncoming = t - start;
+       if (d > 0 && intoIncoming <= d) {
+@@ -1711,7 +1712,7 @@ import {
+         };
+       }
+     }
+-    if (outgoingType === "crossfade" && outgoingD > 0 && primary < list.length - 1) {
++    if (isOverlapTransition(outgoingType) && outgoingD > 0 && primary < list.length - 1) {
+       const nextStart = starts[primary + 1];
+       if (t >= nextStart) {
+         const next = list[primary + 1];
+@@ -5505,7 +5506,7 @@ import {
+       if (previewTitlecard) previewTitlecard.style.opacity = "";
+     } else if (overlap) {
+       showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
+-      const progress = hit.crossfadeProgress;
++      const progress = (hit.overlapClip.dataset.appliedType === "soft_wipe_left") ? 1 : hit.crossfadeProgress;
+       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
+       if (previewVideo && !previewVideo.hidden) previewVideo.style.opacity = String(progress);
+       if (previewTitlecard && !previewTitlecard.hidden) previewTitlecard.style.opacity = String(progress);
+@@ -5531,6 +5532,7 @@ import {
+   // looks grainy while export still scales the source frame. Blit the visible
+   // picture at device pixels with smoothing. Privacy pixelate keeps its own
+   // unsmoothed scratch canvas.
++  const compositeSoftWipe = createSoftWipeCompositor();
+   let previewBlitCanvas = null;
+   let previewBlitRaf = 0;
+ 
+@@ -5691,7 +5693,14 @@ import {
+     ctx.fillRect(0, 0, cssW, cssH);
+     const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH);
+     const rendered = !reuseDraft && !state.playing && previewLayerReady(previewLutStill) ? previewLutStill : null;
+-    const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH, rendered);
++    const hit = !reuseDraft ? resolveAt(state.projectTimeS) : null;
++    const wipe = hit && hit.overlapClip && hit.overlapClip.dataset.appliedType === "soft_wipe_left";
++    const drewPrimary = wipe
++      ? compositeSoftWipe(ctx, pixelW, pixelH, hit.crossfadeProgress, (layer) => {
++          layer.setTransform(dpr, 0, 0, dpr, 0, 0);
++          return drawPreviewLayer(layer, primary, cssW, cssH, rendered);
++        })
++      : drawPreviewLayer(ctx, primary, cssW, cssH, rendered);
+     canvas.hidden = !(drewSecondary || drewPrimary);
+   }
+ 
+@@ -6594,7 +6603,7 @@ import {
+   function transitionOccupancyS(type, duration) {
+     const seconds = Number(duration) || 0;
+     if (type === "fade_black") return Math.max(0, seconds / 2);
+-    if (type === "crossfade") return Math.max(0, seconds);
++    if (isOverlapTransition(type)) return Math.max(0, seconds);
+     return 0;
+   }
+ 
+@@ -9196,7 +9205,7 @@ import {
+         clip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
+         const flex =
+           clipDuration(clip) -
+-          ((body.applied_type === "crossfade" ? Number(body.applied_duration_s) : 0) || 0);
++          ((isOverlapTransition(body.applied_type) ? Number(body.applied_duration_s) : 0) || 0);
+         clip.style.setProperty("--clip-flex", String(Math.max(0, flex).toFixed(4)));
+       }
+       const chip = grid.querySelector(
+diff --git a/src/orga_drone/static/js/studio/soft-wipe.js b/src/orga_drone/static/js/studio/soft-wipe.js
+new file mode 100644
+index 0000000..c388d98
+--- /dev/null
++++ b/src/orga_drone/static/js/studio/soft-wipe.js
+@@ -0,0 +1,51 @@
++// FFmpeg smoothleft: incoming weight = smoothstep(0, 1, x/W + 2*t - 1).
++// Apply to the finished incoming frame in output coordinates, not the source.
++export function isOverlapTransition(type) {
++  return type === "crossfade" || type === "soft_wipe_left";
++}
++
++export function softWipeAlpha(x, width, progress) {
++  const t = Math.max(0, Math.min(1, Number(progress) || 0));
++  const u = Math.max(0, Math.min(1, x / width + 2 * t - 1));
++  return u * u * (3 - 2 * u);
++}
++
++export function createSoftWipeCompositor(createCanvas = () => document.createElement("canvas")) {
++  const incoming = createCanvas();
++  const mask = createCanvas();
++  return function composite(ctx, width, height, progress, drawIncoming) {
++    if (incoming.width !== width || incoming.height !== height) {
++      incoming.width = width;
++      incoming.height = height;
++    }
++    if (mask.width !== width || mask.height !== 1) {
++      mask.width = width;
++      mask.height = 1;
++    }
++    const picture = incoming.getContext("2d");
++    const alpha = mask.getContext("2d");
++    if (!picture || !alpha) return false;
++    picture.setTransform(1, 0, 0, 1, 0, 0);
++    picture.globalCompositeOperation = "source-over";
++    picture.globalAlpha = 1;
++    picture.filter = "none";
++    picture.fillStyle = "#000";
++    picture.fillRect(0, 0, width, height);
++    if (!drawIncoming(picture)) return false;
++    const row = alpha.createImageData(width, 1);
++    for (let x = 0; x < width; x += 1) {
++      row.data[x * 4 + 3] = Math.round(255 * softWipeAlpha(x, width, progress));
++    }
++    alpha.putImageData(row, 0, 0);
++    picture.setTransform(1, 0, 0, 1, 0, 0);
++    picture.globalCompositeOperation = "destination-in";
++    picture.imageSmoothingEnabled = false;
++    picture.drawImage(mask, 0, 0, width, height);
++    picture.globalCompositeOperation = "source-over";
++    ctx.save();
++    ctx.setTransform(1, 0, 0, 1, 0, 0);
++    ctx.drawImage(incoming, 0, 0);
++    ctx.restore();
++    return true;
++  };
++}
+diff --git a/src/orga_drone/studio_transition.py b/src/orga_drone/studio_transition.py
+index 77404c6..bdec469 100644
+--- a/src/orga_drone/studio_transition.py
++++ b/src/orga_drone/studio_transition.py
+@@ -12,7 +12,9 @@ from typing import Iterable, Mapping, Sequence
+ TYPE_CUT = "cut"
+ TYPE_FADE_BLACK = "fade_black"
+ TYPE_CROSSFADE = "crossfade"
+-CANONICAL_TYPES = frozenset({TYPE_CUT, TYPE_FADE_BLACK, TYPE_CROSSFADE})
++TYPE_SOFT_WIPE_LEFT = "soft_wipe_left"
++OVERLAP_TYPES = frozenset({TYPE_CROSSFADE, TYPE_SOFT_WIPE_LEFT})
++CANONICAL_TYPES = frozenset({TYPE_CUT, TYPE_FADE_BLACK, *OVERLAP_TYPES})
+ # Stub / legacy values stored by the unrendered client UI or unused TEXT column.
+ LEGACY_CUT_TYPES = frozenset({"", "none", "fade", "slide"})
+ 
+@@ -44,7 +46,7 @@ def occupancy_s(applied_type: str, applied_d: float) -> float:
+     """How much of a clip this boundary occupies on one side."""
+     if applied_type == TYPE_FADE_BLACK:
+         return max(0.0, float(applied_d) / 2.0)
+-    if applied_type == TYPE_CROSSFADE:
++    if applied_type in OVERLAP_TYPES:
+         return max(0.0, float(applied_d))
+     return 0.0
+ 
+@@ -64,6 +66,10 @@ class AppliedTransition:
+     def is_crossfade(self) -> bool:
+         return self.type == TYPE_CROSSFADE and self.duration_s > 0
+ 
++    @property
++    def is_overlap(self) -> bool:
++        return self.type in OVERLAP_TYPES and self.duration_s > 0
++
+     @property
+     def is_fade_black(self) -> bool:
+         return self.type == TYPE_FADE_BLACK and self.duration_s > 0
+@@ -189,7 +195,7 @@ def story_length_s(
+     """Cut/fade-black: sum(items). Crossfade subtracts each applied overlap D."""
+     total = sum(max(0.0, float(d)) for d in durations_s)
+     for boundary in applied:
+-        if boundary.is_crossfade:
++        if boundary.is_overlap:
+             total -= boundary.duration_s
+     return max(0.0, total)
+ 
+@@ -205,7 +211,7 @@ def story_starts_s(
+     for i, raw in enumerate(durations_s):
+         starts[i] = cursor
+         cursor += max(0.0, float(raw))
+-        if i < len(applied) and applied[i].is_crossfade:
++        if i < len(applied) and applied[i].is_overlap:
+             cursor -= applied[i].duration_s
+     return starts
+ 
+@@ -213,7 +219,7 @@ def story_starts_s(
+ def clip_flex_s(duration_s: float, outgoing: AppliedTransition | None) -> float:
+     """Story-track tile width: shrink by outgoing crossfade overlap only."""
+     d = max(0.0, float(duration_s))
+-    if outgoing is not None and outgoing.is_crossfade:
++    if outgoing is not None and outgoing.is_overlap:
+         return max(0.0, d - outgoing.duration_s)
+     return d
+ 
+@@ -330,7 +336,7 @@ def resolve_story_time(
+     overlap_local = None
+     overlap_start = None
+     progress = None
+-    if incoming is not None and incoming.is_crossfade:
++    if incoming is not None and incoming.is_overlap:
+         d = incoming.duration_s
+         into = t - start
+         if d > 0 and into <= d + 1e-9:
+@@ -338,7 +344,7 @@ def resolve_story_time(
+             overlap_start = starts[overlap_index]
+             overlap_local = t - overlap_start
+             progress = min(1.0, max(0.0, into / d))
+-    elif outgoing is not None and outgoing.is_crossfade:
++    elif outgoing is not None and outgoing.is_overlap:
+         next_start = starts[primary + 1]
+         if t >= next_start:
+             overlap_index = primary + 1
