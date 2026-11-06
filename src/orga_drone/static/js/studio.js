@@ -5374,6 +5374,7 @@ import {
 
   function clearCrossfadePreload({ pause = true } = {}) {
     crossfadePreloadId = null;
+    if (previewVideoB) previewVideoB.__orgaFramePaintPending = false;
     if (pause && previewVideoB && !previewVideoB.paused) {
       try {
         previewVideoB.pause();
@@ -5474,8 +5475,35 @@ import {
             /* ignore */
           }
         };
-        if (previewVideoB.readyState >= 1) sync();
-        else previewVideoB.addEventListener("loadedmetadata", sync, { once: true });
+        const requestFramePaint = () => {
+          if (state.playing) {
+            previewVideoB.__orgaFramePaintPending = false;
+            return;
+          }
+          if (typeof previewVideoB.requestVideoFrameCallback !== "function") {
+            schedulePreviewBlit();
+            return;
+          }
+          if (previewVideoB.__orgaFramePaintPending) return;
+          previewVideoB.__orgaFramePaintPending = true;
+          previewVideoB.requestVideoFrameCallback(() => {
+            previewVideoB.__orgaFramePaintPending = false;
+            schedulePreviewBlit();
+          });
+        };
+        if (previewVideoB.readyState >= 1) {
+          sync();
+          requestFramePaint();
+        } else {
+          previewVideoB.addEventListener(
+            "loadedmetadata",
+            () => {
+              sync();
+              requestFramePaint();
+            },
+            { once: true }
+          );
+        }
         if (state.playing && previewVideoB.paused) {
           previewVideoB.play().catch(() => {
             /* drift correction still runs on the existing clock updates */

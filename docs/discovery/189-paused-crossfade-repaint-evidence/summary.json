@@ -1,0 +1,170 @@
+{
+  "base_develop": "0ee283fe79f0a251c970bfaa86b2decfc21f7458",
+  "fix_build": {
+    "exe_sha256": "0144585c41f4c69d5cc03ede62c1f17e5d68cb1a1a4e44cc003872ad642be9fb",
+    "studio_js_sha256": "78a38d6f0b538f2729c7cc02147ae154af198fb6d1288030ff120de896369cff",
+    "studio_lut_webgl_sha256": "12d4c18dc59caeffc505a75a5cf9c6f8a730450cdb8bf641a65a6fbc1e50ee12",
+    "ffmpeg": "9.0.2",
+    "webview2": "Edg/156.0.4314.58"
+  },
+  "before": {
+    "source": "PR #314 validation evidence",
+    "paused_brightness": [
+      62.09,
+      62.09,
+      62.09,
+      62.09
+    ],
+    "correct_brightness": 124.63,
+    "paused_vs_export": {
+      "full": 60.46447048611111,
+      "max_swatch": 103.0
+    }
+  },
+  "after": {
+    "no_lut": [
+      {
+        "paused_brightness": [
+          124.63,
+          124.63,
+          124.63,
+          124.63
+        ],
+        "paused_brightness_final": 124.63,
+        "paused_vs_export": {
+          "full": 1.9861443865740742,
+          "max_swatch": 2.6666666666666665
+        },
+        "pair_drift_max": 0.06666700000000025,
+        "pair_drift_p95": 0.06666700000000025,
+        "outgoing_seeks": 2,
+        "fresh_outgoing": 19,
+        "webgl": {
+          "b": false
+        }
+      },
+      {
+        "paused_brightness": [
+          124.63,
+          124.63,
+          124.63,
+          124.63
+        ],
+        "paused_brightness_final": 124.63,
+        "paused_vs_export": {
+          "full": 1.9861443865740742,
+          "max_swatch": 2.6666666666666665
+        },
+        "pair_drift_max": 0.033333999999999975,
+        "pair_drift_p95": 0.033332999999999835,
+        "outgoing_seeks": 0,
+        "fresh_outgoing": 23,
+        "webgl": {
+          "b": false
+        }
+      },
+      {
+        "paused_brightness": [
+          124.63,
+          124.63,
+          124.63,
+          124.63
+        ],
+        "paused_brightness_final": 124.63,
+        "paused_vs_export": {
+          "full": 1.9861443865740742,
+          "max_swatch": 2.6666666666666665
+        },
+        "pair_drift_max": 0.033333999999999975,
+        "pair_drift_p95": 0.033333999999999975,
+        "outgoing_seeks": 0,
+        "fresh_outgoing": 23,
+        "webgl": {
+          "b": false
+        }
+      }
+    ],
+    "one_lut": [
+      {
+        "paused_brightness": [
+          97.26,
+          97.26,
+          97.26,
+          97.26
+        ],
+        "paused_brightness_final": 97.26,
+        "paused_vs_export": {
+          "full": 2.841304976851852,
+          "max_swatch": 4.0
+        },
+        "pair_drift_max": 0.033333999999999975,
+        "pair_drift_p95": 0.033333999999999975,
+        "outgoing_seeks": 0,
+        "fresh_outgoing": 22,
+        "webgl": {
+          "a": "1",
+          "b": false
+        }
+      },
+      {
+        "paused_brightness": [
+          97.26,
+          97.26,
+          97.26,
+          97.26
+        ],
+        "paused_brightness_final": 97.26,
+        "paused_vs_export": {
+          "full": 2.841304976851852,
+          "max_swatch": 4.0
+        },
+        "pair_drift_max": 0.06666700000000025,
+        "pair_drift_p95": 0.06666699999999981,
+        "outgoing_seeks": 2,
+        "fresh_outgoing": 19,
+        "webgl": {
+          "a": "1",
+          "b": false
+        }
+      }
+    ]
+  },
+  "priority_two_lut_crossfade_timing": {
+    "clock_runs": [
+      {
+        "presented_pair_drift_max_s": 0.06666700000000025,
+        "presented_pair_drift_p95_s": 0.06666700000000025,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 19,
+        "stable_presented_pairs": 95,
+        "primary_story_drift_max_s": 0.002601292407108491
+      },
+      {
+        "presented_pair_drift_max_s": 0.033333999999999975,
+        "presented_pair_drift_p95_s": 0.033333999999999975,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 20,
+        "stable_presented_pairs": 91,
+        "primary_story_drift_max_s": 0.0031024232633277415
+      },
+      {
+        "presented_pair_drift_max_s": 0.06666700000000025,
+        "presented_pair_drift_p95_s": 0.06666699999999981,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 17,
+        "stable_presented_pairs": 89,
+        "primary_story_drift_max_s": 0.0028990306946692357
+      }
+    ],
+    "status": "UNRESOLVED: 0.0667/0.0333/0.0667 s max pair drift; 2/2/2 outgoing seeks"
+  },
+  "checks": {
+    "js": "106 passed",
+    "python": "1127 passed, 3 skipped",
+    "journey_smoke": "2 passed",
+    "packaged_functional": "10/10",
+    "cut": "PASS",
+    "fade_black": "PASS"
+  },
+  "recommendation": "GO for the paused-crossfade repaint fix; CONDITIONAL/NO-GO for release-candidate sign-off because the LUT crossfade timing blocker remains."
+}
