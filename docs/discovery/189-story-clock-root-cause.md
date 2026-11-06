@@ -96,15 +96,13 @@ Every other sampled plateau is below 53 ms. Treating a seeking video as a clock
 source would be wrong, so this is expected behavior rather than a remaining
 clock drift.
 
-### Remaining crossfade limitation
+### Crossfade outgoing follow-up
 
-The outgoing crossfade video is still paused and repositioned on the native
-clock update. Its presented frame can therefore lag the incoming frame by about
-0.23 s even though the Story playhead now tracks the incoming media. This is a
-separate outgoing-layer synchronization problem, not a regression from this
-fix. It needs its own approved design (for example, whether the outgoing layer
-should play continuously or be replaced by a different blend strategy) and was
-not changed here.
+The previously remaining outgoing crossfade drift was investigated separately
+after this change. [Crossfade synchronization](189-crossfade-sync.md) records the
+paused-outgoing root cause, the bounded play/pre-roll fix, and packaged WebView2
+before/after measurements. LUT crossfade parity and the separate #267 LUT gap
+remain unclaimed.
 
 ## Regression coverage
 

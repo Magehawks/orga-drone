@@ -21,7 +21,7 @@ def probe(monkeypatch):
     return module
 
 
-def video(current_time, *, src, ready=4, presented=None):
+def video(current_time, *, src, ready=4, presented=None, opacity=""):
     return {
         "currentTime": current_time,
         "src": src,
@@ -30,6 +30,7 @@ def video(current_time, *, src, ready=4, presented=None):
         "hidden": False,
         "seeking": False,
         "presented": presented,
+        "opacity": opacity,
         "events": {"timeupdate": 1, "seeking": 0, "seeked": 0},
     }
 
@@ -83,6 +84,14 @@ def valid_report():
                 ),
             ),
         ],
+        "seeks": [
+            sample(
+                900,
+                2.5,
+                video(0.5, src=source, opacity="0.5"),
+                video(2.5, src=outgoing),
+            )
+        ],
     }
 
 
@@ -120,3 +129,10 @@ def test_missing_presented_frames_are_not_zero_error(probe):
     assert result["fresh_outgoing_presentations"] == 0
     assert result["stable_presented_pairs"] == 0
     assert result["presented_pair_drift_max_s"] is None
+
+def test_paused_seek_clock_and_progress(probe):
+    result = probe.summarize(valid_report())
+    assert result["paused_seek_samples"] == 1
+    assert result["paused_seek_primary_error_max_s"] == pytest.approx(0.0)
+    assert result["paused_seek_outgoing_error_max_s"] == pytest.approx(0.0)
+    assert result["paused_seek_progress_error_max"] == pytest.approx(0.0)
