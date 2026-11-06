@@ -1,0 +1,109 @@
+{
+  "schema": "orga-drone-packaged-e2e-v1",
+  "result": "pass",
+  "app_version": "2.3.3",
+  "webview2_version": "156.0.4314.58",
+  "artifact_sha256": "ce0588397f2ab3406c42b01b9ce12dd96db5f21bbc9510b64b6db9f8929635d8",
+  "artifact_size": 121138166,
+  "elapsed_ms": 11280,
+  "journeys": {
+    "edit_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 313,
+      "ok": true
+    },
+    "export": {
+      "detail": {
+        "blue_frames": 3,
+        "bytes": 48520,
+        "frames": 5,
+        "red_frames": 2,
+        "sha256": "d78ed11f0ee41b5ac9061b5e7809e696f9614432a4301947abbac86ae041ac61"
+      },
+      "elapsed_ms": 1250,
+      "ok": true
+    },
+    "image_export": {
+      "detail": {
+        "bytes": 8958,
+        "preset": "instagram",
+        "sha256": "da4e80ee800e0657e56b62ae54bfdddbe91891292c80ee1bbc39c231ef218626"
+      },
+      "elapsed_ms": 280,
+      "ok": true
+    },
+    "library_navigation": {
+      "detail": {
+        "browse_chars": 890
+      },
+      "elapsed_ms": 437,
+      "ok": true
+    },
+    "media_import": {
+      "detail": {
+        "counts": {
+          "assets": 2,
+          "flows": 0,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "offline": 0,
+          "photos": 1,
+          "preserved": 0,
+          "removed": 0,
+          "sessions": 0,
+          "unavailable": 0,
+          "unchanged": 0,
+          "unreadable": 0,
+          "videos": 1
+        },
+        "job_id": "3bb621e1-74fb-46b2-88f9-a67c9efd7cb5"
+      },
+      "elapsed_ms": 578,
+      "ok": true
+    },
+    "playback": {
+      "detail": {
+        "currentTime": 0.960411,
+        "paused": false,
+        "readyState": 4
+      },
+      "elapsed_ms": 1061,
+      "ok": true
+    },
+    "relaunch_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 3109,
+      "ok": true
+    },
+    "source_integrity": {
+      "detail": {
+        "files": [
+          "e2e-blue.jpg",
+          "e2e-red.mp4"
+        ]
+      },
+      "elapsed_ms": 15,
+      "ok": true
+    },
+    "startup": {
+      "detail": {
+        "title": "Start \u00b7 orga-drone",
+        "version": "2.3.3"
+      },
+      "elapsed_ms": 421,
+      "ok": true
+    },
+    "studio_open": {
+      "detail": {
+        "project_id": 1
+      },
+      "elapsed_ms": 797,
+      "ok": true
+    }
+  },
+  "source_integrity": null
+}

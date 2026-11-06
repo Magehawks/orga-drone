@@ -1,0 +1,123 @@
+{
+  "build": "0ee283f",
+  "environment": {
+    "webview2": "Edg/156.0.4314.58",
+    "ffmpeg": "9.0.2",
+    "exe_sha256": "0bfa4ddc0e2c1e6b703798f3a5a563893772626c54dd83f2829cafe7e294c092"
+  },
+  "crossfade_no_lut_runs": [
+    {
+      "status": "OBSERVED",
+      "samples": 507,
+      "overlap_samples": 105,
+      "primary_samples": 102,
+      "primary_story_drift_max_s": 0.0014995153473345013,
+      "story_plateau_max_ms": 183.19999999925494,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 23,
+      "stable_presented_pairs": 102,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    },
+    {
+      "status": "OBSERVED",
+      "samples": 515,
+      "overlap_samples": 107,
+      "primary_samples": 104,
+      "primary_story_drift_max_s": 0.0021017770597742125,
+      "story_plateau_max_ms": 187.40000000223517,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 23,
+      "stable_presented_pairs": 97,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    },
+    {
+      "status": "OBSERVED",
+      "samples": 515,
+      "overlap_samples": 106,
+      "primary_samples": 102,
+      "primary_story_drift_max_s": 0.001202907915993645,
+      "story_plateau_max_ms": 192.89999999850988,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 23,
+      "stable_presented_pairs": 95,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    }
+  ],
+  "crossfade_with_lut_runs": [
+    {
+      "status": "OBSERVED",
+      "samples": 535,
+      "overlap_samples": 108,
+      "primary_samples": 105,
+      "primary_story_drift_max_s": 0.003002746365104947,
+      "story_plateau_max_ms": 191.89999999850988,
+      "outgoing_seek_delta": 2,
+      "fresh_outgoing_presentations": 19,
+      "stable_presented_pairs": 81,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    },
+    {
+      "status": "OBSERVED",
+      "samples": 532,
+      "overlap_samples": 105,
+      "primary_samples": 102,
+      "primary_story_drift_max_s": 0.0014995153473348344,
+      "story_plateau_max_ms": 197.5,
+      "outgoing_seek_delta": 3,
+      "fresh_outgoing_presentations": 18,
+      "stable_presented_pairs": 75,
+      "presented_pair_drift_max_s": 0.06666700000000025,
+      "presented_pair_drift_p95_s": 0.06666700000000025,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    },
+    {
+      "status": "OBSERVED",
+      "samples": 519,
+      "overlap_samples": 108,
+      "primary_samples": 105,
+      "primary_story_drift_max_s": 0.004501130856219948,
+      "story_plateau_max_ms": 183.29999999701977,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 23,
+      "stable_presented_pairs": 98,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975,
+      "paused_seek_samples": 2,
+      "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+      "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+      "paused_seek_progress_error_max": 2.289176090575218e-06
+    }
+  ],
+  "cut": {
+    "status": "NOT_A_CROSSFADE_TRACE",
+    "samples": 622
+  },
+  "fade_black": {
+    "status": "NOT_A_CROSSFADE_TRACE",
+    "samples": 621
+  },
+  "source_unchanged_all": true
+}
