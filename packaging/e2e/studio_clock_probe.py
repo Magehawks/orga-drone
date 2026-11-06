@@ -75,6 +75,24 @@ def summarize(report: dict) -> dict:
         if s["videos"][1]["presented"]
         and s["videos"][1]["presented"]["observedAt"] >= samples[0]["now"]
     }
+    seek_overlap = [
+        s
+        for s in report.get("seeks", [])
+        if 2.0 <= s["story"] <= 3.0 and all(not v["hidden"] for v in s["videos"])
+    ]
+    primary_seek = [
+        abs(s["videos"][0]["currentTime"] - (s["story"] - 2)) for s in seek_overlap
+    ]
+    outgoing_seek = [
+        abs(s["videos"][1]["currentTime"] - s["story"]) for s in seek_overlap
+    ]
+    progress_error = []
+    for s in seek_overlap:
+        raw = s["videos"][0].get("opacity", "")
+        try:
+            progress_error.append(abs(float(raw) - (s["story"] - 2)))
+        except (TypeError, ValueError):
+            pass
     plateaus = []
     first = samples[0]
     for sample in samples[1:]:
@@ -93,6 +111,10 @@ def summarize(report: dict) -> dict:
         "outgoing_seek_delta": overlap[-1]["videos"][1]["events"]["seeking"]
         - overlap[0]["videos"][1]["events"]["seeking"],
         "fresh_outgoing_presentations": len(fresh_b),
+        "paused_seek_samples": len(seek_overlap),
+        "paused_seek_primary_error_max_s": max(primary_seek) if primary_seek else None,
+        "paused_seek_outgoing_error_max_s": max(outgoing_seek) if outgoing_seek else None,
+        "paused_seek_progress_error_max": max(progress_error) if progress_error else None,
         "stable_presented_pairs": len(paired),
         "presented_pair_drift_max_s": max(paired) if paired else None,
         "presented_pair_drift_p95_s": sorted(paired)[int(0.95 * (len(paired) - 1))]
@@ -192,7 +214,7 @@ def main() -> int:
     parser.add_argument("--ffmpeg", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
-        "--transition", choices=["cut", "crossfade"], default="crossfade"
+        "--transition", choices=["cut", "fade_black", "crossfade"], default="crossfade"
     )
     args = parser.parse_args()
     out = args.output_dir.resolve()

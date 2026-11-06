@@ -376,6 +376,7 @@ import {
   let wallClockRaf = 0;
   let wallClockLastMs = 0;
   let suppressVideoClock = false;
+  let crossfadePreloadId = null;
   let videoLoopIndex = 0;
   let loopSeeking = false;
   let loadedVideoSrc = "";
@@ -2017,6 +2018,7 @@ import {
         /* ignore */
       }
     }
+    clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
     setToggleLabel();
@@ -5370,6 +5372,69 @@ import {
     }
   }
 
+  function clearCrossfadePreload({ pause = true } = {}) {
+    crossfadePreloadId = null;
+    if (pause && previewVideoB && !previewVideoB.paused) {
+      try {
+        previewVideoB.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
+  function prepareOutgoingCrossfade(hit) {
+    if (!state.playing || !previewVideoB || !hit || hit.overlapClip || !hit.clip) {
+      return false;
+    }
+    const clip = hit.clip;
+    if (clip.dataset.kind !== "video" || clip.dataset.canPlay !== "1") return false;
+    if ((clip.dataset.appliedType || "cut") !== "crossfade") return false;
+    const duration = Number(clip.dataset.appliedDuration) || 0;
+    if (duration <= 0 || loopOverlapS(clip) > 0) return false;
+    const list = clips().filter((c) => clipDuration(c) > 0);
+    if (hit.index + 1 >= list.length) return false;
+    const remaining = clipDuration(clip) - duration - (Number(hit.localS) || 0);
+    if (remaining <= 0 || remaining > 0.5) return false;
+    const id = String(clip.dataset.studioId);
+    const inS = loopPlayInS(clip);
+    const target = inS + Math.max(0, sectionSampleS(clip, hit.localS)) * playbackSpeed(clip);
+    const sync = () => {
+      if (crossfadePreloadId !== id || !state.playing) return;
+      try {
+        applyClipPlayback(previewVideoB, clip);
+        if (Math.abs((previewVideoB.currentTime || 0) - target) > 0.02) {
+          previewVideoB.currentTime = target;
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      if (previewVideoB.paused) {
+        previewVideoB.play().catch(() => {
+          /* the normal outgoing seek path remains the fallback */
+        });
+      }
+    };
+    if (crossfadePreloadId === id) {
+      if (previewVideoB.readyState >= 1) sync();
+      return true;
+    }
+    clearCrossfadePreload();
+    const src = videoSrcFor(clip);
+    if (!src) return false;
+    crossfadePreloadId = id;
+    previewVideoB.hidden = true;
+    previewVideoB.muted = true;
+    previewVideoB.style.opacity = "";
+    if (previewVideoB.getAttribute("src") !== src) {
+      previewVideoB.src = src;
+      previewVideoB.load();
+    }
+    if (previewVideoB.readyState >= 1) sync();
+    else previewVideoB.addEventListener("loadedmetadata", sync, { once: true });
+    return true;
+  }
+
   function showOutgoingLayer(clip, localS) {
     const kind = clip.dataset.kind || "unknown";
     if (kind === "title_card") {
@@ -5398,17 +5463,31 @@ import {
           previewVideoB.load();
         }
         const inS = loopPlayInS(clip);
-        const target = inS + Math.max(0, sectionSampleS(clip, localS)) * playbackSpeed(clip);
-        const apply = () => {
+        const speed = playbackSpeed(clip);
+        const target = inS + Math.max(0, sectionSampleS(clip, localS)) * speed;
+        const sync = () => {
           try {
             applyClipPlayback(previewVideoB, clip);
-            previewVideoB.currentTime = target;
+            const drift = Math.abs((previewVideoB.currentTime || 0) - target);
+            if (!state.playing || drift > 0.04) previewVideoB.currentTime = target;
           } catch (_) {
             /* ignore */
           }
         };
-        if (previewVideoB.readyState >= 1) apply();
-        else previewVideoB.addEventListener("loadedmetadata", apply, { once: true });
+        if (previewVideoB.readyState >= 1) sync();
+        else previewVideoB.addEventListener("loadedmetadata", sync, { once: true });
+        if (state.playing && previewVideoB.paused) {
+          previewVideoB.play().catch(() => {
+            /* drift correction still runs on the existing clock updates */
+          });
+        }
+        if (!state.playing && !previewVideoB.paused) {
+          try {
+            previewVideoB.pause();
+          } catch (_) {
+            /* ignore */
+          }
+        }
         return;
       }
       if (previewImageB && thumb) {
@@ -5482,16 +5561,16 @@ import {
         : null;
     const loopBlend = !!(loopPoint && loopPoint.blending && showLoopIncoming(hit.clip, loopPoint));
     const overlap = !loopBlend && hit && hit.overlapClip && hit.crossfadeProgress != null;
+    if (loopBlend) crossfadePreloadId = null;
+    const preloading = !overlap && !loopBlend && prepareOutgoingCrossfade(hit);
     if (!overlap && !loopBlend) {
       if (previewImageB) {
         previewImageB.hidden = true;
         previewImageB.style.opacity = "";
       }
       if (previewVideoB) {
-        try {
-          previewVideoB.pause();
-        } catch (_) {
-          /* ignore */
+        if (!preloading) {
+          clearCrossfadePreload();
         }
         previewVideoB.hidden = true;
         previewVideoB.style.opacity = "";
@@ -5504,6 +5583,7 @@ import {
       if (previewVideo) previewVideo.style.opacity = "";
       if (previewTitlecard) previewTitlecard.style.opacity = "";
     } else if (overlap) {
+      clearCrossfadePreload({ pause: false });
       showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
       const progress = hit.crossfadeProgress;
       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
@@ -5774,6 +5854,7 @@ import {
     updatePlayheadChrome();
 
     if (!fromVideo) {
+      clearCrossfadePreload();
       syncPreviewMedia({ seek: true });
     } else {
       const hit = resolveAt(state.projectTimeS);

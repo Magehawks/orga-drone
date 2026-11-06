@@ -386,6 +386,8 @@ test("Story crossfades and cinematic loops retain two layers only during blends"
     c[name] = () => {};
   c.clipDuration = () => 13;
   c.clipMediaTarget = (_clip, offset) => offset;
+  c.prepareOutgoingCrossfade = () => false;
+  c.clearCrossfadePreload = () => {};
   for (const name of [
     "forwardLoopActive",
     "loopPlayInS",
