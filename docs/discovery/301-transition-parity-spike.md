@@ -48,7 +48,7 @@ failure instead records `BLOCKED` and returns nonzero.
   at 640x360. Both sides use different pre-baked grades so the same graded PNG
   inputs reach CSS and FFmpeg.
 - `hblur` midpoint mean absolute RGB error (0–255): **39.11** A-to-B,
-  **38.32** B-to-A. Its start/end errors were 0.08–0.14.
+  **38.32** B-to-A. Its start/end errors were 0.06–0.16 across both orders.
 - Wipe midpoint errors: left 4.84/4.82, right 4.51/4.53, up 4.96/4.67,
   down 4.98/4.92 (A-to-B/B-to-A). These are measurements, not accepted tolerances.
 
