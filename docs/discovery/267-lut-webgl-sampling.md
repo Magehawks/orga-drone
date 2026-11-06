@@ -29,7 +29,8 @@ The fixture, source hashes, EXE and export path were already controlled by the
 [fixed export](267-lut-evidence/fixed-export.png),
 [baseline report](267-lut-evidence/report-baseline.json),
 [fixed report](267-lut-evidence/report-fixed.json), and
-[conversion-LUT report](267-lut-evidence/report-conversion.json).
+[conversion-LUT report](267-lut-evidence/report-conversion.json), and
+[17x17x17 report](267-lut-evidence/report-17.json).
 
 ## Root cause
 
