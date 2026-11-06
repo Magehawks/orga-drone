@@ -73,6 +73,82 @@ def test_shift_on_cut() -> None:
     assert anim.keys[0].t == pytest.approx(0.0)
 
 
+def test_ease_in_out_interpolation_start_middle_end() -> None:
+    anim = ColorAnimation(
+        interp="ease_in_out",
+        bar_start_s=0.0,
+        bar_end_s=4.0,
+        keys=(ColorKey(t=0.0, warmth=0), ColorKey(t=4.0, warmth=40)),
+    )
+    assert keyed_sliders_at(anim, 0.0).warmth == 0
+    assert keyed_sliders_at(anim, 1.0).warmth == 6  # smoothstep(0.25) * 40
+    assert keyed_sliders_at(anim, 2.0).warmth == 20
+    assert keyed_sliders_at(anim, 3.0).warmth == 34  # smoothstep(0.75) * 40
+    assert keyed_sliders_at(anim, 4.0).warmth == 40
+
+
+def test_bar_boundaries_hold_first_and_last_point() -> None:
+    anim = build_preset("warm_up", bar_start_s=1.0, bar_end_s=3.0)
+    blob = dump_color_animation(
+        json.dumps({"image": {"warmth": -10}}),
+        anim,
+    )
+    # Outside the bar the static image grade applies.
+    assert image_adjust_at(blob, 0.9).warmth == -10
+    assert image_adjust_at(blob, 1.0).warmth == 0
+    assert image_adjust_at(blob, 3.0).warmth == 35
+    assert image_adjust_at(blob, 3.1).warmth == -10
+
+
+def test_serialization_preserves_ease_and_lut_strength() -> None:
+    anim = ColorAnimation(
+        mode="manual",
+        interp="ease_in_out",
+        bar_start_s=0.5,
+        bar_end_s=2.5,
+        keys=(
+            ColorKey(t=0.5, lut_strength=0),
+            ColorKey(t=2.5, lut_strength=100),
+        ),
+    )
+    blob = dump_color_animation("{}", anim)
+    loaded = color_animation_from_effect_settings(blob)
+    assert loaded.interp == "ease_in_out"
+    assert loaded.mode == "manual"
+    assert loaded.bar_start_s == pytest.approx(0.5)
+    assert loaded.bar_end_s == pytest.approx(2.5)
+    assert [key.lut_strength for key in loaded.keys] == [0, 100]
+
+
+def test_expand_skips_repeat_and_forward_loop() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+
+    anim = build_preset("warm_up", bar_start_s=0.0, bar_end_s=2.0)
+    for clip in (
+        StudioExportClip(
+            source_path=Path("x.mp4"),
+            kind="video",
+            duration_s=2.0,
+            source_start_s=0.0,
+            source_end_s=2.0,
+            section_repeats=2,
+            color_animation=anim,
+        ),
+        StudioExportClip(
+            source_path=Path("x.mp4"),
+            kind="video",
+            duration_s=2.0,
+            source_start_s=0.0,
+            source_end_s=2.0,
+            forward_loop=True,
+            color_animation=anim,
+        ),
+    ):
+        pieces = expand_export_clip_for_color(clip)
+        assert pieces == [clip]
+        assert pieces[0].color_animation is anim
+
+
 def test_expand_export_clip_splits_grade() -> None:
     from orga_drone.export.studio_config import StudioExportClip
 
@@ -295,6 +371,22 @@ def test_color_animation_api(
     assert body["ok"] is True
     assert body["color_animation"]["preset_id"] == "warm_up"
     assert body["effect_lane"]["color_animation"]["mode"] == "preset"
+    assert ok.headers["x-studio-can-undo"] == "1"
+
+    def stored_anim() -> ColorAnimation:
+        stored = {item.id: item for item in db.list_studio_items()}[clip_id]
+        return color_animation_from_effect_settings(stored.effect_settings)
+
+    assert stored_anim().preset_id == "warm_up"
+    undo = client.post("/api/studio/history/undo")
+    assert undo.status_code == 200
+    assert stored_anim().is_active is False
+    redo = client.post("/api/studio/history/redo")
+    assert redo.status_code == 200
+    restored = stored_anim()
+    assert restored.preset_id == "warm_up"
+    assert restored.bar_end_s == pytest.approx(3.0)
+
     page = client.get("/studio")
     assert page.status_code == 200
     assert 'id="inspector-color-animation"' in page.text
