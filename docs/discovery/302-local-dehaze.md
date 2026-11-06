@@ -1,8 +1,17 @@
 # Local dehaze control for aerial photos and video: discovery (#302)
 
-Status: **discovery complete; GO for a bounded global-strength control after
-real-fixture validation, NO-GO for per-pixel dark-channel dehaze in the current
-FFmpeg-only path.** This document does not add a slider and does not change
+> **Real-fixture validation update (2026-11-06):** the synthetic GO below did
+> not survive real aerial fixtures. The global transform over-darkens clear,
+> sunset, and bright-cloud scenes, and the atmosphere estimator is fragile.
+> Current recommendation: **NO-GO for a Dehaze slider in the current
+> FFmpeg-only pipeline.** See
+> [`302-local-dehaze-validation.md`](302-local-dehaze-validation.md) for the
+> evidence and the bounded conditions for a future attempt.
+
+Status: **discovery complete; original synthetic result was GO for a bounded
+global-strength control after real-fixture validation, NO-GO for per-pixel
+dark-channel dehaze in the current FFmpeg-only path. The real-fixture validation
+superseded the GO.** This document does not add a slider and does not change
 product status.
 
 Snapshot: `develop` at `660f3dd` (2026-11-05), Windows host, Python 3.12,
