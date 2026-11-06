@@ -159,6 +159,6 @@ fixed resource. Local provenance only; not release evidence.
 
 - No new transitions, LUTs, color changes, Dehaze, or export behavior.
 - No HDR, wide-gamut, variable-frame-rate, or cross-machine decoder claim.
-- The crossfade outgoing layer still needs a separate fix; do not describe this
-  result as full preview/export parity approval.
+- The crossfade outgoing follow-up is documented in
+  [189-crossfade-sync.md](189-crossfade-sync.md); LUT parity remains unclaimed.
 - No merge or release is authorized by this document.
