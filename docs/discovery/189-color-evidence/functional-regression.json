@@ -1,0 +1,51 @@
+{
+  "kind": "local functional regression only",
+  "admission_eligible": false,
+  "raw_report_sha256": "bee8d7b4b00ea4adea96d1d4803715bd9b3f448be6dd0446a822c7565f748d34",
+  "result": "pass",
+  "app_version": "2.3.3",
+  "webview2_version": "156.0.4314.58",
+  "manual_checks_claimed": false,
+  "journeys": {
+    "edit_persistence": {
+      "ok": true,
+      "elapsed_ms": 328
+    },
+    "export": {
+      "ok": true,
+      "elapsed_ms": 1280
+    },
+    "image_export": {
+      "ok": true,
+      "elapsed_ms": 282
+    },
+    "library_navigation": {
+      "ok": true,
+      "elapsed_ms": 515
+    },
+    "media_import": {
+      "ok": true,
+      "elapsed_ms": 578
+    },
+    "playback": {
+      "ok": true,
+      "elapsed_ms": 1061
+    },
+    "relaunch_persistence": {
+      "ok": true,
+      "elapsed_ms": 3125
+    },
+    "source_integrity": {
+      "ok": true,
+      "elapsed_ms": 0
+    },
+    "startup": {
+      "ok": true,
+      "elapsed_ms": 375
+    },
+    "studio_open": {
+      "ok": true,
+      "elapsed_ms": 688
+    }
+  }
+}
