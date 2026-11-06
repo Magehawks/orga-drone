@@ -89,6 +89,8 @@
       uniform sampler2D uVideo;
       uniform sampler3D uConv;
       uniform sampler3D uCreative;
+      uniform float uConvSize;
+      uniform float uCreativeSize;
       uniform bool uHasConv;
       uniform bool uHasCreative;
       uniform float uCreativeStrength;
@@ -100,13 +102,18 @@
       in vec2 uv;
       out vec4 outColor;
       float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-      vec3 applyLut(sampler3D lut, vec3 c) { return texture(lut, clamp(c, 0.0, 1.0)).rgb; }
+      vec3 lutCoord(vec3 c, float size) {
+        return (clamp(c, 0.0, 1.0) * (size - 1.0) + 0.5) / size;
+      }
+      vec3 applyLut(sampler3D lut, vec3 c, float size) {
+        return texture(lut, lutCoord(c, size)).rgb;
+      }
       void main() {
         vec3 c = texture(uVideo, uv).rgb * uWarmth * uBrightness;
         c = (c - 0.5) * uContrast + 0.5;
         c = mix(vec3(luma(c)), c, uSaturation);
-        if (uHasConv) c = applyLut(uConv, c);
-        if (uHasCreative) c = mix(c, applyLut(uCreative, c), uCreativeStrength);
+        if (uHasConv) c = applyLut(uConv, c, uConvSize);
+        if (uHasCreative) c = mix(c, applyLut(uCreative, c, uCreativeSize), uCreativeStrength);
         c = mix(vec3(luma(c)), c, uRamp);
         outColor = vec4(clamp(c, 0.0, 1.0), 1.0);
       }`;
@@ -136,6 +143,8 @@
         this.uVideo = gl.getUniformLocation(program, "uVideo");
         this.uConv = gl.getUniformLocation(program, "uConv");
         this.uCreative = gl.getUniformLocation(program, "uCreative");
+        this.uConvSize = gl.getUniformLocation(program, "uConvSize");
+        this.uCreativeSize = gl.getUniformLocation(program, "uCreativeSize");
         this.uHasConv = gl.getUniformLocation(program, "uHasConv");
         this.uHasCreative = gl.getUniformLocation(program, "uHasCreative");
         this.uCreativeStrength = gl.getUniformLocation(program, "uCreativeStrength");
@@ -223,10 +232,14 @@
       Promise.all([...new Set(assets)].map(lutData))
         .then(() => {
           if (this.loadingKey !== key) return;
-          this.convTex = look.conversion_lut && look.conversion_confirmed
-            ? this._textureFor(look.conversion_lut) : this.identity;
-          this.creativeTex = look.creative_lut && Number(look.creative_strength) > 0
-            ? this._textureFor(look.creative_lut) : this.identity;
+          const convData = look.conversion_lut && look.conversion_confirmed
+            ? lutDataCache.get(look.conversion_lut) : null;
+          const creativeData = look.creative_lut && Number(look.creative_strength) > 0
+            ? lutDataCache.get(look.creative_lut) : null;
+          this.convTex = convData ? this._textureFor(look.conversion_lut) : this.identity;
+          this.creativeTex = creativeData ? this._textureFor(look.creative_lut) : this.identity;
+          this.convSize = convData ? convData.size : 2;
+          this.creativeSize = creativeData ? creativeData.size : 2;
           this.lookKey = key;
           this.loadingKey = "";
           if (this.onReady) this.onReady();
@@ -278,6 +291,8 @@
       gl.uniform1i(this.uHasConv, look.conversion_lut && look.conversion_confirmed ? 1 : 0);
       gl.uniform1i(this.uHasCreative,
         look.creative_lut && Number(look.creative_strength) > 0 ? 1 : 0);
+      gl.uniform1f(this.uConvSize, this.convSize);
+      gl.uniform1f(this.uCreativeSize, this.creativeSize);
       gl.uniform1f(this.uCreativeStrength, Math.max(0, Math.min(1, Number(look.creative_strength) / 100)));
       const warmth = grade && grade.warmthGains ? grade.warmthGains : [1, 1, 1];
       gl.uniform3f(this.uWarmth, warmth[0], warmth[1], warmth[2]);

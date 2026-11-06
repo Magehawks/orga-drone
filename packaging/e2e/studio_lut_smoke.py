@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from studio_color_probe import compare, decode, export, image_bytes  # type: ignore[import-not-found]
+from studio_clock_probe import seek as seek_story  # type: ignore[import-not-found]
 from windows_e2e import (  # type: ignore[import-not-found]
     AppProcess,
     E2EError,
@@ -22,6 +23,38 @@ from windows_e2e import (  # type: ignore[import-not-found]
     sha256_file,
     wait_until,
 )
+
+STRICT_TOLERANCE = 3.0
+BASELINE_TOLERANCE_EXTRA = 1.5
+
+
+def lut_parity_decision(
+    paused_max: float,
+    playing_max: float,
+    baseline_max: float,
+    seek_max: float = 0.0,
+) -> dict:
+    """Bound LUT parity against the measured no-LUT color path.
+
+    The strict 3/255 gate is the original #310 target. The measured tagged
+    709 limited browser-vs-FFmpeg path is already above 2.5/255 before any LUT,
+    so the bounded gate allows 1.5 code values over that baseline while still
+    rejecting the 36/255 texel-centre sampling failure.
+    """
+    baseline = max(0.0, float(baseline_max or 0.0))
+    tolerance = max(STRICT_TOLERANCE, baseline + BASELINE_TOLERANCE_EXTRA)
+    worst = max(float(paused_max), float(playing_max), float(seek_max))
+    strict = worst <= STRICT_TOLERANCE
+    bounded = worst <= tolerance
+    return {
+        "baseline_max_swatch_mean_rgb_error": baseline,
+        "strict_tolerance_max_swatch_mean_rgb": STRICT_TOLERANCE,
+        "tolerance_max_swatch_mean_rgb": tolerance,
+        "strict_parity_pass": strict,
+        "parity_pass": bounded,
+        "lut_max_extra_over_baseline": max(0.0, worst - baseline),
+        "decision": "GO_BOUNDED_FIXTURE" if bounded else "NO-GO",
+    }
 
 
 def main() -> int:
@@ -146,9 +179,25 @@ def main() -> int:
         )
         exported = out / "lut-export.mp4"
         export(cdp, pid, exported)
+        report["export_sha256"] = sha256_file(exported)
         reference = decode(args.ffmpeg, exported)
         reference.save(out / "export-lut.png")
         report["paused_vs_export"] = compare(paused, reference)
+        seek_story(cdp, 1.0)
+        time.sleep(0.3)
+        report["seek"] = cdp.evaluate(
+            """(() => {const v=document.getElementById('studio-preview-video');
+          return {currentTime:v.currentTime,paused:v.paused,seeking:v.seeking,
+            readyState:v.readyState,webgl:document.getElementById('studio-preview-frame').dataset.lutWebgl,
+            still:!document.getElementById('studio-preview-lut-still').hidden};})()"""
+        )
+        seeked = image_bytes(
+            cdp.evaluate(
+                "document.getElementById('studio-preview-blit').toDataURL().split(',')[1]"
+            )
+        )
+        seeked.save(out / "seek-lut.png")
+        report["seek_vs_export"] = compare(seeked, reference)
         before_play = cdp.evaluate(
             "document.getElementById('studio-preview-video').currentTime"
         )
@@ -187,13 +236,27 @@ def main() -> int:
         report["source_unchanged"] = before == sha256_file(source)
         if not report["source_unchanged"]:
             raise E2EError("Synthetic source changed")
-        report["tolerance_max_swatch_mean_rgb"] = 3
-        report["parity_pass"] = all(
-            report[k]["max_swatch_mean_rgb_error"] <= 3
-            for k in ("paused_vs_export", "playing_vs_export")
+        baseline_max = 0.0
+        try:
+            baseline_case = next(
+                row for row in manifest["cases"] if row["name"] == "709-tv"
+            )
+            baseline_max = float(
+                baseline_case["comparisons"]["blit_vs_export_ffmpeg"][
+                    "max_swatch_mean_rgb_error"
+                ]
+            )
+        except (KeyError, StopIteration, TypeError, ValueError):
+            baseline_max = 0.0
+        report.update(
+            lut_parity_decision(
+                report["paused_vs_export"]["max_swatch_mean_rgb_error"],
+                report["playing_vs_export"]["max_swatch_mean_rgb_error"],
+                baseline_max,
+                report.get("seek_vs_export", {}).get("max_swatch_mean_rgb_error", 0.0),
+            )
         )
         report["status"] = "COMPLETE_LUT_DIAGNOSTIC"
-        report["decision"] = "GO_BOUNDED_FIXTURE" if report["parity_pass"] else "NO-GO"
     except Exception as exc:  # noqa: BLE001
         report["errors"].append(f"{type(exc).__name__}: {exc}")
     finally:
