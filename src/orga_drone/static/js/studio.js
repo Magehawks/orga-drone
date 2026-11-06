@@ -5699,6 +5699,7 @@ import {
     if (previewBlitRaf) return;
     previewBlitRaf = requestAnimationFrame(() => {
       previewBlitRaf = 0;
+      syncStoryClockFromVideo();
       paintPreviewBlit();
       const playing = [previewVideo, previewVideoB].some(
         (video) => video && !video.hidden && !video.paused && !video.ended
@@ -5901,6 +5902,67 @@ import {
     syncMusicAudio();
   }
 
+  function videoStoryPosition(playing, mediaTime) {
+    const inS = sourceInS(playing);
+    const speed = playbackSpeed(playing);
+    const reps = sectionRepeats(playing);
+    const cycle = sectionCycleS(playing);
+    const offset = clipOffsetFromMediaTime(playing, mediaTime, inS);
+    const within = slowBarOf(playing) && speed >= 0.999
+      ? sourceToStory(playing, offset)
+      : offset / speed;
+    const loopOverlap = forwardLoopOverlapS(playing);
+    const loopSpans = loopOverlap > 0 ? forwardLoopSpans(playing) : [];
+    let local = reps > 1 ? videoLoopIndex * cycle + within : within;
+    if (loopOverlap > 0 && loopSpans.length) {
+      const starts = forwardLoopStarts(loopSpans, loopOverlap);
+      const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
+      local = (starts[index] || 0) + within;
+    }
+    return {
+      inS,
+      speed,
+      reps,
+      cycle,
+      loopOverlap,
+      loopSpans,
+      local,
+      next: clipStartTime(playing) + local,
+    };
+  }
+
+  // The native timeupdate event is coarse (about 4 Hz). Sample the canonical
+  // video-to-Story mapping on the preview paint tick so the playhead and the
+  // visible primary frame do not drift apart between events. This only advances
+  // the clock; transition layers and music stay on their existing update path,
+  // because re-running applyTransitionPreview here seeks the outgoing crossfade
+  // video every frame and it stops presenting pictures.
+  function syncStoryClockFromVideo() {
+    if (reuseDraft || !state.playing || suppressVideoClock || !previewVideo) return;
+    if (!previewVideo.getAttribute("src") && !previewVideo.currentSrc) return;
+    if (
+      previewVideo.paused ||
+      previewVideo.hidden ||
+      previewVideo.seeking ||
+      previewVideo.readyState < 2 ||
+      previewVideo.ended ||
+      wallClockRaf
+    ) {
+      return;
+    }
+    const playing = clips().find(
+      (c) => String(c.dataset.studioId) === String(state.activeStudioId)
+    );
+    if (!playing || playing.dataset.kind !== "video") return;
+    const position = videoStoryPosition(playing, previewVideo.currentTime || 0);
+    const after = resolveAt(position.next);
+    if (!after || after.clip !== playing) return;
+    if (Math.abs(position.next - state.projectTimeS) >= 0.001) {
+      state.projectTimeS = position.next;
+    }
+    updatePlayheadChrome();
+  }
+
   function onVideoTimeUpdate() {
     if (reuseDraft && previewVideo) {
       if (previewVideo.currentTime >= reuseDraft.outS - 0.02) previewVideo.pause();
@@ -5915,26 +5977,19 @@ import {
       applyTransitionPreview(resolveAt(state.projectTimeS));
       return;
     }
-    const inS = sourceInS(playing);
     const outS = sourceOutS(playing);
-    const speed = playbackSpeed(playing);
-    const reps = sectionRepeats(playing);
-    const cycle = sectionCycleS(playing);
     const mediaTime = previewVideo.currentTime || 0;
     applyClipPlayback(previewVideo, playing);
-    const offset = clipOffsetFromMediaTime(playing, mediaTime, inS);
-    const within = slowBarOf(playing) && speed >= 0.999
-      ? sourceToStory(playing, offset)
-      : offset / speed;
-    const loopOverlap = forwardLoopOverlapS(playing);
-    const loopSpans = loopOverlap > 0 ? forwardLoopSpans(playing) : [];
-    let local = reps > 1 ? videoLoopIndex * cycle + within : within;
-    if (loopOverlap > 0 && loopSpans.length) {
-      const starts = forwardLoopStarts(loopSpans, loopOverlap);
-      const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
-      local = (starts[index] || 0) + within;
-    }
-    const next = clipStartTime(playing) + local;
+    const {
+      inS,
+      speed,
+      reps,
+      cycle,
+      loopOverlap,
+      loopSpans,
+      local,
+      next,
+    } = videoStoryPosition(playing, mediaTime);
     if (Math.abs(next - state.projectTimeS) >= 0.01) {
       state.projectTimeS = next;
     }
