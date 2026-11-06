@@ -1,0 +1,222 @@
+{
+  "creative": {
+    "status": "COMPLETE_LUT_DIAGNOSTIC",
+    "decision": "GO_BOUNDED_FIXTURE",
+    "parity_pass": true,
+    "strict_parity_pass": false,
+    "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+    "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+    "lut_max_extra_over_baseline": 1.3333333333333335,
+    "render_path": {
+      "webgl": "1",
+      "still": false,
+      "chip": ""
+    },
+    "seek": {
+      "currentTime": 0.999697,
+      "paused": true,
+      "seeking": false,
+      "readyState": 4,
+      "webgl": "1",
+      "still": false
+    },
+    "playback": {
+      "currentTime": 1.6018,
+      "paused": false,
+      "seeking": false,
+      "readyState": 4,
+      "decodedFrames": 39,
+      "beforeTime": 0.999697
+    },
+    "source_unchanged": true,
+    "export_sha256": "416cb21d93828323883aecbb8d6f89e75867be09a52cf095b3f392dcb7a3d0a3",
+    "paused_vs_export": {
+      "full_mean_rgb_error": 3.304288194444444,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "seek_vs_export": {
+      "full_mean_rgb_error": 3.304280960648148,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playing_vs_export": {
+      "full_mean_rgb_error": 3.304280960648148,
+      "max_swatch_mean_rgb_error": 4.0
+    }
+  },
+  "conversion": {
+    "status": "COMPLETE_LUT_DIAGNOSTIC",
+    "decision": "GO_BOUNDED_FIXTURE",
+    "parity_pass": true,
+    "strict_parity_pass": false,
+    "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+    "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+    "lut_max_extra_over_baseline": 1.3333333333333335,
+    "render_path": {
+      "webgl": "1",
+      "still": false,
+      "chip": ""
+    },
+    "seek": {
+      "currentTime": 0.999697,
+      "paused": true,
+      "seeking": false,
+      "readyState": 4,
+      "webgl": "1",
+      "still": false
+    },
+    "playback": {
+      "currentTime": 1.6012,
+      "paused": false,
+      "seeking": false,
+      "readyState": 4,
+      "decodedFrames": 38,
+      "beforeTime": 0.999697
+    },
+    "source_unchanged": true,
+    "export_sha256": "416cb21d93828323883aecbb8d6f89e75867be09a52cf095b3f392dcb7a3d0a3",
+    "paused_vs_export": {
+      "full_mean_rgb_error": 3.304288194444444,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "seek_vs_export": {
+      "full_mean_rgb_error": 3.304280960648148,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playing_vs_export": {
+      "full_mean_rgb_error": 3.304280960648148,
+      "max_swatch_mean_rgb_error": 4.0
+    }
+  },
+  "size_17": {
+    "status": "COMPLETE_LUT_DIAGNOSTIC",
+    "decision": "GO_BOUNDED_FIXTURE",
+    "parity_pass": true,
+    "strict_parity_pass": false,
+    "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+    "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+    "lut_max_extra_over_baseline": 1.0,
+    "render_path": {
+      "webgl": "1",
+      "still": false,
+      "chip": ""
+    },
+    "seek": {
+      "currentTime": 0.999697,
+      "paused": true,
+      "seeking": false,
+      "readyState": 4,
+      "webgl": "1",
+      "still": false
+    },
+    "playback": {
+      "currentTime": 1.6014,
+      "paused": false,
+      "seeking": false,
+      "readyState": 4,
+      "decodedFrames": 37,
+      "beforeTime": 0.999697
+    },
+    "source_unchanged": true,
+    "export_sha256": "113d48ab1076546695a5c55311ca692df201ffad5bee305db43944471d3796c7",
+    "paused_vs_export": {
+      "full_mean_rgb_error": 2.9383593749999997,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    },
+    "seek_vs_export": {
+      "full_mean_rgb_error": 2.9383593749999997,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    },
+    "playing_vs_export": {
+      "full_mean_rgb_error": 2.938346354166667,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    }
+  },
+  "size_33": {
+    "status": "COMPLETE_LUT_DIAGNOSTIC",
+    "decision": "GO_BOUNDED_FIXTURE",
+    "parity_pass": true,
+    "strict_parity_pass": false,
+    "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+    "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+    "lut_max_extra_over_baseline": 1.0,
+    "render_path": {
+      "webgl": "1",
+      "still": false,
+      "chip": ""
+    },
+    "seek": {
+      "currentTime": 0.999697,
+      "paused": true,
+      "seeking": false,
+      "readyState": 4,
+      "webgl": "1",
+      "still": false
+    },
+    "playback": {
+      "currentTime": 1.6013,
+      "paused": false,
+      "seeking": false,
+      "readyState": 4,
+      "decodedFrames": 38,
+      "beforeTime": 0.999697
+    },
+    "source_unchanged": true,
+    "export_sha256": "f19696c4f90b78c5dd4fb507c74805bc5311f6bcfaecba77507be6c0bf86f407",
+    "paused_vs_export": {
+      "full_mean_rgb_error": 3.017433449074074,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    },
+    "seek_vs_export": {
+      "full_mean_rgb_error": 3.017433449074074,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    },
+    "playing_vs_export": {
+      "full_mean_rgb_error": 3.0174204282407406,
+      "max_swatch_mean_rgb_error": 3.6666666666666665
+    }
+  },
+  "speed_0_5": {
+    "status": "COMPLETE_LUT_DIAGNOSTIC",
+    "decision": "GO_BOUNDED_FIXTURE",
+    "parity_pass": true,
+    "strict_parity_pass": false,
+    "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+    "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+    "lut_max_extra_over_baseline": 1.3333333333333335,
+    "render_path": {
+      "webgl": "1",
+      "still": false,
+      "chip": ""
+    },
+    "seek": {
+      "currentTime": 0.498889,
+      "paused": true,
+      "seeking": false,
+      "readyState": 4,
+      "webgl": "1",
+      "still": false
+    },
+    "playback": {
+      "currentTime": 0.7996,
+      "paused": false,
+      "seeking": false,
+      "readyState": 4,
+      "decodedFrames": 30,
+      "beforeTime": 0.498889
+    },
+    "source_unchanged": true,
+    "export_sha256": "b846873d032803246753aada927690ad1dd80368e640ac09cd37ec45b89ed9ca",
+    "paused_vs_export": {
+      "full_mean_rgb_error": 3.3041840277777776,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "seek_vs_export": {
+      "full_mean_rgb_error": 3.3041767939814815,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playing_vs_export": {
+      "full_mean_rgb_error": 3.3041767939814815,
+      "max_swatch_mean_rgb_error": 4.0
+    }
+  }
+}

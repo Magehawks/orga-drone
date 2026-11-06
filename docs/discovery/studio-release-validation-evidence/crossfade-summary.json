@@ -1,0 +1,1053 @@
+{
+  "no_lut": {
+    "lut_mode": "none",
+    "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+    "webgl": {
+      "b": false
+    },
+    "paused_brightness": 124.63,
+    "paused_brightness_samples": [
+      {
+        "delay": 0.05,
+        "brightness": 62.09,
+        "state": {
+          "now": 827.3000000007451,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:65474/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 371.4,
+                "presentedFrames": 1,
+                "observedAt": 372,
+                "src": "http://127.0.0.1:65474/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:65474/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 443.6,
+                "presentedFrames": 1,
+                "observedAt": 447.3,
+                "src": "http://127.0.0.1:65474/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.2,
+        "brightness": 62.09,
+        "state": {
+          "now": 1033.800000000745,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:65474/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 371.4,
+                "presentedFrames": 1,
+                "observedAt": 372,
+                "src": "http://127.0.0.1:65474/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:65474/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 443.6,
+                "presentedFrames": 1,
+                "observedAt": 447.3,
+                "src": "http://127.0.0.1:65474/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.5,
+        "brightness": 62.09,
+        "state": {
+          "now": 1539.5,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:65474/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 371.4,
+                "presentedFrames": 1,
+                "observedAt": 372,
+                "src": "http://127.0.0.1:65474/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:65474/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 443.6,
+                "presentedFrames": 1,
+                "observedAt": 447.3,
+                "src": "http://127.0.0.1:65474/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 1.0,
+        "brightness": 62.09,
+        "state": {
+          "now": 2545.400000002235,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:65474/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 371.4,
+                "presentedFrames": 1,
+                "observedAt": 372,
+                "src": "http://127.0.0.1:65474/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:65474/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 443.6,
+                "presentedFrames": 1,
+                "observedAt": 447.3,
+                "src": "http://127.0.0.1:65474/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "paused_after_seeked_kick_brightness": 124.63,
+    "paused_vs_export": {
+      "full_mean_rgb_error": 1.9861443865740742,
+      "max_swatch_mean_rgb_error": 2.6666666666666665
+    },
+    "playback_summary": {
+      "status": "OBSERVED",
+      "samples": 515,
+      "overlap_samples": 106,
+      "primary_samples": 103,
+      "primary_story_drift_max_s": 0.0029974151857837805,
+      "story_plateau_max_ms": 187.30000000074506,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 23,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 97,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975
+    },
+    "inside_crossfade_summary": {
+      "status": "OBSERVED",
+      "samples": 153,
+      "overlap_samples": 61,
+      "primary_samples": 61,
+      "primary_story_drift_max_s": 0.053767366720516796,
+      "story_plateau_max_ms": 58.899999998509884,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 14,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 56,
+      "presented_pair_drift_max_s": 0.0,
+      "presented_pair_drift_p95_s": 0.0
+    },
+    "preroll_cancel": {
+      "primary": {
+        "paused": false,
+        "seeking": false,
+        "currentTime": 1.2477
+      },
+      "outgoing": {
+        "hidden": true,
+        "paused": true,
+        "seeking": false,
+        "currentTime": 3
+      }
+    },
+    "seek_brightness": [
+      124.63,
+      124.63,
+      124.63,
+      124.63,
+      124.63,
+      124.63
+    ],
+    "source_unchanged": true
+  },
+  "one_lut": {
+    "lut_mode": "one",
+    "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+    "webgl": {
+      "a": "1",
+      "b": false
+    },
+    "paused_brightness": 97.04,
+    "paused_brightness_samples": [
+      {
+        "delay": 0.05,
+        "brightness": 97.04
+      },
+      {
+        "delay": 0.2,
+        "brightness": 97.04
+      },
+      {
+        "delay": 0.5,
+        "brightness": 97.04
+      },
+      {
+        "delay": 1.0,
+        "brightness": 97.04
+      }
+    ],
+    "paused_after_seeked_kick_brightness": null,
+    "paused_vs_export": {
+      "full_mean_rgb_error": 2.8425795717592592,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playback_summary": {
+      "status": "OBSERVED",
+      "samples": 541,
+      "overlap_samples": 116,
+      "primary_samples": 113,
+      "primary_story_drift_max_s": 0.0037016155088853697,
+      "story_plateau_max_ms": 187.19999999925494,
+      "outgoing_seek_delta": 2,
+      "fresh_outgoing_presentations": 16,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 81,
+      "presented_pair_drift_max_s": 0.10000000000000009,
+      "presented_pair_drift_p95_s": 0.10000000000000009
+    },
+    "inside_crossfade_summary": {
+      "status": "OBSERVED",
+      "samples": 152,
+      "overlap_samples": 61,
+      "primary_samples": 61,
+      "primary_story_drift_max_s": 0.052667366720516806,
+      "story_plateau_max_ms": 58.5,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 15,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 57,
+      "presented_pair_drift_max_s": 0.0,
+      "presented_pair_drift_p95_s": 0.0
+    },
+    "preroll_cancel": {
+      "primary": {
+        "paused": false,
+        "seeking": false,
+        "currentTime": 1.2442
+      },
+      "outgoing": {
+        "hidden": true,
+        "paused": true,
+        "seeking": false,
+        "currentTime": 3
+      }
+    },
+    "seek_brightness": [
+      97.04,
+      97.04,
+      97.04,
+      101.2,
+      97.04,
+      97.04
+    ],
+    "source_unchanged": true
+  },
+  "one_lut_repeat_2": {
+    "lut_mode": "one",
+    "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+    "webgl": {
+      "a": "1",
+      "b": false
+    },
+    "paused_brightness": 97.26,
+    "paused_brightness_samples": [
+      {
+        "delay": 0.05,
+        "brightness": 97.26,
+        "state": {
+          "now": 837.9000000022352,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:54841/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 400.4,
+                "presentedFrames": 1,
+                "observedAt": 401.8,
+                "src": "http://127.0.0.1:54841/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:54841/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 453.3,
+                "presentedFrames": 2,
+                "observedAt": 456.1,
+                "src": "http://127.0.0.1:54841/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.2,
+        "brightness": 97.26,
+        "state": {
+          "now": 1045.6000000014901,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:54841/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 400.4,
+                "presentedFrames": 1,
+                "observedAt": 401.8,
+                "src": "http://127.0.0.1:54841/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:54841/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 453.3,
+                "presentedFrames": 2,
+                "observedAt": 456.1,
+                "src": "http://127.0.0.1:54841/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.5,
+        "brightness": 97.26,
+        "state": {
+          "now": 1551.7000000029802,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:54841/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 400.4,
+                "presentedFrames": 1,
+                "observedAt": 401.8,
+                "src": "http://127.0.0.1:54841/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:54841/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 453.3,
+                "presentedFrames": 2,
+                "observedAt": 456.1,
+                "src": "http://127.0.0.1:54841/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 1.0,
+        "brightness": 97.26,
+        "state": {
+          "now": 2557.2000000029802,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:54841/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 400.4,
+                "presentedFrames": 1,
+                "observedAt": 401.8,
+                "src": "http://127.0.0.1:54841/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:54841/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 453.3,
+                "presentedFrames": 2,
+                "observedAt": 456.1,
+                "src": "http://127.0.0.1:54841/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "paused_after_seeked_kick_brightness": 97.26,
+    "paused_vs_export": {
+      "full_mean_rgb_error": 2.841304976851852,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playback_summary": {
+      "status": "OBSERVED",
+      "samples": 529,
+      "overlap_samples": 105,
+      "primary_samples": 102,
+      "primary_story_drift_max_s": 0.0022001615508885908,
+      "story_plateau_max_ms": 193.60000000149012,
+      "outgoing_seek_delta": 3,
+      "fresh_outgoing_presentations": 20,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 77,
+      "presented_pair_drift_max_s": 0.06666699999999981,
+      "presented_pair_drift_p95_s": 0.033333999999999975
+    },
+    "inside_crossfade_summary": {
+      "status": "OBSERVED",
+      "samples": 153,
+      "overlap_samples": 61,
+      "primary_samples": 61,
+      "primary_story_drift_max_s": 0.05256736672051676,
+      "story_plateau_max_ms": 58.399999998509884,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 14,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 56,
+      "presented_pair_drift_max_s": 0.0,
+      "presented_pair_drift_p95_s": 0.0
+    },
+    "preroll_cancel": {
+      "primary": {
+        "paused": false,
+        "seeking": false,
+        "currentTime": 1.2484
+      },
+      "outgoing": {
+        "hidden": true,
+        "paused": true,
+        "seeking": false,
+        "currentTime": 3
+      }
+    },
+    "seek_brightness": [
+      97.26,
+      97.26,
+      97.26,
+      101.24,
+      97.26,
+      97.26
+    ],
+    "source_unchanged": true
+  },
+  "one_lut_repeat_3": {
+    "lut_mode": "one",
+    "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+    "webgl": {
+      "a": "1",
+      "b": false
+    },
+    "paused_brightness": 97.26,
+    "paused_brightness_samples": [
+      {
+        "delay": 0.05,
+        "brightness": 97.26,
+        "state": {
+          "now": 852.8000000007451,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:53504/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 394.8,
+                "presentedFrames": 1,
+                "observedAt": 413.5,
+                "src": "http://127.0.0.1:53504/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:53504/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 432.3,
+                "presentedFrames": 1,
+                "observedAt": 434.3,
+                "src": "http://127.0.0.1:53504/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.2,
+        "brightness": 97.26,
+        "state": {
+          "now": 1059,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:53504/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 394.8,
+                "presentedFrames": 1,
+                "observedAt": 413.5,
+                "src": "http://127.0.0.1:53504/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:53504/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 432.3,
+                "presentedFrames": 1,
+                "observedAt": 434.3,
+                "src": "http://127.0.0.1:53504/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 0.5,
+        "brightness": 97.26,
+        "state": {
+          "now": 1564.4000000022352,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:53504/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 394.8,
+                "presentedFrames": 1,
+                "observedAt": 413.5,
+                "src": "http://127.0.0.1:53504/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:53504/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 432.3,
+                "presentedFrames": 1,
+                "observedAt": 434.3,
+                "src": "http://127.0.0.1:53504/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "delay": 1.0,
+        "brightness": 97.26,
+        "state": {
+          "now": 2571.400000002235,
+          "story": 2.4992407108239094,
+          "total": 5,
+          "videos": [
+            {
+              "id": "studio-preview-video",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 0.499242,
+              "src": "http://127.0.0.1:53504/media/2/stream",
+              "opacity": "0.499243",
+              "presented": {
+                "mediaTime": 0.466667,
+                "expectedDisplayTime": 394.8,
+                "presentedFrames": 1,
+                "observedAt": 413.5,
+                "src": "http://127.0.0.1:53504/media/2/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            },
+            {
+              "id": "studio-preview-video-b",
+              "hidden": false,
+              "paused": true,
+              "seeking": false,
+              "ready": 4,
+              "currentTime": 2.499242,
+              "src": "http://127.0.0.1:53504/media/1/stream",
+              "opacity": "1",
+              "presented": {
+                "mediaTime": 2.466667,
+                "expectedDisplayTime": 432.3,
+                "presentedFrames": 1,
+                "observedAt": 434.3,
+                "src": "http://127.0.0.1:53504/media/1/stream"
+              },
+              "events": {
+                "timeupdate": 1,
+                "seeking": 1,
+                "seeked": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "paused_after_seeked_kick_brightness": 97.26,
+    "paused_vs_export": {
+      "full_mean_rgb_error": 2.841304976851852,
+      "max_swatch_mean_rgb_error": 4.0
+    },
+    "playback_summary": {
+      "status": "OBSERVED",
+      "samples": 517,
+      "overlap_samples": 106,
+      "primary_samples": 103,
+      "primary_story_drift_max_s": 0.0016016155088852124,
+      "story_plateau_max_ms": 191.79999999701977,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 22,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 95,
+      "presented_pair_drift_max_s": 0.033333999999999975,
+      "presented_pair_drift_p95_s": 0.033333999999999975
+    },
+    "inside_crossfade_summary": {
+      "status": "OBSERVED",
+      "samples": 153,
+      "overlap_samples": 61,
+      "primary_samples": 61,
+      "primary_story_drift_max_s": 0.05306736672051676,
+      "story_plateau_max_ms": 58.79999999701977,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 15,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 57,
+      "presented_pair_drift_max_s": 0.0,
+      "presented_pair_drift_p95_s": 0.0
+    },
+    "preroll_cancel": {
+      "primary": {
+        "paused": false,
+        "seeking": false,
+        "currentTime": 1.2477
+      },
+      "outgoing": {
+        "hidden": true,
+        "paused": true,
+        "seeking": false,
+        "currentTime": 3
+      }
+    },
+    "seek_brightness": [
+      97.26,
+      97.26,
+      97.26,
+      101.57,
+      97.26,
+      97.26
+    ],
+    "source_unchanged": true
+  },
+  "two_luts": {
+    "lut_mode": "two",
+    "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+    "webgl": {
+      "a": "1",
+      "b": false
+    },
+    "paused_brightness": 95.79,
+    "paused_brightness_samples": [
+      {
+        "delay": 0.05,
+        "brightness": 95.79
+      },
+      {
+        "delay": 0.2,
+        "brightness": 95.79
+      },
+      {
+        "delay": 0.5,
+        "brightness": 95.79
+      },
+      {
+        "delay": 1.0,
+        "brightness": 95.79
+      }
+    ],
+    "paused_after_seeked_kick_brightness": null,
+    "paused_vs_export": {
+      "full_mean_rgb_error": 3.5420109953703705,
+      "max_swatch_mean_rgb_error": 4.666666666666667
+    },
+    "playback_summary": {
+      "status": "OBSERVED",
+      "samples": 530,
+      "overlap_samples": 109,
+      "primary_samples": 107,
+      "primary_story_drift_max_s": 0.0023001615508884687,
+      "story_plateau_max_ms": 188.0,
+      "outgoing_seek_delta": 2,
+      "fresh_outgoing_presentations": 20,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 78,
+      "presented_pair_drift_max_s": 0.06666699999999981,
+      "presented_pair_drift_p95_s": 0.06666600000000011
+    },
+    "inside_crossfade_summary": {
+      "status": "OBSERVED",
+      "samples": 166,
+      "overlap_samples": 74,
+      "primary_samples": 74,
+      "primary_story_drift_max_s": 0.05096736672051677,
+      "story_plateau_max_ms": 52.80000000074506,
+      "outgoing_seek_delta": 0,
+      "fresh_outgoing_presentations": 15,
+      "paused_seek_samples": 0,
+      "paused_seek_primary_error_max_s": null,
+      "paused_seek_outgoing_error_max_s": null,
+      "paused_seek_progress_error_max": null,
+      "stable_presented_pairs": 66,
+      "presented_pair_drift_max_s": 0.0,
+      "presented_pair_drift_p95_s": 0.0
+    },
+    "preroll_cancel": {
+      "primary": {
+        "paused": false,
+        "seeking": false,
+        "currentTime": 1.2469
+      },
+      "outgoing": {
+        "hidden": true,
+        "paused": true,
+        "seeking": false,
+        "currentTime": 3
+      }
+    },
+    "seek_brightness": [
+      97.04,
+      97.04,
+      95.42,
+      99.04,
+      94.58,
+      97.04
+    ],
+    "source_unchanged": true
+  }
+}
