@@ -17,7 +17,10 @@
 - Preview approximates color and some effects; timing should match the MP4.
   The image inspector has **Standard** and **Expert** views. Both use the same
   clip settings, so switching views never changes the picture.
-- A `.cube` color file can be used during playback. When a clip combines a LUT
+- JPG/PNG photos with a `.cube` color file keep a cached graded still during
+  playback and pause, including both photo layers of a crossfade. Preparing a
+  new still is asynchronous; the status chip reports pending or failed previews.
+- A `.cube` color file can be used during video playback. When a video combines a LUT
   with HSL or color wheels, the app may prepare a short playback proxy and show
   a rendered still until it is ready. Export always applies the saved settings.
 

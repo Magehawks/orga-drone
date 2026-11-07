@@ -147,24 +147,42 @@ def test_preview_filter_reuses_grade_and_lut_builders(tmp_path: Path) -> None:
     assert chain.startswith(grade + ",")
     assert "lut3d=file=" in chain
     assert "scale=720:720:force_original_aspect_ratio=decrease" in chain
+    photo_chain = preview_filter_chain(
+        image, look, data_dir=data_dir, work_dir=tmp_path / "photo-work", even_dimensions=True,
+    )
+    assert "force_divisible_by" not in chain
+    assert photo_chain.replace("force_divisible_by=2:", "") == chain
 
 
-def test_render_preview_frame_caches_jpeg(tmp_path: Path) -> None:
+@pytest.mark.parametrize("suffix", ["jpg", "png"])
+@pytest.mark.parametrize("conversion,strength", [(False, 0), (False, 50), (False, 100), (True, 100)])
+def test_render_preview_frame_caches_jpeg(
+    tmp_path: Path, suffix: str, conversion: bool, strength: int,
+) -> None:
     data_dir = tmp_path / "data"
-    photo = _make_photo(tmp_path / "still.jpg")
+    photo = _make_photo(tmp_path / f"still.{suffix}")
     asset = import_lut_from_path(data_dir, _red_boost_cube(tmp_path / "boost.cube"))
     req = PreviewFrameRequest(
         media_path=photo,
         kind="photo",
         source_time_s=0.0,
         image=ImageAdjust(warmth=20),
-        look=ColorLook(creative_lut=asset, creative_strength=100),
+        look=ColorLook(
+            conversion_lut=asset if conversion else "",
+            conversion_confirmed=conversion,
+            creative_lut="" if conversion else asset,
+            creative_strength=strength,
+        ),
     )
     first = render_preview_frame(req, data_dir=data_dir)
     second = render_preview_frame(req, data_dir=data_dir)
     assert first == second
     assert first.suffix == ".jpg"
     assert first.stat().st_size > 100
+    from PIL import Image
+
+    with Image.open(first) as rendered:
+        assert all(dimension % 2 == 0 for dimension in rendered.size)
     assert (data_dir / PREVIEW_STILLS_DIR).is_dir()
     assert not list((data_dir / PREVIEW_STILLS_DIR / "work").glob("*/*"))
 

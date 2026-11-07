@@ -124,6 +124,7 @@ def preview_filter_chain(
     data_dir: Path,
     work_dir: Path,
     max_edge: int = PREVIEW_MAX_EDGE,
+    even_dimensions: bool = False,
     saturation: float = 1.0,
     hsl: HslAdjust | None = None,
     color_wheels: ColorWheels | None = None,
@@ -145,8 +146,11 @@ def preview_filter_chain(
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge = max(64, min(2160, int(max_edge)))
     # Same scale pattern as export framing: no filter quotes (Windows argv-safe).
+    # FFmpeg 7.1 can crash encoding odd-height JPEG inputs on the photo/no-LUT
+    # path. Round photos inside this existing scale, leaving video unchanged.
+    divisible = "force_divisible_by=2:" if even_dimensions else ""
     parts.append(
-        f"scale={edge}:{edge}:force_original_aspect_ratio=decrease:"
+        f"scale={edge}:{edge}:force_original_aspect_ratio=decrease:{divisible}"
         "out_color_matrix=bt709:out_range=tv,"
         # Match export's limited-range BT.709 output before converting to the
         # full-range JPEG/BT.601 representation decoded by the browser.
@@ -178,6 +182,8 @@ def cache_key_for(
         "saturation": req.saturation,
         "v": 7,
     }
+    if req.kind == "photo":
+        payload["photo_even_dimensions"] = True
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -269,6 +275,7 @@ def render_preview_frame(
                 data_dir=data_dir,
                 work_dir=work,
                 max_edge=req.max_edge,
+                even_dimensions=req.kind == "photo",
                 saturation=req.saturation,
                 hsl=req.hsl,
                 color_wheels=req.color_wheels,

@@ -30,7 +30,8 @@ const context = {
   lutWebglCanHandle: () => false,
   lutWebglReadyFor: () => false,
   lutProxyEligible: () => false,
-  previewVideo: null, previewVideoB: null, lutProxyActiveFor: () => false,
+  previewVideo: null, previewVideoB: null, previewImage: null, previewImageB: null,
+  clipForPreviewMedia: media => media === context.previewImageB ? context.outgoing : clip, lutProxyActiveFor: () => false,
   previewLutFrameFor: () => null,
   playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
@@ -39,7 +40,7 @@ const context = {
   msgWheelNeutral: 'Neutral',
   resolveAt: () => null,
   URL: { createObjectURL: blob => blob.id, revokeObjectURL() {} },
-  Image: class { decode() { return new Promise((resolve, reject) => decodes.push({ resolve, reject })); } },
+  Image: class { constructor() { this.hidden = true; this.naturalWidth = 320; this.naturalHeight = 180; } removeAttribute() {} decode() { return new Promise((resolve, reject) => decodes.push({ resolve, reject })); } },
   AbortController, Number, JSON, Math,
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
 };
@@ -161,5 +162,147 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
   assert.equal(drawn[0].filter, 'none', 'rendered grade is not applied twice');
   assert.deepEqual(transforms, [[12, -4], [2, 2]], 'original clip framing survives');
   assert.equal(ctx.globalAlpha, 0.5, 'transition opacity survives');
+  // Photo frames are static across Story time, including playback and pause.
+  context.imageSaveChain = Promise.resolve();
+  context.fetch = getFrame;
+  for (const format of ['jpg', 'png']) {
+    for (const look of [
+      ...[0, 50, 100].map(creative_strength => ({ creative_lut: 'a', creative_strength })),
+      { conversion_lut: 'a', conversion_confirmed: true, input_profile: 'custom' },
+    ]) {
+      context.clearLutPreviewStill();
+      clip.dataset = { studioId: 'photo-' + format, kind: 'photo',
+        streamUrl: '/source.' + format, colorLook: JSON.stringify(look) };
+      context.state.playing = true;
+      const before = requests.length;
+      context.scheduleLutPreviewStill(clip, 0.1);
+      await fire();
+      assert.equal(requests.length, before + 1, format + ' LUT requested during playback');
+      await reply(requests.at(-1), format + JSON.stringify(look));
+      decodes.at(-1).resolve(); await tick();
+      assert.equal(still.hidden, false, format + ' graded frame remains visible while playing');
+      for (let t = 0; t < 100; t++) context.scheduleLutPreviewStill(clip, t / 30);
+      context.state.playing = false;
+      context.scheduleLutPreviewStill(clip, 2);
+      await fire();
+      assert.equal(requests.length, before + 1, 'unchanged playback and pause reuse decoded photo');
+      assert.equal(still.hidden, false, 'pause without seeking retains grade');
+    }
+  }
+  // Both composited photo layers own independent cancellation/cache state.
+  const outgoing = { dataset: { ...clip.dataset, studioId: 'outgoing', streamUrl: '/other.png' } };
+  context.outgoing = outgoing;
+  const start = requests.length;
+  context.schedulePhotoOverlapStill(outgoing, 1);
+  await fire(); await reply(requests.at(-1), 'outgoing-graded');
+  decodes.at(-1).resolve(); await tick();
+  context.previewImage = {}; context.previewImageB = {};
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB).src, 'outgoing-graded');
+  assert.equal(context.renderedPreviewStillFor(context.previewImage), still);
+  context.clearLutPreviewStill(clip);
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB).src, 'outgoing-graded',
+    'editing incoming photo does not invalidate outgoing');
+  context.schedulePhotoOverlapStill(outgoing, 2); await fire();
+  assert.equal(requests.length, start + 1, 'outgoing frame reused across overlap ticks');
+  outgoing.dataset.imageAdjust = JSON.stringify({ contrast: 20 });
+  context.schedulePhotoOverlapStill(outgoing, 2); await fire();
+  assert.equal(requests.length, start + 2, 'grade edit invalidates photo');
+  await reply(requests.at(-1), 'stale-outgoing');
+  outgoing.dataset.streamUrl = '/replacement.jpg';
+  context.schedulePhotoOverlapStill(outgoing, 2);
+  decodes.at(-1).resolve(); await tick();
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB), null, 'photo change rejects stale decode');
+  await fire(); await reply(requests.at(-1), 'replacement'); decodes.at(-1).resolve(); await tick();
+  context.clearVideoLutPreviewStill();
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB).src, 'replacement',
+    'video WebGL readiness preserves outgoing photo');
+  context.schedulePhotoOverlapStill({ dataset: { kind: 'video' } }, 0);
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB), null, 'mixed transition removes stale photo layer');
+  // Unconfirmed conversion stays inactive; it must not create a new color path.
+  context.clearLutPreviewStill();
+  clip.dataset.colorLook = JSON.stringify({ conversion_lut: 'a', conversion_confirmed: false });
+  const unconfirmedCount = requests.length;
+  context.scheduleLutPreviewStill(clip, 0); await fire();
+  assert.equal(requests.length, unconfirmedCount);
+  clip.dataset.colorLook = JSON.stringify({ creative_lut: 'a', creative_strength: 100 });
+  context.scheduleLutPreviewStill(clip, 0); await fire();
+  await reply(requests.at(-1), 'retained-at-boundary'); decodes.at(-1).resolve(); await tick();
+  context.alignLutStillOwners(outgoing, clip);
+  context.outgoing = clip;
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB).src, 'retained-at-boundary',
+    'outgoing photo moves layers without waiting for another render');
+  context.scheduleLutPreviewStill(outgoing, 0); // new incoming still is pending
+  assert.equal(chip.textContent, 'Updating picture…');
+  context.alignLutStillOwners(clip, null); // seek back to cached previous primary
+  context.scheduleLutPreviewStill(clip, 1);
+  context.schedulePhotoOverlapStill(null, 0);
+  assert.notEqual(chip.textContent, 'Updating picture…', 'promoted cached photo restores its status');
+  context.alignLutStillOwners(outgoing, clip);
+  context.outgoing = clip;
+  // Masks and compositor sample the same rendered picture during playback.
+  const maskDraws = [];
+  Object.assign(context, {
+    lutWebglCanvasFor: () => null,
+    sourceWindowForMask: () => ({ x: 0, y: 0, w: 320, h: 180 }),
+    effectAmount: () => 2,
+    maskModel: { blurFraction: 0.1 },
+  });
+  vm.runInContext('function paintPrivacyMask' + section('function paintPrivacyMask', 'function drawMaskCanvas'), context);
+  context.state.playing = true;
+  const maskContext = { save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
+    drawImage: picture => maskDraws.push(picture) };
+  context.paintPrivacyMask(maskContext, context.previewImageB,
+    { effect: 'blur', x: 0, y: 0, w: 0.5, h: 0.5, strength: 50 },
+    { width: 640, height: 360 }, 640, 360);
+  assert.equal(maskDraws[0].src, 'retained-at-boundary', 'mask uses graded outgoing pixels');
+  context.compareBeforeAfter = true;
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB), null);
+  context.compareBeforeAfter = false;
+  context.reuseDraft = {};
+  assert.equal(context.renderedPreviewStillFor(context.previewImageB), null);
+  context.reuseDraft = null;
+  context.clearLutPreviewStill();
+  outgoing.dataset.appliedType = 'crossfade';
+  context.outgoing = outgoing;
+  Object.assign(context, {
+    forwardLoopActive: () => false, sectionRepeats: () => 1,
+    gradePreviewElement() {}, clips: () => [outgoing, clip], clipDuration: () => 3,
+  });
+  vm.runInContext('function applyPreviewGrades' + section('function applyPreviewGrades', 'const previewLutStill'), context);
+  const preloadCount = requests.length;
+  context.applyPreviewGrades({ clip: outgoing, localS: 0, index: 0 });
+  await fire();
+  assert.equal(requests.length, preloadCount + 2, 'idle owner prepares next crossfade photo once');
+  for (const request of requests.slice(preloadCount)) {
+    await reply(request, request.url);
+    decodes.at(-1).resolve(); await tick();
+  }
+  for (let i = 0; i < 100; i++) {
+    context.applyPreviewGrades({ clip, overlapClip: outgoing, localS: i / 100,
+      overlapLocalS: 2 + i / 100, index: 1 });
+  }
+  await fire();
+  assert.equal(requests.length, preloadCount + 2, 'both decoded resources transfer without tick or boundary renders');
+  assert.ok(context.renderedPreviewStillFor(context.previewImage));
+  assert.ok(context.renderedPreviewStillFor(context.previewImageB));
+  for (const failure of [409, 500, 'decode']) {
+    context.clearLutPreviewStill();
+    const failedCount = requests.length;
+    context.scheduleLutPreviewStill(clip, 0); await fire();
+    if (failure === 'decode') {
+      await reply(requests.at(-1), 'broken-image');
+      decodes.at(-1).reject(new Error('decode failed')); await tick();
+    } else {
+      requests.at(-1).resolve({ ok: false, status: failure }); await tick();
+    }
+    const failedStatus = chip.textContent;
+    for (let i = 0; i < 100; i++) context.scheduleLutPreviewStill(clip, i / 30);
+    await fire();
+    assert.equal(requests.length, failedCount + 1, 'failed photo is not retried on clock ticks');
+    assert.equal(chip.textContent, failedStatus, 'failure remains visible');
+    assert.equal(context.retryFailedPhotoStills(), true, 'explicit pause/seek retries failed photo');
+    context.scheduleLutPreviewStill(clip, 0); await fire();
+    assert.equal(requests.length, failedCount + 2, 'explicit retry can request again');
+  }
   console.log('LUT preview lifecycle passed');
 })().catch(err => { console.error(err); process.exitCode = 1; });

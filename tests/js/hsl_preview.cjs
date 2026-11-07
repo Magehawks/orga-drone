@@ -36,7 +36,7 @@ const context = {
   msgWheelNeutral: 'Neutral',
   resolveAt: () => null,
   URL: { createObjectURL: blob => blob.id, revokeObjectURL() {} },
-  Image: class { decode() { return new Promise(resolve => decodes.push({ resolve })); } },
+  Image: class { removeAttribute() {} decode() { return new Promise(resolve => decodes.push({ resolve })); } },
   AbortController, Number, JSON, Math,
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
 };
