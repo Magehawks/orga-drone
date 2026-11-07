@@ -1,10 +1,22 @@
 # Proposed develop/main strategy and migration runbook
 
-**Status: branch cutover proposed; not activated.** PR A documented the strategy
-for [#261](https://github.com/Magehawks/orga-drone/issues/261). PR B adds push CI
-and the pre-cutover denial guard described below; neither completes that issue
-or authorizes the operational steps. `main` remains the default branch and
-current contribution target until a separately approved cutover.
+## Current process (2026-11-07)
+
+GitHub repository metadata confirms `develop` is the default branch. Normal
+implementation PRs target develop under [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md).
+All applicable CI must pass; the historical proposal below to allow failing
+informational develop checks is superseded. Mandatory PM/UX/CTO handoffs and
+per-merge Product Owner media testing are also superseded by that workflow.
+Main admission, packaged evidence, security and human release controls remain
+unchanged. This update does not verify or modify effective branch protection,
+execute cutover steps, retarget existing PRs, or authorize merge/publication.
+
+## Historical migration proposal and evidence
+
+The remaining runbook records the earlier #261/#262 migration design and its
+historical snapshots. It is not a statement of current default-branch settings
+or an instruction to repeat administrator operations. Current development
+process takes precedence; promotion/release safety requirements still apply.
 
 The goal is rapid integration without treating unverified changes as release-ready.
 No application architecture, source media, project format, or database changes
@@ -74,11 +86,11 @@ Development assumptions to update at cutover:
 - Require PRs and human merge decisions; prohibit deletion and force pushes.
 - Run the three existing CI checks on PRs and pushes to `develop`. This push
   coverage is configured by PR B for both `main` and `develop`; it creates no branch.
-- Treat those checks as informational for integration. A maintainer may merge
-  failing checks with an explicit reason and linked repair issue. `develop` may
-  temporarily be broken and must not be described as release-ready.
-- Preserve the [PM/CTO, independent review, and human gates](AGENT_WORKFLOW.md).
-  Informational CI is not a waiver of review or the human merge decision.
+- Superseded proposal: informational develop CI. Current policy requires all
+  applicable checks to pass; failures must be corrected, not accepted with a note.
+  Integrated develop changes still must not be described as release-ready.
+- Follow the current [development and independent review workflow](AGENT_WORKFLOW.md).
+  Human merge authorization and explicit release approval remain required.
 - Do not expose publication credentials or add publication jobs to this lane.
 
 ### main: validated release candidates

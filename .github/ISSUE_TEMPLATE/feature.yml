@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        orga-drone is local-first. Feature ideas move through PM → UX (when UI/interaction) → PM concept selection → CTO → Development → Independent Review → Human Test before merge. UX discovery does not create implementation issues.
+        orga-drone is local-first. Approved issues move through implementation → focused tests → PR to develop → independent ChatGPT review → corrections if needed → authorized merge. PM/UX/engineering advice is optional for unresolved questions. Periodic Product Owner testing is separate; release approval remains human-controlled.
 
         A pain point without a proposed change belongs on the **User need** form. External research is evidence, not a request from the person you observed. Filing either form does not add a public roadmap item; that requires a separate maintainer decision (`docs/USER_NEEDS.md`).
   - type: textarea
@@ -62,29 +62,27 @@ body:
     id: ux
     attributes:
       label: UX discovery
-      description: For meaningful UI/interaction work, paste or link the product-ux-designer output and the PM-selected concept. Skip for backend-only, CI/tooling, or simple bug-adjacent features. UX does not create implementation issues.
+      description: If interaction choices remain unresolved, link optional UX advice and the approved direction. Not a mandatory handoff for settled scope.
     validations:
       required: false
   - type: textarea
     id: technical
     attributes:
-      label: CTO / technical constraints
-      description: Filled or refined during CTO review. Note compatibility, non-destructive behavior, architecture, performance, migration and test constraints.
+      label: Technical constraints
+      description: Record known constraints; optional engineering advice can resolve questions. Note compatibility, non-destructive behavior, architecture, performance, migration and test constraints.
     validations:
       required: false
   - type: textarea
     id: testing
     attributes:
-      label: Human test scenario
-      description: What should the Product Owner test with realistic drone media before merge?
+      label: Risk and testing expectations
+      description: Describe focused regression/integration evidence by risk and useful periodic DJI/edit/export scenarios. Identify any issue-specific manual evidence requirement.
     validations:
       required: false
   - type: checkboxes
-    id: gates
+    id: readiness
     attributes:
-      label: Agent gates
+      label: Implementation readiness
       options:
-        - label: PM product gate completed (`PM_APPROVED`)
-        - label: UX discovery completed or not applicable (`product-ux-designer`)
-        - label: CTO engineering gate completed (`CTO_APPROVED`)
-        - label: Ready for developer agent
+        - label: Product Owner approved the scope and acceptance criteria (link decision above)
+        - label: Non-scope and relevant safety/compatibility constraints are recorded

@@ -67,7 +67,7 @@ service, or generic drone administration product.
 | Studio preview stills and playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` |
 | Studio export | `studio_export.py`, `export/` |
 | HTML templates and CSS | `src/orga_drone/templates/`, `src/orga_drone/static/css/app.css` |
-| Studio frontend | `src/orga_drone/static/js/studio.js` (current monolith), `static/js/studio-lut-webgl.js`, target modules under `static/js/studio/` |
+| Studio frontend | `src/orga_drone/static/js/studio.js` (legacy entry plus extracted modules), `static/js/studio-lut-webgl.js`, target modules under `static/js/studio/` |
 | Desktop shell and pickers | `desktop.py` |
 | Windows packaging and licensing evidence | `packaging/` |
 | Python tests and fixtures | `tests/` |
@@ -106,75 +106,39 @@ Change these only for an approved issue, with focused tests:
 - Rescan/data-loss behavior and migrations.
 - Long-running export/scan job cancellation and file publication.
 
-The current Studio frontend is one large `studio.js` IIFE. Read
+The Studio frontend has a large ES-module `studio.js` entry with an internal IIFE
+and incrementally extracted modules. Read
 [`docs/STUDIO_MODULES.md`](docs/STUDIO_MODULES.md) before moving code or adding
 another cross-feature dependency.
 
-## Commands
+## Development checks and completion
 
-Python (3.11+; CI uses 3.12):
+Use risk-based local checks from [`docs/PR_E2E.md`](docs/PR_E2E.md).
+Commands and setup are in [`CONTRIBUTING.md`](CONTRIBUTING.md); executable CI
+remains unchanged. Full local suites are not mandatory for every small change.
+Report actual commands/results and limitations; never silently accept failures.
 
-```bash
-pip install -r requirements.txt
-pip install -e ".[dev]"
-ruff check .
-mypy src packaging/itch_channel.py packaging/windows_third_party.py
-pytest --ignore=tests/test_pr_journey_smoke.py
-pytest tests/test_pr_journey_smoke.py
-```
+1. Implement only approved scope; inspect existing behavior and preserve compatibility.
+2. Add/update meaningful focused regressions where behavior changes.
+3. Update docs when behavior/setup/architecture changes; update DE/EN for UI text.
+4. Follow the PR template, report risk/evidence and obtain independent review.
+5. Avoid unrelated refactors, arbitrary file-size quotas and mass formatting.
 
-JavaScript checks (Node 22.13+; optional for runtime work, required for new
-Studio modules):
+## Workflow and review
 
-```bash
-npm ci
-npm run lint:js
-npm run format:check
-npm run test:js
-```
+Follow [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md): approved issue →
+implementation → focused tests → PR to develop → independent ChatGPT GitHub PR
+review → corrections if needed → authorized develop merge.
 
-`npm run check:js` runs all three. The current JS lint/format scope is new
-modules under `src/orga_drone/static/js/studio/` and `tests/js/**/*.test.js`.
-The legacy `studio.js` monolith is not mass-formatted. Do not run
-`npm audit fix --force`; known advisories are dev-only (see `CONTRIBUTING.md`).
+PM, UX and engineering role prompts are optional read-only advisors, invoked
+when explicitly requested, not mandatory sequential gates for approved issues.
+The implementer cannot supply its own independent approval. The reviewer does
+not fix findings; escalate after three unresolved correction loops.
 
-Windows packaging is documented in [`packaging/README.md`](packaging/README.md).
-Do not add release steps to pull-request CI.
-
-## Definition of done
-
-1. Implement only the approved issue and its explicit non-scope.
-2. Inspect the existing implementation first; preserve compatibility.
-3. Add or update focused tests (Python and JS where the change belongs).
-4. Update docs when behavior, setup, or architecture changes.
-5. Update DE and EN strings for user-visible text.
-6. Run the required checks above and report evidence in the PR.
-7. Avoid unrelated refactors, drive-by formatting, or speculative architecture.
-8. Follow the PR template and keep the implementation/review roles separate.
-
-## Workflow and gates
-
-GitHub issues and pull requests are the handoff boundary. The canonical state
-machine is [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md).
-
-- **PM** (`product-spec-reviewer`): read-only; validates problem, user,
-  milestone fit, smallest slice, acceptance criteria, non-scope; returns
-  `PM_APPROVED`.
-- **UX** (`product-ux-designer`): read-only; required for meaningful UI work,
-  skipped for simple fixes, backend-only work, CI/tooling, and migrations
-  without user-facing impact. UX does not create implementation issues.
-- **CTO** (`engineering-planner`): read-only; validates architecture,
-  compatibility, data/migration impact, performance, security, tests; returns
-  `CTO_APPROVED` before `ready-for-dev`.
-- **Developer**: implements only the approved issue and runs the checks. A human
-  may explicitly waive a gate; do not waive it yourself.
-- **Independent review** (`implementation-reviewer`): read-only; never fixes
-  its own findings; returns `REVIEW_APPROVED`, `REVIEW_CHANGES_REQUESTED`, or
-  `REVIEW_ARCHITECTURE_CONCERN`.
-- **Human Product Owner**: realistic product test and final merge decision.
-
-Do not automate the human product test or merge decision. After three
-developer/reviewer correction loops, escalate to the human.
+The Product Owner periodically tests real DJI media, editing and exports.
+This is separate from routine develop merges. Full release-candidate validation
+and explicit human release approval remain required. Do not merge without
+explicit authorization or bypass CI, security or main-admission requirements.
 
 ## Writing and communication
 

@@ -100,15 +100,9 @@ or accepting one does not change this roadmap. A maintainer may later turn an
 accepted need into a product issue. Shipped work links that user-need issue to
 the release notes. A roadmap edit is a separate maintainer decision.
 
-1. Product intent is written as a **Product Spec** (problem, scope, non-goals).
-2. **Product-Spec-Reviewer** checks the spec against code and vision docs
-   (`docs/PRODUCT_VISION.md` journey filter).
-3. When the slice has meaningful UI/interaction work, **Product-UX-Designer**
-   audits the current interaction model and proposes alternatives. PM then
-   selects a concept. UX does not file implementation issues.
-4. After approval, **Engineering-Planner** produces a technical plan
-   (prefer Cursor Plan Mode for research-first planning).
-5. The main Cursor agent **implements** against the approved plan.
-6. **Implementation-Reviewer** reviews diff, tests, risks, and docs before commit.
-
-Canonical agent roles live under `.cursor/agents/`.
+Approved issues follow [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md): implementation,
+focused tests, PR to develop, independent ChatGPT review, corrections if needed,
+and authorized develop merge. PM/UX/engineering advisors are optional for unresolved
+questions. Periodic Product Owner real-media testing is separate from routine
+merges; full release-candidate validation and human release approval remain.
+This process update does not change any feature's Available now/Later status.

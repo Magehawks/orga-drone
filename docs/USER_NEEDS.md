@@ -26,7 +26,7 @@ public roadmap. It can support a later product issue only after a maintainer
 accepts the need and states scope, non-goals, and acceptance criteria.
 
 A proposed product change still uses the **Feature request** form and the
-gates in [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md). A broken behavior still uses
+workflow in [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md). A broken behavior still uses
 the **Bug report** form.
 
 ## How to report
@@ -93,7 +93,7 @@ For each issue:
 5. Choose one outcome:
    - **Needs more information.** Leave `feedback:needs-triage` and ask one question.
    - **Decline.** Comment with the reason, remove `feedback:needs-triage`, add `feedback:declined`.
-   - **Accept.** Only a maintainer does this. Remove `feedback:needs-triage`, add `feedback:accepted`, and link a product issue that includes the target user, a link back to this evidence, scope, non-goals, and acceptance criteria. That product issue still follows the normal PM / UX / CTO gates. Do not edit [`ROADMAP.md`](ROADMAP.md) in the same step.
+   - **Accept.** Only a maintainer does this. Remove `feedback:needs-triage`, add `feedback:accepted`, and link a product issue that includes the target user, a link back to this evidence, scope, non-goals, and acceptance criteria. That product issue follows the approved-scope and independent-review workflow in [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md). Do not edit [`ROADMAP.md`](ROADMAP.md) in the same step.
 
 There is no target number of accepts, and no vote tally.
 

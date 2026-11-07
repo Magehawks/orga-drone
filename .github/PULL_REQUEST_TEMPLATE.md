@@ -1,65 +1,39 @@
-## Linked issue
+## Approved scope
 
-Closes #
+<!-- Link the approved issue (Closes #...) or explicit Product Owner task/decision. -->
 
 ## Summary
 
-<!-- What changed and why? Keep this tied to the approved issue. -->
+<!-- What changed and why? State non-scope where useful. Target develop for normal work. -->
 
-## Scope check
+## Scope and safety
 
-- [ ] Implements the linked issue acceptance criteria
-- [ ] No unrelated refactors / speculative scope
-- [ ] Source media remains non-destructive where applicable
-- [ ] Existing data/projects remain compatible, or migration is documented
+- [ ] Acceptance criteria met; no unrelated refactors or speculative scope
+- [ ] Source media, privacy/security boundaries and data/project compatibility preserved
+- [ ] Docs and DE/EN strings updated where applicable (otherwise explain N/A)
 
-## Test evidence
+## Risk and test evidence
 
-- [ ] `ruff check .` passes locally
-- [ ] `mypy src packaging/itch_channel.py packaging/windows_third_party.py` passes locally
-- [ ] `pytest` passes locally (includes `tests/test_pr_journey_smoke.py`)
-- [ ] `npm run check:js` passes locally when the diff touches Studio JS or `tests/js/`
-- [ ] Feature-specific regression tests added/updated
+Risk: low / medium / high — explain the affected behavior/boundary.
 
-Details:
+<!-- Use docs/PR_E2E.md. List actual commands/results, focused regressions,
+relevant integration/packaged evidence, skips and limitations. No blanket full
+local suite requirement. Required CI must pass; failures are not silently accepted. -->
 
-<!-- Commands, focused tests, relevant fixtures/synthetic media. -->
+## Architecture / migration impact (if applicable)
 
-## Architecture / refactor impact
+<!-- For extractions: behavior retained, boundary/dependencies, regression evidence
+and rollback. For schema/effect_settings: approved ADR/migration plan. Otherwise N/A. -->
 
-<!-- Fill this for module moves, state ownership changes, or behavior-neutral refactors. -->
+## Independent ChatGPT GitHub PR review
 
-- [ ] Behavior is unchanged (or the approved issue explicitly changes it)
-- [ ] Public module interface / dependency direction is documented
-- [ ] No new cross-module state or duplicate business rule introduced
-- [ ] Rollback path is described below (revert, alias, or compatibility shim)
+<!-- Link independent review of the actual PR/current candidate and its verdict:
+REVIEW_APPROVED / REVIEW_CHANGES_REQUESTED / REVIEW_ARCHITECTURE_CONCERN.
+Keep pending until performed. Implementer self-review is not independent approval.
+Resolve findings and renew review after material corrections before merge. -->
 
-Rollback:
+## Periodic Product Owner testing / follow-ups (if useful)
 
-## Docs / i18n
-
-- [ ] Product/architecture docs updated if shipping truth changed
-- [ ] DE + EN strings updated if user-visible copy changed
-- [ ] ADR added/updated only if a significant architectural decision was made
-
-## Independent review
-
-Reviewer verdict:
-
-- [ ] `REVIEW_APPROVED`
-- [ ] `REVIEW_CHANGES_REQUESTED`
-- [ ] `REVIEW_ARCHITECTURE_CONCERN`
-
-<!-- Reviewer findings belong in PR review/comments; the reviewer must not fix its own findings. -->
-
-## Human test handoff
-
-<!-- Concise real-world checks for the Product Owner before merge. For Studio features, prefer realistic drone media. -->
-
-- [ ] Manual product test completed by human Product Owner
-
-## Follow-ups (not part of this PR)
-
-<!-- Performance improvements, future profiles, cleanup, etc. Keep them out of the current diff unless required for correctness. -->
-
-<!-- CI on PRs runs Ruff, MyPy, unit tests, JavaScript lint/format/tests, and App journey smoke. See docs/PR_E2E.md. -->
+<!-- Suggested realistic DJI/edit/export scenarios or linked bug issues.
+PO testing runs periodically, not before every develop merge. Identify any manual
+evidence explicitly required by this issue. Release approval stays human-controlled. -->

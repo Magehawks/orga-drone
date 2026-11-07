@@ -261,7 +261,10 @@ enforce it only after the migration is complete.
 
 ## Migration order
 
-Each step is independently mergeable and behavior-neutral.
+Each approved extraction step is independently mergeable and behavior-neutral.
+The target map does not require refactoring unrelated areas for every fix/feature.
+Select validation by risk using [`PR_E2E.md`](PR_E2E.md); preserve the focused
+module and sensitive-pipeline regression expectations above.
 
 1. **PR 1 (done):** JavaScript tooling and CI for new module paths.
 2. **PR 3 (done):** one ES-module entry point; no code moved.
@@ -274,7 +277,8 @@ Each step is independently mergeable and behavior-neutral.
 9. **Color controls:** HSL, wheels, LUT, color points.
 10. **Timeline, music, preview/playback.**
 11. **Masks, overlays, map, HUD, frame.**
-12. **Entry slim-down:** target 500–1,000 lines.
+12. **Entry slim-down:** retain boot/wiring responsibilities as approved slices
+    are extracted; no line-count quota or blanket extraction prerequisite.
 
 ## Non-goals
 
