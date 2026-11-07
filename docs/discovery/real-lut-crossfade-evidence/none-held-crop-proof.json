@@ -1,0 +1,44 @@
+{
+  "mode": "none",
+  "kind": "continuous",
+  "run": 5,
+  "held_capture_indices": [
+    23,
+    24,
+    25
+  ],
+  "same_decoded_crop_sha256": [
+    "3dcd4a9e2e3da236c7e45016ca0fcfe69763cdbdc0dcd4d6b2e1b4b996d122b8",
+    "3dcd4a9e2e3da236c7e45016ca0fcfe69763cdbdc0dcd4d6b2e1b4b996d122b8",
+    "3dcd4a9e2e3da236c7e45016ca0fcfe69763cdbdc0dcd4d6b2e1b4b996d122b8"
+  ],
+  "timestamps": [
+    {
+      "now": 15906.8,
+      "story": 1.9971001615508888
+    },
+    {
+      "now": 15940.2,
+      "story": 1.9971001615508888
+    },
+    {
+      "now": 15973.5,
+      "story": 1.9971001615508888
+    },
+    {
+      "now": 16065.1,
+      "story": 2.2586025848142164
+    },
+    {
+      "now": 16098.4,
+      "story": 2.2586025848142164
+    },
+    {
+      "now": 16131.9,
+      "story": 2.2586025848142164
+    }
+  ],
+  "movie_captured_frames": 59,
+  "movie_decoded_frames": 60,
+  "max_movie_pts_error_ms": 0.500000000000167
+}
