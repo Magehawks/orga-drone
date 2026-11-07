@@ -63,6 +63,7 @@ def main() -> int:
     parser.add_argument("--ffmpeg", required=True)
     parser.add_argument("--fixture-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--lut-role", choices=["creative", "conversion"], default="creative")
     args = parser.parse_args()
     fixture = args.fixture_dir.resolve()
     # Refuse arbitrary user data: require the successful synthetic fixture manifest.
@@ -76,7 +77,7 @@ def main() -> int:
     if out.exists() and any(out.iterdir()):
         parser.error("Use a fresh output directory")
     out.mkdir(parents=True, exist_ok=True)
-    report: dict = {"status": "INCOMPLETE", "errors": []}
+    report: dict = {"status": "INCOMPLETE", "errors": [], "lut_role": args.lut_role}
     report_path = out / "report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     app = None
@@ -139,19 +140,34 @@ def main() -> int:
         )
         navigate(cdp, app.app_port, "/studio")
         clip = cdp.evaluate("document.querySelector('.studio-clip').dataset.studioId")
-        expect_ok(
+        payload = {
+            "input_profile": "rec709",
+            "creative_lut": imported["asset_name"],
+            "creative_strength": 100,
+        }
+        if args.lut_role == "conversion":
+            # Exercise the technical LUT stage on a synthetic SDR fixture, not
+            # a claim that this transform converts actual D-Log M footage.
+            payload = {
+                "input_profile": "custom",
+                "conversion_lut": imported["asset_name"],
+                "conversion_confirmed": True,
+                "creative_lut": "",
+                "creative_strength": 100,
+            }
+        applied = expect_ok(
             fetch_json(
                 cdp,
                 f"/api/studio/{clip}/color",
                 method="PATCH",
-                json_body={
-                    "input_profile": "rec709",
-                    "creative_lut": imported["asset_name"],
-                    "creative_strength": 100,
-                },
+                json_body=payload,
             ),
             "apply cube",
         )
+        report["applied_color_look"] = applied["color_look"]
+        expected_stage = "creative_lut" if args.lut_role == "creative" else "conversion_lut"
+        if applied["color_look"].get(expected_stage) != imported["asset_name"]:
+            raise E2EError("Requested LUT stage was not persisted")
         navigate(cdp, app.app_port, "/studio")
         wait_until(
             cdp,
