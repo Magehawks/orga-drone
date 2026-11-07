@@ -33,7 +33,7 @@ def patch(cdp, clip: str, field: str, value: dict) -> None:
     expect_ok(fetch_json(cdp, f"/api/studio/{clip}/{field}", method="PATCH", json_body=value), field)
 
 
-def capture(cdp) -> tuple[Image.Image, dict]:
+def capture(cdp, *, screen: bool = False) -> tuple[Image.Image, dict]:
     # Pixel capture and Story timestamp are read in the same JS task.
     value = cdp.evaluate("""(()=>({
       png:document.getElementById('studio-preview-blit').toDataURL().split(',')[1],
@@ -46,7 +46,13 @@ def capture(cdp) -> tuple[Image.Image, dict]:
       failedChip:[document.getElementById('studio-root').dataset.lutChipFailed,document.getElementById('studio-root').dataset.lutChipMissing].includes(document.getElementById('studio-preview-lut-chip').textContent),
       chip:document.getElementById('studio-preview-lut-chip').textContent
     }))()""")
-    return image_bytes(value.pop("png")), value
+    pixels = image_bytes(value.pop("png"))
+    if screen:
+        rect = cdp.evaluate("(()=>{const r=document.getElementById('studio-preview-frame').getBoundingClientRect();"
+                            "return {x:r.x,y:r.y,width:r.width,height:r.height,scale:1}})()")
+        pixels = image_bytes(cdp.call("Page.captureScreenshot", dict(format="png", clip=rect,
+                                                                   captureBeyondViewport=True))["data"])
+    return pixels, value
 
 
 def reference(binary: str, path: Path, story_time: float) -> tuple[Image.Image, int]:
@@ -121,6 +127,9 @@ def run(args) -> dict:
         cases += [("photos-different", ["jpg", "png"], "different"),
                   ("photo-video", ["jpg", "mp4"], "creative100"),
                   ("video-photo", ["mp4", "png"], "creative100")]
+        if args.decorated:
+            cases = [("jpg-neutral", ["jpg"], "neutral"), ("jpg-creative100", ["jpg"], "creative100")]
+        report["decorated_screen_capture"] = args.decorated
         for name, formats, setting in cases:
             case_dir = out / name
             case_dir.mkdir()
@@ -142,6 +151,13 @@ def run(args) -> dict:
                 if setting == "conversion":
                     look.update(input_profile="custom", conversion_lut=assets["red"], conversion_confirmed=True)
                 patch(cdp, clip, "color", look)
+            if args.decorated:
+                patch(cdp, clips[0], "image", {"exposure": 8, "contrast": 5, "saturation": 12})
+                patch(cdp, clips[0], "frame", {"zoom_start": 1.15, "zoom_end": 1.15,
+                                               "x_start": 0.55, "x_end": 0.55,
+                                               "y_start": 0.45, "y_end": 0.45})
+                patch(cdp, clips[0], "masks", {"masks": [{"effect": "blur", "strength": 55,
+                      "x": 0.2, "y": 0.15, "w": 0.2, "h": 0.3}]})
             if len(clips) == 2:
                 patch(cdp, clips[0], "transition", {"type": "crossfade", "duration_s": 1})
             navigate(cdp, app.app_port, "/studio")
@@ -150,6 +166,11 @@ def run(args) -> dict:
             cdp.evaluate("document.getElementById('studio-preview-frame').style.cssText="
                          "'width:640px;height:360px;max-width:none;border:0;padding:0;flex-shrink:0';"
                          "document.querySelector('[data-timeline-zoom=fit]').click()")
+            if args.decorated:
+                # Compare picture layers, excluding editor handles and status UI.
+                cdp.evaluate("(()=>{const s=document.createElement('style');s.textContent="
+                             "'#studio-preview-mask-handles,#studio-preview-lut-chip{visibility:hidden!important}';"
+                             "document.head.append(s)})()")
             if setting != "neutral":
                 wait_until(cdp, "!document.getElementById('studio-preview-lut-still').hidden||"
                            "document.getElementById('studio-preview-frame').dataset.lutWebgl==='1'||"
@@ -161,7 +182,7 @@ def run(args) -> dict:
             row = {"name": name, "formats": formats, "frames": [], "export_sha256": sha256_file(output)}
 
             def record(label: str) -> None:
-                preview, state = capture(cdp)
+                preview, state = capture(cdp, screen=args.decorated)
                 ref, index = reference(args.ffmpeg, output, state["time"])
                 preview.save(case_dir / f"{label}-preview.png")
                 ref.save(case_dir / f"{label}-export.png")
@@ -219,6 +240,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expect-photo-fix", action="store_true",
                         help="Fail if colored photo-only preview frames exceed the unchanged strict gate")
+    parser.add_argument("--decorated", action="store_true",
+                        help="Additional grade/framing/blur-mask smoke using actual preview-screen captures")
     args = parser.parse_args()
     result = run(args)
     if args.expect_photo_fix and not result["photo_fix_pass"]:

@@ -1,0 +1,3657 @@
+{
+  "baseline": {
+    "exe_sha256": "48914e0b376dc886b8aec4e058b5f8fd89e209b0944de00e758340798bdd2ab1",
+    "studio_js_sha256": "6c20bdcaa497bd559368ac5278428be49606a318774d7c98315fadb180519618",
+    "lut_webgl_sha256": "12d4c18dc59caeffc505a75a5cf9c6f8a730450cdb8bf641a65a6fbc1e50ee12",
+    "ffmpeg_version": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+    "synthetic_only": true,
+    "source_hashes": {
+      "swatches.jpg": "f3d6651c4fe37463c807bc9765c0cd6ec7e188a0a628b7fe3b223dfe5d21ed15",
+      "swatches.mp4": "e458cb350b918ddf8ac53113a9715e75d05510071a773b73ed1a9419b9ad58be",
+      "swatches.png": "8e5512b8a528b1cd99be03c9d3bc06a64c7831781fc38a197dd59d18f8f78552"
+    },
+    "status": "COMPLETE",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Edg/157.0.4341.42",
+      "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "jsVersion": "15.7.11.4"
+    },
+    "strict_all_pass": false,
+    "bounded_photo_pass": false,
+    "photo_fix_pass": false,
+    "sources_unchanged": true,
+    "cases": [
+      {
+        "name": "jpg-neutral",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7506577287066246,
+              "roundedTime": 0.8,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 23,
+            "export_time": 0.7666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8549574132492115,
+              "roundedTime": 0.9,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 26,
+            "export_time": 0.8666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1445662460567823,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2403675078864351,
+              "roundedTime": 1.2,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative0",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          1,
+          1
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Bild wird aktualisiert \u2026"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7465599369085173,
+              "roundedTime": 0.7,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8257618296529968,
+              "roundedTime": 0.8,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1486687697160884,
+              "roundedTime": 1.1,
+              "requests": 3,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2444700315457413,
+              "roundedTime": 1.2,
+              "requests": 3,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative50",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "757cd2ed645ac7b599c1d64b221c0026b417156a278b2d9552790c1bb639b02a",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.0057471264367817,
+            "full_mean_rgb_error": 0.8378081597222223
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7467586750788644,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.869353298611113
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8507602523659306,
+              "roundedTime": 0.9,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 26,
+            "export_time": 0.8666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.869353298611113
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1486687697160884,
+              "roundedTime": 1.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.869353298611113
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2611687697160883,
+              "roundedTime": 1.3,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.869353298611113
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative100",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.062238136574074
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7465599369085173,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8382586750788643,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1528659305993691,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.244569400630915,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          }
+        ]
+      },
+      {
+        "name": "jpg-conversion",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.062238136574074
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.750761829652997,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 23,
+            "export_time": 0.7666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8382586750788643,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1529700315457414,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2488659305993692,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.860225694444445
+          }
+        ]
+      },
+      {
+        "name": "png-neutral",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7464605678233439,
+              "roundedTime": 0.7,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8298596214511043,
+              "roundedTime": 0.8,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1486687697160884,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2570662460567825,
+              "roundedTime": 1.3,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          }
+        ]
+      },
+      {
+        "name": "png-creative0",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.7413793103448274,
+            "full_mean_rgb_error": 2.0549421296296297
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7465599369085173,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8298596214511043,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.151134069400631,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2637334384858045,
+              "roundedTime": 1.3,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          }
+        ]
+      },
+      {
+        "name": "png-creative50",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "757cd2ed645ac7b599c1d64b221c0026b417156a278b2d9552790c1bb639b02a",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.3333333333333333,
+            "full_mean_rgb_error": 1.019720775462963
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7508611987381704,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 23,
+            "export_time": 0.7666666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.95269241898148
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8383580441640378,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.95269241898148
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1442681388012619,
+              "roundedTime": 1.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.95269241898148
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.232167192429022,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.333333333333336,
+            "full_mean_rgb_error": 17.95269241898148
+          }
+        ]
+      },
+      {
+        "name": "png-creative100",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 0.9820254629629629
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7460583596214511,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8327602523659305,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1447697160883281,
+              "roundedTime": 1.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2314668769716088,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          }
+        ]
+      },
+      {
+        "name": "png-conversion",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 0.9820254629629629
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7424574132492114,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.838859621451104,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1497665615141957,
+              "roundedTime": 1.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2463675078864354,
+              "roundedTime": 1.2,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.94355902777777
+          }
+        ]
+      },
+      {
+        "name": "photos-different",
+        "formats": [
+          "jpg",
+          "png"
+        ],
+        "export_sha256": "b6182e4665de77f2a151891072a4d4e3fd92001d85ba0aae38787280aed4af03",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.2429495268138804,
+              "roundedTime": 2.2,
+              "requests": 2,
+              "primaryStill": true,
+              "chip": "Farbstandbild; \u00dcbergangsfarben angen\u00e4hert"
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 52.666666666666664,
+            "full_mean_rgb_error": 26.407643229166666
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4953154574132492,
+              "roundedTime": 2.5,
+              "requests": 2,
+              "primaryStill": true,
+              "chip": "Farbstandbild; \u00dcbergangsfarben angen\u00e4hert"
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 35.0,
+            "full_mean_rgb_error": 17.80692708333333
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7476813880126185,
+              "roundedTime": 2.7,
+              "requests": 2,
+              "primaryStill": true,
+              "chip": "Farbstandbild; \u00dcbergangsfarben angen\u00e4hert"
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 19.0,
+            "full_mean_rgb_error": 9.90554542824074
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.343186119873817,
+              "roundedTime": 2.3,
+              "requests": 3,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 68.33333333333333,
+            "full_mean_rgb_error": 34.054182581018516
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.4417902208201894,
+              "roundedTime": 2.4,
+              "requests": 3,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 73,
+            "export_time": 2.433333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 69.33333333333333,
+            "full_mean_rgb_error": 34.43191261574074
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.888982649842271,
+              "roundedTime": 2.9,
+              "requests": 4,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 68.0,
+            "full_mean_rgb_error": 36.12012876157407
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 2.9968848580441643,
+              "roundedTime": 3,
+              "requests": 4,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 90,
+            "export_time": 3.0,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 36.61609230324074
+          }
+        ]
+      },
+      {
+        "name": "photo-video",
+        "formats": [
+          "jpg",
+          "mp4"
+        ],
+        "export_sha256": "90f203b0a6ccab8625e385d5fcc63f90494f3f2c24f8e236bede7908f183c711",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.248836833602585,
+              "roundedTime": 2.2,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 51.0,
+            "full_mean_rgb_error": 25.980967881944448
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4992407108239094,
+              "roundedTime": 2.5,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 34.666666666666664,
+            "full_mean_rgb_error": 18.13662181712963
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7496445880452343,
+              "roundedTime": 2.7,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 17.666666666666668,
+            "full_mean_rgb_error": 10.18173611111111
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.328198707592892,
+              "roundedTime": 2.3,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 49.666666666666664,
+            "full_mean_rgb_error": 25.47350694444445
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.477600969305331,
+              "roundedTime": 2.5,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 74,
+            "export_time": 2.466666666666667,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 49.666666666666664,
+            "full_mean_rgb_error": 25.473431712962963
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.894297253634895,
+              "roundedTime": 2.9,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 16.0,
+            "full_mean_rgb_error": 9.343969907407407
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 3.0955977382875606,
+              "roundedTime": 3.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 93,
+            "export_time": 3.1,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 3.101941550925926
+          }
+        ]
+      },
+      {
+        "name": "video-photo",
+        "formats": [
+          "mp4",
+          "png"
+        ],
+        "export_sha256": "e031228986cca524c04904221430b8ebc1fb34728cbbafd4c0f4c3c37c7398d7",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.248836833602585,
+              "roundedTime": 2.2,
+              "requests": 0,
+              "primaryStill": false,
+              "chip": ""
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 17.666666666666668,
+            "full_mean_rgb_error": 10.140429687500001
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4992407108239094,
+              "roundedTime": 2.5,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Farbstandbild; \u00dcbergangsfarben angen\u00e4hert"
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.1872410300925926
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7496445880452343,
+              "roundedTime": 2.7,
+              "requests": 1,
+              "primaryStill": true,
+              "chip": "Farbstandbild; \u00dcbergangsfarben angen\u00e4hert"
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": true,
+            "max_swatch_mean_rgb_error": 3.0,
+            "full_mean_rgb_error": 1.7746875
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.3468012924071084,
+              "roundedTime": 2.3,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 23.666666666666668,
+            "full_mean_rgb_error": 12.80685908564815
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.593400646203554,
+              "roundedTime": 2.6,
+              "requests": 1,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 78,
+            "export_time": 2.6,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 40.333333333333336,
+            "full_mean_rgb_error": 20.970049189814816
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.9019386106623584,
+              "roundedTime": 2.9,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 60.333333333333336,
+            "full_mean_rgb_error": 30.648695023148147
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 3.1235379644588046,
+              "roundedTime": 3.1,
+              "requests": 2,
+              "primaryStill": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 94,
+            "export_time": 3.1333333333333333,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 67.33333333333333,
+            "full_mean_rgb_error": 33.941083622685184
+          }
+        ]
+      }
+    ]
+  },
+  "fixed": {
+    "exe_sha256": "63553abb5f5bb30be8cbbcac9c6b22a295cd84e00fcb02f8299e2f7a6ae2df6b",
+    "studio_js_sha256": "c7429758fa15021401ad33f432c460feeb4a552dec65be96e4909ce507fd4a1c",
+    "lut_webgl_sha256": "12d4c18dc59caeffc505a75a5cf9c6f8a730450cdb8bf641a65a6fbc1e50ee12",
+    "ffmpeg_version": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+    "synthetic_only": true,
+    "source_hashes": {
+      "swatches.jpg": "f3d6651c4fe37463c807bc9765c0cd6ec7e188a0a628b7fe3b223dfe5d21ed15",
+      "swatches.mp4": "e458cb350b918ddf8ac53113a9715e75d05510071a773b73ed1a9419b9ad58be",
+      "swatches.png": "8e5512b8a528b1cd99be03c9d3bc06a64c7831781fc38a197dd59d18f8f78552"
+    },
+    "status": "COMPLETE",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Edg/157.0.4341.42",
+      "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "jsVersion": "15.7.11.4"
+    },
+    "strict_all_pass": false,
+    "bounded_photo_pass": true,
+    "photo_fix_pass": false,
+    "sources_unchanged": true,
+    "cases": [
+      {
+        "name": "jpg-neutral",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7431577287066247,
+              "roundedTime": 0.7,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8330583596214511,
+              "roundedTime": 0.8,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1430425867507885,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2420425867507887,
+              "roundedTime": 1.2,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.333333333333333,
+            "full_mean_rgb_error": 3.7926388888888893
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative0",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.007605613425926
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7488596214511041,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.007605613425926
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.830058359621451,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.007605613425926
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1506656151419559,
+              "roundedTime": 1.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.007605613425926
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2506687697160883,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.007605613425926
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative50",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "757cd2ed645ac7b599c1d64b221c0026b417156a278b2d9552790c1bb639b02a",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.7556047453703705
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7482586750788643,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.7556047453703705
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8494589905362777,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.7556047453703705
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1503438485804416,
+              "roundedTime": 1.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.7556047453703705
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2503422712933754,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.6666666666666667,
+            "full_mean_rgb_error": 1.7556047453703705
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative100",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7405599369085173,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8401608832807572,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1467665615141955,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2611687697160883,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          }
+        ]
+      },
+      {
+        "name": "jpg-conversion",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7483343848580442,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8775331230283911,
+              "roundedTime": 0.9,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 26,
+            "export_time": 0.8666666666666667,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1439700315457413,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2455678233438487,
+              "roundedTime": 1.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 5.833333333333333,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 2.0211299189814818
+          }
+        ]
+      },
+      {
+        "name": "png-neutral",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7429589905362776,
+              "roundedTime": 0.7,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8399574132492114,
+              "roundedTime": 0.8,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1431656151419558,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.248468454258675,
+              "roundedTime": 1.2,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.666666666666667,
+            "full_mean_rgb_error": 3.87752025462963
+          }
+        ]
+      },
+      {
+        "name": "png-creative0",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "742d6e9385a9a0d5efe9d79d3b14f296d97b124872e9982d1c9484d9a750ec49",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.7758620689655173,
+            "full_mean_rgb_error": 3.555755208333333
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7460583596214511,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.7758620689655173,
+            "full_mean_rgb_error": 3.555755208333333
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8316577287066247,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.7758620689655173,
+            "full_mean_rgb_error": 3.555755208333333
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1400662460567823,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.7758620689655173,
+            "full_mean_rgb_error": 3.555755208333333
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2462681388012617,
+              "roundedTime": 1.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 37,
+            "export_time": 1.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.7758620689655173,
+            "full_mean_rgb_error": 3.555755208333333
+          }
+        ]
+      },
+      {
+        "name": "png-creative50",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "757cd2ed645ac7b599c1d64b221c0026b417156a278b2d9552790c1bb639b02a",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.0,
+            "full_mean_rgb_error": 2.0136906828703705
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7434605678233438,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.0,
+            "full_mean_rgb_error": 2.0136906828703705
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8370615141955835,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.0,
+            "full_mean_rgb_error": 2.0136906828703705
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1487681388012618,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.0,
+            "full_mean_rgb_error": 2.0136906828703705
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2540662460567824,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.0,
+            "full_mean_rgb_error": 2.0136906828703705
+          }
+        ]
+      },
+      {
+        "name": "png-creative100",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7411608832807571,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8374589905362777,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1465678233438485,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2552681388012616,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          }
+        ]
+      },
+      {
+        "name": "png-conversion",
+        "formats": [
+          "png"
+        ],
+        "export_sha256": "7c36f39e499390e8cd8419a454eb14aeeb1cfce4f4f661ddf3c981cc60938e77",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7461577287066246,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.8397586750788644,
+              "roundedTime": 0.8,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 25,
+            "export_time": 0.8333333333333334,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1506419558359622,
+              "roundedTime": 1.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 35,
+            "export_time": 1.1666666666666667,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.2736419558359622,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 38,
+            "export_time": 1.2666666666666666,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.9980700231481479
+          }
+        ]
+      },
+      {
+        "name": "photos-different",
+        "formats": [
+          "jpg",
+          "png"
+        ],
+        "export_sha256": "b6182e4665de77f2a151891072a4d4e3fd92001d85ba0aae38787280aed4af03",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.2429495268138804,
+              "roundedTime": 2.2,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 3.1862456597222226
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4953154574132492,
+              "roundedTime": 2.5,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.6666666666666665,
+            "full_mean_rgb_error": 2.544577546296296
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7476813880126185,
+              "roundedTime": 2.7,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.8160919540229887,
+            "full_mean_rgb_error": 3.1106467013888888
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.340583596214511,
+              "roundedTime": 2.3,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.1724137931034484,
+            "full_mean_rgb_error": 2.541462673611111
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.4648895899053627,
+              "roundedTime": 2.5,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 74,
+            "export_time": 2.466666666666667,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.6666666666666665,
+            "full_mean_rgb_error": 3.026507523148148
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.896048895899054,
+              "roundedTime": 2.9,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.640484664351852
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 3.0276498422712934,
+              "roundedTime": 3,
+              "requests": 2,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 91,
+            "export_time": 3.033333333333333,
+            "strict_pass": true,
+            "bounded_threshold": 6.166666666666667,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.7011494252873565,
+            "full_mean_rgb_error": 1.9375144675925926
+          }
+        ]
+      },
+      {
+        "name": "photo-video",
+        "formats": [
+          "jpg",
+          "mp4"
+        ],
+        "export_sha256": "90f203b0a6ccab8625e385d5fcc63f90494f3f2c24f8e236bede7908f183c711",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.248836833602585,
+              "roundedTime": 2.2,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.6814510995370373
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4992407108239094,
+              "roundedTime": 2.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.550036168981481
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7496445880452343,
+              "roundedTime": 2.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 3.103987268518518
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.326696284329564,
+              "roundedTime": 2.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.6699913194444442
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.4431987075928916,
+              "roundedTime": 2.4,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 73,
+            "export_time": 2.433333333333333,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.669939236111111
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.9005008077544425,
+              "roundedTime": 2.9,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 3.0932971643518514
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 3.0149999999999997,
+              "roundedTime": 3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 90,
+            "export_time": 3.0,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 16.666666666666668,
+            "full_mean_rgb_error": 9.593803530092593
+          }
+        ]
+      },
+      {
+        "name": "video-photo",
+        "formats": [
+          "mp4",
+          "png"
+        ],
+        "export_sha256": "e031228986cca524c04904221430b8ebc1fb34728cbbafd4c0f4c3c37c7398d7",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-2.25",
+            "state": {
+              "time": 2.248836833602585,
+              "roundedTime": 2.2,
+              "requests": 1,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 67,
+            "export_time": 2.2333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 2.933783275462963
+          },
+          {
+            "label": "paused-2.5",
+            "state": {
+              "time": 2.4992407108239094,
+              "roundedTime": 2.5,
+              "requests": 1,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 75,
+            "export_time": 2.5,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.6666666666666665,
+            "full_mean_rgb_error": 2.600302372685185
+          },
+          {
+            "label": "paused-2.75",
+            "state": {
+              "time": 2.7496445880452343,
+              "roundedTime": 2.7,
+              "requests": 1,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 82,
+            "export_time": 2.7333333333333334,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.4250940393518516
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 2.3339983844911147,
+              "roundedTime": 2.3,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 70,
+            "export_time": 2.3333333333333335,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 4.0,
+            "full_mean_rgb_error": 2.8778414351851853
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 2.4510985460420036,
+              "roundedTime": 2.5,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 74,
+            "export_time": 2.466666666666667,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.6666666666666665,
+            "full_mean_rgb_error": 2.689506655092593
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 2.894022617124394,
+              "roundedTime": 2.9,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 87,
+            "export_time": 2.9,
+            "strict_pass": false,
+            "max_swatch_mean_rgb_error": 3.3333333333333335,
+            "full_mean_rgb_error": 2.3405005787037036
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 3.0031179321486268,
+              "roundedTime": 3,
+              "requests": 2,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 90,
+            "export_time": 3.0,
+            "strict_pass": true,
+            "max_swatch_mean_rgb_error": 2.6666666666666665,
+            "full_mean_rgb_error": 1.987105034722222
+          }
+        ]
+      }
+    ]
+  },
+  "decorated_baseline": {
+    "exe_sha256": "48914e0b376dc886b8aec4e058b5f8fd89e209b0944de00e758340798bdd2ab1",
+    "studio_js_sha256": "6c20bdcaa497bd559368ac5278428be49606a318774d7c98315fadb180519618",
+    "lut_webgl_sha256": "12d4c18dc59caeffc505a75a5cf9c6f8a730450cdb8bf641a65a6fbc1e50ee12",
+    "ffmpeg_version": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+    "synthetic_only": true,
+    "source_hashes": {
+      "swatches.jpg": "f3d6651c4fe37463c807bc9765c0cd6ec7e188a0a628b7fe3b223dfe5d21ed15",
+      "swatches.mp4": "e458cb350b918ddf8ac53113a9715e75d05510071a773b73ed1a9419b9ad58be",
+      "swatches.png": "8e5512b8a528b1cd99be03c9d3bc06a64c7831781fc38a197dd59d18f8f78552"
+    },
+    "status": "COMPLETE",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Edg/157.0.4341.42",
+      "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "jsVersion": "15.7.11.4"
+    },
+    "decorated_screen_capture": true,
+    "strict_all_pass": false,
+    "bounded_photo_pass": false,
+    "photo_fix_pass": false,
+    "sources_unchanged": true,
+    "cases": [
+      {
+        "name": "jpg-neutral",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "dc05999debf8bcf452858b6249318e9f63770fb8d450ea8c9b49b90347cfbc73",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.4351605902777775
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7461577287066246,
+              "roundedTime": 0.7,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 18.625,
+            "full_mean_rgb_error": 10.606244212962963
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.9231577287066246,
+              "roundedTime": 0.9,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 28,
+            "export_time": 0.9333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.435380497685185
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1447697160883281,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 18.625,
+            "full_mean_rgb_error": 10.606244212962963
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.316966876971609,
+              "roundedTime": 1.3,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 40,
+            "export_time": 1.3333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.4351605902777775
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative100",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "5f0ba74c5462f4e52d6437fbd3fa9d548af2aca3acbeeeffa11afcffcc51e664",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                405
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 1.438397988505747,
+            "full_mean_rgb_error": 0.9810243055555556
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7431577287066247,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 62.59722222222223,
+            "full_mean_rgb_error": 37.24523292824074
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.9055599369085174,
+              "roundedTime": 0.9,
+              "requests": 1,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 27,
+            "export_time": 0.9,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 63.822916666666664,
+            "full_mean_rgb_error": 35.058194444444446
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.146870662460568,
+              "roundedTime": 1.1,
+              "requests": 2,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 62.59722222222223,
+            "full_mean_rgb_error": 37.24523292824074
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.3096703470031545,
+              "roundedTime": 1.3,
+              "requests": 2,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": "Wiedergabe ohne Farbdatei"
+            },
+            "export_frame": 39,
+            "export_time": 1.3,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": false,
+            "max_swatch_mean_rgb_error": 63.822916666666664,
+            "full_mean_rgb_error": 35.058194444444446
+          }
+        ]
+      }
+    ]
+  },
+  "decorated_fixed": {
+    "exe_sha256": "63553abb5f5bb30be8cbbcac9c6b22a295cd84e00fcb02f8299e2f7a6ae2df6b",
+    "studio_js_sha256": "c7429758fa15021401ad33f432c460feeb4a552dec65be96e4909ce507fd4a1c",
+    "lut_webgl_sha256": "12d4c18dc59caeffc505a75a5cf9c6f8a730450cdb8bf641a65a6fbc1e50ee12",
+    "ffmpeg_version": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+    "synthetic_only": true,
+    "source_hashes": {
+      "swatches.jpg": "f3d6651c4fe37463c807bc9765c0cd6ec7e188a0a628b7fe3b223dfe5d21ed15",
+      "swatches.mp4": "e458cb350b918ddf8ac53113a9715e75d05510071a773b73ed1a9419b9ad58be",
+      "swatches.png": "8e5512b8a528b1cd99be03c9d3bc06a64c7831781fc38a197dd59d18f8f78552"
+    },
+    "status": "COMPLETE",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Edg/157.0.4341.42",
+      "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "jsVersion": "15.7.11.4"
+    },
+    "decorated_screen_capture": true,
+    "strict_all_pass": false,
+    "bounded_photo_pass": true,
+    "photo_fix_pass": false,
+    "sources_unchanged": true,
+    "cases": [
+      {
+        "name": "jpg-neutral",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "dc05999debf8bcf452858b6249318e9f63770fb8d450ea8c9b49b90347cfbc73",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.516025752314815
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7469337539432177,
+              "roundedTime": 0.7,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 18.625,
+            "full_mean_rgb_error": 10.68931857638889
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.9078312302839115,
+              "roundedTime": 0.9,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 27,
+            "export_time": 0.9,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.516245659722222
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1467665615141955,
+              "roundedTime": 1.1,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 18.625,
+            "full_mean_rgb_error": 10.68931857638889
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.3209700315457413,
+              "roundedTime": 1.3,
+              "requests": 0,
+              "primaryStill": false,
+              "stillSize": [
+                0,
+                0
+              ],
+              "failedChip": false,
+              "chip": ""
+            },
+            "export_frame": 40,
+            "export_time": 1.3333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 7.444893438697318,
+            "full_mean_rgb_error": 5.516025752314815
+          }
+        ]
+      },
+      {
+        "name": "jpg-creative100",
+        "formats": [
+          "jpg"
+        ],
+        "export_sha256": "5f0ba74c5462f4e52d6437fbd3fa9d548af2aca3acbeeeffa11afcffcc51e664",
+        "request_deltas": [
+          0,
+          0
+        ],
+        "frames": [
+          {
+            "label": "paused-0.5",
+            "state": {
+              "time": 0.49876656151419557,
+              "roundedTime": 0.5,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 15,
+            "export_time": 0.5,
+            "strict_pass": true,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.324772509578544,
+            "full_mean_rgb_error": 1.660724826388889
+          },
+          {
+            "label": "continuous-playing",
+            "state": {
+              "time": 0.7486608832807572,
+              "roundedTime": 0.7,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 22,
+            "export_time": 0.7333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 9.458363266283525,
+            "full_mean_rgb_error": 4.865927372685185
+          },
+          {
+            "label": "continuous-after-pause",
+            "state": {
+              "time": 0.9025599369085173,
+              "roundedTime": 0.9,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 27,
+            "export_time": 0.9,
+            "strict_pass": true,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.324772509578544,
+            "full_mean_rgb_error": 1.660724826388889
+          },
+          {
+            "label": "inside-playing",
+            "state": {
+              "time": 1.1469700315457414,
+              "roundedTime": 1.1,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 34,
+            "export_time": 1.1333333333333333,
+            "strict_pass": false,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 9.458363266283525,
+            "full_mean_rgb_error": 4.865927372685185
+          },
+          {
+            "label": "inside-after-pause",
+            "state": {
+              "time": 1.3120694006309148,
+              "roundedTime": 1.3,
+              "requests": 1,
+              "primaryStill": true,
+              "stillSize": [
+                720,
+                406
+              ],
+              "failedChip": false,
+              "chip": "Standbild mit Farbdatei"
+            },
+            "export_frame": 39,
+            "export_time": 1.3,
+            "strict_pass": true,
+            "bounded_threshold": 20.125,
+            "bounded_pass": true,
+            "max_swatch_mean_rgb_error": 2.324772509578544,
+            "full_mean_rgb_error": 1.660724826388889
+          }
+        ]
+      }
+    ]
+  }
+}
