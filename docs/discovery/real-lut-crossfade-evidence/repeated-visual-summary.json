@@ -1,0 +1,2545 @@
+[
+  {
+    "mode": "none",
+    "runs": [
+      {
+        "kind": "continuous",
+        "run": 1,
+        "frames": 58,
+        "observed_overlap_holds": [
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.0368012924071084,
+            "story_end_s": 2.0368012924071084,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 41.70000000000027,
+            "story_start_s": 2.0368012924071084,
+            "story_end_s": 2.0368012924071084,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 166.70000000000027,
+        "black_crop_samples": 0,
+        "brightness_min": 57.851052083333336,
+        "brightness_max": 68.00852083333334,
+        "maximum_adjacent_brightness_change": 4.95825
+      },
+      {
+        "kind": "continuous",
+        "run": 2,
+        "frames": 55,
+        "observed_overlap_holds": [
+          {
+            "first": 33,
+            "last": 34,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.5379967689822296,
+            "story_end_s": 2.5715993537964454,
+            "matched_export_change_mae": 8.224395833333332
+          },
+          {
+            "first": 39,
+            "last": 40,
+            "observed_same_image_ms": 33.400000000000546,
+            "story_start_s": 2.7381987075928915,
+            "story_end_s": 2.7713004846526657,
+            "matched_export_change_mae": 9.5344375
+          },
+          {
+            "first": 45,
+            "last": 46,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.938400646203554,
+            "story_end_s": 2.971502423263328,
+            "matched_export_change_mae": 10.916677083333333
+          }
+        ],
+        "max_capture_gap_ms": 337.40000000000055,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 68.47309375,
+        "maximum_adjacent_brightness_change": 4.664072916666669
+      },
+      {
+        "kind": "continuous",
+        "run": 3,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 1.9934975767366718,
+            "story_end_s": 2.155799676898223,
+            "matched_export_change_mae": 15.41440625
+          },
+          {
+            "first": 20,
+            "last": 21,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.155799676898223,
+            "story_end_s": 2.155799676898223,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 324.89999999999964,
+        "black_crop_samples": 0,
+        "brightness_min": 58.09636458333333,
+        "brightness_max": 68.20228125,
+        "maximum_adjacent_brightness_change": 4.07877083333333
+      },
+      {
+        "kind": "continuous",
+        "run": 4,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.090096930533118,
+            "story_end_s": 2.090096930533118,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 23,
+            "last": 24,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.090096930533118,
+            "story_end_s": 2.090096930533118,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 179.0,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 68.09533333333333,
+        "maximum_adjacent_brightness_change": 4.583645833333328
+      },
+      {
+        "kind": "continuous",
+        "run": 5,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 23,
+            "last": 25,
+            "observed_same_image_ms": 124.89999999999964,
+            "story_start_s": 1.9971001615508888,
+            "story_end_s": 2.2586025848142164,
+            "matched_export_change_mae": 20.09225
+          }
+        ],
+        "max_capture_gap_ms": 170.6999999999989,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 68.70325,
+        "maximum_adjacent_brightness_change": 5.882083333333334
+      },
+      {
+        "kind": "continuous",
+        "run": 6,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.0895961227786755,
+            "story_end_s": 2.0895961227786755,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 43,
+            "last": 44,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.710096930533118,
+            "story_end_s": 2.7434975767366723,
+            "matched_export_change_mae": 9.4305
+          },
+          {
+            "first": 49,
+            "last": 50,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.9100969305331175,
+            "story_end_s": 2.943400646203554,
+            "matched_export_change_mae": 10.76875
+          }
+        ],
+        "max_capture_gap_ms": 149.79999999999927,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.62884375,
+        "maximum_adjacent_brightness_change": 5.537343749999991
+      },
+      {
+        "kind": "continuous",
+        "run": 7,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0929967689822293,
+            "story_end_s": 2.0929967689822293,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 308.1000000000022,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 68.40719791666666,
+        "maximum_adjacent_brightness_change": 4.899302083333325
+      },
+      {
+        "kind": "continuous",
+        "run": 8,
+        "frames": 54,
+        "observed_overlap_holds": [],
+        "max_capture_gap_ms": 354.0,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 68.26179166666667,
+        "maximum_adjacent_brightness_change": 4.750104166666667
+      },
+      {
+        "kind": "continuous",
+        "run": 9,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 26,
+            "last": 27,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.2518012924071087,
+            "story_end_s": 2.2518012924071087,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 162.29999999999927,
+        "black_crop_samples": 0,
+        "brightness_min": 57.851052083333336,
+        "brightness_max": 67.83757291666667,
+        "maximum_adjacent_brightness_change": 5.939843750000001
+      },
+      {
+        "kind": "continuous",
+        "run": 10,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 20,
+            "last": 21,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0863004846526656,
+            "story_end_s": 2.0863004846526656,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 27,
+            "last": 28,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.121098546042003,
+            "story_end_s": 2.149596122778675,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 40,
+            "last": 41,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.5492003231017772,
+            "story_end_s": 2.582600969305331,
+            "matched_export_change_mae": 8.224395833333332
+          }
+        ],
+        "max_capture_gap_ms": 187.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.88585416666667,
+        "brightness_max": 68.55529166666666,
+        "maximum_adjacent_brightness_change": 5.178937499999996
+      },
+      {
+        "kind": "inside",
+        "run": 1,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 2,
+            "last": 3,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.317197092084007,
+            "story_end_s": 2.3505977382875605,
+            "matched_export_change_mae": 6.526791666666667
+          },
+          {
+            "first": 5,
+            "last": 6,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.4215024232633278,
+            "story_end_s": 2.454903069466882,
+            "matched_export_change_mae": 7.4939375
+          },
+          {
+            "first": 11,
+            "last": 12,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6213974151857835,
+            "story_end_s": 2.6547980613893376,
+            "matched_export_change_mae": 9.018354166666667
+          },
+          {
+            "first": 17,
+            "last": 18,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.821502423263328,
+            "story_end_s": 2.854798061389338,
+            "matched_export_change_mae": 10.248197916666667
+          }
+        ],
+        "max_capture_gap_ms": 37.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.83757291666667,
+        "maximum_adjacent_brightness_change": 2.888739583333333
+      },
+      {
+        "kind": "inside",
+        "run": 2,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.596098546042003,
+            "story_end_s": 2.623699515347335,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7905008077544426,
+            "story_end_s": 2.823699515347334,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.9907027463651055,
+            "story_end_s": 3.0242003231017773,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.83757291666667,
+        "maximum_adjacent_brightness_change": 2.888739583333333
+      },
+      {
+        "kind": "inside",
+        "run": 3,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.3860016155088855,
+            "story_end_s": 2.419103392568659,
+            "matched_export_change_mae": 7.2029375
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.60029886914378,
+            "story_end_s": 2.6274959612277864,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.794402261712439,
+            "story_end_s": 2.8275040387722132,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.994499192245557,
+            "story_end_s": 3.027996768982229,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 41.60000000000582,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.88216666666666,
+        "maximum_adjacent_brightness_change": 2.933333333333323
+      },
+      {
+        "kind": "inside",
+        "run": 4,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.59529886914378,
+            "story_end_s": 2.6221001615508883,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.788998384491115,
+            "story_end_s": 2.8221001615508885,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.988998384491115,
+            "story_end_s": 3.0221001615508887,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 37.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.93238541666666,
+        "maximum_adjacent_brightness_change": 2.983552083333322
+      },
+      {
+        "kind": "inside",
+        "run": 5,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.600096930533118,
+            "story_end_s": 2.629596122778675,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.796203554119548,
+            "story_end_s": 2.8295961227786752,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.9963004846526657,
+            "story_end_s": 3.02970113085622,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 41.700000000004366,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.78435416666666,
+        "maximum_adjacent_brightness_change": 2.8355208333333195
+      },
+      {
+        "kind": "inside",
+        "run": 6,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 2,
+            "last": 3,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.3204038772213247,
+            "story_end_s": 2.3536995153473343,
+            "matched_export_change_mae": 6.526791666666667
+          },
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.387302100161551,
+            "story_end_s": 2.4205977382875608,
+            "matched_export_change_mae": 7.2029375
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.5873990306946686,
+            "story_end_s": 2.6205977382875605,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7874959612277865,
+            "story_end_s": 2.820799676898223,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.987600969305331,
+            "story_end_s": 3.020799676898223,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 33.400000000001455,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.93238541666666,
+        "maximum_adjacent_brightness_change": 2.983552083333322
+      },
+      {
+        "kind": "inside",
+        "run": 7,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6637964458804526,
+            "story_end_s": 2.697100161550889,
+            "matched_export_change_mae": 7.278635416666667
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.863699515347334,
+            "story_end_s": 2.8971001615508882,
+            "matched_export_change_mae": 7.961135416666667
+          }
+        ],
+        "max_capture_gap_ms": 41.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.93238541666666,
+        "maximum_adjacent_brightness_change": 2.983552083333322
+      },
+      {
+        "kind": "inside",
+        "run": 8,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.5883037156704365,
+            "story_end_s": 2.62029886914378,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.786898222940226,
+            "story_end_s": 2.8202988691437803,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.9870032310177708,
+            "story_end_s": 3.020403877221325,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 37.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.40127083333333,
+        "maximum_adjacent_brightness_change": 2.636552083333328
+      },
+      {
+        "kind": "inside",
+        "run": 9,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.589103392568659,
+            "story_end_s": 2.6213974151857835,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.7878998384491114,
+            "story_end_s": 2.8212035541195473,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.200000000004366,
+            "story_start_s": 2.988101777059774,
+            "story_end_s": 3.021300484652665,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 37.39999999999418,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.93238541666666,
+        "maximum_adjacent_brightness_change": 2.983552083333322
+      },
+      {
+        "kind": "inside",
+        "run": 10,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.3860016155088855,
+            "story_end_s": 2.419103392568659,
+            "matched_export_change_mae": 7.2029375
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.5884975767366725,
+            "story_end_s": 2.6189014539579967,
+            "matched_export_change_mae": 8.586333333333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.785597738287561,
+            "story_end_s": 2.818998384491115,
+            "matched_export_change_mae": 9.921885416666667
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.985597738287561,
+            "story_end_s": 3.0189014539579966,
+            "matched_export_change_mae": 10.939604166666667
+          }
+        ],
+        "max_capture_gap_ms": 33.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.88216666666666,
+        "maximum_adjacent_brightness_change": 2.933333333333323
+      }
+    ],
+    "total_visual_runs": 20,
+    "crop": "x=440,y=0,width=200,height=160 of a 640x360 blit",
+    "qualification": "Captured crop holds, not display-photon or full-screen freeze durations. Capture gaps do not prove the UI froze."
+  },
+  {
+    "mode": "same",
+    "runs": [
+      {
+        "kind": "continuous",
+        "run": 1,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 37.5,
+            "story_start_s": 2.0994991922455575,
+            "story_end_s": 2.0994991922455575,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 23,
+            "last": 24,
+            "observed_same_image_ms": 37.5,
+            "story_start_s": 2.0994991922455575,
+            "story_end_s": 2.0994991922455575,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 245.5999999999999,
+        "black_crop_samples": 0,
+        "brightness_min": 59.185208333333335,
+        "brightness_max": 64.33321875,
+        "maximum_adjacent_brightness_change": 2.36954166666667
+      },
+      {
+        "kind": "continuous",
+        "run": 2,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.094297253634895,
+            "story_end_s": 2.094297253634895,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 31,
+            "last": 32,
+            "observed_same_image_ms": 33.400000000000546,
+            "story_start_s": 2.1755977382875606,
+            "story_end_s": 2.2079967689822295,
+            "matched_export_change_mae": 2.2609375
+          },
+          {
+            "first": 52,
+            "last": 53,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.923101777059774,
+            "story_end_s": 2.9555008077544427,
+            "matched_export_change_mae": 6.30603125
+          }
+        ],
+        "max_capture_gap_ms": 162.40000000000055,
+        "black_crop_samples": 0,
+        "brightness_min": 58.9545625,
+        "brightness_max": 64.22130208333333,
+        "maximum_adjacent_brightness_change": 2.576322916666662
+      },
+      {
+        "kind": "continuous",
+        "run": 3,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 34,
+            "last": 35,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.548901453957997,
+            "story_end_s": 2.5821001615508883,
+            "matched_export_change_mae": 4.6829479166666665
+          },
+          {
+            "first": 40,
+            "last": 41,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.748796445880452,
+            "story_end_s": 2.7821001615508885,
+            "matched_export_change_mae": 5.50371875
+          }
+        ],
+        "max_capture_gap_ms": 287.2999999999993,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 64.19285416666666,
+        "maximum_adjacent_brightness_change": 2.629979166666665
+      },
+      {
+        "kind": "continuous",
+        "run": 4,
+        "frames": 55,
+        "observed_overlap_holds": [
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 37.5,
+            "story_start_s": 1.998198707592892,
+            "story_end_s": 2.1521970920840063,
+            "matched_export_change_mae": 8.824145833333333
+          }
+        ],
+        "max_capture_gap_ms": 316.3000000000011,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 64.13169791666667,
+        "maximum_adjacent_brightness_change": 2.3203125
+      },
+      {
+        "kind": "continuous",
+        "run": 5,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 37.29999999999927,
+            "story_start_s": 2.0960016155088854,
+            "story_end_s": 2.0960016155088854,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 42,
+            "last": 43,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.5978029079159937,
+            "story_end_s": 2.6310985460420033,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 48,
+            "last": 49,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.7978029079159934,
+            "story_end_s": 2.8312035541195475,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 154.0,
+        "black_crop_samples": 0,
+        "brightness_min": 58.68117708333333,
+        "brightness_max": 64.45048958333334,
+        "maximum_adjacent_brightness_change": 2.750979166666667
+      },
+      {
+        "kind": "continuous",
+        "run": 6,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.1484975767366716,
+            "story_end_s": 2.1484975767366716,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 25,
+            "last": 26,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.2218982229402267,
+            "story_end_s": 2.255799676898223,
+            "matched_export_change_mae": 3.20675
+          },
+          {
+            "first": 28,
+            "last": 29,
+            "observed_same_image_ms": 33.20000000000073,
+            "story_start_s": 2.32440226171244,
+            "story_end_s": 2.354297253634895,
+            "matched_export_change_mae": 3.7119583333333335
+          }
+        ],
+        "max_capture_gap_ms": 316.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 64.42201041666667,
+        "maximum_adjacent_brightness_change": 2.3611666666666693
+      },
+      {
+        "kind": "continuous",
+        "run": 7,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.094297253634895,
+            "story_end_s": 2.094297253634895,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.094297253634895,
+            "story_end_s": 2.094297253634895,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 283.0,
+        "black_crop_samples": 0,
+        "brightness_min": 58.32507291666667,
+        "brightness_max": 64.15339583333333,
+        "maximum_adjacent_brightness_change": 2.5887500000000045
+      },
+      {
+        "kind": "continuous",
+        "run": 8,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 1.9986995153473344,
+            "story_end_s": 2.0876009693053312,
+            "matched_export_change_mae": 6.263385416666667
+          },
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.0876009693053312,
+            "story_end_s": 2.0876009693053312,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 162.20000000000073,
+        "black_crop_samples": 0,
+        "brightness_min": 58.60186458333333,
+        "brightness_max": 64.33321875,
+        "maximum_adjacent_brightness_change": 2.3217187500000023
+      },
+      {
+        "kind": "continuous",
+        "run": 9,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0994991922455575,
+            "story_end_s": 2.0994991922455575,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 29,
+            "last": 30,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.2186025848142163,
+            "story_end_s": 2.250403877221325,
+            "matched_export_change_mae": 3.20675
+          },
+          {
+            "first": 31,
+            "last": 32,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.2844022617124398,
+            "story_end_s": 2.3178998384491116,
+            "matched_export_change_mae": 3.7029791666666667
+          }
+        ],
+        "max_capture_gap_ms": 162.40000000000146,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 64.02666666666667,
+        "maximum_adjacent_brightness_change": 2.3630104166666683
+      },
+      {
+        "kind": "continuous",
+        "run": 10,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 14,
+            "last": 15,
+            "observed_same_image_ms": 79.29999999999927,
+            "story_start_s": 1.9976009693053312,
+            "story_end_s": 2.0595961227786757,
+            "matched_export_change_mae": 5.245458333333334
+          }
+        ],
+        "max_capture_gap_ms": 237.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.32507291666667,
+        "brightness_max": 63.97603125,
+        "maximum_adjacent_brightness_change": 2.718406250000001
+      },
+      {
+        "kind": "inside",
+        "run": 1,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.590403877221325,
+            "story_end_s": 2.6221001615508883,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.788796445880452,
+            "story_end_s": 2.8221970920840063,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 37.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 64.04202083333334,
+        "maximum_adjacent_brightness_change": 1.6793750000000074
+      },
+      {
+        "kind": "inside",
+        "run": 2,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.6644991922455574,
+            "story_end_s": 2.6978998384491115,
+            "matched_export_change_mae": 4.190864583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.86470113085622,
+            "story_end_s": 2.8979967689822295,
+            "matched_export_change_mae": 4.583260416666667
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 63.959020833333334,
+        "maximum_adjacent_brightness_change": 1.5963750000000019
+      },
+      {
+        "kind": "inside",
+        "run": 3,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.59970113085622,
+            "story_end_s": 2.629402261712439,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.796098546042003,
+            "story_end_s": 2.829499192245557,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 41.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 64.04202083333334,
+        "maximum_adjacent_brightness_change": 1.6793750000000074
+      },
+      {
+        "kind": "inside",
+        "run": 4,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.663699515347335,
+            "story_end_s": 2.6970032310177707,
+            "matched_export_change_mae": 4.190864583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.863699515347334,
+            "story_end_s": 2.8971970920840064,
+            "matched_export_change_mae": 4.583260416666667
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 63.91728125,
+        "maximum_adjacent_brightness_change": 1.5546354166666703
+      },
+      {
+        "kind": "inside",
+        "run": 5,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.664200323101777,
+            "story_end_s": 2.6974959612277867,
+            "matched_export_change_mae": 4.190864583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.864200323101777,
+            "story_end_s": 2.8976009693053313,
+            "matched_export_change_mae": 4.583260416666667
+          }
+        ],
+        "max_capture_gap_ms": 41.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 64.04202083333334,
+        "maximum_adjacent_brightness_change": 1.6793750000000074
+      },
+      {
+        "kind": "inside",
+        "run": 6,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.382600969305331,
+            "story_end_s": 2.4160016155088853,
+            "matched_export_change_mae": 3.20975
+          },
+          {
+            "first": 13,
+            "last": 14,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6994022617124394,
+            "story_end_s": 2.732697899838449,
+            "matched_export_change_mae": 5.527052083333333
+          },
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.89940226171244,
+            "story_end_s": 2.932697899838449,
+            "matched_export_change_mae": 6.165802083333333
+          }
+        ],
+        "max_capture_gap_ms": 50.099999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 63.736354166666665,
+        "maximum_adjacent_brightness_change": 1.4450208333333308
+      },
+      {
+        "kind": "inside",
+        "run": 7,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.6618012924071084,
+            "story_end_s": 2.6952019386106625,
+            "matched_export_change_mae": 4.190864583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.8620032310177708,
+            "story_end_s": 2.895201938610662,
+            "matched_export_change_mae": 4.583260416666667
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 64.04202083333334,
+        "maximum_adjacent_brightness_change": 1.6793750000000074
+      },
+      {
+        "kind": "inside",
+        "run": 8,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.592495961227787,
+            "story_end_s": 2.6213004846526653,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.7879967689822296,
+            "story_end_s": 2.8213004846526655,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 37.39999999999418,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 63.959020833333334,
+        "maximum_adjacent_brightness_change": 1.5963750000000019
+      },
+      {
+        "kind": "inside",
+        "run": 9,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.593303715670436,
+            "story_end_s": 2.6233037156704357,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7899999999999996,
+            "story_end_s": 2.8234006462035537,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 37.299999999995634,
+        "black_crop_samples": 0,
+        "brightness_min": 58.17553125,
+        "brightness_max": 64.04202083333334,
+        "maximum_adjacent_brightness_change": 1.6793750000000074
+      },
+      {
+        "kind": "inside",
+        "run": 10,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.38440226171244,
+            "story_end_s": 2.4178029079159935,
+            "matched_export_change_mae": 4.118833333333333
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.5921970920840067,
+            "story_end_s": 2.617996768982229,
+            "matched_export_change_mae": 4.946822916666667
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7847980613893375,
+            "story_end_s": 2.8179967689822294,
+            "matched_export_change_mae": 5.7205625
+          }
+        ],
+        "max_capture_gap_ms": 33.5,
+        "black_crop_samples": 0,
+        "brightness_min": 58.15844791666667,
+        "brightness_max": 63.990875,
+        "maximum_adjacent_brightness_change": 1.6282291666666708
+      }
+    ],
+    "total_visual_runs": 20,
+    "crop": "x=440,y=0,width=200,height=160 of a 640x360 blit",
+    "qualification": "Captured crop holds, not display-photon or full-screen freeze durations. Capture gaps do not prove the UI froze."
+  },
+  {
+    "mode": "different",
+    "runs": [
+      {
+        "kind": "continuous",
+        "run": 1,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.40000000000009,
+            "story_start_s": 2.043497576736672,
+            "story_end_s": 2.043497576736672,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 27,
+            "last": 28,
+            "observed_same_image_ms": 33.40000000000009,
+            "story_start_s": 2.1320032310177703,
+            "story_end_s": 2.1618982229402257,
+            "matched_export_change_mae": 2.810322916666667
+          }
+        ],
+        "max_capture_gap_ms": 179.0999999999999,
+        "black_crop_samples": 0,
+        "brightness_min": 58.073625,
+        "brightness_max": 63.33773958333333,
+        "maximum_adjacent_brightness_change": 2.280093749999999
+      },
+      {
+        "kind": "continuous",
+        "run": 2,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 17,
+            "last": 18,
+            "observed_same_image_ms": 33.400000000000546,
+            "story_start_s": 2.094297253634895,
+            "story_end_s": 2.094297253634895,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 304.09999999999945,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.781447916666664,
+        "maximum_adjacent_brightness_change": 3.255145833333337
+      },
+      {
+        "kind": "continuous",
+        "run": 3,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 17,
+            "last": 18,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.0954038772213246,
+            "story_end_s": 2.0954038772213246,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 42,
+            "last": 43,
+            "observed_same_image_ms": 33.30000000000109,
+            "story_start_s": 2.8065993537964458,
+            "story_end_s": 2.8397980613893377,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 303.7999999999993,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 64.14133333333334,
+        "maximum_adjacent_brightness_change": 2.5439791666666665
+      },
+      {
+        "kind": "continuous",
+        "run": 4,
+        "frames": 58,
+        "observed_overlap_holds": [
+          {
+            "first": 17,
+            "last": 18,
+            "observed_same_image_ms": 33.30000000000109,
+            "story_start_s": 2.0900000000000003,
+            "story_end_s": 2.0900000000000003,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 40,
+            "last": 41,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.681599353796446,
+            "story_end_s": 2.714798061389337,
+            "matched_export_change_mae": 3.961989583333333
+          }
+        ],
+        "max_capture_gap_ms": 295.89999999999964,
+        "black_crop_samples": 0,
+        "brightness_min": 57.487375,
+        "brightness_max": 64.05036458333333,
+        "maximum_adjacent_brightness_change": 2.3623125000000016
+      },
+      {
+        "kind": "continuous",
+        "run": 5,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.0844991922455574,
+            "story_end_s": 2.0844991922455574,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 308.40000000000146,
+        "black_crop_samples": 0,
+        "brightness_min": 58.7404375,
+        "brightness_max": 63.74296875,
+        "maximum_adjacent_brightness_change": 2.9246979166666662
+      },
+      {
+        "kind": "continuous",
+        "run": 6,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.085597738287561,
+            "story_end_s": 2.085597738287561,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 304.09999999999854,
+        "black_crop_samples": 0,
+        "brightness_min": 57.487375,
+        "brightness_max": 64.14133333333334,
+        "maximum_adjacent_brightness_change": 2.6849375000000038
+      },
+      {
+        "kind": "continuous",
+        "run": 7,
+        "frames": 58,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.20000000000073,
+            "story_start_s": 2.061098546042003,
+            "story_end_s": 2.061098546042003,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 228.70000000000073,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 64.05405208333333,
+        "maximum_adjacent_brightness_change": 2.7395416666666677
+      },
+      {
+        "kind": "continuous",
+        "run": 8,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.0863974151857834,
+            "story_end_s": 2.0863974151857834,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 25,
+            "last": 26,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.2686995153473344,
+            "story_end_s": 2.3007996768982233,
+            "matched_export_change_mae": 2.6911145833333334
+          }
+        ],
+        "max_capture_gap_ms": 316.7000000000007,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.8098125,
+        "maximum_adjacent_brightness_change": 2.353416666666668
+      },
+      {
+        "kind": "continuous",
+        "run": 9,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0821001615508887,
+            "story_end_s": 2.0821001615508887,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 37,
+            "last": 38,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.393901453957997,
+            "story_end_s": 2.4271970920840067,
+            "matched_export_change_mae": 4.003947916666666
+          },
+          {
+            "first": 49,
+            "last": 50,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.7936995153473343,
+            "story_end_s": 2.8271001615508884,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 154.1999999999971,
+        "black_crop_samples": 0,
+        "brightness_min": 58.606458333333336,
+        "brightness_max": 63.74296875,
+        "maximum_adjacent_brightness_change": 2.8329583333333375
+      },
+      {
+        "kind": "continuous",
+        "run": 10,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 15,
+            "last": 16,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 1.9973021001615507,
+            "story_end_s": 2.0857027463651048,
+            "matched_export_change_mae": 6.36815625
+          },
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.0857027463651048,
+            "story_end_s": 2.0857027463651048,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 41.599999999998545,
+            "story_start_s": 2.0857027463651048,
+            "story_end_s": 2.0857027463651048,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 24,
+            "last": 25,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.1263004846526656,
+            "story_end_s": 2.16,
+            "matched_export_change_mae": 2.810322916666667
+          },
+          {
+            "first": 39,
+            "last": 40,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.6381017770597737,
+            "story_end_s": 2.671502423263328,
+            "matched_export_change_mae": 4.795802083333333
+          },
+          {
+            "first": 45,
+            "last": 46,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.838101777059774,
+            "story_end_s": 2.8713974151857835,
+            "matched_export_change_mae": 5.42665625
+          }
+        ],
+        "max_capture_gap_ms": 304.09999999999854,
+        "black_crop_samples": 0,
+        "brightness_min": 57.630270833333334,
+        "brightness_max": 64.01607291666667,
+        "maximum_adjacent_brightness_change": 2.559677083333341
+      },
+      {
+        "kind": "inside",
+        "run": 1,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.5887964458804524,
+            "story_end_s": 2.6221970920840065,
+            "matched_export_change_mae": 4.731145833333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.788796445880452,
+            "story_end_s": 2.8221970920840063,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 37.299999999995634,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.2818020833333321
+      },
+      {
+        "kind": "inside",
+        "run": 2,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.662802907915993,
+            "story_end_s": 2.6960985460420033,
+            "matched_export_change_mae": 3.961989583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.862802907915994,
+            "story_end_s": 2.8963004846526657,
+            "matched_export_change_mae": 4.278614583333334
+          }
+        ],
+        "max_capture_gap_ms": 41.80000000000291,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.3594479166666673
+      },
+      {
+        "kind": "inside",
+        "run": 3,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.5995961227786752,
+            "story_end_s": 2.626397415185784,
+            "matched_export_change_mae": 4.731145833333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.793101777059774,
+            "story_end_s": 2.826502423263328,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 41.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.3184062500000024
+      },
+      {
+        "kind": "inside",
+        "run": 4,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.663497576736672,
+            "story_end_s": 2.6960985460420033,
+            "matched_export_change_mae": 3.961989583333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.8631017770597738,
+            "story_end_s": 2.896098546042003,
+            "matched_export_change_mae": 4.278614583333334
+          }
+        ],
+        "max_capture_gap_ms": 41.60000000000582,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.2818020833333321
+      },
+      {
+        "kind": "inside",
+        "run": 5,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.200000000004366,
+            "story_start_s": 2.3847980613893376,
+            "story_end_s": 2.4179967689822295,
+            "matched_export_change_mae": 4.003947916666666
+          },
+          {
+            "first": 13,
+            "last": 14,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.7013974151857836,
+            "story_end_s": 2.7347011308562195,
+            "matched_export_change_mae": 5.06859375
+          },
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.9013974151857838,
+            "story_end_s": 2.934798061389338,
+            "matched_export_change_mae": 5.683270833333333
+          }
+        ],
+        "max_capture_gap_ms": 50.0,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.3184062500000024
+      },
+      {
+        "kind": "inside",
+        "run": 6,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.6007996768982227,
+            "story_end_s": 2.6278998384491112,
+            "matched_export_change_mae": 4.731145833333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.79470113085622,
+            "story_end_s": 2.8279967689822296,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.109458333333336
+      },
+      {
+        "kind": "inside",
+        "run": 7,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 13,
+            "last": 14,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.703998384491115,
+            "story_end_s": 2.737399030694669,
+            "matched_export_change_mae": 5.06859375
+          },
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.9041033925686595,
+            "story_end_s": 2.9373990306946682,
+            "matched_export_change_mae": 5.683270833333333
+          }
+        ],
+        "max_capture_gap_ms": 50,
+        "black_crop_samples": 0,
+        "brightness_min": 57.487375,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.2818020833333321
+      },
+      {
+        "kind": "inside",
+        "run": 8,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.592100161550888,
+            "story_end_s": 2.620096930533118,
+            "matched_export_change_mae": 4.731145833333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.786898222940226,
+            "story_end_s": 2.8202019386106625,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 37.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.132645833333335
+      },
+      {
+        "kind": "inside",
+        "run": 9,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.594103392568659,
+            "story_end_s": 2.621502423263328,
+            "matched_export_change_mae": 4.731145833333334
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.788101777059774,
+            "story_end_s": 2.8213974151857837,
+            "matched_export_change_mae": 5.226604166666666
+          }
+        ],
+        "max_capture_gap_ms": 37.400000000001455,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.3594479166666673
+      },
+      {
+        "kind": "inside",
+        "run": 10,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 9,
+            "last": 10,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.548101777059774,
+            "story_end_s": 2.5879967689822294,
+            "matched_export_change_mae": 5.426114583333334
+          },
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.948101777059774,
+            "story_end_s": 2.9815024232633283,
+            "matched_export_change_mae": 5.80046875
+          }
+        ],
+        "max_capture_gap_ms": 33.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.47452083333334,
+        "brightness_max": 63.57333333333333,
+        "maximum_adjacent_brightness_change": 1.2818020833333321
+      }
+    ],
+    "total_visual_runs": 20,
+    "crop": "x=440,y=0,width=200,height=160 of a 640x360 blit",
+    "qualification": "Captured crop holds, not display-photon or full-screen freeze durations. Capture gaps do not prove the UI froze."
+  },
+  {
+    "mode": "mixed",
+    "runs": [
+      {
+        "kind": "continuous",
+        "run": 1,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 20,
+            "last": 21,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.068303715670436,
+            "story_end_s": 2.068303715670436,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 27,
+            "last": 28,
+            "observed_same_image_ms": 33.30000000000018,
+            "story_start_s": 2.14,
+            "story_end_s": 2.164596122778675,
+            "matched_export_change_mae": 4.081072916666667
+          },
+          {
+            "first": 35,
+            "last": 36,
+            "observed_same_image_ms": 33.40000000000009,
+            "story_start_s": 2.4047980613893376,
+            "story_end_s": 2.4339014539579966,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 42,
+            "last": 43,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.6339983844911146,
+            "story_end_s": 2.667302100161551,
+            "matched_export_change_mae": 8.783072916666667
+          },
+          {
+            "first": 48,
+            "last": 49,
+            "observed_same_image_ms": 33.30000000000018,
+            "story_start_s": 2.83470113085622,
+            "story_end_s": 2.8671001615508884,
+            "matched_export_change_mae": 10.207635416666667
+          }
+        ],
+        "max_capture_gap_ms": 204.0,
+        "black_crop_samples": 0,
+        "brightness_min": 59.635645833333335,
+        "brightness_max": 67.27066666666667,
+        "maximum_adjacent_brightness_change": 3.90977083333334
+      },
+      {
+        "kind": "continuous",
+        "run": 2,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.30000000000018,
+            "story_start_s": 2.0847980613893378,
+            "story_end_s": 2.0847980613893378,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 33,
+            "last": 34,
+            "observed_same_image_ms": 33.30000000000018,
+            "story_start_s": 2.343400646203554,
+            "story_end_s": 2.380702746365105,
+            "matched_export_change_mae": 6.289104166666666
+          }
+        ],
+        "max_capture_gap_ms": 174.90000000000055,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.08851041666667,
+        "maximum_adjacent_brightness_change": 4.709083333333332
+      },
+      {
+        "kind": "continuous",
+        "run": 3,
+        "frames": 55,
+        "observed_overlap_holds": [
+          {
+            "first": 15,
+            "last": 16,
+            "observed_same_image_ms": 70.70000000000073,
+            "story_start_s": 2.089798061389337,
+            "story_end_s": 2.089798061389337,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.089798061389337,
+            "story_end_s": 2.089798061389337,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 329.10000000000036,
+        "black_crop_samples": 0,
+        "brightness_min": 57.69834375,
+        "brightness_max": 67.27066666666667,
+        "maximum_adjacent_brightness_change": 5.432187499999998
+      },
+      {
+        "kind": "continuous",
+        "run": 4,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 23,
+            "last": 24,
+            "observed_same_image_ms": 33.5,
+            "story_start_s": 2.0807027463651053,
+            "story_end_s": 2.0807027463651053,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 42,
+            "last": 43,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.56029886914378,
+            "story_end_s": 2.5936995153473346,
+            "matched_export_change_mae": 6.806885416666667
+          },
+          {
+            "first": 48,
+            "last": 49,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.76029886914378,
+            "story_end_s": 2.7936025848142165,
+            "matched_export_change_mae": 7.649572916666667
+          },
+          {
+            "first": 54,
+            "last": 55,
+            "observed_same_image_ms": 33.30000000000109,
+            "story_start_s": 2.9602019386106626,
+            "story_end_s": 2.9936025848142167,
+            "matched_export_change_mae": 8.619854166666666
+          }
+        ],
+        "max_capture_gap_ms": 141.6999999999989,
+        "black_crop_samples": 0,
+        "brightness_min": 57.95640625,
+        "brightness_max": 67.743125,
+        "maximum_adjacent_brightness_change": 5.393489583333341
+      },
+      {
+        "kind": "continuous",
+        "run": 5,
+        "frames": 56,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.399999999999636,
+            "story_start_s": 2.108303715670436,
+            "story_end_s": 2.108303715670436,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 33,
+            "last": 34,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.460201938610662,
+            "story_end_s": 2.491300484652666,
+            "matched_export_change_mae": 6.191552083333334
+          }
+        ],
+        "max_capture_gap_ms": 270.7999999999993,
+        "black_crop_samples": 0,
+        "brightness_min": 57.851052083333336,
+        "brightness_max": 67.73779166666667,
+        "maximum_adjacent_brightness_change": 4.882760416666663
+      },
+      {
+        "kind": "continuous",
+        "run": 6,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 21,
+            "last": 22,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.088400646203554,
+            "story_end_s": 2.088400646203554,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 44,
+            "last": 45,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6342972536348945,
+            "story_end_s": 2.6674959612277864,
+            "matched_export_change_mae": 8.783072916666667
+          },
+          {
+            "first": 50,
+            "last": 51,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.834103392568659,
+            "story_end_s": 2.8673990306946684,
+            "matched_export_change_mae": 10.207635416666667
+          }
+        ],
+        "max_capture_gap_ms": 158.09999999999854,
+        "black_crop_samples": 0,
+        "brightness_min": 59.22703125,
+        "brightness_max": 67.30265625,
+        "maximum_adjacent_brightness_change": 4.87259375
+      },
+      {
+        "kind": "continuous",
+        "run": 7,
+        "frames": 57,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.098303715670436,
+            "story_end_s": 2.098303715670436,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 32,
+            "last": 33,
+            "observed_same_image_ms": 33.20000000000073,
+            "story_start_s": 2.377600969305331,
+            "story_end_s": 2.413602584814216,
+            "matched_export_change_mae": 5.39540625
+          }
+        ],
+        "max_capture_gap_ms": 275.0,
+        "black_crop_samples": 0,
+        "brightness_min": 57.851052083333336,
+        "brightness_max": 67.81922916666667,
+        "maximum_adjacent_brightness_change": 4.879281250000005
+      },
+      {
+        "kind": "continuous",
+        "run": 8,
+        "frames": 60,
+        "observed_overlap_holds": [
+          {
+            "first": 22,
+            "last": 23,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.093699515347334,
+            "story_end_s": 2.093699515347334,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 27,
+            "last": 28,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.093699515347334,
+            "story_end_s": 2.093699515347334,
+            "matched_export_change_mae": 0.0
+          }
+        ],
+        "max_capture_gap_ms": 162.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52520833333333,
+        "brightness_max": 67.43234375,
+        "maximum_adjacent_brightness_change": 6.000989583333336
+      },
+      {
+        "kind": "continuous",
+        "run": 9,
+        "frames": 54,
+        "observed_overlap_holds": [
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0978029079159937,
+            "story_end_s": 2.0978029079159937,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 29,
+            "last": 30,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.4478998384491115,
+            "story_end_s": 2.4799030694668818,
+            "matched_export_change_mae": 7.190677083333333
+          }
+        ],
+        "max_capture_gap_ms": 316.6000000000022,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.58957291666667,
+        "maximum_adjacent_brightness_change": 4.987895833333333
+      },
+      {
+        "kind": "continuous",
+        "run": 10,
+        "frames": 59,
+        "observed_overlap_holds": [
+          {
+            "first": 20,
+            "last": 21,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.0805008077544422,
+            "story_end_s": 2.0805008077544422,
+            "matched_export_change_mae": 0.0
+          },
+          {
+            "first": 25,
+            "last": 26,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.1833037156704362,
+            "story_end_s": 2.211001615508885,
+            "matched_export_change_mae": 3.53640625
+          },
+          {
+            "first": 40,
+            "last": 41,
+            "observed_same_image_ms": 33.29999999999927,
+            "story_start_s": 2.68529886914378,
+            "story_end_s": 2.7186025848142163,
+            "matched_export_change_mae": 9.386291666666667
+          },
+          {
+            "first": 46,
+            "last": 47,
+            "observed_same_image_ms": 33.39999999999782,
+            "story_start_s": 2.88529886914378,
+            "story_end_s": 2.918497576736672,
+            "matched_export_change_mae": 10.692260416666667
+          }
+        ],
+        "max_capture_gap_ms": 170.79999999999927,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.67890625,
+        "maximum_adjacent_brightness_change": 5.258760416666661
+      },
+      {
+        "kind": "inside",
+        "run": 1,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.5899030694668816,
+            "story_end_s": 2.622600969305331,
+            "matched_export_change_mae": 8.585760416666666
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.789200323101777,
+            "story_end_s": 2.822399030694669,
+            "matched_export_change_mae": 9.96375
+          }
+        ],
+        "max_capture_gap_ms": 37.299999999995634,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.24530208333333,
+        "maximum_adjacent_brightness_change": 3.1068229166666583
+      },
+      {
+        "kind": "inside",
+        "run": 2,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.200000000004366,
+            "story_start_s": 2.6607996768982227,
+            "story_end_s": 2.694103392568659,
+            "matched_export_change_mae": 7.363333333333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.8608966074313407,
+            "story_end_s": 2.894297253634895,
+            "matched_export_change_mae": 8.001958333333333
+          }
+        ],
+        "max_capture_gap_ms": 41.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.31327083333333,
+        "maximum_adjacent_brightness_change": 3.174791666666664
+      },
+      {
+        "kind": "inside",
+        "run": 3,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.3857996768982233,
+            "story_end_s": 2.419103392568659,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.6608966074313405,
+            "story_end_s": 2.694200323101777,
+            "matched_export_change_mae": 7.363333333333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.8608966074313407,
+            "story_end_s": 2.894297253634895,
+            "matched_export_change_mae": 8.001958333333333
+          }
+        ],
+        "max_capture_gap_ms": 41.599999999998545,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.20782291666667,
+        "maximum_adjacent_brightness_change": 3.0693437500000016
+      },
+      {
+        "kind": "inside",
+        "run": 4,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.3836025848142164,
+            "story_end_s": 2.417003231017771,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 13,
+            "last": 14,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7002988691437806,
+            "story_end_s": 2.7336025848142165,
+            "matched_export_change_mae": 9.386291666666667
+          },
+          {
+            "first": 19,
+            "last": 20,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.9005008077544425,
+            "story_end_s": 2.933796445880452,
+            "matched_export_change_mae": 10.692260416666667
+          }
+        ],
+        "max_capture_gap_ms": 50.0,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.20782291666667,
+        "maximum_adjacent_brightness_change": 3.0693437500000016
+      },
+      {
+        "kind": "inside",
+        "run": 5,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.3826978998384494,
+            "story_end_s": 2.4162035541195475,
+            "matched_export_change_mae": 5.39540625
+          },
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.299999999995634,
+            "story_start_s": 2.6576978998384493,
+            "story_end_s": 2.6910016155088856,
+            "matched_export_change_mae": 7.363333333333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.39999999999418,
+            "story_start_s": 2.8578029079159935,
+            "story_end_s": 2.8910985460420036,
+            "matched_export_change_mae": 8.001958333333333
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 66.54416666666667,
+        "maximum_adjacent_brightness_change": 2.815375000000003
+      },
+      {
+        "kind": "inside",
+        "run": 6,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.384297253634895,
+            "story_end_s": 2.417600969305331,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6595961227786753,
+            "story_end_s": 2.692802907915994,
+            "matched_export_change_mae": 7.363333333333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.8597980613893377,
+            "story_end_s": 2.8929967689822296,
+            "matched_export_change_mae": 8.001958333333333
+          }
+        ],
+        "max_capture_gap_ms": 41.69999999999709,
+        "black_crop_samples": 0,
+        "brightness_min": 57.581864583333335,
+        "brightness_max": 67.20782291666667,
+        "maximum_adjacent_brightness_change": 3.0693437500000016
+      },
+      {
+        "kind": "inside",
+        "run": 7,
+        "frames": 30,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.384103392568659,
+            "story_end_s": 2.417495961227787,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 12,
+            "last": 13,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.6591033925686594,
+            "story_end_s": 2.6925040387722134,
+            "matched_export_change_mae": 7.363333333333333
+          },
+          {
+            "first": 18,
+            "last": 19,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.8591033925686595,
+            "story_end_s": 2.8924959612277865,
+            "matched_export_change_mae": 8.001958333333333
+          }
+        ],
+        "max_capture_gap_ms": 41.80000000000291,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 66.54416666666667,
+        "maximum_adjacent_brightness_change": 2.815375000000003
+      },
+      {
+        "kind": "inside",
+        "run": 8,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.3845961227786754,
+            "story_end_s": 2.4178998384491117,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.585201938610662,
+            "story_end_s": 2.6178998384491114,
+            "matched_export_change_mae": 8.585760416666666
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7847011308562197,
+            "story_end_s": 2.818101777059774,
+            "matched_export_change_mae": 9.96375
+          }
+        ],
+        "max_capture_gap_ms": 33.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.31327083333333,
+        "maximum_adjacent_brightness_change": 3.174791666666664
+      },
+      {
+        "kind": "inside",
+        "run": 9,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.386098546042003,
+            "story_end_s": 2.419596122778675,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.5928998384491115,
+            "story_end_s": 2.6195961227786753,
+            "matched_export_change_mae": 8.585760416666666
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.400000000001455,
+            "story_start_s": 2.7870032310177706,
+            "story_end_s": 2.8197980613893376,
+            "matched_export_change_mae": 9.96375
+          }
+        ],
+        "max_capture_gap_ms": 33.400000000001455,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.31327083333333,
+        "maximum_adjacent_brightness_change": 3.174791666666664
+      },
+      {
+        "kind": "inside",
+        "run": 10,
+        "frames": 31,
+        "observed_overlap_holds": [
+          {
+            "first": 4,
+            "last": 5,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.3847980613893376,
+            "story_end_s": 2.4181987075928917,
+            "matched_export_change_mae": 7.02721875
+          },
+          {
+            "first": 10,
+            "last": 11,
+            "observed_same_image_ms": 33.19999999999709,
+            "story_start_s": 2.5915024232633277,
+            "story_end_s": 2.6183037156704363,
+            "matched_export_change_mae": 8.585760416666666
+          },
+          {
+            "first": 16,
+            "last": 17,
+            "observed_same_image_ms": 33.30000000000291,
+            "story_start_s": 2.7852019386106623,
+            "story_end_s": 2.8184006462035542,
+            "matched_export_change_mae": 9.96375
+          }
+        ],
+        "max_capture_gap_ms": 33.5,
+        "black_crop_samples": 0,
+        "brightness_min": 57.52917708333333,
+        "brightness_max": 67.20782291666667,
+        "maximum_adjacent_brightness_change": 3.0693437500000016
+      }
+    ],
+    "total_visual_runs": 20,
+    "crop": "x=440,y=0,width=200,height=160 of a 640x360 blit",
+    "qualification": "Captured crop holds, not display-photon or full-screen freeze durations. Capture gaps do not prove the UI froze."
+  }
+]
