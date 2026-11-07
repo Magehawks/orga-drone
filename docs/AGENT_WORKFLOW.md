@@ -1,180 +1,91 @@
-# Orga Drone Agentic Development Workflow
+# Orga Drone development workflow
 
-This document defines the human-gated development loop used for Orga Drone.
-GitHub issues and pull requests are the source of truth between roles.
+This is the canonical workflow for the 2.4.0 development cycle. The Product
+Owner has scoped a substantial release covering fixes, modular refactoring, MCP,
+and speed ramping/effects. This scope is planning context, not a shipping claim
+or permission to implement unapproved features.
 
-The [proposed develop/main strategy and migration runbook](BRANCH_MIGRATION.md)
-records issue #261's future branch rules, release-gate dependencies, and rollback.
-It is not activated: `main` remains the current default/PR target. The role gates
-and human merge decision below continue to apply throughout any later cutover.
+## Normal development loop
 
-## Principle
+Approved issue → Implementation → Focused tests → PR to develop → Independent
+ChatGPT GitHub PR review → Corrections and renewed review if needed → Develop merge.
 
-**Limit the current scope, not the long-term vision.**
+Coding agents may continuously implement approved issues. An approved issue
+records the problem, expected behavior, acceptance criteria, explicit non-scope
+and relevant compatibility/security constraints. A clear Product Owner task may
+supply the approval and scope; link that decision in the PR if no issue exists.
+Do not manufacture PM/UX/CTO approvals for settled scope. Ask the Product Owner
+about unresolved product decisions; investigate technical questions in place.
 
-Agents may consider future professional creator workflows when judging architecture,
-but they must not implement speculative platform scope unless the current issue requires it.
+PM (`product-spec-reviewer`), UX (`product-ux-designer`) and engineering
+(`engineering-planner`) are optional read-only advisors for unresolved scope,
+interaction or architecture questions. Use them when explicitly requested.
+Their status tokens are advisory and do not create an automatic handoff chain.
+UX advice does not authorize unselected alternatives or create implementation issues.
 
-## Roles
+## Developer responsibilities
 
-| Role | Cursor role | Responsibility | May change application code? |
-|---|---|---|---|
-| Product Owner | Human | Idea, product judgment, real-world test, merge decision | Yes, manually |
-| PM | `product-spec-reviewer` | User problem, target user, milestone fit, simplest slice, acceptance criteria, non-scope; selects UX concept when UI work applied | No |
-| UX | `product-ux-designer` | Usability / interaction discovery when UI work is meaningful; alternatives and trade-offs; no implementation issues | No |
-| CTO | `engineering-planner` | Architecture, compatibility, performance, security, test strategy, technical AC | No |
-| Developer | Main Cursor agent | Implement only the approved issue and run required checks | Yes |
-| Reviewer | `implementation-reviewer` | Independent adversarial review of the completed branch/PR | No |
+- Read AGENTS.md, the approved scope, existing implementation and relevant docs.
+- Implement the smallest complete slice; preserve source media, data and compatibility.
+- Add meaningful regression tests where behavior changes. Select local checks by
+  risk using [PR_E2E.md](PR_E2E.md); report commands, results, skips and limitations.
+- Update docs when behavior/setup/architecture changes and DE/EN for UI text.
+- Open a focused PR against latest develop using the template; avoid unrelated
+  refactors, blanket abstraction requirements and legacy mass formatting.
+- Resolve failures and review findings. Do not silently accept failing checks.
 
-## State flow
+## Independent review and merge readiness
 
-```text
-idea
-  ↓
-pm-review
-  ↓
-ux-review          (only when meaningful UI / interaction work)
-  ↓
-PM selects concept (same issue; UX does not file implementation issues)
-  ↓
-cto-review
-  ↓
-ready-for-dev
-  ↓
-in-development
-  ↓
-review-required
-  ↓
-┌───────────────────────────┐
-│ REVIEW_CHANGES_REQUESTED  │──→ developer fix ──→ review-required
-└───────────────────────────┘
-  ↓ REVIEW_APPROVED
-human-test
-  ↓
-merge / done
-```
+ChatGPT reviews the actual GitHub PR diff, approved scope, relevant implementation,
+tests and CI evidence in an independent review context. The implementation agent
+must not certify its own work as independently approved. The local
+`implementation-reviewer` prompt is a reusable checklist or optional advisory
+review, not a substitute for independent ChatGPT PR review.
 
-Skip `ux-review` for simple bug fixes, backend-only changes, CI/tooling, and
-migrations without user-facing impact unless the human explicitly requests UX.
+Record a linked review with `REVIEW_APPROVED`, `REVIEW_CHANGES_REQUESTED` or
+`REVIEW_ARCHITECTURE_CONCERN`, actionable findings and test limitations. The reviewer
+stays read-only; developers make corrections. Material corrections require renewed
+review. After three unresolved correction loops, escalate to the Product Owner.
 
-A maximum of three developer ↔ reviewer correction loops is recommended. After that,
-a human should decide whether the issue/spec or architecture needs to change.
+Before develop merge: acceptance criteria met, independent review approved,
+findings resolved, and all applicable CI checks successful for the current
+candidate. Missing, failing, cancelled or skipped required checks are not success.
+Do not bypass branch protection or reinterpret a failed check as informational.
+Agents merge only with explicit human authorization; this workflow grants none.
+A green CI run or ChatGPT review is not release approval and does not satisfy a
+GitHub human-approval requirement or main-admission authorization by itself.
 
-## GitHub workflow labels
+## Periodic Product Owner testing
 
-Recommended labels:
+The Product Owner periodically tests realistic DJI media, edits videos and checks
+exports across integrated changes. Manual PO testing is not required before every
+develop merge. Record tested commit/build, scenarios and outcomes; turn problems
+into scoped bug issues with a safe reproduction. Never attach private media or
+precise locations. PR authors may suggest scenarios for the next session.
+A specific approved issue may require targeted manual evidence for a high-risk
+change; identify that requirement explicitly rather than imposing it on every PR.
 
-- `status:idea`
-- `status:pm-review`
-- `status:ux-review`
-- `status:cto-review`
-- `status:ready-for-dev`
-- `status:in-development`
-- `status:review-required`
-- `status:changes-requested`
-- `status:human-test`
+## Release candidates and release approval
 
-Classification labels may be added independently, for example:
+Full validation belongs at the release-candidate stage: full automated checks,
+appropriate packaged/integration evidence, realistic editing/export tests and the
+Windows/MOTW checklist in [packaging/README.md](../packaging/README.md).
+Record coverage gaps and failures; do not describe untested behavior as passed.
+Main promotions remain subject to the existing admission policy, packaged evidence
+and human authorization requirements. Release approval is explicitly human-controlled.
+Do not tag, publish, attach binaries or dispatch release actions without the
+applicable explicit authorization. No release workflow or security gate is changed.
 
-- `area:studio`, `area:library`, `area:telemetry`
-- `priority:p0`, `priority:p1`, `priority:p2`, `priority:p3`
-- GitHub's existing `enhancement`, `bug`, `documentation`
+## Tracking and intake
 
-Exactly one `status:*` label should describe the current workflow state.
+Issues and PRs carry scope, evidence and handoffs. Existing `status:ready-for-dev`,
+`status:in-development`, `status:review-required` and `status:changes-requested`
+labels may be used; labels are not approval or enforcement. Legacy PM/UX/CTO and
+human-test labels are historical, not mandatory stages. No bulk relabeling is needed.
+User-need intake remains evidence, not an approved implementation task or roadmap
+promise; see [USER_NEEDS.md](USER_NEEDS.md).
 
-## User-needs intake
-
-Public pain points use the User need issue form and the labels in
-[`USER_NEEDS.md`](USER_NEEDS.md). A `user-need` issue is not `ready-for-dev`.
-
-An accepted need becomes an ordinary product issue and still passes the PM,
-UX (when required), and CTO gates. When that work ships, the user-need issue
-links the release notes and is labeled `feedback:shipped`. Accepting a need
-does not change [`ROADMAP.md`](ROADMAP.md).
-
-## Issue contract
-
-An issue is `ready-for-dev` only when PM and CTO gates are complete.
-When the slice has meaningful UI or interaction work, UX discovery must also be
-complete and PM must have selected a concept. UX output is advisory: it does
-**not** create implementation issues by itself.
-
-The issue must contain or link to:
-
-- concrete user problem
-- target user
-- why this belongs in the current slice
-- proposed behavior
-- acceptance criteria
-- explicit non-scope
-- UX discovery (concepts, recommendation, non-scope) when UI/interaction applies
-- PM-selected concept when UX ran
-- relevant technical constraints
-- automated and manual test expectations
-
-The developer must not infer missing product decisions by silently expanding scope.
-If a missing decision materially changes behavior, return the issue to the appropriate gate.
-Do not implement unselected UX alternatives.
-
-## UX contract
-
-`product-ux-designer` is discovery, not an implementation gate.
-
-- It evaluates the **existing** interaction model before proposing redesigns.
-- It prefers progressive improvements over wholesale redesigns.
-- It separates usability problems from visual preference.
-- It must not claim roadmap/vision features already exist.
-- It must not create implementation issues or mark work `ready-for-dev`.
-- After `UX_RECOMMENDED`, PM selects a concept on the **same** issue, then CTO reviews feasibility.
-
-UX is **not** required for simple bug fixes, backend-only changes, CI/tooling, or
-migrations without user-facing impact.
-
-## Developer contract
-
-The main implementation agent must:
-
-1. Read the issue and `AGENTS.md` before changing code.
-2. Inspect the existing implementation before choosing a design.
-3. Implement the smallest complete slice that meets the acceptance criteria.
-4. Preserve source media and compatibility unless the issue explicitly says otherwise.
-5. Avoid unrelated refactors and speculative architecture.
-6. Add/update tests and DE/EN strings where needed.
-7. Update product/architecture docs only when product truth actually changes.
-8. Run Ruff, MyPy and pytest (or explain any test that cannot run). Pytest includes the PR journey smoke; CI also reports that file as **App journey smoke** (`docs/PR_E2E.md`). For Studio JavaScript or `tests/js/` changes, also run `npm run check:js`.
-9. Open/update a PR that links the issue and reports test evidence.
-10. Hand the PR to the independent reviewer.
-
-## Review contract
-
-The reviewer evaluates the linked issue and the actual diff, not the developer's intent.
-It returns one of:
-
-- `REVIEW_APPROVED`
-- `REVIEW_CHANGES_REQUESTED`
-- `REVIEW_ARCHITECTURE_CONCERN`
-
-The reviewer does not fix its own findings. This keeps implementation and review contexts independent.
-
-## Human test gate
-
-Automated approval is not merge approval.
-
-After `REVIEW_APPROVED`, the Product Owner performs the real workflow using realistic drone media where relevant. The PR should provide a short manual checklist tailored to the feature.
-
-Examples for Studio work:
-
-- preview and trim behavior feels correct
-- exported media plays continuously
-- visual/audio result is acceptable
-- 4K input does not produce surprising behavior
-- original media is unchanged
-- failure/cancel/retry UX is understandable
-
-Only the human Product Owner decides whether the feature is merged.
-
-## Phase 1 vs automation
-
-Phase 1 is intentionally semi-manual: roles and states are explicit, but agents are started by a human.
-
-Only after several successful real issues should automation trigger Developer or Reviewer agents from GitHub state changes. The human test and merge gates remain manual.
+Develop is the normal development base and PR target. Historical cutover details
+in [BRANCH_MIGRATION.md](BRANCH_MIGRATION.md) do not override this process.
+Effective GitHub protection must be verified by an administrator; documentation
+alone does not install or prove protection.
