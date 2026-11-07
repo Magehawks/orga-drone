@@ -22,8 +22,8 @@ body:
     id: version
     attributes:
       label: orga-drone version
-      description: Release tag, exe build, or `main` commit if from source
-      placeholder: e.g. 1.5.0 or main @ abc1234
+      description: Release tag, exe build, or branch and commit if from source
+      placeholder: e.g. 2.3.3 or develop @ abc1234
     validations:
       required: true
   - type: textarea

@@ -69,7 +69,8 @@ target modules and dependency rules are in
 
 ## Tests
 
-Run the full Python suite from the repo root:
+Select local checks by risk using [`docs/PR_E2E.md`](docs/PR_E2E.md).
+The full Python suite is available from the repo root when appropriate:
 
 ```bash
 pytest
@@ -98,13 +99,14 @@ bounded DOM size via pagination.
 
 ## Quality checks (local and CI)
 
-Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12 and Node 22) with three checks.
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12 and Node 22) with three jobs. Packaged Windows E2E and Main admission additionally run
+on PRs targeting `main`; see [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
 Python:
 
 ```bash
 ruff check .
-mypy src packaging/itch_channel.py packaging/windows_third_party.py
+mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py
 pytest --ignore=tests/test_pr_journey_smoke.py
 pytest tests/test_pr_journey_smoke.py
 ```
@@ -131,9 +133,16 @@ Windows release candidates are a separate **Windows release** workflow
 does not publish a public release. Procedure, checksum, draft approval, and
 rollback: [`packaging/README.md`](packaging/README.md).
 
+Python tooling uses the Ruff E4/E7/E9/F lint baseline and MyPy configuration in
+`pyproject.toml`. There is no mandatory Python formatter gate. Match touched code;
+do not add a formatter rollout or broad lint expansion to an unrelated change.
+Runtime Python is 3.11+; CI/type checking uses 3.12. The explicit CI MyPy command
+above includes packaging targets not listed in the default `mypy` files setting.
+
 ## Architecture and refactoring rules
 
-- Prefer small modules in existing package areas. Do not add a generic
+- Prefer cohesive modules in existing package areas; no arbitrary Python file-size
+  cap or mandatory abstraction layer. Do not add a generic
   `utils/` bucket or a new top-level framework.
 - New Studio frontend modules use ES modules and follow
   [`docs/STUDIO_MODULES.md`](docs/STUDIO_MODULES.md): one responsibility per
@@ -150,15 +159,17 @@ rollback: [`packaging/README.md`](packaging/README.md).
 
 ## Pull requests
 
-The [proposed develop/main strategy and migration runbook](docs/BRANCH_MIGRATION.md)
-is documentation for issue #261, not an activated branch policy. Until a separately
-approved cutover, `main` remains the default and the target for new PRs.
+1. Branch from latest `develop` and target `develop` for normal development PRs.
+2. Implement the approved issue/task and keep commits readable.
+3. Update docs and DE/EN strings when applicable.
+4. Run risk-based local checks and fill in actual evidence in the PR template.
+5. Obtain independent ChatGPT GitHub PR review; correct findings and obtain
+   renewed review after material changes. All applicable CI must pass before merge.
 
-1. Branch from `main` (default branch).
-2. Keep commits readable; squash locally if you prefer one commit per PR.
-3. Update docs when behavior or setup changes.
-4. Confirm `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py`, `pytest`, and `npm run check:js` pass before opening the PR.
-5. Fill in the PR template (summary, test plan).
+The [canonical workflow](docs/AGENT_WORKFLOW.md) separates periodic Product Owner
+DJI/edit/export testing from routine merges. Merge execution still needs explicit
+human authorization; release approval remains human-controlled. Existing main
+admission and packaged validation requirements are unchanged.
 
 **Style:** Match existing code in the touched files — naming, typing, and structure. No drive-by refactors in the same PR unless required.
 
