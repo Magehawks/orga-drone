@@ -1,0 +1,80 @@
+[
+  {
+    "name": "jpg-neutral",
+    "reviewed_worst": 4.333333333333333,
+    "corrected_worst": 4.333333333333333,
+    "strict_pass": false
+  },
+  {
+    "name": "jpg-creative0",
+    "reviewed_worst": 2.6666666666666665,
+    "corrected_worst": 1.6666666666666667,
+    "strict_pass": true
+  },
+  {
+    "name": "jpg-creative50",
+    "reviewed_worst": 1.6666666666666667,
+    "corrected_worst": 1.3333333333333333,
+    "strict_pass": true
+  },
+  {
+    "name": "jpg-creative100",
+    "reviewed_worst": 2.6666666666666665,
+    "corrected_worst": 2.2241379310344827,
+    "strict_pass": true
+  },
+  {
+    "name": "jpg-conversion",
+    "reviewed_worst": 2.6666666666666665,
+    "corrected_worst": 2.2241379310344827,
+    "strict_pass": true
+  },
+  {
+    "name": "png-neutral",
+    "reviewed_worst": 4.666666666666667,
+    "corrected_worst": 4.666666666666667,
+    "strict_pass": false
+  },
+  {
+    "name": "png-creative0",
+    "reviewed_worst": 3.7758620689655173,
+    "corrected_worst": 1.6666666666666667,
+    "strict_pass": true
+  },
+  {
+    "name": "png-creative50",
+    "reviewed_worst": 2.0,
+    "corrected_worst": 1.3333333333333333,
+    "strict_pass": true
+  },
+  {
+    "name": "png-creative100",
+    "reviewed_worst": 2.6666666666666665,
+    "corrected_worst": 2.2241379310344827,
+    "strict_pass": true
+  },
+  {
+    "name": "png-conversion",
+    "reviewed_worst": 2.6666666666666665,
+    "corrected_worst": 2.2241379310344827,
+    "strict_pass": true
+  },
+  {
+    "name": "photos-different",
+    "reviewed_worst": 4.0,
+    "corrected_worst": 3.313218390804598,
+    "strict_pass": false
+  },
+  {
+    "name": "photo-video",
+    "reviewed_worst": 16.666666666666668,
+    "corrected_worst": 4.0,
+    "strict_pass": false
+  },
+  {
+    "name": "video-photo",
+    "reviewed_worst": 4.0,
+    "corrected_worst": 3.6666666666666665,
+    "strict_pass": false
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "baseline_sha": "7dd593000844ab7b6832bb24608f2629ec515c1c",
+  "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+  "source": "generated swatches.jpg, RGB, Pillow quality98 subsampling0, 1280x720",
+  "source_sha256": "f3d6651c4fe37463c807bc9765c0cd6ec7e188a0a628b7fe3b223dfe5d21ed15",
+  "look": "assigned creative LUT at 0%, neutral image adjustments",
+  "baseline_preview_dimensions": [
+    720,
+    405
+  ],
+  "direct_ffmpeg_exit_status": 3221226356,
+  "status_hex": "0xC0000374",
+  "preview_endpoint_status": 500,
+  "preview_endpoint_detail": "Could not build the preview still.",
+  "direct_output_jpeg_existed_despite_nonzero_exit": true,
+  "fixed_photo_dimensions": [
+    720,
+    406
+  ],
+  "fixed_endpoint_render_success": true,
+  "video_path_change": false
+}

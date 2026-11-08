@@ -1,0 +1,122 @@
+{
+  "app_version": "2.3.3",
+  "artifact_api_digest": "NOT_APPLICABLE_LOCAL_ONLY",
+  "artifact_api_size": 0,
+  "artifact_name": "local-photo-lut-a785986",
+  "artifact_sha256": "546257cf3a0a5b5274fc89a14518c13cec9986584d96d53b290ffb2719f4e508",
+  "artifact_size": 141738395,
+  "base_sha": "7dd593000844ab7b6832bb24608f2629ec515c1c",
+  "elapsed_ms": 14516,
+  "generated_at": "2026-11-07T22:38:20.182498+00:00",
+  "head_sha": "a78598693aedde1ef8a2c9355be48c9134681eb4",
+  "journeys": {
+    "edit_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 328,
+      "ok": true
+    },
+    "export": {
+      "detail": {
+        "blue_frames": 3,
+        "bytes": 48403,
+        "frames": 5,
+        "red_frames": 2,
+        "sha256": "12340f6e458bfdca4af273cb138c5f17bca1b7c161576f2588e7aa1e607b2181"
+      },
+      "elapsed_ms": 1906,
+      "ok": true
+    },
+    "image_export": {
+      "detail": {
+        "bytes": 8958,
+        "preset": "instagram",
+        "sha256": "da4e80ee800e0657e56b62ae54bfdddbe91891292c80ee1bbc39c231ef218626"
+      },
+      "elapsed_ms": 280,
+      "ok": true
+    },
+    "library_navigation": {
+      "detail": {
+        "browse_chars": 890
+      },
+      "elapsed_ms": 547,
+      "ok": true
+    },
+    "media_import": {
+      "detail": {
+        "counts": {
+          "assets": 2,
+          "flows": 0,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "offline": 0,
+          "photos": 1,
+          "preserved": 0,
+          "removed": 0,
+          "sessions": 0,
+          "unavailable": 0,
+          "unchanged": 0,
+          "unreadable": 0,
+          "videos": 1
+        },
+        "job_id": "0398277e-d78b-44af-bf48-44285870a0b4"
+      },
+      "elapsed_ms": 1093,
+      "ok": true
+    },
+    "playback": {
+      "detail": {
+        "currentTime": 0.960389,
+        "paused": false,
+        "readyState": 4
+      },
+      "elapsed_ms": 1359,
+      "ok": true
+    },
+    "relaunch_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 3781,
+      "ok": true
+    },
+    "source_integrity": {
+      "detail": {
+        "files": [
+          "e2e-blue.jpg",
+          "e2e-red.mp4"
+        ]
+      },
+      "elapsed_ms": 16,
+      "ok": true
+    },
+    "startup": {
+      "detail": {
+        "title": "Start \u00b7 orga-drone",
+        "version": "2.3.3"
+      },
+      "elapsed_ms": 296,
+      "ok": true
+    },
+    "studio_open": {
+      "detail": {
+        "project_id": 1
+      },
+      "elapsed_ms": 827,
+      "ok": true
+    }
+  },
+  "manual_checks_claimed": false,
+  "pr_number": 0,
+  "repository": "Magehawks/orga-drone",
+  "result": "pass",
+  "run_attempt": 1,
+  "run_id": 0,
+  "runner_image": "Windows-11-10.0.26300-SP0",
+  "schema": "orga-drone-packaged-e2e-v1",
+  "tested_merge_sha": "a78598693aedde1ef8a2c9355be48c9134681eb4",
+  "tested_tree_sha": "08107f1777b709e20d4a104fab4c15d04bfbd696",
+  "webview2_version": "157.0.4341.42"
+}

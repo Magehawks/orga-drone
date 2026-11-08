@@ -1,0 +1,10 @@
+{
+  "tested_commit": "ac5bacfa46f3ea20de30bde439654340548c8906",
+  "local_evidence_only": true,
+  "zip_sha256": "340359b234e0405f6cbce737b097afcc400303f055381ad50c11fb54c0aca6cb",
+  "exe_sha256": "b4f2fe86cff82eb62e4996c4d963d1bb180466d86eac3011c848428b861cc58e",
+  "source_studio_js_sha256": "655f99cb3300059bd16f1873c493c06366382a024342ffe9a0aa6b42ec9ed5f6",
+  "packaged_studio_js_sha256": "655f99cb3300059bd16f1873c493c06366382a024342ffe9a0aa6b42ec9ed5f6",
+  "source_preview_frame_py_sha256": "462b4e423b09b7ac17055e134d449db03536a50cdf7a0899e19fcee6553d9722",
+  "baseline_exe_sha256": "48914e0b376dc886b8aec4e058b5f8fd89e209b0944de00e758340798bdd2ab1"
+}

@@ -1822,7 +1822,7 @@ import {
         lutRendererA = window.OrgaLutPreview?.createRenderer?.() || null;
         if (lutRendererA) {
           lutRendererA.onReady = () => {
-            clearLutPreviewStill();
+            clearVideoLutPreviewStill();
             schedulePreviewBlit();
           };
         }
@@ -1834,7 +1834,7 @@ import {
         lutRendererB = window.OrgaLutPreview?.createRenderer?.() || null;
         if (lutRendererB) {
           lutRendererB.onReady = () => {
-            clearLutPreviewStill();
+            clearVideoLutPreviewStill();
             schedulePreviewBlit();
           };
         }
@@ -2021,7 +2021,13 @@ import {
     clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
+    // The video paint clock can pass the last transition update before pause.
+    // Freeze photo composites at the stopped Story time, including overlap exit.
+    if ((previewImage && !previewImage.hidden) || (previewImageB && !previewImageB.hidden)) {
+      applyTransitionPreview(resolveAt(state.projectTimeS));
+    }
     setToggleLabel();
+    if (retryFailedPhotoStills()) applyPreviewGrades(resolveAt(state.projectTimeS));
   }
 
   function updatePlayheadChrome() {
@@ -2115,7 +2121,7 @@ import {
       blacks: clampImageSlider(adjust.blacks),
     });
     clip.dataset.imagePreviewDirty = persisted ? "0" : "1";
-    clearLutPreviewStill();
+    clearLutPreviewStill(clip);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
 
@@ -2191,7 +2197,7 @@ import {
     if (!clip) return;
     clip.dataset.hsl = JSON.stringify(hsl || neutralHslAdjust());
     clip.dataset.hslPreviewDirty = persisted ? "0" : "1";
-    clearLutPreviewStill();
+    clearLutPreviewStill(clip);
     if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
@@ -2271,7 +2277,7 @@ import {
     if (!clip) return;
     clip.dataset.colorWheels = JSON.stringify(colorWheels || neutralColorWheels());
     clip.dataset.colorWheelsPreviewDirty = persisted ? "0" : "1";
-    clearLutPreviewStill();
+    clearLutPreviewStill(clip);
     if (!colorWheelsIsNeutral(colorWheels)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
   }
@@ -2400,7 +2406,7 @@ import {
       end_saturation: clampRampPercent(ramp.end_saturation),
     });
     clip.dataset.rampPreviewDirty = persisted ? "0" : "1";
-    clearLutPreviewStill();
+    clearLutPreviewStill(clip);
   }
 
   function saturationRampMultiplier(ramp, localS) {
@@ -2492,7 +2498,14 @@ import {
       "studio-preview-grade-matrix-b",
       incomingLocal
     );
+    alignLutStillOwners(primary, incomingClip);
     scheduleLutPreviewStill(primary, primaryLocal);
+    // Prepare the next photo in the otherwise unused owner. It is a single
+    // static request, not clock-tick rendering, and can move to primary intact.
+    const nextPhoto = !incomingClip && primary && primary.dataset.appliedType === "crossfade"
+      ? clips().filter((clip) => clipDuration(clip) > 0)[hit.index + 1]
+      : null;
+    schedulePhotoOverlapStill(incomingClip || nextPhoto, incomingLocal);
     schedulePreviewBlit();
   }
 
@@ -2508,12 +2521,6 @@ import {
   const msgHslChipPlaying = root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
   const msgColorWheelsChipPlaying = root.dataset.colorWheelsChipPlaying || "Playing without color grading preview; pause or seek to see it";
   const msgWheelNeutral = root.dataset.wheelNeutral || "Neutral";
-  let lutStillAbort = null;
-  let lutStillTimer = 0;
-  let lutStillToken = 0;
-  let lutStillObjectUrl = "";
-  let lutStillKey = "";
-
   function colorLookNeedsStill(look, clip) {
     if (!look) return false;
     // Keep 0% on the same output color path as 50/100%, even though the LUT
@@ -2543,163 +2550,267 @@ import {
     previewLutChip.hidden = false;
   }
 
-  function clearLutPreviewStill() {
-    lutStillKey = "";
-    if (lutStillTimer) {
-      window.clearTimeout(lutStillTimer);
-      lutStillTimer = 0;
-    }
-    if (lutStillAbort) {
-      try {
-        lutStillAbort.abort();
-      } catch (_) {
-        /* ignore */
+  function lutStillSourceIdentity(clip) {
+    return JSON.stringify([clip.dataset.studioId, clip.dataset.mediaId,
+      clip.dataset.streamUrl, clip.dataset.previewUrl, clip.dataset.thumb,
+      clip.dataset.sourceIn, clip.dataset.sourceOut]);
+  }
+
+  // Both layers use the same preview-frame path. Only photo owners survive
+  // playback: their source offset is always zero, so clock ticks reuse one still.
+  function createLutStillOwner(previewLutStill, showStatus) {
+    let owner = null;
+    let ownerSource = "";
+    let failed = false;
+    let status = "";
+    const setChip = (text) => {
+      status = text;
+      if (showStatus) setLutPreviewChip(text);
+    };
+    let lutStillAbort = null;
+    let lutStillTimer = 0;
+    let lutStillToken = 0;
+    let lutStillObjectUrl = "";
+    let lutStillKey = "";
+
+    function clearLutPreviewStill() {
+      const hadFrame = Boolean(lutStillKey || lutStillTimer || lutStillAbort || lutStillObjectUrl);
+      owner = null;
+      failed = false;
+      lutStillKey = "";
+      if (lutStillTimer) {
+        window.clearTimeout(lutStillTimer);
+        lutStillTimer = 0;
       }
-      lutStillAbort = null;
-    }
-    lutStillToken += 1;
-    if (previewLutStill) {
-      previewLutStill.hidden = true;
-      previewLutStill.removeAttribute("src");
-    }
-    if (lutStillObjectUrl) {
-      try {
-        URL.revokeObjectURL(lutStillObjectUrl);
-      } catch (_) {
-        /* ignore */
+      if (lutStillAbort) {
+        try {
+          lutStillAbort.abort();
+        } catch (_) {
+          /* ignore */
+        }
+        lutStillAbort = null;
       }
-      lutStillObjectUrl = "";
+      lutStillToken += 1;
+      if (previewLutStill) {
+        previewLutStill.hidden = true;
+        previewLutStill.removeAttribute("src");
+      }
+      if (lutStillObjectUrl) {
+        try {
+          URL.revokeObjectURL(lutStillObjectUrl);
+        } catch (_) {
+          /* ignore */
+        }
+        lutStillObjectUrl = "";
+      }
+      setChip("");
+      if (hadFrame) schedulePreviewBlit();
     }
-    setLutPreviewChip("");
-    schedulePreviewBlit();
+
+    function scheduleLutPreviewStill(clip, localS) {
+      if (!previewLutStill) return;
+      if (reuseDraft || compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
+        clearLutPreviewStill();
+        return;
+      }
+      const look = readColorLook(clip);
+      const hsl = readHsl(clip);
+      const colorWheels = readColorWheels(clip);
+      const hslActive = !hslIsNeutral(hsl);
+      const wheelsActive = !colorWheelsIsNeutral(colorWheels);
+      const lookActive = colorLookNeedsStill(look, clip);
+      if (!lookActive && !hslActive && !wheelsActive) {
+        clearLutPreviewStill();
+        return;
+      }
+      // The proxy already contains grade + LUT + HSL + wheels at video
+      // resolution. Keep its frame for pause/seek/selection instead of
+      // overpainting a soft 720-edge JPEG.
+      if (lutWebglReadyFor(clip)) {
+        clearLutPreviewStill();
+        return;
+      }
+      if (lutProxySrcFor(clip)) {
+        clearLutPreviewStill();
+        return;
+      }
+      if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1" ||
+          clip.dataset.hslPreviewDirty === "1" || clip.dataset.colorWheelsPreviewDirty === "1") {
+        clearLutPreviewStill();
+        setChip(msgLutChipUpdating);
+        return;
+      }
+      if (state.playing && clip.dataset.kind !== "photo") {
+        clearLutPreviewStill();
+        if (lutProxySrcFor(clip)) {
+          setChip("");
+        } else if (lutProxyPreparingFor(clip)) {
+          setChip(msgLutChipProxyPreparing);
+        } else if (!lookActive && !hslActive && wheelsActive) {
+          setChip(msgColorWheelsChipPlaying);
+        } else if (!lookActive && hslActive) {
+          setChip(msgHslChipPlaying);
+        } else {
+          setChip(msgLutChipPlaying);
+        }
+        return;
+      }
+      const studioId = clip.dataset.studioId;
+      if (!studioId) {
+        clearLutPreviewStill();
+        return;
+      }
+      // t_s is source offset from the clip in-point (same mapping as seekVideoLocal).
+      const sourceOff = lutStillSourceOffset(clip, localS);
+      const quant = Math.round(sourceOff * 10) / 10;
+      const key = JSON.stringify([studioId, clip.dataset.mediaId, clip.dataset.streamUrl,
+        clip.dataset.previewUrl, clip.dataset.thumb, quant, clip.dataset.sourceIn,
+        clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, colorWheels,
+        clip.dataset.saturationRamp]);
+      if (key === lutStillKey) return;
+      // Reject old responses now, including during the debounce and image decode.
+      clearLutPreviewStill();
+      owner = clip;
+      ownerSource = lutStillSourceIdentity(clip);
+      lutStillKey = key;
+      const token = lutStillToken;
+      setChip(msgLutChipUpdating);
+      lutStillTimer = window.setTimeout(async () => {
+        lutStillTimer = 0;
+        // The endpoint reads persisted settings. Do not race an in-flight edit.
+        await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]);
+        if (token !== lutStillToken) return;
+        const controller = new AbortController();
+        lutStillAbort = controller;
+        const url = `/api/studio/${studioId}/preview-frame?t_s=${encodeURIComponent(String(quant))}&detail=0`;
+        fetch(url, { cache: "no-store", headers: { Accept: "image/jpeg" }, signal: controller.signal })
+          .then(async (res) => {
+            if (token !== lutStillToken) return null;
+            if (res.status === 409) {
+              failed = true;
+              if (clip.dataset.kind !== "photo") lutStillKey = "";
+              setChip(msgLutChipMissing);
+              previewLutStill.hidden = true;
+              return null;
+            }
+            if (!res.ok) {
+              failed = true;
+              if (clip.dataset.kind !== "photo") lutStillKey = "";
+              setChip(msgLutChipFailed);
+              previewLutStill.hidden = true;
+              return null;
+            }
+            return res.blob();
+          })
+          .then(async (blob) => {
+            if (!blob || token !== lutStillToken) return;
+            const objectUrl = URL.createObjectURL(blob);
+            const decoded = new Image();
+            decoded.src = objectUrl;
+            try {
+              await decoded.decode();
+            } catch (err) {
+              URL.revokeObjectURL(objectUrl);
+              throw err;
+            }
+            if (token !== lutStillToken) {
+              URL.revokeObjectURL(objectUrl);
+              return;
+            }
+            lutStillObjectUrl = objectUrl;
+            previewLutStill.src = objectUrl;
+            previewLutStill.hidden = false;
+            const hit = resolveAt(state.projectTimeS);
+            const composite = hit && (hit.overlapClip ||
+              (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
+            const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
+            setChip(
+              lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
+            );
+            drawPrivacyMasks();
+            schedulePreviewBlit();
+          })
+          .catch((err) => {
+            if (err && err.name === "AbortError") return;
+            if (token !== lutStillToken) return;
+            failed = true;
+            if (clip.dataset.kind !== "photo") lutStillKey = "";
+            setChip(msgLutChipFailed);
+            previewLutStill.hidden = true;
+          });
+      }, 120);
+    }
+
+    return {
+      schedule: scheduleLutPreviewStill,
+      setPrimary(value) {
+        showStatus = value;
+        if (value) setLutPreviewChip(status);
+      },
+      clear(clip = null) {
+        if (!clip || owner === clip) clearLutPreviewStill();
+      },
+      retryFailedPhoto() {
+        if (!failed || !owner || owner.dataset.kind !== "photo") return false;
+        clearLutPreviewStill();
+        return true;
+      },
+      clip: () => owner,
+      picture: () => owner && ownerSource === lutStillSourceIdentity(owner) &&
+        previewLayerReady(previewLutStill) ? previewLutStill : null,
+    };
+  }
+
+  let primaryLutStill = createLutStillOwner(previewLutStill, true);
+  const overlapLutStillImage = new Image();
+  overlapLutStillImage.hidden = true;
+  let overlapLutStill = createLutStillOwner(overlapLutStillImage, false);
+
+  function alignLutStillOwners(primary, overlap) {
+    // The previous primary becomes the outgoing layer at an overlap boundary.
+    // Move its decoded resource rather than clearing and rendering it again.
+    if (primary !== primaryLutStill.clip() &&
+        ((overlap && overlap === primaryLutStill.clip()) ||
+         (primary && primary === overlapLutStill.clip()))) {
+      [primaryLutStill, overlapLutStill] = [overlapLutStill, primaryLutStill];
+      primaryLutStill.setPrimary(true);
+      overlapLutStill.setPrimary(false);
+    }
+  }
+
+  function clearLutPreviewStill(clip = null) {
+    primaryLutStill.clear(clip);
+    overlapLutStill.clear(clip);
+  }
+
+  function retryFailedPhotoStills() {
+    const primary = primaryLutStill.retryFailedPhoto();
+    const overlap = overlapLutStill.retryFailedPhoto();
+    return primary || overlap;
+  }
+
+  function clearVideoLutPreviewStill() {
+    const clip = primaryLutStill.clip();
+    if (clip && clip.dataset.kind === "video") primaryLutStill.clear();
   }
 
   function scheduleLutPreviewStill(clip, localS) {
-    if (!previewLutStill) return;
-    if (reuseDraft || compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
-      clearLutPreviewStill();
-      return;
-    }
-    const look = readColorLook(clip);
-    const hsl = readHsl(clip);
-    const colorWheels = readColorWheels(clip);
-    const hslActive = !hslIsNeutral(hsl);
-    const wheelsActive = !colorWheelsIsNeutral(colorWheels);
-    const lookActive = colorLookNeedsStill(look, clip);
-    if (!lookActive && !hslActive && !wheelsActive) {
-      clearLutPreviewStill();
-      return;
-    }
-    // The proxy already contains grade + LUT + HSL + wheels at video
-    // resolution. Keep its frame for pause/seek/selection instead of
-    // overpainting a soft 720-edge JPEG.
-    if (lutWebglReadyFor(clip)) {
-      clearLutPreviewStill();
-      return;
-    }
-    if (lutProxySrcFor(clip)) {
-      clearLutPreviewStill();
-      return;
-    }
-    if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1" ||
-        clip.dataset.hslPreviewDirty === "1" || clip.dataset.colorWheelsPreviewDirty === "1") {
-      clearLutPreviewStill();
-      setLutPreviewChip(msgLutChipUpdating);
-      return;
-    }
-    if (state.playing) {
-      clearLutPreviewStill();
-      if (lutProxySrcFor(clip)) {
-        setLutPreviewChip("");
-      } else if (lutProxyPreparingFor(clip)) {
-        setLutPreviewChip(msgLutChipProxyPreparing);
-      } else if (!lookActive && !hslActive && wheelsActive) {
-        setLutPreviewChip(msgColorWheelsChipPlaying);
-      } else if (!lookActive && hslActive) {
-        setLutPreviewChip(msgHslChipPlaying);
-      } else {
-        setLutPreviewChip(msgLutChipPlaying);
-      }
-      return;
-    }
-    const studioId = clip.dataset.studioId;
-    if (!studioId) {
-      clearLutPreviewStill();
-      return;
-    }
-    // t_s is source offset from the clip in-point (same mapping as seekVideoLocal).
-    const sourceOff = lutStillSourceOffset(clip, localS);
-    const quant = Math.round(sourceOff * 10) / 10;
-    const key = JSON.stringify([studioId, quant, clip.dataset.sourceIn,
-      clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, colorWheels,
-      clip.dataset.saturationRamp]);
-    if (key === lutStillKey) return;
-    // Reject old responses now, including during the debounce and image decode.
-    clearLutPreviewStill();
-    lutStillKey = key;
-    const token = lutStillToken;
-    setLutPreviewChip(msgLutChipUpdating);
-    lutStillTimer = window.setTimeout(async () => {
-      lutStillTimer = 0;
-      // The endpoint reads persisted settings. Do not race an in-flight edit.
-      await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]);
-      if (token !== lutStillToken) return;
-      const controller = new AbortController();
-      lutStillAbort = controller;
-      const url = `/api/studio/${studioId}/preview-frame?t_s=${encodeURIComponent(String(quant))}&detail=0`;
-      fetch(url, { cache: "no-store", headers: { Accept: "image/jpeg" }, signal: controller.signal })
-        .then(async (res) => {
-          if (token !== lutStillToken) return null;
-          if (res.status === 409) {
-            lutStillKey = "";
-            setLutPreviewChip(msgLutChipMissing);
-            previewLutStill.hidden = true;
-            return null;
-          }
-          if (!res.ok) {
-            lutStillKey = "";
-            setLutPreviewChip(msgLutChipFailed);
-            previewLutStill.hidden = true;
-            return null;
-          }
-          return res.blob();
-        })
-        .then(async (blob) => {
-          if (!blob || token !== lutStillToken) return;
-          const objectUrl = URL.createObjectURL(blob);
-          const decoded = new Image();
-          decoded.src = objectUrl;
-          try {
-            await decoded.decode();
-          } catch (err) {
-            URL.revokeObjectURL(objectUrl);
-            throw err;
-          }
-          if (token !== lutStillToken) {
-            URL.revokeObjectURL(objectUrl);
-            return;
-          }
-          lutStillObjectUrl = objectUrl;
-          previewLutStill.src = objectUrl;
-          previewLutStill.hidden = false;
-          const hit = resolveAt(state.projectTimeS);
-          const composite = hit && (hit.overlapClip ||
-            (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
-          const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
-          setLutPreviewChip(
-            lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
-          );
-          drawPrivacyMasks();
-          schedulePreviewBlit();
-        })
-        .catch((err) => {
-          if (err && err.name === "AbortError") return;
-          if (token !== lutStillToken) return;
-          lutStillKey = "";
-          setLutPreviewChip(msgLutChipFailed);
-          previewLutStill.hidden = true;
-        });
-    }, 120);
+    primaryLutStill.schedule(clip, localS);
+  }
+
+  function schedulePhotoOverlapStill(clip, localS) {
+    overlapLutStill.schedule(clip && clip.dataset.kind === "photo" ? clip : null, localS);
+  }
+
+  function renderedPreviewStillFor(media) {
+    if (reuseDraft || compareBeforeAfter) return null;
+    const secondary = media === previewImageB;
+    if (!secondary && media !== previewImage && media !== previewVideo) return null;
+    const slot = secondary ? overlapLutStill : primaryLutStill;
+    const clip = slot.clip();
+    if (!clip || clipForPreviewMedia(media) !== clip) return null;
+    if (state.playing && clip.dataset.kind !== "photo") return null;
+    return slot.picture();
   }
 
   const lutProxyPrepare = new Map();
@@ -3024,7 +3135,7 @@ import {
   function writeColorLook(clip, look) {
     if (!clip) return;
     clip.dataset.colorLook = JSON.stringify(look || neutralColorLook());
-    clearLutPreviewStill();
+    clearLutPreviewStill(clip);
     scheduleLutProxyPrepare(clip);
     if (colorLookNeedsStill(look, clip)) setLutPreviewChip(msgLutChipUpdating);
   }
@@ -4049,8 +4160,7 @@ import {
   }
 
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
-    const rendered = !reuseDraft && !state.playing && (media === previewVideo || media === previewImage) &&
-      previewLayerReady(previewLutStill) ? previewLutStill : null;
+    const rendered = renderedPreviewStillFor(media);
     const webgl = lutWebglCanvasFor(media);
     const picture = webgl || rendered || media;
     if (webgl) {
@@ -5691,7 +5801,7 @@ import {
   }
 
   function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
-    if (!previewLayerReady(media)) return false;
+    if (!previewLayerReady(media) && !previewLayerReady(rendered)) return false;
     const webgl = previewLutFrameFor(media, frameW, frameH);
     if (webgl && previewFrame) {
       previewFrame.dataset.lutWebgl = "1";
@@ -5788,7 +5898,10 @@ import {
     }
     const secondary = visibleSecondaryMedia();
     const primary = visiblePrimaryMedia();
-    if (!previewLayerReady(secondary) && !previewLayerReady(primary)) {
+    const renderedSecondary = renderedPreviewStillFor(secondary);
+    const rendered = renderedPreviewStillFor(primary);
+    if (!previewLayerReady(secondary) && !previewLayerReady(primary) &&
+        !previewLayerReady(renderedSecondary) && !previewLayerReady(rendered)) {
       canvas.hidden = true;
       return;
     }
@@ -5797,8 +5910,7 @@ import {
     ctx.imageSmoothingQuality = "high";
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, cssW, cssH);
-    const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH);
-    const rendered = !reuseDraft && !state.playing && previewLayerReady(previewLutStill) ? previewLutStill : null;
+    const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH, renderedSecondary);
     const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH, rendered);
     canvas.hidden = !(drewSecondary || drewPrimary);
   }
@@ -5882,6 +5994,7 @@ import {
     updatePlayheadChrome();
 
     if (!fromVideo) {
+      retryFailedPhotoStills();
       clearCrossfadePreload();
       syncPreviewMedia({ seek: true });
     } else {

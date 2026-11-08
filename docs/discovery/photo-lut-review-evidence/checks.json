@@ -1,0 +1,29 @@
+{
+  "tested_commit": "ac5bacfa46f3ea20de30bde439654340548c8906",
+  "python_existing_suite": {
+    "passed": 1136,
+    "skipped": 1,
+    "warnings": 68,
+    "seconds": 405.4,
+    "skip": "opt-in Control WebView2 smoke"
+  },
+  "new_strict_photo_cases": {
+    "passed": 2,
+    "included_in_full_suite_collection": false,
+    "included_in_focused_run": true
+  },
+  "pinned_focused_including_journey": {
+    "passed": 25
+  },
+  "javascript_module_tests": {
+    "passed": 106
+  },
+  "legacy_lifecycle": "PASS",
+  "ruff": "PASS",
+  "mypy": "PASS: 78 source files",
+  "packaged_functional_journeys": {
+    "passed": 10
+  },
+  "strict_photo_probe_exit": 1,
+  "status": "BLOCKED_PO_DECISION"
+}
