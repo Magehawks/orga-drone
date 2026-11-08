@@ -1,5 +1,10 @@
 # Photo LUT playback and crossfade validation
 
+Review follow-up: see [the PR #319 investigation](photo-lut-review-followup.md)
+for the readiness, pause-boundary and photo-source corrections and regenerated
+evidence. The measurements below describe the original reviewed candidate and
+remain historical evidence, not results for the corrected head.
+
 ## Decision
 
 **NO-GO for strict preview/export parity sign-off or release approval.** The
