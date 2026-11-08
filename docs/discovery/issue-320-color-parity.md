@@ -2,6 +2,12 @@
 
 ## Decision boundary
 
+The [conditionally approved precision experiment](issue-320-approved-precision-experiment.md)
+has now been implemented and tested, then reverted under its mandatory detail
+retention gate. It records the cache proof, 1080p/4K/DPR-3 comparisons, timing,
+memory and remaining strict failures. The original investigation below is
+historical evidence; no measurements were deleted or reclassified.
+
 **`BLOCKED_PO_DECISION`. Strict color parity remains FAIL at the unchanged
 maximum interior-swatch mean RGB error of ≤3.0.** No production correction is
 retained in this investigation PR. The localized neutral-photo prototype was
@@ -9,11 +15,10 @@ rejected because its improved color score sacrifices existing preview detail.
 Application code, tests, LUT lifecycle, WebGL, proxies, export, clock, cache keys
 and thresholds are unchanged from develop.
 
-The next correction needs an agreed source/precision contract across existing
-FFmpeg still, proxy and export paths, including cache invalidation and quality/
-performance checks. The task explicitly requires stopping before significant
-cross-module changes. The proposal below is for Product Owner approval; it is
-not implemented, and does not authorize a rendering rewrite or tolerance waiver.
+The original proposal received conditional Product Owner approval; the tested
+active-LUT float variant did not clear retention and is not retained. The
+linked experiment report contains a narrower next-step proposal. No rendering
+rewrite or tolerance waiver is authorized or performed.
 
 ## Baseline and reproducibility
 
@@ -194,7 +199,7 @@ Evidence: [exact-alpha and video stage data](issue-320-color-parity-evidence/pre
   H.264 controls produce the same interior means in this static neutral case.
   Decorated spatial/filter error remains separate and unaccepted.
 
-Proposed bounded follow-up, only after Product Owner approval:
+Original bounded proposal (subsequently conditionally approved; see experiment result above):
 
 1. Agree the existing FFmpeg RGB precision/source-normalization boundary for
    photo and video grading, before native-size YUV output. Preserve native neutral

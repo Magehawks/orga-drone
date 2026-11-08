@@ -1,0 +1,20 @@
+{
+  "status": "BLOCKED_PO_DECISION",
+  "retention_gate": "NOT MET: measured graded-photo detail response changes; production/cache/test experiment reverted",
+  "candidate_focused_tests_passed": 64,
+  "candidate_cache_contract_tests_passed": 6,
+  "candidate_js_tests_passed": 106,
+  "rollback_focused_tests_passed": 23,
+  "ruff": "PASS",
+  "mypy": "PASS:78 source files",
+  "packaged_color_scenarios": 13,
+  "packaged_color_pairs": 71,
+  "packaged_detail_captures_per_build": 16,
+  "strict_color_threshold": 3.0,
+  "strict_candidate_gate": "FAIL",
+  "experimental_cache_contract": "base still7/proxy3 + lut_rgb_precision1 only actual LUTs",
+  "final_cache_contract": "unchanged baseline7/3",
+  "full_suite_repeated_locally": false,
+  "two_simultaneous_4k_owner_memory_measured": false,
+  "general_packaged_functional_journeys_repeated": false
+}

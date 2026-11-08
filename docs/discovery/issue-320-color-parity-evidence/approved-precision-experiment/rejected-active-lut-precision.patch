@@ -1,0 +1,168 @@
+diff --git a/src/orga_drone/studio_lut.py b/src/orga_drone/studio_lut.py
+index 0f5e362..3599ccd 100644
+--- a/src/orga_drone/studio_lut.py
++++ b/src/orga_drone/studio_lut.py
+@@ -335,6 +335,18 @@ def write_strength_blended_cube(
+     return destination
+ 
+ 
++LUT_RGB_PRECISION_VERSION = 1
++
++
++def lut_precision_cache_version(look: ColorLook) -> int | None:
++    """Only actual LUT transforms change representation; neutral/0% stay put."""
++    if (look.conversion_lut and look.conversion_confirmed) or (
++        look.creative_lut and look.creative_strength > 0
++    ):
++        return LUT_RGB_PRECISION_VERSION
++    return None
++
++
+ def ffmpeg_lut_chain(
+     look: ColorLook,
+     *,
+@@ -369,7 +381,9 @@ def ffmpeg_lut_chain(
+         parts.append(
+             f"lut3d=file={escape_ffmpeg_lut_path(path)}:interp=tetrahedral"
+         )
+-    return ",".join(parts)
++    # Avoid an implicit 8-bit RGB boundary before LUT interpolation. This is
++    # local to actual LUT stages, not a global float conversion of neutral media.
++    return ",".join(["format=gbrpf32le", *parts]) if parts else ""
+ 
+ 
+ def write_identity_cube(path: Path, *, size: int = 2) -> Path:
+diff --git a/src/orga_drone/studio_playback_proxy.py b/src/orga_drone/studio_playback_proxy.py
+index 15affee..453a655 100644
+--- a/src/orga_drone/studio_playback_proxy.py
++++ b/src/orga_drone/studio_playback_proxy.py
+@@ -31,6 +31,7 @@ from orga_drone.studio_lut import (
+     ColorLook,
+     LutMissingError,
+     ffmpeg_lut_chain,
++    lut_precision_cache_version,
+     require_lut_asset,
+ )
+ from orga_drone.studio_preview_frame import look_needs_preview_still
+@@ -252,6 +253,9 @@ def cache_key_for(
+         "gop": PROXY_GOP_FRAMES,
+         "v": PROXY_VERSION,
+     }
++    precision = lut_precision_cache_version(req.look)
++    if precision is not None:
++        payload["lut_rgb_precision"] = precision
+     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+ 
+diff --git a/src/orga_drone/studio_preview_frame.py b/src/orga_drone/studio_preview_frame.py
+index 370d930..9c989a3 100644
+--- a/src/orga_drone/studio_preview_frame.py
++++ b/src/orga_drone/studio_preview_frame.py
+@@ -23,7 +23,9 @@ from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
+ from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chain
+ from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
+ from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
+-from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, require_lut_asset
++from orga_drone.studio_lut import (
++    ColorLook, LutMissingError, ffmpeg_lut_chain, lut_precision_cache_version, require_lut_asset,
++)
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -185,6 +187,9 @@ def cache_key_for(
+     if req.kind == "photo":
+         payload["photo_even_dimensions"] = True
+         payload["photo_export_source"] = 1
++    precision = lut_precision_cache_version(req.look)
++    if precision is not None:
++        payload["lut_rgb_precision"] = precision
+     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+ 
+diff --git a/tests/test_studio_lut_precision.py b/tests/test_studio_lut_precision.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_studio_lut_precision.py
+@@ -0,0 +1,82 @@
++"""Active-LUT precision and selective cache invalidation contracts."""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++import pytest
++
++from orga_drone.studio_image import ImageAdjust
++from orga_drone.studio_lut import ColorLook, ffmpeg_lut_chain, import_lut_from_path, write_identity_cube
++import orga_drone.studio_playback_proxy as proxy
++import orga_drone.studio_preview_frame as still
++
++
++@pytest.mark.parametrize("mode,affected", [
++    ("neutral", False), ("zero", False), ("unconfirmed", False),
++    ("creative", True), ("conversion", True),
++])
++def test_precision_changes_only_actual_lut_cache_entries(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, affected: bool,
++) -> None:
++    data = tmp_path / "data"
++    asset = import_lut_from_path(data, write_identity_cube(tmp_path / "identity.cube"))
++    looks = {
++        "neutral": ColorLook(),
++        "zero": ColorLook(creative_lut=asset, creative_strength=0),
++        "unconfirmed": ColorLook(conversion_lut=asset, conversion_confirmed=False),
++        "creative": ColorLook(creative_lut=asset, creative_strength=50),
++        "conversion": ColorLook(conversion_lut=asset, conversion_confirmed=True),
++    }
++    look = looks[mode]
++    source = tmp_path / "synthetic.mp4"
++    source.write_bytes(b"synthetic cache-key fixture")
++    frame = still.PreviewFrameRequest(source, "video", 0, ImageAdjust(), look)
++    playback = proxy.PlaybackProxyRequest(source, source_end_s=1, look=look)
++    metadata = {"media_mtime_ns": source.stat().st_mtime_ns, "media_size": source.stat().st_size}
++    new_still = still.cache_key_for(frame, **metadata)
++    new_proxy = proxy.cache_key_for(playback, data_dir=data, **metadata)
++    with monkeypatch.context() as legacy:
++        legacy.setattr(still, "lut_precision_cache_version", lambda _: None)
++        legacy.setattr(proxy, "lut_precision_cache_version", lambda _: None)
++        old_still = still.cache_key_for(frame, **metadata)
++        old_proxy = proxy.cache_key_for(playback, data_dir=data, **metadata)
++    assert (new_still != old_still) is affected
++    assert (new_proxy != old_proxy) is affected
++    chain = ffmpeg_lut_chain(look, data_dir=data, work_dir=tmp_path / "work")
++    assert chain.startswith("format=gbrpf32le,lut3d=") is affected
++
++
++def test_old_active_lut_outputs_are_not_served_as_new_hits(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    data = tmp_path / "data"
++    asset = import_lut_from_path(data, write_identity_cube(tmp_path / "identity.cube"))
++    source = tmp_path / "synthetic.mp4"
++    original = b"synthetic source left untouched"
++    source.write_bytes(original)
++    look = ColorLook(creative_lut=asset)
++    frame = still.PreviewFrameRequest(source, "video", 0, ImageAdjust(), look)
++    playback = proxy.PlaybackProxyRequest(source, source_end_s=1, look=look)
++    metadata = {"media_mtime_ns": source.stat().st_mtime_ns, "media_size": source.stat().st_size}
++    with monkeypatch.context() as legacy:
++        legacy.setattr(still, "lut_precision_cache_version", lambda _: None)
++        legacy.setattr(proxy, "lut_precision_cache_version", lambda _: None)
++        old_still = still.cache_key_for(frame, **metadata)
++        old_proxy = proxy.cache_key_for(playback, data_dir=data, **metadata)
++    still_dir = still.preview_stills_dir(data)
++    proxy_dir = proxy.playback_proxies_dir(data)
++    proxy_dir.mkdir(parents=True, exist_ok=True)
++    (still_dir / f"{old_still}.jpg").write_bytes(b"legacy still sentinel")
++    (proxy_dir / f"{old_proxy}.mp4").write_bytes(b"legacy proxy sentinel")
++    assert proxy.cached_playback_proxy(playback, data_dir=data) is None
++    monkeypatch.setattr(still, "find_ffmpeg", lambda: None)
++    with pytest.raises(still.PreviewFrameError, match="Install ffmpeg"):
++        still.render_preview_frame(frame, data_dir=data)
++    new_frame = still_dir / f"{still.cache_key_for(frame, **metadata)}.jpg"
++    new_playback = proxy_dir / f"{proxy.cache_key_for(playback, data_dir=data, **metadata)}.mp4"
++    new_frame.write_bytes(b"new still sentinel")
++    new_playback.write_bytes(b"new proxy sentinel")
++    assert still.render_preview_frame(frame, data_dir=data) == new_frame
++    assert proxy.cached_playback_proxy(playback, data_dir=data) == new_playback
++    assert source.read_bytes() == original

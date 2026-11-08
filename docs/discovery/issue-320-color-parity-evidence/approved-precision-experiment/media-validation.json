@@ -1,0 +1,98 @@
+[
+  {
+    "run": "precision-idle-baseline",
+    "file": "0-1080-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "0-2160-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "1-1080-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "1-2160-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "0-1080-proxy-mp4/data/playback-proxies/807513db997318a757f33244614dfb07569c6160ade0496a7f66cea2039815a0.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "0-2160-proxy-mp4/data/playback-proxies/741e10e28627afeb52f95ff76a5723f7d11bcba35120fe889cb031bc2788eb76.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "1-1080-proxy-mp4/data/playback-proxies/c7f8efed4b24227ff22f230464aefa914c84499fb19955de5e47d2c9abaedbca.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-baseline",
+    "file": "1-2160-proxy-mp4/data/playback-proxies/e37c2e6ce271610a7c6065fa9dd78e4146b788808f87dc0beb55da6014b8e3ef.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "0-1080-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "0-2160-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "1-1080-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "1-2160-export-mp4/export.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "0-1080-proxy-mp4/data/playback-proxies/78652814931e56f11c5b747e9251ae9436e84f5f47d7fe9e68a667846df02093.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "0-2160-proxy-mp4/data/playback-proxies/4d9370757eb16e6d01f300005cf3313ad4719f8452bfbec6b9c9133e1cd06ee2.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "1-1080-proxy-mp4/data/playback-proxies/cf095ed3618e24555ae78d32d8401e50a1019fbeb31204f8778f7893a8734a93.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  },
+  {
+    "run": "precision-idle-candidate",
+    "file": "1-2160-proxy-mp4/data/playback-proxies/f1ff1d7593b059779789a3737aefbd232b0ae9bf6563c5348c5b2a6a38028dab.mp4",
+    "decode_exit_code": 0,
+    "stderr": ""
+  }
+]

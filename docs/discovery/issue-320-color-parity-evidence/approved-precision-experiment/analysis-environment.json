@@ -1,0 +1,7 @@
+{
+  "python": "3.12.3",
+  "numpy": "1.26.4",
+  "psutil": "5.9.8",
+  "pillow": "12.3.0",
+  "scope": "backend performance analysis environment; packaged runtime identity is recorded separately"
+}

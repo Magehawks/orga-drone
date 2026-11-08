@@ -1,0 +1,382 @@
+{
+  "synthetic_only": true,
+  "exe_sha256": "b4f2fe86cff82eb62e4996c4d963d1bb180466d86eac3011c848428b861cc58e",
+  "source_hashes": {
+    "detail-1080.jpg": "0b8d1ec5c1af4f147ce19cf2670801934783ca3065e44d5dbd2c33588e19dc1c",
+    "detail-1080.png": "72bd2dba74b44b81b6a38a030934d2cf41a2930d5df1a87bceb9a2a4bc883fda",
+    "detail-2160.jpg": "c7e19c8817e08e26835a45680caf051344fae5b74a0b0a19499db5b0509b4f14",
+    "detail-2160.png": "b3356b95ddc75d9328eada59a8747e3ba7da557f7286cdc4b9f45a50e117d7b5"
+  },
+  "captures": [
+    {
+      "name": "detail-1080.jpg",
+      "look": "neutral",
+      "dpr": 1,
+      "file": "detail-1080.jpg-neutral-dpr1.png",
+      "state": {
+        "size": [
+          640,
+          360
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 1,
+        "still": false
+      },
+      "stddev": [
+        110.02643288692467,
+        110.02643288692467,
+        110.02643288692467
+      ]
+    },
+    {
+      "name": "detail-1080.jpg",
+      "look": "neutral",
+      "dpr": 3,
+      "file": "detail-1080.jpg-neutral-dpr3.png",
+      "state": {
+        "size": [
+          1920,
+          1080
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 3,
+        "still": false
+      },
+      "stddev": [
+        127.48577686341773,
+        127.48577686341773,
+        127.48577686341773
+      ]
+    },
+    {
+      "name": "detail-1080.jpg",
+      "look": "lut",
+      "dpr": 1,
+      "file": "detail-1080.jpg-lut-dpr1.png",
+      "state": {
+        "size": [
+          640,
+          360
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 1,
+        "still": true
+      },
+      "stddev": [
+        77.63856014140539,
+        52.31436498276233,
+        44.19648939786256
+      ]
+    },
+    {
+      "name": "detail-1080.jpg",
+      "look": "lut",
+      "dpr": 3,
+      "file": "detail-1080.jpg-lut-dpr3.png",
+      "state": {
+        "size": [
+          1920,
+          1080
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 3,
+        "still": true
+      },
+      "stddev": [
+        77.65986349383763,
+        52.98117253473955,
+        45.139122301279976
+      ]
+    },
+    {
+      "name": "detail-1080.png",
+      "look": "neutral",
+      "dpr": 1,
+      "file": "detail-1080.png-neutral-dpr1.png",
+      "state": {
+        "size": [
+          640,
+          360
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 1,
+        "still": false
+      },
+      "stddev": [
+        110.10001214808344,
+        110.10001214808344,
+        110.10001214808344
+      ]
+    },
+    {
+      "name": "detail-1080.png",
+      "look": "neutral",
+      "dpr": 3,
+      "file": "detail-1080.png-neutral-dpr3.png",
+      "state": {
+        "size": [
+          1920,
+          1080
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 3,
+        "still": false
+      },
+      "stddev": [
+        127.48600746264444,
+        127.48600746264444,
+        127.48600746264444
+      ]
+    },
+    {
+      "name": "detail-1080.png",
+      "look": "lut",
+      "dpr": 1,
+      "file": "detail-1080.png-lut-dpr1.png",
+      "state": {
+        "size": [
+          640,
+          360
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 1,
+        "still": true
+      },
+      "stddev": [
+        77.63869553999461,
+        52.3145417334065,
+        44.196582526413174
+      ]
+    },
+    {
+      "name": "detail-1080.png",
+      "look": "lut",
+      "dpr": 3,
+      "file": "detail-1080.png-lut-dpr3.png",
+      "state": {
+        "size": [
+          1920,
+          1080
+        ],
+        "sourceSize": [
+          1920,
+          1080
+        ],
+        "dpr": 3,
+        "still": true
+      },
+      "stddev": [
+        77.66008318896695,
+        52.98146676820468,
+        45.13925406723268
+      ]
+    },
+    {
+      "name": "detail-2160.jpg",
+      "look": "neutral",
+      "dpr": 1,
+      "file": "detail-2160.jpg-neutral-dpr1.png",
+      "state": {
+        "size": [
+          1280,
+          720
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 1,
+        "still": false
+      },
+      "stddev": [
+        110.1874879224706,
+        110.1874879224706,
+        110.1874879224706
+      ]
+    },
+    {
+      "name": "detail-2160.jpg",
+      "look": "neutral",
+      "dpr": 3,
+      "file": "detail-2160.jpg-neutral-dpr3.png",
+      "state": {
+        "size": [
+          3840,
+          2160
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 3,
+        "still": false
+      },
+      "stddev": [
+        127.48600746264444,
+        127.48600746264444,
+        127.48600746264444
+      ]
+    },
+    {
+      "name": "detail-2160.jpg",
+      "look": "lut",
+      "dpr": 1,
+      "file": "detail-2160.jpg-lut-dpr1.png",
+      "state": {
+        "size": [
+          1280,
+          720
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 1,
+        "still": true
+      },
+      "stddev": [
+        68.42192991571639,
+        47.93732433301747,
+        40.90009045985184
+      ]
+    },
+    {
+      "name": "detail-2160.jpg",
+      "look": "lut",
+      "dpr": 3,
+      "file": "detail-2160.jpg-lut-dpr3.png",
+      "state": {
+        "size": [
+          3840,
+          2160
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 3,
+        "still": true
+      },
+      "stddev": [
+        68.41981003937616,
+        47.93024326024924,
+        40.888341586488934
+      ]
+    },
+    {
+      "name": "detail-2160.png",
+      "look": "neutral",
+      "dpr": 1,
+      "file": "detail-2160.png-neutral-dpr1.png",
+      "state": {
+        "size": [
+          1280,
+          720
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 1,
+        "still": false
+      },
+      "stddev": [
+        110.1874879224706,
+        110.1874879224706,
+        110.1874879224706
+      ]
+    },
+    {
+      "name": "detail-2160.png",
+      "look": "neutral",
+      "dpr": 3,
+      "file": "detail-2160.png-neutral-dpr3.png",
+      "state": {
+        "size": [
+          3840,
+          2160
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 3,
+        "still": false
+      },
+      "stddev": [
+        127.48600746264444,
+        127.48600746264444,
+        127.48600746264444
+      ]
+    },
+    {
+      "name": "detail-2160.png",
+      "look": "lut",
+      "dpr": 1,
+      "file": "detail-2160.png-lut-dpr1.png",
+      "state": {
+        "size": [
+          1280,
+          720
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 1,
+        "still": true
+      },
+      "stddev": [
+        68.42192991571639,
+        47.93732433301747,
+        40.90009045985184
+      ]
+    },
+    {
+      "name": "detail-2160.png",
+      "look": "lut",
+      "dpr": 3,
+      "file": "detail-2160.png-lut-dpr3.png",
+      "state": {
+        "size": [
+          3840,
+          2160
+        ],
+        "sourceSize": [
+          3840,
+          2160
+        ],
+        "dpr": 3,
+        "still": true
+      },
+      "stddev": [
+        68.41981003937616,
+        47.93024326024924,
+        40.888341586488934
+      ]
+    }
+  ],
+  "status": "COMPLETE",
+  "sources_unchanged": true
+}
