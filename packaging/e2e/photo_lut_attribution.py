@@ -54,7 +54,7 @@ def run(args) -> None:
         cdp = app.require_cdp()
         navigate(cdp, app.app_port, "/")
         report["browser"] = cdp.call("Browser.getVersion")
-        for size in ("720:405", "720:406", "640:360", "1280:720"):
+        for size in ("720:405", "720:406", "704:396", "640:360", "1280:720"):
             limited = (f"scale={size}:out_color_matrix=bt709:out_range=tv,format=yuv420p,"
                        "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv")
             variants = {
@@ -62,6 +62,7 @@ def run(args) -> None:
                 "709-png": (limited + ",scale=in_color_matrix=bt709:in_range=tv,format=rgb24", ".png", []),
                 "jpeg-q5": (limited + "," + JPEG_COLOR_CHAIN, ".jpg", ["-q:v", "5"]),
                 "jpeg-q1": (limited + "," + JPEG_COLOR_CHAIN, ".jpg", ["-q:v", "1"]),
+                "export-source-jpeg-q5": (limited + "," + JPEG_COLOR_CHAIN, ".jpg", ["-q:v", "5"]),
             }
             for name, (chain, suffix, options) in variants.items():
                 key = size.replace(":", "x") + "-" + name
@@ -70,7 +71,8 @@ def run(args) -> None:
                 if size == "720:405" and suffix == ".jpg":
                     continue
                 target = out / (key + suffix)
-                subprocess.run([args.ffmpeg, "-v", "error", "-i", str(args.source),
+                source = materialized if name.startswith("export-source") else args.source
+                subprocess.run([args.ffmpeg, "-v", "error", "-i", str(source),
                                 "-vf", chain, "-frames:v", "1", *options, str(target)],
                                check=True, capture_output=True, timeout=60)
                 if suffix == ".png":

@@ -18,6 +18,46 @@ from orga_drone.studio_lut import ColorLook, LutMissingError, import_lut_from_pa
 from orga_drone.studio_preview_frame import PreviewFrameRequest, render_preview_frame
 
 
+@pytest.mark.parametrize("suffix", ["png", "jpg"])
+def test_photo_zero_strength_matches_export_source_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str,
+) -> None:
+    """PNG must use export's normalized photo source before YUV conversion."""
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg unavailable")
+    data = tmp_path / "data"
+    monkeypatch.setattr("orga_drone.config.settings", Settings(data_dir=data))
+    photo = tmp_path / f"swatches.{suffix}"
+    image = Image.new("RGB", (1280, 720))
+    colors = [(180, 100, 60), (55, 120, 185), (128, 128, 128), (32, 32, 32),
+              (210, 210, 210), (70, 170, 95), (180, 65, 140), (210, 180, 70)]
+    for i, color in enumerate(colors):
+        image.paste(color, (i % 4 * 320, i // 4 * 360, (i % 4 + 1) * 320, (i // 4 + 1) * 360))
+    image.save(photo, quality=98, subsampling=0)
+    original = hashlib.sha256(photo.read_bytes()).hexdigest()
+    from orga_drone.studio_lut import write_identity_cube
+
+    cube = tmp_path / "identity.cube"
+    write_identity_cube(cube)
+    asset = import_lut_from_path(data, cube)
+    look = ColorLook(creative_lut=asset, creative_strength=0)
+    output = FfmpegStudioEncoder().render(StudioExportConfig(
+        output_path=tmp_path / "export.mp4", width=1280, height=720, quality="best",
+        clips=(StudioExportClip(photo, "photo", 0.5, color_look=look),),
+    ))
+    still = render_preview_frame(PreviewFrameRequest(photo, "photo", 0, ImageAdjust(), look), data_dir=data)
+    extracted = tmp_path / "export.png"
+    _run(ffmpeg, "-i", str(output), "-frames:v", "1", "-vf", "scale=640:360", str(extracted))
+    with Image.open(still) as a, Image.open(extracted) as b:
+        difference = ImageChops.difference(a.convert("RGB").resize((640, 360)), b.convert("RGB"))
+        for i in range(8):
+            x, y = i % 4 * 160, i // 4 * 180
+            error = sum(ImageStat.Stat(difference.crop((x + 32, y + 32, x + 128, y + 148))).mean) / 3
+            assert error <= 3.0, (suffix, i, error)
+    assert hashlib.sha256(photo.read_bytes()).hexdigest() == original
+
+
 def _run(ffmpeg: str, *args: str) -> None:
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", *args], check=True,
                    capture_output=True, timeout=60, **subprocess_no_window_kwargs())

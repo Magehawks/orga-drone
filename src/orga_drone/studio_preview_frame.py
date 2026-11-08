@@ -184,6 +184,7 @@ def cache_key_for(
     }
     if req.kind == "photo":
         payload["photo_even_dimensions"] = True
+        payload["photo_export_source"] = 1
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -268,6 +269,16 @@ def render_preview_frame(
             )
         work = folder / "work" / key[:16]
         work.mkdir(parents=True, exist_ok=True)
+        if req.kind == "photo":
+            # Export grades a normalized JPEG rather than the original photo.
+            # Reuse that exact read-only preparation so PNG/JPEG input color
+            # conversion agrees before the shared grade/LUT filters run.
+            from orga_drone.export.studio_encoder import _materialize_photo_still
+
+            try:
+                media = _materialize_photo_still(media, work / "source.jpg")
+            except Exception as exc:  # noqa: BLE001 — surface as preview error
+                raise PreviewFrameError("Could not prepare the photo preview.", code="preview_failed") from exc
         try:
             vf = preview_filter_chain(
                 req.image,
