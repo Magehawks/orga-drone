@@ -1,16 +1,36 @@
 # PR #319 review follow-up
 
-**Status: `BLOCKED_PO_DECISION`.** Confirmed readiness, paused-composite and
-photo-source defects are corrected. The unchanged strict **≤3.0** gate still
-fails for the photo crossfade, mixed transitions and unchanged neutral controls.
-No failing gate is waived, redefined or relabeled as passing.
+**Status: `READY_FOR_REVIEW` for the narrowed photo LUT lifecycle scope.** The
+Product Owner explicitly separated the remaining strict color-parity work into
+[issue #320](https://github.com/Magehawks/orga-drone/issues/320). Confirmed
+readiness, paused-composite and photo-source defects are corrected. The unchanged
+strict **≤3.0** gate still fails for the photo crossfade, mixed transitions and
+unchanged neutral controls. This is a scope decision, not a parity waiver. No
+failing result is deleted, redefined or relabeled as passing. Independent GitHub
+review remains required; this status grants no merge, release or real-media
+acceptance.
 
 ## Scope and corrections
 
 This follow-up addresses the Product Owner's explicit PR #319 review task.
 The existing two-owner photo LUT lifecycle remains intact. No export, video
 WebGL/proxy/clock architecture, schema, source media, threshold or warmth-only
-filter behavior was changed. PR #319 remains draft and unmerged.
+filter behavior was changed. PR #319 is ready for renewed independent review
+and remains open and unmerged.
+
+### Completed lifecycle acceptance criteria
+
+- [x] Photo LUT stills remain visible during playback and after pause without seeking.
+- [x] Both crossfade photo layers retain their own grading and decoded resources.
+- [x] Paused transition reconciliation removes stale outgoing photo layers.
+- [x] A decoded graded still draws while its original image is still loading.
+- [x] Preview and export use the same photo source preparation.
+- [x] Edits/source changes invalidate the affected cache and reject stale fetch/decode results.
+- [x] Static photo playback reuses stills rather than rendering on every tick.
+
+These criteria concern lifecycle correctness. Strict photo-crossfade parity,
+residual mixed-transition colors, pre-existing neutral-photo/video color paths,
+and broader color-pipeline investigation remain open in #320.
 
 - `paintPreviewBlit()` now checks decoded graded still readiness on both layers
   before hiding the canvas. It draws the same resources checked by the guard.
@@ -149,7 +169,9 @@ The main probe completes **13 scenarios / 71 pairs**, preserving JPG/PNG,
 All synthetic source hashes remain unchanged. All unchanged playback intervals
 record **0 additional preview-frame requests**. The strict probe correctly
 returns nonzero: `photo_fix_pass=false`, `strict_all_pass=false`. The bounded
-photo gate remains a separately reported PASS and is insufficient for approval.
+photo gate remains a separately reported PASS and is insufficient for strict
+color-parity approval. Lifecycle readiness follows the explicit Product Owner
+scope decision recorded above.
 
 The packaged functional harness reports **10/10 PASS**, including persistence,
 video playback, export and source integrity. Local artifact/run metadata is
@@ -161,16 +183,36 @@ strict photo cases also pass separately and are included in the 25 focused
 tests; the full-suite collection began before those test cases were added.
 Journey smoke is included in the final focused run (**2 passed**).
 
-### Product Owner decision required
+### Scope-finalization verification
 
-Keep PR #319 open/draft and keep strict parity failed. Decide whether to approve
-a separate narrowly scoped color-pipeline investigation for the residual photo
-crossfade plus pre-existing neutral/video limitations, or explicitly expand this
-PR's scope to that work. The standalone-video residual is independently
-confirmed on the pre-PR baseline; #316 remains a separate timing blocker.
-Neither option silently changes the existing threshold or authorizes merging.
-No further rendering/clock architecture changes are made while this decision is
-pending. Real DJI validation and the human product decision remain outstanding.
+This finalization changes only the two investigation Markdown documents. All
+production, test, probe, packaging and workflow files match tested commit
+`ac5bacfa46f3ea20de30bde439654340548c8906`. Source JS/Python identity hashes,
+every evidence checksum, 13 scenarios/71 pairs, unchanged-source hashes and
+zero additional interval requests were rechecked. Local documentation links
+and `git diff --check` pass. No application change requires repeating expensive
+packaged E2E or full regression suites.
+
+At the incoming head `f75295d298c1d2d8ef4e42c525563a3990e08a37`, all three
+[GitHub CI jobs](https://github.com/Magehawks/orga-drone/actions/runs/42479914315)
+passed: Ruff/MyPy/unit tests, JavaScript lint/format/tests, and App journey
+smoke. The documentation-only final head must also be checked in GitHub; its
+current results belong in the PR handoff. Packaged local results above remain
+valid for unchanged production source, and remain distinct from CI admission
+or release approval.
+
+### Product Owner scope decision and follow-up
+
+The Product Owner approved PR #319 as the focused lifecycle repair, subject to
+final verification and independent review, and assigned all remaining strict
+color-parity investigation to [#320](https://github.com/Magehawks/orga-drone/issues/320).
+This resolves the earlier `BLOCKED_PO_DECISION` scope question. The historical
+checks/evidence JSON retains its original status and every measured FAIL.
+The standalone-video residual is independently confirmed on the pre-PR baseline;
+#316 remains a separate timing blocker. No work on #320 is implemented here.
+The strict threshold stays **≤3.0**, and all recorded failures stay **FAIL**.
+No further rendering/clock architecture change, merge, release, or Product Owner
+real-media acceptance is authorized by this scope decision.
 
 Exact scenario data: [before/after](photo-lut-review-evidence/before-after.json),
 [final 71 pairs](photo-lut-review-evidence/final-parity.json),

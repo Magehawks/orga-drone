@@ -7,6 +7,12 @@ remain historical evidence, not results for the corrected head.
 
 ## Decision
 
+Current scope decision: the Product Owner has separated residual strict color
+parity into [issue #320](https://github.com/Magehawks/orga-drone/issues/320).
+PR #319 is **READY_FOR_REVIEW for photo LUT lifecycle only**, subject to renewed
+independent review. The historical strict-parity NO-GO below remains valid;
+the unchanged **≤3.0** threshold and all failed measurements are preserved.
+
 **NO-GO for strict preview/export parity sign-off or release approval.** The
 photo lifecycle repair is demonstrated, but the unchanged strict color gate
 still fails in the cases below. The bounded photo gate passes. This PR does
