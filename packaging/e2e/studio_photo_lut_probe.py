@@ -43,6 +43,13 @@ def capture(cdp, *, screen: bool = False) -> tuple[Image.Image, dict]:
       requests:performance.getEntriesByType('resource').filter(e=>e.name.includes('/preview-frame?')).length,
       primaryStill:!document.getElementById('studio-preview-lut-still').hidden,
       stillSize:[document.getElementById('studio-preview-lut-still').naturalWidth,document.getElementById('studio-preview-lut-still').naturalHeight],
+      layers:['studio-preview-image','studio-preview-image-b','studio-preview-video','studio-preview-video-b'].map(id=>{
+        const m=document.getElementById(id);
+        return {id,hidden:m.hidden,pending:m.classList.contains('is-pending'),opacity:m.style.opacity,
+          filter:m.style.filter,currentTime:m.currentTime??null,readyState:m.readyState??null,
+          size:[m.videoWidth||m.naturalWidth||0,m.videoHeight||m.naturalHeight||0]};
+      }),
+      webgl:document.getElementById('studio-preview-frame').dataset.lutWebgl,
       failedChip:[document.getElementById('studio-root').dataset.lutChipFailed,document.getElementById('studio-root').dataset.lutChipMissing].includes(document.getElementById('studio-preview-lut-chip').textContent),
       chip:document.getElementById('studio-preview-lut-chip').textContent
     }))()""")

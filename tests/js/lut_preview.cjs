@@ -162,6 +162,39 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
   assert.equal(drawn[0].filter, 'none', 'rendered grade is not applied twice');
   assert.deepEqual(transforms, [[12, -4], [2, 2]], 'original clip framing survives');
   assert.equal(ctx.globalAlpha, 0.5, 'transition opacity survives');
+  // Exercise the compositor entry guard, not only its layer drawing helper.
+  vm.runInContext('function paintPreviewBlit' + section('function paintPreviewBlit', 'function schedulePreviewBlit'), context);
+  const blit = { hidden: true, getContext: () => ctx };
+  Object.assign(ctx, { setTransform() {}, fillRect() {} });
+  const loading = { ...media, hidden: false, complete: false,
+    videoWidth: 0, videoHeight: 0, naturalWidth: 0, naturalHeight: 0,
+    classList: { contains: () => false } };
+  const absent = { ...loading, hidden: true };
+  Object.assign(context, {
+    ensurePreviewBlit: () => blit,
+    previewFrame: { clientWidth: 640, clientHeight: 360, dataset: {} },
+    previewBackingRatio: () => 1,
+  });
+  vm.runInContext('function previewLayerReady' + section('function previewLayerReady', 'let previewGradeScratch'), context);
+  const actualStillFor = context.renderedPreviewStillFor;
+  const decodedGrade = { ...still, hidden: false, classList: { contains: () => false } };
+  for (const layer of ['primary', 'secondary']) {
+    context.visiblePrimaryMedia = () => layer === 'primary' ? loading : absent;
+    context.visibleSecondaryMedia = () => layer === 'secondary' ? loading : absent;
+    context.renderedPreviewStillFor = picture => picture === loading ? decodedGrade : null;
+    drawn.length = 0;
+    context.paintPreviewBlit();
+    assert.equal(blit.hidden, false, layer + ' decoded grade survives loading raw photo');
+    assert.equal(drawn.length, 1);
+    assert.equal(drawn[0].v[0], decodedGrade);
+    assert.equal(drawn[0].filter, 'none');
+    assert.equal(ctx.globalAlpha, 0.5);
+  }
+  context.renderedPreviewStillFor = () => null;
+  context.paintPreviewBlit();
+  assert.equal(blit.hidden, true, 'no ready raw or rendered layer hides canvas');
+  context.renderedPreviewStillFor = actualStillFor;
+  context.previewLayerReady = picture => picture && !picture.hidden;
   // Photo frames are static across Story time, including playback and pause.
   context.imageSaveChain = Promise.resolve();
   context.fetch = getFrame;
@@ -305,4 +338,39 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
     assert.equal(requests.length, failedCount + 2, 'explicit retry can request again');
   }
   console.log('LUT preview lifecycle passed');
+  const photo = { hidden: true, style: {} };
+  const outgoingPhoto = { hidden: false, style: { opacity: '1' } };
+  const video = { hidden: false, style: { opacity: '0.77' }, pause() {} };
+  let stoppedHit;
+  const pausedContext = {
+    state: { playing: true, projectTimeS: 3.001 },
+    previewImage: photo, previewImageB: outgoingPhoto, previewVideo: video,
+    previewVideoB: null, previewTitlecard: null, previewTitlecardB: null, previewFadeBlack: null,
+    clipAudio: null, stopWallClock() {}, clearCrossfadePreload() {}, pauseMusicAudio() {},
+    setToggleLabel() {}, retryFailedPhotoStills: () => false,
+    resolveAt: t => ({ clip, localS: t - 2 }),
+    loopOverlapS: () => 0, prepareOutgoingCrossfade: () => false,
+    applyPreviewGrades: hit => { stoppedHit = hit; },
+    syncAnnotations() {}, drawPrivacyMasks() {}, drawFlightMap() {}, applyFramePreview() {},
+    syncHud() {}, schedulePreviewBlit() {},
+  };
+  vm.createContext(pausedContext);
+  vm.runInContext('function pausePlayback' + section('function pausePlayback', 'function updatePlayheadChrome') +
+    'function applyTransitionPreview' + section('function applyTransitionPreview', '// A CSS-sized video'), pausedContext);
+  pausedContext.pausePlayback();
+  assert.equal(outgoingPhoto.hidden, true, 'pause past photo overlap removes outgoing photo');
+  assert.equal(video.style.opacity, '', 'pause past overlap restores full incoming opacity');
+  assert.equal(stoppedHit.localS, 1.001, 'composite uses frozen Story timestamp');
+  assert.equal(pausedContext.state.playing, false);
+  outgoingPhoto.hidden = false;
+  pausedContext.state.projectTimeS = 2.4;
+  pausedContext.resolveAt = t => ({ clip, overlapClip: outgoing, crossfadeProgress: t - 2 });
+  pausedContext.showOutgoingLayer = () => {};
+  pausedContext.pausePlayback();
+  assert.ok(Math.abs(Number(video.style.opacity) - 0.4) < 1e-9,
+    'pause inside photo overlap refreshes frozen transition progress');
+  outgoingPhoto.hidden = true;
+  stoppedHit = null;
+  pausedContext.pausePlayback();
+  assert.equal(stoppedHit, null, 'video-only pause keeps its existing update path');
 })().catch(err => { console.error(err); process.exitCode = 1; });

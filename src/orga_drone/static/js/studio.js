@@ -2021,6 +2021,11 @@ import {
     clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
+    // The video paint clock can pass the last transition update before pause.
+    // Freeze photo composites at the stopped Story time, including overlap exit.
+    if ((previewImage && !previewImage.hidden) || (previewImageB && !previewImageB.hidden)) {
+      applyTransitionPreview(resolveAt(state.projectTimeS));
+    }
     setToggleLabel();
     if (retryFailedPhotoStills()) applyPreviewGrades(resolveAt(state.projectTimeS));
   }
@@ -5893,7 +5898,10 @@ import {
     }
     const secondary = visibleSecondaryMedia();
     const primary = visiblePrimaryMedia();
-    if (!previewLayerReady(secondary) && !previewLayerReady(primary)) {
+    const renderedSecondary = renderedPreviewStillFor(secondary);
+    const rendered = renderedPreviewStillFor(primary);
+    if (!previewLayerReady(secondary) && !previewLayerReady(primary) &&
+        !previewLayerReady(renderedSecondary) && !previewLayerReady(rendered)) {
       canvas.hidden = true;
       return;
     }
@@ -5902,8 +5910,7 @@ import {
     ctx.imageSmoothingQuality = "high";
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, cssW, cssH);
-    const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH, renderedPreviewStillFor(secondary));
-    const rendered = renderedPreviewStillFor(primary);
+    const drewSecondary = drawPreviewLayer(ctx, secondary, cssW, cssH, renderedSecondary);
     const drewPrimary = drawPreviewLayer(ctx, primary, cssW, cssH, rendered);
     canvas.hidden = !(drewSecondary || drewPrimary);
   }
