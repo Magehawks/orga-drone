@@ -70,6 +70,14 @@ def run(args) -> None:
                 "const w=Math.min(640,Math.round(i.width*r)),h=Math.min(360,Math.round(i.height*r));"
                 "x.drawImage(i,Math.floor((640-w)/2),Math.floor((360-h)/2),w,h)}"
                 "window.photoParityControlImages=images;return c.toDataURL().split(',')[1]})()", await_promise=True))
+            css_alpha = image_bytes(cdp.evaluate("(()=>{const c=document.createElement('canvas');"
+                "c.width=640;c.height=360;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,640,360);"
+                "x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';"
+                "const alpha=Number(document.getElementById('studio-preview-image').style.opacity);"
+                "window.photoParityControlImages.forEach((i,n)=>{x.globalAlpha=n===0?1:alpha;"
+                "const r=Math.min(640/i.width,360/i.height),w=Math.round(i.width*r),h=Math.round(i.height*r);"
+                "x.drawImage(i,Math.floor((640-w)/2),Math.floor((360-h)/2),w,h)});"
+                "return c.toDataURL().split(',')[1]})()"))
             original_aspect = image_bytes(cdp.evaluate("(()=>{const c=document.createElement('canvas');"
                 "c.width=640;c.height=360;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,640,360);"
                 "x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';"
@@ -89,6 +97,8 @@ def run(args) -> None:
                 "aligned_state": aligned_state, "settled_state": settled_state,
                 "settled_versus_export": compare(settled, ref),
                 "reconstructed_versus_settled": compare(reconstructed, settled),
+                "css_alpha_reconstructed_versus_settled": compare(css_alpha, settled),
+                "css_alpha_reconstructed_versus_export": compare(css_alpha, ref),
                 "reconstructed_versus_preview": compare(reconstructed, aligned),
                 "reconstructed_versus_export": compare(reconstructed, ref),
                 "original_aspect_versus_export": compare(original_aspect, ref)})

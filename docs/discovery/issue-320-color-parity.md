@@ -127,10 +127,16 @@ progress. Final controlled frame indices and alpha are:
 The probe fetches the two existing rendered JPEG inputs and independently
 reconstructs the canvas with the same `Image.decode()`, smoothing, integer fit
 and layer opacity. It retains initial and settled captures after two paint
-frames. Reconstruction versus settled preview reaches **0.0** at frames 75/82
-and **0.5258620689655172** at frame 67. That last sampling difference is retained
-and not claimed to be fully explained. Changing the controlled fit back to the
-original 16:9 rectangle does not change the worst interior-swatch errors.
+frames. An initial reconstruction using the requested double-precision alpha
+reaches **0.0** at frames 75/82 and **0.5258620689655172** at frame 67. A separate
+control isolates this discrepancy: CSS serializes requested **7/30** as
+**0.233333**, while the first reconstruction uses **0.2333333333333334** directly.
+Reconstructing with the actual CSS-round-tripped alpha matches settled preview
+with **0.0** error at **all three frames**. The original capture/data is retained.
+This explains a control-comparison artifact, not the strict parity failure;
+frame 67 still reaches **3.3936781609195403** against export. Changing the
+controlled fit back to the original 16:9 rectangle does not change the worst
+interior-swatch errors.
 
 The strict failure survives exact alpha and settled paints; no conclusion relies
 on time rounding. No stale layer, double grading or new lifecycle defect is
@@ -180,9 +186,10 @@ Evidence: [exact-alpha and video stage data](issue-320-color-parity-evidence/pre
   photo preparation/conversion paths. The apparent small fix regresses detail.
 - **Pre-existing video contribution:** source decode and 8-bit LUT/YUV precision
   differ from browser/WebGL; this is reproducible outside transitions.
-- **Measurement/sampling contribution:** live alpha rounding is controlled,
-  and the first reconstructed photo pair retains a sub-level difference.
-  Neither accounts for the remaining strict failures by itself.
+- **Measurement artifact isolated:** requested versus CSS-round-tripped alpha
+  explains the **0.525862** first reconstruction discrepancy. Using the actual
+  CSS alpha produces exact layer/compositor matches at all three control points;
+  strict frame-67 error remains **3.393678**, so this does not resolve acceptance.
 - **Codec effects:** not presumed harmless or unavoidable. Lossless/production
   H.264 controls produce the same interior means in this static neutral case.
   Decorated spatial/filter error remains separate and unaccepted.
@@ -239,3 +246,6 @@ JavaScript tooling previously passed **106 tests** during this investigation;
 all temporary JS/test changes were reverted. No full local suite or release
 smoke was repeated for the retained analysis-only changes. New runtime evidence
 is actual packaged WebView2; it is not release/MOTW or human real-media approval.
+
+Additional [CSS alpha controls](issue-320-color-parity-evidence/css-alpha-controls.json)
+retain requested, serialized and settled values plus both reconstructions.
