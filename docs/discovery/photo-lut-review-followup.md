@@ -1,5 +1,9 @@
 # PR #319 review follow-up
 
+The subsequent [issue #320 investigation](issue-320-color-parity.md) reproduces
+the remaining failures and records a rejected prototype and proposed precision
+work. It does not change the historical measurements below.
+
 **Status: `READY_FOR_REVIEW` for the narrowed photo LUT lifecycle scope.** The
 Product Owner explicitly separated the remaining strict color-parity work into
 [issue #320](https://github.com/Magehawks/orga-drone/issues/320). Confirmed

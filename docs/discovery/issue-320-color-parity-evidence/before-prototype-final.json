@@ -1,0 +1,93 @@
+[
+  {
+    "scenario": "jpg-neutral",
+    "develop": 4.333333333333333,
+    "rejected_prototype": 1.6666666666666667,
+    "final_production": 4.333333333333333,
+    "strict_production_pass": false
+  },
+  {
+    "scenario": "jpg-creative0",
+    "develop": 1.6666666666666667,
+    "rejected_prototype": 1.6666666666666667,
+    "final_production": 1.6666666666666667,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "jpg-creative50",
+    "develop": 1.3333333333333333,
+    "rejected_prototype": 1.3333333333333333,
+    "final_production": 1.3333333333333333,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "jpg-creative100",
+    "develop": 2.2241379310344827,
+    "rejected_prototype": 2.2241379310344827,
+    "final_production": 2.2241379310344827,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "jpg-conversion",
+    "develop": 2.2241379310344827,
+    "rejected_prototype": 2.2241379310344827,
+    "final_production": 2.2241379310344827,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "png-neutral",
+    "develop": 4.666666666666667,
+    "rejected_prototype": 1.6666666666666667,
+    "final_production": 4.666666666666667,
+    "strict_production_pass": false
+  },
+  {
+    "scenario": "png-creative0",
+    "develop": 1.6666666666666667,
+    "rejected_prototype": 1.6666666666666667,
+    "final_production": 1.6666666666666667,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "png-creative50",
+    "develop": 1.3333333333333333,
+    "rejected_prototype": 1.3333333333333333,
+    "final_production": 1.3333333333333333,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "png-creative100",
+    "develop": 2.2241379310344827,
+    "rejected_prototype": 2.2241379310344827,
+    "final_production": 2.2241379310344827,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "png-conversion",
+    "develop": 2.2241379310344827,
+    "rejected_prototype": 2.2241379310344827,
+    "final_production": 2.2241379310344827,
+    "strict_production_pass": true
+  },
+  {
+    "scenario": "photos-different",
+    "develop": 3.313218390804598,
+    "rejected_prototype": 3.2931034482758625,
+    "final_production": 3.313218390804598,
+    "strict_production_pass": false
+  },
+  {
+    "scenario": "photo-video",
+    "develop": 4.0,
+    "rejected_prototype": 4.0,
+    "final_production": 4.0,
+    "strict_production_pass": false
+  },
+  {
+    "scenario": "video-photo",
+    "develop": 3.6666666666666665,
+    "rejected_prototype": 3.6666666666666665,
+    "final_production": 3.6666666666666665,
+    "strict_production_pass": false
+  }
+]
