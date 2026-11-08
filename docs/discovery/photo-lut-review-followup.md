@@ -177,6 +177,7 @@ Exact scenario data: [before/after](photo-lut-review-evidence/before-after.json)
 [readiness-only control](photo-lut-review-evidence/readiness-only-parity.json),
 [source/codec controls](photo-lut-review-evidence/source-controls.json),
 [final transition controls](photo-lut-review-evidence/final-transition-controls.json),
+[uncorrected-source alpha controls](photo-lut-review-evidence/uncorrected-source-transition-controls.json),
 [baseline video controls](photo-lut-review-evidence/baseline-video-controls.json),
 [functional E2E](photo-lut-review-evidence/functional-e2e.json).
 
