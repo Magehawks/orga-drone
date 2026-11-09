@@ -621,3 +621,18 @@ msgstr "Die Story ist leer. Füge vor dem Export ein Foto, Video oder eine Titel
 
 msgid "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
 msgstr "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut."
+
+msgid "Hold to compare"
+msgstr "Zum Vergleichen gedrückt halten"
+
+msgid "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on."
+msgstr "Außerhalb von Loop-Übergängen pausieren. Mit Maus, Leertaste oder Eingabetaste gedrückt halten. Die technische Konvertierung bleibt aktiv."
+
+msgid "Preparing comparison…"
+msgstr "Vergleich wird vorbereitet…"
+
+msgid "Before — technical conversion retained"
+msgstr "Vorher — technische Konvertierung bleibt aktiv"
+
+msgid "Comparison unavailable. Release and try again."
+msgstr "Vergleich nicht verfügbar. Loslassen und erneut versuchen."

@@ -2254,6 +2254,7 @@ def create_app() -> FastAPI:
         studio_item_id: int,
         t_s: float = Query(0.0),
         detail: int = Query(0),
+        before: bool = Query(False),
     ) -> Response:
         """JPEG still using the same grade+LUT builders as export (ADR 0028).
 
@@ -2296,7 +2297,7 @@ def create_app() -> FastAPI:
         else:
             image = image_adjust_from_effect_settings(clip.effect_settings)
             look = base_look
-        if not color_needs_preview_still(look, hsl, color_wheels):
+        if not before and not color_needs_preview_still(look, hsl, color_wheels):
             raise HTTPException(
                 status_code=422,
                 detail="No color file, HSL adjustment, or color wheels are active on this clip.",
@@ -2309,20 +2310,25 @@ def create_app() -> FastAPI:
         from orga_drone.studio_image import saturation_multiplier
 
         ramp = saturation_ramp_from_effect_settings(clip.effect_settings)
+        frame_request = PreviewFrameRequest(
+            media_path=media_path,
+            kind=str(clip.kind),
+            source_time_s=abs_t if clip.kind == "video" else 0.0,
+            image=image,
+            look=look,
+            hsl=hsl,
+            color_wheels=color_wheels,
+            detail=bool(detail),
+            saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
+        )
+        if before:
+            from orga_drone.studio_preview_frame import before_color_request
+
+            frame_request = before_color_request(frame_request)
         try:
             jpeg = await asyncio.to_thread(
                 render_preview_frame,
-                PreviewFrameRequest(
-                    media_path=media_path,
-                    kind=str(clip.kind),
-                    source_time_s=abs_t if clip.kind == "video" else 0.0,
-                    image=image,
-                    look=look,
-                    hsl=hsl,
-                    color_wheels=color_wheels,
-                    detail=bool(detail),
-                    saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
-                ),
+                frame_request,
                 data_dir=settings.data_dir,
             )
         except LutMissingError as exc:

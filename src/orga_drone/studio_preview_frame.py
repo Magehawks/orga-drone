@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
@@ -60,6 +60,21 @@ class PreviewFrameRequest:
     detail: bool = False
     max_edge: int = PREVIEW_MAX_EDGE
     saturation: float = 1.0
+
+
+def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
+    """Temporary comparison inputs; preserve only configured technical conversion.
+
+    Reuse the existing effective-input cache identity. Never write clip settings
+    or change the normal still/proxy/export builders.
+    """
+    look = ColorLook(
+        input_profile=req.look.input_profile,
+        conversion_lut=req.look.conversion_lut if req.look.conversion_confirmed else "",
+        conversion_confirmed=req.look.conversion_confirmed,
+    )
+    return replace(req, image=ImageAdjust(), look=look, hsl=HslAdjust(),
+                   color_wheels=ColorWheels(), saturation=1.0, detail=False)
 
 
 class PreviewFrameError(Exception):

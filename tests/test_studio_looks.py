@@ -87,7 +87,7 @@ def test_quick_look_replaces_sliders_and_persists(
     page = client.get("/studio")
     assert 'id="inspector-quick-look"' in page.text
     assert 'id="inspector-look-compare"' in page.text
-    assert "compareBeforeAfter" in client.get("/static/js/studio.js").text
+    assert "createColorCompare" in client.get("/static/js/studio.js").text
 
     applied = client.patch(f"/api/studio/{clip_id}/look", json={"id": "vibrant"})
     assert applied.status_code == 200

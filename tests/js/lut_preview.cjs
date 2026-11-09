@@ -13,7 +13,7 @@ let proxySrc = "";
 const context = {
   root: { dataset: {} }, document: { getElementById: id => id.endsWith('still') ? still : chip },
   window: { setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; }, clearTimeout: id => timers.delete(id) },
-  state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
+  state: { playing: false }, colorComparison: null, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   readHsl: clip => {
     try {
@@ -162,6 +162,16 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
   assert.equal(drawn[0].filter, 'none', 'rendered grade is not applied twice');
   assert.deepEqual(transforms, [[12, -4], [2, 2]], 'original clip framing survives');
   assert.equal(ctx.globalAlpha, 0.5, 'transition opacity survives');
+  const comparison = { hidden: false, naturalWidth: 320, naturalHeight: 180, src: 'before' };
+  context.colorComparison = { pictureFor: () => comparison };
+  context.previewLutFrameFor = () => { throw new Error('Before must bypass the graded WebGL frame'); };
+  context.drawPreviewLayer(ctx, media, 640, 360, still);
+  assert.equal(drawn.at(-1).v[0], comparison, 'comparison wins over a graded still/proxy');
+  assert.equal(drawn.at(-1).filter, 'none', 'Before receives no CSS grade');
+  context.colorComparison = null;
+  context.previewLutFrameFor = () => null;
+  context.drawPreviewLayer(ctx, media, 640, 360, still);
+  assert.equal(drawn.at(-1).v[0], still, 'release immediately restores the original still owner');
   // Exercise the compositor entry guard, not only its layer drawing helper.
   vm.runInContext('function paintPreviewBlit' + section('function paintPreviewBlit', 'function schedulePreviewBlit'), context);
   const blit = { hidden: true, getContext: () => ctx };
@@ -288,9 +298,6 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
     { effect: 'blur', x: 0, y: 0, w: 0.5, h: 0.5, strength: 50 },
     { width: 640, height: 360 }, 640, 360);
   assert.equal(maskDraws[0].src, 'retained-at-boundary', 'mask uses graded outgoing pixels');
-  context.compareBeforeAfter = true;
-  assert.equal(context.renderedPreviewStillFor(context.previewImageB), null);
-  context.compareBeforeAfter = false;
   context.reuseDraft = {};
   assert.equal(context.renderedPreviewStillFor(context.previewImageB), null);
   context.reuseDraft = null;

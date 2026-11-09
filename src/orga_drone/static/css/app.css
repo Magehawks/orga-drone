@@ -2046,6 +2046,10 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-preview-lut-chip[hidden] {
   display: none !important;
 }
+.studio-color-compare-status {
+  top: 0.55rem;
+  bottom: auto;
+}
 .studio-preview-frame.is-framing {
   cursor: grab;
 }
