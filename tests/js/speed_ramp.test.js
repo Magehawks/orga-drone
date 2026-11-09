@@ -99,9 +99,29 @@ test("malformed, extreme and nonfinite speeds are refused", () => {
   assert.equal(parseRamp({ ...fixture.curve, points: [null, null] }), null);
   for (const value of [null, {}, { ...fixture.curve, points: [] }])
     assert.equal(parseRamp(value), null);
-  for (const speed of [0, -1, 0.249, 4.001, NaN, Infinity, true, "1"]) {
+  for (const speed of [0, -1, 0.249, 20.001, NaN, Infinity, true, "1"]) {
     const value = structuredClone(fixture.curve);
     value.points[0].speed = speed;
     assert.equal(parseRamp(value), null);
   }
+  assert.ok(
+    parseRamp({
+      v: 1,
+      interp: "reciprocal_smoothstep",
+      points: [
+        { source_s: 0, speed: 8 },
+        { source_s: 120, speed: 8 },
+      ],
+    })
+  );
+  assert.ok(
+    parseRamp({
+      v: 1,
+      interp: "reciprocal_smoothstep",
+      points: [
+        { source_s: 0, speed: 20 },
+        { source_s: 300, speed: 20 },
+      ],
+    })
+  );
 });

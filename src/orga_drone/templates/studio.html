@@ -908,6 +908,34 @@
         </div>
         <div id="inspector-speed" data-inspector-tab="clip" hidden>
           <p class="studio-inspector-kind">{{ _('Speed') }}</p>
+          <div id="inspector-timelapse"
+               data-msg-remove-ramp="{{ _('Remove the speed ramp before applying Timelapse.')|e }}"
+               data-msg-remove-repeat="{{ _('Turn off section repeat before applying Timelapse.')|e }}"
+               data-msg-remove-loop="{{ _('Turn off Repeat to soundtrack before applying Timelapse.')|e }}"
+               data-msg-invalid="{{ _('Enter a valid target duration or speed between 1× and 20×.')|e }}"
+               data-msg-calc="{{ _('About {frames} frames ({duration} s) at 30 fps.')|e }}"
+               data-msg-range="{{ _('Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×).')|e }}"
+               data-msg-preview="{{ _('Preview above 16× is approximate; export uses the full speed.')|e }}"
+               data-msg-applied="{{ _('Timelapse applied.')|e }}">
+            <p class="studio-inspector-kind">{{ _('Timelapse') }}</p>
+            <label class="studio-inspector-field">
+              <span>{{ _('Target duration (s)') }}</span>
+              <input type="number" data-timelapse-target min="0.034" step="0.01"
+                     inputmode="decimal" aria-label="{{ _('Target duration (s)') }}">
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Speed multiplier') }}</span>
+              <input type="number" data-timelapse-speed min="1" max="20" step="0.01"
+                     inputmode="decimal" aria-label="{{ _('Speed multiplier') }}">
+            </label>
+            <p class="hint" data-timelapse-calc aria-live="polite"></p>
+            <p class="hint" data-timelapse-hint>
+              {{ _('Uses the trimmed source span. Allowed speeds are 1×–20×. Target duration and speed stay in sync.') }}
+            </p>
+            <p class="hint">{{ _('Applying Timelapse replaces slow motion with a flat speed ramp. Source audio is muted; soundtrack timing stays unchanged.') }}</p>
+            <p class="hint is-error" data-timelapse-status hidden role="status"></p>
+            <button type="button" class="button ghost" data-timelapse-apply>{{ _('Apply Timelapse') }}</button>
+          </div>
           <div id="inspector-speed-ramp">
             <p class="studio-inspector-kind">{{ _('Speed ramp') }}</p>
             <label class="studio-inspector-field"><span>{{ _('Preset') }}</span>
@@ -923,7 +951,7 @@
             <div data-ramp-controls hidden>
               <label class="studio-inspector-field"><span>{{ _('Point') }}</span><select data-ramp-point aria-label="{{ _('Point') }}"></select></label>
               <label class="studio-inspector-field"><span>{{ _('Time in clip (s)') }}</span><input data-ramp-time type="number" step="0.05" inputmode="decimal"></label>
-              <label class="studio-inspector-field"><span>{{ _('Speed') }}</span><input data-ramp-speed type="number" min="0.25" max="4" step="0.05" inputmode="decimal"></label>
+              <label class="studio-inspector-field"><span>{{ _('Speed') }}</span><input data-ramp-speed type="number" min="0.25" max="20" step="0.05" inputmode="decimal"></label>
               <button type="button" class="button ghost" data-ramp-add>{{ _('Add point') }}</button>
               <button type="button" class="button ghost" data-ramp-remove-point>{{ _('Remove point') }}</button>
               <button type="button" class="button ghost" data-ramp-remove>{{ _('Remove ramp') }}</button>

@@ -1,4 +1,16 @@
-import { parseRamp, rampPreset, rampSource, rampSpeed, rampTime } from "./speed-ramp.js";
+import {
+  MAX_SPEED,
+  MIN_SPEED,
+  parseRamp,
+  rampPreset,
+  rampSource,
+  rampSpeed,
+  rampTime,
+} from "./speed-ramp.js";
+
+const LOG_SPAN = Math.log2(MAX_SPEED / MIN_SPEED);
+const curveY = (speed) => 58 - (Math.log2(speed / MIN_SPEED) / LOG_SPAN) * 52;
+const speedFromCurveY = (normalizedY) => MIN_SPEED * 2 ** ((normalizedY / 52) * LOG_SPAN);
 
 export function createSpeedRampEditor({
   panel,
@@ -155,7 +167,7 @@ export function createSpeedRampEditor({
     const start = rampTime(ramp, range.start),
       duration = rampTime(ramp, range.end) - start;
     const x = (source) => (1000 * (rampTime(ramp, source) - start)) / duration;
-    const y = (speed) => 58 - Math.log2(speed / 0.25) * 13;
+    const y = curveY;
     const line = [];
     for (let i = 0; i <= 100; i += 1) {
       const source = range.start + ((range.end - range.start) * i) / 100;
@@ -210,8 +222,8 @@ export function createSpeedRampEditor({
         const { rect, index, ramp, range } = drag;
         const point = draft.points[index];
         point.speed = Math.max(
-          0.25,
-          Math.min(4, 0.25 * 2 ** ((58 - ((event.clientY - rect.top) * 64) / rect.height) / 13))
+          MIN_SPEED,
+          Math.min(MAX_SPEED, speedFromCurveY(58 - ((event.clientY - rect.top) * 64) / rect.height))
         );
         point.speed = Number((Math.round(point.speed / 0.05) * 0.05).toFixed(2));
         if (index > 0 && index < draft.points.length - 1) {

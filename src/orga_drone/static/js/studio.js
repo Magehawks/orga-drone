@@ -8,6 +8,8 @@ import {
   rampTime,
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
+import { createTimelapseEditor } from "./studio/timelapse-editor.js";
+import { clampPreviewPlaybackRate } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -52,6 +54,7 @@ import {
   let historyGesture = "";
   let controlBridge = null;
   let rampEditor = null;
+  let timelapseEditor = null;
   let controlPendingWrites = 0;
   let controlWriteFailed = false;
   const nativeFetch = window.fetch.bind(window);
@@ -766,7 +769,8 @@ import {
       if (speedRampOf(clip) || (slowBarOf(clip) && playbackSpeed(clip) >= 0.999)) speed = speedAtSource(clip, offset);
     }
     try {
-      if (video.playbackRate !== speed) video.playbackRate = speed;
+      const applied = clampPreviewPlaybackRate(speed);
+      if (video.playbackRate !== applied) video.playbackRate = applied;
     } catch (_) {
       /* ignore unsupported rates */
     }
@@ -5724,7 +5728,8 @@ import {
     }
     const seek = () => {
       try {
-        if (previewVideoB.playbackRate !== speed) previewVideoB.playbackRate = speed;
+        const applied = clampPreviewPlaybackRate(speed);
+        if (previewVideoB.playbackRate !== applied) previewVideoB.playbackRate = applied;
         const drift = Math.abs((previewVideoB.currentTime || 0) - target);
         if (drift > 0.12) previewVideoB.currentTime = target;
       } catch (_) {
@@ -7236,6 +7241,7 @@ import {
 
   function fillSpeedInspector(clip, isVideo) {
     rampEditor?.fill();
+    timelapseEditor?.fill();
     layoutEffectBars();
     const wrap = document.getElementById("inspector-speed");
     if (wrap) wrap.hidden = !isVideo;
@@ -11853,41 +11859,73 @@ import {
   } catch (_) {
     state.tracks = [];
   }
+  async function saveSpeedRamp(clip, ramp) {
+    const source = storyToSource(clip, Math.max(0, state.projectTimeS - clipStartTime(clip)));
+    const response = await fetch(`/api/studio/${clipId(clip)}/speed-ramp`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speed_ramp: ramp }),
+    });
+    const body = await readJson(response);
+    if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
+    if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
+      sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
+      window.location.reload();
+      return;
+    }
+    clip.dataset.speedRamp = JSON.stringify(body.speed_ramp);
+    clip.dataset.playbackSpeed = "1";
+    clip.dataset.slowBar = "null";
+    clip.dataset.effectiveDuration = String(body.effective_duration_s);
+    clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
+    const durationLabel = clip.querySelector("[data-clip-duration]");
+    if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
+    const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
+    if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
+    applyTransitionsToDom();
+    layoutTimeline();
+    setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
+    scheduleLutProxyPrepare(clip);
+    setSaveState(true);
+    timelapseEditor?.fill();
+    rampEditor?.fill();
+  }
+  const selectedVideoClip = () => {
+    const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
+    return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
+  };
+  const rampBounds = (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) });
   rampEditor = createSpeedRampEditor({
     panel: document.getElementById("inspector-speed-ramp"),
-    getSelection: () => {
-      const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
-      return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
-    },
+    getSelection: selectedVideoClip,
     readRamp: speedRampOf,
-    bounds: (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) }),
+    bounds: rampBounds,
     pause: pausePlayback,
     position: (clip) => ({ left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() }),
     onError: () => showFlash(msgSpeedFailed),
-    save: async (clip, ramp) => {
-      const source = storyToSource(clip, Math.max(0, state.projectTimeS - clipStartTime(clip)));
-      const response = await fetch(`/api/studio/${clipId(clip)}/speed-ramp`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ speed_ramp: ramp }),
-      });
-      const body = await readJson(response);
-      if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
-      if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
-        sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
-        window.location.reload(); return;
-      }
-      clip.dataset.speedRamp = JSON.stringify(body.speed_ramp);
-      clip.dataset.playbackSpeed = "1"; clip.dataset.slowBar = "null";
-      clip.dataset.effectiveDuration = String(body.effective_duration_s);
-      clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
-      const durationLabel = clip.querySelector("[data-clip-duration]");
-      if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
-      const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
-      if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
-      applyTransitionsToDom(); layoutTimeline();
-      setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
-      scheduleLutProxyPrepare(clip);
-      setSaveState(true);
+    save: saveSpeedRamp,
+  });
+  const timelapsePanel = document.getElementById("inspector-timelapse");
+  timelapseEditor = createTimelapseEditor({
+    panel: timelapsePanel,
+    getSelection: selectedVideoClip,
+    readRamp: speedRampOf,
+    bounds: rampBounds,
+    sectionRepeats,
+    forwardLoop: (clip) => clip?.dataset.forwardLoop === "1",
+    pause: pausePlayback,
+    onError: () => showFlash(msgSpeedFailed),
+    messages: {
+      removeRamp: timelapsePanel?.dataset.msgRemoveRamp,
+      removeRepeat: timelapsePanel?.dataset.msgRemoveRepeat,
+      removeLoop: timelapsePanel?.dataset.msgRemoveLoop,
+      invalid: timelapsePanel?.dataset.msgInvalid,
+      calc: timelapsePanel?.dataset.msgCalc,
+      rangeHint: timelapsePanel?.dataset.msgRange,
+      previewApprox: timelapsePanel?.dataset.msgPreview,
+      applied: timelapsePanel?.dataset.msgApplied,
     },
+    save: saveSpeedRamp,
   });
   applyVolume();
   applyTransitionsToDom();

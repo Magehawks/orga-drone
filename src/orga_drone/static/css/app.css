@@ -3512,6 +3512,7 @@ html.is-edge-drag * {
 }
 .studio-inspector-remove { margin: 0.5rem 0 0; }
 .studio-inspector .hint { margin: 0; font-size: 0.75rem; color: var(--muted); }
+.studio-inspector .hint.is-error { color: var(--danger, #b00020); }
 .thumb-placeholder {
   background:
     repeating-linear-gradient(

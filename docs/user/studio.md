@@ -44,9 +44,27 @@ Fast → Slow → Fast, Smooth Acceleration and Smooth Deceleration.
 The selected clip shows a compact curve on the Effect lane. Drag a point up or
 down to change speed, or drag an internal point sideways to move the change.
 The inspector's Point, Time in clip and Speed fields provide keyboard access.
-Use Add point or Remove point for 2–5 points, at 0.25×–4×. Endpoint speeds can
+Use Add point or Remove point for 2–5 points, at 0.25×–20×. Endpoint speeds can
 change; endpoint times stay fixed. Escape cancels an unfinished pointer drag.
 A preset needs at least 0.1 seconds of source; a shorter clip is left unchanged.
+
+## Timelapse
+
+Select one available video, open **Clip → Timelapse**, and enter either a
+**Target duration (s)** or a **Speed multiplier**. The two fields stay in sync
+from the current trimmed source span (for example 120 s → 15 s is 8×, and
+300 s → 15 s is 20×). Click **Apply Timelapse** once to commit. Typing alone
+does not change the Story. Allowed acceleration is 1×–20×. Unsupported values
+show an actionable range instead of silent clamping.
+
+Apply stores a flat ADR 0034 speed ramp (two equal-speed points) and reuses the
+existing ramp preview/export path. It replaces slow motion. Source audio is
+muted; soundtrack timing stays on Story time. If a speed ramp, section repeat,
+or Repeat to soundtrack is already active on the selected clip, Apply stays
+blocked with an explanation until you clear that mode. Remove the ramp through
+the existing Speed ramp controls to edit Timelapse again. Preview above 16× is
+approximate because the browser playback rate is capped; export uses the full
+speed. Frame rounding follows the shared 30 fps Story grid.
 
 The curve eases between speeds. The clip length and following clips change with
 it. One completed gesture is one Undo step; the saved curve returns when you
@@ -62,8 +80,7 @@ the ramp. Project music follows Story time. Repeats and soundtrack loops reuse
 the ramp on each pass; a partial final pass stops at the corresponding source
 frame. The timeline curve shows that one pass, even when the section repeats.
 Existing transitions and animated color remain available. Stories without a
-ramp keep the existing 1×, 0.5× and 0.25× timing. There is no separate
-timelapse control.
+ramp keep the existing 1×, 0.5× and 0.25× timing.
 
 Export uses source frames before its final 30 fps conversion. Slow motion holds
 frames and faster motion drops frames as required by the speed; no optical flow

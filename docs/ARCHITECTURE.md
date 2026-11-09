@@ -111,10 +111,14 @@ A cut or a trimmed video also stores one `studio_originals` row for that project
 ## Studio variable speed
 
 `studio_speed_ramp.py` and `static/js/studio/speed-ramp.js` implement the same
-source-anchored reciprocal-smoothstep time map and inverse (ADR 0034). The
-optional `effect_settings.speed_ramp` key needs no SQLite migration; the
-existing whole-JSON history snapshots retain it. `/speed-ramp` writes are
-ordinary Story edits. Missing/corrupt ramps fall back to legacy timing.
+source-anchored reciprocal-smoothstep time map and inverse (ADR 0034; validated
+0.25×–20× after #325). `studio_timelapse.py` and `static/js/studio/timelapse.js`
+derive flat two-point ramps from a target duration or speed multiplier and save
+through the existing `/speed-ramp` path. The optional `effect_settings.speed_ramp`
+key needs no SQLite migration; the existing whole-JSON history snapshots retain
+it. `/speed-ramp` writes are ordinary Story edits. Missing/corrupt ramps fall
+back to legacy timing. Older builds that only accepted ≤4× treat faster stored
+ramps as malformed.
 
 `export/studio_ramp_encoder.py` is a timing adapter around the existing renderer
 and stitcher. It expands loop passes before unchanged color subdivision, assigns

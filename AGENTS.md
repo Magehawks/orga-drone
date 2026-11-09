@@ -61,7 +61,7 @@ service, or generic drone administration product.
 | SQLite schema, migrations, media/Studio persistence | `src/orga_drone/db/__init__.py` |
 | Library scan, parsing, grouping, search, dupes, geocode | `scan/`, `parse/`, `group/`, `search/`, `dupes/`, `geocode/` |
 | Rename and flow merge | `ops/` |
-| Studio business rules | `studio_cut.py`, `studio_speed.py`, `studio_transition.py`, `studio_estimate.py`, `studio_effect_lane.py`, `studio_forward_loop.py`, `studio_loop_match.py` |
+| Studio business rules | `studio_cut.py`, `studio_speed.py`, `studio_speed_ramp.py`, `studio_timelapse.py`, `studio_transition.py`, `studio_estimate.py`, `studio_effect_lane.py`, `studio_forward_loop.py`, `studio_loop_match.py` |
 | Studio color and detail | `studio_image.py`, `studio_hsl.py`, `studio_color_wheels.py`, `studio_lut.py`, `studio_detail.py`, `studio_looks.py`, `studio_color_animation.py` |
 | Studio overlays, masks, framing, map, HUD, audio | `studio_overlay.py`, `studio_mask.py`, `studio_frame.py`, `studio_map.py`, `studio_hud.py`, `studio_audio.py` |
 | Studio preview stills and playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` |
@@ -82,7 +82,7 @@ service, or generic drone administration product.
 | Product scope, positioning, shipped-vs-later | `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md` | product docs |
 | Library scan / metadata / flows / sessions | `scan/`, `parse/`, `group/`, `db/` | `docs/ARCHITECTURE.md` |
 | Browse, filters, detail page | `app.py`, `templates/`, `static/js/browse.js`, `static/js/detail-*.js` | `docs/ARCHITECTURE.md` |
-| Studio cut, speed, repeat, transitions, timing | `studio_cut.py`, `studio_speed.py`, `studio_transition.py`, `studio_estimate.py`, `studio_effect_lane.py` | `docs/STUDIO_MODULES.md` |
+| Studio cut, speed, ramp, timelapse, repeat, transitions, timing | `studio_cut.py`, `studio_speed.py`, `studio_speed_ramp.py`, `studio_timelapse.py`, `studio_transition.py`, `studio_estimate.py`, `studio_effect_lane.py` | `docs/STUDIO_MODULES.md` |
 | Studio color, LUT, HSL, wheels, detail | `studio_image.py`, `studio_hsl.py`, `studio_color_wheels.py`, `studio_lut.py`, `studio_detail.py`, `studio_color_animation.py` | `docs/STUDIO_MODULES.md` |
 | Studio preview stills / playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` | `docs/STUDIO_MODULES.md` |
 | Studio MP4 export | `studio_export.py`, `export/` | `docs/ARCHITECTURE.md` |

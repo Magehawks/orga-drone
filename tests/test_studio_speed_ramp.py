@@ -101,7 +101,7 @@ def test_shared_mapping_fixture_and_trim() -> None:
 
 
 @pytest.mark.parametrize(
-    "speed", [0, -1, 0.249, 4.001, float("nan"), float("inf"), True, "1"]
+    "speed", [0, -1, 0.249, 20.001, float("nan"), float("inf"), True, "1"]
 )
 def test_invalid_speeds(speed: object) -> None:
     value = json.loads(json.dumps(FIXTURE["curve"]))

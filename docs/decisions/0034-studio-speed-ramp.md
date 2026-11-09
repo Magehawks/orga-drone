@@ -16,8 +16,13 @@ replace LUT/grade builders or introduce cloud services.
 
 An optional `effect_settings.speed_ramp` object stores `v: 1`,
 `interp: "reciprocal_smoothstep"`, and 2–5 points with absolute file `source_s`
-and `speed` (0.25–4). Points are ordered, finite, and separated by at least
-0.05 source seconds. Endpoint speeds extend outside the point range.
+and `speed` (0.25–20). Points are ordered, finite, and separated by at least
+0.05 source seconds. Endpoint speeds extend outside the point range. Issue #325
+raises the shared validated ceiling from 4× to 20× after flat-ramp export probes
+at 8× and 20× (including 1080p and 4K) passed on the existing adapter. Timelapse
+writes a flat two-point ramp through the same contract; it does not introduce a
+second timing model. Older builds that only accepted ≤4× treat faster stored
+ramps as malformed and fall back to legacy timing.
 
 Between points, interpolate reciprocal speed using smoothstep. With normalized
 source position u and q=1/speed, the integral is
@@ -62,8 +67,10 @@ A ramped clip is a timing adapter: source samples stay intact until one
 nonlinear `setpts` and the final 30 fps step. Slow sections repeat source
 frames and fast sections omit them. There is no optical flow. Source audio is
 silent for the whole ramped clip, including stretches that pass through 1×.
-Preview updates `playbackRate` on the existing paint loop. The browser may drop
-preview frames on demanding 4K playback; that does not change the export.
+Preview updates `playbackRate` on the existing paint loop and clamps the HTML
+media rate at 16× when a curve asks for more; export still uses the full mapped
+speed. The browser may drop preview frames on demanding 4K playback; that does
+not change the export.
 The compact curve in [assets/0034-speed-ramp-curve.png](assets/0034-speed-ramp-curve.png)
 is the selected interaction. Source-app WebView2 measurements use synthetic
 60 fps media. They do not establish private drone footage quality or packaged

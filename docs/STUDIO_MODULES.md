@@ -26,6 +26,11 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   cancellation and numeric controls. The entry injects selection, bounds,
   persistence, timeline positioning and playback callbacks. The editor never
   writes another feature's dataset. See ADR 0034 and `tests/js/speed_ramp.test.js`.
+- `studio/timelapse.js` is the pure target-duration / speed-multiplier draft
+  helper (1×–20×) that builds flat ADR 0034 payloads. `studio/timelapse-editor.js`
+  owns the Inspector Timelapse draft, conflict messaging and explicit Apply.
+  It saves through the shared speed-ramp endpoint and never invents a second
+  timing model. See `tests/js/timelapse.test.js` and `studio_timelapse.py`.
 
 - `studio/color-compare.js` owns the temporary hold input, comparison request,
   abort/decode token and decoded picture. The entry injects the selected paused
