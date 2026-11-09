@@ -1,13 +1,16 @@
 # ADR 0034: Source-anchored Studio speed ramps
 
-Status: Accepted; implemented on the speed-ramp branch targeting develop.
+Status: Accepted for this implementation branch; subject to Product Owner merge.
 
 ## Context
 
-The Product Owner requests variable speed within one clip, four presets, compact
-timeline editing, persistence and history, including animated color, repeat and
-soundtrack-loop combinations. Existing discovery is #295; this is not a new
-rendering architecture. Product and engineering advisors approved this design.
+The Product Owner issued an explicit implementation task for variable speed
+within one clip, four presets, compact timeline editing, persistence and
+history, including animated color, repeat and soundtrack-loop combinations.
+Issue #295 remains the UX discovery record; this ADR records the engineering
+decision used by that PO implementation task. This reuses the existing Studio
+renderer and stitcher with a shared source-anchored timing map; it does not
+replace LUT/grade builders or introduce cloud services.
 
 ## Decision
 

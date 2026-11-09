@@ -119,6 +119,8 @@ import {
   }
 
   async function applyStudioHistory(direction) {
+    // Drop an unfinished curve drag before history so pointerup cannot race Undo.
+    rampEditor?.cancel?.();
     await rampEditor?.whenIdle?.();
     const button = document.getElementById(
       direction === "undo" ? "studio-undo" : "studio-redo"
@@ -5701,8 +5703,14 @@ import {
       previewVideo.style.opacity = String(Math.max(0, 1 - eased));
     }
     const inS = loopPlayInS(clip);
-    const speed = speedRampOf(clip) ? rampSpeed(speedRampOf(clip), inS + playSourceOffset(clip, point.incomingOffset)) : playbackSpeed(clip);
-    const target = inS + playSourceOffset(clip, Math.max(0, point.incomingOffset));
+    const incomingLocal = Math.max(0, point.incomingOffset);
+    const speed = speedRampOf(clip)
+      ? rampSpeed(speedRampOf(clip), inS + playSourceOffset(clip, incomingLocal))
+      : playbackSpeed(clip);
+    // Proxies start at 0 for trimmed sources; reuse the shared secondary mapper.
+    const target = speedRampOf(clip)
+      ? secondaryVideoTarget(clip, incomingLocal, src)
+      : inS + playSourceOffset(clip, incomingLocal);
     if (previewVideoB.getAttribute("src") !== src) {
       previewVideoB.src = src;
       previewVideoB.load();

@@ -1,6 +1,8 @@
 # #295 Speed Ramp UX discovery → ADR 0034
 
-Status: Closed by design decision ADR 0034; implementation follows that ADR.
+Status: Discovery recommendation recorded in ADR 0034. Implementation proceeds
+from an explicit Product Owner task (not from #295 alone, which stays
+discovery-scoped).
 
 ## Recommendation (accepted)
 

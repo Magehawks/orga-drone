@@ -266,5 +266,17 @@ export function createSpeedRampEditor({
     lane.append(curve);
     draw();
   }
-  return { fill, layout, whenIdle: () => idle, isBusy: () => pending || Boolean(drag) };
+  function cancel() {
+    if (!drag && !draft) return;
+    drag = null;
+    draft = null;
+    fill();
+  }
+  return {
+    fill,
+    layout,
+    cancel,
+    whenIdle: () => idle,
+    isBusy: () => pending || Boolean(drag),
+  };
 }
