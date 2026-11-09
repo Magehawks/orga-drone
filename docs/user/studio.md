@@ -11,6 +11,13 @@
 
 **Useful habits**
 
+In **Image**, pause on a selected photo or video and hold **Hold to compare**
+with the mouse, Space or Enter. Before removes creative color adjustments and
+the creative LUT, retaining a configured technical D-Log M conversion. Release
+to restore the current grade. This changes only the preview, never the project,
+Undo history, source media or export. Comparison is unavailable during playback,
+while edits are unsaved, or inside a blend between two copies of the same loop.
+
 - **Undo / Redo** work for this session only. Restart opens the last saved Story.
 - Cut videos keep an **Original** entry so you can add another scene later.
 - Soundtrack can start later on the timeline (drag the music bed). Up to 8 local songs.

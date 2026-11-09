@@ -102,6 +102,9 @@
          data-music-unsupported="{{ _('The selected music file cannot be decoded.')|e }}"
          data-no-clip="{{ _('Select a clip in the Story track.')|e }}"
          data-label-play="{{ _('Play')|e }}"
+         data-compare-loading="{{ _('Preparing comparison…')|e }}"
+         data-compare-before="{{ _('Before — technical conversion retained')|e }}"
+         data-compare-failed="{{ _('Comparison unavailable. Release and try again.')|e }}"
          data-label-pause="{{ _('Pause')|e }}"
          data-transition-cut="{{ _('Cut')|e }}"
          data-transition-fade-black="{{ _('Fade through black')|e }}"
@@ -479,6 +482,7 @@
         {% if items or studio_originals %}
         <div class="studio-preview-frame" id="studio-preview-frame">
           <p id="studio-view-mode" class="studio-view-mode" hidden></p>
+          <p id="studio-color-compare-status" class="studio-preview-lut-chip studio-color-compare-status" hidden role="status" aria-live="polite"></p>
           <svg class="studio-preview-filters" aria-hidden="true" focusable="false" width="0" height="0">
             <filter id="studio-preview-grade" color-interpolation-filters="sRGB">
               <feColorMatrix id="studio-preview-grade-matrix" type="matrix"
@@ -942,11 +946,11 @@
                   <option value="black_and_white">{{ _('Black & White') }}</option>
                 </select>
               </label>
-              <label class="studio-inspector-field studio-frame-motion"
-                     title="{{ _('Preview only. Export keeps the graded picture.') }}">
-                <input type="checkbox" id="inspector-look-compare">
-                <span>{{ _('Show original for comparison') }}</span>
-              </label>
+              <button type="button" class="button ghost" id="inspector-look-compare"
+                      aria-pressed="false" aria-describedby="studio-color-compare-help" disabled>
+                {{ _('Hold to compare') }}
+              </button>
+              <p class="hint" id="studio-color-compare-help">{{ _('Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.') }}</p>
               <label class="studio-inspector-field">
                 <span class="studio-image-adjust-label">
                   <span>{{ _('Brightness') }}</span>

@@ -1,4 +1,5 @@
 import "./studio-lut-webgl.js";
+import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
@@ -317,7 +318,7 @@ import {
   const msgLookFailed = root.dataset.lookFailed || "Could not apply that look.";
   const msgDetailFailed = root.dataset.detailFailed || "Could not save sharpen or denoise.";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
-  let compareBeforeAfter = false;
+  let colorComparison = null;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -1864,10 +1865,8 @@ import {
     const localS = hit && hit.overlapClip === clip
       ? hit.overlapLocalS
       : (hit && hit.clip === clip ? hit.localS : 0);
-    const adjust = compareBeforeAfter ? neutralImageAdjust() : readImageAdjustAt(clip, localS);
-    const ramp = compareBeforeAfter
-      ? 1
-      : saturationRampMultiplier(readSaturationRamp(clip), localS);
+    const adjust = readImageAdjustAt(clip, localS);
+    const ramp = saturationRampMultiplier(readSaturationRamp(clip), localS);
     return renderer.render(media, {
       grade: gradeFactors(adjust, ramp),
       look,
@@ -2431,12 +2430,8 @@ import {
       el.style.filter = "";
       return;
     }
-    const adjust = compareBeforeAfter
-      ? neutralImageAdjust()
-      : readImageAdjustAt(clip, localS);
-    const mult = compareBeforeAfter
-      ? 1
-      : saturationRampMultiplier(readSaturationRamp(clip), localS);
+    const adjust = readImageAdjustAt(clip, localS);
+    const mult = saturationRampMultiplier(readSaturationRamp(clip), localS);
     if (imageAdjustIsNeutral(adjust) && mult >= 0.9995) {
       el.style.filter = "";
       return;
@@ -2609,7 +2604,7 @@ import {
 
     function scheduleLutPreviewStill(clip, localS) {
       if (!previewLutStill) return;
-      if (reuseDraft || compareBeforeAfter || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
+      if (reuseDraft || !clip || (clip.dataset.kind !== "video" && clip.dataset.kind !== "photo")) {
         clearLutPreviewStill();
         return;
       }
@@ -2803,7 +2798,9 @@ import {
   }
 
   function renderedPreviewStillFor(media) {
-    if (reuseDraft || compareBeforeAfter) return null;
+    const compared = colorComparison?.pictureFor(clipForPreviewMedia(media));
+    if (compared) return compared;
+    if (reuseDraft) return null;
     const secondary = media === previewImageB;
     if (!secondary && media !== previewImage && media !== previewVideo) return null;
     const slot = secondary ? overlapLutStill : primaryLutStill;
@@ -2993,8 +2990,6 @@ import {
     });
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
-    const compare = document.getElementById("inspector-look-compare");
-    if (compare) compare.checked = compareBeforeAfter;
     fillHsl(clip);
     fillColorWheels(clip);
     fillColorAnimationInspector(clip);
@@ -4160,8 +4155,9 @@ import {
   }
 
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
+    const compared = colorComparison?.pictureFor(clipForPreviewMedia(media));
     const rendered = renderedPreviewStillFor(media);
-    const webgl = lutWebglCanvasFor(media);
+    const webgl = compared ? null : lutWebglCanvasFor(media);
     const picture = webgl || rendered || media;
     if (webgl) {
       srcW = webgl.width;
@@ -5802,13 +5798,14 @@ import {
 
   function drawPreviewLayer(ctx, media, frameW, frameH, rendered = null) {
     if (!previewLayerReady(media) && !previewLayerReady(rendered)) return false;
-    const webgl = previewLutFrameFor(media, frameW, frameH);
+    const compared = colorComparison?.pictureFor(clipForPreviewMedia(media));
+    const webgl = compared ? null : previewLutFrameFor(media, frameW, frameH);
     if (webgl && previewFrame) {
       previewFrame.dataset.lutWebgl = "1";
       previewFrame.dataset.lutWebglWidth = String(webgl.width);
       previewFrame.dataset.lutWebglHeight = String(webgl.height);
     }
-    const picture = webgl || rendered || media;
+    const picture = compared || webgl || rendered || media;
     const srcW = picture.videoWidth || picture.naturalWidth || picture.width || 0;
     const srcH = picture.videoHeight || picture.naturalHeight || picture.height || 0;
     if (!srcW || !srcH) return false;
@@ -5820,7 +5817,7 @@ import {
     // WebGL output, server stills and LUT proxies already contain grade + LUT.
     const proxyRendered = (media === previewVideo || media === previewVideoB) &&
       lutProxyActiveFor(clipForPreviewMedia(media));
-    const filter = webgl || rendered || proxyRendered
+    const filter = compared || webgl || rendered || proxyRendered
       ? "none"
       : canvasFilterFrom(media.style.filter);
     ctx.save();
@@ -5916,6 +5913,7 @@ import {
   }
 
   function schedulePreviewBlit() {
+    colorComparison?.refresh();
     if (previewBlitRaf) return;
     previewBlitRaf = requestAnimationFrame(() => {
       previewBlitRaf = 0;
@@ -9535,9 +9533,38 @@ import {
     }
   });
 
-  document.getElementById("inspector-look-compare")?.addEventListener("change", (event) => {
-    compareBeforeAfter = Boolean(event.target.checked);
-    applyPreviewGrades(resolveAt(state.projectTimeS));
+  colorComparison = createColorCompare({
+    button: document.getElementById("inspector-look-compare"),
+    status: document.getElementById("studio-color-compare-status"),
+    getTarget: () => {
+      const clip = selectedAdjustableClip();
+      if (!clip || reuseDraft || state.playing || clip.dataset.available !== "1") return null;
+      if (["imagePreviewDirty", "rampPreviewDirty", "hslPreviewDirty", "colorWheelsPreviewDirty"]
+        .some((key) => clip.dataset[key] === "1")) return null;
+      const hit = resolveAt(state.projectTimeS);
+      const local = hit?.clip === clip ? hit.localS
+        : (hit?.overlapClip === clip ? hit.overlapLocalS : null);
+      if (!Number.isFinite(local)) return null;
+      // Repeated/slow video sections use the same source-time mapping as stills.
+      const point = sectionPoint(clip, local);
+      // Two copies of one source can have different offsets inside a loop join.
+      // A single comparison still cannot represent both; retain the normal join.
+      if (point.blending) return null;
+      const offset = Math.round(lutStillSourceOffset(clip, point.offset) * 10) / 10;
+      const id = String(clip.dataset.studioId);
+      return {
+        id,
+        key: JSON.stringify([projectId, id, offset, clip.dataset]),
+        url: `/api/studio/${encodeURIComponent(id)}/preview-frame?t_s=${offset}&before=1`,
+      };
+    },
+    whenIdle: () => Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]),
+    onChange: () => { drawPrivacyMasks(); schedulePreviewBlit(); },
+    messages: {
+      loading: root.dataset.compareLoading,
+      before: root.dataset.compareBefore,
+      failed: root.dataset.compareFailed,
+    },
   });
 
   detailControls.bind();

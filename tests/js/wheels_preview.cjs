@@ -18,7 +18,7 @@ const context = {
     setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; },
     clearTimeout: id => timers.delete(id),
   },
-  state: { playing: false }, compareBeforeAfter: false, reuseDraft: null,
+  state: { playing: false }, colorComparison: null, reuseDraft: null,
   readColorAnimation: () => null,
   readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   readHsl: () => ({ ranges: {} }),

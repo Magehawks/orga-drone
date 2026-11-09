@@ -21,6 +21,14 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
+- `studio/color-compare.js` owns the temporary hold input, comparison request,
+  abort/decode token and decoded picture. The entry injects the selected paused
+  clip/source-time identity, save settling and redraw callback. It never writes
+  clip data, history or caches. The existing preview-frame route neutralizes only
+  comparison inputs while retaining technical conversion; the compositor uses
+  the temporary picture for the selected layer, without replacing either normal
+  still owner. Release restores the normal rendering path immediately.
+
 - `studio/control-bridge.js` owns the opt-in local control polling handshake and
   compact Studio disclosure. The entry injects snapshots, queued-save settling,
   and canonical image/color/HSL/wheels/detail/inspector/history/preview callbacks.

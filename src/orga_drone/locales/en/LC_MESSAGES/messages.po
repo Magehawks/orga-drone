@@ -621,3 +621,18 @@ msgstr "The Story is empty. Add a photo, video, or title card before exporting."
 
 msgid "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
 msgstr "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
+
+msgid "Hold to compare"
+msgstr "Hold to compare"
+
+msgid "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on."
+msgstr "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on."
+
+msgid "Preparing comparison…"
+msgstr "Preparing comparison…"
+
+msgid "Before — technical conversion retained"
+msgstr "Before — technical conversion retained"
+
+msgid "Comparison unavailable. Release and try again."
+msgstr "Comparison unavailable. Release and try again."

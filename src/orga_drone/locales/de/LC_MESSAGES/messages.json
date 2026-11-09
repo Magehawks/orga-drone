@@ -890,5 +890,10 @@
   "Inspector updated. Preview refresh requested.": "Inspektor aktualisiert. Vorschau wird neu angefordert.",
   "A change could not be saved. Reopen Studio before using external control.": "Eine Änderung konnte nicht gespeichert werden. Öffne Studio erneut, bevor du die externe Steuerung verwendest.",
   "The Story is empty. Add a photo, video, or title card before exporting.": "Die Story ist leer. Füge vor dem Export ein Foto, Video oder eine Titelkarte hinzu.",
-  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut."
+  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Die Originaldatei für „{clip}“ ist nicht verfügbar. Verbinde die Bibliothek oder stelle die Datei wieder her und versuche es erneut.",
+  "Hold to compare": "Zum Vergleichen gedrückt halten",
+  "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.": "Außerhalb von Loop-Übergängen pausieren. Mit Maus, Leertaste oder Eingabetaste gedrückt halten. Die technische Konvertierung bleibt aktiv.",
+  "Preparing comparison…": "Vergleich wird vorbereitet…",
+  "Before — technical conversion retained": "Vorher — technische Konvertierung bleibt aktiv",
+  "Comparison unavailable. Release and try again.": "Vergleich nicht verfügbar. Loslassen und erneut versuchen."
 }

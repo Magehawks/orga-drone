@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "kind": ".jpg",
+      "exact_restore": true,
+      "state_unchanged": true,
+      "rapid_toggle": true,
+      "mouse_outside_release": true,
+      "held_requests": 0
+    },
+    {
+      "kind": ".mp4",
+      "exact_restore": true,
+      "state_unchanged": true,
+      "rapid_toggle": true,
+      "mouse_outside_release": true,
+      "held_requests": 0
+    },
+    {
+      "kind": ".png",
+      "exact_restore": true,
+      "state_unchanged": true,
+      "rapid_toggle": true,
+      "mouse_outside_release": true,
+      "held_requests": 0
+    }
+  ],
+  "browser": "Edg/157.0.4341.42",
+  "source_hashes": {
+    "sample.jpg": "90888f03a315e00c87fa899446729bf14f348035fba700ce392be6088cf5fbcb",
+    "sample.mp4": "0d3392731474c24b99660e0fc68836b18c95fef1cf047d486e38fe291c372315",
+    "sample.png": "f8d62920b86432fd6a6496dd48560c3f12bf63c478f78e272395d2eab897bd64"
+  },
+  "implementation_sha256": {
+    "src/orga_drone/app.py": "f24603c4a1521536cde53a84060558140ee305fa038e7f7940f52b990bccd72b",
+    "src/orga_drone/studio_preview_frame.py": "d03bb7b9bdad686c360a9369c6616b2fe829eaf00a4d3975e569c303520f215a",
+    "src/orga_drone/static/js/studio.js": "97a9d4eae499838e8b34837a8e2d3e8a47500a10ff8f7fff457d9c4d1050fc59",
+    "src/orga_drone/static/js/studio/color-compare.js": "cb1813266c3e986bbcb6fb848c4441461b7244f8a815e52c685fc4f483a38c66",
+    "src/orga_drone/templates/studio.html": "5e1cb87d3781b906e8dc91204645b301342ba67a29fdb243e6c46aa89089cbec",
+    "src/orga_drone/static/css/app.css": "5fdef717088e5207c621ee52d46ffdaa522c2430eb6a069478e0e34dd364fc57",
+    "packaging/e2e/studio_color_compare.py": "ca7f89d8a0dce2df918bc4b2eac1186c8ef7cf4344eb0593a805ce44442fd6d1"
+  },
+  "webgl_blur_and_pixel_masks_before": true,
+  "clip_change_releases": true,
+  "export_bytes_identical": true,
+  "export_sha256": "af091a6eaf6755e1c06cc3169fc3139630c372ea64e1755d8e87d9fcf1cb2202",
+  "source_hashes_unchanged": true,
+  "reload_after": true,
+  "lut_removal_releases": true,
+  "playback_interval_still_requests": 0
+}

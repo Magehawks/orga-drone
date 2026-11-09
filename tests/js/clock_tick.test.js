@@ -38,6 +38,7 @@ function scenario(options = {}) {
   const transitionCalls = [];
   const context = vm.createContext({
     state,
+    colorComparison: null,
     previewVideo: video,
     previewVideoB: null,
     previewBlitRaf: 0,

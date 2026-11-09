@@ -890,5 +890,10 @@
   "Inspector updated. Preview refresh requested.": "Inspector updated. Preview refresh requested.",
   "A change could not be saved. Reopen Studio before using external control.": "A change could not be saved. Reopen Studio before using external control.",
   "The Story is empty. Add a photo, video, or title card before exporting.": "The Story is empty. Add a photo, video, or title card before exporting.",
-  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again."
+  "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.": "Original source unavailable for \"{clip}\". Reconnect its library or restore the file, then try again.",
+  "Hold to compare": "Hold to compare",
+  "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.": "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.",
+  "Preparing comparison…": "Preparing comparison…",
+  "Before — technical conversion retained": "Before — technical conversion retained",
+  "Comparison unavailable. Release and try again.": "Comparison unavailable. Release and try again."
 }
