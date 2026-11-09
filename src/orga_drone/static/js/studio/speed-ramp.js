@@ -52,18 +52,68 @@ export function rampSpeed(ramp, source) {
   return points.at(-1).speed;
 }
 
-export function rampSource(ramp, story, start, end) {
-  if (story <= 0) return start;
-  if (story >= rampTime(ramp, end) - rampTime(ramp, start)) return end;
-  const target = rampTime(ramp, start) + Math.max(0, story);
-  let lo = start,
-    hi = end;
-  for (let i = 0; i < 48; i += 1) {
-    const mid = (lo + hi) / 2;
-    if (rampTime(ramp, mid) < target) lo = mid;
-    else hi = mid;
+export function rampSourceAtTime(ramp, absoluteStory, lo, hi) {
+  // Invert rampTime() against an absolute primitive inside [lo, hi].
+  let low = lo,
+    high = hi;
+  if (high < low) {
+    low = hi;
+    high = lo;
   }
-  return (lo + hi) / 2;
+  const target = absoluteStory;
+  if (target <= rampTime(ramp, low)) return low;
+  if (target >= rampTime(ramp, high)) return high;
+  let left = low,
+    right = high;
+  for (let i = 0; i < 48; i += 1) {
+    const mid = (left + right) / 2;
+    if (rampTime(ramp, mid) < target) left = mid;
+    else right = mid;
+  }
+  return (left + right) / 2;
+}
+
+export function rampSource(ramp, story, start, end) {
+  // story is relative to rampTime(start); do not pass an absolute primitive here.
+  return rampSourceAtTime(ramp, rampTime(ramp, start) + Math.max(0, story), start, end);
+}
+
+export function edgeSourceAfterRampDrag(
+  ramp,
+  { edge, sourceIn, sourceOut, deltaStory, repeats = 1, catalog, minSegment = 0.05 }
+) {
+  if (!(catalog > minSegment)) return { inS: 0, outS: Math.max(0, catalog) };
+  const count = Math.max(1, Math.min(8, Math.round(Number(repeats) || 1)));
+  const source = edge === "in" ? sourceIn : sourceOut;
+  const mapped = rampSourceAtTime(
+    ramp,
+    rampTime(ramp, source) + Number(deltaStory) / count,
+    0,
+    catalog
+  );
+  let start = edge === "in" ? mapped : sourceIn;
+  let end = edge === "out" ? mapped : sourceOut;
+  start = Math.min(Math.max(0, start), catalog);
+  end = Math.min(Math.max(0, end), catalog);
+  if (end - start < minSegment) {
+    if (edge === "in") start = end - minSegment;
+    else end = start + minSegment;
+    start = Math.min(Math.max(0, start), catalog);
+    end = Math.min(Math.max(0, end), catalog);
+    if (end - start < minSegment) {
+      if (edge === "in") end = Math.min(catalog, start + minSegment);
+      else start = Math.max(0, end - minSegment);
+    }
+  }
+  start = Number(start.toFixed(2));
+  end = Number(end.toFixed(2));
+  start = Math.min(Math.max(0, start), catalog);
+  end = Math.min(Math.max(0, end), catalog);
+  if (end - start < minSegment) {
+    if (edge === "in") start = Math.max(0, Number((end - minSegment).toFixed(2)));
+    else end = Math.min(catalog, Number((start + minSegment).toFixed(2)));
+  }
+  return { inS: start, outS: end };
 }
 
 export function rampPreset(id, start, end) {
