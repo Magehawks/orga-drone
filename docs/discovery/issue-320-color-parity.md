@@ -1,5 +1,7 @@
 # Issue #320: residual Studio color parity
 
+> Final follow-up: the [RGB24-boundary isolated experiment](issue-320-final-rgb24-boundary.md) also failed its mandatory detail gate. No production/cache change was made. Precision work is stopped; `BLOCKED_PO_DECISION` remains. The report below is historical evidence.
+
 ## Decision boundary
 
 The [conditionally approved precision experiment](issue-320-approved-precision-experiment.md)

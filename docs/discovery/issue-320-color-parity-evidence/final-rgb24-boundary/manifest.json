@@ -1,0 +1,430 @@
+{
+  "detail-1080-jpg-False-native-baseline.png": {
+    "sha256": "0ed5b2813571cb2c088b8df63d738b1df23d2a7d7e879200be7285df721e756c",
+    "bytes": 17354
+  },
+  "detail-1080-jpg-False-native-baseline.txt": {
+    "sha256": "8dfab178bffface04cbcf9c5f5dab34eb848ba1cac419ef139a2446559830c11",
+    "bytes": 4774
+  },
+  "detail-1080-jpg-False-native-candidate.png": {
+    "sha256": "0ed5b2813571cb2c088b8df63d738b1df23d2a7d7e879200be7285df721e756c",
+    "bytes": 17354
+  },
+  "detail-1080-jpg-False-native-candidate.txt": {
+    "sha256": "b7e4d9f1479ba01d173ab78092abadf36871112ddce73ab98dda153d8ad529a2",
+    "bytes": 4776
+  },
+  "detail-1080-jpg-False-third-baseline.png": {
+    "sha256": "488c6b09e926cb4e09bc5eb76adc1b0bbfd2e5add37bff75703261ba18e3056d",
+    "bytes": 3204
+  },
+  "detail-1080-jpg-False-third-baseline.txt": {
+    "sha256": "9d990cd170aac8f5b775be2d6ac88e8680194b8b5fcf07fa3a12cacd0011a59a",
+    "bytes": 5457
+  },
+  "detail-1080-jpg-False-third-candidate.png": {
+    "sha256": "488c6b09e926cb4e09bc5eb76adc1b0bbfd2e5add37bff75703261ba18e3056d",
+    "bytes": 3204
+  },
+  "detail-1080-jpg-False-third-candidate.txt": {
+    "sha256": "0708853f7bdb959f888d4d9c4fdbfb897feb793824dd3e641c4997d2ac37e755",
+    "bytes": 5182
+  },
+  "detail-1080-jpg-False-yuv-baseline.png": {
+    "sha256": "751f12db0e7a33784d6b566b3f8a7f39c71181ef4fcf4ae6e15e2ebe0076f46f",
+    "bytes": 17354
+  },
+  "detail-1080-jpg-False-yuv-baseline.txt": {
+    "sha256": "fc4a063cde40dbd8c383f2d0139c317285a587bee81f8e2192b6afb7afa20439",
+    "bytes": 5789
+  },
+  "detail-1080-jpg-False-yuv-candidate.png": {
+    "sha256": "751f12db0e7a33784d6b566b3f8a7f39c71181ef4fcf4ae6e15e2ebe0076f46f",
+    "bytes": 17354
+  },
+  "detail-1080-jpg-False-yuv-candidate.txt": {
+    "sha256": "b52114f539300493d924d6321114dbd5bfa69c566340992b5d0b376e8375882e",
+    "bytes": 5792
+  },
+  "detail-1080-jpg-True-native-baseline.png": {
+    "sha256": "96fab4911c0687047fcaa7a867ea421f42e6ed95703b5d83bea8c218317b7df8",
+    "bytes": 19867
+  },
+  "detail-1080-jpg-True-native-baseline.txt": {
+    "sha256": "162d6318f36e8a6bb52271f6fa0b64104f62f6fb67a797b35791cfb0d6028b30",
+    "bytes": 6435
+  },
+  "detail-1080-jpg-True-native-candidate.png": {
+    "sha256": "29bc800cb5f8d83d6ca052548f91cfdb2b9723d8ca2ea8f42bb4a9b5d9985309",
+    "bytes": 20335
+  },
+  "detail-1080-jpg-True-native-candidate.txt": {
+    "sha256": "1c24930056f83058603516dcddf04da48bd242732fcfba18244c1ad76ab557a8",
+    "bytes": 7530
+  },
+  "detail-1080-jpg-True-third-baseline.png": {
+    "sha256": "24af6f6256d5d59c47e93debd6220367dd05e5e7197ceda448b09c2de09623dc",
+    "bytes": 3565
+  },
+  "detail-1080-jpg-True-third-baseline.txt": {
+    "sha256": "b94030433f9fdabfb3c63cff8efee852f1307bece9160761762d47137bf5e79f",
+    "bytes": 7016
+  },
+  "detail-1080-jpg-True-third-candidate.png": {
+    "sha256": "8d05bf04aaa1362af624023bb5c6b7db681180ac9febddbdb4a1285b78c59801",
+    "bytes": 3602
+  },
+  "detail-1080-jpg-True-third-candidate.txt": {
+    "sha256": "7c59e6f7212ad6608101d17d73d7980884432188f08d2da3d81119f37e8872a6",
+    "bytes": 8111
+  },
+  "detail-1080-jpg-True-yuv-baseline.png": {
+    "sha256": "afd688b32f00e533b4f68d07029c5d1de1892debf7c831bbc6fffcfebce49ba6",
+    "bytes": 20012
+  },
+  "detail-1080-jpg-True-yuv-baseline.txt": {
+    "sha256": "82ec2c9d37a601b35afcea53fcb08eab9d26f249a6b91bdd627ba5325e819032",
+    "bytes": 7488
+  },
+  "detail-1080-jpg-True-yuv-candidate.png": {
+    "sha256": "23f6fb2e8976659aaa6468f6ea67292c79c71fde5d709024e665da093119bfc8",
+    "bytes": 19814
+  },
+  "detail-1080-jpg-True-yuv-candidate.txt": {
+    "sha256": "29c123753f4f8d9fde8d8cb33d13ccd6d434f21186e41f70eac837e737dee53f",
+    "bytes": 8643
+  },
+  "detail-1080-png-False-native-baseline.png": {
+    "sha256": "63e61396a395f548920e4d7e3da0fb9067a027a657da47d7d4b5a9d1cec73dc2",
+    "bytes": 17304
+  },
+  "detail-1080-png-False-native-baseline.txt": {
+    "sha256": "8e194ddfd14f39dc2a45bb0c2af216770b9b3dc6fa4387baa5114ff9eba4916a",
+    "bytes": 4773
+  },
+  "detail-1080-png-False-native-candidate.png": {
+    "sha256": "63e61396a395f548920e4d7e3da0fb9067a027a657da47d7d4b5a9d1cec73dc2",
+    "bytes": 17304
+  },
+  "detail-1080-png-False-native-candidate.txt": {
+    "sha256": "df58fa9c86fa219d7031a7f746d8e335bdfd34a9e63316082a1dc80eb7879ed6",
+    "bytes": 4776
+  },
+  "detail-1080-png-False-third-baseline.png": {
+    "sha256": "488c6b09e926cb4e09bc5eb76adc1b0bbfd2e5add37bff75703261ba18e3056d",
+    "bytes": 3204
+  },
+  "detail-1080-png-False-third-baseline.txt": {
+    "sha256": "d3f08ed7d64fb5154a212d7ab43b2ae11fc4fa8986a543fa99da249bfcfac80f",
+    "bytes": 5179
+  },
+  "detail-1080-png-False-third-candidate.png": {
+    "sha256": "488c6b09e926cb4e09bc5eb76adc1b0bbfd2e5add37bff75703261ba18e3056d",
+    "bytes": 3204
+  },
+  "detail-1080-png-False-third-candidate.txt": {
+    "sha256": "1d65acc609121885f251f2977641bb1c46aba1b2d532571d1ce8a3ca33820271",
+    "bytes": 5182
+  },
+  "detail-1080-png-False-yuv-baseline.png": {
+    "sha256": "63e61396a395f548920e4d7e3da0fb9067a027a657da47d7d4b5a9d1cec73dc2",
+    "bytes": 17304
+  },
+  "detail-1080-png-False-yuv-baseline.txt": {
+    "sha256": "3e1e78c4400a724ab92973a220efa90a1917a02b2dca482d959c834f5c1dd648",
+    "bytes": 5788
+  },
+  "detail-1080-png-False-yuv-candidate.png": {
+    "sha256": "63e61396a395f548920e4d7e3da0fb9067a027a657da47d7d4b5a9d1cec73dc2",
+    "bytes": 17304
+  },
+  "detail-1080-png-False-yuv-candidate.txt": {
+    "sha256": "64a84aea43bbdf50ca24f0461345867ad91e81ffc8945692337ed2ea3f2da14c",
+    "bytes": 5792
+  },
+  "detail-1080-png-True-native-baseline.png": {
+    "sha256": "5d635341fa1dcc7f2bde7e949e1bffa2b550716669454b6ca165346032d8157d",
+    "bytes": 19806
+  },
+  "detail-1080-png-True-native-baseline.txt": {
+    "sha256": "9f223887dffbf6b7b98635c86123656caf98274cdb2e60713dcd278c6235e69b",
+    "bytes": 6992
+  },
+  "detail-1080-png-True-native-candidate.png": {
+    "sha256": "0791268a9c6b4beec2b8b47fa380a021d02ce764dea7ffd98e89437b925c8ed1",
+    "bytes": 20302
+  },
+  "detail-1080-png-True-native-candidate.txt": {
+    "sha256": "c862b0048cdb56a4359fdaec9d0fe8ff1dd6636054ed47dcaa92093f7cb4ede1",
+    "bytes": 8087
+  },
+  "detail-1080-png-True-third-baseline.png": {
+    "sha256": "c4fef1aec1d0719c3987c966508ed0e47bb0f6c3e71ece86bec7cf9d5e96e2d2",
+    "bytes": 3570
+  },
+  "detail-1080-png-True-third-baseline.txt": {
+    "sha256": "ce063ef840fcaa2e4639a25053ed428ab8eceb238b965983e1ebb4be0f983437",
+    "bytes": 7015
+  },
+  "detail-1080-png-True-third-candidate.png": {
+    "sha256": "c5a06f13d20c021459f00d0c087a816ff06a4e9bebfd9ce0858682dea72bcecb",
+    "bytes": 3602
+  },
+  "detail-1080-png-True-third-candidate.txt": {
+    "sha256": "1ff7e27bbfd85413cc2f30dc7524287a5dc503e1f32255ad15ff567b0916d47e",
+    "bytes": 8111
+  },
+  "detail-1080-png-True-yuv-baseline.png": {
+    "sha256": "6f7b7d49c288ecaf36cea91c84e63efb5bc0b53e5a2ef12ca9f328ec2df5225b",
+    "bytes": 19950
+  },
+  "detail-1080-png-True-yuv-baseline.txt": {
+    "sha256": "87e25d47892ad45c98cd9774281270ef4743ef400b2a21cb8b4a3c22cc210165",
+    "bytes": 7488
+  },
+  "detail-1080-png-True-yuv-candidate.png": {
+    "sha256": "23f6fb2e8976659aaa6468f6ea67292c79c71fde5d709024e665da093119bfc8",
+    "bytes": 19814
+  },
+  "detail-1080-png-True-yuv-candidate.txt": {
+    "sha256": "031a8f455f2ca5ff7c8d2f009b546eb6fb7d611be192703d13b584751f5a3def",
+    "bytes": 8583
+  },
+  "detail-2160-jpg-False-native-baseline.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-jpg-False-native-baseline.txt": {
+    "sha256": "a4bb5f78ff0ea1f6cf1316884231931a4c50ec6f16c06740d2cda2b3836848d1",
+    "bytes": 4775
+  },
+  "detail-2160-jpg-False-native-candidate.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-jpg-False-native-candidate.txt": {
+    "sha256": "e945f6516e86b108ec3fbc2468dded8833a89274c1461d56b44ee902cf6e7189",
+    "bytes": 4778
+  },
+  "detail-2160-jpg-False-third-baseline.png": {
+    "sha256": "1094e2662a517d5c62137bad339dbbcd20087328994ea43628cd17cd9fa7dea7",
+    "bytes": 9390
+  },
+  "detail-2160-jpg-False-third-baseline.txt": {
+    "sha256": "c51ca6d463a359125ff4bcc65699f33ee4cd40295e88081892d3c2e7df67cb9b",
+    "bytes": 5187
+  },
+  "detail-2160-jpg-False-third-candidate.png": {
+    "sha256": "1094e2662a517d5c62137bad339dbbcd20087328994ea43628cd17cd9fa7dea7",
+    "bytes": 9390
+  },
+  "detail-2160-jpg-False-third-candidate.txt": {
+    "sha256": "6c83607ea096fbc8806ec7c7625c70fdc7d984735c655d2cd2f39d1f63c63622",
+    "bytes": 5190
+  },
+  "detail-2160-jpg-False-yuv-baseline.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-jpg-False-yuv-baseline.txt": {
+    "sha256": "4bf2acbdf1ff791a0e9bdac21b1f3bc6cce86b26df7f73f232f7eea7bced0ce6",
+    "bytes": 5512
+  },
+  "detail-2160-jpg-False-yuv-candidate.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-jpg-False-yuv-candidate.txt": {
+    "sha256": "3ed331e334ce57a28c314066f2b76b8bc9b2a9e97f33e3022a81c5b03986c634",
+    "bytes": 5516
+  },
+  "detail-2160-jpg-True-native-baseline.png": {
+    "sha256": "a3d5299280a4cdbcf65f4f48b133748efc79842511b8c51941b7ee13398d010a",
+    "bytes": 65720
+  },
+  "detail-2160-jpg-True-native-baseline.txt": {
+    "sha256": "52ab03273610364f87326aaeddba4d24ef5662a4d27f06a212eace3e8887affd",
+    "bytes": 6994
+  },
+  "detail-2160-jpg-True-native-candidate.png": {
+    "sha256": "3102daa20a1389d58870682bae43068a302457373c9d53855b4cccbc6d702dad",
+    "bytes": 67871
+  },
+  "detail-2160-jpg-True-native-candidate.txt": {
+    "sha256": "b94d2f2f0f8338f526bf62cb4ad1cfe9aef3c414153ee9947d30756b7d30d52f",
+    "bytes": 7811
+  },
+  "detail-2160-jpg-True-third-baseline.png": {
+    "sha256": "2d012ddca31ca140219676029c75da694be5b45f570860b7078299052bfdc137",
+    "bytes": 10612
+  },
+  "detail-2160-jpg-True-third-baseline.txt": {
+    "sha256": "81339b1518e17fb5fd4a4446f29204211d25aad0b6145a51e47c516eab1762d4",
+    "bytes": 7025
+  },
+  "detail-2160-jpg-True-third-candidate.png": {
+    "sha256": "930d6b5a1578132136af9287e1dbc99b7d94389beb5e12dbf4661f5a9de40bcc",
+    "bytes": 10661
+  },
+  "detail-2160-jpg-True-third-candidate.txt": {
+    "sha256": "fe67aa0f8f76e3bb26d49b187b06c3db330d53f00abd1b91bbeda0ef776a4af5",
+    "bytes": 8121
+  },
+  "detail-2160-jpg-True-yuv-baseline.png": {
+    "sha256": "97def2b7829efba923a054c6ea3538c68898ee85c3407059971be581fc5463bb",
+    "bytes": 65612
+  },
+  "detail-2160-jpg-True-yuv-baseline.txt": {
+    "sha256": "8c03a0ecfd09c532906bce0f681b2c918521629512a90bac1a81e42162f23a51",
+    "bytes": 7490
+  },
+  "detail-2160-jpg-True-yuv-candidate.png": {
+    "sha256": "02a58db156dad62647b00095b7ab6627ba722e154284ad0b9004862ed2b41859",
+    "bytes": 65245
+  },
+  "detail-2160-jpg-True-yuv-candidate.txt": {
+    "sha256": "b0cd1f12a1b4d1b582215f89eeddbdbf0a7e51a8b4508922ee9df525c2fd67cc",
+    "bytes": 8550
+  },
+  "detail-2160-png-False-native-baseline.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-png-False-native-baseline.txt": {
+    "sha256": "70f699540944614f2010196a646fc09b46f4b8fc66af3a1bc43c5c6d73a6d5b4",
+    "bytes": 4775
+  },
+  "detail-2160-png-False-native-candidate.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-png-False-native-candidate.txt": {
+    "sha256": "8f80bc35f7e424c0c18bc23f217e5edee247a81db099c9f2f0e350fbc25f4a08",
+    "bytes": 4778
+  },
+  "detail-2160-png-False-third-baseline.png": {
+    "sha256": "1094e2662a517d5c62137bad339dbbcd20087328994ea43628cd17cd9fa7dea7",
+    "bytes": 9390
+  },
+  "detail-2160-png-False-third-baseline.txt": {
+    "sha256": "a1eb3f3428974656be18d6c236d0222e23dff01b9d1f205ff27249442ee5a85c",
+    "bytes": 5187
+  },
+  "detail-2160-png-False-third-candidate.png": {
+    "sha256": "1094e2662a517d5c62137bad339dbbcd20087328994ea43628cd17cd9fa7dea7",
+    "bytes": 9390
+  },
+  "detail-2160-png-False-third-candidate.txt": {
+    "sha256": "f61889d14eed891cce19e3401831e0b1e9487c7bfe80fc93bc9f506f988049ba",
+    "bytes": 5190
+  },
+  "detail-2160-png-False-yuv-baseline.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-png-False-yuv-baseline.txt": {
+    "sha256": "9fdaeaabcc8f8e2acceaef236c861f3cb182fa600f936eea14cff68fff6990d4",
+    "bytes": 5513
+  },
+  "detail-2160-png-False-yuv-candidate.png": {
+    "sha256": "3dff838c010e3c56ac521c767d7ccd13f2c62f153c71270ca9dc91787c4124d2",
+    "bytes": 59908
+  },
+  "detail-2160-png-False-yuv-candidate.txt": {
+    "sha256": "7ed9edffd0f140341d4830483735276e49513c5cd13be478cd2b0206859615be",
+    "bytes": 5795
+  },
+  "detail-2160-png-True-native-baseline.png": {
+    "sha256": "a3d5299280a4cdbcf65f4f48b133748efc79842511b8c51941b7ee13398d010a",
+    "bytes": 65720
+  },
+  "detail-2160-png-True-native-baseline.txt": {
+    "sha256": "fdca8945344e1c45494c7491876a79ba0247d7a2c32cdb879294eb0ef6cfe288",
+    "bytes": 6994
+  },
+  "detail-2160-png-True-native-candidate.png": {
+    "sha256": "3102daa20a1389d58870682bae43068a302457373c9d53855b4cccbc6d702dad",
+    "bytes": 67871
+  },
+  "detail-2160-png-True-native-candidate.txt": {
+    "sha256": "48f304105734f5e3b48d52521b5855cfb278f3998eb2fc2ca6061e336e201434",
+    "bytes": 8089
+  },
+  "detail-2160-png-True-third-baseline.png": {
+    "sha256": "2d012ddca31ca140219676029c75da694be5b45f570860b7078299052bfdc137",
+    "bytes": 10612
+  },
+  "detail-2160-png-True-third-baseline.txt": {
+    "sha256": "a67835654c782c1a8c7e7d59f8996079ba3810a93e1e12c77a1aadaf28be3269",
+    "bytes": 6854
+  },
+  "detail-2160-png-True-third-candidate.png": {
+    "sha256": "930d6b5a1578132136af9287e1dbc99b7d94389beb5e12dbf4661f5a9de40bcc",
+    "bytes": 10661
+  },
+  "detail-2160-png-True-third-candidate.txt": {
+    "sha256": "ffb0a25b99dcdfcded020f3c53e38d18df20d06c71c52027ae5fd971301b6210",
+    "bytes": 7997
+  },
+  "detail-2160-png-True-yuv-baseline.png": {
+    "sha256": "97def2b7829efba923a054c6ea3538c68898ee85c3407059971be581fc5463bb",
+    "bytes": 65612
+  },
+  "detail-2160-png-True-yuv-baseline.txt": {
+    "sha256": "dd6ba771860a23d18079803f178ed5741fd8d456092ed7042ac86ea4e3f29e6b",
+    "bytes": 7455
+  },
+  "detail-2160-png-True-yuv-candidate.png": {
+    "sha256": "02a58db156dad62647b00095b7ab6627ba722e154284ad0b9004862ed2b41859",
+    "bytes": 65245
+  },
+  "detail-2160-png-True-yuv-candidate.txt": {
+    "sha256": "a377130bdabd73ccfd6bda403dde376e0d2350799ee35c1acad85db6f65b89db",
+    "bytes": 8551
+  },
+  "interrupted-checkpoint.json": {
+    "sha256": "c5dbb51ca0ae23c75dbba108489b5fc99b7b533a33cff1ba8e1a089f92c4a649",
+    "bytes": 68513
+  },
+  "perf-1080-0-baseline.txt": {
+    "sha256": "25508496b8d28922dcdadd0e26cdd002815b66982caac2021a7c03d358641b15",
+    "bytes": 25269
+  },
+  "perf-1080-0-candidate.txt": {
+    "sha256": "a4d6b4eba4a1af960e7ce7cd122fd952e3498ae2fc8b404f682d0243910b95d0",
+    "bytes": 26525
+  },
+  "perf-1080-1-baseline.txt": {
+    "sha256": "c2156183e90c78dcd0a14fde7e7983e1097c05c8b30dd11bc1250a308d1f632b",
+    "bytes": 25286
+  },
+  "perf-1080-1-candidate.txt": {
+    "sha256": "633aeb67ad931a76a3c6ed23ecd2d0056362d071bbaee666d6fd215267e225c0",
+    "bytes": 26340
+  },
+  "perf-1080-2-baseline.txt": {
+    "sha256": "2d8c273c1f38285a1de5c1942f8c4c99b52a4e52bd91903a763fca001b50f51e",
+    "bytes": 25251
+  },
+  "perf-1080-2-candidate.txt": {
+    "sha256": "e62a46dd4db222cce202a05c034e8b8dd42579ca3e51ecaddd743b0434c11071",
+    "bytes": 26376
+  },
+  "perf-2160-0-baseline.txt": {
+    "sha256": "7bbde8f39474db3533ee0961f16ffeec55d428f6481efb930293d4dda9f86537",
+    "bytes": 26648
+  },
+  "perf-2160-0-candidate.txt": {
+    "sha256": "53595ab30cfcefcb0e9938ff077546c461c6bc66557b7761fcccd67b557b10e0",
+    "bytes": 27739
+  },
+  "perf-2160-1-candidate.txt": {
+    "sha256": "96661cd0d847f00b8bc85e69e7eb124a9420d067bbff32cb159dc008e2dea467",
+    "bytes": 20790
+  },
+  "summary.json": {
+    "sha256": "3be9056d3f471f62df18c57696761d710bb68e8eee8a9a076a2e85673c9b9a1b",
+    "bytes": 7920
+  }
+}

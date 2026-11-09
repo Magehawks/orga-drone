@@ -1,0 +1,227 @@
+{
+  "status": "BLOCKED_PO_DECISION",
+  "experiment_status": "EARLY_STOP_DETAIL_GATE_FAILED",
+  "checkpoint_status": "INCOMPLETE: terminated running FFmpeg benchmark when first inspected metrics failed the gate",
+  "production_changes": false,
+  "cache_changes": false,
+  "new_packaged_validation": false,
+  "driver_note": "Automatic negative-response early-stop guard added after this run; no further precision run performed.",
+  "completed_indexed_detail_rows": 18,
+  "completed_indexed_performance_rows": 6,
+  "color_reference_comparisons": "NOT RUN: early stop before queued swatch control",
+  "actual_dpr1_dpr3_packaged_comparisons": "NOT RUN: isolated gate failed",
+  "unindexed_outputs": "Other completed PNGs/logs from the active 4K PNG fixture preserved but not counted as completed workload; interrupted MP4 is not a valid result.",
+  "negative_detail": [
+    {
+      "source": "detail-1080.jpg",
+      "graded": true,
+      "mode": "native",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8357253086419753,
+      "baseline": {
+        "normalized_gradient": 0.3385042824564872,
+        "fine_to_broad": 1.0175232357806556,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "candidate": {
+        "normalized_gradient": 0.33849540270120365,
+        "fine_to_broad": 1.0175232357806554,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "change_percent": {
+        "normalized_gradient": -0.0026232327754116547,
+        "fine_to_broad": -2.220446049250313e-14,
+        "medium_to_broad": 0.0
+      }
+    },
+    {
+      "source": "detail-1080.jpg",
+      "graded": true,
+      "mode": "yuv",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8546296296296297,
+      "baseline": {
+        "normalized_gradient": 0.33934879006250435,
+        "fine_to_broad": 1.0233095063032855,
+        "medium_to_broad": 1.0165332784064283
+      },
+      "candidate": {
+        "normalized_gradient": 0.3391230398472516,
+        "fine_to_broad": 1.020277398322587,
+        "medium_to_broad": 1.0169685852070487
+      },
+      "change_percent": {
+        "normalized_gradient": -0.06652453813409398,
+        "fine_to_broad": -0.2963040958792629,
+        "medium_to_broad": 0.04282268075894713
+      }
+    },
+    {
+      "source": "detail-1080.png",
+      "graded": true,
+      "mode": "native",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8358024691358025,
+      "baseline": {
+        "normalized_gradient": 0.33849540270120465,
+        "fine_to_broad": 1.0175232357806556,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "candidate": {
+        "normalized_gradient": 0.33849540270120365,
+        "fine_to_broad": 1.0175232357806554,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "change_percent": {
+        "normalized_gradient": -2.9976021664879227e-13,
+        "fine_to_broad": -2.220446049250313e-14,
+        "medium_to_broad": 0.0
+      }
+    },
+    {
+      "source": "detail-1080.png",
+      "graded": true,
+      "mode": "yuv",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8546296296296297,
+      "baseline": {
+        "normalized_gradient": 0.3393461481639155,
+        "fine_to_broad": 1.0233095063032855,
+        "medium_to_broad": 1.0165332784064283
+      },
+      "candidate": {
+        "normalized_gradient": 0.3391230398472516,
+        "fine_to_broad": 1.020277398322587,
+        "medium_to_broad": 1.0169685852070487
+      },
+      "change_percent": {
+        "normalized_gradient": -0.06574652986959251,
+        "fine_to_broad": -0.2963040958792629,
+        "medium_to_broad": 0.04282268075894713
+      }
+    },
+    {
+      "source": "detail-2160.jpg",
+      "graded": true,
+      "mode": "native",
+      "dimensions": [
+        3840,
+        2160
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8308641975308642,
+      "baseline": {
+        "normalized_gradient": 0.33633675983595884,
+        "fine_to_broad": 1.0175232357806556,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "candidate": {
+        "normalized_gradient": 0.33633675983595823,
+        "fine_to_broad": 1.0175232357806554,
+        "medium_to_broad": 1.0176007879499522
+      },
+      "change_percent": {
+        "normalized_gradient": -1.7763568394002505e-13,
+        "fine_to_broad": -2.220446049250313e-14,
+        "medium_to_broad": 0.0
+      }
+    },
+    {
+      "source": "detail-2160.jpg",
+      "graded": true,
+      "mode": "yuv",
+      "dimensions": [
+        3840,
+        2160
+      ],
+      "exact_pixels": false,
+      "mean_rgb_error": 0.8532407407407407,
+      "baseline": {
+        "normalized_gradient": 0.33719729666102904,
+        "fine_to_broad": 1.0234997225152678,
+        "medium_to_broad": 1.0166384544899523
+      },
+      "candidate": {
+        "normalized_gradient": 0.33696026204522755,
+        "fine_to_broad": 1.0204673836784395,
+        "medium_to_broad": 1.0170738519550873
+      },
+      "change_percent": {
+        "normalized_gradient": -0.07029552672831452,
+        "fine_to_broad": -0.2962715836772545,
+        "medium_to_broad": 0.04282716861752078
+      }
+    }
+  ],
+  "performance": [
+    {
+      "height": 1080,
+      "repetitions_per_variant": 3,
+      "baseline_seconds_mean": 2.4195295333326308,
+      "candidate_seconds_mean": 2.1358303999998802,
+      "time_change_percent": -11.725384188304854,
+      "baseline_peak_mib": 593.68359375,
+      "candidate_peak_mib": 624.41015625,
+      "memory_change_percent": 5.175578847634266
+    }
+  ],
+  "source_integrity": {
+    "build\\precision-detail-fixtures\\detail-1080.jpg": {
+      "expected": "0b8d1ec5c1af4f147ce19cf2670801934783ca3065e44d5dbd2c33588e19dc1c",
+      "actual": "0b8d1ec5c1af4f147ce19cf2670801934783ca3065e44d5dbd2c33588e19dc1c",
+      "unchanged": true
+    },
+    "detail-1080-jpg.rgb": {
+      "expected": "76b615af7f94387f02f53d29bcefdd69bba2a868ad0460807f86e238115f8616",
+      "actual": "76b615af7f94387f02f53d29bcefdd69bba2a868ad0460807f86e238115f8616",
+      "unchanged": true
+    },
+    "build\\precision-detail-fixtures\\detail-1080.png": {
+      "expected": "72bd2dba74b44b81b6a38a030934d2cf41a2930d5df1a87bceb9a2a4bc883fda",
+      "actual": "72bd2dba74b44b81b6a38a030934d2cf41a2930d5df1a87bceb9a2a4bc883fda",
+      "unchanged": true
+    },
+    "detail-1080-png.rgb": {
+      "expected": "c2022c3bb336b16831e7b670e85e9d12033992337c1e0252f9abf714fc07ebae",
+      "actual": "c2022c3bb336b16831e7b670e85e9d12033992337c1e0252f9abf714fc07ebae",
+      "unchanged": true
+    },
+    "build\\precision-detail-fixtures\\detail-2160.jpg": {
+      "expected": "c7e19c8817e08e26835a45680caf051344fae5b74a0b0a19499db5b0509b4f14",
+      "actual": "c7e19c8817e08e26835a45680caf051344fae5b74a0b0a19499db5b0509b4f14",
+      "unchanged": true
+    },
+    "detail-2160-jpg.rgb": {
+      "expected": "f6509c7b7775d5160b3be59e188615246525481adb10334cb6f1a6df216b9947",
+      "actual": "f6509c7b7775d5160b3be59e188615246525481adb10334cb6f1a6df216b9947",
+      "unchanged": true
+    }
+  },
+  "baseline_commit": "3d72528126931569ad8490a1a79b94c1326f17f2",
+  "starting_pr_head": "31592b4bda251505bcf5e0211be1f0db22437b91",
+  "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+  "strict_scenarios_historical_unchanged": {
+    "neutral_jpg": 4.333333333333333,
+    "neutral_png": 4.666666666666667,
+    "photo_crossfade": 3.313218390804598,
+    "photo_video": 4.0,
+    "video_photo": 3.6666666666666665
+  },
+  "fourth_decoded_fixture_matches_raw": true
+}

@@ -1,0 +1,271 @@
+[rawvideo @ 000002242be54280] Estimating duration from bitrate, this may be inaccurate
+Input #0, rawvideo, from 'C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-1080-png.rgb':
+  Duration: 00:00:00.03, start: 0.000000, bitrate: 1493006 kb/s
+  Stream #0:0: Video: rawvideo, 1 reference frame (RGB[24] / 0x18424752), rgb24, 1920x1080, 1492992 kb/s, 30 tbr, 30 tbn
+[out#0/mp4 @ 000002242bdda940] No explicit maps, mapping streams automatically...
+[vost#0:0/libx264 @ 000002242bddb480] Created video stream from input stream 0:0
+[Parsed_scale_1 @ 000002242bdde000] w:1920 h:1080 flags:'' interl:0
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (libx264))
+[vost#0:0/libx264 @ 000002242bddb480] Starting thread...
+[vf#0:0 @ 000002242bddd980] Starting thread...
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Starting thread...
+[in#0/rawvideo @ 000002242be53f40] Starting thread...
+Press [q] to stop, [?] for help
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[Parsed_scale_1 @ 000002242be53c80] w:1920 h:1080 flags:'' interl:0
+[graph -1 input from stream 0:0 @ 000002242bebaf00] w:1920 h:1080 pixfmt:rgb24 tb:1/30 fr:30/1 sar:0/1 csp:unknown range:unknown
+[Parsed_scale_1 @ 000002242be53c80] w:1920 h:1080 fmt:rgb24 csp:gbr range:pc sar:0/1 -> w:1920 h:1080 fmt:yuv420p csp:bt709 range:tv sar:0/1 flags:0x00000004
+[Parsed_scale_1 @ 000002242be53c80] [framesync @ 000002242be638e8] Selected 1/30 time base
+[Parsed_scale_1 @ 000002242be53c80] [framesync @ 000002242be638e8] Sync level 1
+[graph -1 input from stream 0:0 @ 000002242bebaf00] video frame properties congruent with link at pts_time: 0
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[libx264 @ 000002242bddb800] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[libx264 @ 000002242bddb800] profile High, level 4.0, 4:2:0, 8-bit
+[libx264 @ 000002242bddb800] 264 - core 165 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=1 ref=1 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=2 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=24 lookahead_threads=8 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=1 keyint=250 keyint_min=25 scenecut=40 intra_refresh=0 rc_lookahead=10 rc=crf mbtree=1 crf=20.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+Output #0, mp4, to 'C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\perf-1080-0-baseline.mp4':
+  Metadata:
+    encoder         : Lavf61.7.100
+  Stream #0:0: Video: h264, 1 reference frame (avc1 / 0x31637661), yuv420p(tv, bt709/unknown/unknown, progressive), 1920x1080, q=2-31, 30 fps, 15360 tbn
+      Metadata:
+        encoder         : Lavc61.19.100 libx264
+      Side data:
+        cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+[out#0/mp4 @ 000002242bdda940] Starting thread...
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+    Last message repeated 4 times
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    [vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    [vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    [vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+frame=    5 fps=2.4 q=26.0 size=       0KiB time=00:00:00.10 bitrate=   3.8kbits/s speed=0.0488x    [in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+frame=   18 fps=7.0 q=26.0 size=       0KiB time=00:00:00.53 bitrate=   0.7kbits/s speed=0.209x    [in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000002242be53f40] EOF while reading input
+[vf#0:0 @ 000002242bddd980] All consumers returned EOF
+[vf#0:0 @ 000002242bddd980] Terminating thread with return code 0 (success)
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Decoder returned EOF, finishing
+[vist#0:0/rawvideo @ 000002242be5d580] [dec:rawvideo @ 000002242be5e3c0] Terminating thread with return code 0 (success)
+[in#0/rawvideo @ 000002242be53f40] Terminating thread with return code 0 (success)
+[vost#0:0/libx264 @ 000002242bddb480] Encoder thread received EOF
+[vost#0:0/libx264 @ 000002242bddb480] Terminating thread with return code 0 (success)
+[out#0/mp4 @ 000002242bdda940] All streams finished
+[out#0/mp4 @ 000002242bdda940] Terminating thread with return code 0 (success)
+[AVIOContext @ 000002242be5fa40] Statistics: 10658 bytes written, 2 seeks, 4 writeouts
+[out#0/mp4 @ 000002242bdda940] Output file #0 (C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\perf-1080-0-baseline.mp4):
+[out#0/mp4 @ 000002242bdda940]   Output stream #0:0 (video): 60 frames encoded; 60 packets muxed (9080 bytes); 
+[out#0/mp4 @ 000002242bdda940]   Total: 60 packets (9080 bytes) muxed
+[out#0/mp4 @ 000002242bdda940] video:9KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 17.334802%
+frame=   60 fps= 22 q=-1.0 Lsize=      10KiB time=00:00:01.93 bitrate=  44.1kbits/s speed=0.706x    
+[libx264 @ 000002242bddb800] frame I:1     Avg QP:13.41  size:  3805
+[libx264 @ 000002242bddb800] frame P:15    Avg QP:28.30  size:   108
+[libx264 @ 000002242bddb800] frame B:44    Avg QP:31.34  size:    68
+[libx264 @ 000002242bddb800] consecutive B-frames:  1.7%  0.0%  5.0% 93.3%
+[libx264 @ 000002242bddb800] mb I  I16..4: 97.7%  0.0%  2.3%
+[libx264 @ 000002242bddb800] mb P  I16..4:  0.0%  0.0%  0.0%  P16..4:  1.6%  0.0%  0.0%  0.0%  0.0%    skip:98.4%
+[libx264 @ 000002242bddb800] mb B  I16..4:  0.0%  0.0%  0.0%  B16..8:  0.0%  0.0%  0.0%  direct: 0.0%  skip:100.0%
+[libx264 @ 000002242bddb800] 8x8 transform intra:0.0%
+[libx264 @ 000002242bddb800] coded y,uvDC,uvAC intra: 0.6% 2.5% 2.1% inter: 0.0% 0.4% 0.0%
+[libx264 @ 000002242bddb800] i16 v,h,dc,p: 67% 33%  0%  0%
+[libx264 @ 000002242bddb800] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 67% 19% 15%  0%  0%  0%  0%  0%  0%
+[libx264 @ 000002242bddb800] i8c dc,h,v,p: 27% 37% 36%  0%
+[libx264 @ 000002242bddb800] Weighted P-Frames: Y:0.0% UV:0.0%
+[libx264 @ 000002242bddb800] kb/s:33.62
+[in#0/rawvideo @ 000002242be53f40] Input file #0 (C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-1080-png.rgb):
+[in#0/rawvideo @ 000002242be53f40]   Input stream #0:0 (video): 73 packets read (454118400 bytes); 69 frames decoded; 0 decode errors; 
+[in#0/rawvideo @ 000002242be53f40]   Total: 73 packets (454118400 bytes) demuxed
+[AVIOContext @ 000002242be5d040] Statistics: 902016000 bytes read, 144 seeks

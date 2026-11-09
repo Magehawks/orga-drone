@@ -1,5 +1,7 @@
 # Issue #320: conditionally approved precision experiment
 
+> Final follow-up: the [RGB24-boundary isolated experiment](issue-320-final-rgb24-boundary.md) also failed its mandatory detail gate. No production/cache change was made. Precision work is stopped; `BLOCKED_PO_DECISION` remains. The report below is historical evidence.
+
 ## Outcome
 
 **`BLOCKED_PO_DECISION`. Experimental production/cache changes were reverted.**
