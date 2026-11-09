@@ -10053,6 +10053,7 @@ import {
   function selectedVideoClip() {
     const clip = selectedAdjustableClip();
     if (!clip || clip.dataset.kind !== "video") return null;
+    if (clip.dataset.available !== "1") return null;
     return clip;
   }
 
@@ -10892,12 +10893,6 @@ import {
     );
     if (overlap) paintHud(previewHudB, hit.overlapClip, hit.overlapLocalS || 0, 1);
     else paintHud(previewHudB, null, 0, null);
-  }
-
-  function selectedVideoClip() {
-    const clip = selectedAdjustableClip();
-    if (!clip || clip.dataset.kind !== "video") return null;
-    return clip;
   }
 
   function fillHud(clip) {
@@ -11977,10 +11972,6 @@ import {
     timelapseEditor?.fill();
     rampEditor?.fill();
   }
-  const selectedVideoClip = () => {
-    const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
-    return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
-  };
   const rampBounds = (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) });
   rampEditor = createSpeedRampEditor({
     panel: document.getElementById("inspector-speed-ramp"),
