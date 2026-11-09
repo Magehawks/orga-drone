@@ -36,9 +36,14 @@ DE/EN copy, Undo via the existing speed-ramp history path.
 ## Preview above 16× (review follow-up)
 
 Continuous HTML `playbackRate` is capped at 16. When any ramp point exceeds that
-ceiling (including flat 20× Timelapse), Studio pauses decode playback and advances
-Story time with wall-clock seek sampling on both preview layers so soundtrack
-alignment follows Story time. Export remains the authority for continuous 20×
-frame timing. Packaged WebView2 measurement of seek-sampling smoothness on real
-drone footage remains a human acceptance item; synthetic export probes do not
-claim live preview visual quality.
+ceiling (including flat 20× Timelapse), Studio:
+
+1. Pauses both preview video layers (no HTML autoplay while sampling).
+2. Advances Story time from the wall clock (soundtrack stays on Story time).
+3. Periodically reconciles source time with `seekVideoLocal` / secondary sync at
+   about 30 Hz (`SEEK_SAMPLE_MIN_INTERVAL_MS`), including transition overlaps.
+
+Export remains the authority for continuous 20× frame timing. **Human acceptance
+gate (not claimed by CI):** packaged Windows/WebView2 smoothness of seek-sampled
+20× preview on representative drone footage. Synthetic export probes and pure JS
+source-mapping tests do not claim live WebView2 visual quality.

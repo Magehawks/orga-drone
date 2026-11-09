@@ -108,6 +108,23 @@ export function rampNeedsSeekPreview(ramp) {
   );
 }
 
+/** Bound continuous seek sampling near 30 Hz to avoid decode overload. */
+export const SEEK_SAMPLE_MIN_INTERVAL_MS = 33;
+
+export function shouldReconcileSeekSample(
+  lastMs,
+  nowMs,
+  minIntervalMs = SEEK_SAMPLE_MIN_INTERVAL_MS
+) {
+  if (!finite(nowMs)) return false;
+  if (!finite(lastMs) || lastMs <= 0) return true;
+  return nowMs - lastMs >= minIntervalMs;
+}
+
+export function allowHtmlVideoAutoplay({ playing, seekSample }) {
+  return !!playing && !seekSample;
+}
+
 export function captureValidatedDraft({ clipId, start, end, field, draft }) {
   if (!draft || clipId === null || clipId === undefined || !finite(start) || !finite(end))
     return null;

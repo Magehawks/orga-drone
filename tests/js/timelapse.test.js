@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_TIMELAPSE_SPEED,
+  SEEK_SAMPLE_MIN_INTERVAL_MS,
+  allowHtmlVideoAutoplay,
   allowedTargetRange,
   captureValidatedDraft,
   clampPreviewPlaybackRate,
@@ -9,10 +11,15 @@ import {
   draftFromTarget,
   flatTimelapseRamp,
   rampNeedsSeekPreview,
+  shouldReconcileSeekSample,
   timelapseConflict,
   validatedDraftMatches,
 } from "../../src/orga_drone/static/js/studio/timelapse.js";
-import { parseRamp, rampTime } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
+import {
+  parseRamp,
+  rampSource,
+  rampTime,
+} from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
 test("target duration and speed multiplier stay synchronized", () => {
   const eight = draftFromTarget(120, 15);
@@ -80,4 +87,17 @@ test("flat timelapse ramps reuse the shared ADR 0034 parser", () => {
       ],
     })
   );
+});
+
+test("seek-sampled 20× preview advances source with Story time and blocks HTML autoplay", () => {
+  const ramp = flatTimelapseRamp(30, 330, 20);
+  assert.ok(rampNeedsSeekPreview(ramp));
+  // Wall-clock Story +0.5 s at 20× must land +10 s into the source span.
+  assert.ok(Math.abs(rampSource(ramp, 0.5, 30, 330) - 40) < 1e-9);
+  assert.ok(Math.abs(rampTime(ramp, 40) - rampTime(ramp, 30) - 0.5) < 1e-9);
+  assert.equal(allowHtmlVideoAutoplay({ playing: true, seekSample: true }), false);
+  assert.equal(allowHtmlVideoAutoplay({ playing: true, seekSample: false }), true);
+  assert.equal(shouldReconcileSeekSample(0, 10), true);
+  assert.equal(shouldReconcileSeekSample(100, 100 + SEEK_SAMPLE_MIN_INTERVAL_MS - 1), false);
+  assert.equal(shouldReconcileSeekSample(100, 100 + SEEK_SAMPLE_MIN_INTERVAL_MS), true);
 });

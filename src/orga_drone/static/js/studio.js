@@ -9,7 +9,12 @@ import {
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
-import { clampPreviewPlaybackRate, rampNeedsSeekPreview } from "./studio/timelapse.js";
+import {
+  allowHtmlVideoAutoplay,
+  clampPreviewPlaybackRate,
+  rampNeedsSeekPreview,
+  shouldReconcileSeekSample,
+} from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -392,6 +397,7 @@ import {
   let playheadWasPlaying = false;
   let wallClockRaf = 0;
   let wallClockLastMs = 0;
+  let lastSeekSampleMs = 0;
   let suppressVideoClock = false;
   let crossfadePreloadId = null;
   let videoLoopIndex = 0;
@@ -5630,11 +5636,14 @@ import {
         const inS = loopPlayInS(clip);
         const speed = playbackSpeed(clip);
         const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, localS)), src);
+        const seekSample = rampNeedsSeekPreview(speedRampOf(clip));
+        const mayPlay = allowHtmlVideoAutoplay({ playing: state.playing, seekSample });
         const sync = () => {
           try {
             applyClipPlayback(previewVideoB, clip);
             const drift = Math.abs((previewVideoB.currentTime || 0) - target);
-            if (!state.playing || drift > 0.04) previewVideoB.currentTime = target;
+            // Seek-sampled >16× previews must always snap; continuous playbackRate is off.
+            if (!mayPlay || drift > 0.04) previewVideoB.currentTime = target;
           } catch (_) {
             /* ignore */
           }
@@ -5668,12 +5677,12 @@ import {
             { once: true }
           );
         }
-        if (state.playing && previewVideoB.paused) {
+        if (mayPlay && previewVideoB.paused) {
           previewVideoB.play().catch(() => {
             /* drift correction still runs on the existing clock updates */
           });
         }
-        if (!state.playing && !previewVideoB.paused) {
+        if (!mayPlay && !previewVideoB.paused) {
           try {
             previewVideoB.pause();
           } catch (_) {
@@ -5738,12 +5747,16 @@ import {
     };
     if (previewVideoB.readyState >= 1) seek();
     else previewVideoB.addEventListener("loadedmetadata", seek, { once: true });
-    if (state.playing && previewVideoB.paused) {
+    const mayPlay = allowHtmlVideoAutoplay({
+      playing: state.playing,
+      seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+    });
+    if (mayPlay && previewVideoB.paused) {
       previewVideoB.play().catch(() => {
         /* the outgoing picture still advances */
       });
     }
-    if (!state.playing && !previewVideoB.paused) {
+    if (!mayPlay && !previewVideoB.paused) {
       try {
         previewVideoB.pause();
       } catch (_) {
@@ -6035,7 +6048,13 @@ import {
         updateCutEnabled();
         return;
       }
-      showVideo(src, localS, { play: state.playing && !atEnd, clip });
+      showVideo(src, localS, {
+        play: allowHtmlVideoAutoplay({
+          playing: state.playing && !atEnd,
+          seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+        }),
+        clip,
+      });
       applyTransitionPreview(hit);
       updateCutEnabled();
       return;
@@ -6103,6 +6122,42 @@ import {
     pausePlayback();
   }
 
+  function pausePreviewVideoLayers() {
+    for (const video of [previewVideo, previewVideoB]) {
+      if (!video) continue;
+      try {
+        if (!video.paused) video.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
+  function hitNeedsSeekSample(hit) {
+    if (!hit) return false;
+    if (rampNeedsSeekPreview(speedRampOf(hit.clip))) return true;
+    return !!(hit.overlapClip && rampNeedsSeekPreview(speedRampOf(hit.overlapClip)));
+  }
+
+  function reconcileSeekSamplePreview(hit, nowMs) {
+    if (!hit || !hitNeedsSeekSample(hit)) {
+      applyTransitionPreview(hit);
+      return;
+    }
+    pausePreviewVideoLayers();
+    if (shouldReconcileSeekSample(lastSeekSampleMs, nowMs)) {
+      lastSeekSampleMs = nowMs;
+      // Keep the HTML decoder paused and snap both layers to Story-mapped source time.
+      seekVideoLocal(hit.localS, hit.clip);
+      applyTransitionPreview(hit);
+      pausePreviewVideoLayers();
+      return;
+    }
+    // Cadence gate: still refresh overlays/grades without a new decode seek.
+    applyTransitionPreview(hit);
+    pausePreviewVideoLayers();
+  }
+
   function wallClockTick(nowMs) {
     if (!state.playing) {
       stopWallClock();
@@ -6127,12 +6182,17 @@ import {
       return;
     }
     if (!before || before.clip !== after.clip) {
+      lastSeekSampleMs = 0;
       syncPreviewMedia({ seek: true });
       beginClockForActiveClip();
       syncMusicAudio();
       return;
     }
-    applyTransitionPreview(after);
+    if (hitNeedsSeekSample(after)) {
+      reconcileSeekSamplePreview(after, nowMs);
+    } else {
+      applyTransitionPreview(after);
+    }
     syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
   }
@@ -6153,25 +6213,13 @@ import {
     const kind = hit.clip.dataset.kind || "unknown";
     const canPlay = hit.clip.dataset.canPlay === "1";
     // Speeds above the HTMLMediaElement ceiling cannot keep Story/music time
-    // honest via playbackRate alone. Drive Story from the wall clock and seek
-    // both preview layers (same path as photo stills) so export timing stays
-    // the authority for continuous 20× playback.
-    if (kind === "video" && canPlay && videoSrcFor(hit.clip) && rampNeedsSeekPreview(speedRampOf(hit.clip))) {
-      if (previewVideo) {
-        try {
-          previewVideo.pause();
-        } catch (_) {
-          /* ignore */
-        }
-      }
-      if (previewVideoB) {
-        try {
-          previewVideoB.pause();
-        } catch (_) {
-          /* ignore */
-        }
-      }
+    // honest via playbackRate alone. Drive Story from the wall clock and
+    // periodically seek both preview layers while keeping HTML video paused.
+    if (kind === "video" && canPlay && videoSrcFor(hit.clip) && hitNeedsSeekSample(hit)) {
+      pausePreviewVideoLayers();
+      lastSeekSampleMs = 0;
       syncPreviewMedia({ seek: true });
+      pausePreviewVideoLayers();
       startWallClock();
       return;
     }
