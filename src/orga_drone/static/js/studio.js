@@ -1,5 +1,12 @@
 import "./studio-lut-webgl.js";
-import { parseRamp, rampTime, rampSpeed, rampSource, rampMediaTime } from "./studio/speed-ramp.js";
+import {
+  edgeSourceAfterRampDrag,
+  parseRamp,
+  rampMediaTime,
+  rampSource,
+  rampSpeed,
+  rampTime,
+} from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
@@ -8496,11 +8503,16 @@ import {
     );
     const ramp = speedRampOf(edgeDrag.clip);
     if (ramp) {
-      const source = edgeDrag.edge === "in" ? edgeDrag.startIn : edgeDrag.startOut;
-      const mapped = rampSource(ramp, rampTime(ramp, source) + deltaStory / edgeDrag.repeats, 0, edgeDrag.catalog);
-      next = edgeDrag.edge === "in"
-        ? { inS: Math.min(edgeDrag.startOut - 0.05, mapped), outS: edgeDrag.startOut }
-        : { inS: edgeDrag.startIn, outS: Math.max(edgeDrag.startIn + 0.05, mapped) };
+      // Absolute primitive + dedicated inverse; do not pass absolute time as a
+      // relative rampSource(story, start=0) argument.
+      next = edgeSourceAfterRampDrag(ramp, {
+        edge: edgeDrag.edge,
+        sourceIn: edgeDrag.startIn,
+        sourceOut: edgeDrag.startOut,
+        deltaStory,
+        repeats: edgeDrag.repeats,
+        catalog: edgeDrag.catalog,
+      });
     }
     edgeDrag.currentIn = next.inS;
     edgeDrag.currentOut = next.outS;

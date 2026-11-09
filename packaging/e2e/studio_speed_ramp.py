@@ -238,6 +238,93 @@ def run(out: Path, *, proxy_case: bool = False) -> None:
         assert ramp(ids[0]) == before
         evidence["numeric_edit_undo_redo"] = True
         select(ids[0])
+        # Nonzero source-in and headroom on source-out so an out-edge expand is
+        # possible; Story delta must follow the absolute ramp inverse.
+        ev(
+            "document.getElementById('inspector-source-in').value='1';document.getElementById('inspector-source-in').dispatchEvent(new Event('change',{bubbles:true}))"
+        )
+        until(
+            f"Number(document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]').dataset.sourceIn)===1"
+        )
+        ev(
+            "document.getElementById('inspector-source-out').value='3';document.getElementById('inspector-source-out').dispatchEvent(new Event('change',{bubbles:true}))"
+        )
+        until(
+            f"Number(document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]').dataset.sourceOut)===3"
+        )
+        ev(
+            "document.querySelector('[data-ramp-preset]').value='slow_fast_slow';document.querySelector('[data-ramp-apply]').click()"
+        )
+        until("!document.querySelector('[data-ramp-apply]').disabled")
+        before_edge = ev(
+            f"""(async()=>{{
+              const {{rampTime}}=await import('/static/js/studio/speed-ramp.js');
+              const clip=document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]');
+              const r=JSON.parse(clip.dataset.speedRamp);
+              return {{
+                in:Number(clip.dataset.sourceIn),
+                out:Number(clip.dataset.sourceOut),
+                story:Number(clip.dataset.effectiveDuration),
+                primitive:rampTime(r,Number(clip.dataset.sourceOut))-rampTime(r,Number(clip.dataset.sourceIn)),
+              }};
+            }})()"""
+        )
+        assert before_edge["in"] == 1
+        assert before_edge["out"] == 3
+        # Drive the same absolute inverse the edge-drag path uses, then persist
+        # through the inspector so WebView2 verifies UI→API timing without
+        # relying on synthetic pointer button quirks.
+        planned = ev(
+            f"""(async()=>{{
+              const {{edgeSourceAfterRampDrag,parseRamp,rampTime}}=await import('/static/js/studio/speed-ramp.js');
+              const clip=document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]');
+              const ramp=parseRamp(JSON.parse(clip.dataset.speedRamp));
+              const next=edgeSourceAfterRampDrag(ramp,{{
+                edge:'out',
+                sourceIn:Number(clip.dataset.sourceIn),
+                sourceOut:Number(clip.dataset.sourceOut),
+                deltaStory:0.9,
+                repeats:1,
+                catalog:Number(clip.dataset.mediaDuration),
+              }});
+              return {{
+                ...next,
+                expectedStory:rampTime(ramp,next.outS)-rampTime(ramp,next.inS),
+              }};
+            }})()"""
+        )
+        assert planned["outS"] > before_edge["out"]
+        ev(
+            f"document.getElementById('inspector-source-out').value='{planned['outS']}';document.getElementById('inspector-source-out').dispatchEvent(new Event('change',{{bubbles:true}}))"
+        )
+        until(
+            f"Math.abs(Number(document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]').dataset.sourceOut)-{planned['outS']})<0.011"
+        )
+        after_edge = ev(
+            f"""(async()=>{{
+              const {{rampTime,parseRamp}}=await import('/static/js/studio/speed-ramp.js');
+              const clip=document.querySelector('#studio-grid [data-studio-id=\"{ids[0]}\"]');
+              const r=parseRamp(JSON.parse(clip.dataset.speedRamp));
+              const out=Number(clip.dataset.sourceOut);
+              const inS=Number(clip.dataset.sourceIn);
+              return {{
+                in:inS,
+                out,
+                story:Number(clip.dataset.effectiveDuration),
+                deltaStory:rampTime(r,out)-rampTime(r,{before_edge["out"]}),
+              }};
+            }})()"""
+        )
+        assert after_edge["in"] == 1
+        assert abs(after_edge["out"] - planned["outS"]) < 0.011
+        assert abs(after_edge["story"] - planned["expectedStory"]) < 0.05
+        assert after_edge["deltaStory"] > 0.05
+        evidence["trimmed_edge_drag"] = {
+            "before": before_edge,
+            "planned": planned,
+            "after": after_edge,
+        }
+        select(ids[0])
         ev(
             "document.querySelector('[data-ramp-preset]').value='slow_fast_slow';document.querySelector('[data-ramp-apply]').click()"
         )
