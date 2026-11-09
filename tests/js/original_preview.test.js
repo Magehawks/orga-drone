@@ -117,6 +117,8 @@ function harness() {
     videoSrcFor: () => "synthetic-story",
     lutProxySrcFor: () => "",
     speedRampOf: () => null,
+    rampNeedsSeekPreview: () => false,
+    allowHtmlVideoAutoplay: ({ playing, seekSample }) => !!playing && !seekSample,
     storyToSource: (_clip, time) => time,
     playSourceOffset: (_clip, time) => time,
     secondaryVideoTarget: (_clip, time) => time,

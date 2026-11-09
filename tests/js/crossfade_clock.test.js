@@ -76,6 +76,9 @@ function scenario(options = {}) {
     playbackSpeed: () => 2,
     playSourceOffset: (_, time) => time * 2,
     secondaryVideoTarget: (_, time) => 1.5 + time * 2,
+    speedRampOf: () => null,
+    rampNeedsSeekPreview: () => false,
+    allowHtmlVideoAutoplay: ({ playing, seekSample }) => !!playing && !seekSample,
     applyClipPlayback: () => {
       video.playbackRate = 2;
       events.push("applyClipPlayback");
@@ -178,6 +181,9 @@ function preloadScenario(options = {}) {
     playbackSpeed: () => options.speed ?? 1,
     playSourceOffset: (_, time) => time * (options.speed ?? 1),
     secondaryVideoTarget: (_, time) => time * (options.speed ?? 1),
+    speedRampOf: () => options.ramp ?? null,
+    rampNeedsSeekPreview: (ramp) => !!(options.seekSample || ramp),
+    allowHtmlVideoAutoplay: ({ playing, seekSample }) => !!playing && !seekSample,
     applyClipPlayback: () => events.push("applyClipPlayback"),
   });
   const names = ["clearCrossfadePreload", "prepareOutgoingCrossfade"];
@@ -222,4 +228,14 @@ test("outgoing preload keeps the clip speed mapping", () => {
   const result = preloadScenario({ speed: 2, localS: 1.6 });
   assert.equal(result.prepared, true);
   assert.equal(result.video.currentTime, 3.2);
+});
+
+test("outgoing preload stays paused for seek-sampled >16× ramps", () => {
+  const result = preloadScenario({
+    seekSample: true,
+    ramp: { points: [{ speed: 20 }, { speed: 20 }] },
+  });
+  assert.equal(result.prepared, true);
+  assert.equal(result.video.paused, true);
+  assert.ok(!result.events.includes("play"));
 });

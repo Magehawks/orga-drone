@@ -5459,7 +5459,13 @@ import {
         if (reuseDraft || !clip || loadedVideoSrc !== lutSrc) return;
         delete clip.dataset.lutProxyUrl;
         loadedVideoSrc = "";
-        showVideo(videoSrcFor(clip), localS, { play: state.playing, clip });
+        showVideo(videoSrcFor(clip), localS, {
+          play: allowHtmlVideoAutoplay({
+            playing: state.playing,
+            seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+          }),
+          clip,
+        });
       }, { once: true });
     }
     applyClipPlayback(previewVideo, clip);
@@ -5570,6 +5576,8 @@ import {
     const id = String(clip.dataset.studioId);
     const inS = loopPlayInS(clip);
     const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, hit.localS)), videoSrcFor(clip));
+    const seekSample = rampNeedsSeekPreview(speedRampOf(clip));
+    const mayPlay = allowHtmlVideoAutoplay({ playing: state.playing, seekSample });
     const sync = () => {
       if (crossfadePreloadId !== id || !state.playing) return;
       try {
@@ -5580,10 +5588,18 @@ import {
       } catch (_) {
         /* ignore */
       }
-      if (previewVideoB.paused) {
+      // Seek-sampled >16× previews must not thrash HTML autoplay on the preload layer.
+      if (mayPlay && previewVideoB.paused) {
         previewVideoB.play().catch(() => {
           /* the normal outgoing seek path remains the fallback */
         });
+      }
+      if (!mayPlay && !previewVideoB.paused) {
+        try {
+          previewVideoB.pause();
+        } catch (_) {
+          /* ignore */
+        }
       }
     };
     if (crossfadePreloadId === id) {
