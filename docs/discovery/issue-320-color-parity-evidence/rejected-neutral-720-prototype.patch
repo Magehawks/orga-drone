@@ -1,0 +1,36 @@
+diff --git a/src/orga_drone/app.py b/src/orga_drone/app.py
+--- a/src/orga_drone/app.py
++++ b/src/orga_drone/app.py
+@@ -2296,7 +2296,7 @@
+         else:
+             image = image_adjust_from_effect_settings(clip.effect_settings)
+             look = base_look
+-        if not color_needs_preview_still(look, hsl, color_wheels):
++        if clip.kind != "photo" and not color_needs_preview_still(look, hsl, color_wheels):
+             raise HTTPException(
+                 status_code=422,
+                 detail="No color file, HSL adjustment, or color wheels are active on this clip.",
+diff --git a/src/orga_drone/static/js/studio.js b/src/orga_drone/static/js/studio.js
+--- a/src/orga_drone/static/js/studio.js
++++ b/src/orga_drone/static/js/studio.js
+@@ -2619,7 +2619,9 @@
+       const hslActive = !hslIsNeutral(hsl);
+       const wheelsActive = !colorWheelsIsNeutral(colorWheels);
+       const lookActive = colorLookNeedsStill(look, clip);
+-      if (!lookActive && !hslActive && !wheelsActive) {
++      // Neutral photos need the same normalized source/color conversion as
++      // export too; reuse the bounded photo owner rather than raw RGB pixels.
++      if (clip.dataset.kind !== "photo" && !lookActive && !hslActive && !wheelsActive) {
+         clearLutPreviewStill();
+         return;
+       }
+@@ -2723,7 +2725,8 @@
+             const hit = resolveAt(state.projectTimeS);
+             const composite = hit && (hit.overlapClip ||
+               (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
+-            const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
++            const stillLabel = !lookActive && !hslActive && !wheelsActive
++              ? "" : composite ? msgLutChipComposite : msgLutChipStill;
+             setChip(
+               lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
+             );

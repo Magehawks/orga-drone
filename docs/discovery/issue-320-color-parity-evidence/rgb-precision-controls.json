@@ -1,0 +1,1019 @@
+{
+  "rgb24-bicubic": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=rgb24,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.451164641203704,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            178.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "rgb24-bicubic+accurate_rnd": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=rgb24,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.53111255787037,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            176.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "rgb24-bicubic+accurate_rnd+full_chroma_int": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=rgb24,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.53111255787037,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            176.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "gbrp-bicubic": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrp,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.451164641203704,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            178.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "gbrp-bicubic+accurate_rnd": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrp,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.53111255787037,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            176.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "gbrp-bicubic+accurate_rnd+full_chroma_int": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrp,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.53111255787037,
+      "max_swatch_mean_rgb_error": 3.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            178.0,
+            97.0,
+            58.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            67.0,
+            168.0,
+            93.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            176.0,
+            62.0,
+            137.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        },
+        {
+          "a": [
+            207.0,
+            176.0,
+            67.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 3.3333333333333335
+        }
+      ]
+    }
+  },
+  "gbrpf32le-bicubic": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrpf32le,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 2.0879267939814814,
+      "max_swatch_mean_rgb_error": 2.6666666666666665,
+      "patches": [
+        {
+          "a": [
+            176.0,
+            98.0,
+            59.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            51.0,
+            119.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.6666666666666665
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            68.0,
+            169.0,
+            94.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 1.3333333333333333
+        },
+        {
+          "a": [
+            178.0,
+            63.0,
+            138.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            178.0,
+            68.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 2.0
+        }
+      ]
+    }
+  },
+  "gbrpf32le-bicubic+accurate_rnd": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrpf32le,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 1.9273784722222222,
+      "max_swatch_mean_rgb_error": 2.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            179.0,
+            98.0,
+            59.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 1.3333333333333333
+        },
+        {
+          "a": [
+            53.0,
+            118.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            68.0,
+            169.0,
+            94.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 1.3333333333333333
+        },
+        {
+          "a": [
+            178.0,
+            63.0,
+            138.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            178.0,
+            68.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 2.0
+        }
+      ]
+    }
+  },
+  "gbrpf32le-bicubic+accurate_rnd+full_chroma_int": {
+    "chain": "scale=in_color_matrix=bt601:in_range=pc,format=gbrpf32le,scale=1280:720:out_color_matrix=bt709:out_range=tv:flags=bicubic+accurate_rnd+full_chroma_int,format=yuv420p,setparams=colorspace=bt709:range=tv,scale=640:360:in_color_matrix=bt709:in_range=tv,format=rgb24",
+    "compare": {
+      "full_mean_rgb_error": 1.9273784722222222,
+      "max_swatch_mean_rgb_error": 2.3333333333333335,
+      "patches": [
+        {
+          "a": [
+            179.0,
+            98.0,
+            59.0
+          ],
+          "b": [
+            180.0,
+            100.0,
+            60.0
+          ],
+          "mean_rgb_error": 1.3333333333333333
+        },
+        {
+          "a": [
+            53.0,
+            118.0,
+            182.0
+          ],
+          "b": [
+            55.0,
+            120.0,
+            185.0
+          ],
+          "mean_rgb_error": 2.3333333333333335
+        },
+        {
+          "a": [
+            126.0,
+            126.0,
+            126.0
+          ],
+          "b": [
+            128.0,
+            128.0,
+            128.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "b": [
+            32.0,
+            32.0,
+            32.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            208.0,
+            208.0
+          ],
+          "b": [
+            210.0,
+            210.0,
+            210.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            68.0,
+            169.0,
+            94.0
+          ],
+          "b": [
+            70.0,
+            170.0,
+            95.0
+          ],
+          "mean_rgb_error": 1.3333333333333333
+        },
+        {
+          "a": [
+            178.0,
+            63.0,
+            138.0
+          ],
+          "b": [
+            180.0,
+            65.0,
+            140.0
+          ],
+          "mean_rgb_error": 2.0
+        },
+        {
+          "a": [
+            208.0,
+            178.0,
+            68.0
+          ],
+          "b": [
+            210.0,
+            180.0,
+            70.0
+          ],
+          "mean_rgb_error": 2.0
+        }
+      ]
+    }
+  }
+}

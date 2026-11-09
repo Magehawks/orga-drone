@@ -1,0 +1,36 @@
+{
+  "synthetic_only": true,
+  "analysis_only": true,
+  "exe_sha256": "b4f2fe86cff82eb62e4996c4d963d1bb180466d86eac3011c848428b861cc58e",
+  "css_size": [
+    640,
+    360
+  ],
+  "dpr": 3,
+  "backing_size": [
+    1920,
+    1080
+  ],
+  "source_sha256": "7c891689bace86bde18474c696d6e7fcd0c9e0f5c650f75b85924a1e793f7a93",
+  "strict_color_gate": "not measured by this detail control",
+  "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+  "full_frame_mean_rgb_error": 126.61055057227367,
+  "original_stddev": [
+    127.5,
+    127.5,
+    127.5
+  ],
+  "prototype_stddev": [
+    14.808057709223878,
+    14.79458751152657,
+    14.802098329852436
+  ],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/157.0.4341.42",
+    "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "jsVersion": "15.7.11.4"
+  },
+  "sources_unchanged": true
+}

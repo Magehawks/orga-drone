@@ -1,0 +1,31 @@
+{
+  "status": "BLOCKED_PO_DECISION",
+  "retained_production_changes": false,
+  "strict_threshold": 3.0,
+  "strict_production_gate": "FAIL",
+  "final_focused_tests": {
+    "passed": 23
+  },
+  "rejected_prototype_focused_tests": {
+    "passed": 26,
+    "production_changes_reverted": true
+  },
+  "ruff": "PASS",
+  "mypy": "PASS:78 source files",
+  "javascript_tooling": {
+    "passed": 106,
+    "temporary_changes_reverted": true
+  },
+  "packaged_baseline": {
+    "scenarios": 13,
+    "pairs": 71,
+    "strict_probe_exit": 1
+  },
+  "packaged_rejected_prototype": {
+    "scenarios": 13,
+    "pairs": 71,
+    "strict_probe_exit": 1
+  },
+  "full_suite_repeated": false,
+  "actual_independent_pr_review": "requested after PR creation; pending"
+}

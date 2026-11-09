@@ -1,0 +1,14 @@
+{
+  "baseline_develop_commit": "3d72528126931569ad8490a1a79b94c1326f17f2",
+  "production_commit_used_to_build_reused_baseline": "ac5bacfa46f3ea20de30bde439654340548c8906",
+  "baseline_src_and_packaging_spec_equal": true,
+  "baseline_exe_sha256": "b4f2fe86cff82eb62e4996c4d963d1bb180466d86eac3011c848428b861cc58e",
+  "baseline_zip_sha256": "340359b234e0405f6cbce737b097afcc400303f055381ad50c11fb54c0aca6cb",
+  "prototype_exe_sha256": "1d7d66458e29d671b7eaa9fb46742179416792b07a5b74f116b5b9e864088573",
+  "prototype_zip_sha256": "f81ac7a510ce01cf654a64691798e5d0ce6aadccdb79cb16142f0e12aa2dcf08",
+  "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+  "production_changes_retained": false,
+  "strict_threshold": 3.0,
+  "status": "BLOCKED_PO_DECISION",
+  "synthetic_only": true
+}

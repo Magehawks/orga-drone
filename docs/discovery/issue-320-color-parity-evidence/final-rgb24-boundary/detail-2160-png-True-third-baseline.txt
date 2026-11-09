@@ -1,0 +1,76 @@
+[rawvideo @ 000001dfd5454100] Estimating duration from bitrate, this may be inaccurate
+Input #0, rawvideo, from 'C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-2160-png.rgb':
+  Duration: 00:00:00.03, start: 0.000000, bitrate: 5972027 kb/s
+  Stream #0:0: Video: rawvideo, 1 reference frame (RGB[24] / 0x18424752), rgb24, 3840x2160, 5971968 kb/s, 30 tbr, 30 tbn
+[out#0/image2 @ 000001dfd5449500] No explicit maps, mapping streams automatically...
+[vost#0:0/png @ 000001dfd544bf40] Created video stream from input stream 0:0
+[Parsed_scale_1 @ 000001dfd545fa40] w:1280 h:720 flags:'' interl:0
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> png (native))
+[vost#0:0/png @ 000001dfd544bf40] Starting thread...
+[vf#0:0 @ 000001dfd544edc0] Starting thread...
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Starting thread...
+[in#0/rawvideo @ 000001dfd5453d80] Starting thread...
+Press [q] to stop, [?] for help
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[Parsed_scale_1 @ 000001dfd5465e80] w:1280 h:720 flags:'' interl:0
+[graph -1 input from stream 0:0 @ 000001dfd547ba00] w:3840 h:2160 pixfmt:rgb24 tb:1/30 fr:30/1 sar:0/1 csp:unknown range:unknown
+[Parsed_scale_1 @ 000001dfd5465e80] w:3840 h:2160 fmt:rgb24 csp:gbr range:pc sar:0/1 -> w:1280 h:720 fmt:rgb24 csp:gbr range:pc sar:0/1 flags:0x00002004
+[Parsed_scale_1 @ 000001dfd5465e80] [framesync @ 000001dfd5465fa8] Selected 1/30 time base
+[Parsed_scale_1 @ 000001dfd5465e80] [framesync @ 000001dfd5465fa8] Sync level 1
+[graph -1 input from stream 0:0 @ 000001dfd547ba00] video frame properties congruent with link at pts_time: 0
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder thread received flush packet
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, resetting
+Output #0, image2, to 'C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-2160-png-True-third-baseline.png':
+  Metadata:
+    encoder         : Lavf61.7.100
+  Stream #0:0: Video: png, 1 reference frame, rgb24(pc, gbr/unknown/unknown, progressive), 1280x720, q=2-31, 200 kb/s, 30 fps, 30 tbn
+      Metadata:
+        encoder         : Lavc61.19.100 png
+[out#0/image2 @ 000001dfd5449500] Starting thread...
+[vf#0:0 @ 000001dfd544edc0] All consumers returned EOF
+[vf#0:0 @ 000001dfd544edc0] Terminating thread with return code 0 (success)
+[in#0/rawvideo @ 000001dfd5453d80] EOF while reading input
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Decoder returned EOF, finishing
+[vist#0:0/rawvideo @ 000001dfd545d600] [dec:rawvideo @ 000001dfd545f840] Terminating thread with return code 0 (success)
+[vost#0:0/png @ 000001dfd544bf40] Encoder thread received EOF
+[vost#0:0/png @ 000001dfd544bf40] Terminating thread with return code 0 (success)
+[image2 @ 000001dfd5449640] The specified filename 'C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-2160-png-True-third-baseline.png' does not contain an image sequence pattern or a pattern is invalid.
+[image2 @ 000001dfd5449640] Use a pattern such as %03d for an image sequence or use the -update option (with -frames:v 1 if needed) to write a single image.
+[AVIOContext @ 000001dfd5442740] Statistics: 10612 bytes written, 0 seeks, 1 writeouts
+[out#0/image2 @ 000001dfd5449500] All streams finished
+[out#0/image2 @ 000001dfd5449500] Terminating thread with return code 0 (success)
+[in#0/rawvideo @ 000001dfd5453d80] Terminating thread with return code 0 (success)
+[out#0/image2 @ 000001dfd5449500] Output file #0 (C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-2160-png-True-third-baseline.png):
+[out#0/image2 @ 000001dfd5449500]   Output stream #0:0 (video): 1 frames encoded; 1 packets muxed (10612 bytes); 
+[out#0/image2 @ 000001dfd5449500]   Total: 1 packets (10612 bytes) muxed
+[out#0/image2 @ 000001dfd5449500] video:10KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=    1 fps=0.0 q=-0.0 Lsize=N/A time=00:00:00.03 bitrate=N/A speed=0.129x    
+[in#0/rawvideo @ 000001dfd5453d80] Input file #0 (C:\Users\Niwes\.codex\worktrees\0699\orga-drone\build\final-rgb24-isolated\detail-2160-png.rgb):
+[in#0/rawvideo @ 000001dfd5453d80]   Input stream #0:0 (video): 11 packets read (273715200 bytes); 10 frames decoded; 0 decode errors; 
+[in#0/rawvideo @ 000001dfd5453d80]   Total: 11 packets (273715200 bytes) demuxed
+[AVIOContext @ 000001dfd545d000] Statistics: 522547200 bytes read, 20 seeks

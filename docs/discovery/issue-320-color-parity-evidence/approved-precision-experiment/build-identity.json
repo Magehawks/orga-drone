@@ -1,0 +1,14 @@
+{
+  "baseline_commit": "3d72528126931569ad8490a1a79b94c1326f17f2",
+  "baseline_exe_sha256": "b4f2fe86cff82eb62e4996c4d963d1bb180466d86eac3011c848428b861cc58e",
+  "candidate_exe_sha256": "b66d75485088ae3c9ed28ae0215b8cbedfc369c5c72233fbef257d0c3cf257f8",
+  "candidate_zip_sha256": "ae81459dda2008a8768e60a02a7b920db2c651e150da75f7f06462cfc27f75b8",
+  "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+  "candidate_source_normalized_lf_sha256": {
+    "src/orga_drone/studio_lut.py": "8c21e579587a2fc3e6fd3dc2f4833058470e468ee955e98cbe7902fd9021ff4d",
+    "src/orga_drone/studio_preview_frame.py": "e382976a6be614f59443cf9ef2d366a0e3f946a953f5edaeb413a64f092b45c5",
+    "src/orga_drone/studio_playback_proxy.py": "48201f0006b86ab2adcf8413a66144844a013a78bdf7342dd4d6cef5b701b46d"
+  },
+  "retained_production_changes": false,
+  "status": "BLOCKED_PO_DECISION"
+}

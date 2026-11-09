@@ -1,0 +1,80 @@
+[
+  {
+    "scenario": "jpg-neutral",
+    "baseline_and_final_production": 4.333333333333333,
+    "rejected_candidate": 4.333333333333333,
+    "candidate_strict_pass": false
+  },
+  {
+    "scenario": "jpg-creative0",
+    "baseline_and_final_production": 1.6666666666666667,
+    "rejected_candidate": 1.6666666666666667,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "jpg-creative50",
+    "baseline_and_final_production": 1.3333333333333333,
+    "rejected_candidate": 1.3304597701149425,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "jpg-creative100",
+    "baseline_and_final_production": 2.2241379310344827,
+    "rejected_candidate": 2.043103448275862,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "jpg-conversion",
+    "baseline_and_final_production": 2.2241379310344827,
+    "rejected_candidate": 2.043103448275862,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "png-neutral",
+    "baseline_and_final_production": 4.666666666666667,
+    "rejected_candidate": 4.666666666666667,
+    "candidate_strict_pass": false
+  },
+  {
+    "scenario": "png-creative0",
+    "baseline_and_final_production": 1.6666666666666667,
+    "rejected_candidate": 1.6666666666666667,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "png-creative50",
+    "baseline_and_final_production": 1.3333333333333333,
+    "rejected_candidate": 1.3304597701149425,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "png-creative100",
+    "baseline_and_final_production": 2.2241379310344827,
+    "rejected_candidate": 2.043103448275862,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "png-conversion",
+    "baseline_and_final_production": 2.2241379310344827,
+    "rejected_candidate": 2.043103448275862,
+    "candidate_strict_pass": true
+  },
+  {
+    "scenario": "photos-different",
+    "baseline_and_final_production": 3.313218390804598,
+    "rejected_candidate": 3.3333333333333335,
+    "candidate_strict_pass": false
+  },
+  {
+    "scenario": "photo-video",
+    "baseline_and_final_production": 4.0,
+    "rejected_candidate": 3.1120689655172415,
+    "candidate_strict_pass": false
+  },
+  {
+    "scenario": "video-photo",
+    "baseline_and_final_production": 3.6666666666666665,
+    "rejected_candidate": 3.103448275862069,
+    "candidate_strict_pass": false
+  }
+]
