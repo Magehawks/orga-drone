@@ -52,6 +52,20 @@ Existing project snapshots already retain the complete JSON. Unrelated keys
 must survive every save. Old versions ignore this key and cannot reproduce
 ramped timing; remove ramps in a supporting version before downgrading.
 
+## Performance and limits
+
+A story with no ramp keeps the existing encoder path and continuous durations.
+A ramped clip is a timing adapter: source samples stay intact until one
+nonlinear `setpts` and the final 30 fps step. Slow sections repeat source
+frames and fast sections omit them. There is no optical flow. Source audio is
+silent for the whole ramped clip, including stretches that pass through 1×.
+Preview updates `playbackRate` on the existing paint loop. The browser may drop
+preview frames on demanding 4K playback; that does not change the export.
+The compact curve in [assets/0034-speed-ramp-curve.png](assets/0034-speed-ramp-curve.png)
+is the selected interaction. Source-app WebView2 measurements use synthetic
+60 fps media. They do not establish private drone footage quality or packaged
+release readiness.
+
 ## Validation requirement
 
 Shared mapping fixtures, trim/cut, transitions, history, reopen, malformed values,
