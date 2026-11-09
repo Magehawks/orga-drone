@@ -32,3 +32,13 @@ stored ramps as malformed and fall back to legacy timing. Preview clamps HTML
 Inspector Timelapse with synchronized target duration and speed multiplier,
 explicit Apply, conflict blocking for active ramps / repeats / soundtrack loops,
 DE/EN copy, Undo via the existing speed-ramp history path.
+
+## Preview above 16× (review follow-up)
+
+Continuous HTML `playbackRate` is capped at 16. When any ramp point exceeds that
+ceiling (including flat 20× Timelapse), Studio pauses decode playback and advances
+Story time with wall-clock seek sampling on both preview layers so soundtrack
+alignment follows Story time. Export remains the authority for continuous 20×
+frame timing. Packaged WebView2 measurement of seek-sampling smoothness on real
+drone footage remains a human acceptance item; synthetic export probes do not
+claim live preview visual quality.

@@ -920,8 +920,9 @@
   "Turn off section repeat before applying Timelapse.": "Schalte die Abschnittswiederholung aus, bevor du Zeitraffer anwendest.",
   "Turn off Repeat to soundtrack before applying Timelapse.": "Schalte „Bis Soundtrack wiederholen“ aus, bevor du Zeitraffer anwendest.",
   "Enter a valid target duration or speed between 1× and 20×.": "Gib eine gültige Zieldauer oder eine Geschwindigkeit zwischen 1× und 20× ein.",
-  "About {frames} frames ({duration} s) at 30 fps.": "Etwa {frames} Frames ({duration} s) bei 30 fps.",
+  "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame).": "Etwa {frames} Frames (~{duration} s) bei 30 fps (Story-Raster kann um ein Frame abweichen).",
   "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×).": "Erlaubte Zieldauer für diesen Clip: {min}–{max} s (bis {maxSpeed}×).",
-  "Preview above 16× is approximate; export uses the full speed.": "Die Vorschau über 16× ist näherungsweise; der Export nutzt die volle Geschwindigkeit.",
+  "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed.": "Vorschau über 16× nutzt Seek-Sampling (kein durchgehendes playbackRate); der Export nutzt die volle Geschwindigkeit.",
+  "Source range changed. Re-enter Timelapse values.": "Quellbereich geändert. Timelapse-Werte erneut eingeben.",
   "Timelapse applied.": "Zeitraffer angewendet."
 }

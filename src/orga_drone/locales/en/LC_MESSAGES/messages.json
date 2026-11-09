@@ -920,8 +920,9 @@
   "Turn off section repeat before applying Timelapse.": "Turn off section repeat before applying Timelapse.",
   "Turn off Repeat to soundtrack before applying Timelapse.": "Turn off Repeat to soundtrack before applying Timelapse.",
   "Enter a valid target duration or speed between 1× and 20×.": "Enter a valid target duration or speed between 1× and 20×.",
-  "About {frames} frames ({duration} s) at 30 fps.": "About {frames} frames ({duration} s) at 30 fps.",
+  "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame).": "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame).",
   "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×).": "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×).",
-  "Preview above 16× is approximate; export uses the full speed.": "Preview above 16× is approximate; export uses the full speed.",
+  "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed.": "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed.",
+  "Source range changed. Re-enter Timelapse values.": "Source range changed. Re-enter Timelapse values.",
   "Timelapse applied.": "Timelapse applied."
 }

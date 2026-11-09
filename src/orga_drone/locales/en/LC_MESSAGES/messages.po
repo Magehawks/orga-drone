@@ -709,14 +709,17 @@ msgstr "Turn off Repeat to soundtrack before applying Timelapse."
 msgid "Enter a valid target duration or speed between 1× and 20×."
 msgstr "Enter a valid target duration or speed between 1× and 20×."
 
-msgid "About {frames} frames ({duration} s) at 30 fps."
-msgstr "About {frames} frames ({duration} s) at 30 fps."
+msgid "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame)."
+msgstr "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame)."
 
 msgid "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×)."
 msgstr "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×)."
 
-msgid "Preview above 16× is approximate; export uses the full speed."
-msgstr "Preview above 16× is approximate; export uses the full speed."
+msgid "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed."
+msgstr "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed."
+
+msgid "Source range changed. Re-enter Timelapse values."
+msgstr "Source range changed. Re-enter Timelapse values."
 
 msgid "Timelapse applied."
 msgstr "Timelapse applied."

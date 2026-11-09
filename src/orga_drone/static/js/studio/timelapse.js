@@ -25,6 +25,7 @@ export function draftFromTarget(sourceSpan, targetDuration) {
   const range = allowedTargetRange(sourceSpan);
   if (!range || targetDuration + 1e-9 < range.min || targetDuration - 1e-9 > range.max) return null;
   const speed = sourceSpan / targetDuration;
+  // Approximate only: export snaps absolute Story boundaries on the shared 30 fps grid.
   const outputFrames = Math.max(
     MIN_OUTPUT_FRAMES,
     Math.trunc(targetDuration * EXPORT_FPS + 0.5 + 1e-8)
@@ -35,6 +36,7 @@ export function draftFromTarget(sourceSpan, targetDuration) {
     targetDurationS: targetDuration,
     outputFrames,
     outputDurationS: outputFrames / EXPORT_FPS,
+    framesApproximate: true,
   };
 }
 
@@ -60,6 +62,7 @@ export function draftFromSpeed(sourceSpan, speed) {
     targetDurationS: targetDuration,
     outputFrames,
     outputDurationS: outputFrames / EXPORT_FPS,
+    framesApproximate: true,
   };
 }
 
@@ -96,4 +99,40 @@ export function timelapseConflict({ hasRamp, sectionRepeats, forwardLoop }) {
 export function clampPreviewPlaybackRate(speed) {
   if (!finite(speed)) return 1;
   return Math.min(Math.max(speed, MIN_SPEED), MAX_HTML_PLAYBACK_RATE);
+}
+
+export function rampNeedsSeekPreview(ramp) {
+  if (!ramp || !Array.isArray(ramp.points)) return false;
+  return ramp.points.some(
+    (point) => finite(point.speed) && point.speed > MAX_HTML_PLAYBACK_RATE + 1e-9
+  );
+}
+
+export function captureValidatedDraft({ clipId, start, end, field, draft }) {
+  if (!draft || clipId === null || clipId === undefined || !finite(start) || !finite(end))
+    return null;
+  return {
+    clipId: String(clipId),
+    start,
+    end,
+    span: end - start,
+    field,
+    speed: draft.speed,
+    targetDurationS: draft.targetDurationS,
+    outputFrames: draft.outputFrames,
+    outputDurationS: draft.outputDurationS,
+    key: `${clipId}:${start}:${end}`,
+  };
+}
+
+export function validatedDraftMatches(captured, { clipId, start, end }) {
+  if (!captured) return false;
+  return (
+    captured.clipId === String(clipId) &&
+    captured.start === start &&
+    captured.end === end &&
+    captured.key === `${clipId}:${start}:${end}` &&
+    finite(captured.speed) &&
+    finite(captured.targetDurationS)
+  );
 }

@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import {
   MAX_TIMELAPSE_SPEED,
   allowedTargetRange,
+  captureValidatedDraft,
   clampPreviewPlaybackRate,
   draftFromSpeed,
   draftFromTarget,
   flatTimelapseRamp,
+  rampNeedsSeekPreview,
   timelapseConflict,
+  validatedDraftMatches,
 } from "../../src/orga_drone/static/js/studio/timelapse.js";
 import { parseRamp, rampTime } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
@@ -20,6 +23,7 @@ test("target duration and speed multiplier stay synchronized", () => {
   assert.equal(twenty.speed, 20);
   assert.equal(draftFromSpeed(300, 20).targetDurationS, 15);
   assert.equal(MAX_TIMELAPSE_SPEED, 20);
+  assert.equal(eight.framesApproximate, true);
 });
 
 test("unsupported values and conflicts refuse mutation helpers", () => {
@@ -37,6 +41,24 @@ test("unsupported values and conflicts refuse mutation helpers", () => {
   assert.equal(range.max, 120);
 });
 
+test("validated draft ownership rejects stale bounds and empty capture", () => {
+  const draft = draftFromTarget(120, 15);
+  const captured = captureValidatedDraft({
+    clipId: "7",
+    start: 0,
+    end: 120,
+    field: "target",
+    draft,
+  });
+  assert.ok(validatedDraftMatches(captured, { clipId: "7", start: 0, end: 120 }));
+  assert.equal(validatedDraftMatches(captured, { clipId: "7", start: 10, end: 120 }), false);
+  assert.equal(validatedDraftMatches(captured, { clipId: "8", start: 0, end: 120 }), false);
+  assert.equal(
+    captureValidatedDraft({ clipId: "7", start: 0, end: 120, field: "target", draft: null }),
+    null
+  );
+});
+
 test("flat timelapse ramps reuse the shared ADR 0034 parser", () => {
   const ramp = flatTimelapseRamp(30, 90, 4);
   assert.ok(parseRamp(ramp));
@@ -45,4 +67,17 @@ test("flat timelapse ramps reuse the shared ADR 0034 parser", () => {
   assert.ok(flatTimelapseRamp(0, 300, 20));
   assert.equal(clampPreviewPlaybackRate(20), 16);
   assert.equal(clampPreviewPlaybackRate(8), 8);
+  assert.equal(rampNeedsSeekPreview(flatTimelapseRamp(0, 120, 8)), false);
+  assert.equal(rampNeedsSeekPreview(flatTimelapseRamp(0, 300, 20)), true);
+  assert.ok(
+    parseRamp({
+      v: 1,
+      interp: "reciprocal_smoothstep",
+      points: [
+        { source_s: 0, speed: 0.5 },
+        { source_s: 5, speed: 20 },
+        { source_s: 10, speed: 1 },
+      ],
+    })
+  );
 });

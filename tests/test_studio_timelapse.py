@@ -159,6 +159,31 @@ def test_decoded_flat_timelapse_exports_match_frame_grid(
     assert source.read_bytes() == original
 
 
+def test_non_grid_story_start_changes_exported_frame_count() -> None:
+    """Inspector target*30 is approximate; absolute Story snaps own the count."""
+    from orga_drone.export.studio_frame_plan import frame_index, plan_story_frames
+
+    ramp = SpeedRamp((Point(0.0, 8.0), Point(15.1, 8.0)))
+    duration = ramp.duration(0.0, 15.1)
+    naive = int(duration * 30 + 0.5 + 1e-8)
+    assert naive == 57
+    lead = StudioExportClip(Path("lead.mp4"), "video", 0.02, source_end_s=0.02)
+    timed = StudioExportClip(
+        Path("timed.mp4"),
+        "video",
+        duration,
+        source_end_s=15.1,
+        speed_ramp=ramp,
+    )
+    render, _ = plan_story_frames((lead, timed))
+    assert len(render) == 2
+    origin = render[1].export_frame_origin_s or 0.0
+    assert origin == pytest.approx(0.02)
+    assert render[1].export_frame_count == frame_index(0.02 + duration) - frame_index(0.02)
+    assert render[1].export_frame_count == 56
+    assert render[1].export_frame_count != naive
+
+
 def test_mixed_story_with_flat_timelapse_keeps_shared_grid(tmp_path: Path) -> None:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:

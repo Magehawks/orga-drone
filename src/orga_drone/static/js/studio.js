@@ -9,7 +9,7 @@ import {
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
-import { clampPreviewPlaybackRate } from "./studio/timelapse.js";
+import { clampPreviewPlaybackRate, rampNeedsSeekPreview } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -6152,6 +6152,29 @@ import {
     }
     const kind = hit.clip.dataset.kind || "unknown";
     const canPlay = hit.clip.dataset.canPlay === "1";
+    // Speeds above the HTMLMediaElement ceiling cannot keep Story/music time
+    // honest via playbackRate alone. Drive Story from the wall clock and seek
+    // both preview layers (same path as photo stills) so export timing stays
+    // the authority for continuous 20× playback.
+    if (kind === "video" && canPlay && videoSrcFor(hit.clip) && rampNeedsSeekPreview(speedRampOf(hit.clip))) {
+      if (previewVideo) {
+        try {
+          previewVideo.pause();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      if (previewVideoB) {
+        try {
+          previewVideoB.pause();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      syncPreviewMedia({ seek: true });
+      startWallClock();
+      return;
+    }
     if (kind === "video" && canPlay && videoSrcFor(hit.clip)) {
       stopWallClock();
       syncPreviewMedia({ seek: true });
@@ -11923,6 +11946,7 @@ import {
       calc: timelapsePanel?.dataset.msgCalc,
       rangeHint: timelapsePanel?.dataset.msgRange,
       previewApprox: timelapsePanel?.dataset.msgPreview,
+      stale: timelapsePanel?.dataset.msgStale,
       applied: timelapsePanel?.dataset.msgApplied,
     },
     save: saveSpeedRamp,

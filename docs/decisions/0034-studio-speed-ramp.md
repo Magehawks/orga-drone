@@ -67,10 +67,13 @@ A ramped clip is a timing adapter: source samples stay intact until one
 nonlinear `setpts` and the final 30 fps step. Slow sections repeat source
 frames and fast sections omit them. There is no optical flow. Source audio is
 silent for the whole ramped clip, including stretches that pass through 1×.
-Preview updates `playbackRate` on the existing paint loop and clamps the HTML
-media rate at 16× when a curve asks for more; export still uses the full mapped
-speed. The browser may drop preview frames on demanding 4K playback; that does
-not change the export.
+Preview updates `playbackRate` on the existing paint loop when every ramp point
+stays at or below 16×. When any point exceeds the HTML media ceiling, preview
+pauses continuous decode playback and advances Story time with wall-clock seek
+sampling on both layers so soundtrack alignment follows Story time; export still
+uses the full mapped speed. Raising `MAX_SPEED` to 20 is a shared contract for
+Timelapse flat ramps and manual variable curves. The browser may drop preview
+frames on demanding 4K playback; that does not change the export.
 The compact curve in [assets/0034-speed-ramp-curve.png](assets/0034-speed-ramp-curve.png)
 is the selected interaction. Source-app WebView2 measurements use synthetic
 60 fps media. They do not establish private drone footage quality or packaged

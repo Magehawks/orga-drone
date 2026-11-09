@@ -913,9 +913,10 @@
                data-msg-remove-repeat="{{ _('Turn off section repeat before applying Timelapse.')|e }}"
                data-msg-remove-loop="{{ _('Turn off Repeat to soundtrack before applying Timelapse.')|e }}"
                data-msg-invalid="{{ _('Enter a valid target duration or speed between 1× and 20×.')|e }}"
-               data-msg-calc="{{ _('About {frames} frames ({duration} s) at 30 fps.')|e }}"
+               data-msg-calc="{{ _('About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame).')|e }}"
                data-msg-range="{{ _('Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×).')|e }}"
-               data-msg-preview="{{ _('Preview above 16× is approximate; export uses the full speed.')|e }}"
+               data-msg-preview="{{ _('Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed.')|e }}"
+               data-msg-stale="{{ _('Source range changed. Re-enter Timelapse values.')|e }}"
                data-msg-applied="{{ _('Timelapse applied.')|e }}">
             <p class="studio-inspector-kind">{{ _('Timelapse') }}</p>
             <label class="studio-inspector-field">

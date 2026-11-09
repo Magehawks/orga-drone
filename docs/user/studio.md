@@ -62,9 +62,12 @@ existing ramp preview/export path. It replaces slow motion. Source audio is
 muted; soundtrack timing stays on Story time. If a speed ramp, section repeat,
 or Repeat to soundtrack is already active on the selected clip, Apply stays
 blocked with an explanation until you clear that mode. Remove the ramp through
-the existing Speed ramp controls to edit Timelapse again. Preview above 16× is
-approximate because the browser playback rate is capped; export uses the full
-speed. Frame rounding follows the shared 30 fps Story grid.
+the existing Speed ramp controls to edit Timelapse again. The shared ramp ceiling
+is 20×, so the manual Speed ramp editor can also author curves up to 20×.
+Preview above 16× pauses continuous `playbackRate` playback and advances Story
+time with seek sampling so music stays on Story time; export still uses the full
+mapped speed. The Inspector frame count is an estimate: export snaps absolute
+Story boundaries on the shared 30 fps grid and may differ by one frame.
 
 The curve eases between speeds. The clip length and following clips change with
 it. One completed gesture is one Undo step; the saved curve returns when you

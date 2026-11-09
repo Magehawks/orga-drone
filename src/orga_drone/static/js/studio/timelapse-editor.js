@@ -2,10 +2,12 @@ import {
   MAX_TIMELAPSE_SPEED,
   MIN_TIMELAPSE_SPEED,
   allowedTargetRange,
+  captureValidatedDraft,
   draftFromSpeed,
   draftFromTarget,
   flatTimelapseRamp,
   timelapseConflict,
+  validatedDraftMatches,
 } from "./timelapse.js";
 
 export function createTimelapseEditor({
@@ -31,6 +33,11 @@ export function createTimelapseEditor({
   let syncing = false;
   let pending = false;
   let lastField = "target";
+  let validated = null;
+
+  function clipKey(clip) {
+    return clip ? String(clip.dataset.studioId || "") : "";
+  }
 
   function setStatus(text, { error = false } = {}) {
     if (!status) return;
@@ -66,13 +73,20 @@ export function createTimelapseEditor({
     return value >= 10 ? value.toFixed(1) : value.toFixed(2);
   }
 
+  function clearValidated() {
+    validated = null;
+    applyBtn.disabled = true;
+  }
+
   function updateCalc(draft, span) {
     if (!calc) return;
     if (!draft) {
       calc.textContent = "";
       return;
     }
-    const template = messages.calc || "About {frames} frames ({duration} s) at 30 fps.";
+    const template =
+      messages.calc ||
+      "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame).";
     calc.textContent = template
       .replace("{frames}", String(draft.outputFrames))
       .replace("{duration}", formatSeconds(draft.outputDurationS));
@@ -87,52 +101,51 @@ export function createTimelapseEditor({
     }
   }
 
-  function readDraft(clip) {
-    const { span } = currentBounds(clip);
-    if (lastField === "speed") {
-      const speed = Number(speedInput.value);
-      return draftFromSpeed(span, speed);
-    }
-    const target = Number(targetInput.value);
-    return draftFromTarget(span, target);
-  }
-
   function syncFrom(field) {
     const clip = getSelection();
     if (!clip || syncing || pending) return;
     syncing = true;
     lastField = field;
     try {
-      const { span } = currentBounds(clip);
+      const { start, end, span } = currentBounds(clip);
       const conflict = conflictFor(clip);
       if (conflict) {
+        clearValidated();
         setStatus(localizeConflict(conflict), { error: true });
-        applyBtn.disabled = true;
         updateCalc(null, span);
         return;
       }
       let draft = null;
       if (field === "speed") {
         draft = draftFromSpeed(span, Number(speedInput.value));
-        if (draft) targetInput.value = String(Number(draft.targetDurationS.toFixed(3)));
+        // Keep the secondary field empty when the primary is invalid so Apply
+        // cannot revive a stale rounded value after switching fields.
+        targetInput.value = draft ? String(Number(draft.targetDurationS.toFixed(3))) : "";
       } else {
         draft = draftFromTarget(span, Number(targetInput.value));
-        if (draft) speedInput.value = String(Number(draft.speed.toFixed(4)));
+        speedInput.value = draft ? String(Number(draft.speed.toFixed(4))) : "";
       }
       updateCalc(draft, span);
       if (!draft) {
+        clearValidated();
         setStatus(messages.invalid || "Enter a valid target duration or speed.", {
           error: true,
         });
-        applyBtn.disabled = true;
         return;
       }
+      validated = captureValidatedDraft({
+        clipId: clipKey(clip),
+        start,
+        end,
+        field,
+        draft,
+      });
       if (draft.speed > 16) {
         setStatus(messages.previewApprox || "", { error: false });
       } else {
         setStatus("");
       }
-      applyBtn.disabled = false;
+      applyBtn.disabled = !validated;
     } finally {
       syncing = false;
     }
@@ -141,27 +154,52 @@ export function createTimelapseEditor({
   function fill() {
     const clip = getSelection();
     panel.hidden = !clip;
-    if (!clip) return;
-    if (selectedClip !== clip) {
+    if (!clip) {
+      clearValidated();
+      return;
+    }
+    const { start, end, span } = currentBounds(clip);
+    const sameClip = selectedClip === clip;
+    if (!sameClip) {
       selectedClip = clip;
       lastField = "target";
-      const { span } = currentBounds(clip);
+      validated = null;
       const range = allowedTargetRange(span);
       targetInput.value = range ? String(Number(range.max.toFixed(3))) : "";
       speedInput.value = String(MIN_TIMELAPSE_SPEED);
+    } else if (
+      validated &&
+      !validatedDraftMatches(validated, { clipId: clipKey(clip), start, end })
+    ) {
+      // Trim, history restore, or source-range change while the same DOM node
+      // stays selected — drop the stale Apply candidate.
+      clearValidated();
+      setStatus(messages.stale || "Source range changed. Re-enter Timelapse values.", {
+        error: true,
+      });
+      updateCalc(null, span);
+      const available = clip.dataset.available === "1";
+      targetInput.disabled = !available || pending;
+      speedInput.disabled = !available || pending;
+      return;
     }
     const available = clip.dataset.available === "1";
     targetInput.disabled = !available || pending;
     speedInput.disabled = !available || pending;
-    applyBtn.disabled = !available || pending;
+    applyBtn.disabled = !available || pending || !validated;
     const conflict = conflictFor(clip);
     if (conflict) {
+      clearValidated();
       setStatus(localizeConflict(conflict), { error: true });
-      applyBtn.disabled = true;
-      updateCalc(null, currentBounds(clip).span);
+      updateCalc(null, span);
       return;
     }
-    syncFrom(lastField);
+    if (!validated) syncFrom(lastField);
+    else {
+      updateCalc(validated, span);
+      applyBtn.disabled = !available || pending;
+      if (validated.speed > 16) setStatus(messages.previewApprox || "", { error: false });
+    }
   }
 
   async function apply() {
@@ -169,19 +207,23 @@ export function createTimelapseEditor({
     if (!clip || pending) return;
     const conflict = conflictFor(clip);
     if (conflict) {
+      clearValidated();
       setStatus(localizeConflict(conflict), { error: true });
       return;
     }
-    const draft = readDraft(clip);
-    if (!draft) {
-      setStatus(messages.invalid || "Enter a valid target duration or speed.", {
+    const { start, end } = currentBounds(clip);
+    if (!validatedDraftMatches(validated, { clipId: clipKey(clip), start, end })) {
+      clearValidated();
+      setStatus(messages.stale || "Source range changed. Re-enter Timelapse values.", {
         error: true,
       });
       return;
     }
-    const { start, end } = currentBounds(clip);
+    const draft = validated;
     const payload =
-      Math.abs(draft.speed - 1) <= 1e-9 ? null : flatTimelapseRamp(start, end, draft.speed);
+      Math.abs(draft.speed - 1) <= 1e-9
+        ? null
+        : flatTimelapseRamp(draft.start, draft.end, draft.speed);
     if (draft.speed > 1 && !payload) {
       onError();
       return;
@@ -191,11 +233,31 @@ export function createTimelapseEditor({
     panel.querySelectorAll("button,input").forEach((el) => {
       el.disabled = true;
     });
+    const appliedKey = draft.key;
     try {
+      // Re-check immediately before save so a concurrent trim cannot mutate.
+      const live = currentBounds(clip);
+      if (
+        !validatedDraftMatches(validated, {
+          clipId: clipKey(clip),
+          start: live.start,
+          end: live.end,
+        }) ||
+        validated.key !== appliedKey
+      ) {
+        clearValidated();
+        setStatus(messages.stale || "Source range changed. Re-enter Timelapse values.", {
+          error: true,
+        });
+        return;
+      }
       await save(clip, payload);
+      clearValidated();
       setStatus(messages.applied || "");
     } catch (error) {
+      // Keep the last validated draft so a failed save does not look applied.
       onError(error);
+      setStatus(messages.invalid || "Could not apply Timelapse.", { error: true });
     } finally {
       pending = false;
       panel.querySelectorAll("button,input").forEach((el) => {
