@@ -271,9 +271,9 @@ def run(out: Path, *, proxy_case: bool = False) -> None:
         )
         assert before_edge["in"] == 1
         assert before_edge["out"] == 3
-        # Drive the same absolute inverse the edge-drag path uses, then persist
-        # through the inspector so WebView2 verifies UI→API timing without
-        # relying on synthetic pointer button quirks.
+        # Mapping + inspector persist only: exercises the same absolute inverse
+        # helpers used by timeline edge drag, then saves via the source-out field.
+        # This is not a pointer gesture on the Story edge handle.
         planned = ev(
             f"""(async()=>{{
               const {{edgeSourceAfterRampDrag,parseRamp,rampTime}}=await import('/static/js/studio/speed-ramp.js');
@@ -319,7 +319,9 @@ def run(out: Path, *, proxy_case: bool = False) -> None:
         assert abs(after_edge["out"] - planned["outS"]) < 0.011
         assert abs(after_edge["story"] - planned["expectedStory"]) < 0.05
         assert after_edge["deltaStory"] > 0.05
-        evidence["trimmed_edge_drag"] = {
+        evidence["trimmed_edge_mapping_and_inspector_persist"] = {
+            "mode": "absolute_inverse_then_inspector_change",
+            "pointer_edge_gesture": False,
             "before": before_edge,
             "planned": planned,
             "after": after_edge,
