@@ -22,9 +22,5 @@ test("studio.js parses as an ES module", () => {
   const checked = spawnSync(process.execPath, ["--check", studioJs], {
     encoding: "utf8",
   });
-  assert.equal(
-    checked.status,
-    0,
-    checked.stderr || checked.stdout || "node --check failed"
-  );
+  assert.equal(checked.status, 0, checked.stderr || checked.stdout || "node --check failed");
 });
