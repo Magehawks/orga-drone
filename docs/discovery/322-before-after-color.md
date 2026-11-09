@@ -76,7 +76,7 @@ inherits its detail/color limitations; it is a color inspection aid.
 - `node tests/js/lut_preview.cjs`, `hsl_preview.cjs`, `wheels_preview.cjs`: PASS.
 - `ruff check .`: PASS.
 - `mypy src packaging/e2e/studio_color_compare.py`: PASS (77 source files).
-- Windows command: `python packaging/e2e/studio_color_compare.py --output-dir build/issue322-e2e-reviewed`:
+- Windows command: `python packaging/e2e/studio_color_compare.py --output-dir build/issue322-e2e-masks`:
   PASS in real WebView2 **157.0.4341.42**, launched from this checkout.
 
 [Machine-readable evidence](issue-322-evidence/evidence.json) contains tested-file
@@ -99,3 +99,22 @@ the normal still-status pill. Final evidence is from the complete passing run.
 
 Synthetic UI captures: [Before](issue-322-evidence/ui-before.png),
 [After](issue-322-evidence/ui-after.png). No private media is included.
+
+
+## Independent review correction
+
+The first independent GitHub review of `fa47e89` requested a correction:
+[review](https://github.com/Magehawks/orga-drone/pull/323#pullrequestreview-5827613968).
+The base compositor used Before correctly, but the privacy-mask path could still
+prefer a ready, creatively graded WebGL canvas. The mask path now bypasses that
+canvas while the selected comparison picture is present, preserving its existing
+source dimensions and normal After priority on release.
+
+The executed production-function harness checks both blur and pixelate against a
+ready graded WebGL source, then verifies normal WebGL sampling resumes on release.
+The renewed Windows run uses a LUT-only video (no HSL to force a fallback) with
+both mask types. It asserts WebGL was exercised and the interior color of both
+mask regions exactly matches the Before compositor pixels. All other comparison,
+source-hash, export-byte, reload and request-count assertions still pass. Retained
+machine evidence and screenshots now come from this corrected full run. Renewed
+independent review is requested for the corrected candidate.

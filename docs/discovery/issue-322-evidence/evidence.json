@@ -35,15 +35,16 @@
   "implementation_sha256": {
     "src/orga_drone/app.py": "f24603c4a1521536cde53a84060558140ee305fa038e7f7940f52b990bccd72b",
     "src/orga_drone/studio_preview_frame.py": "d03bb7b9bdad686c360a9369c6616b2fe829eaf00a4d3975e569c303520f215a",
-    "src/orga_drone/static/js/studio.js": "3d2f4f7ba2916eb34e0ff2797ade10721f5a72ae54a160c35073ec9ddce517a1",
+    "src/orga_drone/static/js/studio.js": "97a9d4eae499838e8b34837a8e2d3e8a47500a10ff8f7fff457d9c4d1050fc59",
     "src/orga_drone/static/js/studio/color-compare.js": "cb1813266c3e986bbcb6fb848c4441461b7244f8a815e52c685fc4f483a38c66",
     "src/orga_drone/templates/studio.html": "5e1cb87d3781b906e8dc91204645b301342ba67a29fdb243e6c46aa89089cbec",
     "src/orga_drone/static/css/app.css": "5fdef717088e5207c621ee52d46ffdaa522c2430eb6a069478e0e34dd364fc57",
-    "packaging/e2e/studio_color_compare.py": "143c4dbbab8e9e79d2f18997cbb24ab0baf895f1995ab04859d92d273834c428"
+    "packaging/e2e/studio_color_compare.py": "ca7f89d8a0dce2df918bc4b2eac1186c8ef7cf4344eb0593a805ce44442fd6d1"
   },
+  "webgl_blur_and_pixel_masks_before": true,
   "clip_change_releases": true,
   "export_bytes_identical": true,
-  "export_sha256": "aaf74a74f140657e496f676a3a2987eab4393bf5fd66b8072f679e2527e57420",
+  "export_sha256": "af091a6eaf6755e1c06cc3169fc3139630c372ea64e1755d8e87d9fcf1cb2202",
   "source_hashes_unchanged": true,
   "reload_after": true,
   "lut_removal_releases": true,

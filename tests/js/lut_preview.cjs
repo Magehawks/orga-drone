@@ -298,6 +298,28 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
     { effect: 'blur', x: 0, y: 0, w: 0.5, h: 0.5, strength: 50 },
     { width: 640, height: 360 }, 640, 360);
   assert.equal(maskDraws[0].src, 'retained-at-boundary', 'mask uses graded outgoing pixels');
+  const beforeMask = { hidden: false, naturalWidth: 320, naturalHeight: 180, src: 'before-mask' };
+  const gradedWebgl = { width: 320, height: 180, src: 'graded-webgl' };
+  context.state.playing = false;
+  context.colorComparison = { pictureFor: () => beforeMask };
+  context.lutWebglCanvasFor = () => gradedWebgl;
+  const scratchDraws = [];
+  context.maskScratch = { getContext: () => ({ clearRect() {}, drawImage: picture => scratchDraws.push(picture) }) };
+  context.maskModel.pixelFraction = 0.1;
+  for (const effect of ['blur', 'pixelate']) {
+    context.paintPrivacyMask(maskContext, context.previewImageB,
+      { effect, x: 0.2, y: 0.2, w: 0.3, h: 0.3, strength: 50 },
+      { width: 640, height: 360 }, 640, 360);
+    const sampled = effect === 'blur' ? maskDraws.at(-1) : scratchDraws.at(-1);
+    assert.equal(sampled, beforeMask, `${effect} samples Before instead of an already graded WebGL canvas`);
+  }
+  context.colorComparison = null;
+  context.paintPrivacyMask(maskContext, context.previewImageB,
+    { effect: 'blur', x: 0.2, y: 0.2, w: 0.3, h: 0.3, strength: 50 },
+    { width: 640, height: 360 }, 640, 360);
+  assert.equal(maskDraws.at(-1), gradedWebgl, 'release restores normal WebGL mask pixels');
+  context.lutWebglCanvasFor = () => null;
+  context.state.playing = true;
   context.reuseDraft = {};
   assert.equal(context.renderedPreviewStillFor(context.previewImageB), null);
   context.reuseDraft = null;

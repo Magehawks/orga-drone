@@ -4155,8 +4155,9 @@ import {
   }
 
   function paintPrivacyMask(ctx, media, mask, box, srcW, srcH) {
+    const compared = colorComparison?.pictureFor(clipForPreviewMedia(media));
     const rendered = renderedPreviewStillFor(media);
-    const webgl = lutWebglCanvasFor(media);
+    const webgl = compared ? null : lutWebglCanvasFor(media);
     const picture = webgl || rendered || media;
     if (webgl) {
       srcW = webgl.width;

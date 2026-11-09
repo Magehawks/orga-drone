@@ -86,7 +86,14 @@ def run(out: Path) -> None:
         db.set_studio_color_look(cid, dict(input_profile="dlog_m", conversion_lut=technical,
                                          conversion_confirmed=True, creative_lut=creative, creative_strength=75))
         db.set_studio_image_adjust(cid, dict(exposure=35, contrast=20, saturation=15))
-        db.set_studio_hsl(cid, {"range": "blue", "hue": 10})
+        if kind == "photo":
+            db.set_studio_hsl(cid, {"range": "blue", "hue": 10})
+        else:
+            # Keep video WebGL-eligible: generated HSL would select another path.
+            db.set_studio_masks(cid, {"masks": [
+                dict(id="blur", effect="blur", x=.15, y=.25, w=.2, h=.3, strength=50),
+                dict(id="pixel", effect="pixelate", x=.65, y=.25, w=.2, h=.3, strength=50),
+            ]})
         ids.append((cid, source.suffix))
     port, debug = free_port(), free_port()
     repo = Path(__file__).resolve().parents[2]
@@ -184,6 +191,11 @@ def run(out: Path) -> None:
             assert len([u for u in cdp.urls if "before=1" in u]) == request_count, "held comparison must not poll"
             before = pixels()
             assert before != after, ext + " comparison must visibly change color"
+            if ext == ".mp4":
+                assert ev("document.getElementById('studio-preview-frame').dataset.lutWebgl === '1'"), "video must exercise WebGL"
+                matched = ev("(()=>{let a=document.getElementById('studio-preview-blit'),b=document.getElementById('studio-preview-masks');return [.25,.75].every(x=>{let p=a.getContext('2d').getImageData(Math.floor(a.width*x),Math.floor(a.height*.4),1,1).data;let q=b.getContext('2d').getImageData(Math.floor(b.width*x),Math.floor(b.height*.4),1,1).data;return [...p].every((v,i)=>v===q[i]);});})()")
+                assert matched, "blur and pixel masks must use the same Before color as the compositor"
+                result["webgl_blur_and_pixel_masks_before"] = True
             (out / (ext[1:] + "-before.png")).write_bytes(base64.b64decode(before.split(",", 1)[1]))
             if ext == ".jpg":
                 (out / "ui-before.png").write_bytes(base64.b64decode(cdp.call("Page.captureScreenshot", {"format": "png"})["data"]))
