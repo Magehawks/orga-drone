@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Issue #325 Timelapse Inspector preview</title>
+  <style>
+    :root { --muted: #667085; --danger: #b00020; --border: #d0d5dd; --bg: #f8fafc; --ink: #101828; }
+    body { margin: 0; font: 14px/1.4 "Segoe UI", sans-serif; background: #e4e7ec; color: var(--ink); }
+    .frame { width: 320px; margin: 24px auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; box-shadow: 0 8px 24px rgba(16,24,40,.08); }
+    .studio-inspector-kind { font-weight: 600; margin: 0 0 8px; }
+    .studio-inspector-field { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; font-size: 12px; }
+    .studio-inspector-field input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+    .hint { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+    .hint.is-error { color: var(--danger); }
+    .button { border: 1px solid var(--border); background: #fff; border-radius: 4px; padding: 6px 10px; cursor: default; }
+    h1 { text-align: center; font-size: 16px; margin: 24px 0 0; }
+    p.meta { text-align: center; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Studio Inspector — Timelapse</h1>
+  <p class="meta">Synthetic layout preview for PR #325 (not a live WebView2 capture)</p>
+  <div class="frame" id="inspector-timelapse">
+    <p class="studio-inspector-kind">Timelapse</p>
+    <label class="studio-inspector-field"><span>Target duration (s)</span>
+      <input type="number" value="15" readonly>
+    </label>
+    <label class="studio-inspector-field"><span>Speed multiplier</span>
+      <input type="number" value="8" readonly>
+    </label>
+    <p class="hint">About 450 frames (~15.00 s) at 30 fps (Story grid may differ by one frame).</p>
+    <p class="hint">Allowed target for this clip: 6.00–120 s (up to 20×).</p>
+    <p class="hint">Uses the trimmed source span. Allowed speeds are 1×–20×. Target duration and speed stay in sync.</p>
+    <p class="hint">Applying Timelapse replaces slow motion with a flat speed ramp. Source audio is muted; soundtrack timing stays unchanged.</p>
+    <button type="button" class="button">Apply Timelapse</button>
+  </div>
+</body>
+</html>

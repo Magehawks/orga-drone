@@ -1,7 +1,11 @@
 // Pure counterpart of studio_speed_ramp.py. Absolute source seconds survive trims/cuts.
+export const MIN_SPEED = 0.25;
+export const MAX_SPEED = 20;
+export const MAX_POINTS = 5;
+
 export function parseRamp(value) {
   if (!value || value.v !== 1 || value.interp !== "reciprocal_smoothstep") return null;
-  if (!Array.isArray(value.points) || value.points.length < 2 || value.points.length > 5)
+  if (!Array.isArray(value.points) || value.points.length < 2 || value.points.length > MAX_POINTS)
     return null;
   let previous = -Infinity;
   for (const point of value.points) {
@@ -13,8 +17,8 @@ export function parseRamp(value) {
       point.source_s - previous < 0.05 - 1e-9 ||
       typeof point.speed !== "number" ||
       !Number.isFinite(point.speed) ||
-      point.speed < 0.25 ||
-      point.speed > 4
+      point.speed < MIN_SPEED ||
+      point.speed > MAX_SPEED
     )
       return null;
     previous = point.source_s;

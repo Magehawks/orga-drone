@@ -678,3 +678,48 @@ msgstr "Rampe entfernen"
 
 msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 msgstr "Ziehe Punkte auf der Zeitleiste oder ändere ihre Werte hier. Ohne Rampe gilt wieder 1×."
+
+msgid "Timelapse"
+msgstr "Zeitraffer"
+
+msgid "Target duration (s)"
+msgstr "Zieldauer (s)"
+
+msgid "Speed multiplier"
+msgstr "Geschwindigkeitsfaktor"
+
+msgid "Uses the trimmed source span. Allowed speeds are 1×–20×. Target duration and speed stay in sync."
+msgstr "Nutzt den getrimmten Quellbereich. Erlaubt sind 1×–20×. Zieldauer und Geschwindigkeit bleiben synchron."
+
+msgid "Applying Timelapse replaces slow motion with a flat speed ramp. Source audio is muted; soundtrack timing stays unchanged."
+msgstr "Zeitraffer ersetzt die Zeitlupe durch eine flache Geschwindigkeitsrampe. Der Originalton wird stummgeschaltet; die Soundtrack-Zeit bleibt unverändert."
+
+msgid "Apply Timelapse"
+msgstr "Zeitraffer anwenden"
+
+msgid "Remove the speed ramp before applying Timelapse."
+msgstr "Entferne die Geschwindigkeitsrampe, bevor du Zeitraffer anwendest."
+
+msgid "Turn off section repeat before applying Timelapse."
+msgstr "Schalte die Abschnittswiederholung aus, bevor du Zeitraffer anwendest."
+
+msgid "Turn off Repeat to soundtrack before applying Timelapse."
+msgstr "Schalte „Bis Soundtrack wiederholen“ aus, bevor du Zeitraffer anwendest."
+
+msgid "Enter a valid target duration or speed between 1× and 20×."
+msgstr "Gib eine gültige Zieldauer oder eine Geschwindigkeit zwischen 1× und 20× ein."
+
+msgid "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame)."
+msgstr "Etwa {frames} Frames (~{duration} s) bei 30 fps (Story-Raster kann um ein Frame abweichen)."
+
+msgid "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×)."
+msgstr "Erlaubte Zieldauer für diesen Clip: {min}–{max} s (bis {maxSpeed}×)."
+
+msgid "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed."
+msgstr "Vorschau über 16× nutzt Seek-Sampling (kein durchgehendes playbackRate); der Export nutzt die volle Geschwindigkeit."
+
+msgid "Source range changed. Re-enter Timelapse values."
+msgstr "Quellbereich geändert. Timelapse-Werte erneut eingeben."
+
+msgid "Timelapse applied."
+msgstr "Zeitraffer angewendet."

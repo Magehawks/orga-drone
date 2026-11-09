@@ -8,7 +8,7 @@ import math
 
 KEY = "speed_ramp"
 MIN_SPEED = 0.25
-MAX_SPEED = 4.0
+MAX_SPEED = 20.0
 MAX_POINTS = 5
 
 
@@ -196,7 +196,7 @@ def parse_ramp(value: object, *, media_duration_s: float | None = None) -> Speed
         ):
             raise ValueError("speed ramp points must stay inside the source")
         if not MIN_SPEED <= speed <= MAX_SPEED:
-            raise ValueError("speed ramp must stay between 0.25 and 4")
+            raise ValueError(f"speed ramp must stay between {MIN_SPEED:g} and {MAX_SPEED:g}")
         if points and source - points[-1].source_s < 0.05 - 1e-9:
             raise ValueError(
                 "speed ramp points must be ordered and at least 0.05 seconds apart"

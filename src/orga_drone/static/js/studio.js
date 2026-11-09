@@ -8,6 +8,13 @@ import {
   rampTime,
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
+import { createTimelapseEditor } from "./studio/timelapse-editor.js";
+import {
+  allowHtmlVideoAutoplay,
+  clampPreviewPlaybackRate,
+  rampNeedsSeekPreview,
+  shouldReconcileSeekSample,
+} from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -52,6 +59,7 @@ import {
   let historyGesture = "";
   let controlBridge = null;
   let rampEditor = null;
+  let timelapseEditor = null;
   let controlPendingWrites = 0;
   let controlWriteFailed = false;
   const nativeFetch = window.fetch.bind(window);
@@ -389,6 +397,7 @@ import {
   let playheadWasPlaying = false;
   let wallClockRaf = 0;
   let wallClockLastMs = 0;
+  let lastSeekSampleMs = 0;
   let suppressVideoClock = false;
   let crossfadePreloadId = null;
   let videoLoopIndex = 0;
@@ -766,7 +775,8 @@ import {
       if (speedRampOf(clip) || (slowBarOf(clip) && playbackSpeed(clip) >= 0.999)) speed = speedAtSource(clip, offset);
     }
     try {
-      if (video.playbackRate !== speed) video.playbackRate = speed;
+      const applied = clampPreviewPlaybackRate(speed);
+      if (video.playbackRate !== applied) video.playbackRate = applied;
     } catch (_) {
       /* ignore unsupported rates */
     }
@@ -5449,7 +5459,13 @@ import {
         if (reuseDraft || !clip || loadedVideoSrc !== lutSrc) return;
         delete clip.dataset.lutProxyUrl;
         loadedVideoSrc = "";
-        showVideo(videoSrcFor(clip), localS, { play: state.playing, clip });
+        showVideo(videoSrcFor(clip), localS, {
+          play: allowHtmlVideoAutoplay({
+            playing: state.playing,
+            seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+          }),
+          clip,
+        });
       }, { once: true });
     }
     applyClipPlayback(previewVideo, clip);
@@ -5560,6 +5576,8 @@ import {
     const id = String(clip.dataset.studioId);
     const inS = loopPlayInS(clip);
     const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, hit.localS)), videoSrcFor(clip));
+    const seekSample = rampNeedsSeekPreview(speedRampOf(clip));
+    const mayPlay = allowHtmlVideoAutoplay({ playing: state.playing, seekSample });
     const sync = () => {
       if (crossfadePreloadId !== id || !state.playing) return;
       try {
@@ -5570,10 +5588,18 @@ import {
       } catch (_) {
         /* ignore */
       }
-      if (previewVideoB.paused) {
+      // Seek-sampled >16× previews must not thrash HTML autoplay on the preload layer.
+      if (mayPlay && previewVideoB.paused) {
         previewVideoB.play().catch(() => {
           /* the normal outgoing seek path remains the fallback */
         });
+      }
+      if (!mayPlay && !previewVideoB.paused) {
+        try {
+          previewVideoB.pause();
+        } catch (_) {
+          /* ignore */
+        }
       }
     };
     if (crossfadePreloadId === id) {
@@ -5626,11 +5652,14 @@ import {
         const inS = loopPlayInS(clip);
         const speed = playbackSpeed(clip);
         const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, localS)), src);
+        const seekSample = rampNeedsSeekPreview(speedRampOf(clip));
+        const mayPlay = allowHtmlVideoAutoplay({ playing: state.playing, seekSample });
         const sync = () => {
           try {
             applyClipPlayback(previewVideoB, clip);
             const drift = Math.abs((previewVideoB.currentTime || 0) - target);
-            if (!state.playing || drift > 0.04) previewVideoB.currentTime = target;
+            // Seek-sampled >16× previews must always snap; continuous playbackRate is off.
+            if (!mayPlay || drift > 0.04) previewVideoB.currentTime = target;
           } catch (_) {
             /* ignore */
           }
@@ -5664,12 +5693,12 @@ import {
             { once: true }
           );
         }
-        if (state.playing && previewVideoB.paused) {
+        if (mayPlay && previewVideoB.paused) {
           previewVideoB.play().catch(() => {
             /* drift correction still runs on the existing clock updates */
           });
         }
-        if (!state.playing && !previewVideoB.paused) {
+        if (!mayPlay && !previewVideoB.paused) {
           try {
             previewVideoB.pause();
           } catch (_) {
@@ -5724,7 +5753,8 @@ import {
     }
     const seek = () => {
       try {
-        if (previewVideoB.playbackRate !== speed) previewVideoB.playbackRate = speed;
+        const applied = clampPreviewPlaybackRate(speed);
+        if (previewVideoB.playbackRate !== applied) previewVideoB.playbackRate = applied;
         const drift = Math.abs((previewVideoB.currentTime || 0) - target);
         if (drift > 0.12) previewVideoB.currentTime = target;
       } catch (_) {
@@ -5733,12 +5763,16 @@ import {
     };
     if (previewVideoB.readyState >= 1) seek();
     else previewVideoB.addEventListener("loadedmetadata", seek, { once: true });
-    if (state.playing && previewVideoB.paused) {
+    const mayPlay = allowHtmlVideoAutoplay({
+      playing: state.playing,
+      seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+    });
+    if (mayPlay && previewVideoB.paused) {
       previewVideoB.play().catch(() => {
         /* the outgoing picture still advances */
       });
     }
-    if (!state.playing && !previewVideoB.paused) {
+    if (!mayPlay && !previewVideoB.paused) {
       try {
         previewVideoB.pause();
       } catch (_) {
@@ -6030,7 +6064,13 @@ import {
         updateCutEnabled();
         return;
       }
-      showVideo(src, localS, { play: state.playing && !atEnd, clip });
+      showVideo(src, localS, {
+        play: allowHtmlVideoAutoplay({
+          playing: state.playing && !atEnd,
+          seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+        }),
+        clip,
+      });
       applyTransitionPreview(hit);
       updateCutEnabled();
       return;
@@ -6098,6 +6138,42 @@ import {
     pausePlayback();
   }
 
+  function pausePreviewVideoLayers() {
+    for (const video of [previewVideo, previewVideoB]) {
+      if (!video) continue;
+      try {
+        if (!video.paused) video.pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
+  function hitNeedsSeekSample(hit) {
+    if (!hit) return false;
+    if (rampNeedsSeekPreview(speedRampOf(hit.clip))) return true;
+    return !!(hit.overlapClip && rampNeedsSeekPreview(speedRampOf(hit.overlapClip)));
+  }
+
+  function reconcileSeekSamplePreview(hit, nowMs) {
+    if (!hit || !hitNeedsSeekSample(hit)) {
+      applyTransitionPreview(hit);
+      return;
+    }
+    pausePreviewVideoLayers();
+    if (shouldReconcileSeekSample(lastSeekSampleMs, nowMs)) {
+      lastSeekSampleMs = nowMs;
+      // Keep the HTML decoder paused and snap both layers to Story-mapped source time.
+      seekVideoLocal(hit.localS, hit.clip);
+      applyTransitionPreview(hit);
+      pausePreviewVideoLayers();
+      return;
+    }
+    // Cadence gate: still refresh overlays/grades without a new decode seek.
+    applyTransitionPreview(hit);
+    pausePreviewVideoLayers();
+  }
+
   function wallClockTick(nowMs) {
     if (!state.playing) {
       stopWallClock();
@@ -6122,12 +6198,17 @@ import {
       return;
     }
     if (!before || before.clip !== after.clip) {
+      lastSeekSampleMs = 0;
       syncPreviewMedia({ seek: true });
       beginClockForActiveClip();
       syncMusicAudio();
       return;
     }
-    applyTransitionPreview(after);
+    if (hitNeedsSeekSample(after)) {
+      reconcileSeekSamplePreview(after, nowMs);
+    } else {
+      applyTransitionPreview(after);
+    }
     syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
   }
@@ -6147,6 +6228,17 @@ import {
     }
     const kind = hit.clip.dataset.kind || "unknown";
     const canPlay = hit.clip.dataset.canPlay === "1";
+    // Speeds above the HTMLMediaElement ceiling cannot keep Story/music time
+    // honest via playbackRate alone. Drive Story from the wall clock and
+    // periodically seek both preview layers while keeping HTML video paused.
+    if (kind === "video" && canPlay && videoSrcFor(hit.clip) && hitNeedsSeekSample(hit)) {
+      pausePreviewVideoLayers();
+      lastSeekSampleMs = 0;
+      syncPreviewMedia({ seek: true });
+      pausePreviewVideoLayers();
+      startWallClock();
+      return;
+    }
     if (kind === "video" && canPlay && videoSrcFor(hit.clip)) {
       stopWallClock();
       syncPreviewMedia({ seek: true });
@@ -7236,6 +7328,7 @@ import {
 
   function fillSpeedInspector(clip, isVideo) {
     rampEditor?.fill();
+    timelapseEditor?.fill();
     layoutEffectBars();
     const wrap = document.getElementById("inspector-speed");
     if (wrap) wrap.hidden = !isVideo;
@@ -11853,41 +11946,74 @@ import {
   } catch (_) {
     state.tracks = [];
   }
+  async function saveSpeedRamp(clip, ramp) {
+    const source = storyToSource(clip, Math.max(0, state.projectTimeS - clipStartTime(clip)));
+    const response = await fetch(`/api/studio/${clipId(clip)}/speed-ramp`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speed_ramp: ramp }),
+    });
+    const body = await readJson(response);
+    if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
+    if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
+      sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
+      window.location.reload();
+      return;
+    }
+    clip.dataset.speedRamp = JSON.stringify(body.speed_ramp);
+    clip.dataset.playbackSpeed = "1";
+    clip.dataset.slowBar = "null";
+    clip.dataset.effectiveDuration = String(body.effective_duration_s);
+    clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
+    const durationLabel = clip.querySelector("[data-clip-duration]");
+    if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
+    const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
+    if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
+    applyTransitionsToDom();
+    layoutTimeline();
+    setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
+    scheduleLutProxyPrepare(clip);
+    setSaveState(true);
+    timelapseEditor?.fill();
+    rampEditor?.fill();
+  }
+  const selectedVideoClip = () => {
+    const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
+    return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
+  };
+  const rampBounds = (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) });
   rampEditor = createSpeedRampEditor({
     panel: document.getElementById("inspector-speed-ramp"),
-    getSelection: () => {
-      const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
-      return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
-    },
+    getSelection: selectedVideoClip,
     readRamp: speedRampOf,
-    bounds: (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) }),
+    bounds: rampBounds,
     pause: pausePlayback,
     position: (clip) => ({ left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() }),
     onError: () => showFlash(msgSpeedFailed),
-    save: async (clip, ramp) => {
-      const source = storyToSource(clip, Math.max(0, state.projectTimeS - clipStartTime(clip)));
-      const response = await fetch(`/api/studio/${clipId(clip)}/speed-ramp`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ speed_ramp: ramp }),
-      });
-      const body = await readJson(response);
-      if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
-      if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
-        sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
-        window.location.reload(); return;
-      }
-      clip.dataset.speedRamp = JSON.stringify(body.speed_ramp);
-      clip.dataset.playbackSpeed = "1"; clip.dataset.slowBar = "null";
-      clip.dataset.effectiveDuration = String(body.effective_duration_s);
-      clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
-      const durationLabel = clip.querySelector("[data-clip-duration]");
-      if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
-      const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
-      if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
-      applyTransitionsToDom(); layoutTimeline();
-      setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
-      scheduleLutProxyPrepare(clip);
-      setSaveState(true);
+    save: saveSpeedRamp,
+  });
+  const timelapsePanel = document.getElementById("inspector-timelapse");
+  timelapseEditor = createTimelapseEditor({
+    panel: timelapsePanel,
+    getSelection: selectedVideoClip,
+    readRamp: speedRampOf,
+    bounds: rampBounds,
+    sectionRepeats,
+    forwardLoop: (clip) => clip?.dataset.forwardLoop === "1",
+    pause: pausePlayback,
+    onError: () => showFlash(msgSpeedFailed),
+    messages: {
+      removeRamp: timelapsePanel?.dataset.msgRemoveRamp,
+      removeRepeat: timelapsePanel?.dataset.msgRemoveRepeat,
+      removeLoop: timelapsePanel?.dataset.msgRemoveLoop,
+      invalid: timelapsePanel?.dataset.msgInvalid,
+      calc: timelapsePanel?.dataset.msgCalc,
+      rangeHint: timelapsePanel?.dataset.msgRange,
+      previewApprox: timelapsePanel?.dataset.msgPreview,
+      stale: timelapsePanel?.dataset.msgStale,
+      applied: timelapsePanel?.dataset.msgApplied,
     },
+    save: saveSpeedRamp,
   });
   applyVolume();
   applyTransitionsToDom();

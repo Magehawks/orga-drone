@@ -678,3 +678,48 @@ msgstr "Remove ramp"
 
 msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 msgstr "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
+
+msgid "Timelapse"
+msgstr "Timelapse"
+
+msgid "Target duration (s)"
+msgstr "Target duration (s)"
+
+msgid "Speed multiplier"
+msgstr "Speed multiplier"
+
+msgid "Uses the trimmed source span. Allowed speeds are 1×–20×. Target duration and speed stay in sync."
+msgstr "Uses the trimmed source span. Allowed speeds are 1×–20×. Target duration and speed stay in sync."
+
+msgid "Applying Timelapse replaces slow motion with a flat speed ramp. Source audio is muted; soundtrack timing stays unchanged."
+msgstr "Applying Timelapse replaces slow motion with a flat speed ramp. Source audio is muted; soundtrack timing stays unchanged."
+
+msgid "Apply Timelapse"
+msgstr "Apply Timelapse"
+
+msgid "Remove the speed ramp before applying Timelapse."
+msgstr "Remove the speed ramp before applying Timelapse."
+
+msgid "Turn off section repeat before applying Timelapse."
+msgstr "Turn off section repeat before applying Timelapse."
+
+msgid "Turn off Repeat to soundtrack before applying Timelapse."
+msgstr "Turn off Repeat to soundtrack before applying Timelapse."
+
+msgid "Enter a valid target duration or speed between 1× and 20×."
+msgstr "Enter a valid target duration or speed between 1× and 20×."
+
+msgid "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame)."
+msgstr "About {frames} frames (~{duration} s) at 30 fps (Story grid may differ by one frame)."
+
+msgid "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×)."
+msgstr "Allowed target for this clip: {min}–{max} s (up to {maxSpeed}×)."
+
+msgid "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed."
+msgstr "Preview above 16× uses seek sampling (not continuous playbackRate); export uses the full speed."
+
+msgid "Source range changed. Re-enter Timelapse values."
+msgstr "Source range changed. Re-enter Timelapse values."
+
+msgid "Timelapse applied."
+msgstr "Timelapse applied."
