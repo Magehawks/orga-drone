@@ -17,6 +17,7 @@ from orga_drone.studio_lut import ColorLook
 from orga_drone.studio_map import GpsSample, MapPlacement
 from orga_drone.studio_mask import Mask
 from orga_drone.studio_overlay import Overlay
+from orga_drone.studio_speed_ramp import SpeedRamp
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,13 @@ class StudioExportClip:
     # Clip-local source seconds. None keeps the existing whole-clip zoom or speed.
     zoom_span: tuple[float, float] | None = None
     slow_span: tuple[float, float, float] | None = None
+    speed_ramp: SpeedRamp | None = None
+    # Original clip-local effect clock, before an automatic loop seam narrows it.
+    speed_ramp_source_in_s: float | None = None
+    speed_ramp_source_out_s: float | None = None
+    # Derived export-only frame projection; saved Story durations stay continuous.
+    export_frame_origin_s: float | None = None
+    export_frame_count: int | None = None
 
 
 @dataclass(frozen=True)

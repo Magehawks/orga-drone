@@ -3733,6 +3733,32 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def set_studio_speed_ramp(self, studio_item_id: int, value: object) -> StudioClip:
+        """Persist one source-anchored ramp without changing media or other effects."""
+        from orga_drone.studio_speed_ramp import KEY, parse_ramp
+
+        try:
+            row, project_id = self._video_clip_row(studio_item_id)
+        except ValueError as exc:
+            if "not found" in str(exc):
+                raise
+            raise ValueError("only video clips can use a speed ramp") from exc
+        if row["media_id"] is None or row["duration_s"] is None:
+            raise ValueError("speed ramp needs an available video with a known duration")
+        ramp = None if value is None else parse_ramp(value, media_duration_s=float(row["duration_s"]))
+        data = json.loads(str(row["effect_settings"] or "{}"))
+        if ramp is None:
+            data.pop(KEY, None)
+        else:
+            data[KEY] = ramp.as_dict()
+        data.pop("slow_bar", None)
+        with self.connect() as conn:
+            conn.execute("UPDATE studio_clips SET effect_settings = ?, playback_speed = 1 WHERE id = ?",
+                         (json.dumps(data, separators=(",", ":"), sort_keys=True), studio_item_id))
+            conn.execute("UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                         (datetime.now().isoformat(timespec="seconds"), project_id))
+        return next(item for item in self.list_studio_items(project_id) if item.id == studio_item_id)
+
     def _video_clip_row(self, studio_item_id: int) -> tuple[sqlite3.Row, int]:
         from orga_drone.studio_estimate import effective_kind
         from orga_drone.studio_title_card import ITEM_KIND_TITLE_CARD
@@ -3973,6 +3999,10 @@ class Database:
             )
         else:
             raise ValueError("unknown effect")
+        if kind == "slow":
+            data = json.loads(blob)
+            data.pop("speed_ramp", None)
+            blob = json.dumps(data, separators=(",", ":"), sort_keys=True)
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
             if speed_value is None:
@@ -4432,6 +4462,10 @@ class Database:
             position = int(row["position"])
             ids: list[int] = [studio_item_id]
             now = datetime.now().isoformat(timespec="seconds")
+            clean_effects = json.loads(str(row["effect_settings"] or "{}"))
+            clean_effects.pop("speed_ramp", None)
+            conn.execute("UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                         (json.dumps(clean_effects), studio_item_id))
             if len(segments) == 1:
                 conn.execute(
                     "UPDATE studio_clips SET playback_speed = ? WHERE id = ?",
@@ -4469,7 +4503,7 @@ class Database:
                 volume = float(row["volume"] if row["volume"] is not None else 1.0)
                 from orga_drone.studio_forward_loop import without_loop_to_soundtrack
 
-                original_effects = str(row["effect_settings"] or "{}")
+                original_effects = json.dumps(clean_effects)
                 copied_settings = without_loop_to_soundtrack(original_effects)
                 if copied_settings != original_effects:
                     conn.execute(
@@ -4894,15 +4928,18 @@ class Database:
             from orga_drone.studio_speed import coerce_playback_speed, timeline_offset_s
 
             original_settings = str(row["effect_settings"] or "{}")
+            from orga_drone.studio_speed_ramp import ramp_from_settings
+
+            ramp = ramp_from_settings(original_settings)
             speed = coerce_playback_speed(row["playback_speed"])
             left_len = float(left.source_out_s) - float(left.source_in_s)
             right_len = float(right.source_out_s) - float(right.source_in_s)
             # Overlay times are clip-local; ``local_cut_s`` is the source offset.
             left_settings, right_base = split_overlay_settings(
                 original_settings,
-                timeline_offset_s(float(local_cut_s), speed),
-                left_s=timeline_offset_s(left_len, speed),
-                right_s=timeline_offset_s(right_len, speed),
+                ramp.duration(rang.source_in_s, right.source_in_s) if ramp else timeline_offset_s(float(local_cut_s), speed),
+                left_s=ramp.duration(left.source_in_s, left.source_out_s) if ramp else timeline_offset_s(left_len, speed),
+                right_s=ramp.duration(right.source_in_s, right.source_out_s) if ramp else timeline_offset_s(right_len, speed),
             )
             right_settings = shift_saturation_ramp_settings(
                 right_base,

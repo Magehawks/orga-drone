@@ -85,6 +85,81 @@ def test_plan_refuses_gap_reverse_speed_and_mask_mismatch() -> None:
     assert mask_exc.value.code == "masks"
 
 
+def test_plan_rejoins_speed_ramp_with_overlay_on_mapped_duration() -> None:
+    """Cut halves keep the same absolute ramp; overlay shift uses ramp Story time."""
+    from orga_drone.studio_speed_ramp import SpeedRamp, Point
+
+    ramp = SpeedRamp((Point(0.0, 0.5), Point(4.0, 4.0), Point(8.0, 0.5)))
+    left_story = ramp.duration(0.0, 4.0)
+    right_story = ramp.duration(4.0, 8.0)
+    settings = json.dumps(
+        {
+            "speed_ramp": ramp.as_dict(),
+            "overlays": [
+                {
+                    "id": "ov1",
+                    "kind": "text",
+                    "start_s": 0.2,
+                    "end_s": left_story + right_story - 0.2,
+                    "x": 0.1,
+                    "y": 0.1,
+                    "w": 0.4,
+                    "h": 0.16,
+                    "text": "Ramp",
+                }
+            ],
+        }
+    )
+    left_settings, right_settings = split_overlay_settings(
+        settings, left_story, left_s=left_story, right_s=right_story
+    )
+    # Both halves retain the identical absolute source-anchored curve.
+    left_data = json.loads(left_settings)
+    right_data = json.loads(right_settings)
+    left_data["speed_ramp"] = ramp.as_dict()
+    right_data["speed_ramp"] = ramp.as_dict()
+    plan = plan_merge(
+        [
+            _clip(
+                1,
+                position=0,
+                start=0.0,
+                end=4.0,
+                settings=json.dumps(left_data),
+            ),
+            _clip(
+                2,
+                position=1,
+                start=4.0,
+                end=8.0,
+                settings=json.dumps(right_data),
+            ),
+        ],
+        2,
+    )
+    stored = json.loads(plan.effect_settings)
+    assert stored["speed_ramp"] == ramp.as_dict()
+    overlay = stored["overlays"][0]
+    assert overlay["id"] == "ov1"
+    assert overlay["start_s"] == pytest.approx(0.2)
+    assert overlay["end_s"] == pytest.approx(left_story + right_story - 0.2)
+    assert plan.source_end == pytest.approx(8.0)
+
+    mismatched = json.loads(json.dumps(right_data))
+    mismatched["speed_ramp"]["points"][1]["speed"] = 2.0
+    with pytest.raises(MergeBlocked) as exc:
+        plan_merge(
+            [
+                _clip(1, position=0, start=0.0, end=4.0, settings=json.dumps(left_data)),
+                _clip(
+                    2, position=1, start=4.0, end=8.0, settings=json.dumps(mismatched)
+                ),
+            ],
+            2,
+        )
+    assert exc.value.code == "speed_ramp"
+
+
 def test_plan_rejoins_a_split_overlay_and_ramp() -> None:
     original = json.dumps(
         {

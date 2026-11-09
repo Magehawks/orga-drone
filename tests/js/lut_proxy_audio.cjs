@@ -24,6 +24,7 @@ const context = {
   sourceOutS: clip => Number(clip.dataset.sourceOut || 10),
   playbackSpeed: () => 1,
   slowBarOf: () => null,
+  speedRampOf: () => null,
   speedAtSource: () => 1,
   sourceToStory: (clip, offset) => offset,
   Number, JSON, Math,

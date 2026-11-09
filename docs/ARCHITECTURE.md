@@ -100,13 +100,36 @@ Studio Undo/Redo keeps up to 50 snapshots of one project's `studio_clips` rows i
 
 The transport trash button, the Delete key, and the Story clip context menu remove one selected clip through the existing `/studio/{id}/remove` route. That drops the Story row only. The media file stays. Delete applies when focus is on the Story track or the playhead and no dialog is open. Backspace is not a remove shortcut. Opening the clip menu focuses its item and closing it returns focus to the control that was active before.
 
-Removing a cut joins the clip with the one before it through `POST /api/studio/{id}/merge-previous`. The left row keeps its id and grows to the right row's source end. The right row is deleted. Settings are copied only when they match, including masks and grade. Overlay times shift back onto one timeline. A saturation ramp is kept when the right-hand times are the left-hand ramp shifted by the left source duration. Source ends must meet within 0.001 s. A repeat, a soundtrack loop, a different speed, or a transition other than a cut between the two clips is refused. The refusal does not become an Undo step. A successful join is one Undo step in the existing story history.
+Removing a cut joins the clip with the one before it through `POST /api/studio/{id}/merge-previous`. The left row keeps its id and grows to the right row's source end. The right row is deleted. Settings are copied only when they match, including masks and grade. Overlay times shift back onto one timeline. A saturation ramp is kept when the right-hand times are the left-hand ramp shifted by the left source duration. Source ends must meet within 0.001 s. A repeat, a soundtrack loop, a different speed, mismatched speed ramps, or a transition other than a cut between the two clips is refused. Matching source-anchored speed ramps are kept and overlay shift uses the mapped Story duration. The refusal does not become an Undo step. A successful join is one Undo step in the existing story history.
 
 Another scene from the same original is `POST /api/studio/{id}/reuse-source`. It inserts one new `studio_clips` row immediately after the clicked video, in story order, and shifts only the clips that follow. The new row copies the media path, identity, and library id, stores the chosen source range (NULL, NULL when it covers the whole file), and starts with empty effects, speed 1, and a hard cut out. The clicked row is not updated. The preview seek during the draft is client-side and does not write. Cancel writes nothing. A refusal is not an Undo step. A successful add is one Undo step; Undo removes the new row and restores the later positions.
 
 Dragging a video clip's left or right edge on the Story timeline changes that clip's source start or source end through the existing section PATCH. The drag stays inside the file duration and at least 0.05 s. One completed drag is one Undo step. Neighboring clips keep their source ranges and effects; their story positions move only because this clip's length changed. There is no snap. Photos, title cards, and videos with an unknown duration have no edge handles. The original file is not modified.
 
 A cut or a trimmed video also stores one `studio_originals` row for that project and file. Removing the Story clips does not remove it, and it is still there after a restart. `POST /api/studio/media/{media_id}/reuse-source` inserts one new clip from that row, at the end or before `before_id`, in one Undo step. The Original row is not part of the session snapshot, so Undo of the new scene leaves the Original in the Story browser.
+
+## Studio variable speed
+
+`studio_speed_ramp.py` and `static/js/studio/speed-ramp.js` implement the same
+source-anchored reciprocal-smoothstep time map and inverse (ADR 0034). The
+optional `effect_settings.speed_ramp` key needs no SQLite migration; the
+existing whole-JSON history snapshots retain it. `/speed-ramp` writes are
+ordinary Story edits. Missing/corrupt ramps fall back to legacy timing.
+
+`export/studio_ramp_encoder.py` is a timing adapter around the existing renderer
+and stitcher. It expands loop passes before unchanged color subdivision, assigns
+pieces to cumulative output-frame boundaries, and preserves source samples until
+nonlinear retiming and final CFR. Timed source effects precede retiming; Story
+overlays and fades follow it. A separately retimed transparent map layer preserves
+the existing map-over-overlay order. Animated framing uses frame-evaluated
+scale/crop on the ramp path so fixed-fps zoompan cannot replace source timestamps.
+Grading builders, LUT processing, caches and the non-ramp filter path are retained.
+Video and audio joins stay separate so AAC padding cannot shift video boundaries.
+
+Both preview decoder layers use the same inverse map and instantaneous speed;
+the existing paint loop refreshes ramp playback rates. Source video remains the
+clock authority. Source audio is muted throughout a ramp; music stays in Story
+time. HTML playback is measured separately from exact exported frame counts.
 
 ## Scan / index pipeline
 

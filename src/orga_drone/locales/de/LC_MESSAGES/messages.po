@@ -390,6 +390,9 @@ msgstr "Einblendungen lassen sich nicht ohne Verlust verbinden."
 msgid "The color change does not match."
 msgstr "Der Farbverlauf stimmt nicht überein."
 
+msgid "The speed ramp does not match."
+msgstr "Die Geschwindigkeitsrampe stimmt nicht überein."
+
 msgid "Clip settings do not match."
 msgstr "Die Clip-Einstellungen stimmen nicht überein."
 
@@ -636,3 +639,42 @@ msgstr "Vorher — technische Konvertierung bleibt aktiv"
 
 msgid "Comparison unavailable. Release and try again."
 msgstr "Vergleich nicht verfügbar. Loslassen und erneut versuchen."
+
+msgid "Speed ramp"
+msgstr "Geschwindigkeitsrampe"
+
+msgid "Slow → Fast → Slow"
+msgstr "Langsam → Schnell → Langsam"
+
+msgid "Fast → Slow → Fast"
+msgstr "Schnell → Langsam → Schnell"
+
+msgid "Smooth Acceleration"
+msgstr "Sanft beschleunigen"
+
+msgid "Smooth Deceleration"
+msgstr "Sanft abbremsen"
+
+msgid "Apply ramp"
+msgstr "Rampe anwenden"
+
+msgid "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing."
+msgstr "Eine Rampe ersetzt die Zeitlupe. Der Originalton wird stummgeschaltet; die Musik spielt weiter."
+
+msgid "Point"
+msgstr "Punkt"
+
+msgid "Time in clip (s)"
+msgstr "Zeit im Clip (s)"
+
+msgid "Add point"
+msgstr "Punkt hinzufügen"
+
+msgid "Remove point"
+msgstr "Punkt entfernen"
+
+msgid "Remove ramp"
+msgstr "Rampe entfernen"
+
+msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
+msgstr "Ziehe Punkte auf der Zeitleiste oder ändere ihre Werte hier. Ohne Rampe gilt wieder 1×."

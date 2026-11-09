@@ -493,6 +493,7 @@ def _playback_bounds(item: object) -> tuple[float | None, float | None, Path | N
 
 def _cycle_s(item: object) -> float | None:
     from orga_drone.studio_estimate import effective_seconds
+    from orga_drone.studio_speed_ramp import ramp_from_settings
 
     if (getattr(item, "kind", None) or "") != "video":
         return None
@@ -508,6 +509,8 @@ def _cycle_s(item: object) -> float | None:
         source_out_s=end,
         playback_speed=getattr(item, "playback_speed", None),
         section_repeats=1,
+        effect_settings=(getattr(item, "effect_settings", None)
+                         if ramp_from_settings(getattr(item, "effect_settings", None)) else None),
     )
 
 

@@ -1,0 +1,4 @@
+{
+  "curve": {"v": 1, "interp": "reciprocal_smoothstep", "points": [{"source_s": 0, "speed": 0.25}, {"source_s": 4, "speed": 4}]},
+  "samples": [{"source": 0, "story": 0, "speed": 0.25}, {"source": 2, "story": 6.59375, "speed": 0.47058823529411764}, {"source": 4, "story": 8.5, "speed": 4}, {"source": 5, "story": 8.75, "speed": 4}]
+}

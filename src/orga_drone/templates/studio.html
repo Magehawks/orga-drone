@@ -742,6 +742,7 @@
                   data-frame='{{ row.frame|tojson }}'
                   data-zoom-bar='{{ row.zoom_bar|tojson }}'
                   data-slow-bar='{{ row.slow_bar|tojson }}'
+                  data-speed-ramp='{{ row.speed_ramp|tojson }}'
                   data-clip-audio='{{ row.clip_audio|tojson|replace("'", "\\u0027") }}'
                   data-map='{{ row.map|tojson }}'
                   data-gps='{{ row.gps|tojson|replace("'", "\\u0027") }}'
@@ -794,6 +795,7 @@
                      data-label-blur="{{ _('Lane blur') }}"
                      data-label-pixelate="{{ _('Pixelate') }}"
                      data-label-slow="{{ _('Slow motion') }}"
+                     data-label-ramp="{{ _('Speed ramp') }}"
                      data-label-color="{{ _('Color') }}"></div>
                 <div class="studio-track studio-track-music" id="studio-music-track" data-selected="0">
                   <div class="studio-music-body" id="studio-music-body">
@@ -906,6 +908,28 @@
         </div>
         <div id="inspector-speed" data-inspector-tab="clip" hidden>
           <p class="studio-inspector-kind">{{ _('Speed') }}</p>
+          <div id="inspector-speed-ramp">
+            <p class="studio-inspector-kind">{{ _('Speed ramp') }}</p>
+            <label class="studio-inspector-field"><span>{{ _('Preset') }}</span>
+              <select data-ramp-preset>
+                <option value="slow_fast_slow">{{ _('Slow → Fast → Slow') }}</option>
+                <option value="fast_slow_fast">{{ _('Fast → Slow → Fast') }}</option>
+                <option value="acceleration">{{ _('Smooth Acceleration') }}</option>
+                <option value="deceleration">{{ _('Smooth Deceleration') }}</option>
+              </select>
+            </label>
+            <button type="button" class="button ghost" data-ramp-apply>{{ _('Apply ramp') }}</button>
+            <p class="hint">{{ _('Applying a ramp replaces slow motion. Source audio is muted; music keeps playing.') }}</p>
+            <div data-ramp-controls hidden>
+              <label class="studio-inspector-field"><span>{{ _('Point') }}</span><select data-ramp-point aria-label="{{ _('Point') }}"></select></label>
+              <label class="studio-inspector-field"><span>{{ _('Time in clip (s)') }}</span><input data-ramp-time type="number" step="0.05" inputmode="decimal"></label>
+              <label class="studio-inspector-field"><span>{{ _('Speed') }}</span><input data-ramp-speed type="number" min="0.25" max="4" step="0.05" inputmode="decimal"></label>
+              <button type="button" class="button ghost" data-ramp-add>{{ _('Add point') }}</button>
+              <button type="button" class="button ghost" data-ramp-remove-point>{{ _('Remove point') }}</button>
+              <button type="button" class="button ghost" data-ramp-remove>{{ _('Remove ramp') }}</button>
+              <p class="hint">{{ _('Drag points on the timeline or edit their values here. Removing the ramp returns to 1×.') }}</p>
+            </div>
+          </div>
           <div class="studio-speed-choices" role="group" aria-label="{{ _('Speed') }}">
             <button type="button" class="button ghost" data-speed="1">1×</button>
             <button type="button" class="button ghost" data-speed="0.5">0.5×</button>

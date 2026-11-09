@@ -83,6 +83,7 @@ function harness() {
   };
   const context = vm.createContext({
     state,
+    rampEditor: null,
     reuseDraft: null,
     syncToken: 0,
     loadedVideoSrc: "",
@@ -115,6 +116,10 @@ function harness() {
     defaultReuseRange: () => ({ inS: 20, outS: 100, whole: false }),
     videoSrcFor: () => "synthetic-story",
     lutProxySrcFor: () => "",
+    speedRampOf: () => null,
+    storyToSource: (_clip, time) => time,
+    playSourceOffset: (_clip, time) => time,
+    secondaryVideoTarget: (_clip, time) => time,
     lutProxyActiveFor: () => false,
     loopPlayInS: () => 0,
     loopPlayOutS: () => 20,

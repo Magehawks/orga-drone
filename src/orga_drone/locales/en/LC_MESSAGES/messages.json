@@ -280,6 +280,7 @@
   "The telemetry display does not match.": "The telemetry display does not match.",
   "Overlays cannot be combined without dropping one.": "Overlays cannot be combined without dropping one.",
   "The color change does not match.": "The color change does not match.",
+  "The speed ramp does not match.": "The speed ramp does not match.",
   "Clip settings do not match.": "Clip settings do not match.",
   "Unavailable": "Unavailable",
   "Go to Browse": "Go to Browse",
@@ -895,5 +896,18 @@
   "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.": "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.",
   "Preparing comparison…": "Preparing comparison…",
   "Before — technical conversion retained": "Before — technical conversion retained",
-  "Comparison unavailable. Release and try again.": "Comparison unavailable. Release and try again."
+  "Comparison unavailable. Release and try again.": "Comparison unavailable. Release and try again.",
+  "Speed ramp": "Speed ramp",
+  "Slow → Fast → Slow": "Slow → Fast → Slow",
+  "Fast → Slow → Fast": "Fast → Slow → Fast",
+  "Smooth Acceleration": "Smooth Acceleration",
+  "Smooth Deceleration": "Smooth Deceleration",
+  "Apply ramp": "Apply ramp",
+  "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing.": "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing.",
+  "Point": "Point",
+  "Time in clip (s)": "Time in clip (s)",
+  "Add point": "Add point",
+  "Remove point": "Remove point",
+  "Remove ramp": "Remove ramp",
+  "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×.": "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 }

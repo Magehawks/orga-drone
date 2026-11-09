@@ -4823,3 +4823,8 @@ footer {
 .studio-control details > * { margin-block: 0.35rem; }
 .studio-control input { max-width: 18rem; width: 100%; }
 .studio-control [data-control-status] { margin: 0.25rem 0; }
+.studio-ramp-curve { position: absolute; height: 64px; overflow: visible; touch-action: none; color: var(--accent); }
+.studio-ramp-line { fill: none; stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.studio-ramp-reference { stroke: currentColor; opacity: .3; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.studio-ramp-point { fill: currentColor; stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: grab; }
+.studio-ramp-point.is-selected { stroke: currentColor; fill: var(--bg); }

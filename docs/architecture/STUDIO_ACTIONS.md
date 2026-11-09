@@ -8,6 +8,10 @@ promise that every Studio control becomes an MCP tool. Product truth remains
 
 ## 1. Goal and boundary
 
+The speed-ramp UI uses `PATCH /api/studio/{id}/speed-ramp` and the existing Story
+history boundary. It is a manual Studio action; no new Control API v1 or MCP
+capability is implied. The versioned curve contract is documented in ADR 0034.
+
 The Studio UI, the opt-in local Control API, and an external MCP adapter must
 invoke **one domain implementation per action**. Transports stay separate:
 
