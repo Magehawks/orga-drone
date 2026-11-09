@@ -22,6 +22,7 @@ from orga_drone.studio_estimate import effective_seconds
 from orga_drone.studio_speed_ramp import (
     Point,
     SpeedRamp,
+    edge_source_after_ramp_drag,
     parse_ramp,
     ramp_from_settings,
 )
@@ -169,6 +170,92 @@ def test_roundtrip_history_cut_and_legacy_speed(
     )
     assert refused.status_code == 400
     assert "video" in refused.json()["detail"]
+
+
+def test_edge_drag_absolute_inverse_on_trimmed_asymmetric_ramp() -> None:
+    ramp = SpeedRamp((Point(0.0, 0.5), Point(4.0, 4.0), Point(8.0, 0.5)))
+    start_in, start_out = 5.0, 8.0
+    delta = 1.25
+    new_in, new_out = edge_source_after_ramp_drag(
+        ramp,
+        edge="out",
+        source_in_s=start_in,
+        source_out_s=start_out,
+        delta_story_s=delta,
+        repeats=1,
+        media_duration_s=10.0,
+    )
+    assert new_in == pytest.approx(start_in)
+    assert ramp.time_at(new_out) - ramp.time_at(start_out) == pytest.approx(
+        delta, abs=0.02
+    )
+    left_in, left_out = edge_source_after_ramp_drag(
+        ramp,
+        edge="in",
+        source_in_s=start_in,
+        source_out_s=start_out,
+        delta_story_s=-0.8,
+        repeats=2,
+        media_duration_s=10.0,
+    )
+    assert left_out == pytest.approx(start_out)
+    assert left_in == pytest.approx(
+        round(ramp.source_at_time(ramp.time_at(start_in) - 0.4, 0.0, 10.0), 2)
+    )
+
+
+def test_cut_on_trimmed_ramp_uses_relative_local_offset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UI storyToSource is relative; cut expects that same relative local_s."""
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    cid = _add_item(
+        db,
+        _seed_media(
+            db,
+            tmp_path / "lib",
+            filename="trim-cut.mp4",
+            content=b"synthetic",
+            duration_s=12,
+        ),
+    )
+    client = TestClient(app)
+    assert (
+        client.patch(
+            f"/api/studio/{cid}/section",
+            json={"source_in_s": 5, "source_out_s": 9, "repeats": 1},
+        ).status_code
+        == 200
+    )
+    curve = {
+        "v": 1,
+        "interp": "reciprocal_smoothstep",
+        "points": [
+            {"source_s": 5.0, "speed": 0.5},
+            {"source_s": 7.0, "speed": 4.0},
+            {"source_s": 9.0, "speed": 0.5},
+        ],
+    }
+    assert (
+        client.patch(
+            f"/api/studio/{cid}/speed-ramp", json={"speed_ramp": curve}
+        ).status_code
+        == 200
+    )
+    # Relative offset 2 from source_in 5 → absolute source 7.
+    cut = client.post(f"/api/studio/{cid}/cut", json={"local_s": 2})
+    assert cut.status_code == 200
+    left, right = db.list_studio_items()
+    assert left.source_start == pytest.approx(5.0)
+    assert left.source_end == pytest.approx(7.0)
+    assert right.source_start == pytest.approx(7.0)
+    assert right.source_end == pytest.approx(9.0)
+    assert ramp_from_settings(left.effect_settings) == parse_ramp(curve)
+    assert ramp_from_settings(right.effect_settings) == parse_ramp(curve)
 
 
 def test_partial_loop_uses_inverse_mapping() -> None:

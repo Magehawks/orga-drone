@@ -5,9 +5,11 @@ import {
   parseRamp,
   rampTime,
   rampSource,
+  rampSourceAtTime,
   rampSpeed,
   rampPreset,
   rampMediaTime,
+  edgeSourceAfterRampDrag,
 } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../fixtures/speed_ramp.json", import.meta.url)));
@@ -50,6 +52,49 @@ test("trimmed stream and clip-local proxy share source landmarks", () => {
   close(rampMediaTime(ramp, 6.59375, 5, 9), 7);
   close(rampMediaTime(ramp, 6.59375, 5, 9, 5), 2);
 });
+
+test("edge drag uses absolute inverse on asymmetric trimmed ramps", () => {
+  const ramp = parseRamp({
+    v: 1,
+    interp: "reciprocal_smoothstep",
+    points: [
+      { source_s: 0, speed: 0.5 },
+      { source_s: 4, speed: 4 },
+      { source_s: 8, speed: 0.5 },
+    ],
+  });
+  const startIn = 5;
+  const startOut = 8;
+  const delta = 1.25;
+  const expectedOut = rampSourceAtTime(ramp, rampTime(ramp, startOut) + delta, 0, 10);
+  const moved = edgeSourceAfterRampDrag(ramp, {
+    edge: "out",
+    sourceIn: startIn,
+    sourceOut: startOut,
+    deltaStory: delta,
+    repeats: 1,
+    catalog: 10,
+  });
+  assert.equal(moved.inS, startIn);
+  close(moved.outS, Number(expectedOut.toFixed(2)));
+  assert.ok(Math.abs(rampTime(ramp, moved.outS) - rampTime(ramp, startOut) - delta) < 0.02);
+
+  const left = edgeSourceAfterRampDrag(ramp, {
+    edge: "in",
+    sourceIn: startIn,
+    sourceOut: startOut,
+    deltaStory: -0.8,
+    repeats: 2,
+    catalog: 10,
+  });
+  const expectedIn = rampSourceAtTime(ramp, rampTime(ramp, startIn) - 0.8 / 2, 0, 10);
+  assert.equal(left.outS, startOut);
+  close(left.inS, Number(expectedIn.toFixed(2)));
+  // Absolute primitive fed as relative story with start=0 coincides only because
+  // rampTime(0) is 0; keep callers on rampSourceAtTime / edgeSourceAfterRampDrag.
+  close(rampSource(ramp, rampTime(ramp, startOut) + delta, 0, 10), expectedOut);
+});
+
 test("malformed, extreme and nonfinite speeds are refused", () => {
   assert.equal(parseRamp({ ...fixture.curve, points: [null, null] }), null);
   for (const value of [null, {}, { ...fixture.curve, points: [] }])

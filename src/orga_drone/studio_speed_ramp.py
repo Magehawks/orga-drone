@@ -76,20 +76,29 @@ class SpeedRamp:
     def duration(self, start: float, end: float) -> float:
         return max(0.0, self.time_at(end) - self.time_at(start))
 
-    def source_at(self, story_s: float, start: float, end: float) -> float:
-        if story_s <= 0:
-            return start
-        if story_s >= self.duration(start, end):
-            return end
-        target = self.time_at(start) + max(0.0, story_s)
-        lo, hi = start, end
+    def source_at_time(self, absolute_story_s: float, lo: float, hi: float) -> float:
+        """Invert ``time_at`` inside ``[lo, hi]`` against an absolute primitive."""
+        low = float(lo)
+        high = float(hi)
+        if high < low:
+            low, high = high, low
+        target = float(absolute_story_s)
+        if target <= self.time_at(low):
+            return low
+        if target >= self.time_at(high):
+            return high
+        left, right = low, high
         for _ in range(48):
-            mid = (lo + hi) / 2
+            mid = (left + right) / 2
             if self.time_at(mid) < target:
-                lo = mid
+                left = mid
             else:
-                hi = mid
-        return (lo + hi) / 2
+                right = mid
+        return (left + right) / 2
+
+    def source_at(self, story_s: float, start: float, end: float) -> float:
+        """Invert relative Story seconds measured from ``time_at(start)``."""
+        return self.source_at_time(self.time_at(start) + max(0.0, float(story_s)), start, end)
 
     def ffmpeg_time(self, variable: str = "T") -> str:
         """An exact primitive in FFmpeg expression syntax, including endpoint holds."""
@@ -104,6 +113,63 @@ class SpeedRamp:
             )
             tail = f"if(lte(({variable}),{b.source_s:.12g}),{span},{tail})"
         return f"if(lte(({variable}),{p[0].source_s:.12g}),({variable})/{p[0].speed:.12g},{tail})"
+
+
+def edge_source_after_ramp_drag(
+    ramp: SpeedRamp,
+    *,
+    edge: str,
+    source_in_s: float,
+    source_out_s: float,
+    delta_story_s: float,
+    repeats: int = 1,
+    media_duration_s: float,
+    min_segment_s: float = 0.05,
+) -> tuple[float, float]:
+    """Move one trimmed edge by Story seconds along a source-anchored ramp."""
+    if edge not in {"in", "out"}:
+        raise ValueError("edge must be in or out")
+    catalog = float(media_duration_s)
+    floor = float(min_segment_s)
+    if catalog <= floor:
+        return 0.0, max(0.0, catalog)
+    count = max(1, min(8, int(repeats)))
+    start = float(source_in_s)
+    end = float(source_out_s)
+    source = start if edge == "in" else end
+    mapped = ramp.source_at_time(
+        ramp.time_at(source) + float(delta_story_s) / count,
+        0.0,
+        catalog,
+    )
+    if edge == "in":
+        start = mapped
+    else:
+        end = mapped
+    start = min(max(0.0, start), catalog)
+    end = min(max(0.0, end), catalog)
+    if end - start < floor:
+        if edge == "in":
+            start = end - floor
+        else:
+            end = start + floor
+        start = min(max(0.0, start), catalog)
+        end = min(max(0.0, end), catalog)
+        if end - start < floor:
+            if edge == "in":
+                end = min(catalog, start + floor)
+            else:
+                start = max(0.0, end - floor)
+    start = round(start, 2)
+    end = round(end, 2)
+    start = min(max(0.0, start), catalog)
+    end = min(max(0.0, end), catalog)
+    if end - start < floor:
+        if edge == "in":
+            start = max(0.0, round(end - floor, 2))
+        else:
+            end = min(catalog, round(start + floor, 2))
+    return start, end
 
 
 def parse_ramp(value: object, *, media_duration_s: float | None = None) -> SpeedRamp:
