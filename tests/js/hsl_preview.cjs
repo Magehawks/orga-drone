@@ -28,7 +28,7 @@ const context = {
   lutProxyPreparingFor: () => false,
   msgLutChipProxyPreparing: 'Preparing color preview',
   previewVideo: null, previewVideoB: null, lutProxyActiveFor: () => false,
-  playbackSpeed: () => 1, slowBarOf: () => null,
+  playbackSpeed: () => 1, slowBarOf: () => null, speedRampOf: () => null,
   schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
   hslSaveChain: Promise.resolve(), msgHslChipPlaying: 'Playing without HSL preview',

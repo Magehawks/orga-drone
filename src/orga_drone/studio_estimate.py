@@ -105,7 +105,12 @@ def effective_seconds(
         from orga_drone.studio_speed import output_duration_s
 
         speed = 1.0 if playback_speed is None else playback_speed
-        if effect_settings is not None:
+        from orga_drone.studio_speed_ramp import ramp_from_settings
+
+        ramp = ramp_from_settings(effect_settings)
+        if ramp is not None:
+            slowed = ramp.duration(rang.source_in_s, rang.source_out_s)
+        elif effect_settings is not None:
             slowed = output_seconds(rang.duration_s, speed, effect_settings)
         else:
             slowed = output_duration_s(rang.duration_s, speed)

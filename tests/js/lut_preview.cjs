@@ -33,7 +33,7 @@ const context = {
   previewVideo: null, previewVideoB: null, previewImage: null, previewImageB: null,
   clipForPreviewMedia: media => media === context.previewImageB ? context.outgoing : clip, lutProxyActiveFor: () => false,
   previewLutFrameFor: () => null,
-  playbackSpeed: () => 1, slowBarOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
+  playbackSpeed: () => 1, slowBarOf: () => null, speedRampOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
   hslSaveChain: Promise.resolve(), msgHslChipPlaying: 'Playing without HSL preview',
   colorWheelsSaveChain: Promise.resolve(), msgColorWheelsChipPlaying: 'Playing without color grading preview',

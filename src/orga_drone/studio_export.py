@@ -362,6 +362,7 @@ def _clip_to_export_clip(
     locale: str = "en",
     forward: object | None = None,
 ) -> StudioExportClip | None:
+    from orga_drone.studio_speed_ramp import ramp_from_settings
     if clip.item_kind == TITLE_CARD_KIND or clip.kind == TITLE_CARD_KIND:
         seconds = effective_seconds(
             kind=TITLE_CARD_KIND,
@@ -606,6 +607,9 @@ def _clip_to_export_clip(
         playback_speed=speed,
         zoom_span=zoom_span,
         slow_span=slow_span,
+        speed_ramp=ramp_from_settings(clip.effect_settings) if kind == "video" else None,
+        speed_ramp_source_in_s=float(clip.source_start or 0),
+        speed_ramp_source_out_s=float(clip.source_end) if clip.source_end is not None else media.duration_s,
         detached_audio=detached,
         section_repeats=repeats if kind == "video" else 1,
         forward_loop=forward_active,

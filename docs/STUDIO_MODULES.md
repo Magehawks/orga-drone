@@ -21,6 +21,12 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
+- `studio/speed-ramp.js` is the pure curve/time-map counterpart to Python.
+  `studio/speed-ramp-editor.js` owns the compact curve draft, pointer completion,
+  cancellation and numeric controls. The entry injects selection, bounds,
+  persistence, timeline positioning and playback callbacks. The editor never
+  writes another feature's dataset. See ADR 0034 and `tests/js/speed_ramp.test.js`.
+
 - `studio/color-compare.js` owns the temporary hold input, comparison request,
   abort/decode token and decoded picture. The entry injects the selected paused
   clip/source-time identity, save settling and redraw callback. It never writes

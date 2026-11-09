@@ -25,6 +25,7 @@ from orga_drone.studio_forward_loop import loop_to_soundtrack_enabled, loop_tran
 from orga_drone.studio_image import RAMP_KEY, saturation_ramp_from_effect_settings
 from orga_drone.studio_overlay import MAX_OVERLAYS, Overlay, overlays_from_effect_settings
 from orga_drone.studio_speed import coerce_playback_speed, output_duration_s
+from orga_drone.studio_speed_ramp import KEY as SPEED_RAMP_KEY, ramp_from_settings
 
 MERGE_SOURCE_TOLERANCE_S = 0.001
 MERGE_OVERLAY_SEAM_S = 0.15
@@ -49,6 +50,7 @@ MERGE_REASONS: dict[str, str] = {
     "hud": "The telemetry display does not match.",
     "overlays": "Overlays cannot be combined without dropping one.",
     "ramp": "The color change does not match.",
+    "speed_ramp": "The speed ramp does not match.",
     "settings": "Clip settings do not match.",
 }
 
@@ -61,6 +63,7 @@ _NAMED_KEYS = {
     "frame": "frame",
     "map": "map",
     "hud": "hud",
+    SPEED_RAMP_KEY: "speed_ramp",
 }
 
 
@@ -129,8 +132,19 @@ def plan_merge(items: list[StudioClip], right_id: int) -> MergePlan:
     _reject_repeat_or_loop(right.effect_settings)
     speed = coerce_playback_speed(left.playback_speed)
     left_source_s = left_range.duration_s
-    left_timeline_s = output_duration_s(left_source_s, speed)
-    right_timeline_s = output_duration_s(right_range.duration_s, speed)
+    # Source-anchored ramps stretch Story time; overlay seams must use that
+    # mapped duration, not constant playback_speed (which is forced to 1×).
+    left_ramp = ramp_from_settings(left.effect_settings)
+    if left_ramp is not None:
+        left_timeline_s = left_ramp.duration(
+            left_range.source_in_s, left_range.source_out_s
+        )
+        right_timeline_s = left_ramp.duration(
+            right_range.source_in_s, right_range.source_out_s
+        )
+    else:
+        left_timeline_s = output_duration_s(left_source_s, speed)
+        right_timeline_s = output_duration_s(right_range.duration_s, speed)
     settings = _join_settings(
         left.effect_settings,
         right.effect_settings,

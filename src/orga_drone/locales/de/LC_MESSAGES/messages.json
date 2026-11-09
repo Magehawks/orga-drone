@@ -280,6 +280,7 @@
   "The telemetry display does not match.": "Die Telemetrieanzeige stimmt nicht überein.",
   "Overlays cannot be combined without dropping one.": "Einblendungen lassen sich nicht ohne Verlust verbinden.",
   "The color change does not match.": "Der Farbverlauf stimmt nicht überein.",
+  "The speed ramp does not match.": "Die Geschwindigkeitsrampe stimmt nicht überein.",
   "Clip settings do not match.": "Die Clip-Einstellungen stimmen nicht überein.",
   "Unavailable": "Nicht verfügbar",
   "Go to Browse": "Zu Medien",
@@ -895,5 +896,18 @@
   "Pause outside loop blends. Hold with the mouse, Space or Enter. Technical conversion stays on.": "Außerhalb von Loop-Übergängen pausieren. Mit Maus, Leertaste oder Eingabetaste gedrückt halten. Die technische Konvertierung bleibt aktiv.",
   "Preparing comparison…": "Vergleich wird vorbereitet…",
   "Before — technical conversion retained": "Vorher — technische Konvertierung bleibt aktiv",
-  "Comparison unavailable. Release and try again.": "Vergleich nicht verfügbar. Loslassen und erneut versuchen."
+  "Comparison unavailable. Release and try again.": "Vergleich nicht verfügbar. Loslassen und erneut versuchen.",
+  "Speed ramp": "Geschwindigkeitsrampe",
+  "Slow → Fast → Slow": "Langsam → Schnell → Langsam",
+  "Fast → Slow → Fast": "Schnell → Langsam → Schnell",
+  "Smooth Acceleration": "Sanft beschleunigen",
+  "Smooth Deceleration": "Sanft abbremsen",
+  "Apply ramp": "Rampe anwenden",
+  "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing.": "Eine Rampe ersetzt die Zeitlupe. Der Originalton wird stummgeschaltet; die Musik spielt weiter.",
+  "Point": "Punkt",
+  "Time in clip (s)": "Zeit im Clip (s)",
+  "Add point": "Punkt hinzufügen",
+  "Remove point": "Punkt entfernen",
+  "Remove ramp": "Rampe entfernen",
+  "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×.": "Ziehe Punkte auf der Zeitleiste oder ändere ihre Werte hier. Ohne Rampe gilt wieder 1×."
 }

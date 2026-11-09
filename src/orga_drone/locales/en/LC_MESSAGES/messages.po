@@ -390,6 +390,9 @@ msgstr "Overlays cannot be combined without dropping one."
 msgid "The color change does not match."
 msgstr "The color change does not match."
 
+msgid "The speed ramp does not match."
+msgstr "The speed ramp does not match."
+
 msgid "Clip settings do not match."
 msgstr "Clip settings do not match."
 
@@ -636,3 +639,42 @@ msgstr "Before — technical conversion retained"
 
 msgid "Comparison unavailable. Release and try again."
 msgstr "Comparison unavailable. Release and try again."
+
+msgid "Speed ramp"
+msgstr "Speed ramp"
+
+msgid "Slow → Fast → Slow"
+msgstr "Slow → Fast → Slow"
+
+msgid "Fast → Slow → Fast"
+msgstr "Fast → Slow → Fast"
+
+msgid "Smooth Acceleration"
+msgstr "Smooth Acceleration"
+
+msgid "Smooth Deceleration"
+msgstr "Smooth Deceleration"
+
+msgid "Apply ramp"
+msgstr "Apply ramp"
+
+msgid "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing."
+msgstr "Applying a ramp replaces slow motion. Source audio is muted; music keeps playing."
+
+msgid "Point"
+msgstr "Point"
+
+msgid "Time in clip (s)"
+msgstr "Time in clip (s)"
+
+msgid "Add point"
+msgstr "Add point"
+
+msgid "Remove point"
+msgstr "Remove point"
+
+msgid "Remove ramp"
+msgstr "Remove ramp"
+
+msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
+msgstr "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."

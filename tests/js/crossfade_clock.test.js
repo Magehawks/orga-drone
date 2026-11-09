@@ -74,6 +74,8 @@ function scenario(options = {}) {
     loopPlayInS: () => 1.5,
     sectionSampleS: (_, localS) => localS,
     playbackSpeed: () => 2,
+    playSourceOffset: (_, time) => time * 2,
+    secondaryVideoTarget: (_, time) => 1.5 + time * 2,
     applyClipPlayback: () => {
       video.playbackRate = 2;
       events.push("applyClipPlayback");
@@ -174,6 +176,8 @@ function preloadScenario(options = {}) {
     loopPlayInS: () => 0,
     sectionSampleS: (_, localS) => localS,
     playbackSpeed: () => options.speed ?? 1,
+    playSourceOffset: (_, time) => time * (options.speed ?? 1),
+    secondaryVideoTarget: (_, time) => time * (options.speed ?? 1),
     applyClipPlayback: () => events.push("applyClipPlayback"),
   });
   const names = ["clearCrossfadePreload", "prepareOutgoingCrossfade"];

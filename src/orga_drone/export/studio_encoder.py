@@ -88,6 +88,17 @@ def _x264_video_args() -> list[str]:
     return ["-c:v", "libx264", "-preset", preset, "-crf", crf, *_x264_color_args()]
 
 
+def _frame_output_args(clip: StudioExportClip) -> list[str]:
+    if clip.export_frame_count is None:
+        return []
+    return ["-frames:v", str(clip.export_frame_count), "-r", "30", "-fps_mode", "cfr"]
+
+
+def _duration_argument(clip: StudioExportClip, duration: float) -> str:
+    # Millisecond rounding can cut the last frame of a 10/30s planned piece.
+    return f"{duration + 0.000001:.9f}" if clip.export_frame_count is not None else f"{duration:.3f}"
+
+
 def _segment_vf(width: int, height: int) -> str:
     """Scale/pad + CFR + limited-range BT.709 yuv420p (photo and video match)."""
     return (
@@ -204,7 +215,7 @@ def _slow_pieces(clip: StudioExportClip) -> list[StudioExportClip]:
     return pieces or [clip]
 
 
-def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
+def _segment_chain(width: int, height: int, clip: StudioExportClip, *, frame_chain: str | None = None) -> str:
     """Grade, optional saturation ramp, optional zoom/pan, then scale/pad.
 
     Fades stay separate so privacy masks and overlays can sit on the framed
@@ -300,6 +311,8 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip) -> str:
             source_start_s=frame_origin,
             duration_s=frame_duration,
         )
+    if frame_chain is not None:
+        prefix, suffix = frame_chain, ""
     return ",".join(
         part
         for part in (trim, grade, lut, hsl, wheels, detail, ramp, prefix, base, suffix, stretch)
@@ -540,11 +553,14 @@ def _attach_flight_map(
     return [*extra, *map_args], _filter_args(graph, work, complex_graph=True)
 
 
-def _segment_filter_invocation(
+def _segment_filter_invocation_impl(
     clip: StudioExportClip,
     width: int,
     height: int,
     work: Path,
+    *,
+    prebuilt: tuple[str, str, list[str]] | None = None,
+    frame_chain: str | None = None,
 ) -> tuple[list[str], list[str]]:
     """Extra inputs and the filter flags for one segment.
 
@@ -553,7 +569,7 @@ def _segment_filter_invocation(
     With either effect: ``-filter_complex`` mapped to ``[vout]``.
     The caller still maps audio.
     """
-    chain = _segment_chain(width, height, clip)
+    chain = _segment_chain(width, height, clip, frame_chain=frame_chain)
     fades = _fade_filters(clip)
     masks = tuple(clip.masks) if clip.kind in {"photo", "video"} else ()
     hud = _hud_filter_text(clip, height)
@@ -590,6 +606,10 @@ def _segment_filter_invocation(
         return graph, len(placed)
 
     def plain_or_masks() -> tuple[list[str], list[str]]:
+        if prebuilt is not None:
+            prefix, label, inputs = prebuilt
+            tail = ",".join([*fades, "format=yuv420p"])
+            return inputs, _filter_args(f"{prefix};[{label}]{tail}[vout]", work, complex_graph=True)
         if not masks:
             return [], _filter_args(
                 _chain_with_hud(chain, hud, fades),
@@ -632,7 +652,8 @@ def _segment_filter_invocation(
     )
     source_w, source_h = _source_frame_size(clip)
     fitted = content_rect(width, height, source_w, source_h)
-    extra: list[str] = []
+    extra: list[str] = list(prebuilt[2]) if prebuilt is not None else []
+    first_overlay = 1 + extra.count("-i")
     windows: list[OverlayWindow] = []
     for index, overlay in enumerate(active):
         end = min(float(overlay.end_s), float(clip.duration_s))
@@ -695,7 +716,9 @@ def _segment_filter_invocation(
     if not windows:
         return _attach_flight_map(clip, width, height, work, *plain_or_masks())
     source_label = None
-    if masks:
+    if prebuilt is not None:
+        prefix, source_label, _inputs = prebuilt
+    elif masks:
         prefix, count = privacy_graph(include_tail=False)
         source_label = f"mbase{count}"
     else:
@@ -704,7 +727,7 @@ def _segment_filter_invocation(
         base_chain=chain,
         fades=fades,
         windows=windows,
-        first_input=1,
+        first_input=first_overlay,
         source_label=source_label,
     )
     if prefix:
@@ -721,6 +744,28 @@ def _segment_filter_invocation(
         body = _graph_with_hud(_complex_graph_body(filters), hud)
         return extra_out, _filter_args(body, work, complex_graph=True)
     return extra_out, filters
+
+
+def _segment_filter_invocation(
+    clip: StudioExportClip, width: int, height: int, work: Path, *,
+    prebuilt: tuple[str, str, list[str]] | None = None, frame_chain: str | None = None,
+) -> tuple[list[str], list[str]]:
+    extra, filters = _segment_filter_invocation_impl(clip, width, height, work,
+                                                   prebuilt=prebuilt, frame_chain=frame_chain)
+    if clip.export_frame_count is None:
+        return extra, filters
+    from orga_drone.export.studio_frame_plan import frame_index
+
+    origin = float(clip.export_frame_origin_s or 0)
+    linear = _linear_filter_body(filters)
+    graph = f"[0:v]{linear}[gridin]" if linear is not None else _complex_graph_body(filters).replace("[vout]", "[gridin]")
+    if clip.kind == "video" and _slow_timing(clip) is None and clip.source_end_s is not None:
+        graph = re.sub(r"\[0:v(?::0)?\]", "[gridinput]", graph)
+        graph = f"[0:v]trim=duration={clip.source_end_s-clip.source_start_s:.12g}[gridinput];{graph}"
+    tail = (f"fps=30,tpad=stop_mode=clone:stop=2,settb=AVTB,setpts=(T+{origin:.12g})/TB,"
+            f"fps=30:start_time={frame_index(origin)/30:.12g},setpts=N/(30*TB),"
+            f"trim=end_frame={clip.export_frame_count},format=yuv420p")
+    return extra, _filter_args(f"{graph};[gridin]{tail}[vout]", work, complex_graph=True)
 
 
 def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list[str]:
@@ -1469,7 +1514,13 @@ class FfmpegStudioEncoder:
                 "ffmpeg is not available. Install ffmpeg or use a build that includes it."
             )
 
-        clip_total = len(config.clips)
+        from orga_drone.export.studio_frame_plan import plan_story_frames
+
+        render_clips, stitch_clips = plan_story_frames(config.clips)
+        if not render_clips:
+            raise StudioExportError("The Story is too short to export at 30 fps.")
+        config = replace(config, clips=stitch_clips)
+        clip_total = len(render_clips)
         tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
         tmp_out = tmp_dir / "export_tmp.mp4"
         partial = parent / f".{dest.name}.{uuid.uuid4().hex}.partial"
@@ -1482,7 +1533,7 @@ class FfmpegStudioEncoder:
         try:
             _raise_if_cancelled()
             segments: list[Path] = []
-            for index, clip in enumerate(config.clips):
+            for index, clip in enumerate(render_clips):
                 _raise_if_cancelled()
                 clip_index = index + 1
                 label = _clip_progress_label(clip)
@@ -1610,6 +1661,12 @@ class FfmpegStudioEncoder:
                 clip_total=clip_total,
             )
         else:
+            if clip.speed_ramp is not None:
+                from orga_drone.export.studio_ramp_encoder import render_ramped_clip
+
+                render_ramped_clip(self, ffmpeg, clip, out, width, height,
+                                   on_progress=on_progress, clip_index=clip_index, clip_total=clip_total)
+                return
             from orga_drone.studio_color_animation import expand_export_clip_for_color
 
             pieces: list[StudioExportClip] = []
@@ -1635,7 +1692,17 @@ class FfmpegStudioEncoder:
                 )
                 return
             paths: list[Path] = []
+            piece_configs: list[StudioExportClip] = []
+            frame_cursor = float(clip.export_frame_origin_s or 0)
             for index, piece in enumerate(pieces):
+                if clip.export_frame_count is not None:
+                    from orga_drone.export.studio_frame_plan import frame_index
+
+                    count = frame_index(frame_cursor+piece.duration_s)-frame_index(frame_cursor)
+                    piece = replace(piece, export_frame_origin_s=frame_cursor, export_frame_count=count)
+                    frame_cursor += piece.duration_s
+                    if count <= 0:
+                        continue
                 piece_out = out.with_name(f"{out.stem}-fx{index}.mp4")
                 self._render_video(
                     ffmpeg,
@@ -1648,12 +1715,12 @@ class FfmpegStudioEncoder:
                     clip_total=clip_total,
                 )
                 paths.append(piece_out)
-            self._concat(
-                ffmpeg,
-                paths,
-                out,
-                duration_s=sum(piece.duration_s for piece in pieces),
-            )
+                piece_configs.append(replace(piece, duration_s=piece.export_frame_count/30 if piece.export_frame_count is not None else piece.duration_s,
+                                             transition_type="cut", transition_s=0))
+            if clip.export_frame_count is not None:
+                self._stitch_parts(ffmpeg, paths, out, tuple(piece_configs))
+            else:
+                self._concat(ffmpeg, paths, out, duration_s=sum(piece.duration_s for piece in pieces))
             for path in paths:
                 path.unlink(missing_ok=True)
 
@@ -1699,6 +1766,8 @@ class FfmpegStudioEncoder:
             label=_clip_progress_label(clip),
             fade_in_s=clip.fade_in_s,
             fade_out_s=clip.fade_out_s,
+            export_frame_origin_s=clip.export_frame_origin_s,
+            export_frame_count=clip.export_frame_count,
         )
         self._render_photo(
             ffmpeg,
@@ -1759,6 +1828,8 @@ class FfmpegStudioEncoder:
         _materialize_photo_still(clip.source_path, still)
         sized = replace(clip, source_path=still, kind="photo")
         dur = max(0.1, float(clip.duration_s))
+        if clip.export_frame_count is not None:
+            dur = clip.export_frame_count / EXPORT_FPS
         extra, filters = _segment_filter_invocation(sized, width, height, out.parent)
         overlay_count = extra.count("-i")
         audio_index = 1 + overlay_count
@@ -1778,8 +1849,9 @@ class FfmpegStudioEncoder:
             "-i",
             "anullsrc=channel_layout=stereo:sample_rate=48000",
             "-t",
-            f"{dur:.3f}",
+            _duration_argument(clip, dur),
             *filters,
+            *_frame_output_args(clip),
         ]
         if uses_graph:
             cmd.extend(["-map", f"{audio_index}:a:0"])
@@ -1834,6 +1906,8 @@ class FfmpegStudioEncoder:
             speed=speed,
         )
         dur = max(0.1, output_dur)
+        if clip.export_frame_count is not None:
+            dur = clip.export_frame_count / EXPORT_FPS
         on_time = self._progress_cb(
             on_progress,
             clip=clip,
@@ -1856,8 +1930,9 @@ class FfmpegStudioEncoder:
             "-i",
             "anullsrc=channel_layout=stereo:sample_rate=48000",
             "-t",
-            f"{dur:.3f}",
+            _duration_argument(clip, dur),
             *filters,
+            *_frame_output_args(clip),
             *_x264_video_args(),
             "-c:a",
             "aac",
@@ -1887,6 +1962,23 @@ class FfmpegStudioEncoder:
         clip_total: int,
     ) -> None:
         slices = section_repeat_slices(clip)
+        if clip.export_frame_count is not None and not (len(slices) == 1 and slices[0] is clip):
+            from orga_drone.export.studio_frame_plan import frame_index
+
+            planned = []
+            cursor = float(clip.export_frame_origin_s or 0)
+            for slice_clip in slices:
+                duration = float(slice_clip.duration_s)
+                if slice_clip.kind == "video" and slice_clip.source_end_s is not None:
+                    duration = (slice_clip.source_end_s-slice_clip.source_start_s) / coerce_playback_speed(slice_clip.playback_speed)
+                end = cursor + duration
+                count = frame_index(end)-frame_index(cursor)
+                overlap = frame_index(end)-frame_index(end-slice_clip.transition_s)
+                if count > 0:
+                    planned.append(replace(slice_clip, export_frame_origin_s=cursor, export_frame_count=count,
+                                           transition_s=overlap/30))
+                cursor = end-slice_clip.transition_s
+            slices = tuple(planned)
         if not (len(slices) == 1 and slices[0] is clip):
             if len(slices) == 1:
                 self._render_video(
@@ -1916,11 +2008,13 @@ class FfmpegStudioEncoder:
                 )
                 parts.append(part)
             _raise_if_cancelled()
-            if any(
+            if clip.export_frame_count is not None or any(
                 part.transition_type == "crossfade" and part.transition_s > 0
                 for part in slices[:-1]
             ):
-                self._stitch_parts(ffmpeg, parts, out, slices)
+                stitch_slices = tuple(replace(part, duration_s=part.export_frame_count/30)
+                                      if part.export_frame_count is not None else part for part in slices)
+                self._stitch_parts(ffmpeg, parts, out, stitch_slices)
             else:
                 self._concat(ffmpeg, parts, out)
             return
@@ -1945,6 +2039,8 @@ class FfmpegStudioEncoder:
             dur = float(clip.duration_s) if clip.exact_span else max(0.1, float(clip.duration_s))
         if clip.exact_span:
             dur = max(0.05, dur)
+        if clip.export_frame_count is not None:
+            dur = clip.export_frame_count / EXPORT_FPS
         on_time = self._progress_cb(
             on_progress,
             clip=clip,
@@ -1966,8 +2062,9 @@ class FfmpegStudioEncoder:
             str(clip.source_path),
             *extra,
             "-t",
-            f"{dur:.3f}",
+            _duration_argument(clip, dur),
             *filters,
+            *_frame_output_args(clip),
             *_x264_video_args(),
             "-c:a",
             "aac",
@@ -2006,8 +2103,9 @@ class FfmpegStudioEncoder:
                 "-i",
                 "anullsrc=channel_layout=stereo:sample_rate=48000",
                 "-t",
-                f"{dur:.3f}",
+                _duration_argument(clip, dur),
                 *filters,
+                *_frame_output_args(clip),
                 *_x264_video_args(),
                 "-c:a",
                 "aac",
@@ -2100,7 +2198,7 @@ class FfmpegStudioEncoder:
                 duration_s=story_s,
                 phase="concat",
             )
-        if _has_crossfade(config.clips):
+        if _has_crossfade(config.clips) or any(clip.export_frame_count is not None for clip in config.clips):
             self._stitch(
                 ffmpeg,
                 segments,
@@ -2158,14 +2256,25 @@ class FfmpegStudioEncoder:
                 on_time(duration_s)
             return
         filters = build_stitch_filters(clips)
+        if any(clip.export_frame_count is not None for clip in clips):
+            # AAC packet padding must never accumulate between frame-planned
+            # clips. Keep video and audio joins independent on the same grid.
+            prefixes = []
+            for index, clip in enumerate(clips):
+                label = f"grida{index}"
+                filters = [step.replace(f"[{index}:a]", f"[{label}]") for step in filters]
+                prefixes.append(f"[{index}:a]apad,atrim=duration={clip.duration_s:.12g},asetpts=PTS-STARTPTS[{label}]")
+            filters = [*prefixes, *filters]
         last = len(clips) - 2
         cmd: list[str] = [ffmpeg, "-y"]
         for seg in segments:
             cmd.extend(["-i", str(seg)])
+        filter_options = ["-filter_complex", ";".join(filters)]
+        if any(clip.export_frame_count is not None for clip in clips):
+            filter_options = _filter_args(";".join(filters), out.parent, complex_graph=True)[:2]
         cmd.extend(
             [
-                "-filter_complex",
-                ";".join(filters),
+                *filter_options,
                 "-map",
                 f"[xv{last}]",
                 "-map",

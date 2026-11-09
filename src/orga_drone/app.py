@@ -54,6 +54,7 @@ from orga_drone.studio_forward_loop import (
     soundtrack_once_s,
 )
 from orga_drone.studio_effect_lane import stored_lane
+from orga_drone.studio_speed_ramp import ramp_client_state
 from orga_drone.studio_estimate import (
     DEFAULT_PHOTO_DURATION_S,
     effective_seconds,
@@ -1534,6 +1535,7 @@ def create_app() -> FastAPI:
                         "frame": frame_from_effect_settings(it.effect_settings).as_dict(),
                         "zoom_bar": stored_lane(it.effect_settings)["zoom_bar"],
                         "slow_bar": stored_lane(it.effect_settings)["slow_bar"],
+                        "speed_ramp": ramp_client_state(it.effect_settings),
                         "clip_audio": detached_audio_from_effect_settings(
                             it.effect_settings
                         ).as_dict(),
@@ -2588,6 +2590,25 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.patch("/api/studio/{studio_item_id}/speed-ramp")
+    async def api_studio_speed_ramp(studio_item_id: int, request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict) or "speed_ramp" not in payload:
+                raise ValueError("JSON body must include speed_ramp")
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                item = db.set_studio_speed_ramp(studio_item_id, payload["speed_ramp"])
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        from orga_drone.studio_speed_ramp import ramp_from_settings
+
+        ramp = ramp_from_settings(item.effect_settings)
+        items = db.list_studio_items(item.project_id)
+        seconds = effective_item_seconds(item, items, soundtrack_once_s(db.list_studio_music(item.project_id)))
+        return JSONResponse({"ok": True, "id": item.id,
+                             "speed_ramp": ramp.as_dict() if ramp else None,
+                             "effective_duration_s": seconds})
+
     @app.patch("/api/studio/{studio_item_id}/effect-lane")
     async def api_studio_effect_lane(
         studio_item_id: int,
@@ -3234,6 +3255,7 @@ def create_app() -> FastAPI:
                         source_in_s=left.source_in_s,
                         source_out_s=left.source_out_s,
                         playback_speed=left.playback_speed,
+                        effect_settings=left.effect_settings,
                         section_repeats=section_repeats_from_effect_settings(
                             left.effect_settings
                         ),
@@ -3251,6 +3273,7 @@ def create_app() -> FastAPI:
                         source_in_s=right.source_in_s,
                         source_out_s=right.source_out_s,
                         playback_speed=right.playback_speed,
+                        effect_settings=right.effect_settings,
                         section_repeats=section_repeats_from_effect_settings(
                             right.effect_settings
                         ),

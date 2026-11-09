@@ -34,3 +34,39 @@ while edits are unsaved, or inside a blend between two copies of the same loop.
 **Not a pro editor**
 
 Orga Drone is a memory editor. It does not replace a full video NLE.
+
+## Speed ramps
+
+Select a video on the Story timeline, open **Clip → Speed ramp**, choose a
+preset and click **Apply ramp**. The four presets are Slow → Fast → Slow,
+Fast → Slow → Fast, Smooth Acceleration and Smooth Deceleration.
+
+The selected clip shows a compact curve on the Effect lane. Drag a point up or
+down to change speed, or drag an internal point sideways to move the change.
+The inspector's Point, Time in clip and Speed fields provide keyboard access.
+Use Add point or Remove point for 2–5 points, at 0.25×–4×. Endpoint speeds can
+change; endpoint times stay fixed. Escape cancels an unfinished pointer drag.
+A preset needs at least 0.1 seconds of source; a shorter clip is left unchanged.
+
+The curve eases between speeds. The clip length and following clips change with
+it. One completed gesture is one Undo step; the saved curve returns when you
+reopen the project. Source files stay untouched. Trims and cuts keep points
+anchored to the original source: points outside a newly trimmed range still
+define its curve. Apply a preset again to fit a new curve to that visible range.
+
+Applying a ramp explicitly replaces existing slow motion. Choosing 0.25× or
+0.5× removes the ramp and uses that constant speed instead. Remove ramp returns
+the picture to 1×. Source audio is muted throughout a ramped clip, including
+parts passing through 1×; its stored placement remains available after removing
+the ramp. Project music follows Story time. Repeats and soundtrack loops reuse
+the ramp on each pass; a partial final pass stops at the corresponding source
+frame. The timeline curve shows that one pass, even when the section repeats.
+Existing transitions and animated color remain available. Stories without a
+ramp keep the existing 1×, 0.5× and 0.25× timing. There is no separate
+timelapse control.
+
+Export uses source frames before its final 30 fps conversion. Slow motion holds
+frames and faster motion drops frames as required by the speed; no optical flow
+or invented intermediate frames are provided. Preview uses the browser decoder,
+so very demanding 4K playback can drop frames. This does not lower export quality.
+Existing color-preview approximation limits still apply.

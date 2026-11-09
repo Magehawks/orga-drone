@@ -1,4 +1,6 @@
 import "./studio-lut-webgl.js";
+import { parseRamp, rampTime, rampSpeed, rampSource, rampMediaTime } from "./studio/speed-ramp.js";
+import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -42,6 +44,7 @@ import {
   const msgTitleFailed = root.dataset.titleFailed || "Could not save project title.";
   let historyGesture = "";
   let controlBridge = null;
+  let rampEditor = null;
   let controlPendingWrites = 0;
   let controlWriteFailed = false;
   const nativeFetch = window.fetch.bind(window);
@@ -116,6 +119,9 @@ import {
   }
 
   async function applyStudioHistory(direction) {
+    // Drop an unfinished curve drag before history so pointerup cannot race Undo.
+    rampEditor?.cancel?.();
+    await rampEditor?.whenIdle?.();
     const button = document.getElementById(
       direction === "undo" ? "studio-undo" : "studio-redo"
     );
@@ -627,6 +633,8 @@ import {
   }
 
   function speedAtSource(clip, offset) {
+    const ramp = speedRampOf(clip);
+    if (ramp) return rampSpeed(ramp, sourceInS(clip) + offset);
     const bar = slowBarOf(clip);
     if (!bar) return playbackSpeed(clip);
     if (offset >= bar.start - 0.001 && offset <= bar.end + 0.001) return bar.speed;
@@ -634,6 +642,8 @@ import {
   }
 
   function sourceToStory(clip, offset) {
+    const ramp = speedRampOf(clip);
+    if (ramp) return Math.max(0, rampTime(ramp, sourceInS(clip) + Math.max(0, offset)) - rampTime(ramp, loopPlayInS(clip)));
     const bar = slowBarOf(clip);
     const off = Math.max(0, offset);
     if (!bar || playbackSpeed(clip) < 0.999) return off / playbackSpeed(clip);
@@ -643,6 +653,8 @@ import {
   }
 
   function storyToSource(clip, localS) {
+    const ramp = speedRampOf(clip);
+    if (ramp) return rampSource(ramp, localS, loopPlayInS(clip), loopPlayOutS(clip)) - sourceInS(clip);
     const bar = slowBarOf(clip);
     const local = Math.max(0, localS);
     if (!bar || playbackSpeed(clip) < 0.999) return local * playbackSpeed(clip);
@@ -653,6 +665,10 @@ import {
   }
 
   let clipAudio = null;
+  function speedRampOf(clip) {
+    try { return parseRamp(JSON.parse(clip?.dataset.speedRamp || "null")); }
+    catch (_) { return null; }
+  }
   function clipAudioEl() {
     if (clipAudio) return clipAudio;
     clipAudio = document.createElement("audio");
@@ -669,7 +685,7 @@ import {
       return;
     }
     const offset = clipOffsetFromMediaTime(clip, video.currentTime || 0, sourceInS(clip));
-    const slow = speedAtSource(clip, offset) < 0.999;
+    const slow = !!speedRampOf(clip) || speedAtSource(clip, offset) < 0.999;
     const stream = clip.dataset.streamUrl || "";
     const proxy = clip.dataset.hasProxy === "1";
     const range = audioPlacement(clip);
@@ -737,9 +753,10 @@ import {
   function applyClipPlayback(video, clip) {
     if (!video) return;
     let speed = clip ? playbackSpeed(clip) : 1;
-    if (clip && video === previewVideo && clip.dataset.kind === "video") {
-      const offset = Math.max(0, (video.currentTime || 0) - sourceInS(clip));
-      if (slowBarOf(clip) && playbackSpeed(clip) >= 0.999) speed = speedAtSource(clip, offset);
+    if (clip && clip.dataset.kind === "video") {
+      const relative = video.getAttribute("src") === lutProxySrcFor(clip);
+      const offset = Math.max(0, (video.currentTime || 0) - (relative ? 0 : sourceInS(clip)));
+      if (speedRampOf(clip) || (slowBarOf(clip) && playbackSpeed(clip) >= 0.999)) speed = speedAtSource(clip, offset);
     }
     try {
       if (video.playbackRate !== speed) video.playbackRate = speed;
@@ -779,6 +796,8 @@ import {
   function onePlayS(clip) {
     if (!clip) return 0;
     const source = Math.max(0, loopPlayOutS(clip) - loopPlayInS(clip));
+    const ramp = speedRampOf(clip);
+    if (ramp) return rampTime(ramp, loopPlayOutS(clip)) - rampTime(ramp, loopPlayInS(clip));
     const speed = playbackSpeed(clip);
     return speed > 0 ? source / speed : source;
   }
@@ -850,6 +869,7 @@ import {
   }
 
   function sectionCycleS(clip) {
+    if (speedRampOf(clip)) return onePlayS(clip);
     if (forwardLoopActive(clip) || (clip && clip.dataset.loopMatchState === "ok")) {
       const story = onePlayS(clip);
       if (story > 0.001) return story;
@@ -941,6 +961,18 @@ import {
     return sectionPoint(clip, localS).offset;
   }
 
+  function playSourceOffset(clip, localS) {
+    const offset = storyToSource(clip, localS);
+    return speedRampOf(clip) ? offset - (loopPlayInS(clip) - sourceInS(clip)) : offset;
+  }
+
+  function secondaryVideoTarget(clip, localS, src) {
+    const ramp = speedRampOf(clip);
+    if (ramp) return rampMediaTime(ramp, localS, loopPlayInS(clip), loopPlayOutS(clip),
+      src === lutProxySrcFor(clip) ? sourceInS(clip) : 0);
+    return loopPlayInS(clip) + playSourceOffset(clip, localS);
+  }
+
   function totalDuration() {
     const list = clips();
     let total = 0;
@@ -1015,6 +1047,7 @@ import {
     if (!lane) return kind;
     if (kind === "zoom") return lane.dataset.labelZoom || "Zoom";
     if (kind === "color") return lane.dataset.labelColor || "Color";
+    if (kind === "ramp") return lane.dataset.labelRamp || "Speed ramp";
     if (kind === "blur") return lane.dataset.labelBlur || "Blur";
     if (kind === "pixelate") return lane.dataset.labelPixelate || "Pixelate";
     return lane.dataset.labelSlow || "Slow motion";
@@ -1044,6 +1077,9 @@ import {
     videos.forEach((clip) => {
       const left = Number.parseFloat(clip.style.left) || 0;
       const bars = [];
+      if (speedRampOf(clip) && String(state.selected?.id) !== String(clip.dataset.studioId)) {
+        bars.push({ kind: "ramp", id: "", start: Math.max(0, loopPlayInS(clip) - sourceInS(clip)), end: loopPlayOutS(clip) - sourceInS(clip), label: effectLabel("ramp") });
+      }
       const zoom = zoomBarOf(clip);
       if (zoom) bars.push({ kind: "zoom", id: "", start: zoom.start, end: zoom.end, label: `${effectLabel("zoom")} ${zoom.zoom.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}×` });
       readMasks(clip).forEach((mask) => {
@@ -1092,17 +1128,24 @@ import {
         edgeIn.className = "studio-effect-edge studio-effect-edge-in";
         const edgeOut = document.createElement("span");
         edgeOut.className = "studio-effect-edge studio-effect-edge-out";
-        el.append(edgeIn, edgeOut);
+        if (bar.kind !== "ramp") el.append(edgeIn, edgeOut);
         if (selectedEffectBar && selectedEffectBar.studioId === el.dataset.studioId && selectedEffectBar.kind === el.dataset.kind && selectedEffectBar.id === el.dataset.maskId) {
           el.classList.add("is-selected");
         }
-        el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
+        if (bar.kind === "ramp") {
+          el.addEventListener("click", () => {
+            selectClip(clipId(clip), { movePlayhead: false });
+            document.getElementById("inspector-speed-ramp")?.scrollIntoView({ block: "nearest" });
+          });
+        } else el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
         lane.appendChild(el);
         stack = Math.max(stack, index + 1);
       });
     });
     const step = effectBarPx + effectBarGapPx;
     lane.style.minHeight = `${effectBarGapPx + stack * step}px`;
+    if (label) label.style.minHeight = lane.style.minHeight;
+    rampEditor?.layout(lane);
     if (label) label.style.minHeight = lane.style.minHeight;
   }
 
@@ -2530,7 +2573,7 @@ import {
     if (!clip || clip.dataset.kind !== "video") return 0;
     const offset = Math.max(0, Number(localS) || 0);
     const speed = playbackSpeed(clip);
-    if (slowBarOf(clip) && speed >= 0.999) return storyToSource(clip, offset);
+    if (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999)) return storyToSource(clip, offset);
     return offset * speed;
   }
 
@@ -5102,6 +5145,10 @@ import {
   }
 
   function framePreviewProgress(clip, localS, sampleOverride) {
+    if (speedRampOf(clip)) {
+      const sample = sampleOverride ?? sectionSampleS(clip, localS);
+      return Math.max(0, Math.min(1, storyToSource(clip, sample) / Math.max(0.05, sourceDurationS(clip))));
+    }
     if (sampleOverride != null && Number.isFinite(sampleOverride)) {
       const duration = sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip);
       if (!(duration > 0)) return 0;
@@ -5359,8 +5406,8 @@ import {
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
     videoLoopIndex = point.index;
     const speed = clip ? playbackSpeed(clip) : 1;
-    const mapped = clip && slowBarOf(clip) && speed >= 0.999
-      ? storyToSource(clip, point.offset)
+    const mapped = clip && (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999))
+      ? playSourceOffset(clip, point.offset)
       : Math.max(0, point.offset) * speed;
     const target = clipMediaTarget(clip, mapped, inS);
     const apply = () => {
@@ -5505,7 +5552,7 @@ import {
     if (remaining <= 0 || remaining > 0.5) return false;
     const id = String(clip.dataset.studioId);
     const inS = loopPlayInS(clip);
-    const target = inS + Math.max(0, sectionSampleS(clip, hit.localS)) * playbackSpeed(clip);
+    const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, hit.localS)), videoSrcFor(clip));
     const sync = () => {
       if (crossfadePreloadId !== id || !state.playing) return;
       try {
@@ -5571,7 +5618,7 @@ import {
         }
         const inS = loopPlayInS(clip);
         const speed = playbackSpeed(clip);
-        const target = inS + Math.max(0, sectionSampleS(clip, localS)) * speed;
+        const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, localS)), src);
         const sync = () => {
           try {
             applyClipPlayback(previewVideoB, clip);
@@ -5656,8 +5703,14 @@ import {
       previewVideo.style.opacity = String(Math.max(0, 1 - eased));
     }
     const inS = loopPlayInS(clip);
-    const speed = playbackSpeed(clip);
-    const target = inS + Math.max(0, point.incomingOffset) * speed;
+    const incomingLocal = Math.max(0, point.incomingOffset);
+    const speed = speedRampOf(clip)
+      ? rampSpeed(speedRampOf(clip), inS + playSourceOffset(clip, incomingLocal))
+      : playbackSpeed(clip);
+    // Proxies start at 0 for trimmed sources; reuse the shared secondary mapper.
+    const target = speedRampOf(clip)
+      ? secondaryVideoTarget(clip, incomingLocal, src)
+      : inS + playSourceOffset(clip, incomingLocal);
     if (previewVideoB.getAttribute("src") !== src) {
       previewVideoB.src = src;
       previewVideoB.load();
@@ -6123,12 +6176,12 @@ import {
   }
 
   function videoStoryPosition(playing, mediaTime) {
-    const inS = sourceInS(playing);
+    const inS = speedRampOf(playing) ? loopPlayInS(playing) : sourceInS(playing);
     const speed = playbackSpeed(playing);
     const reps = sectionRepeats(playing);
     const cycle = sectionCycleS(playing);
-    const offset = clipOffsetFromMediaTime(playing, mediaTime, inS);
-    const within = slowBarOf(playing) && speed >= 0.999
+    const offset = clipOffsetFromMediaTime(playing, mediaTime, speedRampOf(playing) ? sourceInS(playing) : inS);
+    const within = speedRampOf(playing) || (slowBarOf(playing) && speed >= 0.999)
       ? sourceToStory(playing, offset)
       : offset / speed;
     const loopOverlap = forwardLoopOverlapS(playing);
@@ -6175,8 +6228,22 @@ import {
     );
     if (!playing || playing.dataset.kind !== "video") return;
     const position = videoStoryPosition(playing, previewVideo.currentTime || 0);
+    if (speedRampOf(playing)) applyClipPlayback(previewVideo, playing);
+    const secondary = clipForPreviewMedia(previewVideoB) || (previewVideoB && !previewVideoB.hidden && loopOverlapS(playing) > 0 ? playing : null);
+    if (secondary && speedRampOf(secondary)) applyClipPlayback(previewVideoB, secondary);
     const after = resolveAt(position.next);
-    if (!after || after.clip !== playing) return;
+    if (!after) return;
+    if (after.clip !== playing) {
+      if (speedRampOf(playing) || speedRampOf(after.clip)) {
+        // Hand off once at the mapped boundary. Waiting for coarse native
+        // timeupdate would leave the playhead behind a ramped crossfade.
+        state.projectTimeS = position.next;
+        updatePlayheadChrome();
+        beginClockForActiveClip();
+        syncMusicAudio();
+      }
+      return;
+    }
     if (Math.abs(position.next - state.projectTimeS) >= 0.001) {
       state.projectTimeS = position.next;
     }
@@ -6234,7 +6301,7 @@ import {
     if (loopOverlap > 0 && loopSpans.length) {
       const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
       const span = loopSpans[index] || 0;
-      const endMedia = inS + span * speed;
+      const endMedia = inS + (speedRampOf(playing) ? playSourceOffset(playing, span) : span * speed);
       if (index + 1 < loopSpans.length && mediaTime >= endMedia - 0.02) {
         if (loopSeeking) return;
         loopSeeking = true;
@@ -6254,7 +6321,7 @@ import {
         previewVideo.addEventListener("seeked", settle, { once: true });
         window.setTimeout(settle, 200);
         try {
-          previewVideo.currentTime = inS + loopOverlap * speed;
+          previewVideo.currentTime = inS + playSourceOffset(playing, loopOverlap);
         } catch (_) {
           settle();
         }
@@ -6336,7 +6403,7 @@ import {
       state.projectTimeS = clipStartTime(hit.clip) + (starts[videoLoopIndex] || 0) + endedOverlap;
       updatePlayheadChrome();
       try {
-        previewVideo.currentTime = inS + endedOverlap * speed;
+        previewVideo.currentTime = inS + playSourceOffset(hit.clip, endedOverlap);
       } catch (_) {
         /* ignore */
       }
@@ -7161,6 +7228,8 @@ import {
   }
 
   function fillSpeedInspector(clip, isVideo) {
+    rampEditor?.fill();
+    layoutEffectBars();
     const wrap = document.getElementById("inspector-speed");
     if (wrap) wrap.hidden = !isVideo;
     if (!isVideo || !clip) return;
@@ -7192,7 +7261,7 @@ import {
       (c) => state.selected && String(c.dataset.studioId) === String(state.selected.id)
     );
     if (!selected || selected.dataset.kind !== "video") return;
-    if (speed === playbackSpeed(selected)) return;
+    if (speed === playbackSpeed(selected) && !speedRampOf(selected)) return;
     const inEl = document.getElementById("inspector-speed-in");
     const outEl = document.getElementById("inspector-speed-out");
     const rangeIn = inEl ? Number(inEl.value) : 0;
@@ -7245,7 +7314,7 @@ import {
     if (sectionRepeats(hit.clip) > 1) return false;
     if (hit.clip.dataset.canPlay !== "1") return false;
     if (hit.clip.dataset.available !== "1") return false;
-    const sourceLocal = hit.localS * playbackSpeed(hit.clip);
+    const sourceLocal = storyToSource(hit.clip, hit.localS);
     const sourceDur = sourceDurationS(hit.clip);
     return sourceLocal > MIN_CUT_SEGMENT_S && sourceLocal < sourceDur - MIN_CUT_SEGMENT_S;
   }
@@ -7412,7 +7481,7 @@ import {
     const hit = resolveAt(state.projectTimeS);
     if (!canCutAtHit(hit)) return;
     const studioId = hit.clip.dataset.studioId;
-    const localS = hit.localS * playbackSpeed(hit.clip);
+    const localS = storyToSource(hit.clip, hit.localS);
     const playhead = state.projectTimeS;
     if (state.playing) pausePlayback();
     cutBtn.disabled = true;
@@ -8337,7 +8406,8 @@ import {
   function previewEdgeDuration(clip, inS, outS) {
     const speed = playbackSpeed(clip);
     const span = Math.max(0, outS - inS);
-    const cycle = speed > 0 ? span / speed : span;
+    const ramp = speedRampOf(clip);
+    const cycle = ramp ? rampTime(ramp, outS) - rampTime(ramp, inS) : (speed > 0 ? span / speed : span);
     const reps = storedSectionRepeats(clip);
     let duration = cycle * reps;
     const overlap = loopOverlapS(clip);
@@ -8415,7 +8485,7 @@ import {
   function onEdgePointerMove(event) {
     if (!edgeDrag || event.pointerId !== edgeDrag.pointerId) return;
     const deltaStory = (event.clientX - edgeDrag.originX) / edgeDrag.pps;
-    const next = edgeSourceAfterDrag(
+    let next = edgeSourceAfterDrag(
       edgeDrag.edge,
       edgeDrag.startIn,
       edgeDrag.startOut,
@@ -8424,6 +8494,14 @@ import {
       edgeDrag.repeats,
       edgeDrag.catalog
     );
+    const ramp = speedRampOf(edgeDrag.clip);
+    if (ramp) {
+      const source = edgeDrag.edge === "in" ? edgeDrag.startIn : edgeDrag.startOut;
+      const mapped = rampSource(ramp, rampTime(ramp, source) + deltaStory / edgeDrag.repeats, 0, edgeDrag.catalog);
+      next = edgeDrag.edge === "in"
+        ? { inS: Math.min(edgeDrag.startOut - 0.05, mapped), outS: edgeDrag.startOut }
+        : { inS: edgeDrag.startIn, outS: Math.max(edgeDrag.startIn + 0.05, mapped) };
+    }
     edgeDrag.currentIn = next.inS;
     edgeDrag.currentOut = next.outS;
     paintEdgePreview(edgeDrag.clip, next.inS, next.outS);
@@ -11423,7 +11501,7 @@ import {
 
   function sourceClock(clip, localS) {
     const sample = sectionSampleS(clip, Math.max(0, Number(localS) || 0));
-    return loopPlayInS(clip) + sample * playbackSpeed(clip);
+    return speedRampOf(clip) ? sourceInS(clip) + storyToSource(clip, sample) : loopPlayInS(clip) + sample * playbackSpeed(clip);
   }
 
   function mapClock(clip, localS) {
@@ -11763,6 +11841,42 @@ import {
   } catch (_) {
     state.tracks = [];
   }
+  rampEditor = createSpeedRampEditor({
+    panel: document.getElementById("inspector-speed-ramp"),
+    getSelection: () => {
+      const clip = state.selected?.type === "clip" ? findClip(grid, state.selected.id) : null;
+      return clip?.dataset.kind === "video" && clip.dataset.available === "1" ? clip : null;
+    },
+    readRamp: speedRampOf,
+    bounds: (clip) => ({ start: loopPlayInS(clip), end: loopPlayOutS(clip) }),
+    pause: pausePlayback,
+    position: (clip) => ({ left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() }),
+    onError: () => showFlash(msgSpeedFailed),
+    save: async (clip, ramp) => {
+      const source = storyToSource(clip, Math.max(0, state.projectTimeS - clipStartTime(clip)));
+      const response = await fetch(`/api/studio/${clipId(clip)}/speed-ramp`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ speed_ramp: ramp }),
+      });
+      const body = await readJson(response);
+      if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
+      if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
+        sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
+        window.location.reload(); return;
+      }
+      clip.dataset.speedRamp = JSON.stringify(body.speed_ramp);
+      clip.dataset.playbackSpeed = "1"; clip.dataset.slowBar = "null";
+      clip.dataset.effectiveDuration = String(body.effective_duration_s);
+      clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
+      const durationLabel = clip.querySelector("[data-clip-duration]");
+      if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
+      const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
+      if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
+      applyTransitionsToDom(); layoutTimeline();
+      setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
+      scheduleLutProxyPrepare(clip);
+      setSaveState(true);
+    },
+  });
   applyVolume();
   applyTransitionsToDom();
   renderMusic();
@@ -11815,7 +11929,7 @@ import {
       playhead_s: state.projectTimeS,
       playing: state.playing,
       busy: controlPendingWrites > 0 || controlWriteFailed || Boolean(historyGesture ||
-        titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer) || saveStateEl?.dataset.state === "dirty" ||
+        titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer || rampEditor?.isBusy?.()) || saveStateEl?.dataset.state === "dirty" ||
         hasActiveControlGesture({ dragCard, musicDragCard, dragOriginalMediaId, edgeDrag, maskDragging, playheadDragging }),
       ready: Boolean(!reuseDraft && clip && clip.dataset.kind === "video" && clip.dataset.available === "1" &&
         !readColorAnimation(clip) && !readSaturationRamp(clip)?.enabled),
@@ -11832,6 +11946,7 @@ import {
     whenIdle: async () => {
       await Promise.resolve();
       await Promise.all([imageAdjustSaver.whenIdle(), detailControls.whenIdle(), colorSaveChain,
+        rampEditor?.whenIdle?.(),
         imageSaveChain, hslSaveChain, colorWheelsSaveChain, maskSaveChain, frameSaveChain,
         overlaySaveChain, mapSaveChain]);
     },
