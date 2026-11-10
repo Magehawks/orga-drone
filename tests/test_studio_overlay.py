@@ -538,3 +538,36 @@ def test_animation_presets_are_bounded_and_numeric() -> None:
     assert "fade_out" in script
     assert "slide_in" in script
 
+
+def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
+    """Phase 3 (#339): text/image/shape overlays share timeline-first actions."""
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    helpers = Path("src/orga_drone/static/js/studio/timed-selection.js").read_text(
+        encoding="utf-8"
+    )
+    assert '"overlay"' in helpers.split("TIMED_DELETE_KINDS", 1)[1].split("]", 1)[0]
+    assert "isOverlayTimedKind" in helpers
+    assert 'if (value === "overlay") return "overlays"' in helpers
+    assert "function selectTimedOverlay" in script
+    assert "function onOverlayBarPointerDown" in script
+    assert "function removeTimedOverlaySelection" in script
+    assert 'kind: "overlay"' in script
+    assert 'coord: "story"' in script
+    layout = script.split("function layoutEffectBars", 1)[1].split(
+        "function layoutClipAudio", 1
+    )[0]
+    assert "readOverlays(clip)" in layout
+    assert "onOverlayBarPointerDown" in layout
+    assert "showTimedEffectMenu(" in layout
+    remove = script.split("async function removeTimedOverlaySelection", 1)[1].split(
+        "function selectTimedRamp", 1
+    )[0]
+    assert "persistTimedSelectionRemoval" in remove
+    assert "isActiveTimedSelection(timedSelection, selection)" in remove
+    assert "selectedEffectBar.kind" not in remove.split("persistTimedSelectionRemoval", 1)[0]
+    dispatch = script.split("function dispatchDeleteShortcut", 1)[1].split(
+        "function layoutTimeline", 1
+    )[0]
+    assert 'action === "overlay"' in dispatch
+    assert "removeTimedOverlaySelection" in dispatch
+

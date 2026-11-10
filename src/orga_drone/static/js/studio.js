@@ -13,6 +13,7 @@ import {
   createTimedSelection,
   isActiveTimedSelection,
   isEffectBarKind,
+  isOverlayTimedKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
@@ -1069,6 +1070,7 @@ import {
 
   let selectedEffectBar = null;
   let timedSelection = null;
+  let overlayBarDragging = false;
 
   function clearTimedSelection() {
     timedSelection = null;
@@ -1085,6 +1087,15 @@ import {
     if (kind === "blur") return lane.dataset.labelBlur || "Blur";
     if (kind === "pixelate") return lane.dataset.labelPixelate || "Pixelate";
     return lane.dataset.labelSlow || "Slow motion";
+  }
+
+  function overlayBarLabel(overlay) {
+    if (!overlay) return "Overlay";
+    if (overlay.kind === "text") {
+      const text = String(overlay.text || "").trim();
+      if (text) return text.length > 18 ? `${text.slice(0, 17)}…` : text;
+    }
+    return overlayLabel(overlay);
   }
 
   function layoutEffectBars() {
@@ -1147,9 +1158,24 @@ import {
           });
         }
       }
+      // Overlays use story-local start_s/end_s (clip duration / section cycle).
+      readOverlays(clip).forEach((overlay) => {
+        const start = Number(overlay.start_s);
+        const end = Number(overlay.end_s);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 0.05) return;
+        bars.push({
+          kind: "overlay",
+          id: overlay.id,
+          start,
+          end,
+          effect: overlay.kind,
+          coord: "story",
+          label: overlayBarLabel(overlay),
+        });
+      });
       bars.forEach((bar, index) => {
-        const storyStart = sourceToStory(clip, bar.start);
-        const storyEnd = sourceToStory(clip, bar.end);
+        const storyStart = bar.coord === "story" ? bar.start : sourceToStory(clip, bar.start);
+        const storyEnd = bar.coord === "story" ? bar.end : sourceToStory(clip, bar.end);
         const el = document.createElement("button");
         el.type = "button";
         el.className = "studio-effect-bar";
@@ -1159,7 +1185,7 @@ import {
         el.style.top = `${effectBarGapPx + index * step}px`;
         el.style.height = `${effectBarPx}px`;
         el.dataset.kind = bar.kind === "blur" || bar.kind === "pixelate" ? "mask" : bar.kind;
-        el.dataset.effect = bar.kind;
+        el.dataset.effect = bar.effect || bar.kind;
         el.dataset.maskId = bar.id;
         el.dataset.studioId = clip.dataset.studioId || "";
         el.dataset.speed = bar.speed ? String(bar.speed) : "";
@@ -1193,6 +1219,19 @@ import {
             event.preventDefault();
             event.stopPropagation();
             showTimedEffectMenu(event, clip, "ramp", "", el);
+          });
+        } else if (bar.kind === "overlay") {
+          el.addEventListener("pointerdown", (event) => onOverlayBarPointerDown(event, el, clip));
+          el.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            showTimedEffectMenu(
+              event,
+              clip,
+              "overlay",
+              el.dataset.maskId || "",
+              el
+            );
           });
         } else {
           el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
@@ -1430,6 +1469,9 @@ import {
     if (selection.kind === "mask") {
       return readMasks(clip).some((mask) => String(mask.id) === String(selection.id));
     }
+    if (selection.kind === "overlay") {
+      return readOverlays(clip).some((overlay) => String(overlay.id) === String(selection.id));
+    }
     return false;
   }
 
@@ -1462,6 +1504,11 @@ import {
       panel = document.getElementById("inspector-speed-ramp");
       focusQuery =
         "[data-ramp-speed]:not([disabled]), [data-ramp-preset], [data-ramp-apply]";
+    } else if (kind === "overlay") {
+      panel = document.getElementById("inspector-overlays");
+      focusQuery = "#overlay-text, #overlay-start, #overlay-end, #overlay-remove";
+      fillOverlayInspector(clip);
+      syncAnnotations(resolveAt(state.projectTimeS));
     }
     panel?.scrollIntoView({ block: "nearest" });
     if (!focusInspector) return;
@@ -1508,6 +1555,149 @@ import {
         .forEach((node) => node.classList.remove("is-selected"));
     }
     return selection;
+  }
+
+  function selectTimedOverlay(
+    clip,
+    id,
+    { focusInspector = false, relayout = true } = {}
+  ) {
+    if (!clip || !id || clip.dataset.kind !== "video") return null;
+    const selection = createTimedSelection({
+      kind: "overlay",
+      clipId: clipId(clip),
+      id,
+    });
+    if (!selection || !timedEffectStillPresent(clip, selection)) return null;
+    suppressTimelineClick = true;
+    window.setTimeout(() => {
+      suppressTimelineClick = false;
+    }, 0);
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clipId(clip));
+    if (!already) selectClip(clipId(clip), { movePlayhead: false });
+    timedSelection = selection;
+    selectedEffectBar = {
+      studioId: String(clipId(clip)),
+      kind: "overlay",
+      id: String(id),
+    };
+    selectedOverlayId = String(id);
+    openTimedEffectInspector(clip, "overlay", { focusInspector });
+    if (relayout) layoutEffectBars();
+    else {
+      document
+        .querySelectorAll(".studio-effect-bar.is-selected")
+        .forEach((node) => node.classList.remove("is-selected"));
+    }
+    return selection;
+  }
+
+  function overlayStoryDuration(clip) {
+    return Math.max(
+      0.05,
+      sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip)
+    );
+  }
+
+  function overlayRangeForBar(clip, id) {
+    const dur = overlayStoryDuration(clip);
+    const overlay = readOverlays(clip).find((item) => String(item.id) === String(id));
+    if (!overlay) return { start: 0, end: dur };
+    return {
+      start: Number(overlay.start_s) || 0,
+      end: Number(overlay.end_s) || dur,
+    };
+  }
+
+  function onOverlayBarPointerDown(event, el, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const id = el.dataset.maskId || "";
+    if (!id) return;
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId);
+    selectTimedOverlay(clip, id, { focusInspector: false, relayout: !already });
+    if (!already) {
+      const fresh = document.querySelector(effectBarSelector("overlay", clipId(clip), id));
+      if (fresh) el = fresh;
+    } else {
+      el.classList.add("is-selected");
+    }
+    const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
+    const mode = edge && edge.classList.contains("studio-effect-edge-in")
+      ? "start"
+      : edge && edge.classList.contains("studio-effect-edge-out")
+        ? "end"
+        : "move";
+    const dur = overlayStoryDuration(clip);
+    const origin = overlayRangeForBar(clip, id);
+    const startX = event.clientX;
+    const pps = timelinePxPerSecond() || 1;
+    const group = "overlay" + String(event.pointerId || Date.now());
+    overlayBarDragging = true;
+    const move = (ev) => {
+      const delta = (ev.clientX - startX) / pps;
+      let start = origin.start;
+      let end = origin.end;
+      if (mode === "move") {
+        const span = end - start;
+        start = Math.max(0, Math.min(dur - span, origin.start + delta));
+        end = start + span;
+      } else if (mode === "start") {
+        start = Math.max(0, Math.min(end - 0.05, origin.start + delta));
+      } else {
+        end = Math.max(start + 0.05, Math.min(dur, origin.end + delta));
+      }
+      const left = Number.parseFloat(clip.style.left) || 0;
+      el.style.left = `${left + start * pps}px`;
+      el.style.width = `${Math.max(12, (end - start) * pps)}px`;
+      el.dataset.draftStart = String(start);
+      el.dataset.draftEnd = String(end);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      overlayBarDragging = false;
+      const start = Number(el.dataset.draftStart);
+      const end = Number(el.dataset.draftEnd);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      if (
+        Math.abs(start - origin.start) < 0.001 &&
+        Math.abs(end - origin.end) < 0.001
+      ) {
+        return;
+      }
+      const previous = readOverlays(clip);
+      const next = previous.map((overlay) =>
+        String(overlay.id) === String(id)
+          ? Object.assign({}, overlay, { start_s: start, end_s: end })
+          : overlay
+      );
+      writeOverlays(clip, next);
+      if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+      syncAnnotations(resolveAt(state.projectTimeS));
+      historyGesture = group;
+      void saveOverlays(clipId(clip))
+        .catch((err) => {
+          showRootFlash((err && err.message) || msgOverlayFailed);
+          writeOverlays(clip, previous);
+          if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+          syncAnnotations(resolveAt(state.projectTimeS));
+        })
+        .finally(() => {
+          historyGesture = "";
+        });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   }
 
   function onEffectPointerDown(event, el, clip) {
@@ -1686,6 +1876,65 @@ import {
     return true;
   }
 
+  async function removeTimedOverlaySelection() {
+    if (!timedSelection || !isOverlayTimedKind(timedSelection.kind)) return false;
+    const selection = timedSelection;
+    const clip = clips().find(
+      (item) => String(item.dataset.studioId) === String(selection.clipId)
+    );
+    if (!clip || !timedEffectStillPresent(clip, selection)) {
+      clearTimedSelection();
+      layoutEffectBars();
+      return false;
+    }
+    hideClipMenu();
+    const previous = readOverlays(clip);
+    const next = previous.filter((overlay) => String(overlay.id) !== String(selection.id));
+    writeOverlays(clip, next);
+    if (String(selectedOverlayId || "") === String(selection.id)) {
+      selectedOverlayId = next.length ? next[next.length - 1].id : null;
+    }
+    if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+    syncAnnotations(resolveAt(state.projectTimeS));
+    // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
+    const result = await persistTimedSelectionRemoval(selection, async () => {
+      try {
+        await saveOverlays(selection.clipId);
+      } catch (error) {
+        writeOverlays(clip, previous);
+        if (isActiveTimedSelection(timedSelection, selection)) {
+          selectedOverlayId = selection.id;
+          selectedEffectBar = {
+            studioId: selection.clipId,
+            kind: "overlay",
+            id: selection.id,
+          };
+        }
+        if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+        syncAnnotations(resolveAt(state.projectTimeS));
+        throw error;
+      }
+    });
+    if (!result.ok) {
+      if (isActiveTimedSelection(timedSelection, selection)) {
+        selectedEffectBar = {
+          studioId: selection.clipId,
+          kind: "overlay",
+          id: selection.id,
+        };
+        selectedOverlayId = selection.id;
+      }
+      showRootFlash((result.error && result.error.message) || msgOverlayFailed);
+      layoutEffectBars();
+      return false;
+    }
+    if (isActiveTimedSelection(timedSelection, selection)) {
+      clearTimedSelection();
+    }
+    layoutEffectBars();
+    return true;
+  }
+
   function selectTimedRamp(clip, { focusInspector = false, source = "bar" } = {}) {
     if (!clip || !speedRampOf(clip)) return;
     suppressTimelineClick = true;
@@ -1735,6 +1984,7 @@ import {
 
   function showTimedEffectMenu(event, clip, kind, id = "", returnTarget) {
     if (kind === "ramp") selectTimedRamp(clip, { focusInspector: false, source: "menu" });
+    else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: false, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: false, relayout: true });
     const removeItem = document.getElementById("studio-clip-menu-remove");
     const mergeItem = document.getElementById("studio-clip-menu-merge");
@@ -1758,7 +2008,8 @@ import {
       rampRemoveItem.dataset.studioId = clipId(clip);
     }
     if (effectRemoveItem) {
-      effectRemoveItem.hidden = kind === "ramp" || !isEffectBarKind(kind);
+      effectRemoveItem.hidden =
+        kind === "ramp" || !(isEffectBarKind(kind) || isOverlayTimedKind(kind));
       effectRemoveItem.dataset.studioId = clipId(clip);
       effectRemoveItem.dataset.timedKind = kind;
       effectRemoveItem.dataset.timedId = id || "";
@@ -1788,6 +2039,10 @@ import {
     event.preventDefault();
     if (action === "ramp") {
       void removeTimedRampSelection();
+      return true;
+    }
+    if (action === "overlay") {
+      void removeTimedOverlaySelection();
       return true;
     }
     if (action === "effect-bar") {
@@ -9552,6 +9807,7 @@ import {
     hideClipMenu();
     if (!clip) return;
     if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit" });
+    else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: true, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: true, relayout: true });
   });
   document.getElementById("studio-clip-menu-remove-ramp")?.addEventListener("click", () => {
@@ -9560,6 +9816,10 @@ import {
   });
   document.getElementById("studio-clip-menu-remove-effect")?.addEventListener("click", () => {
     hideClipMenu();
+    if (timedSelection && isOverlayTimedKind(timedSelection.kind)) {
+      void removeTimedOverlaySelection();
+      return;
+    }
     void removeTimedEffectBarSelection();
   });
   document.getElementById("studio-clip-menu-merge")?.addEventListener("click", () => {
@@ -10557,6 +10817,7 @@ import {
 
   function writeOverlays(clip, overlays) {
     clip.dataset.overlays = JSON.stringify(overlays);
+    if (!overlayBarDragging) layoutEffectBars();
   }
 
   function overlayActive(overlay, localS, duration) {
@@ -10782,9 +11043,13 @@ import {
       button.textContent = overlayLabel(overlay);
       if (overlay.id === selectedOverlayId) button.classList.add("is-selected");
       button.addEventListener("click", () => {
-        selectedOverlayId = overlay.id;
-        fillOverlayInspector(clip);
-        syncAnnotations(resolveAt(state.projectTimeS));
+        if (clip.dataset.kind === "video") {
+          selectTimedOverlay(clip, overlay.id, { focusInspector: false, relayout: true });
+        } else {
+          selectedOverlayId = overlay.id;
+          fillOverlayInspector(clip);
+          syncAnnotations(resolveAt(state.projectTimeS));
+        }
       });
       item.appendChild(button);
       list.appendChild(item);
@@ -10953,8 +11218,12 @@ import {
     };
     selectedOverlayId = overlay.id;
     writeOverlays(clip, existing.concat([overlay]));
-    fillOverlayInspector(clip);
-    syncAnnotations(resolveAt(state.projectTimeS));
+    if (clip.dataset.kind === "video") {
+      selectTimedOverlay(clip, overlay.id, { focusInspector: false, relayout: true });
+    } else {
+      fillOverlayInspector(clip);
+      syncAnnotations(resolveAt(state.projectTimeS));
+    }
     queueOverlaySave(clip);
   }
 
@@ -10968,11 +11237,15 @@ import {
     if (!clip) return;
     event.preventDefault();
     event.stopPropagation();
-    selectedOverlayId = overlayId;
-    if (!state.selected || String(state.selected.id) !== String(clip.dataset.studioId)) {
-      selectClip(clip.dataset.studioId, { movePlayhead: false });
+    if (clip.dataset.kind === "video") {
+      selectTimedOverlay(clip, overlayId, { focusInspector: false, relayout: true });
     } else {
-      fillOverlayInspector(clip);
+      selectedOverlayId = overlayId;
+      if (!state.selected || String(state.selected.id) !== String(clip.dataset.studioId)) {
+        selectClip(clip.dataset.studioId, { movePlayhead: false });
+      } else {
+        fillOverlayInspector(clip);
+      }
     }
     const layer = previewAnnotations;
     if (!layer) return;
@@ -11049,8 +11322,26 @@ import {
   document.getElementById("overlay-remove")?.addEventListener("click", () => {
     const clip = selectedOverlayClip();
     if (!clip || !selectedOverlayId) return;
+    if (
+      clip.dataset.kind === "video" &&
+      timedSelection &&
+      isOverlayTimedKind(timedSelection.kind) &&
+      String(timedSelection.id) === String(selectedOverlayId) &&
+      String(timedSelection.clipId) === String(clipId(clip))
+    ) {
+      void removeTimedOverlaySelection();
+      return;
+    }
+    const removedId = selectedOverlayId;
     const overlays = readOverlays(clip).filter((overlay) => overlay.id !== selectedOverlayId);
     selectedOverlayId = overlays.length ? overlays[overlays.length - 1].id : null;
+    if (
+      timedSelection &&
+      isOverlayTimedKind(timedSelection.kind) &&
+      String(timedSelection.id) === String(removedId)
+    ) {
+      clearTimedSelection();
+    }
     writeOverlays(clip, overlays);
     fillOverlayInspector(clip);
     syncAnnotations(resolveAt(state.projectTimeS));
