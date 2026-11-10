@@ -814,16 +814,26 @@ def run(out: Path) -> None:
         )
         assert dual and dual.get("ok") and len(dual.get("overlays") or []) == 2, dual
         reload_studio()
+        until(
+            f"""(() => {{
+              const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+              if (!clip) return false;
+              const list = JSON.parse(clip.dataset.overlays || '[]');
+              return list.some((o) => o.id === 'ovpersista01') &&
+                list.some((o) => o.id === 'ovpersistb01');
+            }})()"""
+        )
         wait_overlay("ovpersista01", True)
         wait_overlay("ovpersistb01", True)
         evidence["two_overlay_seed"] = True
 
-        # Install a one-shot PATCH failure for /overlays (real fetch, not handler stubs).
+        # Install PATCH failure helper (optional delay) for /overlays.
         ev(
             """(() => {
               if (window.__overlayFetchWrapped) return true;
               const orig = window.fetch.bind(window);
               window.__overlayFailRemaining = 0;
+              window.__overlayFailDelayMs = 0;
               window.__overlayFailHits = 0;
               window.fetch = async (input, init = {}) => {
                 const url = String(typeof input === 'string' ? input : (input && input.url) || '');
@@ -835,6 +845,10 @@ def run(out: Path) -> None:
                 ) {
                   window.__overlayFailRemaining -= 1;
                   window.__overlayFailHits += 1;
+                  const delay = Number(window.__overlayFailDelayMs) || 0;
+                  if (delay > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                  }
                   return new Response(
                     JSON.stringify({ ok: false, detail: 'forced overlay fail' }),
                     { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -868,6 +882,115 @@ def run(out: Path) -> None:
         assert ev(f'!!document.querySelector(\'{overlay_selector("ovpersistb01")}\')')
         evidence["failed_remove_retry"] = True
 
+        # Delayed failed delete A while B is selected/edited — A must return, focus stays on B.
+        delayed = http_json(
+            "PATCH",
+            f"/api/studio/{cid}/overlays",
+            {
+                "overlays": [
+                    _base_overlay("ovpersista01", "text", text="Persist-A", start_s=0.2, end_s=1.8),
+                    _base_overlay("ovpersistb01", "circle", start_s=1.0, end_s=3.0),
+                ]
+            },
+        )
+        assert delayed and delayed.get("ok"), delayed
+        reload_studio()
+        wait_overlay("ovpersista01", True)
+        wait_overlay("ovpersistb01", True)
+        ev(
+            """(() => {
+              if (window.__overlayFetchWrapped) return true;
+              const orig = window.fetch.bind(window);
+              window.__overlayFailRemaining = 0;
+              window.__overlayFailDelayMs = 0;
+              window.__overlayFailHits = 0;
+              window.fetch = async (input, init = {}) => {
+                const url = String(typeof input === 'string' ? input : (input && input.url) || '');
+                const method = String((init && init.method) || 'GET').toUpperCase();
+                if (
+                  window.__overlayFailRemaining > 0 &&
+                  method === 'PATCH' &&
+                  url.includes('/overlays')
+                ) {
+                  window.__overlayFailRemaining -= 1;
+                  window.__overlayFailHits += 1;
+                  const delay = Number(window.__overlayFailDelayMs) || 0;
+                  if (delay > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                  }
+                  return new Response(
+                    JSON.stringify({ ok: false, detail: 'forced overlay fail' }),
+                    { status: 500, headers: { 'Content-Type': 'application/json' } }
+                  );
+                }
+                return orig(input, init);
+              };
+              window.__overlayFetchWrapped = true;
+              return true;
+            })()"""
+        )
+        mouse_at(overlay_selector("ovpersista01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersista01")}.is-selected\')')
+        blur_focus()
+        ev("window.__overlayFailDelayMs = 900; window.__overlayFailRemaining = 1")
+        key("Delete")
+        # While A's PATCH is still delayed, select and edit B.
+        until(f'!document.querySelector(\'{overlay_selector("ovpersista01")}\')', timeout=5)
+        mouse_at(overlay_selector("ovpersistb01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersistb01")}.is-selected\')')
+        ev(
+            """(() => {
+              const input = document.getElementById('overlay-end');
+              if (!input) return false;
+              input.value = '3.5';
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            })()"""
+        )
+        until(
+            f"""(() => {{
+              const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+              const ov = JSON.parse(clip.dataset.overlays||'[]').find(o => o.id === 'ovpersistb01');
+              return ov && Number(ov.end_s) >= 3.4;
+            }})()"""
+        )
+        # After delayed failure, A returns and B's edit + selection remain.
+        until(
+            "!!document.getElementById('studio-flash')?.textContent && "
+            f'!!document.querySelector(\'{overlay_selector("ovpersista01")}\')'
+        )
+        until(
+            f"""(() => {{
+              const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+              const list = JSON.parse(clip.dataset.overlays||'[]');
+              const a = list.find(o => o.id === 'ovpersista01');
+              const b = list.find(o => o.id === 'ovpersistb01');
+              const selected = document.querySelector(
+                '{overlay_selector("ovpersistb01")}.is-selected'
+              );
+              return !!a && !!b && Number(b.end_s) >= 3.4 && !!selected;
+            }})()"""
+        )
+        evidence["delayed_remove_a_restored_while_b_focused"] = True
+        shot("09b-delayed-remove-overlap.png")
+        # Settled save/reopen must keep both overlays (A restored + B edit).
+        time.sleep(1.0)
+        reload_studio()
+        wait_overlay("ovpersista01", True)
+        wait_overlay("ovpersistb01", True)
+        b_reopen = float(
+            ev(
+                f"""(() => {{
+                  const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+                  const ov = JSON.parse(clip.dataset.overlays||'[]').find(o => o.id === 'ovpersistb01');
+                  return ov ? Number(ov.end_s) : -1;
+                }})()"""
+            )
+        )
+        evidence["delayed_remove_reopen_keeps_both"] = b_reopen >= 3.4
+        assert evidence["delayed_remove_reopen_keeps_both"], b_reopen
+        shot("09c-delayed-remove-reopen.png")
+
         # Recreate A; fail A's timing save while B is edited — B must not roll back.
         restored = http_json(
             "PATCH",
@@ -889,6 +1012,7 @@ def run(out: Path) -> None:
               if (window.__overlayFetchWrapped) return true;
               const orig = window.fetch.bind(window);
               window.__overlayFailRemaining = 0;
+              window.__overlayFailDelayMs = 0;
               window.__overlayFailHits = 0;
               window.fetch = async (input, init = {}) => {
                 const url = String(typeof input === 'string' ? input : (input && input.url) || '');
@@ -900,6 +1024,10 @@ def run(out: Path) -> None:
                 ) {
                   window.__overlayFailRemaining -= 1;
                   window.__overlayFailHits += 1;
+                  const delay = Number(window.__overlayFailDelayMs) || 0;
+                  if (delay > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                  }
                   return new Response(
                     JSON.stringify({ ok: false, detail: 'forced overlay fail' }),
                     { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -1046,10 +1174,17 @@ def run(out: Path) -> None:
     except Exception:
         if cdp:
             evidence["failure_context"] = ev(
-                "({errors:window.__overlayErrors,flash:document.getElementById('studio-flash')?.textContent,"
-                "menu:document.getElementById('studio-clip-menu')?.outerHTML,"
-                "bars:[...document.querySelectorAll('.studio-effect-bar')].map(el=>el.outerHTML),"
-                "tab:document.getElementById('inspector-clip')?.dataset.tab})"
+                f"""({{
+                  errors: window.__overlayErrors,
+                  flash: document.getElementById('studio-flash')?.textContent,
+                  menu: document.getElementById('studio-clip-menu')?.outerHTML,
+                  bars: [...document.querySelectorAll('.studio-effect-bar')].map((el) => el.outerHTML),
+                  tab: document.getElementById('inspector-clip')?.dataset.tab,
+                  overlays: JSON.parse(
+                    document.querySelector('#studio-grid [data-studio-id="{cid}"]')?.dataset.overlays || '[]'
+                  ),
+                  clipCount: document.querySelectorAll('#studio-grid [data-studio-id]').length
+                }})"""
             )
             shot("failure.png")
         raise

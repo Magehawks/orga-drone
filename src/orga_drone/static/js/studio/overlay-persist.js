@@ -48,3 +48,41 @@ export function restoreRemovedOverlay(current, previous, overlayId) {
   list.splice(Math.min(Math.max(0, index), list.length), 0, entry);
   return list;
 }
+
+/**
+ * Decide how to recover after a failed overlay-removal PATCH.
+ * Does not depend on whether the removed overlay is still selected.
+ * Skips restore when a newer removal of the same id superseded this one.
+ */
+export function recoverFailedOverlayRemoval({
+  localRevision,
+  mutationRevision,
+  previous,
+  current,
+  overlayId,
+  newerRemovalRevision = null,
+} = {}) {
+  const full = rollbackOverlaysIfCurrent({
+    localRevision,
+    mutationRevision,
+    previous,
+  });
+  if (full) return { overlays: full, mode: "full" };
+  if (
+    newerRemovalRevision != null &&
+    Number.isFinite(Number(newerRemovalRevision)) &&
+    Number(newerRemovalRevision) > Number(mutationRevision)
+  ) {
+    return { overlays: null, mode: "superseded" };
+  }
+  const id = String(overlayId || "");
+  const before = Array.isArray(current) ? current : [];
+  if (!id || before.some((item) => String(item.id) === id)) {
+    return { overlays: null, mode: "noop" };
+  }
+  const next = restoreRemovedOverlay(before, previous, id);
+  if (!next.some((item) => String(item.id) === id)) {
+    return { overlays: null, mode: "noop" };
+  }
+  return { overlays: next, mode: "partial" };
+}

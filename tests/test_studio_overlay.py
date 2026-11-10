@@ -560,9 +560,10 @@ def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
     assert "shouldApplyOverlayResponse" in persist
     assert "rollbackOverlaysIfCurrent" in persist
     assert "restoreRemovedOverlay" in persist
+    assert "recoverFailedOverlayRemoval" in persist
     assert "function enqueueOverlaySave" in script
     assert "shouldApplyOverlayResponse" in script
-    assert "rollbackOverlaysIfCurrent" in script
+    assert "recoverFailedOverlayRemoval" in script
     layout = script.split("function layoutEffectBars", 1)[1].split(
         "function layoutClipAudio", 1
     )[0]
@@ -575,8 +576,15 @@ def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
     assert "persistTimedSelectionRemoval" in remove
     assert "isActiveTimedSelection(timedSelection, selection)" in remove
     assert "enqueueOverlaySave" in remove
-    assert "restoreRemovedOverlay" in remove
+    assert "recoverFailedOverlayRemoval" in remove
+    assert "mode === \"partial\"" in remove or "recovery.mode === \"partial\"" in remove
     assert "selectedEffectBar.kind" not in remove.split("persistTimedSelectionRemoval", 1)[0]
+    # Failed removal restore must not require the removed overlay to stay selected.
+    failure = remove.split("onFailure:", 1)[1]
+    assert "recoverFailedOverlayRemoval" in failure
+    assert "isActiveTimedSelection(timedSelection, selection)" not in failure.split(
+      "recoverFailedOverlayRemoval", 1
+    )[0]
     drag = script.split("function onOverlayBarPointerDown", 1)[1].split(
         "function onEffectPointerDown", 1
     )[0]

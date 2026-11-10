@@ -12,7 +12,7 @@ import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
   bumpOverlayRevision,
   overlayRevisionOf,
-  restoreRemovedOverlay,
+  recoverFailedOverlayRemoval,
   rollbackOverlaysIfCurrent,
   shouldApplyOverlayResponse,
 } from "./studio/overlay-persist.js";
@@ -407,6 +407,26 @@ import {
   let selectedOverlayId = null;
   let overlaySaveChain = Promise.resolve();
   const overlayRevisions = new Map();
+  /** clipId:overlayId → revision of the latest optimistic removal for that overlay. */
+  const overlayRemovalRevisions = new Map();
+
+  function overlayRemovalKey(studioId, overlayId) {
+    return `${String(studioId || "")}:${String(overlayId || "")}`;
+  }
+
+  function noteOverlayRemoval(studioId, overlayId, revision) {
+    overlayRemovalRevisions.set(overlayRemovalKey(studioId, overlayId), Number(revision) || 0);
+  }
+
+  function clearOverlayRemovalNote(studioId, overlayId) {
+    overlayRemovalRevisions.delete(overlayRemovalKey(studioId, overlayId));
+  }
+
+  function newerOverlayRemovalRevision(studioId, overlayId, mutationRevision) {
+    const recorded = overlayRemovalRevisions.get(overlayRemovalKey(studioId, overlayId));
+    if (recorded == null) return null;
+    return Number(recorded) > Number(mutationRevision) ? recorded : null;
+  }
 
   let dragCard = null;
   let dragOrderBefore = null;
@@ -1903,32 +1923,42 @@ import {
     const previous = readOverlays(clip);
     const next = previous.filter((overlay) => String(overlay.id) !== String(selection.id));
     writeOverlays(clip, next);
+    const removalRevision = overlayRevisionOf(overlayRevisions, selection.clipId);
+    noteOverlayRemoval(selection.clipId, selection.id, removalRevision);
     if (String(selectedOverlayId || "") === String(selection.id)) {
       selectedOverlayId = next.length ? next[next.length - 1].id : null;
     }
     if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
     syncAnnotations(resolveAt(state.projectTimeS));
-    // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
+    // Keep timedSelection until PATCH succeeds so failed saves remain retryable
+    // when this removal still owns focus. Sibling selection/edits stay intact.
     const result = await persistTimedSelectionRemoval(selection, () =>
       enqueueOverlaySave(clip, {
         onFailure: (error, mutationRevision) => {
-          const localRevision = overlayRevisionOf(overlayRevisions, selection.clipId);
-          let restored = rollbackOverlaysIfCurrent({
-            localRevision,
+          const recovery = recoverFailedOverlayRemoval({
+            localRevision: overlayRevisionOf(overlayRevisions, selection.clipId),
             mutationRevision,
             previous,
+            current: readOverlays(clip),
+            overlayId: selection.id,
+            newerRemovalRevision: newerOverlayRemovalRevision(
+              selection.clipId,
+              selection.id,
+              mutationRevision
+            ),
           });
-          if (!restored && isActiveTimedSelection(timedSelection, selection)) {
-            // Newer edits exist: put only the removed overlay back for retry.
-            restored = restoreRemovedOverlay(
-              readOverlays(clip),
-              previous,
-              selection.id
-            );
-            writeOverlays(clip, restored);
-          } else if (restored) {
-            writeOverlays(clip, restored, { bump: false });
+          if (recovery.mode === "full" && recovery.overlays) {
+            writeOverlays(clip, recovery.overlays, { bump: false });
+            clearOverlayRemovalNote(selection.clipId, selection.id);
+          } else if (recovery.mode === "partial" && recovery.overlays) {
+            // Re-insert only A; keep B's newer edits and queue a save of both.
+            writeOverlays(clip, recovery.overlays);
+            clearOverlayRemovalNote(selection.clipId, selection.id);
+            void enqueueOverlaySave(clip);
+          } else if (recovery.mode === "superseded") {
+            clearOverlayRemovalNote(selection.clipId, selection.id);
           }
+          // Only reclaim selection/inspector when this removal is still focused.
           if (isActiveTimedSelection(timedSelection, selection)) {
             selectedOverlayId = selection.id;
             selectedEffectBar = {
@@ -1956,6 +1986,7 @@ import {
       layoutEffectBars();
       return false;
     }
+    clearOverlayRemovalNote(selection.clipId, selection.id);
     if (isActiveTimedSelection(timedSelection, selection)) {
       clearTimedSelection();
     }
