@@ -18,7 +18,7 @@ export const TIMED_KINDS = Object.freeze([
 export const EFFECT_BAR_KINDS = Object.freeze(["zoom", "mask", "slow", "color"]);
 
 /** Kinds that Delete/Backspace may remove without touching the story clip. */
-export const TIMED_DELETE_KINDS = Object.freeze(["ramp", ...EFFECT_BAR_KINDS]);
+export const TIMED_DELETE_KINDS = Object.freeze(["ramp", "overlay", ...EFFECT_BAR_KINDS]);
 
 export function createTimedSelection(value = null) {
   if (!value || typeof value !== "object") return null;
@@ -43,11 +43,16 @@ export function isEffectBarKind(kind) {
   return EFFECT_BAR_KINDS.includes(String(kind || ""));
 }
 
+export function isOverlayTimedKind(kind) {
+  return String(kind || "") === "overlay";
+}
+
 /** Existing inspector tab for a timed effect kind. */
 export function timedEffectInspectorTab(kind) {
   const value = String(kind || "");
   if (value === "zoom") return "image";
   if (value === "mask" || value === "color") return "effects";
+  if (value === "overlay") return "overlays";
   return "clip";
 }
 
@@ -95,7 +100,9 @@ export function resolveDeleteAction({
   void hasEffectBarSelection;
   if (key !== "Delete" && key !== "Backspace") return null;
   if (timedSelection && TIMED_DELETE_KINDS.includes(timedSelection.kind)) {
-    return timedSelection.kind === "ramp" ? "ramp" : "effect-bar";
+    if (timedSelection.kind === "ramp") return "ramp";
+    if (timedSelection.kind === "overlay") return "overlay";
+    return "effect-bar";
   }
   if (privacyMaskActive) return "mask";
   if (key === "Delete" && storyClipFocused && hasSelectedStoryClip) return "story-clip";

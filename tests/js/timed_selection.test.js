@@ -4,6 +4,7 @@ import {
   createTimedSelection,
   isActiveTimedSelection,
   isEffectBarKind,
+  isOverlayTimedKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
@@ -38,11 +39,15 @@ test("effect bar kinds map to existing inspector tabs", () => {
   assert.equal(isEffectBarKind("slow"), true);
   assert.equal(isEffectBarKind("color"), true);
   assert.equal(isEffectBarKind("ramp"), false);
+  assert.equal(isEffectBarKind("overlay"), false);
+  assert.equal(isOverlayTimedKind("overlay"), true);
+  assert.equal(isOverlayTimedKind("zoom"), false);
   assert.equal(timedEffectInspectorTab("zoom"), "image");
   assert.equal(timedEffectInspectorTab("mask"), "effects");
   assert.equal(timedEffectInspectorTab("color"), "effects");
   assert.equal(timedEffectInspectorTab("slow"), "clip");
   assert.equal(timedEffectInspectorTab("ramp"), "clip");
+  assert.equal(timedEffectInspectorTab("overlay"), "overlays");
 });
 
 test("shouldIgnoreDeleteShortcut protects typing and dialogs", () => {
@@ -94,6 +99,25 @@ test("resolveDeleteAction prefers timed effects over clip and allows Backspace",
       storyClipFocused: true,
     }),
     "effect-bar"
+  );
+  const overlay = createTimedSelection({ kind: "overlay", clipId: "8", id: "ovtext001" });
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: overlay,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "overlay"
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Backspace",
+      timedSelection: overlay,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "overlay"
   );
   // Legacy selectedEffectBar alone must not delete after an ordinary clip switch.
   assert.equal(
