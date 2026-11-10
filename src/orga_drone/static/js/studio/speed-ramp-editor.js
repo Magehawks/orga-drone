@@ -2,6 +2,7 @@ import {
   MAX_SPEED,
   MIN_SPEED,
   parseRamp,
+  remapRampSpan,
   rampPreset,
   rampSource,
   rampSpeed,
@@ -75,7 +76,7 @@ export function createSpeedRampEditor({
     const range = bounds(clip);
     field("time").value = (point.source_s - range.start).toFixed(2);
     field("speed").value = point.speed;
-    field("time").disabled = selected === 0 || selected === ramp.points.length - 1 || pending;
+    field("time").disabled = pending;
     field("remove-point").disabled =
       selected === 0 || selected === ramp.points.length - 1 || pending;
     field("add").disabled = ramp.points.length >= 5 || pending;
@@ -133,10 +134,30 @@ export function createSpeedRampEditor({
   function edit() {
     const value = copy(current());
     if (!value) return;
-    const range = bounds(getSelection());
+    const clip = getSelection();
+    const range = bounds(clip);
     const point = value.points[selected];
-    point.source_s = Number(field("time").value) + range.start;
-    point.speed = Number(field("speed").value);
+    const nextTime = Number(field("time").value) + range.start;
+    const nextSpeed = Number(field("speed").value);
+    const isEnd = selected === 0 || selected === value.points.length - 1;
+    const timeChanged = Number.isFinite(nextTime) && Math.abs(nextTime - point.source_s) > 1e-6;
+    if (isEnd && timeChanged) {
+      const newStart = selected === 0 ? nextTime : value.points[0].source_s;
+      const newEnd = selected === value.points.length - 1 ? nextTime : value.points.at(-1).source_s;
+      const remapped = remapRampSpan(value, newStart, newEnd, {
+        playStart: range.start,
+        playEnd: range.end,
+      });
+      if (!remapped || !parseRamp(remapped)) {
+        onError();
+        fill();
+        return;
+      }
+      commit(remapped);
+      return;
+    }
+    point.source_s = nextTime;
+    point.speed = nextSpeed;
     if (parseRamp(value)) commit(value);
     else {
       onError();
@@ -166,6 +187,59 @@ export function createSpeedRampEditor({
     Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, String(value)));
     return node;
   }
+  function displayRange(ramp) {
+    return { start: ramp.points[0].source_s, end: ramp.points.at(-1).source_s };
+  }
+  function curvePathD(ramp, range) {
+    const start = rampTime(ramp, range.start);
+    const duration = rampTime(ramp, range.end) - start;
+    if (!(duration > 0)) return "";
+    const x = (source) => (1000 * (rampTime(ramp, source) - start)) / duration;
+    const line = [];
+    for (let i = 0; i <= 100; i += 1) {
+      const source = range.start + ((range.end - range.start) * i) / 100;
+      line.push(`${i ? "L" : "M"}${x(source)},${curveY(rampSpeed(ramp, source))}`);
+    }
+    return line.join(" ");
+  }
+  function updateDragVisual() {
+    if (!curve || !drag || !draft) return;
+    const range = displayRange(draft);
+    const start = rampTime(draft, range.start);
+    const duration = rampTime(draft, range.end) - start;
+    if (!(duration > 0)) return;
+    const x = (source) => (1000 * (rampTime(draft, source) - start)) / duration;
+    const path = curve.querySelector(".studio-ramp-line");
+    if (path) path.setAttribute("d", curvePathD(draft, range));
+    const ref = curve.querySelector(".studio-ramp-reference");
+    if (ref) {
+      const y1 = curveY(1);
+      ref.setAttribute("y1", String(y1));
+      ref.setAttribute("y2", String(y1));
+    }
+    curve.querySelectorAll(".studio-ramp-point").forEach((handle) => {
+      const index = Number(handle.getAttribute("data-index"));
+      const point = draft.points[index];
+      if (!point) return;
+      handle.setAttribute("cx", String(x(point.source_s)));
+      handle.setAttribute("cy", String(curveY(point.speed)));
+      handle.setAttribute(
+        "aria-label",
+        `${field("point").getAttribute("aria-label")} ${index + 1}: ${point.speed.toFixed(2)}×`
+      );
+      handle.setAttribute(
+        "class",
+        index === selected ? "studio-ramp-point is-selected" : "studio-ramp-point"
+      );
+    });
+    const clip = getSelection();
+    const play = clip ? bounds(clip) : range;
+    const point = draft.points[selected];
+    if (point) {
+      field("speed").value = point.speed;
+      field("time").value = (point.source_s - play.start).toFixed(2);
+    }
+  }
   function draw() {
     if (!curve || drag) return;
     const ramp = current(),
@@ -175,22 +249,17 @@ export function createSpeedRampEditor({
       return;
     }
     curve.hidden = false;
-    const range = bounds(clip);
-    const start = rampTime(ramp, range.start),
-      duration = rampTime(ramp, range.end) - start;
-    const x = (source) => (1000 * (rampTime(ramp, source) - start)) / duration;
+    const range = displayRange(ramp);
+    const start = rampTime(ramp, range.start);
+    const duration = rampTime(ramp, range.end) - start;
+    const x = (source) =>
+      duration > 0 ? (1000 * (rampTime(ramp, source) - start)) / duration : 0;
     const y = curveY;
-    const line = [];
-    for (let i = 0; i <= 100; i += 1) {
-      const source = range.start + ((range.end - range.start) * i) / 100;
-      line.push(`${i ? "L" : "M"}${x(source)},${y(rampSpeed(ramp, source))}`);
-    }
     curve.replaceChildren(
       svgNode("line", { x1: 0, x2: 1000, y1: y(1), y2: y(1), class: "studio-ramp-reference" }),
-      svgNode("path", { d: line.join(" "), class: "studio-ramp-line" })
+      svgNode("path", { d: curvePathD(ramp, range), class: "studio-ramp-line" })
     );
     ramp.points.forEach((point, index) => {
-      if (point.source_s < range.start || point.source_s > range.end) return;
       const handle = svgNode("ellipse", {
         cx: x(point.source_s),
         cy: y(point.speed),
@@ -198,6 +267,7 @@ export function createSpeedRampEditor({
         ry: 7,
         tabindex: 0,
         role: "button",
+        "data-index": index,
         "aria-label": `${field("point").getAttribute("aria-label")} ${index + 1}: ${point.speed.toFixed(2)}×`,
         class: index === selected ? "studio-ramp-point is-selected" : "studio-ramp-point",
       });
@@ -216,8 +286,15 @@ export function createSpeedRampEditor({
         pause();
         selected = index;
         draft = copy(ramp);
-        drag = { ramp: copy(ramp), index, rect: curve.getBoundingClientRect(), range };
+        drag = {
+          ramp: copy(ramp),
+          index,
+          rect: curve.getBoundingClientRect(),
+          range: displayRange(ramp),
+        };
         curve.setPointerCapture(event.pointerId);
+        fill();
+        updateDragVisual();
       });
       curve.append(handle);
     });
@@ -244,30 +321,28 @@ export function createSpeedRampEditor({
         if (clip) onContextMenu?.(event, clip, { source: "curve" });
       });
       curve.addEventListener("pointermove", (event) => {
-        if (!drag) return;
-        const { rect, index, ramp, range } = drag;
+        if (!drag || !draft) return;
+        const { rect, index } = drag;
         const point = draft.points[index];
+        const range = displayRange(draft);
         point.speed = Math.max(
           MIN_SPEED,
           Math.min(MAX_SPEED, speedFromCurveY(58 - ((event.clientY - rect.top) * 64) / rect.height))
         );
         point.speed = Number((Math.round(point.speed / 0.05) * 0.05).toFixed(2));
         if (index > 0 && index < draft.points.length - 1) {
+          const span = rampTime(draft, range.end) - rampTime(draft, range.start);
           const time =
-            Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) *
-            (rampTime(ramp, range.end) - rampTime(ramp, range.start));
+            Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * span;
           point.source_s = Math.max(
             draft.points[index - 1].source_s + 0.05,
             Math.min(
               draft.points[index + 1].source_s - 0.05,
-              rampSource(ramp, time, range.start, range.end)
+              rampSource(draft, time, range.start, range.end)
             )
           );
         }
-        const active = drag;
-        drag = null;
-        fill();
-        drag = active;
+        updateDragVisual();
       });
       curve.addEventListener("pointerup", () => {
         if (!drag) return;

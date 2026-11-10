@@ -1,7 +1,9 @@
 import "./studio-lut-webgl.js";
 import {
   edgeSourceAfterRampDrag,
+  MIN_SPEED,
   parseRamp,
+  remapRampSpan,
   rampMediaTime,
   rampSource,
   rampSpeed,
@@ -828,9 +830,15 @@ import {
     if (!video) return;
     let speed = clip ? playbackSpeed(clip) : 1;
     if (clip && clip.dataset.kind === "video") {
+      const ramp = speedRampOf(clip);
       const relative = video.getAttribute("src") === lutProxySrcFor(clip);
-      const offset = Math.max(0, (video.currentTime || 0) - (relative ? 0 : sourceInS(clip)));
-      if (speedRampOf(clip) || (slowBarOf(clip) && playbackSpeed(clip) >= 0.999)) speed = speedAtSource(clip, offset);
+      const absolute = relative
+        ? sourceInS(clip) + Math.max(0, video.currentTime || 0)
+        : Math.max(0, video.currentTime || 0);
+      if (ramp) speed = rampSpeed(ramp, absolute);
+      else if (slowBarOf(clip) && playbackSpeed(clip) >= 0.999) {
+        speed = speedAtSource(clip, Math.max(0, absolute - sourceInS(clip)));
+      }
     }
     try {
       const applied = clampPreviewPlaybackRate(speed);
@@ -1169,12 +1177,15 @@ import {
     videos.forEach((clip) => {
       const left = Number.parseFloat(clip.style.left) || 0;
       const bars = [];
-      if (speedRampOf(clip)) {
+      const rampBar = speedRampOf(clip);
+      if (rampBar) {
+        const first = rampBar.points[0].source_s;
+        const last = rampBar.points.at(-1).source_s;
         bars.push({
           kind: "ramp",
           id: "",
-          start: Math.max(0, loopPlayInS(clip) - sourceInS(clip)),
-          end: loopPlayOutS(clip) - sourceInS(clip),
+          start: Math.max(0, first - sourceInS(clip)),
+          end: Math.max(0.05, last - sourceInS(clip)),
           label: effectLabel("ramp"),
         });
       }
@@ -1241,7 +1252,7 @@ import {
         edgeIn.className = "studio-effect-edge studio-effect-edge-in";
         const edgeOut = document.createElement("span");
         edgeOut.className = "studio-effect-edge studio-effect-edge-out";
-        if (bar.kind !== "ramp") el.append(edgeIn, edgeOut);
+        el.append(edgeIn, edgeOut);
         if (
           timedSelectionMatches(
             timedSelection,
@@ -1257,11 +1268,7 @@ import {
           el.classList.add("is-selected");
         }
         if (bar.kind === "ramp") {
-          el.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            selectTimedRamp(clip, { focusInspector: false, source: "bar" });
-          });
+          el.addEventListener("pointerdown", (event) => onRampPointerDown(event, el, clip));
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -1839,6 +1846,92 @@ import {
     window.addEventListener("pointercancel", up);
   }
 
+  function onRampPointerDown(event, el, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const ramp = speedRampOf(clip);
+    if (!ramp) return;
+    const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
+    const mode = edge && edge.classList.contains("studio-effect-edge-in")
+      ? "start"
+      : edge && edge.classList.contains("studio-effect-edge-out")
+        ? "end"
+        : "move";
+    selectTimedRamp(clip, { focusInspector: false, source: "bar" });
+    const fresh = document.querySelector(effectBarSelector("ramp", clipId(clip), ""));
+    if (fresh) el = fresh;
+    else el.classList.add("is-selected");
+    const playStart = loopPlayInS(clip);
+    const playEnd = loopPlayOutS(clip);
+    const originStart = ramp.points[0].source_s;
+    const originEnd = ramp.points.at(-1).source_s;
+    const span = originEnd - originStart;
+    if (!(span >= 0.05)) return;
+    const startX = event.clientX;
+    const pps = timelinePxPerSecond() || 1;
+    const clipLeft = Number.parseFloat(clip.style.left) || 0;
+    el.classList.add("is-dragging");
+    const move = (ev) => {
+      const deltaStory = (ev.clientX - startX) / pps;
+      let newStart = originStart;
+      let newEnd = originEnd;
+      if (mode === "move") {
+        const midSpeed = Math.max(MIN_SPEED, rampSpeed(ramp, (originStart + originEnd) / 2) || 1);
+        const deltaSource = deltaStory * midSpeed;
+        newStart = originStart + deltaSource;
+        newEnd = newStart + span;
+        if (newStart < playStart) {
+          newStart = playStart;
+          newEnd = playStart + span;
+        }
+        if (newEnd > playEnd) {
+          newEnd = playEnd;
+          newStart = playEnd - span;
+        }
+      } else {
+        const edgeSource = mode === "start" ? originStart : originEnd;
+        const localSpeed = Math.max(MIN_SPEED, rampSpeed(ramp, edgeSource) || 1);
+        const deltaSource = deltaStory * localSpeed;
+        if (mode === "start") newStart = originStart + deltaSource;
+        else newEnd = originEnd + deltaSource;
+      }
+      const draft = remapRampSpan(ramp, newStart, newEnd, { playStart, playEnd });
+      if (!draft) return;
+      const storyLeft = rampTime(draft, draft.points[0].source_s) - rampTime(draft, playStart);
+      const storyRight =
+        rampTime(draft, draft.points.at(-1).source_s) - rampTime(draft, playStart);
+      el.style.left = `${clipLeft + Math.max(0, storyLeft) * pps}px`;
+      el.style.width = `${Math.max(12, (storyRight - storyLeft) * pps)}px`;
+      el.dataset.draftRamp = JSON.stringify(draft);
+      const curve = document.querySelector(".studio-ramp-curve");
+      if (curve) {
+        curve.style.left = el.style.left;
+        curve.style.width = el.style.width;
+      }
+    };
+    const up = () => {
+      el.classList.remove("is-dragging");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      const raw = el.dataset.draftRamp;
+      delete el.dataset.draftRamp;
+      if (!raw) return;
+      let draft = null;
+      try {
+        draft = parseRamp(JSON.parse(raw));
+      } catch (_) {
+        draft = null;
+      }
+      if (!draft) return;
+      void saveSpeedRamp(clip, draft).catch(() => showFlash(msgSpeedFailed));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
   function onEffectPointerDown(event, el, clip) {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -2101,6 +2194,37 @@ import {
     return true;
   }
 
+  function absoluteSourceAtPlayhead(clip) {
+    const local = Math.max(0, state.projectTimeS - clipStartTime(clip));
+    return sourceInS(clip) + storyToSource(clip, local);
+  }
+
+  function seekPlayheadIntoRamp(clip) {
+    const ramp = speedRampOf(clip);
+    if (!ramp || !clip) return;
+    const start = ramp.points[0].source_s;
+    const end = ramp.points.at(-1).source_s;
+    if (!(end - start >= 0.05)) return;
+    const absolute = absoluteSourceAtPlayhead(clip);
+    if (absolute >= start - 0.001 && absolute <= end + 0.001) {
+      applyClipPlayback(previewVideo, clip);
+      return;
+    }
+    // Land on the strongest non-1× point so Play immediately shows the ramp.
+    let target = (start + end) / 2;
+    let best = -1;
+    ramp.points.forEach((point) => {
+      const score = Math.abs(Math.log2(Math.max(Number(point.speed) || 1, 1e-6)));
+      if (score > best) {
+        best = score;
+        target = point.source_s;
+      }
+    });
+    const offset = Math.max(0, target - sourceInS(clip));
+    setProjectTime(clipStartTime(clip) + sourceToStory(clip, offset));
+    applyClipPlayback(previewVideo, clip);
+  }
+
   function selectTimedRamp(clip, { focusInspector = false, source = "bar" } = {}) {
     if (!clip || !speedRampOf(clip)) return;
     suppressTimelineClick = true;
@@ -2116,7 +2240,7 @@ import {
     });
     openTimedEffectInspector(clip, "ramp", { focusInspector });
     layoutEffectBars();
-    void source;
+    if (source === "bar" || source === "curve") seekPlayheadIntoRamp(clip);
   }
 
   async function removeTimedRampSelection() {
@@ -13023,6 +13147,7 @@ import {
     // After remove, restore 1× preview rate and source-audio placement immediately.
     applyClipPlayback(previewVideo, clip);
     if (previewVideo) syncClipAudio(previewVideo, clip);
+    if (body.speed_ramp) seekPlayheadIntoRamp(clip);
     scheduleLutProxyPrepare(clip);
     setSaveState(true);
     timelapseEditor?.fill();
@@ -13035,7 +13160,20 @@ import {
     readRamp: speedRampOf,
     bounds: rampBounds,
     pause: pausePlayback,
-    position: (clip) => ({ left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() }),
+    position: (clip) => {
+      const ramp = speedRampOf(clip);
+      if (!ramp) return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
+      const playStart = loopPlayInS(clip);
+      const first = ramp.points[0].source_s;
+      const last = ramp.points.at(-1).source_s;
+      const storyLeft = Math.max(0, rampTime(ramp, first) - rampTime(ramp, playStart));
+      const storyRight = Math.max(storyLeft, rampTime(ramp, last) - rampTime(ramp, playStart));
+      const pps = timelinePxPerSecond();
+      return {
+        left: timeToX(clipStartTime(clip) + storyLeft),
+        width: Math.max(12, (storyRight - storyLeft) * pps),
+      };
+    },
     onError: () => showFlash(msgSpeedFailed),
     save: saveSpeedRamp,
     onSelect: (clip, options) => selectTimedRamp(clip, options),

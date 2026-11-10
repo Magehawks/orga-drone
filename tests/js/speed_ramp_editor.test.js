@@ -75,8 +75,29 @@ function installDom() {
             this.children.push(kid);
           }
         },
+        querySelector(sel) {
+          const want = String(sel).replace(/^\./, "");
+          return (
+            this.children.find((child) =>
+              String(child.attrs.class || "")
+                .split(/\s+/)
+                .includes(want)
+            ) || null
+          );
+        },
+        querySelectorAll(sel) {
+          const want = String(sel).replace(/^\./, "");
+          return this.children.filter((child) =>
+            String(child.attrs.class || "")
+              .split(/\s+/)
+              .includes(want)
+          );
+        },
         addEventListener(type, fn) {
           this.listeners[type] = fn;
+        },
+        getAttribute(key) {
+          return this.attrs[key];
         },
         dispatch(type, event = {}) {
           this.listeners[type]?.({
@@ -225,4 +246,36 @@ test("curve click and context menu select the whole ramp", async () => {
   curve.dispatch("contextmenu");
   assert.equal(f.menus.length, 1);
   assert.equal(f.menus[0].selected, f.clip);
+});
+
+test("curve handle drag updates in place and saves once on pointerup", async () => {
+  const f = fixtureEditor();
+  f.setRamp(fixture.curve);
+  f.editor.fill();
+  f.editor.layout(f.lane);
+  const curve = f.lane.children[0];
+  let rebuilds = 0;
+  const originalReplace = curve.replaceChildren.bind(curve);
+  curve.replaceChildren = (...kids) => {
+    rebuilds += 1;
+    return originalReplace(...kids);
+  };
+  const handle = curve.querySelectorAll(".studio-ramp-point")[1];
+  assert.ok(handle);
+  handle.listeners.pointerdown({
+    preventDefault() {},
+    stopPropagation() {},
+    pointerId: 1,
+    clientX: 200,
+    clientY: 32,
+  });
+  const afterDown = rebuilds;
+  curve.dispatch("pointermove", { clientX: 220, clientY: 18 });
+  curve.dispatch("pointermove", { clientX: 240, clientY: 12 });
+  assert.equal(rebuilds, afterDown, "pointermove must not rebuild the SVG");
+  assert.equal(f.saves.length, 0);
+  curve.dispatch("pointerup");
+  await tick();
+  assert.equal(f.saves.length, 1);
+  assert.ok(f.saves[0]);
 });

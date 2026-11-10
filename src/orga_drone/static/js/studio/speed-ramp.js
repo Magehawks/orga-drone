@@ -138,6 +138,100 @@ export function rampPreset(id, start, end) {
   };
 }
 
+/**
+ * Move a ramp onto [newStart, newEnd] inside the playable source window.
+ * When the span no longer covers the full play range, pin endpoint speeds to 1×
+ * so outside the bar plays at normal speed (Slow-bar mental model).
+ */
+export function remapRampSpan(
+  ramp,
+  newStart,
+  newEnd,
+  { playStart, playEnd, minSpan = 0.05 } = {}
+) {
+  if (!ramp || !Array.isArray(ramp.points) || ramp.points.length < 2) return null;
+  if (!Number.isFinite(playStart) || !Number.isFinite(playEnd) || playEnd - playStart < minSpan) {
+    return null;
+  }
+  const oldStart = ramp.points[0].source_s;
+  const oldEnd = ramp.points.at(-1).source_s;
+  const oldSpan = oldEnd - oldStart;
+  if (!(oldSpan > 0) || !Number.isFinite(oldSpan)) return null;
+
+  let start = Number(newStart);
+  let end = Number(newEnd);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  start = Math.min(Math.max(playStart, start), playEnd);
+  end = Math.min(Math.max(playStart, end), playEnd);
+  if (end < start) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+  if (end - start < minSpan) {
+    if (end >= playEnd - 1e-9) start = Math.max(playStart, end - minSpan);
+    else end = Math.min(playEnd, start + minSpan);
+  }
+  if (end - start < minSpan) return null;
+  start = Number(start.toFixed(2));
+  end = Number(end.toFixed(2));
+  if (end - start < minSpan) return null;
+
+  const coversFull = start <= playStart + 1e-6 && end >= playEnd - 1e-6;
+  let points = ramp.points.map((point) => {
+    const u = (point.source_s - oldStart) / oldSpan;
+    return {
+      source_s: Number((start + u * (end - start)).toFixed(2)),
+      speed: point.speed,
+    };
+  });
+  points[0].source_s = start;
+  points[points.length - 1].source_s = end;
+
+  if (!coversFull) {
+    // Keep the original curve character inside the bar and join to 1× outside.
+    // With ≤3 source points we can wrap 1× anchors (max 5). More points: pin ends.
+    const innerStart = Number((start + minSpan).toFixed(2));
+    const innerEnd = Number((end - minSpan).toFixed(2));
+    if (ramp.points.length <= 3 && innerEnd - innerStart >= minSpan) {
+      const inner = ramp.points.map((point) => {
+        const u = (point.source_s - oldStart) / oldSpan;
+        return {
+          source_s: Number((innerStart + u * (innerEnd - innerStart)).toFixed(2)),
+          speed: point.speed,
+        };
+      });
+      inner[0].source_s = innerStart;
+      inner[inner.length - 1].source_s = innerEnd;
+      points = [
+        { source_s: start, speed: 1 },
+        ...inner,
+        { source_s: end, speed: 1 },
+      ];
+    } else {
+      points[0].speed = 1;
+      points[points.length - 1].speed = 1;
+    }
+  }
+
+  // Keep minimum separation after rounding.
+  for (let i = 1; i < points.length; i += 1) {
+    const floor = points[i - 1].source_s + minSpan;
+    if (points[i].source_s < floor) points[i].source_s = Number(floor.toFixed(2));
+  }
+  if (points[points.length - 1].source_s > end) {
+    points[points.length - 1].source_s = end;
+    for (let i = points.length - 2; i >= 0; i -= 1) {
+      const ceiling = points[i + 1].source_s - minSpan;
+      if (points[i].source_s > ceiling) points[i].source_s = Number(ceiling.toFixed(2));
+    }
+    points[0].source_s = start;
+  }
+
+  const next = { v: 1, interp: "reciprocal_smoothstep", points };
+  return parseRamp(next) ? next : null;
+}
+
 export function rampMediaTime(ramp, story, start, end, mediaOrigin = 0) {
   return rampSource(ramp, story, start, end) - mediaOrigin;
 }
