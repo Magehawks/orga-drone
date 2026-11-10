@@ -545,6 +545,9 @@ def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
     helpers = Path("src/orga_drone/static/js/studio/timed-selection.js").read_text(
         encoding="utf-8"
     )
+    persist = Path("src/orga_drone/static/js/studio/overlay-persist.js").read_text(
+        encoding="utf-8"
+    )
     assert '"overlay"' in helpers.split("TIMED_DELETE_KINDS", 1)[1].split("]", 1)[0]
     assert "isOverlayTimedKind" in helpers
     assert 'if (value === "overlay") return "overlays"' in helpers
@@ -553,6 +556,13 @@ def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
     assert "function removeTimedOverlaySelection" in script
     assert 'kind: "overlay"' in script
     assert 'coord: "story"' in script
+    assert "bumpOverlayRevision" in persist
+    assert "shouldApplyOverlayResponse" in persist
+    assert "rollbackOverlaysIfCurrent" in persist
+    assert "restoreRemovedOverlay" in persist
+    assert "function enqueueOverlaySave" in script
+    assert "shouldApplyOverlayResponse" in script
+    assert "rollbackOverlaysIfCurrent" in script
     layout = script.split("function layoutEffectBars", 1)[1].split(
         "function layoutClipAudio", 1
     )[0]
@@ -564,7 +574,20 @@ def test_timeline_first_overlay_bars_reuse_timed_selection_contract() -> None:
     )[0]
     assert "persistTimedSelectionRemoval" in remove
     assert "isActiveTimedSelection(timedSelection, selection)" in remove
+    assert "enqueueOverlaySave" in remove
+    assert "restoreRemovedOverlay" in remove
     assert "selectedEffectBar.kind" not in remove.split("persistTimedSelectionRemoval", 1)[0]
+    drag = script.split("function onOverlayBarPointerDown", 1)[1].split(
+        "function onEffectPointerDown", 1
+    )[0]
+    assert "enqueueOverlaySave" in drag
+    assert "rollbackOverlaysIfCurrent" in drag
+    assert "saveOverlays(clipId(clip))" not in drag
+    save = script.split("async function saveOverlays", 1)[1].split(
+        "function enqueueOverlaySave", 1
+    )[0]
+    assert "shouldApplyOverlayResponse" in save
+    assert "bump: false" in save
     dispatch = script.split("function dispatchDeleteShortcut", 1)[1].split(
         "function layoutTimeline", 1
     )[0]

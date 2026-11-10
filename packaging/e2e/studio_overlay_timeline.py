@@ -801,7 +801,240 @@ def run(out: Path) -> None:
         assert clip_present()
         evidence["image_context_remove"] = True
 
-        # Save/reopen without leftover overlay bars.
+        # --- Persistence races: clip revisions + serialized saves ---
+        dual = http_json(
+            "PATCH",
+            f"/api/studio/{cid}/overlays",
+            {
+                "overlays": [
+                    _base_overlay("ovpersista01", "text", text="Persist-A", start_s=0.2, end_s=1.8),
+                    _base_overlay("ovpersistb01", "circle", start_s=1.0, end_s=3.0),
+                ]
+            },
+        )
+        assert dual and dual.get("ok") and len(dual.get("overlays") or []) == 2, dual
+        reload_studio()
+        wait_overlay("ovpersista01", True)
+        wait_overlay("ovpersistb01", True)
+        evidence["two_overlay_seed"] = True
+
+        # Install a one-shot PATCH failure for /overlays (real fetch, not handler stubs).
+        ev(
+            """(() => {
+              if (window.__overlayFetchWrapped) return true;
+              const orig = window.fetch.bind(window);
+              window.__overlayFailRemaining = 0;
+              window.__overlayFailHits = 0;
+              window.fetch = async (input, init = {}) => {
+                const url = String(typeof input === 'string' ? input : (input && input.url) || '');
+                const method = String((init && init.method) || 'GET').toUpperCase();
+                if (
+                  window.__overlayFailRemaining > 0 &&
+                  method === 'PATCH' &&
+                  url.includes('/overlays')
+                ) {
+                  window.__overlayFailRemaining -= 1;
+                  window.__overlayFailHits += 1;
+                  return new Response(
+                    JSON.stringify({ ok: false, detail: 'forced overlay fail' }),
+                    { status: 500, headers: { 'Content-Type': 'application/json' } }
+                  );
+                }
+                return orig(input, init);
+              };
+              window.__overlayFetchWrapped = true;
+              return true;
+            })()"""
+        )
+
+        # Failed removal keeps selection and can be retried; sibling overlay survives.
+        mouse_at(overlay_selector("ovpersista01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersista01")}.is-selected\')')
+        blur_focus()
+        ev("window.__overlayFailRemaining = 1")
+        key("Delete")
+        until(
+            "!!document.getElementById('studio-flash')?.textContent && "
+            f'!!document.querySelector(\'{overlay_selector("ovpersista01")}\')'
+        )
+        assert ev(f'!!document.querySelector(\'{overlay_selector("ovpersistb01")}\')')
+        evidence["failed_remove_restored"] = True
+        shot("09-failed-remove.png")
+        blur_focus()
+        mouse_at(overlay_selector("ovpersista01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersista01")}.is-selected\')')
+        key("Delete")
+        wait_overlay("ovpersista01", False)
+        assert ev(f'!!document.querySelector(\'{overlay_selector("ovpersistb01")}\')')
+        evidence["failed_remove_retry"] = True
+
+        # Recreate A; fail A's timing save while B is edited — B must not roll back.
+        restored = http_json(
+            "PATCH",
+            f"/api/studio/{cid}/overlays",
+            {
+                "overlays": [
+                    _base_overlay("ovpersista01", "text", text="Persist-A", start_s=0.2, end_s=1.8),
+                    _base_overlay("ovpersistb01", "circle", start_s=1.0, end_s=3.0),
+                ]
+            },
+        )
+        assert restored and restored.get("ok"), restored
+        reload_studio()
+        wait_overlay("ovpersista01", True)
+        wait_overlay("ovpersistb01", True)
+        # Re-wrap fetch after reload.
+        ev(
+            """(() => {
+              if (window.__overlayFetchWrapped) return true;
+              const orig = window.fetch.bind(window);
+              window.__overlayFailRemaining = 0;
+              window.__overlayFailHits = 0;
+              window.fetch = async (input, init = {}) => {
+                const url = String(typeof input === 'string' ? input : (input && input.url) || '');
+                const method = String((init && init.method) || 'GET').toUpperCase();
+                if (
+                  window.__overlayFailRemaining > 0 &&
+                  method === 'PATCH' &&
+                  url.includes('/overlays')
+                ) {
+                  window.__overlayFailRemaining -= 1;
+                  window.__overlayFailHits += 1;
+                  return new Response(
+                    JSON.stringify({ ok: false, detail: 'forced overlay fail' }),
+                    { status: 500, headers: { 'Content-Type': 'application/json' } }
+                  );
+                }
+                return orig(input, init);
+              };
+              window.__overlayFetchWrapped = true;
+              return true;
+            })()"""
+        )
+        ev("window.__overlayFailRemaining = 1")
+        mouse_at(overlay_selector("ovpersista01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersista01")}.is-selected\')')
+        edge = ev(
+            f"""(() => {{
+              const edge = document.querySelector(
+                '{overlay_selector("ovpersista01")} .studio-effect-edge-out'
+              );
+              if (!edge) return null;
+              edge.scrollIntoView({{block:'center', inline:'nearest'}});
+              const r = edge.getBoundingClientRect();
+              return {{x: r.x + r.width / 2, y: r.y + r.height / 2}};
+            }})()"""
+        )
+        assert edge
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mouseMoved",
+                "x": edge["x"],
+                "y": edge["y"],
+                "button": "none",
+                "buttons": 0,
+            },
+        )
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mousePressed",
+                "x": edge["x"],
+                "y": edge["y"],
+                "button": "left",
+                "buttons": 1,
+                "clickCount": 1,
+                "pointerType": "mouse",
+            },
+        )
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mouseMoved",
+                "x": edge["x"] - 35,
+                "y": edge["y"],
+                "button": "left",
+                "buttons": 1,
+            },
+        )
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mouseReleased",
+                "x": edge["x"] - 35,
+                "y": edge["y"],
+                "button": "left",
+                "buttons": 0,
+                "clickCount": 1,
+                "pointerType": "mouse",
+            },
+        )
+        # Immediately edit sibling B so a newer clip revision exists before rollback.
+        mouse_at(overlay_selector("ovpersistb01"), button="left")
+        until(f'!!document.querySelector(\'{overlay_selector("ovpersistb01")}.is-selected\')')
+        ev(
+            """(() => {
+              const input = document.getElementById('overlay-end');
+              if (!input) return false;
+              input.value = '3.5';
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            })()"""
+        )
+        until(
+            f"""(() => {{
+              const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+              const ov = JSON.parse(clip.dataset.overlays||'[]').find(o => o.id === 'ovpersistb01');
+              return ov && Number(ov.end_s) >= 3.4;
+            }})()"""
+        )
+        time.sleep(0.8)
+        b_end = float(
+            ev(
+                f"""(() => {{
+                  const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+                  const ov = JSON.parse(clip.dataset.overlays||'[]').find(o => o.id === 'ovpersistb01');
+                  return ov ? Number(ov.end_s) : -1;
+                }})()"""
+            )
+        )
+        a_present = bool(ev(f'!!document.querySelector(\'{overlay_selector("ovpersista01")}\')'))
+        evidence["sibling_edit_survives_failed_drag"] = b_end >= 3.4 and a_present
+        assert evidence["sibling_edit_survives_failed_drag"], (b_end, a_present)
+        evidence["overlay_fail_hits"] = int(ev("Number(window.__overlayFailHits||0)") or 0)
+        shot("10-sibling-survives-failed-drag.png")
+
+        # Two-overlay Save/Reopen persistence.
+        settled = http_json(
+            "PATCH",
+            f"/api/studio/{cid}/overlays",
+            {
+                "overlays": [
+                    _base_overlay("ovpersista01", "text", text="Persist-A", start_s=0.2, end_s=1.5),
+                    _base_overlay("ovpersistb01", "circle", start_s=1.0, end_s=2.8),
+                ]
+            },
+        )
+        assert settled and settled.get("ok"), settled
+        reload_studio()
+        wait_overlay("ovpersista01", True)
+        wait_overlay("ovpersistb01", True)
+        ids = ev(
+            f"""(() => {{
+              const clip = document.querySelector('#studio-grid [data-studio-id="{cid}"]');
+              return JSON.parse(clip.dataset.overlays||'[]').map(o => o.id);
+            }})()"""
+        )
+        evidence["two_overlay_reopen"] = ids == ["ovpersista01", "ovpersistb01"] or set(ids) == {
+            "ovpersista01",
+            "ovpersistb01",
+        }
+        assert evidence["two_overlay_reopen"], ids
+        shot("11-two-overlay-reopen.png")
+
+        cleared = http_json("PATCH", f"/api/studio/{cid}/overlays", {"overlays": []})
+        assert cleared and cleared.get("ok"), cleared
         reload_studio()
         assert not ev('!!document.querySelector(\'.studio-effect-bar[data-kind="overlay"]\')')
         evidence["reopen_without_overlay_bars"] = True
@@ -809,7 +1042,7 @@ def run(out: Path) -> None:
         assert hashlib.sha256(source_b.read_bytes()).hexdigest() == original_b
         evidence["originals_unchanged"] = True
         evidence["status"] = "PASS"
-        shot("09-reopen.png")
+        shot("12-cleared-reopen.png")
     except Exception:
         if cdp:
             evidence["failure_context"] = ev(

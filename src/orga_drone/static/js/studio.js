@@ -10,6 +10,13 @@ import {
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
+  bumpOverlayRevision,
+  overlayRevisionOf,
+  restoreRemovedOverlay,
+  rollbackOverlaysIfCurrent,
+  shouldApplyOverlayResponse,
+} from "./studio/overlay-persist.js";
+import {
   createTimedSelection,
   isActiveTimedSelection,
   isEffectBarKind,
@@ -399,6 +406,7 @@ import {
   };
   let selectedOverlayId = null;
   let overlaySaveChain = Promise.resolve();
+  const overlayRevisions = new Map();
 
   let dragCard = null;
   let dragOrderBefore = null;
@@ -1683,17 +1691,21 @@ import {
       writeOverlays(clip, next);
       if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
       syncAnnotations(resolveAt(state.projectTimeS));
-      historyGesture = group;
-      void saveOverlays(clipId(clip))
-        .catch((err) => {
+      void enqueueOverlaySave(clip, {
+        historyGroup: group,
+        onFailure: (err, mutationRevision) => {
           showRootFlash((err && err.message) || msgOverlayFailed);
-          writeOverlays(clip, previous);
+          const restored = rollbackOverlaysIfCurrent({
+            localRevision: overlayRevisionOf(overlayRevisions, clipId(clip)),
+            mutationRevision,
+            previous,
+          });
+          if (!restored) return;
+          writeOverlays(clip, restored, { bump: false });
           if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
           syncAnnotations(resolveAt(state.projectTimeS));
-        })
-        .finally(() => {
-          historyGesture = "";
-        });
+        },
+      });
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -1897,24 +1909,40 @@ import {
     if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
     syncAnnotations(resolveAt(state.projectTimeS));
     // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
-    const result = await persistTimedSelectionRemoval(selection, async () => {
-      try {
-        await saveOverlays(selection.clipId);
-      } catch (error) {
-        writeOverlays(clip, previous);
-        if (isActiveTimedSelection(timedSelection, selection)) {
-          selectedOverlayId = selection.id;
-          selectedEffectBar = {
-            studioId: selection.clipId,
-            kind: "overlay",
-            id: selection.id,
-          };
-        }
-        if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
-        syncAnnotations(resolveAt(state.projectTimeS));
-        throw error;
-      }
-    });
+    const result = await persistTimedSelectionRemoval(selection, () =>
+      enqueueOverlaySave(clip, {
+        onFailure: (error, mutationRevision) => {
+          const localRevision = overlayRevisionOf(overlayRevisions, selection.clipId);
+          let restored = rollbackOverlaysIfCurrent({
+            localRevision,
+            mutationRevision,
+            previous,
+          });
+          if (!restored && isActiveTimedSelection(timedSelection, selection)) {
+            // Newer edits exist: put only the removed overlay back for retry.
+            restored = restoreRemovedOverlay(
+              readOverlays(clip),
+              previous,
+              selection.id
+            );
+            writeOverlays(clip, restored);
+          } else if (restored) {
+            writeOverlays(clip, restored, { bump: false });
+          }
+          if (isActiveTimedSelection(timedSelection, selection)) {
+            selectedOverlayId = selection.id;
+            selectedEffectBar = {
+              studioId: selection.clipId,
+              kind: "overlay",
+              id: selection.id,
+            };
+          }
+          if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
+          syncAnnotations(resolveAt(state.projectTimeS));
+          throw error;
+        },
+      })
+    );
     if (!result.ok) {
       if (isActiveTimedSelection(timedSelection, selection)) {
         selectedEffectBar = {
@@ -10815,8 +10843,9 @@ import {
     }
   }
 
-  function writeOverlays(clip, overlays) {
+  function writeOverlays(clip, overlays, { bump = true } = {}) {
     clip.dataset.overlays = JSON.stringify(overlays);
+    if (bump) bumpOverlayRevision(overlayRevisions, clip.dataset.studioId);
     if (!overlayBarDragging) layoutEffectBars();
   }
 
@@ -11152,33 +11181,59 @@ import {
     if (save) queueOverlaySave(clip);
   }
 
-  async function saveOverlays(studioId) {
+  async function saveOverlays(studioId, { revision } = {}) {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
-    if (!clip) return;
+    if (!clip) return { ok: false, stale: false };
+    const revAtSend =
+      revision == null ? overlayRevisionOf(overlayRevisions, studioId) : Number(revision);
+    const payload = readOverlays(clip);
     const res = await fetch("/api/studio/" + studioId + "/overlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ overlays: readOverlays(clip) }),
+      body: JSON.stringify({ overlays: payload }),
     });
     const body = await readJson(res);
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgOverlayFailed);
     }
-    writeOverlays(clip, body.overlays || []);
+    const localRevision = overlayRevisionOf(overlayRevisions, studioId);
+    if (!shouldApplyOverlayResponse(localRevision, revAtSend)) {
+      // A newer local mutation owns this clip; keep it and let its queued save settle.
+      return { ok: true, stale: true };
+    }
+    writeOverlays(clip, body.overlays || [], { bump: false });
     if (body.clamped) showRootFlash(msgOverlayClamped);
     if (selectedOverlayClip() === clip) fillOverlayInspector(clip);
     syncAnnotations(resolveAt(state.projectTimeS));
     setSaveState(true);
+    return { ok: true, stale: false };
+  }
+
+  function enqueueOverlaySave(clip, { historyGroup = "", onFailure = null } = {}) {
+    const studioId = clip.dataset.studioId;
+    const revision = overlayRevisionOf(overlayRevisions, studioId);
+    setSaveState(false);
+    const run = async () => {
+      const priorGesture = historyGesture;
+      if (historyGroup) historyGesture = historyGroup;
+      try {
+        return await saveOverlays(studioId, { revision });
+      } catch (err) {
+        if (typeof onFailure === "function") onFailure(err, revision);
+        else showRootFlash((err && err.message) || msgOverlayFailed);
+        throw err;
+      } finally {
+        if (historyGroup) historyGesture = priorGesture || "";
+      }
+    };
+    // Continue after prior failures so later inspector/timeline edits still flush.
+    const next = overlaySaveChain.then(run, run);
+    overlaySaveChain = next.catch(() => {});
+    return next;
   }
 
   function queueOverlaySave(clip) {
-    const studioId = clip.dataset.studioId;
-    setSaveState(false);
-    overlaySaveChain = overlaySaveChain
-      .then(() => saveOverlays(studioId))
-      .catch((err) => {
-        showRootFlash((err && err.message) || msgOverlayFailed);
-      });
+    void enqueueOverlaySave(clip);
   }
 
   function addOverlay(kind, assetName) {
