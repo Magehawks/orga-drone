@@ -21,6 +21,9 @@ export function createSpeedRampEditor({
   pause,
   position,
   onError,
+  onSelect,
+  onContextMenu,
+  isTimedSelected,
 }) {
   if (!panel) return { fill() {}, layout() {} };
   const field = (name) => panel.querySelector(`[data-ramp-${name}]`);
@@ -226,6 +229,20 @@ export function createSpeedRampEditor({
         preserveAspectRatio: "none",
         class: "studio-ramp-curve",
       });
+      curve.addEventListener("click", (event) => {
+        if (drag || pending) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const clip = getSelection();
+        if (clip) onSelect?.(clip, { focusInspector: false, source: "curve" });
+      });
+      curve.addEventListener("contextmenu", (event) => {
+        if (pending) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const clip = getSelection();
+        if (clip) onContextMenu?.(event, clip, { source: "curve" });
+      });
       curve.addEventListener("pointermove", (event) => {
         if (!drag) return;
         const { rect, index, ramp, range } = drag;
@@ -284,6 +301,7 @@ export function createSpeedRampEditor({
     }
     const pos = position(getSelection());
     curve.hidden = false;
+    curve.classList.toggle("is-selected", Boolean(isTimedSelected?.()));
     curve.style.left = `${pos.left}px`;
     curve.style.width = `${pos.width}px`;
     curve.style.top = `${Number.parseFloat(lane.style.minHeight) || 36}px`;

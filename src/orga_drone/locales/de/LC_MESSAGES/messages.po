@@ -562,6 +562,9 @@ msgstr "Farbstandbild; Übergangsfarben angenähert"
 msgid "Standard"
 msgstr "Standard"
 
+msgid "Edit"
+msgstr "Bearbeiten"
+
 msgid "Expert"
 msgstr "Experte"
 

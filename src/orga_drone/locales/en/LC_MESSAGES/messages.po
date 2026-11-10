@@ -562,6 +562,9 @@ msgstr "Color still; transition colors approximate"
 msgid "Standard"
 msgstr "Standard"
 
+msgid "Edit"
+msgstr "Edit"
+
 msgid "Expert"
 msgstr "Expert"
 
