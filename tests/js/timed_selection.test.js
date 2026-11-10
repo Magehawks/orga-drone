@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   createTimedSelection,
   isActiveTimedSelection,
+  isAudioTimedKind,
   isEffectBarKind,
+  isMusicTimedKind,
   isOverlayTimedKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
@@ -20,6 +22,17 @@ test("createTimedSelection keeps ramp identity and rejects unknown kinds", () =>
   });
   assert.equal(createTimedSelection({ kind: "lut", clipId: "1" }), null);
   assert.equal(createTimedSelection({ kind: "ramp", clipId: "" }), null);
+  assert.deepEqual(createTimedSelection({ kind: "music", clipId: "", id: "42" }), {
+    kind: "music",
+    clipId: "",
+    id: "42",
+  });
+  assert.deepEqual(createTimedSelection({ kind: "audio", clipId: "9", id: "" }), {
+    kind: "audio",
+    clipId: "9",
+    id: "",
+  });
+  assert.equal(createTimedSelection({ kind: "audio", clipId: "" }), null);
 });
 
 test("timedSelectionMatches compares kind, clip and id", () => {
@@ -48,6 +61,11 @@ test("effect bar kinds map to existing inspector tabs", () => {
   assert.equal(timedEffectInspectorTab("slow"), "clip");
   assert.equal(timedEffectInspectorTab("ramp"), "clip");
   assert.equal(timedEffectInspectorTab("overlay"), "overlays");
+  assert.equal(isMusicTimedKind("music"), true);
+  assert.equal(isAudioTimedKind("audio"), true);
+  assert.equal(isAudioTimedKind("music"), false);
+  assert.equal(timedEffectInspectorTab("music"), "music");
+  assert.equal(timedEffectInspectorTab("audio"), "clip");
 });
 
 test("shouldIgnoreDeleteShortcut protects typing and dialogs", () => {
@@ -118,6 +136,45 @@ test("resolveDeleteAction prefers timed effects over clip and allows Backspace",
       storyClipFocused: true,
     }),
     "overlay"
+  );
+  const music = createTimedSelection({ kind: "music", clipId: "", id: "11" });
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: music,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "music"
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Backspace",
+      timedSelection: music,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "music"
+  );
+  const audio = createTimedSelection({ kind: "audio", clipId: "12" });
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: audio,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "audio-guard",
+    "clip-audio selection must not delete the story clip"
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Backspace",
+      timedSelection: audio,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "audio-guard"
   );
   // Legacy selectedEffectBar alone must not delete after an ordinary clip switch.
   assert.equal(

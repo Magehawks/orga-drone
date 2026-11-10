@@ -17,9 +17,19 @@ import {
   shouldApplyOverlayResponse,
 } from "./studio/overlay-persist.js";
 import {
+  applyDeletedMusicTrack,
+  bumpMusicPlaylistRevision,
+  filterResurrectedMusicTracks,
+  musicPlaylistRevisionOf,
+  resolveMusicDeleteSuccess,
+  shouldApplyMusicPlaylistResponse,
+} from "./studio/music-persist.js";
+import {
   createTimedSelection,
   isActiveTimedSelection,
+  isAudioTimedKind,
   isEffectBarKind,
+  isMusicTimedKind,
   isOverlayTimedKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
@@ -409,6 +419,12 @@ import {
   const overlayRevisions = new Map();
   /** clipId:overlayId → revision of the latest optimistic removal for that overlay. */
   const overlayRemovalRevisions = new Map();
+  /** Project soundtrack playlist mutation counter (single shared revision). */
+  const musicPlaylistRevision = { value: 0 };
+  /** Track ids removed by a successful DELETE — blocks stale payload resurrection. */
+  const musicRemovedIds = new Set();
+  /** In-flight DELETE ids — avoids duplicate removals of the same track. */
+  const musicDeleteInFlight = new Set();
 
   function overlayRemovalKey(studioId, overlayId) {
     return `${String(studioId || "")}:${String(overlayId || "")}`;
@@ -1335,17 +1351,92 @@ import {
     bar.dataset.studioId = clip.dataset.studioId || "";
     bar.setAttribute("aria-label", clip.dataset.filename || "Audio");
     bar.textContent = clip.dataset.filename || "";
+    if (
+      timedSelectionMatches(timedSelection, "audio", clip.dataset.studioId || "", "")
+    ) {
+      bar.classList.add("is-selected");
+    }
     const edgeIn = document.createElement("span");
     edgeIn.className = "studio-clip-audio-edge studio-clip-audio-edge-in";
     const edgeOut = document.createElement("span");
     edgeOut.className = "studio-clip-audio-edge studio-clip-audio-edge-out";
     bar.append(edgeIn, edgeOut);
     bar.addEventListener("pointerdown", (event) => onAudioPointerDown(event, bar, clip));
+    bar.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showTimedAudioMenu(event, clip, bar);
+    });
     bar.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
     });
     return bar;
+  }
+
+  function selectTimedClipAudio(clip, { focusInspector = false, relayout = true } = {}) {
+    if (!clip || clip.dataset.kind !== "video") return null;
+    const selection = createTimedSelection({
+      kind: "audio",
+      clipId: clipId(clip),
+      id: "",
+    });
+    if (!selection) return null;
+    suppressTimelineClick = true;
+    window.setTimeout(() => {
+      suppressTimelineClick = false;
+    }, 0);
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clipId(clip));
+    if (!already) selectClip(clipId(clip), { movePlayhead: false });
+    timedSelection = selection;
+    selectedEffectBar = null;
+    setInspectorTab("clip");
+    const panel = document.getElementById("inspector-clip");
+    panel?.scrollIntoView({ block: "nearest" });
+    if (focusInspector) {
+      window.setTimeout(() => {
+        const focus =
+          panel?.querySelector("#inspector-source-in, #inspector-section-repeats, #studio-volume") ||
+          document.getElementById("studio-volume");
+        if (focus && typeof focus.focus === "function") focus.focus();
+      }, 0);
+    }
+    if (relayout) layoutClipAudio();
+    else {
+      document
+        .querySelectorAll(".studio-clip-audio-bar.is-selected")
+        .forEach((node) => node.classList.remove("is-selected"));
+    }
+    return selection;
+  }
+
+  function showTimedAudioMenu(event, clip, returnTarget) {
+    selectTimedClipAudio(clip, { focusInspector: false, relayout: true });
+    const removeItem = document.getElementById("studio-clip-menu-remove");
+    const mergeItem = document.getElementById("studio-clip-menu-merge");
+    const uncutItem = document.getElementById("studio-clip-menu-uncut");
+    const reuseItem = document.getElementById("studio-clip-menu-reuse");
+    const editItem = document.getElementById("studio-clip-menu-edit");
+    const rampRemoveItem = document.getElementById("studio-clip-menu-remove-ramp");
+    const effectRemoveItem = document.getElementById("studio-clip-menu-remove-effect");
+    if (removeItem) removeItem.hidden = true;
+    if (reuseItem) reuseItem.hidden = true;
+    if (mergeItem) mergeItem.hidden = true;
+    if (uncutItem) uncutItem.hidden = true;
+    if (rampRemoveItem) rampRemoveItem.hidden = true;
+    // Embedded source audio has no supported removal — Edit only.
+    if (effectRemoveItem) effectRemoveItem.hidden = true;
+    if (editItem) {
+      editItem.hidden = false;
+      editItem.dataset.studioId = clipId(clip);
+      editItem.dataset.timedKind = "audio";
+      editItem.dataset.timedId = "";
+    }
+    setClipMenuReason("");
+    showClipMenu(event.clientX, event.clientY, returnTarget || clip);
   }
 
   function layoutClipAudio() {
@@ -1400,7 +1491,20 @@ import {
     const speed = playbackSpeed(clip) || 1;
     const group = "audio" + String(event.pointerId || Date.now());
     pausePlayback();
-    selectClip(clip.dataset.studioId, { movePlayhead: false });
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId) &&
+      timedSelectionMatches(timedSelection, "audio", clip.dataset.studioId || "", "");
+    selectTimedClipAudio(clip, { focusInspector: false, relayout: !already });
+    if (!already) {
+      const fresh = document.querySelector(
+        `.studio-clip-audio-bar[data-studio-id="${CSS.escape(String(clip.dataset.studioId || ""))}"]`
+      );
+      if (fresh) el = fresh;
+    } else {
+      el.classList.add("is-selected");
+    }
     const move = (ev) => {
       const deltaStory = (ev.clientX - startX) / pps;
       let sourceIn = origin.sourceIn;
@@ -2102,6 +2206,14 @@ import {
     }
     if (action === "overlay") {
       void removeTimedOverlaySelection();
+      return true;
+    }
+    if (action === "music") {
+      void removeTimedMusicSelection();
+      return true;
+    }
+    if (action === "audio-guard") {
+      // Clip-audio selection must never remove the story clip or media file.
       return true;
     }
     if (action === "effect-bar") {
@@ -7205,11 +7317,25 @@ import {
     };
   }
 
-  function applyTracksPayload(payload) {
+  function applyTracksPayload(payload, { acceptRemoved = false } = {}) {
     const list = payload && Array.isArray(payload.tracks) ? payload.tracks : [];
     const startS = Number(payload && payload.music_start_s);
     if (Number.isFinite(startS)) state.musicStartS = Math.max(0, startS);
-    state.tracks = list.map(musicFromPayload).filter(Boolean);
+    const mapped = list.map(musicFromPayload).filter(Boolean);
+    state.tracks = acceptRemoved
+      ? mapped
+      : filterResurrectedMusicTracks(mapped, musicRemovedIds);
+  }
+
+  function beginMusicPlaylistMutation() {
+    return bumpMusicPlaylistRevision(musicPlaylistRevision);
+  }
+
+  function musicPlaylistMutationIsCurrent(mutationRev) {
+    return shouldApplyMusicPlaylistResponse(
+      musicPlaylistRevisionOf(musicPlaylistRevision),
+      mutationRev
+    );
   }
 
   function selectedMusicTrack() {
@@ -7811,6 +7937,7 @@ import {
     });
     grid.querySelectorAll(".studio-transition").forEach((el) => el.classList.remove("is-selected"));
     layoutMusicSpans();
+    layoutClipAudio();
 
     if (kind === "title_card") {
       showInspector("inspector-titlecard");
@@ -8233,6 +8360,7 @@ import {
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.toggle("is-selected", t === el));
     layoutMusicSpans();
     layoutEffectBars();
+    layoutClipAudio();
     showInspector("inspector-transition");
     const headingType = transitionLabels[el.dataset.transitionType || "cut"] || "Transition";
     setInspectorHeading(headingType);
@@ -8297,11 +8425,21 @@ import {
     return msgMusicFailed;
   }
 
-  function selectMusic(trackId) {
+  function selectMusic(trackId, { focusInspector = false } = {}) {
     if (reuseDraft) cancelReuseDraft();
     const track = state.tracks.find((item) => String(item.id) === String(trackId));
     if (!track) return;
     controlBridge?.noteLocalChange();
+    suppressTimelineClick = true;
+    window.setTimeout(() => {
+      suppressTimelineClick = false;
+    }, 0);
+    selectedEffectBar = null;
+    timedSelection = createTimedSelection({
+      kind: "music",
+      clipId: "",
+      id: String(track.id),
+    });
     state.selected = { type: "music", id: String(track.id) };
     updateRemoveEnabled();
     clips().forEach((c) => {
@@ -8309,9 +8447,13 @@ import {
       c.removeAttribute("aria-selected");
     });
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.remove("is-selected"));
+    document
+      .querySelectorAll(".studio-clip-audio-bar.is-selected")
+      .forEach((node) => node.classList.remove("is-selected"));
     showInspector("inspector-music");
     setInspectorHeading(labelInspectorMusic);
     layoutMusicSpans();
+    layoutClipAudio();
     const panel = document.getElementById("inspector-music");
     if (!panel) return;
     const nameEl = panel.querySelector('[data-field="music-name"]');
@@ -8344,11 +8486,54 @@ import {
     const downBtn = document.getElementById("inspector-music-move-down");
     if (upBtn) upBtn.disabled = index <= 0;
     if (downBtn) downBtn.disabled = index < 0 || index >= state.tracks.length - 1;
+    panel.scrollIntoView({ block: "nearest" });
+    if (!focusInspector) return;
+    window.setTimeout(() => {
+      const focus = panel.querySelector(
+        "#inspector-music-volume, #inspector-music-start, #inspector-music-remove"
+      );
+      if (focus && typeof focus.focus === "function") focus.focus();
+    }, 0);
+  }
+
+  function showTimedMusicMenu(event, trackId, returnTarget) {
+    selectMusic(trackId, { focusInspector: false });
+    const removeItem = document.getElementById("studio-clip-menu-remove");
+    const mergeItem = document.getElementById("studio-clip-menu-merge");
+    const uncutItem = document.getElementById("studio-clip-menu-uncut");
+    const reuseItem = document.getElementById("studio-clip-menu-reuse");
+    const editItem = document.getElementById("studio-clip-menu-edit");
+    const rampRemoveItem = document.getElementById("studio-clip-menu-remove-ramp");
+    const effectRemoveItem = document.getElementById("studio-clip-menu-remove-effect");
+    if (removeItem) removeItem.hidden = true;
+    if (reuseItem) reuseItem.hidden = true;
+    if (mergeItem) mergeItem.hidden = true;
+    if (uncutItem) uncutItem.hidden = true;
+    if (rampRemoveItem) rampRemoveItem.hidden = true;
+    if (editItem) {
+      editItem.hidden = false;
+      editItem.dataset.studioId = "";
+      editItem.dataset.timedKind = "music";
+      editItem.dataset.timedId = String(trackId || "");
+    }
+    if (effectRemoveItem) {
+      effectRemoveItem.hidden = false;
+      effectRemoveItem.dataset.studioId = "";
+      effectRemoveItem.dataset.timedKind = "music";
+      effectRemoveItem.dataset.timedId = String(trackId || "");
+    }
+    setClipMenuReason("");
+    showClipMenu(
+      event.clientX,
+      event.clientY,
+      returnTarget || document.querySelector(`.studio-music-select[data-music-id="${CSS.escape(String(trackId))}"]`)
+    );
   }
 
   function renderMusic() {
     if (state.selected.type === "music" && !selectedMusicTrack()) {
       state.selected = { type: null, id: null };
+      clearTimedSelection();
       updateRemoveEnabled();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
@@ -8387,6 +8572,7 @@ import {
       const path = await pickMusicPath();
       if (!path) return;
       setSaveState(false);
+      const mutationRev = beginMusicPlaylistMutation();
       const saved = await fetch(`/api/studio/projects/${projectId}/music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8397,11 +8583,15 @@ import {
         showFlash(musicErrorDetail(savedBody));
         return;
       }
-      applyTracksPayload(savedBody);
-      if (reloadIfForwardLoop()) return;
-      const last = state.tracks[state.tracks.length - 1];
-      renderMusic();
-      if (last) selectMusic(last.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(savedBody);
+        if (reloadIfForwardLoop()) return;
+        const last = state.tracks[state.tracks.length - 1];
+        renderMusic();
+        if (last) selectMusic(last.id);
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -8413,12 +8603,14 @@ import {
     if (!projectId) return;
     const track = selectedMusicTrack();
     if (!track) return;
+    const trackId = track.id;
     try {
       const path = await pickMusicPath();
       if (!path) return;
       setSaveState(false);
+      const mutationRev = beginMusicPlaylistMutation();
       const saved = await fetch(
-        `/api/studio/projects/${projectId}/music/${track.id}`,
+        `/api/studio/projects/${projectId}/music/${trackId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8430,10 +8622,16 @@ import {
         showFlash(musicErrorDetail(savedBody));
         return;
       }
-      applyTracksPayload(savedBody);
-      if (reloadIfForwardLoop()) return;
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(savedBody);
+        if (reloadIfForwardLoop()) return;
+        renderMusic();
+        if (selectedMusicTrack()?.id === trackId || state.selected?.type === "music") {
+          selectMusic(trackId);
+        }
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -8444,6 +8642,7 @@ import {
   async function patchMusicSettings() {
     const track = selectedMusicTrack();
     if (!projectId || !track) return;
+    const trackId = track.id;
     setSaveState(false);
     const payload = {
       volume: track.volume,
@@ -8451,8 +8650,9 @@ import {
       fade_out_s: track.fadeOut,
     };
     if (state.tracks.length === 1) payload.loop = !!track.loop;
+    const mutationRev = beginMusicPlaylistMutation();
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/music/${track.id}`, {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${trackId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(payload),
@@ -8462,9 +8662,20 @@ import {
         showFlash(musicErrorDetail(data));
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+        // Keep inspector on this track only when it is still the selection.
+        if (
+          state.selected?.type === "music" &&
+          String(state.selected.id) === String(trackId)
+        ) {
+          selectMusic(trackId);
+        }
+      } else {
+        // Newer playlist mutation owns the list; keep local fields/selection.
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -8546,44 +8757,110 @@ import {
     handle.addEventListener("pointercancel", cancel);
   }
 
-  async function clearMusic() {
-    const track = selectedMusicTrack();
+  async function deleteMusicTrack(trackId) {
+    const id = String(trackId || "");
+    if (!id) return false;
     if (!projectId) {
-      state.tracks = [];
-      renderMusic();
-      showInspector("inspector-empty");
-      document.getElementById("studio-music-track")?.classList.remove("is-selected");
-      return;
+      state.tracks = applyDeletedMusicTrack(state.tracks, id);
+      musicRemovedIds.add(id);
+      return true;
     }
-    if (!track) return;
-    setSaveState(false);
+    // Duplicate in-flight/completed deletes must not hit the API again or
+    // revive the track via a second response path.
+    if (musicDeleteInFlight.has(id) || musicRemovedIds.has(id)) {
+      state.tracks = applyDeletedMusicTrack(state.tracks, id);
+      return true;
+    }
+    musicDeleteInFlight.add(id);
+    const mutationRev = beginMusicPlaylistMutation();
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/music/${track.id}`, {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${id}`, {
         method: "DELETE",
         headers: { Accept: "application/json" },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok) {
-        showFlash(musicErrorDetail(data));
-        return;
+        throw new Error(musicErrorDetail(data));
       }
-      applyTracksPayload(data);
-      if (reloadIfForwardLoop()) return;
+      musicRemovedIds.add(id);
+      const resolved = resolveMusicDeleteSuccess({
+        localRevision: musicPlaylistRevisionOf(musicPlaylistRevision),
+        mutationRevision: mutationRev,
+        currentTracks: state.tracks,
+        responseTracks: Array.isArray(data.tracks) ? data.tracks : [],
+        trackId: id,
+      });
+      if (resolved.mode === "full") {
+        applyTracksPayload(data);
+      } else {
+        // Keep newer local fields (e.g. B's volume) and drop only this id.
+        state.tracks = resolved.tracks;
+      }
+      return true;
+    } finally {
+      musicDeleteInFlight.delete(id);
+    }
+  }
+
+  async function removeTimedMusicSelection() {
+    if (!timedSelection || !isMusicTimedKind(timedSelection.kind)) return false;
+    const selection = timedSelection;
+    const track = state.tracks.find((item) => String(item.id) === String(selection.id));
+    if (!track) {
+      clearTimedSelection();
+      layoutMusicSpans();
+      return false;
+    }
+    hideClipMenu();
+    setSaveState(false);
+    const result = await persistTimedSelectionRemoval(selection, async () => {
+      await deleteMusicTrack(selection.id);
+    });
+    if (!result.ok) {
+      showFlash((result.error && result.error.message) || msgMusicFailed);
+      if (isActiveTimedSelection(timedSelection, selection)) {
+        selectMusic(selection.id, { focusInspector: false });
+      }
+      layoutMusicSpans();
+      return false;
+    }
+    if (reloadIfForwardLoop()) return true;
+    if (isActiveTimedSelection(timedSelection, selection)) {
+      clearTimedSelection();
       state.selected = { type: null, id: null };
       updateRemoveEnabled();
-      renderMusic();
       showInspector("inspector-empty");
       document.getElementById("studio-music-track")?.classList.remove("is-selected");
-      setSaveState(true);
-      showFlash("");
-    } catch (_) {
-      showFlash(msgMusicFailed);
     }
+    renderMusic();
+    setSaveState(true);
+    showFlash("");
+    return true;
+  }
+
+  async function clearMusic() {
+    const track = selectedMusicTrack();
+    if (!track) return;
+    if (
+      timedSelection &&
+      isMusicTimedKind(timedSelection.kind) &&
+      String(timedSelection.id) === String(track.id)
+    ) {
+      void removeTimedMusicSelection();
+      return;
+    }
+    timedSelection = createTimedSelection({
+      kind: "music",
+      clipId: "",
+      id: String(track.id),
+    });
+    void removeTimedMusicSelection();
   }
 
   async function moveSelectedMusic(delta) {
     const track = selectedMusicTrack();
     if (!projectId || !track) return;
+    const trackId = track.id;
     const ids = state.tracks.map((item) => item.id);
     const index = ids.indexOf(track.id);
     const next = index + delta;
@@ -8593,6 +8870,7 @@ import {
     swapped[index] = swapped[next];
     swapped[next] = tmp;
     setSaveState(false);
+    const mutationRev = beginMusicPlaylistMutation();
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
         method: "PUT",
@@ -8604,9 +8882,18 @@ import {
         showFlash(musicErrorDetail(data));
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+        if (
+          state.selected?.type === "music" &&
+          String(state.selected.id) === String(trackId)
+        ) {
+          selectMusic(trackId);
+        }
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -8623,6 +8910,7 @@ import {
       return;
     }
     setSaveState(false);
+    const mutationRev = beginMusicPlaylistMutation();
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
         method: "PUT",
@@ -8631,7 +8919,7 @@ import {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok) {
-        if (previous) {
+        if (previous && musicPlaylistMutationIsCurrent(mutationRev)) {
           const byId = new Map(state.tracks.map((track) => [track.id, track]));
           state.tracks = previous.map((id) => byId.get(id)).filter(Boolean);
         }
@@ -8639,8 +8927,12 @@ import {
         layoutTimeline();
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -9858,14 +10150,19 @@ import {
   });
   document.getElementById("studio-clip-menu-edit")?.addEventListener("click", () => {
     const button = document.getElementById("studio-clip-menu-edit");
-    const clip = clips().find(
-      (item) => String(item.dataset.studioId) === String(button?.dataset.studioId || "")
-    );
     const kind = button?.dataset.timedKind || "ramp";
     const id = button?.dataset.timedId || "";
     hideClipMenu();
+    if (kind === "music") {
+      selectMusic(id, { focusInspector: true });
+      return;
+    }
+    const clip = clips().find(
+      (item) => String(item.dataset.studioId) === String(button?.dataset.studioId || "")
+    );
     if (!clip) return;
-    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit" });
+    if (kind === "audio") selectTimedClipAudio(clip, { focusInspector: true, relayout: true });
+    else if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit" });
     else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: true, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: true, relayout: true });
   });
@@ -9875,6 +10172,10 @@ import {
   });
   document.getElementById("studio-clip-menu-remove-effect")?.addEventListener("click", () => {
     hideClipMenu();
+    if (timedSelection && isMusicTimedKind(timedSelection.kind)) {
+      void removeTimedMusicSelection();
+      return;
+    }
     if (timedSelection && isOverlayTimedKind(timedSelection.kind)) {
       void removeTimedOverlaySelection();
       return;
@@ -10087,7 +10388,15 @@ import {
     const card = event.target.closest(".studio-music-select");
     if (!card) return;
     event.stopPropagation();
-    selectMusic(card.dataset.musicId);
+    selectMusic(card.dataset.musicId, { focusInspector: false });
+  });
+  musicClipsEl?.addEventListener("contextmenu", (event) => {
+    if (event.target.closest(".studio-drag-handle, .studio-music-start-handle")) return;
+    const card = event.target.closest(".studio-music-select");
+    if (!card || !card.dataset.musicId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showTimedMusicMenu(event, card.dataset.musicId, card);
   });
   musicClipsEl?.addEventListener("pointerdown", (event) => {
     const handle =
@@ -12637,7 +12946,9 @@ import {
   loadUiState();
   try {
     const boot = root.dataset.musicPayload;
-    if (boot) applyTracksPayload(JSON.parse(boot));
+    musicRemovedIds.clear();
+    musicPlaylistRevision.value = 0;
+    if (boot) applyTracksPayload(JSON.parse(boot), { acceptRemoved: true });
   } catch (_) {
     state.tracks = [];
   }

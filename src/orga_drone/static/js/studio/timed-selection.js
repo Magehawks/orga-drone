@@ -18,7 +18,7 @@ export const TIMED_KINDS = Object.freeze([
 export const EFFECT_BAR_KINDS = Object.freeze(["zoom", "mask", "slow", "color"]);
 
 /** Kinds that Delete/Backspace may remove without touching the story clip. */
-export const TIMED_DELETE_KINDS = Object.freeze(["ramp", "overlay", ...EFFECT_BAR_KINDS]);
+export const TIMED_DELETE_KINDS = Object.freeze(["ramp", "overlay", "music", ...EFFECT_BAR_KINDS]);
 
 export function createTimedSelection(value = null) {
   if (!value || typeof value !== "object") return null;
@@ -47,12 +47,22 @@ export function isOverlayTimedKind(kind) {
   return String(kind || "") === "overlay";
 }
 
+export function isMusicTimedKind(kind) {
+  return String(kind || "") === "music";
+}
+
+export function isAudioTimedKind(kind) {
+  return String(kind || "") === "audio";
+}
+
 /** Existing inspector tab for a timed effect kind. */
 export function timedEffectInspectorTab(kind) {
   const value = String(kind || "");
   if (value === "zoom") return "image";
   if (value === "mask" || value === "color") return "effects";
   if (value === "overlay") return "overlays";
+  if (value === "music") return "music";
+  if (value === "audio") return "clip";
   return "clip";
 }
 
@@ -99,9 +109,12 @@ export function resolveDeleteAction({
 } = {}) {
   void hasEffectBarSelection;
   if (key !== "Delete" && key !== "Backspace") return null;
+  // Clip-audio has no supported removal; still block Story-Clip deletion.
+  if (timedSelection && timedSelection.kind === "audio") return "audio-guard";
   if (timedSelection && TIMED_DELETE_KINDS.includes(timedSelection.kind)) {
     if (timedSelection.kind === "ramp") return "ramp";
     if (timedSelection.kind === "overlay") return "overlay";
+    if (timedSelection.kind === "music") return "music";
     return "effect-bar";
   }
   if (privacyMaskActive) return "mask";
