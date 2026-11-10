@@ -440,7 +440,8 @@ body.studio-app main {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* Show the full frame (portrait/square/landscape) on the dark hero well. */
+  object-fit: contain;
   object-position: center;
 }
 .home-logo {
