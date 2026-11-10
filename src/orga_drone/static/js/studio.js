@@ -2769,6 +2769,12 @@ import {
     return !!renderer && renderer.isReady(readColorLook(clip));
   }
 
+  const FULLSCREEN_PREVIEW_MAX_EDGE = 1280;
+
+  function previewIsFullscreen() {
+    return !!(previewFrame && document.fullscreenElement === previewFrame);
+  }
+
   function previewLutFrameFor(media, frameW, frameH) {
     const clip = clipForPreviewMedia(media);
     if (!lutWebglCanHandle(clip)) return null;
@@ -2781,12 +2787,26 @@ import {
       : (hit && hit.clip === clip ? hit.localS : 0);
     const adjust = readImageAdjustAt(clip, localS);
     const ramp = saturationRampMultiplier(readSaturationRamp(clip), localS);
+    const fullscreen = previewIsFullscreen();
+    let width = frameW;
+    let height = frameH;
+    let dpr = window.devicePixelRatio || 1;
+    if (fullscreen) {
+      dpr = 1;
+      const longEdge = Math.max(Number(width) || 0, Number(height) || 0);
+      if (longEdge > FULLSCREEN_PREVIEW_MAX_EDGE) {
+        const scale = FULLSCREEN_PREVIEW_MAX_EDGE / longEdge;
+        width = Math.max(2, Math.round(width * scale));
+        height = Math.max(2, Math.round(height * scale));
+      }
+    }
     return renderer.render(media, {
       grade: gradeFactors(adjust, ramp),
       look,
-      frameW,
-      frameH,
-      dpr: window.devicePixelRatio || 1,
+      frameW: width,
+      frameH: height,
+      dpr,
+      maxEdge: fullscreen ? FULLSCREEN_PREVIEW_MAX_EDGE : 4096,
     });
   }
 
@@ -2805,7 +2825,11 @@ import {
 
   /** Live WebGL LUT per frame is too heavy for fullscreen; proxy path stays allowed. */
   function liveLutBlocksFullscreen(clip) {
-    return !!(clip && lutWebglCanHandle(clip) && !lutProxyActiveFor(clip));
+    if (!clip || (clip.dataset && clip.dataset.kind) !== "video") return false;
+    if (lutProxyActiveFor(clip)) return false;
+    // Any live LUT path (WebGL or would-be WebGL) blocks fullscreen.
+    if (lutWebglCanHandle(clip)) return true;
+    return lookHasLut(readColorLook(clip)) && !!(window.OrgaLutPreview && window.OrgaLutPreview.supported);
   }
 
   function syncFullscreenControl() {
@@ -2819,7 +2843,7 @@ import {
     const tip = blocked ? msgFullscreenLutBlocked : msgFullscreen;
     btn.title = tip;
     btn.setAttribute("aria-label", tip);
-    if (blocked && document.fullscreenElement === previewFrame) {
+    if (blocked && previewIsFullscreen()) {
       document.exitFullscreen?.().catch(() => {});
     }
   }
@@ -6706,8 +6730,14 @@ import {
   function previewBackingRatio(cssW, cssH) {
     let dpr = Number(window.devicePixelRatio);
     if (!Number.isFinite(dpr) || dpr < 1) dpr = 1;
-    dpr = Math.min(dpr, 3);
     const longEdge = Math.max(Number(cssW) || 0, Number(cssH) || 0);
+    // Fullscreen blit at native DPR / source size stutters on WebView2; keep a
+    // modest pixel budget and leave full quality to the non-fullscreen pane.
+    if (previewIsFullscreen()) {
+      if (!(longEdge > 0)) return 1;
+      return Math.max(0.25, Math.min(1, FULLSCREEN_PREVIEW_MAX_EDGE / longEdge));
+    }
+    dpr = Math.min(dpr, 3);
     if (longEdge > 0 && longEdge * dpr > 4096) dpr = Math.max(1, 4096 / longEdge);
     return dpr;
   }
@@ -6835,6 +6865,13 @@ import {
   function paintPreviewBlit() {
     const canvas = ensurePreviewBlit();
     if (!canvas || !previewFrame) return;
+    if (previewIsFullscreen()) {
+      const hit = resolveAt(state.projectTimeS);
+      if (liveLutBlocksFullscreen(hit && hit.clip ? hit.clip : null)) {
+        document.exitFullscreen?.().catch(() => {});
+        syncFullscreenControl();
+      }
+    }
     const cssW = previewFrame.clientWidth;
     const cssH = previewFrame.clientHeight;
     if (cssW < 2 || cssH < 2) {

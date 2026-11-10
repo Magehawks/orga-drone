@@ -45,7 +45,9 @@ Continuous playback uses the existing optional WebGL2 LUT renderer when it can
 handle the clip; otherwise it uses native video plus approximate CSS grading and
 the visible "Playing without color file" indicator. Pause or scrub uses the
 shared FFmpeg still, WebGL renderer, or existing proxy path. This does not add a
-new rendering architecture.
+new rendering architecture. Fullscreen stays disabled while a live (non-proxy)
+LUT path would run each frame; the fullscreen blit itself also caps long-edge
+pixels (~1280) and DPR so WebView2 does not upscale 4K source every paint.
 
 Stills have a maximum edge of 1080 pixels and a 0.1-second scrub clock. JPEG/H.264
 compression, chroma subsampling, scaling and display color management permit small
