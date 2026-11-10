@@ -35,6 +35,12 @@ export function createSpeedRampEditor({
   function current() {
     return draft || readRamp(getSelection());
   }
+  function hideCurve() {
+    if (!curve) return;
+    curve.hidden = true;
+    curve.replaceChildren();
+    if (curve.parentNode) curve.remove();
+  }
   function fill() {
     const clip = getSelection();
     if (selectedClip !== clip) {
@@ -47,7 +53,10 @@ export function createSpeedRampEditor({
     const ramp = current();
     const controls = field("controls");
     controls.hidden = !ramp;
-    if (!ramp) return;
+    if (!ramp) {
+      hideCurve();
+      return;
+    }
     selected = Math.min(selected, ramp.points.length - 1);
     const pick = field("point");
     pick.replaceChildren(
@@ -269,8 +278,12 @@ export function createSpeedRampEditor({
         }
       });
     }
-    if (!readRamp(getSelection())) return;
+    if (!readRamp(getSelection())) {
+      hideCurve();
+      return;
+    }
     const pos = position(getSelection());
+    curve.hidden = false;
     curve.style.left = `${pos.left}px`;
     curve.style.width = `${pos.width}px`;
     curve.style.top = `${Number.parseFloat(lane.style.minHeight) || 36}px`;

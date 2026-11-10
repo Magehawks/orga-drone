@@ -11,20 +11,26 @@
 {% endblock %}
 {% block content %}
 {% set empty = stats.videos + stats.photos == 0 %}
-<section class="home-hero {% if hero_media_id %}has-photo{% else %}has-logo{% endif %}"
-         {% if hero_media_id %}style="background-image: url('/media/{{ hero_media_id }}/cached-thumb')"{% endif %}>
-  <div class="home-hero-scrim">
-    {% if not hero_media_id %}
+<section class="home-welcome">
+  <div class="home-hero-copy">
+    <h1>{{ _('Welcome to orga-drone') }}</h1>
+    {% if empty %}
+    <p>{{ _('Add a library folder and scan your drone files.') }}</p>
+    {% else %}
+    <p>{{ _('Your local drone media hub — browse the library or explore the world map.') }}</p>
+    {% endif %}
+  </div>
+  <div class="home-hero {% if hero_media_id %}has-photo{% else %}has-logo{% endif %}">
+    {% if hero_media_id %}
+    <img class="home-hero-media"
+         src="/media/{{ hero_media_id }}/hero-thumb"
+         alt=""
+         width="1280"
+         height="720"
+         decoding="async">
+    {% else %}
     <img class="home-logo" src="/static/icons/orga-drone.png" alt="{{ _('orga-drone') }}">
     {% endif %}
-    <div class="home-hero-copy">
-      <h1>{{ _('Welcome to orga-drone') }}</h1>
-      {% if empty %}
-      <p>{{ _('Add a library folder and scan your drone files.') }}</p>
-      {% else %}
-      <p>{{ _('Your local drone media hub — browse the library or explore the world map.') }}</p>
-      {% endif %}
-    </div>
   </div>
 </section>
 

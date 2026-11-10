@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from PIL import Image
 
 THUMB_SIZE = (480, 270)
+# Home hero mid-resolution JPEG. Never serves the original media file.
+HERO_SIZE = (1280, 720)
+HERO_CACHE_PREFIX = "hero_"
 # Detail-page JPEG for formats browsers cannot show natively (HEIC/HEIF/DNG).
 PHOTO_PREVIEW_MAX = (1920, 1920)
 
@@ -142,24 +145,85 @@ def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> 
 
     cache = _cache_path(media_id, source)
     if cache.exists():
+        try:
+            ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
+        except OSError:
+            pass
         return cache
 
     if kind == "photo":
         try:
             with Image.open(path) as img:
                 _save_image(img, cache)
+            try:
+                ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
+            except OSError:
+                pass
             return cache
         except OSError:
             pass
 
     if kind == "video":
         if _ffmpeg_frame(source, cache):
+            try:
+                ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
+            except OSError:
+                pass
             return cache
         _save_image(_placeholder("video", filename), cache)
         return cache
 
     _save_image(_placeholder(kind, filename), cache)
     return cache
+
+
+def ensure_hero_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> Path:
+    """Return a mid-resolution Home hero JPEG, creating it if needed.
+
+    Never opens a browser stream of the original file. Video frames reuse the
+    same LRF-proxy preference as grid thumbnails, then are letterboxed to
+    ``HERO_SIZE``.
+
+    Raises ``OSError`` when a real mid-res frame cannot be produced so callers
+    can fall back to the grid thumbnail instead of caching a permanent
+    placeholder under the hero prefix.
+    """
+    from PIL import Image
+
+    from orga_drone.parse import ensure_heif_support
+
+    ensure_heif_support()
+
+    source = path
+    if kind == "video":
+        proxy = find_proxy(path)
+        if proxy is not None:
+            source = proxy
+
+    cache = _cache_path(media_id, source, prefix=HERO_CACHE_PREFIX)
+    if cache.exists():
+        return cache
+
+    if kind == "photo":
+        with Image.open(path) as img:
+            _save_image(img, cache, size=HERO_SIZE, quality=85)
+        return cache
+
+    if kind == "video":
+        raw = cache.with_name(f"{cache.stem}_raw.jpg")
+        try:
+            if not _ffmpeg_frame(source, raw):
+                raise OSError(f"hero frame unavailable for {filename}")
+            with Image.open(raw) as img:
+                _save_image(img, cache, size=HERO_SIZE, quality=85)
+            return cache
+        finally:
+            try:
+                raw.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    raise OSError(f"hero thumbnail unsupported for {kind}:{filename}")
 
 
 def ensure_photo_preview(

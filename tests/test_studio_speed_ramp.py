@@ -172,6 +172,68 @@ def test_roundtrip_history_cut_and_legacy_speed(
     assert "video" in refused.json()["detail"]
 
 
+def test_remove_ramp_null_undo_redo_and_legacy_estimate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    db: Database = app.state.db
+    cid = _add_item(
+        db,
+        _seed_media(
+            db,
+            tmp_path / "lib",
+            filename="remove-ramp.mp4",
+            content=b"synthetic",
+            duration_s=5,
+        ),
+    )
+    client = TestClient(app)
+    route = f"/api/studio/{cid}/speed-ramp"
+    applied = client.patch(route, json={"speed_ramp": FIXTURE["curve"]})
+    assert applied.status_code == 200
+    assert applied.json()["speed_ramp"] is not None
+    ramped = next(i for i in db.list_studio_items() if i.id == cid)
+    assert ramp_from_settings(ramped.effect_settings) is not None
+    ramped_seconds = effective_seconds(
+        kind="video",
+        available=True,
+        photo_duration_s=None,
+        duration_s=5,
+        source_in_s=0,
+        source_out_s=5,
+        effect_settings=ramped.effect_settings,
+    )
+    removed = client.patch(route, json={"speed_ramp": None})
+    assert removed.status_code == 200
+    assert removed.json()["speed_ramp"] is None
+    assert removed.json()["effective_duration_s"] == pytest.approx(5.0)
+    cleared = next(i for i in db.list_studio_items() if i.id == cid)
+    assert ramp_from_settings(cleared.effect_settings) is None
+    assert cleared.playback_speed == pytest.approx(1.0)
+    assert "speed_ramp" not in json.loads(cleared.effect_settings or "{}")
+    legacy_seconds = effective_seconds(
+        kind="video",
+        available=True,
+        photo_duration_s=None,
+        duration_s=5,
+        source_in_s=0,
+        source_out_s=5,
+        effect_settings=cleared.effect_settings,
+    )
+    assert legacy_seconds == pytest.approx(5.0)
+    assert ramped_seconds != pytest.approx(legacy_seconds)
+    assert client.post("/api/studio/history/undo").status_code == 200
+    restored = next(i for i in db.list_studio_items() if i.id == cid)
+    assert ramp_from_settings(restored.effect_settings) == parse_ramp(FIXTURE["curve"])
+    assert client.post("/api/studio/history/redo").status_code == 200
+    reopened = Database(db.path)
+    gone = next(i for i in reopened.list_studio_items() if i.id == cid)
+    assert ramp_from_settings(gone.effect_settings) is None
+
+
 def test_edge_drag_absolute_inverse_on_trimmed_asymmetric_ramp() -> None:
     ramp = SpeedRamp((Point(0.0, 0.5), Point(4.0, 4.0), Point(8.0, 0.5)))
     start_in, start_out = 5.0, 8.0

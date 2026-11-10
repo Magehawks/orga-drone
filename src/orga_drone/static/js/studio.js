@@ -11967,6 +11967,9 @@ import {
     applyTransitionsToDom();
     layoutTimeline();
     setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
+    // After remove, restore 1× preview rate and source-audio placement immediately.
+    applyClipPlayback(previewVideo, clip);
+    if (previewVideo) syncClipAudio(previewVideo, clip);
     scheduleLutProxyPrepare(clip);
     setSaveState(true);
     timelapseEditor?.fill();
