@@ -254,6 +254,9 @@ import {
   const msgMusicMissing = root.dataset.musicMissing || "The selected music file is no longer available.";
   const msgMusicLimit = root.dataset.musicLimit || "This story already has 8 soundtrack songs.";
   const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
+  const msgFullscreen = root.dataset.fullscreenLabel || "Fullscreen";
+  const msgFullscreenLutBlocked =
+    root.dataset.fullscreenLutBlocked || "Fullscreen is too heavy with live color preview";
   const msgDragReorder = root.dataset.dragReorder || "Drag to reorder";
   const msgDragMusicStart =
     root.dataset.dragMusicStart || "Drag to set when the soundtrack starts";
@@ -2676,6 +2679,27 @@ import {
     return !!src && loadedVideoSrc === src;
   }
 
+  /** Live WebGL LUT per frame is too heavy for fullscreen; proxy path stays allowed. */
+  function liveLutBlocksFullscreen(clip) {
+    return !!(clip && lutWebglCanHandle(clip) && !lutProxyActiveFor(clip));
+  }
+
+  function syncFullscreenControl() {
+    const btn = root.querySelector('[data-transport="fullscreen"]');
+    if (!btn) return;
+    const hit = resolveAt(state.projectTimeS);
+    const clip = hit && hit.clip ? hit.clip : null;
+    const hasItems = clips().some((c) => clipDuration(c) > 0);
+    const blocked = hasItems && liveLutBlocksFullscreen(clip);
+    btn.disabled = !hasItems || blocked;
+    const tip = blocked ? msgFullscreenLutBlocked : msgFullscreen;
+    btn.title = tip;
+    btn.setAttribute("aria-label", tip);
+    if (blocked && document.fullscreenElement === previewFrame) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
   function clipMediaTarget(clip, mapped, inS) {
     return lutProxyActiveFor(clip)
       ? Math.max(0, mapped)
@@ -3407,7 +3431,7 @@ import {
       }
       // The proxy already contains grade + LUT + HSL + wheels at video
       // resolution. Keep its frame for pause/seek/selection instead of
-      // overpainting a soft 720-edge JPEG.
+      // overpainting a soft still JPEG.
       if (lutWebglReadyFor(clip)) {
         clearLutPreviewStill();
         return;
@@ -5605,7 +5629,8 @@ import {
       if (savedBrowser != null) workspace.style.setProperty("--studio-browser-width", `${savedBrowser}px`);
     }
     if (stage) {
-      const savedStory = readStoredSize("orga-drone.studio.storyHeight", 128, 480);
+      // Floor keeps story + audio + effect + soundtrack lanes visible without drag-up.
+      const savedStory = readStoredSize("orga-drone.studio.storyHeight", 300, 480);
       if (savedStory != null) stage.style.setProperty("--studio-story-height", `${savedStory}px`);
     }
     if (browserHandle && workspace && browser) {
@@ -5652,8 +5677,8 @@ import {
         const originH = story.getBoundingClientRect().height;
         const move = (ev) => {
           const rect = stage.getBoundingClientRect();
-          const max = Math.min(480, Math.max(180, rect.height * 0.55));
-          const height = Math.round(Math.min(max, Math.max(128, originH + (originY - ev.clientY))));
+          const max = Math.min(480, Math.max(300, rect.height * 0.55));
+          const height = Math.round(Math.min(max, Math.max(300, originH + (originY - ev.clientY))));
           stage.style.setProperty("--studio-story-height", `${height}px`);
         };
         const up = () => {
@@ -6543,6 +6568,7 @@ import {
     applyFramePreview(hit);
     syncHud(hit);
     schedulePreviewBlit();
+    syncFullscreenControl();
   }
 
   // A CSS-sized video is rasterized in CSS pixels. Grade filters, zoom scale,
@@ -6671,7 +6697,12 @@ import {
       media.addEventListener("load", kick);
     });
     if (typeof ResizeObserver === "function") {
-      const observer = new ResizeObserver(() => schedulePreviewBlit());
+      const observer = new ResizeObserver(() => {
+        schedulePreviewBlit();
+        // Map/masks are placed in picture pixels; refresh when the frame size changes.
+        drawPrivacyMasks();
+        drawFlightMap(resolveAt(state.projectTimeS));
+      });
       observer.observe(previewFrame);
     }
     return canvas;
@@ -10316,11 +10347,16 @@ import {
         return;
       }
       if (action === "fullscreen" && previewFrame) {
-        if (!document.fullscreenElement) {
-          previewFrame.requestFullscreen?.().catch(() => {});
-        } else {
+        if (document.fullscreenElement) {
           document.exitFullscreen?.().catch(() => {});
+          return;
         }
+        const hit = resolveAt(state.projectTimeS);
+        if (liveLutBlocksFullscreen(hit && hit.clip ? hit.clip : null)) {
+          syncFullscreenControl();
+          return;
+        }
+        previewFrame.requestFullscreen?.().catch(() => {});
         return;
       }
       if (reuseDraft) return;
@@ -10726,6 +10762,11 @@ import {
   window.addEventListener("resize", () => {
     drawPrivacyMasks();
     drawFlightMap(resolveAt(state.projectTimeS));
+  });
+  document.addEventListener("fullscreenchange", () => {
+    drawPrivacyMasks();
+    drawFlightMap(resolveAt(state.projectTimeS));
+    syncFullscreenControl();
   });
   previewImage?.addEventListener("load", () => drawPrivacyMasks());
   previewVideo?.addEventListener("seeked", () => drawPrivacyMasks());

@@ -559,6 +559,9 @@ msgstr "Farbvorschau nicht verfügbar; erneut pausieren oder eine andere Stelle 
 msgid "Color still; transition colors approximate"
 msgstr "Farbstandbild; Übergangsfarben angenähert"
 
+msgid "Fullscreen is too heavy with live color preview"
+msgstr "Vollbild mit Live-Farbvorschau ist zu schwer"
+
 msgid "Standard"
 msgstr "Standard"
 

@@ -28,9 +28,9 @@ from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, 
 logger = logging.getLogger(__name__)
 
 PREVIEW_STILLS_DIR = "preview-stills"
-PREVIEW_MAX_EDGE = 720
+PREVIEW_MAX_EDGE = 1080
 PREVIEW_QUANTIZE_S = 0.1
-PREVIEW_JPEG_Q = 5
+PREVIEW_JPEG_Q = 3
 PREVIEW_CACHE_MAX_BYTES = 400 * 1024 * 1024
 PREVIEW_FFMPEG_TIMEOUT_S = 45.0
 PREVIEW_COLD_LATENCY_WARN_S = 1.0
