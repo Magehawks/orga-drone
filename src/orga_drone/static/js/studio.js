@@ -11,9 +11,12 @@ import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
   createTimedSelection,
+  isActiveTimedSelection,
+  isEffectBarKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
+  timedEffectInspectorTab,
   timedSelectionMatches,
 } from "./studio/timed-selection.js";
 import {
@@ -1069,6 +1072,8 @@ import {
 
   function clearTimedSelection() {
     timedSelection = null;
+    // Keep legacy drag chrome in sync so Delete cannot target a prior clip.
+    selectedEffectBar = null;
   }
 
   function effectLabel(kind) {
@@ -1165,12 +1170,16 @@ import {
         edgeOut.className = "studio-effect-edge studio-effect-edge-out";
         if (bar.kind !== "ramp") el.append(edgeIn, edgeOut);
         if (
+          timedSelectionMatches(
+            timedSelection,
+            el.dataset.kind,
+            el.dataset.studioId,
+            el.dataset.maskId || ""
+          ) ||
           (selectedEffectBar &&
             selectedEffectBar.studioId === el.dataset.studioId &&
             selectedEffectBar.kind === el.dataset.kind &&
-            selectedEffectBar.id === el.dataset.maskId) ||
-          (bar.kind === "ramp" &&
-            timedSelectionMatches(timedSelection, "ramp", el.dataset.studioId))
+            selectedEffectBar.id === el.dataset.maskId)
         ) {
           el.classList.add("is-selected");
         }
@@ -1183,9 +1192,22 @@ import {
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            showTimedRampMenu(event, clip, el);
+            showTimedEffectMenu(event, clip, "ramp", "", el);
           });
-        } else el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
+        } else {
+          el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
+          el.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            showTimedEffectMenu(
+              event,
+              clip,
+              el.dataset.kind,
+              el.dataset.maskId || "",
+              el
+            );
+          });
+        }
         lane.appendChild(el);
         stack = Math.max(stack, index + 1);
       });
@@ -1391,33 +1413,122 @@ import {
     applyClipPlayback(previewVideo, clip);
   }
 
+  function effectBarSelector(kind, clipIdValue, id = "") {
+    const mask = id ? `[data-mask-id="${CSS.escape(String(id))}"]` : "";
+    return `.studio-effect-bar[data-kind="${CSS.escape(String(kind))}"][data-studio-id="${CSS.escape(String(clipIdValue))}"]${mask}`;
+  }
+
+  function timedEffectStillPresent(clip, selection) {
+    if (!clip || !selection) return false;
+    if (selection.kind === "ramp") return Boolean(speedRampOf(clip));
+    if (selection.kind === "zoom") return Boolean(zoomBarOf(clip));
+    if (selection.kind === "slow") return Boolean(slowBarOf(clip));
+    if (selection.kind === "color") {
+      const anim = readColorAnimation(clip);
+      return Boolean(anim && anim.keys && anim.keys.length >= 2);
+    }
+    if (selection.kind === "mask") {
+      return readMasks(clip).some((mask) => String(mask.id) === String(selection.id));
+    }
+    return false;
+  }
+
+  function openTimedEffectInspector(clip, kind, { focusInspector = false } = {}) {
+    const tab = timedEffectInspectorTab(kind);
+    setInspectorTab(tab);
+    let panel = null;
+    let focusQuery = null;
+    if (kind === "zoom") {
+      panel = document.getElementById("inspector-frame");
+      focusQuery = "#inspector-frame-zoom";
+      fillFrame(clip);
+    } else if (kind === "mask") {
+      panel = document.getElementById("inspector-masks");
+      focusQuery = "#inspector-masks button, #mask-list button, #inspector-masks input";
+      try {
+        fillMaskInspector(clip);
+      } catch (_) {
+        /* Preview handles still follow selectedMaskId. */
+      }
+      drawPrivacyMasks();
+    } else if (kind === "slow") {
+      panel = document.getElementById("inspector-speed");
+      focusQuery = '#inspector-speed [data-speed="0.5"], #inspector-speed-in';
+    } else if (kind === "color") {
+      panel = document.getElementById("inspector-color-animation");
+      focusQuery = "#color-anim-preset, #color-anim-remove, #color-anim-apply-preset";
+      fillColorAnimationInspector(clip);
+    } else if (kind === "ramp") {
+      panel = document.getElementById("inspector-speed-ramp");
+      focusQuery =
+        "[data-ramp-speed]:not([disabled]), [data-ramp-preset], [data-ramp-apply]";
+    }
+    panel?.scrollIntoView({ block: "nearest" });
+    if (!focusInspector) return;
+    window.setTimeout(() => {
+      const focus = panel?.querySelector(focusQuery);
+      if (focus && typeof focus.focus === "function") focus.focus();
+    }, 0);
+  }
+
+  function selectTimedEffectBar(
+    clip,
+    kind,
+    id = "",
+    { focusInspector = false, relayout = true } = {}
+  ) {
+    if (!clip || !isEffectBarKind(kind)) return null;
+    const selection = createTimedSelection({
+      kind,
+      clipId: clipId(clip),
+      id,
+    });
+    if (!selection || !timedEffectStillPresent(clip, selection)) return null;
+    suppressTimelineClick = true;
+    window.setTimeout(() => {
+      suppressTimelineClick = false;
+    }, 0);
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clipId(clip));
+    if (!already) selectClip(clipId(clip), { movePlayhead: false });
+    timedSelection = selection;
+    selectedEffectBar = {
+      studioId: String(clipId(clip)),
+      kind,
+      id: id || "",
+    };
+    if (kind === "mask" && id) selectedMaskId = id;
+    openTimedEffectInspector(clip, kind, { focusInspector });
+    if (relayout) layoutEffectBars();
+    else {
+      document
+        .querySelectorAll(".studio-effect-bar.is-selected")
+        .forEach((node) => node.classList.remove("is-selected"));
+    }
+    return selection;
+  }
+
   function onEffectPointerDown(event, el, clip) {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    if (el.dataset.kind === "mask" && el.dataset.maskId) {
-      selectedMaskId = el.dataset.maskId;
-      const already =
-        state.selected &&
-        state.selected.type === "clip" &&
-        String(state.selected.id) === String(clip.dataset.studioId);
-      if (!already) selectClip(clip.dataset.studioId, { movePlayhead: false });
-      else {
-        try {
-          fillMaskInspector(clip);
-        } catch (_) {
-          /* The preview frame still follows the selected mask. */
-        }
-        drawPrivacyMasks();
-      }
+    const kind = el.dataset.kind;
+    const id = el.dataset.maskId || "";
+    if (!isEffectBarKind(kind)) return;
+    const already =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId);
+    // selectClip rebuilds bars; re-query the live node when the parent clip changes.
+    selectTimedEffectBar(clip, kind, id, { focusInspector: false, relayout: !already });
+    if (!already) {
+      const fresh = document.querySelector(effectBarSelector(kind, clipId(clip), id));
+      if (fresh) el = fresh;
+    } else {
+      el.classList.add("is-selected");
     }
-    selectedEffectBar = {
-      studioId: el.dataset.studioId,
-      kind: el.dataset.kind,
-      id: el.dataset.maskId || "",
-    };
-    document.querySelectorAll(".studio-effect-bar.is-selected").forEach((node) => node.classList.remove("is-selected"));
-    el.classList.add("is-selected");
     const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
     const mode = edge && edge.classList.contains("studio-effect-edge-in")
       ? "start"
@@ -1454,7 +1565,7 @@ import {
       const start = Number(el.dataset.draftStart);
       const end = Number(el.dataset.draftEnd);
       if (!Number.isFinite(start) || !Number.isFinite(end)) return;
-      saveEffectBar(clip, {
+      void saveEffectBar(clip, {
         kind: el.dataset.kind,
         op: "update",
         id: el.dataset.maskId || "",
@@ -1499,7 +1610,7 @@ import {
     if (!res.ok || !data || !data.ok) {
       showFlash((data && data.detail) || "Could not update the effect.");
       layoutEffectBars();
-      return;
+      return false;
     }
     clip.dataset.frame = JSON.stringify(data.frame || {});
     clip.dataset.masks = JSON.stringify(data.masks || []);
@@ -1515,24 +1626,63 @@ import {
     drawPrivacyMasks();
     applyClipPlayback(previewVideo, clip);
     fillColorAnimationInspector(clip);
+    return true;
   }
 
-  function deleteSelectedEffectBar() {
-    if (!selectedEffectBar) return false;
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(selectedEffectBar.studioId));
-    if (!clip) return false;
+  async function removeTimedEffectBarSelection() {
+    // timedSelection is the sole deletion authority — never fall back to
+    // selectedEffectBar after an ordinary clip switch cleared it.
+    if (!timedSelection || !isEffectBarKind(timedSelection.kind)) return false;
+    const selection = timedSelection;
+    const clip = clips().find(
+      (item) => String(item.dataset.studioId) === String(selection.clipId)
+    );
+    if (!clip || !timedEffectStillPresent(clip, selection)) {
+      clearTimedSelection();
+      if (selection.kind === "mask") selectedMaskId = null;
+      layoutEffectBars();
+      return false;
+    }
+    hideClipMenu();
     const body = {
-      kind: selectedEffectBar.kind,
+      kind: selection.kind,
       op: "delete",
-      id: selectedEffectBar.id,
+      id: selection.id,
     };
-    if (selectedEffectBar.kind === "slow") {
+    if (selection.kind === "slow") {
       const bar = slowBarOf(clip);
       body.speed = bar ? bar.speed : 0.5;
     }
-    selectedEffectBar = null;
-    clearTimedSelection();
-    saveEffectBar(clip, body);
+    // Keep selection until PATCH succeeds so Delete/Backspace can retry.
+    const result = await persistTimedSelectionRemoval(selection, async () => {
+      const ok = await saveEffectBar(clip, body);
+      if (!ok) throw new Error("effect save failed");
+    });
+    if (!result.ok) {
+      // Do not overwrite a newer timedSelection chosen while the PATCH ran.
+      if (isActiveTimedSelection(timedSelection, selection)) {
+        selectedEffectBar = {
+          studioId: selection.clipId,
+          kind: selection.kind,
+          id: selection.id,
+        };
+        if (selection.kind === "mask") selectedMaskId = selection.id;
+      }
+      layoutEffectBars();
+      return false;
+    }
+    if (isActiveTimedSelection(timedSelection, selection)) {
+      clearTimedSelection();
+      if (selection.kind === "mask" && String(selectedMaskId || "") === String(selection.id)) {
+        selectedMaskId = null;
+      }
+    }
+    layoutEffectBars();
+    return true;
+  }
+
+  function deleteSelectedEffectBar() {
+    void removeTimedEffectBarSelection();
     return true;
   }
 
@@ -1549,19 +1699,8 @@ import {
       clipId: clipId(clip),
       id: "",
     });
-    setInspectorTab("clip");
-    const panel = document.getElementById("inspector-speed-ramp");
-    panel?.scrollIntoView({ block: "nearest" });
+    openTimedEffectInspector(clip, "ramp", { focusInspector });
     layoutEffectBars();
-    if (focusInspector) {
-      window.setTimeout(() => {
-        const focus =
-          panel?.querySelector("[data-ramp-speed]:not([disabled])") ||
-          panel?.querySelector("[data-ramp-preset]") ||
-          panel?.querySelector("[data-ramp-apply]");
-        if (focus && typeof focus.focus === "function") focus.focus();
-      }, 0);
-    }
     void source;
   }
 
@@ -1582,26 +1721,28 @@ import {
       saveSpeedRamp(clip, null)
     );
     if (!result.ok) {
-      timedSelection = result.selection;
-      layoutEffectBars();
+      // Leave a newer selection alone; only flash when this removal still owns focus.
       showFlash(msgSpeedFailed);
+      layoutEffectBars();
       return false;
     }
-    if (timedSelectionMatches(timedSelection, "ramp", selection.clipId)) {
+    if (isActiveTimedSelection(timedSelection, selection)) {
       clearTimedSelection();
     }
     layoutEffectBars();
     return true;
   }
 
-  function showTimedRampMenu(event, clip, returnTarget) {
-    selectTimedRamp(clip, { focusInspector: false, source: "menu" });
+  function showTimedEffectMenu(event, clip, kind, id = "", returnTarget) {
+    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: false, source: "menu" });
+    else selectTimedEffectBar(clip, kind, id, { focusInspector: false, relayout: true });
     const removeItem = document.getElementById("studio-clip-menu-remove");
     const mergeItem = document.getElementById("studio-clip-menu-merge");
     const uncutItem = document.getElementById("studio-clip-menu-uncut");
     const reuseItem = document.getElementById("studio-clip-menu-reuse");
     const editItem = document.getElementById("studio-clip-menu-edit");
     const rampRemoveItem = document.getElementById("studio-clip-menu-remove-ramp");
+    const effectRemoveItem = document.getElementById("studio-clip-menu-remove-effect");
     if (removeItem) removeItem.hidden = true;
     if (reuseItem) reuseItem.hidden = true;
     if (mergeItem) mergeItem.hidden = true;
@@ -1609,10 +1750,18 @@ import {
     if (editItem) {
       editItem.hidden = false;
       editItem.dataset.studioId = clipId(clip);
+      editItem.dataset.timedKind = kind;
+      editItem.dataset.timedId = id || "";
     }
     if (rampRemoveItem) {
-      rampRemoveItem.hidden = false;
+      rampRemoveItem.hidden = kind !== "ramp";
       rampRemoveItem.dataset.studioId = clipId(clip);
+    }
+    if (effectRemoveItem) {
+      effectRemoveItem.hidden = kind === "ramp" || !isEffectBarKind(kind);
+      effectRemoveItem.dataset.studioId = clipId(clip);
+      effectRemoveItem.dataset.timedKind = kind;
+      effectRemoveItem.dataset.timedId = id || "";
     }
     setClipMenuReason("");
     showClipMenu(event.clientX, event.clientY, returnTarget || clip);
@@ -1631,7 +1780,6 @@ import {
     const action = resolveDeleteAction({
       key: event.key,
       timedSelection,
-      hasEffectBarSelection: Boolean(selectedEffectBar),
       privacyMaskActive: privacyMaskDeleteActive(),
       storyClipFocused: storyClipDeleteContext(document.activeElement),
       hasSelectedStoryClip: Boolean(selectedStoryClip()),
@@ -1643,7 +1791,7 @@ import {
       return true;
     }
     if (action === "effect-bar") {
-      deleteSelectedEffectBar();
+      void removeTimedEffectBarSelection();
       return true;
     }
     if (action === "mask") {
@@ -7762,6 +7910,7 @@ import {
   function selectTransition(el) {
     if (reuseDraft) cancelReuseDraft();
     controlBridge?.noteLocalChange();
+    clearTimedSelection();
     state.selected = { type: "transition", id: el.dataset.transitionAfter || "" };
     clips().forEach((c) => {
       c.classList.remove("is-selected");
@@ -7769,6 +7918,7 @@ import {
     });
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.toggle("is-selected", t === el));
     layoutMusicSpans();
+    layoutEffectBars();
     showInspector("inspector-transition");
     const headingType = transitionLabels[el.dataset.transitionType || "cut"] || "Transition";
     setInspectorHeading(headingType);
@@ -9331,6 +9481,7 @@ import {
     const reuseItem = document.getElementById("studio-clip-menu-reuse");
     const editItem = document.getElementById("studio-clip-menu-edit");
     const rampRemoveItem = document.getElementById("studio-clip-menu-remove-ramp");
+    const effectRemoveItem = document.getElementById("studio-clip-menu-remove-effect");
     const clipEl =
       mode === "clip"
         ? (anchor.closest && anchor.closest(".studio-clip")) || anchor
@@ -9338,6 +9489,7 @@ import {
     const reuse = mode === "clip" ? reuseMenuState(clipEl) : { show: false, reason: "" };
     if (editItem) editItem.hidden = true;
     if (rampRemoveItem) rampRemoveItem.hidden = true;
+    if (effectRemoveItem) effectRemoveItem.hidden = true;
     if (removeItem) removeItem.hidden = mode !== "clip";
     if (reuseItem) {
       reuseItem.hidden = !reuse.show;
@@ -9395,12 +9547,20 @@ import {
     const clip = clips().find(
       (item) => String(item.dataset.studioId) === String(button?.dataset.studioId || "")
     );
+    const kind = button?.dataset.timedKind || "ramp";
+    const id = button?.dataset.timedId || "";
     hideClipMenu();
-    if (clip) selectTimedRamp(clip, { focusInspector: true, source: "edit" });
+    if (!clip) return;
+    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit" });
+    else selectTimedEffectBar(clip, kind, id, { focusInspector: true, relayout: true });
   });
   document.getElementById("studio-clip-menu-remove-ramp")?.addEventListener("click", () => {
     hideClipMenu();
     void removeTimedRampSelection();
+  });
+  document.getElementById("studio-clip-menu-remove-effect")?.addEventListener("click", () => {
+    hideClipMenu();
+    void removeTimedEffectBarSelection();
   });
   document.getElementById("studio-clip-menu-merge")?.addEventListener("click", () => {
     const button = document.getElementById("studio-clip-menu-merge");
@@ -12150,7 +12310,8 @@ import {
     onError: () => showFlash(msgSpeedFailed),
     save: saveSpeedRamp,
     onSelect: (clip, options) => selectTimedRamp(clip, options),
-    onContextMenu: (event, clip) => showTimedRampMenu(event, clip, event.currentTarget),
+    onContextMenu: (event, clip) =>
+      showTimedEffectMenu(event, clip, "ramp", "", event.currentTarget),
     isTimedSelected: () =>
       timedSelectionMatches(timedSelection, "ramp", selectedVideoClip()?.dataset?.studioId || ""),
   });

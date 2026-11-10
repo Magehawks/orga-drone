@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createTimedSelection,
+  isActiveTimedSelection,
+  isEffectBarKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
+  timedEffectInspectorTab,
   timedSelectionMatches,
 } from "../../src/orga_drone/static/js/studio/timed-selection.js";
 
@@ -24,6 +27,22 @@ test("timedSelectionMatches compares kind, clip and id", () => {
   assert.equal(timedSelectionMatches(selection, "ramp", 7), true);
   assert.equal(timedSelectionMatches(selection, "zoom", "7"), false);
   assert.equal(timedSelectionMatches(null, "ramp", "7"), false);
+  const mask = createTimedSelection({ kind: "mask", clipId: "3", id: "blur-1" });
+  assert.equal(timedSelectionMatches(mask, "mask", "3", "blur-1"), true);
+  assert.equal(timedSelectionMatches(mask, "mask", "3", "other"), false);
+});
+
+test("effect bar kinds map to existing inspector tabs", () => {
+  assert.equal(isEffectBarKind("zoom"), true);
+  assert.equal(isEffectBarKind("mask"), true);
+  assert.equal(isEffectBarKind("slow"), true);
+  assert.equal(isEffectBarKind("color"), true);
+  assert.equal(isEffectBarKind("ramp"), false);
+  assert.equal(timedEffectInspectorTab("zoom"), "image");
+  assert.equal(timedEffectInspectorTab("mask"), "effects");
+  assert.equal(timedEffectInspectorTab("color"), "effects");
+  assert.equal(timedEffectInspectorTab("slow"), "clip");
+  assert.equal(timedEffectInspectorTab("ramp"), "clip");
 });
 
 test("shouldIgnoreDeleteShortcut protects typing and dialogs", () => {
@@ -36,8 +55,10 @@ test("shouldIgnoreDeleteShortcut protects typing and dialogs", () => {
   assert.equal(shouldIgnoreDeleteShortcut({ tagName: "DIV" }), false);
 });
 
-test("resolveDeleteAction prefers ramp over clip and keeps Backspace off story clips", () => {
+test("resolveDeleteAction prefers timed effects over clip and allows Backspace", () => {
   const ramp = createTimedSelection({ kind: "ramp", clipId: "3" });
+  const zoom = createTimedSelection({ kind: "zoom", clipId: "4" });
+  const mask = createTimedSelection({ kind: "mask", clipId: "5", id: "m1" });
   assert.equal(
     resolveDeleteAction({
       key: "Delete",
@@ -55,6 +76,43 @@ test("resolveDeleteAction prefers ramp over clip and keeps Backspace off story c
       storyClipFocused: true,
     }),
     "ramp"
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: zoom,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "effect-bar"
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Backspace",
+      timedSelection: mask,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "effect-bar"
+  );
+  // Legacy selectedEffectBar alone must not delete after an ordinary clip switch.
+  assert.equal(
+    resolveDeleteAction({
+      key: "Backspace",
+      timedSelection: null,
+      hasEffectBarSelection: true,
+    }),
+    null
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: null,
+      hasEffectBarSelection: true,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "story-clip"
   );
   assert.equal(
     resolveDeleteAction({
@@ -76,15 +134,6 @@ test("resolveDeleteAction prefers ramp over clip and keeps Backspace off story c
   );
   assert.equal(
     resolveDeleteAction({
-      key: "Delete",
-      timedSelection: null,
-      hasEffectBarSelection: true,
-      privacyMaskActive: true,
-    }),
-    "effect-bar"
-  );
-  assert.equal(
-    resolveDeleteAction({
       key: "Backspace",
       timedSelection: null,
       privacyMaskActive: true,
@@ -93,8 +142,16 @@ test("resolveDeleteAction prefers ramp over clip and keeps Backspace off story c
   );
 });
 
-test("failed ramp removal keeps selection so Delete/Backspace can retry", async () => {
-  const selection = createTimedSelection({ kind: "ramp", clipId: "9" });
+test("isActiveTimedSelection blocks async handlers from overwriting a newer choice", () => {
+  const pending = createTimedSelection({ kind: "zoom", clipId: "1" });
+  const newer = createTimedSelection({ kind: "slow", clipId: "2" });
+  assert.equal(isActiveTimedSelection(pending, pending), true);
+  assert.equal(isActiveTimedSelection(null, pending), false);
+  assert.equal(isActiveTimedSelection(newer, pending), false);
+});
+
+test("failed effect removal keeps selection so Delete/Backspace can retry", async () => {
+  const selection = createTimedSelection({ kind: "zoom", clipId: "9" });
   let calls = 0;
   const save = async () => {
     calls += 1;
@@ -106,7 +163,7 @@ test("failed ramp removal keeps selection so Delete/Backspace can retry", async 
   assert.equal(failed.selection, selection);
   assert.equal(String(failed.error?.message || ""), "patch failed");
   assert.equal(
-    timedSelectionMatches(failed.selection, "ramp", "9"),
+    timedSelectionMatches(failed.selection, "zoom", "9"),
     true,
     "selection remains after failed save"
   );

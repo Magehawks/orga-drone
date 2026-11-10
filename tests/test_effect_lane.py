@@ -120,6 +120,39 @@ def test_removing_a_bar_clears_that_effect() -> None:
     assert mask_covers(gone, 1.0, 4.0) is True
 
 
+def test_timeline_first_effect_bars_reuse_timed_selection_contract() -> None:
+    """Phase 2 (#339): zoom/mask/slow/color share ramp-style timeline actions."""
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    helpers = Path("src/orga_drone/static/js/studio/timed-selection.js").read_text(
+        encoding="utf-8"
+    )
+    page = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    assert "EFFECT_BAR_KINDS" in helpers
+    assert "timedEffectInspectorTab" in helpers
+    assert "function selectTimedEffectBar" in script
+    assert "function showTimedEffectMenu" in script
+    assert "function removeTimedEffectBarSelection" in script
+    assert "persistTimedSelectionRemoval" in script
+    assert "isActiveTimedSelection" in script
+    clear = script.split("function clearTimedSelection", 1)[1].split(
+        "function effectLabel", 1
+    )[0]
+    assert "selectedEffectBar = null" in clear
+    remove = script.split("async function removeTimedEffectBarSelection", 1)[1].split(
+        "function deleteSelectedEffectBar", 1
+    )[0]
+    assert "selectedEffectBar.kind" not in remove
+    assert "isActiveTimedSelection(timedSelection, selection)" in remove
+    assert 'id="studio-clip-menu-remove-effect"' in page
+    assert "{{ _('Remove') }}" in page
+    layout = script.split("function layoutEffectBars", 1)[1].split(
+        "function layoutClipAudio", 1
+    )[0]
+    assert "onEffectPointerDown" in layout
+    assert "showTimedEffectMenu(" in layout
+    assert "studio-effect-edge" in layout
+
+
 def test_normal_speed_preview_uses_the_original_audio() -> None:
     assert (
         preview_audio_source(

@@ -1,5 +1,5 @@
 /**
- * Minimal timed-element selection helpers for timeline-first Studio UX (#334).
+ * Minimal timed-element selection helpers for timeline-first Studio UX (#334/#339).
  * Pure state helpers only — persistence and DOM wiring stay in the entry.
  */
 
@@ -13,6 +13,12 @@ export const TIMED_KINDS = Object.freeze([
   "audio",
   "music",
 ]);
+
+/** Effect-lane bars that share the Phase-2 timeline-first contract. */
+export const EFFECT_BAR_KINDS = Object.freeze(["zoom", "mask", "slow", "color"]);
+
+/** Kinds that Delete/Backspace may remove without touching the story clip. */
+export const TIMED_DELETE_KINDS = Object.freeze(["ramp", ...EFFECT_BAR_KINDS]);
 
 export function createTimedSelection(value = null) {
   if (!value || typeof value !== "object") return null;
@@ -31,6 +37,18 @@ export function timedSelectionMatches(selection, kind, clipId, id = "") {
     String(selection.clipId) === String(clipId || "") &&
     String(selection.id || "") === String(id || "")
   );
+}
+
+export function isEffectBarKind(kind) {
+  return EFFECT_BAR_KINDS.includes(String(kind || ""));
+}
+
+/** Existing inspector tab for a timed effect kind. */
+export function timedEffectInspectorTab(kind) {
+  const value = String(kind || "");
+  if (value === "zoom") return "image";
+  if (value === "mask" || value === "color") return "effects";
+  return "clip";
 }
 
 /**
@@ -63,6 +81,8 @@ export function shouldIgnoreDeleteShortcut(
 /**
  * Decide which deletion path owns a Delete/Backspace press.
  * Story-clip removal stays Delete-only and requires story focus.
+ * timedSelection is the sole authority for timed-effect deletion; legacy
+ * selectedEffectBar must not delete after an ordinary clip switch.
  */
 export function resolveDeleteAction({
   key,
@@ -72,12 +92,23 @@ export function resolveDeleteAction({
   storyClipFocused = false,
   hasSelectedStoryClip = false,
 } = {}) {
+  void hasEffectBarSelection;
   if (key !== "Delete" && key !== "Backspace") return null;
-  if (timedSelection && timedSelection.kind === "ramp") return "ramp";
-  if (key === "Delete" && hasEffectBarSelection) return "effect-bar";
+  if (timedSelection && TIMED_DELETE_KINDS.includes(timedSelection.kind)) {
+    return timedSelection.kind === "ramp" ? "ramp" : "effect-bar";
+  }
   if (privacyMaskActive) return "mask";
   if (key === "Delete" && storyClipFocused && hasSelectedStoryClip) return "story-clip";
   return null;
+}
+
+/**
+ * True when an in-flight timed removal still owns the live selection.
+ * Prevents async success/failure handlers from overwriting a newer choice.
+ */
+export function isActiveTimedSelection(current, pending) {
+  if (!pending) return false;
+  return timedSelectionMatches(current, pending.kind, pending.clipId, pending.id);
 }
 
 /**
