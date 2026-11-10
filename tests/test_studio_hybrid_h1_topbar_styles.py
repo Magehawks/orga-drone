@@ -214,20 +214,33 @@ def h1_browser() -> Any:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
+    profile = Path(
+        os.environ.get("TMPDIR")
+        or os.environ.get("TEMP")
+        or os.environ.get("TMP")
+        or "/tmp"
+    ) / f"od-h1-{cdp_port}"
+    profile.mkdir(parents=True, exist_ok=True)
+    stderr_path = profile / "chrome.stderr"
     cmd = [
         str(chrome),
         f"--remote-debugging-port={cdp_port}",
+        "--remote-debugging-address=127.0.0.1",
         "--headless=new",
         "--disable-gpu",
         "--no-first-run",
         "--no-default-browser-check",
-        "--user-data-dir=" + str(Path(os.environ.get("TMP", "/tmp")) / f"od-h1-{cdp_port}"),
+        # GitHub-hosted Linux runners need these for Chromium CDP.
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        f"--user-data-dir={profile}",
         "about:blank",
     ]
+    stderr_file = stderr_path.open("wb")
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=stderr_file,
     )
     cdp: _CDP | None = None
     try:
@@ -235,6 +248,8 @@ def h1_browser() -> Any:
         version: dict[str, Any] | None = None
         last_error = ""
         while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                break
             try:
                 version = _http_json(f"http://127.0.0.1:{cdp_port}/json/version")
                 break
@@ -242,7 +257,16 @@ def h1_browser() -> Any:
                 last_error = str(exc)
                 time.sleep(0.2)
         if version is None:
-            raise AssertionError(f"CDP never appeared on {cdp_port}: {last_error}")
+            stderr_file.flush()
+            detail = ""
+            try:
+                detail = stderr_path.read_text(encoding="utf-8", errors="replace")[-2000:]
+            except OSError:
+                detail = ""
+            raise AssertionError(
+                f"CDP never appeared on {cdp_port}: {last_error}; "
+                f"chrome_exit={proc.poll()}; stderr={detail!r}"
+            )
 
         page = None
         deadline = time.monotonic() + 15.0
@@ -304,6 +328,10 @@ def h1_browser() -> Any:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+        try:
+            stderr_file.close()
+        except Exception:
+            pass
         server.shutdown()
 
 
