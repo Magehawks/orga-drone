@@ -3009,9 +3009,16 @@ img.studio-preview-media,
   bottom: 0;
   width: 12px;
   cursor: ew-resize;
+  z-index: 2;
 }
 .studio-effect-edge-in { left: 0; }
 .studio-effect-edge-out { right: 0; }
+.studio-effect-bar[data-kind="ramp"] {
+  cursor: grab;
+}
+.studio-effect-bar[data-kind="ramp"].is-dragging {
+  cursor: grabbing;
+}
 .studio-bw-scale {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

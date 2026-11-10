@@ -10,6 +10,7 @@ import {
   rampPreset,
   rampMediaTime,
   edgeSourceAfterRampDrag,
+  remapRampSpan,
 } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../fixtures/speed_ramp.json", import.meta.url)));
@@ -93,6 +94,51 @@ test("edge drag uses absolute inverse on asymmetric trimmed ramps", () => {
   // Absolute primitive fed as relative story with start=0 coincides only because
   // rampTime(0) is 0; keep callers on rampSourceAtTime / edgeSourceAfterRampDrag.
   close(rampSource(ramp, rampTime(ramp, startOut) + delta, 0, 10), expectedOut);
+});
+
+test("edge remap localizes a sub-span with 1× joins and keeps curve character", () => {
+  const ramp = rampPreset("slow_fast_slow", 0, 60);
+  const localized = remapRampSpan(ramp, 10, 40, { playStart: 0, playEnd: 60 });
+  assert.ok(localized);
+  assert.equal(localized.points[0].source_s, 10);
+  assert.equal(localized.points.at(-1).source_s, 40);
+  assert.equal(localized.points[0].speed, 1);
+  assert.equal(localized.points.at(-1).speed, 1);
+  assert.equal(localized.points.length, 5);
+  assert.equal(localized.points[2].speed, 4);
+  assert.equal(rampSpeed(localized, 5), 1);
+  assert.equal(rampSpeed(localized, 50), 1);
+  assert.ok(Math.abs(rampSpeed(localized, 25) - 4) < 0.05);
+  const full = remapRampSpan(ramp, 0, 60, { playStart: 0, playEnd: 60 });
+  assert.ok(full);
+  assert.equal(full.points[0].speed, 0.5);
+  assert.equal(full.points.at(-1).speed, 0.5);
+});
+
+test("edge remap can translate a localized span without changing its length", () => {
+  const ramp = remapRampSpan(rampPreset("slow_fast_slow", 0, 60), 10, 40, {
+    playStart: 0,
+    playEnd: 60,
+  });
+  const moved = remapRampSpan(ramp, 20, 50, { playStart: 0, playEnd: 60 });
+  assert.ok(moved);
+  assert.equal(moved.points[0].source_s, 20);
+  assert.equal(moved.points.at(-1).source_s, 50);
+  assert.equal(moved.points[0].speed, 1);
+  assert.equal(moved.points.at(-1).speed, 1);
+  assert.ok(moved.points.some((point) => point.speed === 4));
+});
+
+test("edge remap wraps two-point presets with 1× joins", () => {
+  const ramp = rampPreset("acceleration", 0, 20);
+  const localized = remapRampSpan(ramp, 4, 14, { playStart: 0, playEnd: 20 });
+  assert.ok(localized);
+  assert.equal(localized.points.length, 4);
+  assert.equal(localized.points[0].speed, 1);
+  assert.equal(localized.points.at(-1).speed, 1);
+  assert.equal(localized.points[1].speed, 0.5);
+  assert.equal(localized.points[2].speed, 4);
+  assert.equal(remapRampSpan(ramp, 0, 0.01, { playStart: 0, playEnd: 0.02 }), null);
 });
 
 test("malformed, extreme and nonfinite speeds are refused", () => {

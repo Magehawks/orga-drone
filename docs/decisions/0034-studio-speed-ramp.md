@@ -17,12 +17,16 @@ replace LUT/grade builders or introduce cloud services.
 An optional `effect_settings.speed_ramp` object stores `v: 1`,
 `interp: "reciprocal_smoothstep"`, and 2–5 points with absolute file `source_s`
 and `speed` (0.25–20). Points are ordered, finite, and separated by at least
-0.05 source seconds. Endpoint speeds extend outside the point range. Issue #325
-raises the shared validated ceiling from 4× to 20× after flat-ramp export probes
-at 8× and 20× (including 1080p and 4K) passed on the existing adapter. Timelapse
-writes a flat two-point ramp through the same contract; it does not introduce a
-second timing model. Older builds that only accepted ≤4× treat faster stored
-ramps as malformed and fall back to legacy timing.
+0.05 source seconds. Endpoint speeds extend outside the point range in the
+timing math. When the user edge-trims the ramp bar to a sub-clip span, the
+client pins first/last point speeds to 1× so the rest of the clip plays at
+normal speed (Slow-bar mental model); full-clip presets without an edge trim
+keep their endpoint speeds. Issue #325 raises the shared validated ceiling
+from 4× to 20× after flat-ramp export probes at 8× and 20× (including 1080p
+and 4K) passed on the existing adapter. Timelapse writes a flat two-point
+ramp through the same contract; it does not introduce a second timing model.
+Older builds that only accepted ≤4× treat faster stored ramps as malformed
+and fall back to legacy timing.
 
 Between points, interpolate reciprocal speed using smoothstep. With normalized
 source position u and q=1/speed, the integral is
@@ -49,8 +53,10 @@ time. Removing a ramp restores the stored source-audio placement. Applying a
 ramp explicitly replaces legacy slow motion; removing it returns to 1×.
 
 The selected UX is a compact curve in the existing Effect lane, with presets
-and selected-point numeric controls in the Speed inspector. Each completed
-gesture uses existing history grouping.
+and selected-point numeric controls in the Speed inspector. The ramp bar
+supports edge drag to shorten the active source span; the curve overlay
+matches that span. Curve handle drags update the path in place and commit on
+pointerup. Each completed gesture uses existing history grouping.
 
 ## Compatibility and rollback
 
