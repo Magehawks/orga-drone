@@ -88,11 +88,23 @@ function fixtureEditor() {
   const speed = field("speed");
   const add = field("add");
   const removePoint = field("remove-point");
-  const fields = { controls, remove, apply, preset, point, time, speed, add, "remove-point": removePoint };
+  const fields = {
+    controls,
+    remove,
+    apply,
+    preset,
+    point,
+    time,
+    speed,
+    add,
+    "remove-point": removePoint,
+  };
   const panel = {
     hidden: false,
     querySelector(sel) {
-      const key = String(sel).replace(/^\[data-ramp-/, "").replace(/\]$/, "");
+      const key = String(sel)
+        .replace(/^\[data-ramp-/, "")
+        .replace(/\]$/, "");
       return fields[key] || null;
     },
     querySelectorAll() {
@@ -107,7 +119,7 @@ function fixtureEditor() {
       this.children.push(node);
     },
   };
-  let clip = { dataset: { studioId: "1", speedRamp: "null" } };
+  const clip = { dataset: { studioId: "1", speedRamp: "null" } };
   let ramp = null;
   const saves = [];
   const editor = createSpeedRampEditor({
@@ -124,10 +136,17 @@ function fixtureEditor() {
       c.dataset.speedRamp = value ? JSON.stringify(value) : "null";
     },
   });
-  return { editor, controls, remove, lane, saves, setRamp(next) {
-    ramp = next;
-    clip.dataset.speedRamp = next ? JSON.stringify(next) : "null";
-  } };
+  return {
+    editor,
+    controls,
+    remove,
+    lane,
+    saves,
+    setRamp(next) {
+      ramp = next;
+      clip.dataset.speedRamp = next ? JSON.stringify(next) : "null";
+    },
+  };
 }
 
 test("removing a ramp hides controls and detaches the curve", async () => {
