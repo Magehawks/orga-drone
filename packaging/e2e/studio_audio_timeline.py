@@ -529,12 +529,213 @@ def run(out: Path) -> None:
         assert clip_present(cid_b)
         evidence["story_backspace_keeps_clip"] = True
 
+        # --- Playlist race: delayed DELETE A while editing B ---
+        song_b = media / "soundtrack-b.wav"
+        _write_silent_wav(song_b, seconds=2.0)
+        original_song_b = hashlib.sha256(song_b.read_bytes()).hexdigest()
+
+        def post_music(path: Path) -> int:
+            req = urllib.request.Request(
+                base + f"/api/studio/projects/{project.id}/music",
+                data=json.dumps({"path": str(path)}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Origin": base,
+                    "Referer": base + "/studio",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            assert body.get("ok"), body
+            return int(body["tracks"][-1]["id"])
+
+        # Ensure two soundtracks: keep restored A, add B.
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{restored_music_id}"]\')'
+        )
+        music_b_id = post_music(song_b)
+        cdp.call("Page.navigate", {"url": base + "/studio"})
+        until("!!document.querySelector('#studio-grid [data-studio-id]')")
+        time.sleep(0.5)
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{restored_music_id}"]\')'
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"]\')'
+        )
+        music_a_id = restored_music_id
+
+        def install_music_fetch_hooks() -> None:
+            ev(
+                """(() => {
+                  if (window.__musicFetchWrapped) return true;
+                  const orig = window.fetch.bind(window);
+                  window.__musicDeleteDelayMs = 0;
+                  window.__musicDeleteFailRemaining = 0;
+                  window.__musicDeleteHits = 0;
+                  window.__musicDeleteFailHits = 0;
+                  window.fetch = async (input, init = {}) => {
+                    const url = String(
+                      typeof input === 'string' ? input : (input && input.url) || ''
+                    );
+                    const method = String((init && init.method) || 'GET').toUpperCase();
+                    const isMusicDelete =
+                      method === 'DELETE' && /\\/music\\/\\d+/.test(url);
+                    if (!isMusicDelete) return orig(input, init);
+                    window.__musicDeleteHits += 1;
+                    const delay = Number(window.__musicDeleteDelayMs) || 0;
+                    if (delay > 0) {
+                      await new Promise((resolve) => setTimeout(resolve, delay));
+                    }
+                    if (window.__musicDeleteFailRemaining > 0) {
+                      window.__musicDeleteFailRemaining -= 1;
+                      window.__musicDeleteFailHits += 1;
+                      return new Response(
+                        JSON.stringify({ ok: false, detail: 'forced music delete fail' }),
+                        { status: 500, headers: { 'Content-Type': 'application/json' } }
+                      );
+                    }
+                    return orig(input, init);
+                  };
+                  window.__musicFetchWrapped = true;
+                  return true;
+                })()"""
+            )
+
+        install_music_fetch_hooks()
+        mouse_at(
+            f'.studio-music-select[data-music-id="{music_a_id}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"].is-selected\')'
+        )
+        blur_focus()
+        ev("window.__musicDeleteDelayMs = 900; window.__musicDeleteFailRemaining = 0")
+        key("Delete")
+        # While DELETE A is delayed, select B and change volume.
+        mouse_at(
+            f'.studio-music-select[data-music-id="{music_b_id}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"].is-selected\')'
+        )
+        until(
+            "!!document.getElementById('inspector-music') && "
+            "!document.getElementById('inspector-music').hidden"
+        )
+        ev(
+            """(() => {
+              const vol = document.getElementById('inspector-music-volume');
+              if (!vol) return false;
+              vol.value = '28';
+              vol.dispatchEvent(new Event('input', { bubbles: true }));
+              vol.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            })()"""
+        )
+        until(
+            f"""(() => {{
+              const gone = !document.querySelector(
+                '.studio-music-select[data-music-id="{music_a_id}"]'
+              );
+              const selected = !!document.querySelector(
+                '.studio-music-select[data-music-id="{music_b_id}"].is-selected'
+              );
+              const vol = document.getElementById('inspector-music-volume');
+              return gone && selected && vol && Number(vol.value) === 28;
+            }})()""",
+            timeout=8,
+        )
+        hits = int(ev("Number(window.__musicDeleteHits)||0") or 0)
+        assert hits == 1, hits
+        evidence["stale_delete_a_keeps_b_volume"] = True
+        shot("09-stale-delete-overlap.png")
+
+        # Persist via reopen: A gone, B volume kept.
+        time.sleep(0.6)
+        cdp.call("Page.navigate", {"url": base + "/studio"})
+        until("!!document.querySelector('#studio-grid [data-studio-id]')")
+        time.sleep(0.5)
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"]\')'
+        )
+        assert not ev(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"]\')'
+        )
+        mouse_at(
+            f'.studio-music-select[data-music-id="{music_b_id}"]',
+            button="left",
+        )
+        until(
+            "!!document.getElementById('inspector-music-volume') && "
+            "Number(document.getElementById('inspector-music-volume').value) === 28"
+        )
+        evidence["stale_delete_reopen_keeps_b"] = True
+        shot("10-stale-delete-reopen.png")
+
+        # Failed DELETE + retry: restore A, fail once, then succeed.
+        music_a_id = post_music(song)
+        cdp.call("Page.navigate", {"url": base + "/studio"})
+        until("!!document.querySelector('#studio-grid [data-studio-id]')")
+        time.sleep(0.5)
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"]\')'
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"]\')'
+        )
+        install_music_fetch_hooks()
+        mouse_at(
+            f'.studio-music-select[data-music-id="{music_a_id}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"].is-selected\')'
+        )
+        blur_focus()
+        ev(
+            "window.__musicDeleteDelayMs = 0; window.__musicDeleteFailRemaining = 1; "
+            "window.__musicDeleteHits = 0; window.__musicDeleteFailHits = 0"
+        )
+        key("Delete")
+        until(
+            "!!document.getElementById('studio-flash')?.textContent && "
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"]\')'
+        )
+        assert ev(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"]\')'
+        )
+        evidence["failed_music_delete_restored"] = True
+        blur_focus()
+        mouse_at(
+            f'.studio-music-select[data-music-id="{music_a_id}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"].is-selected\')'
+        )
+        blur_focus()
+        key("Delete")
+        until(
+            f'!document.querySelector(\'.studio-music-select[data-music-id="{music_a_id}"]\')'
+        )
+        assert ev(
+            f'!!document.querySelector(\'.studio-music-select[data-music-id="{music_b_id}"]\')'
+        )
+        evidence["failed_music_delete_retry"] = True
+        shot("11-failed-delete-retry.png")
+
         assert hashlib.sha256(source.read_bytes()).hexdigest() == original
         assert hashlib.sha256(source_b.read_bytes()).hexdigest() == original_b
         assert hashlib.sha256(song.read_bytes()).hexdigest() == original_song
+        assert hashlib.sha256(song_b.read_bytes()).hexdigest() == original_song_b
         evidence["originals_unchanged"] = True
         evidence["status"] = "PASS"
-        shot("08-done.png")
+        shot("12-done.png")
     except Exception:
         if cdp:
             evidence["failure_context"] = ev(

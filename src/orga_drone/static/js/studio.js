@@ -17,6 +17,14 @@ import {
   shouldApplyOverlayResponse,
 } from "./studio/overlay-persist.js";
 import {
+  applyDeletedMusicTrack,
+  bumpMusicPlaylistRevision,
+  filterResurrectedMusicTracks,
+  musicPlaylistRevisionOf,
+  resolveMusicDeleteSuccess,
+  shouldApplyMusicPlaylistResponse,
+} from "./studio/music-persist.js";
+import {
   createTimedSelection,
   isActiveTimedSelection,
   isAudioTimedKind,
@@ -411,6 +419,12 @@ import {
   const overlayRevisions = new Map();
   /** clipId:overlayId → revision of the latest optimistic removal for that overlay. */
   const overlayRemovalRevisions = new Map();
+  /** Project soundtrack playlist mutation counter (single shared revision). */
+  const musicPlaylistRevision = { value: 0 };
+  /** Track ids removed by a successful DELETE — blocks stale payload resurrection. */
+  const musicRemovedIds = new Set();
+  /** In-flight DELETE ids — avoids duplicate removals of the same track. */
+  const musicDeleteInFlight = new Set();
 
   function overlayRemovalKey(studioId, overlayId) {
     return `${String(studioId || "")}:${String(overlayId || "")}`;
@@ -7303,11 +7317,25 @@ import {
     };
   }
 
-  function applyTracksPayload(payload) {
+  function applyTracksPayload(payload, { acceptRemoved = false } = {}) {
     const list = payload && Array.isArray(payload.tracks) ? payload.tracks : [];
     const startS = Number(payload && payload.music_start_s);
     if (Number.isFinite(startS)) state.musicStartS = Math.max(0, startS);
-    state.tracks = list.map(musicFromPayload).filter(Boolean);
+    const mapped = list.map(musicFromPayload).filter(Boolean);
+    state.tracks = acceptRemoved
+      ? mapped
+      : filterResurrectedMusicTracks(mapped, musicRemovedIds);
+  }
+
+  function beginMusicPlaylistMutation() {
+    return bumpMusicPlaylistRevision(musicPlaylistRevision);
+  }
+
+  function musicPlaylistMutationIsCurrent(mutationRev) {
+    return shouldApplyMusicPlaylistResponse(
+      musicPlaylistRevisionOf(musicPlaylistRevision),
+      mutationRev
+    );
   }
 
   function selectedMusicTrack() {
@@ -8544,6 +8572,7 @@ import {
       const path = await pickMusicPath();
       if (!path) return;
       setSaveState(false);
+      const mutationRev = beginMusicPlaylistMutation();
       const saved = await fetch(`/api/studio/projects/${projectId}/music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8554,11 +8583,15 @@ import {
         showFlash(musicErrorDetail(savedBody));
         return;
       }
-      applyTracksPayload(savedBody);
-      if (reloadIfForwardLoop()) return;
-      const last = state.tracks[state.tracks.length - 1];
-      renderMusic();
-      if (last) selectMusic(last.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(savedBody);
+        if (reloadIfForwardLoop()) return;
+        const last = state.tracks[state.tracks.length - 1];
+        renderMusic();
+        if (last) selectMusic(last.id);
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -8570,12 +8603,14 @@ import {
     if (!projectId) return;
     const track = selectedMusicTrack();
     if (!track) return;
+    const trackId = track.id;
     try {
       const path = await pickMusicPath();
       if (!path) return;
       setSaveState(false);
+      const mutationRev = beginMusicPlaylistMutation();
       const saved = await fetch(
-        `/api/studio/projects/${projectId}/music/${track.id}`,
+        `/api/studio/projects/${projectId}/music/${trackId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8587,10 +8622,16 @@ import {
         showFlash(musicErrorDetail(savedBody));
         return;
       }
-      applyTracksPayload(savedBody);
-      if (reloadIfForwardLoop()) return;
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(savedBody);
+        if (reloadIfForwardLoop()) return;
+        renderMusic();
+        if (selectedMusicTrack()?.id === trackId || state.selected?.type === "music") {
+          selectMusic(trackId);
+        }
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
       showFlash("");
     } catch (_) {
@@ -8601,6 +8642,7 @@ import {
   async function patchMusicSettings() {
     const track = selectedMusicTrack();
     if (!projectId || !track) return;
+    const trackId = track.id;
     setSaveState(false);
     const payload = {
       volume: track.volume,
@@ -8608,8 +8650,9 @@ import {
       fade_out_s: track.fadeOut,
     };
     if (state.tracks.length === 1) payload.loop = !!track.loop;
+    const mutationRev = beginMusicPlaylistMutation();
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/music/${track.id}`, {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${trackId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(payload),
@@ -8619,9 +8662,20 @@ import {
         showFlash(musicErrorDetail(data));
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+        // Keep inspector on this track only when it is still the selection.
+        if (
+          state.selected?.type === "music" &&
+          String(state.selected.id) === String(trackId)
+        ) {
+          selectMusic(trackId);
+        }
+      } else {
+        // Newer playlist mutation owns the list; keep local fields/selection.
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -8704,20 +8758,48 @@ import {
   }
 
   async function deleteMusicTrack(trackId) {
+    const id = String(trackId || "");
+    if (!id) return false;
     if (!projectId) {
-      state.tracks = state.tracks.filter((item) => String(item.id) !== String(trackId));
+      state.tracks = applyDeletedMusicTrack(state.tracks, id);
+      musicRemovedIds.add(id);
       return true;
     }
-    const res = await fetch(`/api/studio/projects/${projectId}/music/${trackId}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data || !data.ok) {
-      throw new Error(musicErrorDetail(data));
+    // Duplicate in-flight/completed deletes must not hit the API again or
+    // revive the track via a second response path.
+    if (musicDeleteInFlight.has(id) || musicRemovedIds.has(id)) {
+      state.tracks = applyDeletedMusicTrack(state.tracks, id);
+      return true;
     }
-    applyTracksPayload(data);
-    return true;
+    musicDeleteInFlight.add(id);
+    const mutationRev = beginMusicPlaylistMutation();
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/music/${id}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.ok) {
+        throw new Error(musicErrorDetail(data));
+      }
+      musicRemovedIds.add(id);
+      const resolved = resolveMusicDeleteSuccess({
+        localRevision: musicPlaylistRevisionOf(musicPlaylistRevision),
+        mutationRevision: mutationRev,
+        currentTracks: state.tracks,
+        responseTracks: Array.isArray(data.tracks) ? data.tracks : [],
+        trackId: id,
+      });
+      if (resolved.mode === "full") {
+        applyTracksPayload(data);
+      } else {
+        // Keep newer local fields (e.g. B's volume) and drop only this id.
+        state.tracks = resolved.tracks;
+      }
+      return true;
+    } finally {
+      musicDeleteInFlight.delete(id);
+    }
   }
 
   async function removeTimedMusicSelection() {
@@ -8778,6 +8860,7 @@ import {
   async function moveSelectedMusic(delta) {
     const track = selectedMusicTrack();
     if (!projectId || !track) return;
+    const trackId = track.id;
     const ids = state.tracks.map((item) => item.id);
     const index = ids.indexOf(track.id);
     const next = index + delta;
@@ -8787,6 +8870,7 @@ import {
     swapped[index] = swapped[next];
     swapped[next] = tmp;
     setSaveState(false);
+    const mutationRev = beginMusicPlaylistMutation();
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
         method: "PUT",
@@ -8798,9 +8882,18 @@ import {
         showFlash(musicErrorDetail(data));
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
-      selectMusic(track.id);
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+        if (
+          state.selected?.type === "music" &&
+          String(state.selected.id) === String(trackId)
+        ) {
+          selectMusic(trackId);
+        }
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -8817,6 +8910,7 @@ import {
       return;
     }
     setSaveState(false);
+    const mutationRev = beginMusicPlaylistMutation();
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/music/reorder`, {
         method: "PUT",
@@ -8825,7 +8919,7 @@ import {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !data.ok) {
-        if (previous) {
+        if (previous && musicPlaylistMutationIsCurrent(mutationRev)) {
           const byId = new Map(state.tracks.map((track) => [track.id, track]));
           state.tracks = previous.map((id) => byId.get(id)).filter(Boolean);
         }
@@ -8833,8 +8927,12 @@ import {
         layoutTimeline();
         return;
       }
-      applyTracksPayload(data);
-      renderMusic();
+      if (musicPlaylistMutationIsCurrent(mutationRev)) {
+        applyTracksPayload(data);
+        renderMusic();
+      } else {
+        renderMusic();
+      }
       setSaveState(true);
     } catch (_) {
       showFlash(msgMusicFailed);
@@ -12848,7 +12946,9 @@ import {
   loadUiState();
   try {
     const boot = root.dataset.musicPayload;
-    if (boot) applyTracksPayload(JSON.parse(boot));
+    musicRemovedIds.clear();
+    musicPlaylistRevision.value = 0;
+    if (boot) applyTracksPayload(JSON.parse(boot), { acceptRemoved: true });
   } catch (_) {
     state.tracks = [];
   }
