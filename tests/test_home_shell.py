@@ -274,8 +274,16 @@ def test_empty_home_shows_logo_and_shared_nav(
     assert css.status_code == 200
     assert ".home-welcome" in css.text
     assert "aspect-ratio: 16 / 9" in css.text
+    assert ".home-hero-media" in css.text
+    media_rule = css.text.split(".home-hero-media", 1)[1].split("}", 1)[0]
+    assert "object-fit: contain" in media_rule
+    assert "object-fit: cover" not in media_rule
+    assert "object-position: center" in media_rule
+    hero_rule = css.text.split(".home-hero {", 1)[1].split("}", 1)[0]
+    assert "background: #12161c" in hero_rule
     assert "@media (min-width: 1440px)" in css.text
     assert "@media (min-width: 1920px)" in css.text
+    assert "@media (max-width: 900px)" in css.text
 
 
 def test_home_hero_falls_back_when_thumbnail_or_file_is_missing(
