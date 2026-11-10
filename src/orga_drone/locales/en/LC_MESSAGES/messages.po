@@ -559,6 +559,9 @@ msgstr "Color preview unavailable; try pausing or seeking again"
 msgid "Color still; transition colors approximate"
 msgstr "Color still; transition colors approximate"
 
+msgid "Fullscreen is too heavy with live color preview"
+msgstr "Fullscreen is too heavy with live color preview"
+
 msgid "Standard"
 msgstr "Standard"
 

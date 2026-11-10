@@ -47,7 +47,7 @@ the visible "Playing without color file" indicator. Pause or scrub uses the
 shared FFmpeg still, WebGL renderer, or existing proxy path. This does not add a
 new rendering architecture.
 
-Stills have a maximum edge of 720 pixels and a 0.1-second scrub clock. JPEG/H.264
+Stills have a maximum edge of 1080 pixels and a 0.1-second scrub clock. JPEG/H.264
 compression, chroma subsampling, scaling and display color management permit small
 differences. Sharpen/denoise remain omitted from stills. This is a color inspection
 path, not a full-story reference render: crossfade partners and loop-overlap

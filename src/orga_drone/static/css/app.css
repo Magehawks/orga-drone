@@ -1983,7 +1983,7 @@ button.cta, .button.cta {
 .studio-add-media { width: 100%; text-align: center; }
 
 .studio-stage {
-  --studio-story-height: 16rem;
+  --studio-story-height: 22rem;
   /* Story track body ~64px; compact mode drops to ~56px without changing timing. */
   --studio-story-track-height: 4rem;
   --studio-edge-hit: 20px;

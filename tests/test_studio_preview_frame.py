@@ -146,7 +146,7 @@ def test_preview_filter_reuses_grade_and_lut_builders(tmp_path: Path) -> None:
     assert grade
     assert chain.startswith(grade + ",")
     assert "lut3d=file=" in chain
-    assert "scale=720:720:force_original_aspect_ratio=decrease" in chain
+    assert "scale=1080:1080:force_original_aspect_ratio=decrease" in chain
     photo_chain = preview_filter_chain(
         image, look, data_dir=data_dir, work_dir=tmp_path / "photo-work", even_dimensions=True,
     )

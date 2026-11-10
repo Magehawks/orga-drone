@@ -19,8 +19,10 @@ rejected.
    same `ffmpeg_grade_chain` and `ffmpeg_lut_chain` builders as Studio MP4
    export (grade → LUT). Sharpen/denoise may be omitted for speed.
 2. Serve JPEG stills from `GET /api/studio/{id}/preview-frame` for pause and
-   scrub when a clip has a non-neutral color look. Longest edge ≤ 720. Cache
-   under `{data_dir}/preview-stills/` (cleared with Settings cache clear).
+   scrub when a clip has a non-neutral color look. Longest edge ≤ 1080
+   (amended from 720 for sharper pause/scrub inspection; still not full-res
+   reference). Cache under `{data_dir}/preview-stills/` (cleared with Settings
+   cache clear).
 3. **Playback** may keep live `<video>` + CSS grade **without** LUT, with an
    on-screen state chip. Do not claim live or 30 fps graded+LUT playback.
 4. Amend ADR 0027 §7: pause/scrub stills are preview truth for LUT; playback
