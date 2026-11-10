@@ -48,6 +48,21 @@ function installDom() {
         style: {},
         hidden: false,
         parentNode: null,
+        listeners: {},
+        classList: {
+          toggle(name, force) {
+            const parts = new Set(
+              String(node.attrs.class || "")
+                .split(/\s+/)
+                .filter(Boolean)
+            );
+            if (force === false) parts.delete(name);
+            else if (force === true) parts.add(name);
+            else if (parts.has(name)) parts.delete(name);
+            else parts.add(name);
+            node.attrs.class = [...parts].join(" ");
+          },
+        },
         setAttribute(key, value) {
           this.attrs[key] = String(value);
         },
@@ -60,7 +75,16 @@ function installDom() {
             this.children.push(kid);
           }
         },
-        addEventListener() {},
+        addEventListener(type, fn) {
+          this.listeners[type] = fn;
+        },
+        dispatch(type, event = {}) {
+          this.listeners[type]?.({
+            preventDefault() {},
+            stopPropagation() {},
+            ...event,
+          });
+        },
         setPointerCapture() {},
         getBoundingClientRect() {
           return { width: 400, height: 64, left: 0, top: 0 };
@@ -77,7 +101,7 @@ function installDom() {
   };
 }
 
-function fixtureEditor() {
+function fixtureEditor(options = {}) {
   installDom();
   const controls = field("controls", { hidden: true });
   const remove = field("remove");
@@ -122,6 +146,9 @@ function fixtureEditor() {
   const clip = { dataset: { studioId: "1", speedRamp: "null" } };
   let ramp = null;
   const saves = [];
+  const selects = [];
+  const menus = [];
+  let timedSelected = false;
   const editor = createSpeedRampEditor({
     panel,
     getSelection: () => clip,
@@ -130,11 +157,22 @@ function fixtureEditor() {
     pause() {},
     position: () => ({ left: 10, width: 200 }),
     onError() {},
+    onSelect(selected, opts) {
+      selects.push({ selected, opts });
+      timedSelected = true;
+    },
+    onContextMenu(event, selected) {
+      menus.push({ event, selected });
+      timedSelected = true;
+    },
+    isTimedSelected: () => timedSelected,
     async save(c, value) {
       saves.push(value);
       ramp = value ? parseRamp(value) && value : null;
       c.dataset.speedRamp = value ? JSON.stringify(value) : "null";
+      if (!value) timedSelected = false;
     },
+    ...options,
   });
   return {
     editor,
@@ -142,6 +180,12 @@ function fixtureEditor() {
     remove,
     lane,
     saves,
+    selects,
+    menus,
+    clip,
+    markSelected() {
+      timedSelected = true;
+    },
     setRamp(next) {
       ramp = next;
       clip.dataset.speedRamp = next ? JSON.stringify(next) : "null";
@@ -164,4 +208,21 @@ test("removing a ramp hides controls and detaches the curve", async () => {
   assert.equal(f.lane.children.length, 0);
   f.editor.layout(f.lane);
   assert.equal(f.lane.children.length, 0);
+});
+
+test("curve click and context menu select the whole ramp", async () => {
+  const f = fixtureEditor();
+  f.setRamp(fixture.curve);
+  f.editor.fill();
+  f.editor.layout(f.lane);
+  const curve = f.lane.children[0];
+  curve.dispatch("click");
+  assert.equal(f.selects.length, 1);
+  assert.equal(f.selects[0].selected, f.clip);
+  assert.equal(f.selects[0].opts.source, "curve");
+  f.editor.layout(f.lane);
+  assert.match(String(f.lane.children[0].attrs.class || ""), /is-selected/);
+  curve.dispatch("contextmenu");
+  assert.equal(f.menus.length, 1);
+  assert.equal(f.menus[0].selected, f.clip);
 });

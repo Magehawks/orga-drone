@@ -40,11 +40,20 @@ def test_trash_button_and_menu_are_labeled(tmp_path: Path, monkeypatch: pytest.M
     assert 'item.focus()' in script
     handler = script.split('if (event.key === "Escape") hideClipMenu();', 1)[1]
     handler = handler.split("window.addEventListener", 1)[0]
-    assert 'event.key !== "Delete"' in handler
-    assert "Backspace" not in handler
-    assert "storyClipDeleteContext(document.activeElement)" in handler
-    assert 'if (isTextEditingTarget(document.activeElement)) return;' in handler
-    assert 'if (privacyMaskDeleteActive()) return;' in handler
+    assert 'event.key !== "Delete" && event.key !== "Backspace"' in handler
+    assert "dispatchDeleteShortcut(event)" in handler
+    # Story-clip removal stays Delete-only inside the shared dispatcher.
+    resolve = script.split("function resolveDeleteAction", 1)
+    if len(resolve) == 1:
+        resolve_src = Path(
+            "src/orga_drone/static/js/studio/timed-selection.js"
+        ).read_text(encoding="utf-8")
+    else:
+        resolve_src = resolve[1]
+    assert 'key === "Delete" && storyClipFocused && hasSelectedStoryClip' in resolve_src
+    assert "storyClipDeleteContext(document.activeElement)" in script
+    assert "shouldIgnoreDeleteShortcut" in script
+    assert "privacyMaskDeleteActive()" in script
 
 
 def test_remove_keeps_the_file_and_undo_restores_it(
