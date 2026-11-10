@@ -252,7 +252,7 @@
         });
     }
 
-    render(video, { grade, look, frameW, frameH, dpr }) {
+    render(video, { grade, look, frameW, frameH, dpr, maxEdge }) {
       if (!this.available || !this.scratchCtx || !look) return null;
       this.ensureLook(look);
       if (!this.isReady(look)) return null;
@@ -265,6 +265,13 @@
       const scale = Math.min(cssW / srcW, cssH / srcH) * ratio;
       let width = Math.min(srcW, Math.max(2, Math.round(srcW * scale)));
       let height = Math.min(srcH, Math.max(2, Math.round(srcH * scale)));
+      const edgeCap = Math.max(64, Number(maxEdge) || 4096);
+      const longEdge = Math.max(width, height);
+      if (longEdge > edgeCap) {
+        const fit = edgeCap / longEdge;
+        width = Math.max(2, Math.round(width * fit));
+        height = Math.max(2, Math.round(height * fit));
+      }
       width -= width % 2;
       height -= height % 2;
       if (this.canvas.width !== width || this.canvas.height !== height) {
