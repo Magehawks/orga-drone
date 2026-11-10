@@ -345,6 +345,20 @@ def test_studio_hybrid_h1_topbar_chrome_css() -> None:
     assert "backdrop-filter: none" in reduced
     assert ".studio-topbar-export" in css
     assert 'data-chrome="opaque"' in css
+    # Interaction selectors must outrank the resting ghost override (source order).
+    ghost_rest = css.index(".studio-topbar .button.ghost {")
+    ghost_hover = css.index(".studio-topbar .button.ghost:hover {")
+    ghost_focus = css.index(".studio-topbar .button.ghost:focus-visible {")
+    assert ghost_rest < ghost_hover < ghost_focus
+    hover_block = css.split(".studio-topbar .button.ghost:hover {", 1)[1].split(
+        "}", 1
+    )[0]
+    assert "var(--accent)" in hover_block
+    assert "var(--kind-bg)" in hover_block
+    focus_block = css.split(
+        ".studio-topbar .button.ghost:focus-visible {", 1
+    )[1].split("}", 1)[0]
+    assert "var(--ring)" in focus_block
 
 
 def test_studio_browser_layout_containment_css() -> None:

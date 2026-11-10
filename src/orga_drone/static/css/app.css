@@ -1516,11 +1516,21 @@ button.cta, .button.cta {
   align-items: center;
   gap: 0.5rem;
 }
+/* Only suppress topbar glow at rest so global .button.ghost:hover can still win. */
 .studio-topbar .button.ghost {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--text);
   box-shadow: none;
+}
+.studio-topbar .button.ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  /* Solid token wash: --nav-active-bg uses color-mix(...transparent) which some WebView2 builds resolve to fully transparent. */
+  background: var(--kind-bg);
+  box-shadow: none;
+}
+.studio-topbar .button.ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--ring);
 }
 .studio-topbar-export {
   box-shadow: 0 0 14px var(--studio-accent-glow);

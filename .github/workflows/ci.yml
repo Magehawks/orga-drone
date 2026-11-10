@@ -44,9 +44,15 @@ jobs:
       - name: MyPy type check
         run: mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py
 
+      - name: Install Chrome for Hybrid H1 style regressions
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+
       - name: Unit tests
         # The journey file has its own check so a failure is visible as
         # "App journey smoke". Local `pytest` still runs it.
+        env:
+          ORGA_DRONE_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: pytest --ignore=tests/test_pr_journey_smoke.py
 
   javascript:
