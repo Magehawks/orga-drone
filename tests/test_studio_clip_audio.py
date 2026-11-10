@@ -153,16 +153,27 @@ def test_audio_bar_is_a_control_and_picture_edges_remain() -> None:
     script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
     page = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
     css = Path("src/orga_drone/static/css/app.css").read_text(encoding="utf-8")
+    helpers = Path("src/orga_drone/static/js/studio/timed-selection.js").read_text(
+        encoding="utf-8"
+    )
     bars = script.split("function makeAudioBar", 1)[1].split("function layoutClipAudio", 1)[0]
     assert "studio-clip-audio-edge-in" in bars
     assert "studio-clip-audio-edge-out" in bars
     assert "pointerdown" in bars
+    assert "showTimedAudioMenu" in bars
+    assert "selectTimedClipAudio" in bars
     layout = script.split("function layoutClipAudio", 1)[1].split("function onAudioPointerDown", 1)[0]
     assert "makeAudioBar" in layout
+    select_audio = script.split("function selectTimedClipAudio", 1)[1].split(
+        "function showTimedAudioMenu", 1
+    )[0]
+    assert "movePlayhead: false" in select_audio
+    assert 'kind: "audio"' in select_audio
     drag = script.split("function onAudioPointerDown", 1)[1].split("async function saveClipAudio", 1)[0]
     assert 'addEventListener("pointermove"' in drag
     assert 'mode === "move"' in drag
     assert 'mode === "start"' in drag
+    assert "selectTimedClipAudio" in drag
     save = script.split("async function saveClipAudio", 1)[1].split("function onEffectPointerDown", 1)[0]
     assert "/clip-audio" in save
     assert "dataset.clipAudio" in save
@@ -177,7 +188,21 @@ def test_audio_bar_is_a_control_and_picture_edges_remain() -> None:
     assert "position: absolute" not in host
     bar = css.split(".studio-clip-audio-bar {", 1)[1].split("}", 1)[0]
     assert "pointer-events: auto" in bar
+    assert ".studio-clip-audio-bar.is-selected" in css
     assert 'data-edge="in"' in page
     assert 'data-edge="out"' in page
     assert "function beginEdgeDrag" in script
     assert 'closest("[data-edge]")' in script
+    # Phase 4: clip-audio guards Story-Clip deletion; no invented audio removal.
+    assert "isAudioTimedKind" in helpers
+    assert 'return "audio-guard"' in helpers
+    assert '"audio"' not in helpers.split("TIMED_DELETE_KINDS", 1)[1].split("]", 1)[0]
+    menu = script.split("function showTimedAudioMenu", 1)[1].split(
+        "function layoutClipAudio", 1
+    )[0]
+    assert "effectRemoveItem.hidden = true" in menu
+    assert 'timedKind = "audio"' in menu
+    dispatch = script.split("function dispatchDeleteShortcut", 1)[1].split(
+        "function layoutTimeline", 1
+    )[0]
+    assert 'action === "audio-guard"' in dispatch

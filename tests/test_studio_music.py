@@ -496,11 +496,41 @@ def test_studio_js_offsets_playlist_hit_and_layout() -> None:
     assert "state.musicStartS" in layout
     assert "let cursor = Math.max(0, Math.min(story, state.musicStartS))" in layout
     drag = script.split("function beginMusicStartDrag", 1)[1].split(
-        "async function clearMusic", 1
+        "async function deleteMusicTrack", 1
     )[0]
     assert "const storedStartS = state.musicStartS" in drag
     assert "Math.min(totalDuration(), storedStartS)" in drag
     assert "persistMusicStart(storedStartS)" in drag
+
+
+def test_timeline_first_music_reuses_timed_selection_contract() -> None:
+    """Phase 4 (#339): soundtrack select/remove via timedSelection."""
+    script = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    helpers = Path("src/orga_drone/static/js/studio/timed-selection.js").read_text(
+        encoding="utf-8"
+    )
+    assert '"music"' in helpers.split("TIMED_DELETE_KINDS", 1)[1].split("]", 1)[0]
+    assert "isMusicTimedKind" in helpers
+    assert 'timedSelection.kind === "music") return "music"' in helpers
+    assert "function selectMusic" in script
+    assert "function showTimedMusicMenu" in script
+    assert "function removeTimedMusicSelection" in script
+    assert "persistTimedSelectionRemoval" in script
+    select = script.split("function selectMusic", 1)[1].split(
+        "function showTimedMusicMenu", 1
+    )[0]
+    assert 'kind: "music"' in select
+    assert "movePlayhead" not in select
+    remove = script.split("async function removeTimedMusicSelection", 1)[1].split(
+        "async function clearMusic", 1
+    )[0]
+    assert "isActiveTimedSelection(timedSelection, selection)" in remove
+    assert "deleteMusicTrack" in remove
+    dispatch = script.split("function dispatchDeleteShortcut", 1)[1].split(
+        "function layoutTimeline", 1
+    )[0]
+    assert 'action === "music"' in dispatch
+    assert "removeTimedMusicSelection" in dispatch
 
 
 def test_http_music_playlist_reorder_cap_and_loop(

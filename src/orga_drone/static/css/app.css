@@ -3052,6 +3052,12 @@ img.studio-preview-media,
   transform: none;
   cursor: grabbing;
 }
+.studio-clip-audio-bar.is-selected {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, #8fd3ff);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+  z-index: 2;
+}
 .studio-clip-audio-edge {
   position: absolute;
   top: 0;

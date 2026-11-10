@@ -189,6 +189,7 @@ function harness() {
     "scheduleLutProxyPrepare",
     "clearTimedSelection",
     "layoutEffectBars",
+    "layoutClipAudio",
   ])
     context[name] = noop;
   for (const name of [
