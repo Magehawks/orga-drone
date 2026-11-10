@@ -18,8 +18,8 @@ export function createTimedSelection(value = null) {
   if (!value || typeof value !== "object") return null;
   const kind = String(value.kind || "");
   if (!TIMED_KINDS.includes(kind)) return null;
-  const clipId = value.clipId == null ? "" : String(value.clipId);
-  const id = value.id == null ? "" : String(value.id);
+  const clipId = value.clipId === null || value.clipId === undefined ? "" : String(value.clipId);
+  const id = value.id === null || value.id === undefined ? "" : String(value.id);
   if (kind !== "music" && !clipId) return null;
   return { kind, clipId, id };
 }
