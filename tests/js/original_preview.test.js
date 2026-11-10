@@ -158,6 +158,7 @@ function harness() {
     },
     syncPreviewMedia: () => calls.preview.push(state.projectTimeS),
   });
+  context.timedSelection = null;
   for (const name of [
     "layoutMusicSpans",
     "markActiveClips",
@@ -186,6 +187,8 @@ function harness() {
     "setInspectorTab",
     "refreshInspectorTabMarks",
     "scheduleLutProxyPrepare",
+    "clearTimedSelection",
+    "layoutEffectBars",
   ])
     context[name] = noop;
   for (const name of [
