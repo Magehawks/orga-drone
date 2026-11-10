@@ -1418,14 +1418,49 @@ button.cta, .button.cta {
   min-height: 0;
   background: color-mix(in srgb, var(--bg) 92%, var(--surface-deep));
 }
+/* Hybrid Crystal H1: floating frosted topbar; Export is sole accent CTA */
 .studio-topbar {
+  --studio-blur-top: 14px;
+  --studio-border-lit: color-mix(in srgb, var(--accent) 16%, var(--border));
+  --studio-accent-glow: color-mix(in srgb, var(--accent) 22%, transparent);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1rem;
+  margin: 0.5rem 0.65rem 0;
   padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--studio-border-lit);
+  border-radius: 12px;
+  background: var(--top-bg);
+  backdrop-filter: blur(var(--studio-blur-top)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--studio-blur-top)) saturate(1.1);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .studio-topbar {
+    --studio-blur-top: 0px;
+    --studio-accent-glow: transparent;
+    --studio-border-lit: var(--border);
+    background: var(--panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+}
+/* Runtime hook for a later Settings toggle (H6); unused by default */
+.studio-creator[data-chrome="opaque"] .studio-topbar {
+  --studio-blur-top: 0px;
+  --studio-accent-glow: transparent;
+  --studio-border-lit: var(--border);
   background: var(--panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 .studio-topbar-title {
   flex: 1 1 12rem;
@@ -1481,8 +1516,35 @@ button.cta, .button.cta {
   align-items: center;
   gap: 0.5rem;
 }
+/* Only suppress topbar glow at rest so global .button.ghost:hover can still win. */
+.studio-topbar .button.ghost {
+  box-shadow: none;
+}
+.studio-topbar .button.ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  /* Solid token wash: --nav-active-bg uses color-mix(...transparent) which some WebView2 builds resolve to fully transparent. */
+  background: var(--kind-bg);
+  box-shadow: none;
+}
+.studio-topbar .button.ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--ring);
+}
+.studio-topbar-export {
+  box-shadow: 0 0 14px var(--studio-accent-glow);
+}
+.studio-topbar-export:disabled {
+  box-shadow: none;
+}
 .studio-topbar .app-version-button {
   margin-left: auto;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 500;
 }
 .studio-clear-form { margin: 0; }
 .studio-timeline-toolbar .studio-clear-form {
