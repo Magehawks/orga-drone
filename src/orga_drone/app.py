@@ -183,7 +183,12 @@ from orga_drone.theme import (
     prefs_from_cookies,
     save_theme_file,
 )
-from orga_drone.thumbs import browser_can_display_photo, ensure_photo_preview, ensure_thumbnail
+from orga_drone.thumbs import (
+    browser_can_display_photo,
+    ensure_hero_thumbnail,
+    ensure_photo_preview,
+    ensure_thumbnail,
+)
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = PACKAGE_DIR / "templates"
@@ -781,7 +786,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request) -> HTMLResponse:
-        """Home — entry actions and a hero from an already cached thumbnail."""
+        """Home — entry actions and a mid-res hero from local JPEG caches."""
         recent = db.list_media(sort="recorded_at", order="desc", limit=8)
         favorites = db.list_media(sort="recorded_at", order="desc", favorite=True, limit=8)
         hero_pool = db.list_media(sort="recorded_at", order="desc", limit=24)
@@ -4023,6 +4028,45 @@ def create_app() -> FastAPI:
             media_type="image/jpeg",
             content_disposition_type="inline",
             headers={"Cache-Control": "private, max-age=3600"},
+        )
+
+    @app.get("/media/{media_id}/hero-thumb")
+    async def media_hero_thumb(media_id: int) -> FileResponse:
+        """Serve a mid-resolution Home hero JPEG. Never streams the original.
+
+        If the mid-res cache cannot be produced yet, fall back to the grid
+        thumbnail so a valid online file does not stick on a permanent
+        placeholder. Full-resolution originals are never served here.
+        """
+        item = db.get_media(media_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Not found")
+        path = resolve_media_file(db, item)
+        if path is None:
+            raise HTTPException(status_code=404, detail="File missing")
+
+        def _hero_or_grid() -> Path:
+            try:
+                return ensure_hero_thumbnail(
+                    media_id=item.id,
+                    path=path,
+                    kind=item.kind,
+                    filename=item.filename,
+                )
+            except OSError:
+                return ensure_thumbnail(
+                    media_id=item.id,
+                    path=path,
+                    kind=item.kind,
+                    filename=item.filename,
+                )
+
+        hero = await asyncio.to_thread(_hero_or_grid)
+        return FileResponse(
+            hero,
+            media_type="image/jpeg",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, max-age=86400"},
         )
 
     @app.get("/media/{media_id}/thumb")
