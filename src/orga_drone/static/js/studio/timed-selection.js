@@ -79,3 +79,17 @@ export function resolveDeleteAction({
   if (key === "Delete" && storyClipFocused && hasSelectedStoryClip) return "story-clip";
   return null;
 }
+
+/**
+ * Persist a timed-selection removal without clearing selection first.
+ * On save failure the prior selection is returned so Delete/Backspace can retry.
+ */
+export async function persistTimedSelectionRemoval(selection, save) {
+  if (!selection) return { ok: false, selection: null };
+  try {
+    await save(selection);
+    return { ok: true, selection: null };
+  } catch (error) {
+    return { ok: false, selection, error };
+  }
+}

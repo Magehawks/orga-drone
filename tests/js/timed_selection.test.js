@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createTimedSelection,
+  persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
   timedSelectionMatches,
@@ -90,4 +91,28 @@ test("resolveDeleteAction prefers ramp over clip and keeps Backspace off story c
     }),
     "mask"
   );
+});
+
+test("failed ramp removal keeps selection so Delete/Backspace can retry", async () => {
+  const selection = createTimedSelection({ kind: "ramp", clipId: "9" });
+  let calls = 0;
+  const save = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error("patch failed");
+  };
+
+  const failed = await persistTimedSelectionRemoval(selection, save);
+  assert.equal(failed.ok, false);
+  assert.equal(failed.selection, selection);
+  assert.equal(String(failed.error?.message || ""), "patch failed");
+  assert.equal(
+    timedSelectionMatches(failed.selection, "ramp", "9"),
+    true,
+    "selection remains after failed save"
+  );
+
+  const retried = await persistTimedSelectionRemoval(failed.selection, save);
+  assert.equal(retried.ok, true);
+  assert.equal(retried.selection, null);
+  assert.equal(calls, 2);
 });

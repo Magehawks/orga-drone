@@ -11,6 +11,7 @@ import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
   createTimedSelection,
+  persistTimedSelectionRemoval,
   resolveDeleteAction,
   shouldIgnoreDeleteShortcut,
   timedSelectionMatches,
@@ -1566,8 +1567,9 @@ import {
 
   async function removeTimedRampSelection() {
     if (!timedSelection || timedSelection.kind !== "ramp") return false;
+    const selection = timedSelection;
     const clip = clips().find(
-      (item) => String(item.dataset.studioId) === String(timedSelection.clipId)
+      (item) => String(item.dataset.studioId) === String(selection.clipId)
     );
     if (!clip || !speedRampOf(clip)) {
       clearTimedSelection();
@@ -1575,12 +1577,18 @@ import {
       return false;
     }
     hideClipMenu();
-    clearTimedSelection();
-    try {
-      await saveSpeedRamp(clip, null);
-    } catch (_) {
+    // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
+    const result = await persistTimedSelectionRemoval(selection, () =>
+      saveSpeedRamp(clip, null)
+    );
+    if (!result.ok) {
+      timedSelection = result.selection;
+      layoutEffectBars();
       showFlash(msgSpeedFailed);
       return false;
+    }
+    if (timedSelectionMatches(timedSelection, "ramp", selection.clipId)) {
+      clearTimedSelection();
     }
     layoutEffectBars();
     return true;

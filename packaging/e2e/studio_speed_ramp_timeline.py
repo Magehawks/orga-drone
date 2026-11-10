@@ -174,19 +174,41 @@ def run(out: Path) -> None:
         data = cdp.call("Page.captureScreenshot", {"format": "png"})["data"]
         (out / name).write_bytes(base64.b64decode(data))
 
-    def mouse_at(selector: str, button: str = "left", clicks: int = 1) -> dict[str, float]:
-        assert cdp
+    def _target_point(selector: str) -> dict[str, float]:
         rect = ev(
             f"""(() => {{
               const el = document.querySelector({selector!r});
               if (!el) return null;
-              el.scrollIntoView({{block:'center', inline:'center'}});
+              el.scrollIntoView({{block:'center', inline:'nearest'}});
               const r = el.getBoundingClientRect();
-              return {{x: r.x + r.width / 2, y: r.y + Math.min(r.height / 2, 12)}};
+              return {{
+                x: r.x + r.width / 2,
+                y: r.y + Math.min(Math.max(r.height / 2, 4), 12),
+                width: r.width,
+                height: r.height
+              }};
             }})()"""
         )
         assert rect, selector
+        return rect
+
+    def mouse_at(selector: str, button: str = "left", clicks: int = 1) -> dict[str, float]:
+        assert cdp
+        rect = _target_point(selector)
+        # Let scrollIntoView settle before hit-testing coordinates.
+        time.sleep(0.08)
+        rect = _target_point(selector)
         pressed = 1 if button == "left" else 2
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mouseMoved",
+                "x": rect["x"],
+                "y": rect["y"],
+                "button": "none",
+                "buttons": 0,
+            },
+        )
         cdp.call(
             "Input.dispatchMouseEvent",
             {
@@ -196,6 +218,7 @@ def run(out: Path) -> None:
                 "button": button,
                 "buttons": pressed,
                 "clickCount": clicks,
+                "pointerType": "mouse",
             },
         )
         cdp.call(
@@ -207,15 +230,64 @@ def run(out: Path) -> None:
                 "button": button,
                 "buttons": 0,
                 "clickCount": clicks,
+                "pointerType": "mouse",
             },
         )
         return rect
+
+    def menu_open() -> bool:
+        return bool(
+            ev(
+                "document.getElementById('studio-clip-menu') && "
+                "!document.getElementById('studio-clip-menu').hidden"
+            )
+        )
+
+    def open_context_menu_cdp(selector: str, *, label: str) -> None:
+        """Open the clip menu with real CDP right-click only (no synthetic events)."""
+        assert cdp
+        # Dismiss any leftover menu first.
+        if menu_open():
+            key("Escape")
+            time.sleep(0.05)
+        last_hit = None
+        for attempt in range(1, 4):
+            rect = mouse_at(selector, button="right")
+            hit = ev(
+                f"""(() => {{
+                  const x = {rect["x"]!r}, y = {rect["y"]!r};
+                  const stack = document.elementsFromPoint(x, y).map(
+                    (el) => el.className || el.id || el.tagName
+                  );
+                  return {{stack, matched: !!document.querySelector({selector!r})}};
+                }})()"""
+            )
+            last_hit = {"attempt": attempt, "rect": rect, "hit": hit}
+            deadline = time.monotonic() + 1.5
+            while time.monotonic() < deadline:
+                if menu_open():
+                    evidence[f"cdp_contextmenu_{label}"] = True
+                    evidence[f"cdp_contextmenu_{label}_attempt"] = attempt
+                    return
+                time.sleep(0.05)
+            # Move away and retry a clean right-click if the first press missed.
+            cdp.call(
+                "Input.dispatchMouseEvent",
+                {"type": "mouseMoved", "x": 8, "y": 8, "button": "none", "buttons": 0},
+            )
+            time.sleep(0.08)
+        evidence[f"cdp_contextmenu_{label}"] = False
+        evidence[f"cdp_contextmenu_{label}_debug"] = last_hit
+        raise AssertionError(
+            f"CDP right-click did not open context menu for {label} ({selector})"
+        )
 
     def key(name: str) -> None:
         assert cdp
         mapping = {
             "Delete": ("Delete", "Delete", 46),
             "Backspace": ("Backspace", "Backspace", 8),
+            "Escape": ("Escape", "Escape", 27),
         }
         key_name, code, vk = mapping[name]
         for kind in ("keyDown", "keyUp"):
@@ -300,32 +372,12 @@ def run(out: Path) -> None:
         shot("01-bar-selected.png")
 
         until("!!document.querySelector('.studio-ramp-curve')")
-        mouse_at(".studio-ramp-curve", button="right")
-        # Allow the post-contextmenu suppress window to settle, then require an open menu.
-        time.sleep(0.05)
-        if not ev(
-            "document.getElementById('studio-clip-menu') && !document.getElementById('studio-clip-menu').hidden"
-        ):
-            # Fallback: synthesize contextmenu at the same hit target if CDP
-            # right-click was swallowed by a scroll/click race.
-            ev(
-                """(() => {
-                  const el = document.querySelector('.studio-ramp-curve');
-                  const r = el.getBoundingClientRect();
-                  el.dispatchEvent(new MouseEvent('contextmenu', {
-                    bubbles: true, cancelable: true, button: 2,
-                    clientX: r.x + r.width / 2, clientY: r.y + 8
-                  }));
-                })()"""
-            )
-        until(
-            "document.getElementById('studio-clip-menu') && !document.getElementById('studio-clip-menu').hidden"
-        )
+        open_context_menu_cdp(".studio-ramp-curve", label="curve")
         assert ev("!document.getElementById('studio-clip-menu-edit').hidden")
         assert ev("!document.getElementById('studio-clip-menu-remove-ramp').hidden")
         assert ev("document.getElementById('studio-clip-menu-remove').hidden")
         shot("02-curve-context-menu.png")
-        # Prefer a direct activation so CDP right-click click-dismissal cannot race.
+        # Activate while suppressClipMenuClose still covers scroll/click races.
         ev("document.getElementById('studio-clip-menu-edit').click()")
         until(
             "document.getElementById('inspector-clip').dataset.tab === 'clip' && "
@@ -416,25 +468,9 @@ def run(out: Path) -> None:
             "document.getElementById('studio-playhead')?.focus();"
         )
         until("!!document.querySelector('.studio-effect-bar[data-kind=\"ramp\"].is-selected')")
-        mouse_at('.studio-effect-bar[data-kind="ramp"]', button="right")
-        time.sleep(0.05)
-        if not ev(
-            "document.getElementById('studio-clip-menu') && !document.getElementById('studio-clip-menu').hidden"
-        ):
-            ev(
-                """(() => {
-                  const el = document.querySelector('.studio-effect-bar[data-kind=\"ramp\"]');
-                  const r = el.getBoundingClientRect();
-                  el.dispatchEvent(new MouseEvent('contextmenu', {
-                    bubbles: true, cancelable: true, button: 2,
-                    clientX: r.x + r.width / 2, clientY: r.y + 8
-                  }));
-                })()"""
-            )
-        until(
-            "document.getElementById('studio-clip-menu') && !document.getElementById('studio-clip-menu').hidden"
-        )
-        time.sleep(0.12)
+        open_context_menu_cdp('.studio-effect-bar[data-kind="ramp"]', label="bar")
+        assert ev("!document.getElementById('studio-clip-menu-remove-ramp').hidden")
+        shot("03b-bar-context-menu.png")
         ev("document.getElementById('studio-clip-menu-remove-ramp').click()")
         wait_ramp(False)
         evidence["context_remove"] = True
