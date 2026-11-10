@@ -11,7 +11,12 @@ from orga_drone.config import Settings
 from orga_drone.db import Database
 from orga_drone.home_hero import pick_home_media_id
 from orga_drone.local_cache import clear_regenerable_cache
-from orga_drone.thumbs import HERO_CACHE_PREFIX, HERO_SIZE, ensure_hero_thumbnail
+from orga_drone.thumbs import (
+    HERO_CACHE_PREFIX,
+    HERO_SIZE,
+    ensure_hero_thumbnail,
+    ensure_thumbnail,
+)
 
 
 class _Item:
@@ -78,8 +83,6 @@ def test_hero_thumb_falls_back_to_grid_without_caching_placeholder(
     def _fail_hero(**_kwargs):
         raise OSError("hero unavailable")
 
-    # Patch the thumbs helper so both the route and opportunistic grid-thumb
-    # warming refuse to create a hero_ cache entry.
     monkeypatch.setattr("orga_drone.thumbs.ensure_hero_thumbnail", _fail_hero)
     monkeypatch.setattr("orga_drone.app.ensure_hero_thumbnail", _fail_hero)
     from orga_drone.app import create_app
@@ -120,6 +123,73 @@ def test_hero_thumb_falls_back_to_grid_without_caching_placeholder(
     assert thumbs.is_dir()
     assert not any(thumbs.glob(f"{HERO_CACHE_PREFIX}{media_id}_*.jpg"))
     assert any(thumbs.glob(f"{media_id}_*.jpg"))
+
+
+def test_grid_thumbnail_path_never_triggers_hero_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PIL import Image
+
+    monkeypatch.setattr("orga_drone.thumbs.settings", Settings(data_dir=tmp_path / "data"))
+    calls: list[dict[str, object]] = []
+
+    def _track_hero(**kwargs):
+        calls.append(kwargs)
+        raise AssertionError("ensure_hero_thumbnail must not run on the grid path")
+
+    monkeypatch.setattr("orga_drone.thumbs.ensure_hero_thumbnail", _track_hero)
+    photo = tmp_path / "shot.jpg"
+    Image.new("RGB", (800, 450), (30, 70, 110)).save(photo, "JPEG")
+
+    first = ensure_thumbnail(media_id=11, path=photo, kind="photo", filename=photo.name)
+    second = ensure_thumbnail(media_id=11, path=photo, kind="photo", filename=photo.name)
+    assert first.is_file()
+    assert second == first
+    assert calls == []
+    thumbs = tmp_path / "data" / "thumbs"
+    assert any(thumbs.glob("11_*.jpg"))
+    assert not any(thumbs.glob(f"{HERO_CACHE_PREFIX}11_*.jpg"))
+
+    client_settings = Settings(data_dir=tmp_path / "data")
+    monkeypatch.setattr("orga_drone.app.settings", client_settings)
+    from orga_drone.app import create_app
+
+    client = TestClient(create_app())
+    db: Database = client.app.state.db
+    root = tmp_path / "library"
+    root.mkdir()
+    library_photo = root / "grid.jpg"
+    Image.new("RGB", (640, 360), (40, 80, 120)).save(library_photo, "JPEG")
+    root_id = db.add_root(root, label="card")
+    media_id = db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "photo",
+            "filename": library_photo.name,
+            "path": str(library_photo.resolve()),
+            "size_bytes": library_photo.stat().st_size,
+            "duration_s": None,
+            "recorded_at": "2024-01-02T00:00:00",
+            "sequence": None,
+            "mode": None,
+            "drone_model": None,
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+    monkeypatch.setattr("orga_drone.app.ensure_hero_thumbnail", _track_hero)
+    grid = client.get(f"/media/{media_id}/thumb")
+    assert grid.status_code == 200
+    assert calls == []
+    assert not any(
+        (tmp_path / "data" / "thumbs").glob(f"{HERO_CACHE_PREFIX}{media_id}_*.jpg")
+    )
 
 
 def test_hero_jpeg_covers_rendered_viewport_boxes() -> None:

@@ -130,7 +130,11 @@ def _ffmpeg_frame(source: Path, dest: Path) -> bool:
 
 
 def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> Path:
-    """Return path to a JPEG thumbnail, creating it if needed."""
+    """Return path to a JPEG thumbnail, creating it if needed.
+
+    Grid thumbnail generation stays independent of Home hero mid-res caches.
+    Hero JPEGs are created only through ``ensure_hero_thumbnail`` / `/hero-thumb`.
+    """
     from PIL import Image
 
     from orga_drone.parse import ensure_heif_support
@@ -145,30 +149,18 @@ def ensure_thumbnail(*, media_id: int, path: Path, kind: str, filename: str) -> 
 
     cache = _cache_path(media_id, source)
     if cache.exists():
-        try:
-            ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
-        except OSError:
-            pass
         return cache
 
     if kind == "photo":
         try:
             with Image.open(path) as img:
                 _save_image(img, cache)
-            try:
-                ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
-            except OSError:
-                pass
             return cache
         except OSError:
             pass
 
     if kind == "video":
         if _ffmpeg_frame(source, cache):
-            try:
-                ensure_hero_thumbnail(media_id=media_id, path=path, kind=kind, filename=filename)
-            except OSError:
-                pass
             return cache
         _save_image(_placeholder("video", filename), cache)
         return cache

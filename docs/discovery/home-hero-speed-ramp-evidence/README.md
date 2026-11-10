@@ -20,4 +20,4 @@ Welcome copy is outside the media preview at all three widths.
 
 ## Missing hero cache
 
-`/media/{id}/hero-thumb` tries the mid-res `hero_` cache first. If generation fails, it falls back to the grid thumbnail and does **not** write a permanent `hero_` placeholder. Limitation: first successful generation may still block that one request on ffmpeg/Pillow; no background warm pipeline in this PR (#335).
+`/media/{id}/hero-thumb` tries the mid-res `hero_` cache first. If generation fails, it falls back to the grid thumbnail and does **not** write a permanent `hero_` placeholder. Grid `/thumb` generation never calls hero creation. Limitation: first successful `/hero-thumb` generation may still block that one request on ffmpeg/Pillow; no background warm pipeline in this PR (#335).
