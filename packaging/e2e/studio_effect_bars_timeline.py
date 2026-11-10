@@ -66,29 +66,59 @@ def run(out: Path) -> None:
         **subprocess_no_window_kwargs(),
     )
     original = hashlib.sha256(source.read_bytes()).hexdigest()
-    mid = db.upsert_media(
-        dict(
-            root_id=root,
-            kind="video",
-            path=str(source),
-            filename=source.name,
-            size_bytes=source.stat().st_size,
-            duration_s=4,
-            width=1280,
-            height=720,
-            has_srt=0,
-            has_lrf=0,
+    source_b = media / "synthetic-effects-b.mp4"
+    subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=1280x720:r=30:d=3",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            str(source_b),
+        ],
+        check=True,
+        timeout=120,
+        **subprocess_no_window_kwargs(),
+    )
+    original_b = hashlib.sha256(source_b.read_bytes()).hexdigest()
+
+    def _add_video(path: Path, duration: int) -> int:
+        mid = db.upsert_media(
+            dict(
+                root_id=root,
+                kind="video",
+                path=str(path),
+                filename=path.name,
+                size_bytes=path.stat().st_size,
+                duration_s=duration,
+                width=1280,
+                height=720,
+                has_srt=0,
+                has_lrf=0,
+            )
         )
-    )
-    cid, _ = db.add_studio_item(
-        str(source),
-        identity_key=source.name,
-        filename=source.name,
-        recorded_at=None,
-        kind="video",
-        project_id=project.id,
-        source_media_id=mid,
-    )
+        item_id, _ = db.add_studio_item(
+            str(path),
+            identity_key=path.name,
+            filename=path.name,
+            recorded_at=None,
+            kind="video",
+            project_id=project.id,
+            source_media_id=mid,
+        )
+        return int(item_id)
+
+    cid = _add_video(source, 4)
+    cid_b = _add_video(source_b, 3)
     port, debug = _harness.free_port(), _harness.free_port()
     repo = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
@@ -491,6 +521,81 @@ def run(out: Path) -> None:
         wait_bar("zoom", False)
         evidence["zoom_redo"] = True
 
+        # --- Stale selection across ordinary clip switch ---
+        zoomed_again = http_json(
+            "PATCH", f"/api/studio/{cid}/frame", {"zoom_start": 1.8, "zoom_end": 1.8}
+        )
+        assert zoomed_again and zoomed_again.get("ok"), zoomed_again
+        reload_studio()
+        wait_bar("zoom", True)
+        mouse_at(
+            f'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"].is-selected\')'
+        )
+        # Ordinary Story-Clip B selection must invalidate the timed effect on A.
+        ev(
+            f"""(() => {{
+              const pick = document.querySelector('#studio-grid [data-select-clip="{cid_b}"]');
+              if (!pick) return false;
+              const r = pick.getBoundingClientRect();
+              pick.dispatchEvent(new MouseEvent('click', {{bubbles:true, clientX:r.x+2, clientY:r.y+2}}));
+              return true;
+            }})()"""
+        )
+        until(
+            f'document.querySelector(\'#studio-grid [data-studio-id="{cid_b}"]\')?.classList.contains("is-selected")'
+        )
+        until(
+            f'!document.querySelector(\'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"].is-selected\')'
+        )
+        # Focus outside story-delete context so Delete must not remove clip B either.
+        ev("document.getElementById('inspector-tab-image')?.focus()")
+        key("Delete")
+        key("Backspace")
+        time.sleep(0.25)
+        assert ev(
+            f'!!document.querySelector(\'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"]\')'
+        )
+        assert clip_present()
+        assert bool(
+            ev(f'!!document.querySelector(\'#studio-grid [data-studio-id="{cid_b}"]\')')
+        )
+        evidence["stale_selection_safe_after_clip_switch"] = True
+        shot("04b-stale-selection-safe.png")
+
+        # Correctly selected effects can still be deleted.
+        mouse_at(
+            f'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"]',
+            button="left",
+        )
+        until(
+            f'!!document.querySelector(\'.studio-effect-bar[data-kind="zoom"][data-studio-id="{cid}"].is-selected\')'
+        )
+        blur_focus()
+        key("Delete")
+        wait_bar("zoom", False)
+        evidence["selected_effect_still_deletable"] = True
+
+        # Story-clip focus rules: Backspace must not remove the selected clip.
+        ev(
+            f"""(() => {{
+              const pick = document.querySelector('#studio-grid [data-select-clip="{cid_b}"]');
+              const r = pick.getBoundingClientRect();
+              pick.dispatchEvent(new MouseEvent('click', {{bubbles:true, clientX:r.x+2, clientY:r.y+2}}));
+              document.getElementById('studio-playhead')?.focus();
+              return true;
+            }})()"""
+        )
+        key("Backspace")
+        time.sleep(0.2)
+        assert bool(
+            ev(f'!!document.querySelector(\'#studio-grid [data-studio-id="{cid_b}"]\')')
+        )
+        evidence["story_backspace_keeps_clip"] = True
+
         # --- Mask ---
         masked = http_json(
             "PATCH",
@@ -579,6 +684,7 @@ def run(out: Path) -> None:
         )
         evidence["reopen_without_effect_bars"] = True
         assert hashlib.sha256(source.read_bytes()).hexdigest() == original
+        assert hashlib.sha256(source_b.read_bytes()).hexdigest() == original_b
         evidence["originals_unchanged"] = True
         evidence["status"] = "PASS"
         shot("08-reopen.png")

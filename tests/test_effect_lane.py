@@ -133,6 +133,16 @@ def test_timeline_first_effect_bars_reuse_timed_selection_contract() -> None:
     assert "function showTimedEffectMenu" in script
     assert "function removeTimedEffectBarSelection" in script
     assert "persistTimedSelectionRemoval" in script
+    assert "isActiveTimedSelection" in script
+    clear = script.split("function clearTimedSelection", 1)[1].split(
+        "function effectLabel", 1
+    )[0]
+    assert "selectedEffectBar = null" in clear
+    remove = script.split("async function removeTimedEffectBarSelection", 1)[1].split(
+        "function deleteSelectedEffectBar", 1
+    )[0]
+    assert "selectedEffectBar.kind" not in remove
+    assert "isActiveTimedSelection(timedSelection, selection)" in remove
     assert 'id="studio-clip-menu-remove-effect"' in page
     assert "{{ _('Remove') }}" in page
     layout = script.split("function layoutEffectBars", 1)[1].split(

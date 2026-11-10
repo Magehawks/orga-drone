@@ -11,6 +11,7 @@ import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
   createTimedSelection,
+  isActiveTimedSelection,
   isEffectBarKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
@@ -1071,6 +1072,8 @@ import {
 
   function clearTimedSelection() {
     timedSelection = null;
+    // Keep legacy drag chrome in sync so Delete cannot target a prior clip.
+    selectedEffectBar = null;
   }
 
   function effectLabel(kind) {
@@ -1627,22 +1630,14 @@ import {
   }
 
   async function removeTimedEffectBarSelection() {
-    const selection =
-      timedSelection && isEffectBarKind(timedSelection.kind)
-        ? timedSelection
-        : selectedEffectBar
-          ? createTimedSelection({
-              kind: selectedEffectBar.kind,
-              clipId: selectedEffectBar.studioId,
-              id: selectedEffectBar.id,
-            })
-          : null;
-    if (!selection || !isEffectBarKind(selection.kind)) return false;
+    // timedSelection is the sole deletion authority — never fall back to
+    // selectedEffectBar after an ordinary clip switch cleared it.
+    if (!timedSelection || !isEffectBarKind(timedSelection.kind)) return false;
+    const selection = timedSelection;
     const clip = clips().find(
       (item) => String(item.dataset.studioId) === String(selection.clipId)
     );
     if (!clip || !timedEffectStillPresent(clip, selection)) {
-      selectedEffectBar = null;
       clearTimedSelection();
       if (selection.kind === "mask") selectedMaskId = null;
       layoutEffectBars();
@@ -1664,24 +1659,23 @@ import {
       if (!ok) throw new Error("effect save failed");
     });
     if (!result.ok) {
-      timedSelection = result.selection;
-      selectedEffectBar = {
-        studioId: selection.clipId,
-        kind: selection.kind,
-        id: selection.id,
-      };
-      if (selection.kind === "mask") selectedMaskId = selection.id;
+      // Do not overwrite a newer timedSelection chosen while the PATCH ran.
+      if (isActiveTimedSelection(timedSelection, selection)) {
+        selectedEffectBar = {
+          studioId: selection.clipId,
+          kind: selection.kind,
+          id: selection.id,
+        };
+        if (selection.kind === "mask") selectedMaskId = selection.id;
+      }
       layoutEffectBars();
       return false;
     }
-    selectedEffectBar = null;
-    if (
-      timedSelectionMatches(timedSelection, selection.kind, selection.clipId, selection.id)
-    ) {
+    if (isActiveTimedSelection(timedSelection, selection)) {
       clearTimedSelection();
-    }
-    if (selection.kind === "mask" && String(selectedMaskId || "") === String(selection.id)) {
-      selectedMaskId = null;
+      if (selection.kind === "mask" && String(selectedMaskId || "") === String(selection.id)) {
+        selectedMaskId = null;
+      }
     }
     layoutEffectBars();
     return true;
@@ -1727,12 +1721,12 @@ import {
       saveSpeedRamp(clip, null)
     );
     if (!result.ok) {
-      timedSelection = result.selection;
-      layoutEffectBars();
+      // Leave a newer selection alone; only flash when this removal still owns focus.
       showFlash(msgSpeedFailed);
+      layoutEffectBars();
       return false;
     }
-    if (timedSelectionMatches(timedSelection, "ramp", selection.clipId)) {
+    if (isActiveTimedSelection(timedSelection, selection)) {
       clearTimedSelection();
     }
     layoutEffectBars();
@@ -1786,7 +1780,6 @@ import {
     const action = resolveDeleteAction({
       key: event.key,
       timedSelection,
-      hasEffectBarSelection: Boolean(selectedEffectBar),
       privacyMaskActive: privacyMaskDeleteActive(),
       storyClipFocused: storyClipDeleteContext(document.activeElement),
       hasSelectedStoryClip: Boolean(selectedStoryClip()),
@@ -7917,6 +7910,7 @@ import {
   function selectTransition(el) {
     if (reuseDraft) cancelReuseDraft();
     controlBridge?.noteLocalChange();
+    clearTimedSelection();
     state.selected = { type: "transition", id: el.dataset.transitionAfter || "" };
     clips().forEach((c) => {
       c.classList.remove("is-selected");
@@ -7924,6 +7918,7 @@ import {
     });
     grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.toggle("is-selected", t === el));
     layoutMusicSpans();
+    layoutEffectBars();
     showInspector("inspector-transition");
     const headingType = transitionLabels[el.dataset.transitionType || "cut"] || "Transition";
     setInspectorHeading(headingType);

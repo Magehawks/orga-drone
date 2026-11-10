@@ -81,6 +81,8 @@ export function shouldIgnoreDeleteShortcut(
 /**
  * Decide which deletion path owns a Delete/Backspace press.
  * Story-clip removal stays Delete-only and requires story focus.
+ * timedSelection is the sole authority for timed-effect deletion; legacy
+ * selectedEffectBar must not delete after an ordinary clip switch.
  */
 export function resolveDeleteAction({
   key,
@@ -90,14 +92,23 @@ export function resolveDeleteAction({
   storyClipFocused = false,
   hasSelectedStoryClip = false,
 } = {}) {
+  void hasEffectBarSelection;
   if (key !== "Delete" && key !== "Backspace") return null;
   if (timedSelection && TIMED_DELETE_KINDS.includes(timedSelection.kind)) {
     return timedSelection.kind === "ramp" ? "ramp" : "effect-bar";
   }
-  if (hasEffectBarSelection) return "effect-bar";
   if (privacyMaskActive) return "mask";
   if (key === "Delete" && storyClipFocused && hasSelectedStoryClip) return "story-clip";
   return null;
+}
+
+/**
+ * True when an in-flight timed removal still owns the live selection.
+ * Prevents async success/failure handlers from overwriting a newer choice.
+ */
+export function isActiveTimedSelection(current, pending) {
+  if (!pending) return false;
+  return timedSelectionMatches(current, pending.kind, pending.clipId, pending.id);
 }
 
 /**

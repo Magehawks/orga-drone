@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createTimedSelection,
+  isActiveTimedSelection,
   isEffectBarKind,
   persistTimedSelectionRemoval,
   resolveDeleteAction,
@@ -94,13 +95,24 @@ test("resolveDeleteAction prefers timed effects over clip and allows Backspace",
     }),
     "effect-bar"
   );
+  // Legacy selectedEffectBar alone must not delete after an ordinary clip switch.
   assert.equal(
     resolveDeleteAction({
       key: "Backspace",
       timedSelection: null,
       hasEffectBarSelection: true,
     }),
-    "effect-bar"
+    null
+  );
+  assert.equal(
+    resolveDeleteAction({
+      key: "Delete",
+      timedSelection: null,
+      hasEffectBarSelection: true,
+      hasSelectedStoryClip: true,
+      storyClipFocused: true,
+    }),
+    "story-clip"
   );
   assert.equal(
     resolveDeleteAction({
@@ -122,21 +134,20 @@ test("resolveDeleteAction prefers timed effects over clip and allows Backspace",
   );
   assert.equal(
     resolveDeleteAction({
-      key: "Delete",
-      timedSelection: null,
-      hasEffectBarSelection: true,
-      privacyMaskActive: true,
-    }),
-    "effect-bar"
-  );
-  assert.equal(
-    resolveDeleteAction({
       key: "Backspace",
       timedSelection: null,
       privacyMaskActive: true,
     }),
     "mask"
   );
+});
+
+test("isActiveTimedSelection blocks async handlers from overwriting a newer choice", () => {
+  const pending = createTimedSelection({ kind: "zoom", clipId: "1" });
+  const newer = createTimedSelection({ kind: "slow", clipId: "2" });
+  assert.equal(isActiveTimedSelection(pending, pending), true);
+  assert.equal(isActiveTimedSelection(null, pending), false);
+  assert.equal(isActiveTimedSelection(newer, pending), false);
 });
 
 test("failed effect removal keeps selection so Delete/Backspace can retry", async () => {
