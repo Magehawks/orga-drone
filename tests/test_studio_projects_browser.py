@@ -332,8 +332,15 @@ def test_http_project_api_list_create_open_update_delete(
         "</div>", 1
     )[0]
     assert 'id="studio-export-open"' in actions
+    assert "studio-topbar-export" in actions
     assert "studio-clear-form" not in actions
     assert 'id="studio-projects-back"' not in actions
+    # Accent discipline: secondary topbar links stay ghost; Export is the filled CTA.
+    assert 'class="button ghost studio-back"' in after_creator
+    assert (
+        'class="button ghost studio-icon-button" id="studio-projects-back"'
+        in after_creator
+    )
     toolbar = after_creator.split("studio-timeline-toolbar", 1)[1].split(
         "studio-timeline-row", 1
     )[0]

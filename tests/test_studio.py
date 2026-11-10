@@ -324,6 +324,29 @@ def test_http_studio_empty_and_nav(client: TestClient) -> None:
     assert "/studio" in primary
 
 
+def test_studio_hybrid_h1_topbar_chrome_css() -> None:
+    """Floating frosted topbar with reduced-transparency fallback (Hybrid H1)."""
+    css = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "orga_drone"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+    block = css.split(".studio-topbar {", 1)[1].split(".studio-topbar-title", 1)[0]
+    assert "backdrop-filter: blur(" in block
+    assert "var(--top-bg)" in block
+    assert "border-radius: 12px" in block
+    assert "@media (prefers-reduced-transparency: reduce)" in css
+    reduced = css.split(
+        "@media (prefers-reduced-transparency: reduce)", 1
+    )[1].split("}", 2)[0]
+    assert "backdrop-filter: none" in reduced
+    assert ".studio-topbar-export" in css
+    assert 'data-chrome="opaque"' in css
+
+
 def test_studio_browser_layout_containment_css() -> None:
     """Desktop shell pins height; panel scrolls; mobile keeps max-height list."""
     css = (
