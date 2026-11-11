@@ -113,6 +113,21 @@ Stable codes are part of the contract: `CONTROL_DISABLED`, `INVALID_CREDENTIAL`,
 - Persisted `effect_settings` and the SQLite schema are not changed by the action
   contract. Project compatibility is preserved.
 
+### Semantic guidance for MCP assistants (#291)
+
+`action_catalog()` attaches versioned **semantics** to implemented color
+actions (`semantics_version`, per-action `semantics` with visual effect,
+DE/EN example intents, prerequisites, side effects, alternatives and honest
+limitations, plus the shared `disambiguation` entries: global saturation vs.
+HSL saturation, conversion vs. creative LUT, hue edits vs. object masking).
+The metadata lives in `studio_action_semantics.py`; it imports ranges and
+neutral values from the live validators instead of restating numbers, and
+`tests/test_studio_action_semantics.py` fails on missing/orphan entries or
+range drift. Future implemented actions add their entry (including DE/EN
+intents and limitations) in the same PR that adds the action; guidance is
+descriptive and never claims unimplemented capabilities such as
+object-selective editing.
+
 ## 3. Current action inventory
 
 Line references point at `develop` when this analysis was written. Route names
