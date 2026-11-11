@@ -12,6 +12,8 @@ const context = {
   clearLutPreviewStill() {},
   setLutPreviewChip() {},
   scheduleLutProxyPrepare: clip => prepared.push(clip.dataset.studioId),
+  refreshColorGradeSummaryFor() {},
+  updateColorGradeSummary() {},
   msgLutChipUpdating: 'Updating',
   hslIsNeutral: value => !value || !value.ranges ||
     Object.values(value.ranges).every(item => !item.hue && !item.saturation && !item.luminance),

@@ -3096,7 +3096,6 @@ import {
     clip.dataset.imagePreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill(clip);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
-    refreshColorGradeSummaryFor(clip);
   }
 
   function imageAdjustIsNeutral(adjust) {
@@ -3174,7 +3173,6 @@ import {
     clearLutPreviewStill(clip);
     if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
-    refreshColorGradeSummaryFor(clip);
   }
 
   const COLOR_WHEEL_IDS = ["shadows", "midtones", "highlights"];
@@ -3255,7 +3253,6 @@ import {
     clearLutPreviewStill(clip);
     if (!colorWheelsIsNeutral(colorWheels)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
-    refreshColorGradeSummaryFor(clip);
   }
 
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
@@ -3383,7 +3380,6 @@ import {
     });
     clip.dataset.rampPreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill(clip);
-    refreshColorGradeSummaryFor(clip);
   }
 
   function saturationRampMultiplier(ramp, localS) {
@@ -4105,6 +4101,7 @@ import {
     colorWheels.wheels[wheelId] = point;
     writeColorWheels(clip, colorWheels);
     fillColorWheels(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
   }
 
@@ -4224,7 +4221,6 @@ import {
     clearLutPreviewStill(clip);
     scheduleLutProxyPrepare(clip);
     if (colorLookNeedsStill(look, clip)) setLutPreviewChip(msgLutChipUpdating);
-    refreshColorGradeSummaryFor(clip);
   }
 
   let colorAnimationModel = { maxKeys: 8, minKeyGapS: 0.1, presets: [] };
@@ -11132,12 +11128,14 @@ import {
       if (!clip) return;
       writeHsl(clip, hslRangeFromControls(clip));
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
     });
     input.addEventListener("change", () => {
       const clip = selectedAdjustableClip();
       if (!clip) return;
       writeHsl(clip, hslRangeFromControls(clip));
+      updateColorGradeSummary(clip);
       queueHslSave(clip);
     });
   });
@@ -11160,6 +11158,7 @@ import {
     writeHsl(clip, hsl);
     fillHsl(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueHslSave(clip);
   });
@@ -11170,6 +11169,7 @@ import {
     writeHsl(clip, neutralHslAdjust());
     fillHsl(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueHslSave(clip);
   });
@@ -11234,6 +11234,7 @@ import {
       colorWheels.wheels[wheelId] = normalizeColorWheelPoint(point);
       writeColorWheels(clip, colorWheels);
       fillColorWheels(clip);
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorWheelsSave(clip);
     });
@@ -11248,6 +11249,7 @@ import {
       writeColorWheels(clip, colorWheels);
       fillColorWheels(clip);
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorWheelsSave(clip);
     });
@@ -11266,6 +11268,7 @@ import {
     look.conversion_confirmed = true;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11316,6 +11319,7 @@ import {
     look.conversion_confirmed = false;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11339,6 +11343,7 @@ import {
       if (!look.creative_strength) look.creative_strength = 100;
       writeColorLook(clip, look);
       fillColorLook(clip);
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorLookSave(clip);
     } catch (err) {
@@ -11357,6 +11362,7 @@ import {
     else if (!look.creative_strength) look.creative_strength = 100;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11370,6 +11376,7 @@ import {
     look.creative_strength = Math.max(0, Math.min(100, Math.round(Number(input && input.value) || 0)));
     if (valueEl) valueEl.textContent = String(look.creative_strength);
     writeColorLook(clip, look);
+    updateColorGradeSummary(clip);
     setSaveState(false);
   });
 
@@ -11485,6 +11492,7 @@ import {
     writeSaturationRamp(clip, ramp);
     fillSaturationRamp(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueSaturationRampSave(clip);
   }
@@ -11508,6 +11516,7 @@ import {
     if (!clip) return;
     writeSaturationRamp(clip, saturationRampFromControls(clip));
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
   });
   document.getElementById("inspector-bw-strength")?.addEventListener("change", () => {
