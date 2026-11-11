@@ -252,8 +252,7 @@ export function createSpeedRampEditor({
     const range = displayRange(ramp);
     const start = rampTime(ramp, range.start);
     const duration = rampTime(ramp, range.end) - start;
-    const x = (source) =>
-      duration > 0 ? (1000 * (rampTime(ramp, source) - start)) / duration : 0;
+    const x = (source) => (duration > 0 ? (1000 * (rampTime(ramp, source) - start)) / duration : 0);
     const y = curveY;
     curve.replaceChildren(
       svgNode("line", { x1: 0, x2: 1000, y1: y(1), y2: y(1), class: "studio-ramp-reference" }),
@@ -332,8 +331,7 @@ export function createSpeedRampEditor({
         point.speed = Number((Math.round(point.speed / 0.05) * 0.05).toFixed(2));
         if (index > 0 && index < draft.points.length - 1) {
           const span = rampTime(draft, range.end) - rampTime(draft, range.start);
-          const time =
-            Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * span;
+          const time = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * span;
           point.source_s = Math.max(
             draft.points[index - 1].source_s + 0.05,
             Math.min(

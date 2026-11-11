@@ -2164,7 +2164,7 @@ video.studio-preview-media.studio-preview-layer-b {
 .studio-image-mode {
   display: flex;
   gap: 0.25rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 .studio-image-mode-btn {
   flex: 1 1 0;
@@ -2187,13 +2187,68 @@ video.studio-preview-media.studio-preview-layer-b {
   outline: 2px solid var(--accent, currentColor);
   outline-offset: 1px;
 }
-.studio-image-panel[data-image-mode="standard"] #inspector-image-section-hsl,
-.studio-image-panel[data-image-mode="standard"] #inspector-image-section-color-wheels,
-.studio-image-panel[data-image-mode="standard"] #inspector-image-section-advanced {
+.studio-color-mode-help {
+  margin: 0 0 0.35rem;
+}
+.studio-color-grade-summary {
+  margin: 0 0 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--surface, transparent) 80%, var(--border));
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.studio-color-grade-summary:empty {
   display: none;
 }
-.studio-image-panel[data-image-mode="standard"] #inspector-image-section-profile {
+.studio-quick-look-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.55rem;
+}
+.studio-quick-look-chip {
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.studio-quick-look-chip[aria-checked="true"] {
+  border-color: var(--accent, currentColor);
+  background: color-mix(in srgb, var(--accent, currentColor) 14%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+.studio-quick-look-chip:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+}
+.studio-quick-look-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.studio-image-panel[data-image-mode="creative"] #inspector-image-section-hsl,
+.studio-image-panel[data-image-mode="creative"] #inspector-image-section-color-wheels,
+.studio-image-panel[data-image-mode="creative"] #inspector-image-section-advanced {
+  display: none;
+}
+.studio-image-panel[data-image-mode="creative"] #inspector-image-section-profile {
   order: -1;
+}
+@media (max-width: 1100px) {
+  .studio-quick-look-chips {
+    gap: 0.25rem;
+  }
+  .studio-quick-look-chip {
+    flex: 1 1 auto;
+    text-align: center;
+  }
 }
 .studio-lut-stage {
   margin-top: 0.55rem;

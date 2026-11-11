@@ -34,6 +34,8 @@ const context = {
   clipForPreviewMedia: media => media === context.previewImageB ? context.outgoing : clip, lutProxyActiveFor: () => false,
   previewLutFrameFor: () => null,
   playbackSpeed: () => 1, slowBarOf: () => null, speedRampOf: () => null, schedulePreviewBlit() {}, drawPrivacyMasks() {},
+  previewIsFullscreen: () => false, syncFullscreenControl() {},
+  refreshColorGradeSummaryFor() {}, updateColorGradeSummary() {},
   colorSaveChain: Promise.resolve(), imageSaveChain: Promise.resolve(),
   hslSaveChain: Promise.resolve(), msgHslChipPlaying: 'Playing without HSL preview',
   colorWheelsSaveChain: Promise.resolve(), msgColorWheelsChipPlaying: 'Playing without color grading preview',
@@ -381,7 +383,8 @@ async function reply(request, id) { request.resolve({ ok: true, status: 200, blo
     loopOverlapS: () => 0, prepareOutgoingCrossfade: () => false,
     applyPreviewGrades: hit => { stoppedHit = hit; },
     syncAnnotations() {}, drawPrivacyMasks() {}, drawFlightMap() {}, applyFramePreview() {},
-    syncHud() {}, schedulePreviewBlit() {},
+    syncHud() {}, schedulePreviewBlit() {}, syncFullscreenControl() {},
+    previewIsFullscreen: () => false,
   };
   vm.createContext(pausedContext);
   vm.runInContext('function pausePlayback' + section('function pausePlayback', 'function updatePlayheadChrome') +
