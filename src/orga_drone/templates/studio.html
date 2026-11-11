@@ -194,6 +194,7 @@
          data-lut-chip-still="{{ _('Still frame with color file')|e }}"
          data-lut-chip-proxy-preparing="{{ _('LUT video is being prepared...')|e }}"
          data-lut-chip-playing="{{ _('Playing without color file')|e }}"
+         data-lut-chip-loop-playing="{{ _('Playing looped; color file preview appears on pause')|e }}"
          data-lut-chip-missing="{{ _('Color file missing')|e }}"
           data-lut-chip-failed="{{ _('Color preview unavailable; try pausing or seeking again')|e }}"
           data-lut-chip-composite="{{ _('Color still; transition colors approximate')|e }}"
@@ -203,9 +204,11 @@
          data-hsl-model='{{ hsl_model|tojson }}'
          data-hsl-failed="{{ _('Could not save HSL color settings.')|e }}"
          data-hsl-chip-playing="{{ _('Playing without HSL preview; pause or seek to see it')|e }}"
+         data-hsl-chip-loop-playing="{{ _('Playing looped; HSL preview appears on pause')|e }}"
          data-color-wheels-model='{{ color_wheels_model|tojson }}'
          data-color-wheels-failed="{{ _('Could not save color grading.')|e }}"
          data-color-wheels-chip-playing="{{ _('Playing without color grading preview; pause or seek to see it')|e }}"
+         data-color-wheels-chip-loop-playing="{{ _('Playing looped; color grading preview appears on pause')|e }}"
          data-wheel-neutral="{{ _('Neutral')|e }}"
          data-color-look-model='{{ color_look_model|tojson }}'
          data-color-animation-model='{{ color_animation_model|tojson }}'

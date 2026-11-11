@@ -3491,11 +3491,14 @@ import {
   const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
   const msgLutChipProxyPreparing = root.dataset.lutChipProxyPreparing || "LUT video is being prepared...";
   const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
+  const msgLutChipLoopPlaying = root.dataset.lutChipLoopPlaying || "Playing looped; color file preview appears on pause";
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
   const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
   const msgLutChipComposite = root.dataset.lutChipComposite || "Color still; transition colors approximate";
   const msgHslChipPlaying = root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
+  const msgHslChipLoopPlaying = root.dataset.hslChipLoopPlaying || "Playing looped; HSL preview appears on pause";
   const msgColorWheelsChipPlaying = root.dataset.colorWheelsChipPlaying || "Playing without color grading preview; pause or seek to see it";
+  const msgColorWheelsChipLoopPlaying = root.dataset.colorWheelsChipLoopPlaying || "Playing looped; color grading preview appears on pause";
   const msgWheelNeutral = root.dataset.wheelNeutral || "Neutral";
   function colorLookNeedsStill(look, clip) {
     if (!look) return false;
@@ -3618,10 +3621,19 @@ import {
       }
       if (state.playing && clip.dataset.kind !== "photo") {
         clearLutPreviewStill();
+        // Forward loop and manual repeats play without a color proxy
+        // (issue #294): name the loop cause instead of a generic message.
+        const looped = forwardLoopActive(clip) || sectionRepeats(clip) > 1;
         if (lutProxySrcFor(clip)) {
           setChip("");
         } else if (lutProxyPreparingFor(clip)) {
           setChip(msgLutChipProxyPreparing);
+        } else if (looped && !lookActive && !hslActive && wheelsActive) {
+          setChip(msgColorWheelsChipLoopPlaying);
+        } else if (looped && !lookActive && hslActive) {
+          setChip(msgHslChipLoopPlaying);
+        } else if (looped) {
+          setChip(msgLutChipLoopPlaying);
         } else if (!lookActive && !hslActive && wheelsActive) {
           setChip(msgColorWheelsChipPlaying);
         } else if (!lookActive && hslActive) {

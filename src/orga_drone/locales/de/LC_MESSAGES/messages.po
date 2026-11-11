@@ -858,3 +858,12 @@ msgstr "Heruntergerechnete Messung"
 
 msgid "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
 msgstr "Scopes ändern weder den gespeicherten Grade noch den Export. Histogramm: 256 Bins. Waveform und Parade: Y′ / R′G′B′. Vectorscope: BT.709 Cb/Cr."
+
+msgid "Playing looped; color file preview appears on pause"
+msgstr "Loop-Wiedergabe; Farbdatei-Vorschau erscheint bei Pause"
+
+msgid "Playing looped; HSL preview appears on pause"
+msgstr "Loop-Wiedergabe; HSL-Vorschau erscheint bei Pause"
+
+msgid "Playing looped; color grading preview appears on pause"
+msgstr "Loop-Wiedergabe; Farbkorrektur-Vorschau erscheint bei Pause"
