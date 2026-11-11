@@ -20,6 +20,35 @@ export function shouldRefreshColorInspector({ clipId, selectedId, requestCurrent
   return String(clipId) === String(selectedId);
 }
 
+/** Serialize async work so older jobs can be skipped before they mutate state. */
+export function createSerialRequestQueue() {
+  let chain = Promise.resolve();
+  return {
+    enqueue(run) {
+      const next = chain.then(run, run);
+      chain = next.catch(() => {});
+      return next;
+    },
+  };
+}
+
+/**
+ * Queue an execute callback. If a newer token exists before execute runs, skip
+ * the network/write entirely so superseded intents cannot persist last.
+ */
+export function runLatestQueuedRequest({ store, key, token, queue, execute }) {
+  return queue.enqueue(async () => {
+    if (!isCurrentRequestToken(store, key, token)) {
+      return { superseded: true };
+    }
+    const result = await execute();
+    if (!isCurrentRequestToken(store, key, token)) {
+      return { superseded: true, result };
+    }
+    return { superseded: false, result };
+  });
+}
+
 /**
  * @param {{
  *   lookId?: string,

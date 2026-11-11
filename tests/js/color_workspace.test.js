@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
+  createSerialRequestQueue,
   formatColorGradeSummary,
   isCurrentRequestToken,
+  runLatestQueuedRequest,
   shouldRefreshColorInspector,
 } from "../../src/orga_drone/static/js/studio/color-workspace.js";
 
@@ -210,4 +212,64 @@ test("failed Quick Look for a previous clip does not refill the inspector", asyn
   resolveFail({ ok: false });
   await run;
   assert.deepEqual(fills, []);
+});
+
+test("serialized Quick Look queue skips superseded intents before they persist", async () => {
+  const store = new Map();
+  const queue = createSerialRequestQueue();
+  const persisted = [];
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  let firstStarted;
+  const firstStartedGate = new Promise((resolve) => {
+    firstStarted = resolve;
+  });
+
+  const firstToken = beginRequestToken(store, "11");
+  const first = runLatestQueuedRequest({
+    store,
+    key: "11",
+    token: firstToken,
+    queue,
+    execute: async () => {
+      firstStarted();
+      await firstGate;
+      persisted.push("cinematic");
+      return "cinematic";
+    },
+  });
+  await firstStartedGate;
+
+  const secondToken = beginRequestToken(store, "11");
+  const second = runLatestQueuedRequest({
+    store,
+    key: "11",
+    token: secondToken,
+    queue,
+    execute: async () => {
+      persisted.push("vibrant");
+      return "vibrant";
+    },
+  });
+  const thirdToken = beginRequestToken(store, "11");
+  const third = runLatestQueuedRequest({
+    store,
+    key: "11",
+    token: thirdToken,
+    queue,
+    execute: async () => {
+      persisted.push("cool");
+      return "cool";
+    },
+  });
+
+  releaseFirst();
+  assert.equal((await first).superseded, true);
+  assert.equal((await second).superseded, true);
+  assert.equal((await third).superseded, false);
+  assert.equal((await third).result, "cool");
+  // First already entered execute before being superseded; second never persists.
+  assert.deepEqual(persisted, ["cinematic", "cool"]);
 });

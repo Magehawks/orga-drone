@@ -49,8 +49,10 @@ import { createColorCompare } from "./studio/color-compare.js";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
+  createSerialRequestQueue,
   formatColorGradeSummary,
   isCurrentRequestToken,
+  runLatestQueuedRequest,
   shouldRefreshColorInspector,
 } from "./studio/color-workspace.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
@@ -4107,30 +4109,36 @@ import {
   }
 
   const quickLookRequestTokens = new Map();
+  const quickLookSaveQueue = createSerialRequestQueue();
 
-  async function applyQuickLook(clip, lookId) {
+  async function applyQuickLook(clip, lookId, { applyResponse = true } = {}) {
     const studioId = String(clip.dataset.studioId);
     const token = beginRequestToken(quickLookRequestTokens, studioId);
-    let body = null;
-    try {
-      const res = await fetch(`/api/studio/${studioId}/look`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ id: lookId || "" }),
-      });
-      body = await readJson(res);
-      if (!isCurrentRequestToken(quickLookRequestTokens, studioId, token)) {
-        return { superseded: true };
-      }
-      if (!res.ok || !body || !body.ok) {
-        throw new Error((body && body.detail) || msgLookFailed);
-      }
-    } catch (err) {
-      if (!isCurrentRequestToken(quickLookRequestTokens, studioId, token)) {
-        return { superseded: true };
-      }
-      throw err;
+    const desiredLook = lookId || "";
+    const outcome = await runLatestQueuedRequest({
+      store: quickLookRequestTokens,
+      key: studioId,
+      token,
+      queue: quickLookSaveQueue,
+      execute: async () => {
+        const res = await fetch(`/api/studio/${studioId}/look`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ id: desiredLook }),
+        });
+        const body = await readJson(res);
+        if (!res.ok || !body || !body.ok) {
+          throw new Error((body && body.detail) || msgLookFailed);
+        }
+        return body;
+      },
+    });
+    if (outcome.superseded) return { superseded: true };
+    if (!applyResponse) {
+      setSaveState(true);
+      return { superseded: false };
     }
+    const body = outcome.result;
     if (body.image) writeImageAdjust(clip, body.image, true);
     clip.dataset.quickLook = body.quick_look || "";
     const selected = selectedAdjustableClip();
@@ -4165,11 +4173,9 @@ import {
       syncQuickLookChips("");
       updateColorGradeSummary(clip);
     }
-    fetch(`/api/studio/${clip.dataset.studioId}/look`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ id: "" }),
-    }).catch(() => {});
+    // Share the serialized Look queue so clear and Look PATCH cannot finish out of
+    // order. Do not apply the response image — local slider edits may be newer.
+    applyQuickLook(clip, "", { applyResponse: false }).catch(() => {});
   }
 
   function colorProfileDisplayLabel(token) {
