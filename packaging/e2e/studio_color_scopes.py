@@ -198,8 +198,27 @@ def run(out: Path) -> None:
         assert "live scope" in leave_fixture["status"].lower() or "live-scope" in leave_fixture["status"].lower() or "warten" in leave_fixture["status"].lower() or "no live" in leave_fixture["status"].lower(), leave_fixture
         result["cases"].append({"name": "leave_fixture_clears_display", "ok": True})
 
+        live_honest = ev(
+            """(()=>{
+              const root=document.getElementById('inspector-image-section-scopes');
+              const disclosure=root.querySelector('[data-scope-disclosure]').textContent.toLowerCase();
+              const source=root.querySelector('[data-scope-disclosure]').dataset.scopeSource;
+              return {
+                source,
+                mentionsAdapter: disclosure.includes('render-adapter') || disclosure.includes('adapter-tap') || disclosure.includes('anzeige-pixel') || disclosure.includes('display pixels'),
+                claimsEngineTap: source === 'engine-tap'
+              };
+            })()"""
+        )
+        assert live_honest["source"] == "unavailable", live_honest
+        assert live_honest["claimsEngineTap"] is False, live_honest
+        assert live_honest["mentionsAdapter"] is True, live_honest
+        result["cases"].append({"name": "live_unavailable_without_fake_tap", "ok": True})
+
         result["status"] = "PASS"
         result["clip_id"] = cid
+        result["live_media_scopes"] = "NOT_RUN"
+        result["blocked_on"] = "#359 tagged post-grade capture plane"
     except Exception as exc:  # noqa: BLE001
         result["status"] = "FAIL"
         result["error"] = str(exc)

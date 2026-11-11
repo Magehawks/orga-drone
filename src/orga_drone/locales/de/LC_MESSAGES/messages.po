@@ -832,8 +832,8 @@ msgstr "Blau"
 msgid "Test patterns only. Not a measurement of your media."
 msgstr "Nur Testmuster. Keine Messung deiner Medien."
 
-msgid "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged."
-msgstr "Live-Scopes warten auf den Engine-Pixel-Tap. Gespeicherte Grades und Export bleiben unverändert."
+msgid "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged."
+msgstr "Live-Scopes warten auf den gerenderten Adapter-Tap. Anzeige-Pixel werden nicht als Messung genutzt. Gespeicherte Grades und Export bleiben unverändert."
 
 msgid "Engine tap measurement for the selected clip."
 msgstr "Engine-Tap-Messung für den ausgewählten Clip."

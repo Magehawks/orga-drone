@@ -55,7 +55,11 @@ import {
   runLatestQueuedRequest,
   shouldRefreshColorInspector,
 } from "./studio/color-workspace.js";
-import { createColorScopesPanel } from "./studio/scopes/index.js";
+import {
+  createColorScopesPanel,
+  createScopeTapController,
+  probeScopeTapCapability,
+} from "./studio/scopes/index.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
@@ -384,6 +388,7 @@ import {
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   let colorComparison = null;
   let colorScopes = null;
+  let colorScopeTap = null;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -3974,6 +3979,33 @@ import {
 
   function syncColorScopesView() {
     colorScopes?.syncView();
+    colorScopeTap?.sync();
+  }
+
+  function currentScopeTapCapability() {
+    // Refuse today's display/CSS/JPEG candidates; #359 must supply a tagged plane.
+    return probeScopeTapCapability({
+      renderAdapterReady: false,
+      candidates: [
+        { id: "preview-blit", kind: "display-blit", hasFraming: true, hasComposite: true },
+        { id: "css-grade", kind: "css-filter" },
+        { id: "lut-still", kind: "jpeg-still" },
+        {
+          id: "lut-webgl",
+          kind: "webgl-lut",
+          profileTagged: false,
+          transferTagged: false,
+        },
+        {
+          id: "playback-proxy",
+          kind: "playback-proxy",
+          profileTagged: false,
+          transferTagged: false,
+          playing: Boolean(state.playing),
+          gradedProxyReady: false,
+        },
+      ],
+    });
   }
 
   function updateColorGradeSummary(clip) {
@@ -11082,9 +11114,33 @@ import {
       sourceDownsampled: scopesRoot?.dataset.scopeSourceDownsampled,
     },
   });
-  // Engine tap (#366) will call colorScopes.injectFrame(ScopeFrameV1). Until then
-  // the panel stays honest: no synthetic values are shown as media analysis.
+  // #366 orchestration: capability stays unavailable until #359 provides a
+  // tagged post-grade capture plane. Never sample blit/CSS/JPEG as live media.
+  colorScopeTap = createScopeTapController({
+    panel: colorScopes,
+    getView: () => {
+      const clip = selectedAdjustableClip();
+      return {
+        projectId: String(projectId || ""),
+        clipId: clip ? String(clip.dataset.studioId || "") : "",
+        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
+        contextDigest: clip
+          ? [
+              clip.dataset.colorLook || "",
+              clip.dataset.imageAdjust || "",
+              clip.dataset.hsl || "",
+              clip.dataset.colorWheels || "",
+              clip.dataset.detail || "",
+              clip.dataset.saturationRamp || "",
+              clip.dataset.quickLook || "",
+            ].join("|")
+          : "",
+      };
+    },
+    getCapability: currentScopeTapCapability,
+  });
   syncColorScopesView();
+  void colorScopeTap.probe();
 
   colorComparison = createColorCompare({
     button: document.getElementById("inspector-look-compare"),
