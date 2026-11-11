@@ -448,15 +448,17 @@ def test_full_stack_still_matches_export_photo(
         changed_pairs = 0
         for name, box in boxes.items():
             half_box = (box[0] // 2, box[1] // 2, box[2] // 2, box[3] // 2)
+            # Metric A (see docs/discovery/color-scenario-test-report.md):
+            # per-patch mean absolute pixel difference averaged over R,G,B.
+            # Measured worst today: green 1.67 with the still-side JPEG q3 +
+            # BT.601 conversion as the dominant term. This is the same metric
+            # class as the existing photo swatch gate in
+            # test_studio_lut_pixel_parity.py (<=3.0), not the #320 admission
+            # gate itself; that investigation owns the residual.
             error = sum(ImageStat.Stat(
                 ImageChops.difference(a_rgb.crop(half_box), b_rgb.crop(half_box))
             ).mean) / 3
-            # Measured worst patch today: green 3.19 (see
-            # docs/discovery/color-scenario-test-report.md). The residual is
-            # dominated by the still-side JPEG/BT.601 conversion and tracked
-            # with the strict 3.0 gate in issue #320; 5.0 pins today's
-            # behavior without waiving that investigation.
-            assert error <= 5.0, (suffix, name, error)
+            assert error <= 3.0, (suffix, name, error)
             export_mean = _patch_mean(b_rgb, half_box)
             source_mean = _patch_mean(s_rgb, half_box)
             # The grade must visibly reach the exported frame.
@@ -496,10 +498,12 @@ def test_full_stack_still_matches_export_video(
         _run(ffmpeg, "-ss", str(local), "-i", str(output), "-frames:v", "1",
              "-vf", "scale=in_color_matrix=bt709:in_range=tv,format=rgb24", str(extracted))
         with Image.open(still) as a, Image.open(extracted) as b:
+            # Metric C (see docs/discovery/color-scenario-test-report.md):
+            # full-frame per-channel mean absolute difference, asserted at the
+            # worst channel. JPEG still + H.264 chroma/scaling tolerance;
+            # documented in the scenario report. The full stack must not
+            # exceed the single-effect budget already accepted for video.
             difference = ImageStat.Stat(ImageChops.difference(a.convert("RGB"), b.convert("RGB")))
-            # JPEG still + H.264 chroma/scaling tolerance; documented in the
-            # scenario report. The full stack must not exceed the single-effect
-            # budget already accepted for video.
             assert max(difference.mean) < 8, (local, difference.mean)
 
 
@@ -533,12 +537,16 @@ def test_full_stack_neutral_settings_encode_without_grade(
             still_mean = _patch_mean(still_rgb, half_box)
             export_mean = _patch_mean(b.convert("RGB"), half_box)
             for channel in range(3):
-                # Neutral settings must stay inside the documented residual
-                # (worst measured 3.43, still-side JPEG/BT.601 conversion,
-                # tracked in #320) and must not shift the encoded picture.
-                assert abs(still_mean[channel] - export_mean[channel]) <= 5.0, (
+                # Metric B (see docs/discovery/color-scenario-test-report.md):
+                # per-channel patch-mean difference, asserted per channel (so
+                # effectively the worst channel). Neutral still-to-export
+                # measured worst 2.0 on the still-side JPEG/BT.601 conversion;
+                # tracked with #320.
+                assert abs(still_mean[channel] - export_mean[channel]) <= 3.0, (
                     half_box, still_mean, export_mean
                 )
+                # H.264 DC/chroma quantization at quality "best" measured
+                # exactly 6.0 worst-case on Windows and the CI runner.
                 assert abs(export_mean[channel] - source_mean[channel]) <= 6.0, (
                     half_box, export_mean, source_mean
                 )
