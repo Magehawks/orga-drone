@@ -71,6 +71,59 @@ print("PASS: six vectors, gray negative control, quantization and toe branches")
 
 Result on Python 3.12.3: PASS. These values are separate from all #320 historical evidence. The existing #320 reference extractor at `packaging/e2e/studio_photo_lut_probe.py::reference` uses select(frame), scale=640:360 and PNG, without a BT.709-to-sRGB transfer conversion. It remains unchanged. Managed evidence must use the new explicitly profiled boundary and a distinct result ID; raw mismatched codes are INVALID_MANAGED_BOUNDARY.
 
+## Alpha reference vectors
+
+Correction for [P2 alpha-stage finding](https://github.com/Magehawks/orga-drone/pull/367#discussion_r4541836757): alpha preservation applies only to equivalent pre-composite taps. The final encoded gate compares opaque RGB outputs after composing preview once over the same black background. MP4 has no alpha plane; its implicit alpha=1 is not compared with the pre-composite coverage. All established thresholds and L320 are unchanged. These are analytical vectors, not production application/codec measurements.
+
+Expected straight linear BT.709/D65 RGBA for an identity operator:
+
+- 50% coverage: both equivalent pre-composite taps are `(0.18, 0.5, 1.0, 0.5)`; alpha difference is zero. Their black-composited result is `(0.09, 0.25, 0.5, 1.0)`. The reference export's encoded BT.709 RGB is approximately `(0.272883424630, 0.489939517664, 0.705515089922)` with implicit alpha=1. After inverse BT.709 and common sRGB/Q8, both ideal final outputs have RGB8 `(85, 137, 188)` and implicit/display alpha8=255. Comparing 0.5 with 1 would be an invalid stage comparison, not an alpha-preservation failure.
+- Fully transparent: both equivalent canonical pre-composite taps are `(0, 0, 0, 0)`; alpha difference is zero. Both black-composited outputs are `(0, 0, 0, 1)` and final RGBA8 `(0, 0, 0, 255)`. Arbitrary hidden straight RGB at alpha=0 also contributes zero to the composite; canonicalize it to zero for the equivalent operator RGB comparison rather than treating hidden color as visible export error.
+- Readback quantization is separate: exact float alpha=0.5 quantizes to alpha8=128, representing 128/255, not exact 0.5. Observed sRGB RGBA8 `(118, 188, 255, 128)` decodes and black-composites to RGB8 `(85, 138, 188)` with alpha8=255. Retain this one-code green residual versus the ideal `(85, 137, 188)`. Do not replace observed values with ideal taps to make a measured gate pass. Alpha remains within the unchanged 1/255 bound when comparing equivalent quantized/float pre-composite taps.
+
+Run this standard-library snippet after the transfer snippet above (it reuses only its `srgb`, `bt709`, `decode_srgb`, `decode_bt709` and `q8` functions):
+
+```python
+
+def over_black(rgb, alpha):
+    return tuple(alpha*c for c in rgb), 1.0
+
+
+def rgb8(rgb):
+    return tuple(q8(srgb(c)) for c in rgb)
+
+
+for rgb, alpha, expected_linear, expected_codes in [
+    ((.18, .5, 1.0), .5, (.09, .25, .5), (85, 137, 188)),
+    ((0.0, 0.0, 0.0), 0.0, (0.0, 0.0, 0.0), (0, 0, 0)),
+]:
+    # Equivalent pre-composite identity taps preserve alpha and linear RGB.
+    reference_tap = (rgb, alpha)
+    candidate_tap = (rgb, alpha)
+    assert abs(candidate_tap[1]-reference_tap[1]) <= 1/255
+    final_rgb, final_alpha = over_black(*candidate_tap)
+    assert final_rgb == expected_linear and final_alpha == 1.0
+    # Ideal encoded export represents the already-composited RGB, not raw RGB.
+    export_encoded = tuple(bt709(c) for c in expected_linear)
+    export_linear = tuple(decode_bt709(c) for c in export_encoded)
+    assert rgb8(export_linear) == rgb8(final_rgb) == expected_codes
+    assert q8(final_alpha) == 255  # implicit opaque MP4 alpha, not tap alpha
+    if alpha == .5:
+        assert abs(alpha-1.0) > 1/255  # demonstrates why cross-stage test is invalid
+
+assert over_black((.18, .5, 1.0), 0.0) == ((0.0, 0.0, 0.0), 1.0)
+assert q8(.5) == 128
+observed_rgb = tuple(decode_srgb(c/255) for c in (118, 188, 255))
+observed_alpha = 128/255
+assert abs(observed_alpha-.5) <= 1/255
+observed_final, observed_final_alpha = over_black(observed_rgb, observed_alpha)
+assert rgb8(observed_final) == (85, 138, 188)
+assert observed_final_alpha == 1.0
+print("PASS: half-alpha, transparent pixels, opaque final RGB and readback quantization")
+```
+
+Result on Python 3.12.3: PASS. These assertions verify the reference arithmetic and comparison-stage distinction only. Equivalent real adapter-tap alpha preservation and actual MP4/preview encoded parity remain NOT_RUN; independent harness/application evidence remains mandatory. No production comparator, renderer, test or #320 metric is changed.
+
 ## Completed original CI and develop comparison
 
 PR original head: `599b5b31554ed713723865ffdebb8b01f11b2c00`; develop baseline and current fetched origin/develop: `8ff25454672de14b312e5b9e4d553a9c57d1b8ef`. The completed [PR run 43067423342](https://github.com/Magehawks/orga-drone/actions/runs/43067423342) and completed [develop run 42918380509](https://github.com/Magehawks/orga-drone/actions/runs/42918380509) BOTH fail the same two jobs. This is actual baseline-run evidence, not an inference from a docs-only label.
