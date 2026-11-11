@@ -1,0 +1,18 @@
+{
+  "legacy": {
+    "image": {"exposure": 20, "contrast": 10, "saturation": 30, "warmth": -5, "highlights": 12, "shadows": -4, "blacks": 3, "future": {"keep": [null, 1]}},
+    "color": {"input_profile": "dlog_m", "conversion_lut": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.cube", "conversion_confirmed": true, "creative_lut": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cube", "creative_strength": 50, "future": [1, 2]},
+    "hsl": {"ranges": {"red": {"hue": 10, "saturation": 20, "luminance": 5, "future": "keep"}}},
+    "color_wheels": {"wheels": {"shadows": {"x": 0.25, "y": 0.5, "future": "keep"}}},
+    "detail": {"sharpen": 10, "denoise": 5, "future": true},
+    "saturation_ramp": {"enabled": true, "start_s": 0, "end_s": 4, "start_saturation": 100, "end_saturation": 0, "future": true},
+    "color_animation": {"v": 1, "mode": "manual", "interp": "linear", "bar": {"start_s": 0, "end_s": 4}, "keys": [{"t": 0, "exposure": 0, "contrast": 0, "saturation": 0, "warmth": 0, "lut_strength": 0}, {"t": 4, "exposure": 40, "contrast": 20, "saturation": 60, "warmth": -10, "lut_strength": 100}], "future": {"keep": 1}},
+    "overlays": [{"untouched": true}], "future_effect": {"keep": [false, null]}
+  },
+  "at_source_local_2": {
+    "operation_types": ["legacy-image-v1", "legacy-technical-lut-v1", "legacy-creative-lut-v1", "legacy-hsl-v1", "legacy-wheels-v1", "legacy-detail-v1", "legacy-saturation-ramp-v1"],
+    "image": {"exposure": 20, "contrast": 10, "saturation": 30, "warmth": -5, "highlights": 12, "shadows": -4, "blacks": 3},
+    "creative_strength": 50, "ramp_multiplier": 0.5,
+    "asset_ids": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.cube", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cube"]
+  }
+}
