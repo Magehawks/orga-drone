@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  SCOPE_CAPTURE_PLANES,
+  SCOPE_CAPTURE_STAGES,
   SCOPE_SOURCE_KINDS,
   SCOPE_TAP_IDS,
   SCOPE_TAP_REASONS,
@@ -10,6 +12,33 @@ import {
   probeScopeTapCapability,
   refusePreviewCandidate,
 } from "../../src/orga_drone/static/js/studio/scopes/index.js";
+
+function taggedDescriptor(fixture, overrides = {}) {
+  return {
+    width: fixture.width,
+    height: fixture.height,
+    stride: fixture.stride,
+    rgb: fixture.rgb,
+    channels: fixture.channels,
+    profile: "bt709",
+    transfer: "bt709",
+    captureStage: SCOPE_CAPTURE_STAGES.CLIP_POST_GRADE_PRE_FRAME,
+    capturePlane: SCOPE_CAPTURE_PLANES.BT709_ENCODED_RGBA,
+    tapId: SCOPE_TAP_IDS.CLIP_POST_GRADE,
+    straightAlpha: true,
+    legalRange: false,
+    ptsNum: 1,
+    ptsDen: 30,
+    frameIndex: 3,
+    projectId: "p1",
+    clipId: "c1",
+    gradeRevision: "9",
+    contextDigest: "digest",
+    roi: { x: 0, y: 0, width: fixture.width, height: fixture.height },
+    sampleFactor: 2,
+    ...overrides,
+  };
+}
 
 test("probe refuses current preview candidates and stays unavailable", () => {
   const capability = probeScopeTapCapability({
@@ -25,6 +54,16 @@ test("probe refuses current preview candidates and stays unavailable", () => {
   assert.equal(capability.reason, SCOPE_TAP_REASONS.AWAITING_RENDER_ADAPTER);
   assert.ok(capability.notes.some((n) => n.includes("display-blit")));
   assert.ok(capability.notes.some((n) => n.includes("css-filter")));
+});
+
+test("renderAdapterReady alone never makes capability available", () => {
+  const capability = probeScopeTapCapability({
+    renderAdapterReady: true,
+    candidates: [],
+  });
+  assert.equal(capability.available, false);
+  assert.equal(capability.reason, SCOPE_TAP_REASONS.AWAITING_RENDER_ADAPTER);
+  assert.ok(capability.notes.some((n) => n.includes("flag-alone-never-qualifies")));
 });
 
 test("refusePreviewCandidate covers framing, CSS, JPEG and untagged GPU paths", () => {
@@ -52,29 +91,73 @@ test("refusePreviewCandidate covers framing, CSS, JPEG and untagged GPU paths", 
   );
 });
 
-test("buildScopeFrameFromTaggedRgb produces engine-tap frames for fixtures buffers", () => {
+test("fully tagged buffer builds an engine-tap ScopeFrameV1", () => {
   const fixture = createScopeFixture("red");
-  const frame = buildScopeFrameFromTaggedRgb({
-    width: fixture.width,
-    height: fixture.height,
-    stride: fixture.stride,
-    rgb: fixture.rgb,
-    channels: fixture.channels,
-    projectId: "p1",
-    clipId: "c1",
-    gradeRevision: "9",
-    contextDigest: "digest",
-    frameIndex: 3,
-    ptsNum: 1,
-    ptsDen: 30,
-    sampleFactor: 2,
-  });
+  const frame = buildScopeFrameFromTaggedRgb(taggedDescriptor(fixture));
   assert.equal(frame.sourceKind, SCOPE_SOURCE_KINDS.ENGINE_TAP);
   assert.equal(frame.tapId, SCOPE_TAP_IDS.CLIP_POST_GRADE);
   assert.equal(frame.profile, "bt709");
   assert.equal(frame.transfer, "bt709");
   assert.equal(frame.sampleFactor, 2);
   assert.equal(frame.clipId, "c1");
+  assert.equal(frame.frameIndex, 3);
+  assert.equal(frame.ptsDen, 30);
+  assert.equal(frame.straightAlpha, true);
+});
+
+test("missing or mislabeled provenance is rejected before engine-tap creation", () => {
+  const fixture = createScopeFixture("gray");
+  const base = taggedDescriptor(fixture);
+
+  for (const key of [
+    "profile",
+    "transfer",
+    "captureStage",
+    "capturePlane",
+    "tapId",
+    "straightAlpha",
+    "ptsNum",
+    "ptsDen",
+    "frameIndex",
+    "projectId",
+    "clipId",
+    "gradeRevision",
+    "contextDigest",
+    "roi",
+    "sampleFactor",
+    "channels",
+  ]) {
+    const broken = { ...base };
+    delete broken[key];
+    assert.throws(() => buildScopeFrameFromTaggedRgb(broken), /missing-scope-frame-provenance/);
+  }
+
+  assert.throws(
+    () => buildScopeFrameFromTaggedRgb(taggedDescriptor(fixture, { profile: "display-p3" })),
+    /invalid-scope-frame-provenance:profile/
+  );
+  assert.throws(
+    () => buildScopeFrameFromTaggedRgb(taggedDescriptor(fixture, { transfer: "pq" })),
+    /invalid-scope-frame-provenance:transfer/
+  );
+  assert.throws(
+    () =>
+      buildScopeFrameFromTaggedRgb(
+        taggedDescriptor(fixture, {
+          captureStage: SCOPE_CAPTURE_STAGES.CLIP_POST_GRADE_PRE_FRAME,
+          tapId: SCOPE_TAP_IDS.PROJECT_COMPOSITE,
+        })
+      ),
+    /captureStage\/tapId-mismatch/
+  );
+  assert.throws(
+    () => buildScopeFrameFromTaggedRgb(taggedDescriptor(fixture, { straightAlpha: "yes" })),
+    /straightAlpha/
+  );
+  assert.throws(
+    () => buildScopeFrameFromTaggedRgb({ rgb: fixture.rgb }),
+    /missing-scope-frame-provenance/
+  );
 });
 
 test("controller never publishes while capability is unavailable", () => {
@@ -101,17 +184,18 @@ test("controller never publishes while capability is unavailable", () => {
   });
 
   const fixture = createScopeFixture("gray");
-  const fakeLive = buildScopeFrameFromTaggedRgb({
-    width: fixture.width,
-    height: fixture.height,
-    stride: fixture.stride,
-    rgb: fixture.rgb,
-    channels: fixture.channels,
-    projectId: "p",
-    clipId: "a",
-    gradeRevision: "1",
-    contextDigest: "x",
-  });
+  const fakeLive = buildScopeFrameFromTaggedRgb(
+    taggedDescriptor(fixture, {
+      projectId: "p",
+      clipId: "a",
+      gradeRevision: "1",
+      contextDigest: "x",
+      sampleFactor: 1,
+      frameIndex: 1,
+      ptsNum: 0,
+      ptsDen: 1,
+    })
+  );
 
   const denied = controller.tryPublish(fakeLive);
   assert.equal(denied.accepted, false);
@@ -128,10 +212,11 @@ test("controller never publishes while capability is unavailable", () => {
   controller.destroy();
 });
 
-test("controller publishes only when capability is available and rate allows", () => {
+test("first eligible frame is not rate-limited; view change resets throttle and rejects stale", () => {
   const injected = [];
-  let available = false;
+  let available = true;
   let t = 0;
+  let view = { projectId: "p", clipId: "a", gradeRevision: "1", contextDigest: "x" };
   const panel = {
     injectFrame(frame) {
       injected.push(frame);
@@ -141,12 +226,7 @@ test("controller publishes only when capability is available and rate allows", (
   };
   const controller = createScopeTapController({
     panel,
-    getView: () => ({
-      projectId: "p",
-      clipId: "a",
-      gradeRevision: "1",
-      contextDigest: "x",
-    }),
+    getView: () => view,
     getCapability: () => ({
       available,
       reason: available ? "" : SCOPE_TAP_REASONS.AWAITING_RENDER_ADAPTER,
@@ -157,29 +237,54 @@ test("controller publishes only when capability is available and rate allows", (
     minIntervalMs: 50,
   });
   const fixture = createScopeFixture("blue");
-  const frame = buildScopeFrameFromTaggedRgb({
-    width: fixture.width,
-    height: fixture.height,
-    stride: fixture.stride,
-    rgb: fixture.rgb,
-    channels: fixture.channels,
-    projectId: "p",
-    clipId: "a",
-    gradeRevision: "1",
-    contextDigest: "x",
-    frameIndex: 1,
-  });
+  const frameA = buildScopeFrameFromTaggedRgb(
+    taggedDescriptor(fixture, {
+      projectId: "p",
+      clipId: "a",
+      gradeRevision: "1",
+      contextDigest: "x",
+      frameIndex: 1,
+      ptsNum: 0,
+      ptsDen: 1,
+      sampleFactor: 1,
+    })
+  );
 
-  assert.equal(controller.tryPublish(frame).accepted, false);
-  available = true;
-  t = 100;
-  assert.equal(controller.tryPublish(frame).accepted, true);
+  // Fake clock at 0 must still accept the first frame (sentinel, not lastPublishMs=0).
+  t = 0;
+  assert.equal(controller.tryPublish(frameA).accepted, true);
   assert.equal(injected.length, 1);
-  t = 120;
-  assert.equal(controller.tryPublish(frame).accepted, false);
-  assert.equal(controller.tryPublish(frame).reason, "rate-limited");
-  t = 160;
-  assert.equal(controller.tryPublish(frame).accepted, true);
+
+  t = 20;
+  assert.equal(controller.tryPublish(frameA).accepted, false);
+  assert.equal(controller.tryPublish(frameA).reason, "rate-limited");
+
+  // Clip/seek/revision change clears throttle and rejects the previous clip frame.
+  view = { projectId: "p", clipId: "b", gradeRevision: "1", contextDigest: "y" };
+  controller.sync();
+  t = 25;
+  assert.equal(controller.tryPublish(frameA).accepted, false);
+  assert.equal(controller.tryPublish(frameA).reason, SCOPE_TAP_REASONS.STALE_VIEW);
+
+  const frameB = buildScopeFrameFromTaggedRgb(
+    taggedDescriptor(fixture, {
+      projectId: "p",
+      clipId: "b",
+      gradeRevision: "1",
+      contextDigest: "y",
+      frameIndex: 2,
+      ptsNum: 1,
+      ptsDen: 30,
+      sampleFactor: 1,
+    })
+  );
+  assert.equal(controller.tryPublish(frameB).accepted, true);
+  assert.equal(injected.length, 2);
+
+  // Revision change: old revision is stale even if clip id matches.
+  view = { projectId: "p", clipId: "b", gradeRevision: "2", contextDigest: "y2" };
+  controller.sync();
+  assert.equal(controller.tryPublish(frameB).reason, SCOPE_TAP_REASONS.STALE_VIEW);
   controller.destroy();
 });
 

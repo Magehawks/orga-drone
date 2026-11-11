@@ -41,24 +41,42 @@ probeScopeTapCapability(snapshot) -> {
   notes: string[]
 }
 
+assertTaggedRgbProvenance(descriptor) -> { profile, transfer, captureStage, capturePlane, tapId }
 buildScopeFrameFromTaggedRgb(descriptor) -> ScopeFrameV1
-  // descriptor must include profile/transfer = bt709, identity fields,
-  // ROI, sampleFactor, and a Float32 RGB(A) buffer already in encoded [0,1].
+  // No silent defaults. Producer must supply every provenance field below.
 
 createScopeTapController({ panel, getView, getCapability, now, minIntervalMs })
   -> { sync(), tryPublish(frame), getStatus(), destroy() }
 ```
+
+### Required producer provenance (no defaults)
+
+| Field | Requirement |
+| --- | --- |
+| `profile` / `transfer` | Explicit `"bt709"` |
+| `captureStage` | `clip-post-grade-pre-frame` or `project-composite` |
+| `capturePlane` | `bt709-encoded-rgba` |
+| `tapId` | Must match `captureStage` |
+| `projectId` / `clipId` / `gradeRevision` / `contextDigest` | Non-empty strings |
+| `frameIndex` / `ptsNum` / `ptsDen` | Explicit safe integers (`ptsDen >= 1`) |
+| `roi` / `sampleFactor` | Explicit; subsample must not pretend full-res |
+| `straightAlpha` / `legalRange` | Explicit booleans |
+| `width` / `height` / `stride` / `channels` / `rgb` | Explicit buffer geometry |
+
+`captureStage` / `capturePlane` are validated at the adapter boundary pending any
+ADR extension of ScopeFrameV1 itself; they are not invented from the builder name.
 
 Rules:
 
 1. Controllers may call `panel.injectFrame` only when `sourceKind === "engine-tap"`
    and capability `available === true`.
 2. Controllers must call `panel.syncView()` on clip/seek/grade/project changes
-   (Studio already clears stale display via #362).
+   and reset publish throttling; stale identity is rejected before a successful publish.
 3. Subsampling must set `sampleFactor` and never claim full-resolution reference.
 4. No new public HTTP endpoint; no grade/export writes; no `#320` changes.
 5. Until #359 publishes a tagged capture plane, `probeScopeTapCapability`
    returns `available: false`, reason `awaiting-render-adapter-359`.
+6. `renderAdapterReady: true` alone never qualifies a buffer or sets `available`.
 
 ## Delivered in this PR
 
