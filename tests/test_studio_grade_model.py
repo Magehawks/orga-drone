@@ -643,3 +643,77 @@ def test_typed_error_survives_context_manager_unwinding() -> None:
         with boundary():
             read_grade({"grade": None})
     assert caught.value.as_dict()["code"] == "INVALID_GRADE"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        r'{"note":"bad\q","grade"}',
+        r'{"note":"bad\q","grade":null}',
+        r'{"note":"bad\uZZZZ","grade":{',
+        r'{"note":"bad\q","gr\u0061de"}',
+        r'{"note":"bad\q","\u0067rade":null}',
+        r'{"note":"bad\q, } [ \"quoted\"","grade":null}',
+        r'{"note":"escaped slash \\","grade"}',
+        '{"note":"bad\ncontrol","grade":null}',
+        r'{"nested":{"note":"bad\q","grade":12},"grade"}',
+        r'{"nested":[{"text":"bad\q"},"grade"],"grade"}',
+        r'{"grade":{"note":"bad\q"}}',
+        r'{"grade","note":"bad\q"}',
+        r'{"gr\u0061de":null,"note":"bad\q"}',
+    ],
+)
+def test_root_grade_remains_canonical_across_damaged_strings(raw) -> None:
+    with pytest.raises(GradeError) as error:
+        read_grade(raw)
+    assert error.value.code == "INVALID_GRADE"
+    assert "Corrupt canonical" in error.value.message
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        r'{"note":"bad\q","label":"grade"}',
+        r'{"note":"bad\q","label":"grade: null"}',
+        r'{"note":"bad\q \"grade\":null"}',
+        r'{"note":"bad\q, \"grade\":null } ["}',
+        r'{"note":"bad\q","nested":{"grade":null}}',
+        r'{"nested":{"note":"bad\q","grade":null}}',
+        r'{"note":"bad\q","nested":["grade",{"grade":null}]}',
+        r'{"note":"bad\q","nested":[{"gr\u0061de":null}]}',
+        r'{"note":"bad\q","label":"\u0067rade"}',
+        r'{"note":"bad\q","gr\\u0061de":null}',
+        r'{"note":"bad\q","label":"slash \\","image":',
+        r'{"note":"bad\q"} {"grade":null}',
+        r'[ {"note":"bad\q","grade":null} ]',
+        r'{"note":"unterminated grade: null',
+        r'{"note":"bad\q grade',
+        r'{"note" "grade":null}',  # no root member separator: ambiguous value position
+        r'{"nested":[} ,"grade":null}',  # mismatched brackets: cannot infer root position
+        r'{"note":"bad\q","grade_suffix":null}',
+    ],
+)
+def test_damaged_legacy_values_nested_keys_and_ambiguous_text_do_not_claim_grade(
+    raw,
+) -> None:
+    model = read_grade(raw)
+    assert model.authority == "legacy"
+    assert model.diagnostics == ("legacy-invalid-json",)
+    assert model.original_effect_settings() == raw
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        r'{"label":"grade"}',
+        r'{"label":"\"grade\":null"}',
+        r'{"nested":{"grade":null}}',
+        r'{"nested":[{"grade":null}]}',
+        r'{"label":"slash \\ and quote \" and braces {},"}',
+    ],
+)
+def test_valid_legacy_strings_and_nested_grade_keep_original_values(raw) -> None:
+    model = read_grade(raw)
+    assert model.authority == "legacy" and not model.diagnostics
+    assert model.to_dict() == json.loads(raw)
+    assert model.original_effect_settings() == raw

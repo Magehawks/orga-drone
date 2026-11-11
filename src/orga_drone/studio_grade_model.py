@@ -224,31 +224,54 @@ def _validate_grade(grade: dict[str, Any]) -> None:
 
 
 def _has_canonical_member(raw: str) -> bool:
-    """Recognize a root grade key in damaged JSON without matching string contents.
+    """Find lexically identifiable root keys even after invalid string escapes.
 
-    Only used on failed parsing. Ambiguous corrupt legacy text remains diagnostic;
-    a visible canonical envelope must never downgrade into a neutral legacy plan.
+    This is a corruption guard, not a recovering JSON parser. Quoted spans are
+    scanned with escape parity even when their contents cannot be decoded. Only
+    a decodable key in root member position establishes canonical authority;
+    values, nested keys, trailing documents and unterminated spans do not.
+    A root grade key alone is enough: its colon/value may themselves be damaged.
     """
-    if not raw.lstrip().startswith("{"):
+    index = len(raw) - len(raw.lstrip())
+    if index == len(raw) or raw[index] != "{":
         return False
-    decoder = json.JSONDecoder()
-    depth = 0
-    index = 0
+    stack = ["{"]
+    root_key = True
+    index += 1
     while index < len(raw):
         char = raw[index]
         if char == '"':
-            try:
-                token, end = decoder.raw_decode(raw, index)
-            except ValueError:
+            start = index
+            index += 1
+            while index < len(raw) and raw[index] != '"':
+                # Invalid escapes still escape the next lexical character. In
+                # particular, do not treat quoted commas/braces as structure.
+                index += 2 if raw[index] == "\\" else 1
+            if index >= len(raw):
                 return False
-            if depth == 1 and token == "grade" and raw[end:].lstrip().startswith(":"):
-                return True
-            index = end
+            index += 1
+            if len(stack) == 1 and root_key:
+                try:
+                    key = json.loads(raw[start:index])
+                except ValueError:
+                    key = None
+                if key == "grade":
+                    return True
+                root_key = False
             continue
         if char in "{[":
-            depth += 1
+            stack.append(char)
         elif char in "}]":
-            depth -= 1
+            if not stack or stack[-1] != ("{" if char == "}" else "["):
+                return False
+            stack.pop()
+            if not stack:
+                return False
+        elif len(stack) == 1:
+            if char == ",":
+                root_key = True
+            elif char == ":":
+                root_key = False
         index += 1
     return False
 
