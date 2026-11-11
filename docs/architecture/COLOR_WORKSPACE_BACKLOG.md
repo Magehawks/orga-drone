@@ -274,3 +274,9 @@ Acceptance:
 - Disclose deterministic subsampling separately from full-resolution reference; measure resource lifetime/cancellation and performance.
 
 Out of scope: UI, HDR scopes, calibration claims, new renderer or color-threshold changes.
+
+## Review revision: mandatory gates before implementation
+
+The binding engineering criteria on all 47 issues apply in addition to this backlog; see the [contract mapping](COLOR_WORKSPACE_CONTRACT.md#binding-po-engineering-criteria-across-the-47-issue-portfolio). ADR acceptance is required before any implementation, including fixture-backed module/UI work. #351 requires explicit PO decisions for minimum-reader/startup, separate database/backup naming and permissions, verified restore/downgrade and later-edit-loss consent before canonical writes.
+
+#352/#359/#360 must emit/capture declared profiles and implement the reviewed common comparison boundary. #364 must separately report unchanged legacy L320 and proposed managed M709-SRGB8-v1, including the .18 negative-control vector, quantization, alpha, frame/raster metadata and unsupported-reference errors; #365 cannot use a managed PASS to close legacy FAILs. No existing issue or numeric #320 tolerance is changed. Runtime E2E is deferred to those implementation/evidence issues; Phase A evidence is documentation/arithmetic/baseline diagnosis only. See [review evidence](COLOR_WORKSPACE_REVIEW_EVIDENCE.md).
