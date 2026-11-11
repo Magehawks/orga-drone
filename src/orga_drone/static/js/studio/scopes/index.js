@@ -2,12 +2,16 @@
 
 export {
   SCOPE_FRAME_VERSION,
+  SCOPE_PROFILES,
   SCOPE_SOURCE_KINDS,
   SCOPE_TAP_IDS,
+  SCOPE_TRANSFERS,
   createScopeFrameV1,
   describeScopeSource,
   isScopeFrameCurrent,
+  requireSafeInt,
   scopeFrameIdentity,
+  scopeViewKey,
 } from "./scope-frame.js";
 
 export {

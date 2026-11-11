@@ -32,6 +32,20 @@ Fields follow ADR 0035: RGB buffer (BT.709 encoded [0,1] RGBA), dimensions/strid
 profile/transfer, straight alpha, PTS/frame index, project/clip/grade revision/
 context digest, tap ID, ROI, sample factor, `sourceKind` (`fixture` | `engine-tap`).
 
+Validation (UI gate before display):
+
+- Dimensions, ROI, stride, `frameIndex`, and PTS use safe-integer checks (no
+  bitwise `|0` truncation).
+- `ptsDen` must be a positive safe integer; `profile`/`transfer` must be `bt709`.
+- `rgb` is a defensive `Float32Array` copy. The frame object and ROI are frozen;
+  TypedArray element slots cannot be deeply frozen in JS — callers must treat
+  `rgb` as read-only.
+
+View binding: `panel.syncView()` / `invalidate()` clears live measurements when
+project, clip, grade revision, or context digest changes so a previous clip
+cannot remain on screen. Studio calls this from selection and grade-summary
+refresh. Fixture mode stays disclosed as a test pattern across clip switches.
+
 Math (reference):
 
 - Histogram: 256 bins, `min(255, floor(256*c))`; luma `Y'=0.2126R'+0.7152G'+0.0722B'`

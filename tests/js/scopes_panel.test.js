@@ -21,6 +21,8 @@ test("template exposes four scope controls and Pro-only hooks", () => {
 test("entry mounts scopes without embedding accumulate math", () => {
   const entry = fs.readFileSync("src/orga_drone/static/js/studio.js", "utf8");
   assert.match(entry, /createColorScopesPanel/);
+  assert.match(entry, /syncColorScopesView/);
+  assert.match(entry, /colorScopes\?\.syncView/);
   assert.equal(entry.includes("histogramBin"), false);
   assert.equal(entry.includes("VECTORSCOPE_CB_SCALE"), false);
 });

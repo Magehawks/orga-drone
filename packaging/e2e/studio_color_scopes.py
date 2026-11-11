@@ -179,6 +179,25 @@ def run(out: Path) -> None:
         assert fixture["wheels"] == before["wheels"], fixture
         result["cases"].append({"name": "fixture_disclosure_no_grade_mutation", "ok": True})
 
+        leave_fixture = ev(
+            """(()=>{
+              const root=document.getElementById('inspector-image-section-scopes');
+              const enable=root.querySelector('[data-scope-fixture-enable]');
+              enable.checked=false;
+              enable.dispatchEvent(new Event('change',{bubbles:true}));
+              return {
+                fixtureMode: root.dataset.scopeFixtureMode,
+                disclosure: root.querySelector('[data-scope-disclosure]').textContent,
+                source: root.querySelector('[data-scope-disclosure]').dataset.scopeSource,
+                status: root.querySelector('[data-scope-status]').textContent
+              };
+            })()"""
+        )
+        assert leave_fixture["fixtureMode"] == "0", leave_fixture
+        assert leave_fixture["source"] == "unavailable", leave_fixture
+        assert "live scope" in leave_fixture["status"].lower() or "live-scope" in leave_fixture["status"].lower() or "warten" in leave_fixture["status"].lower() or "no live" in leave_fixture["status"].lower(), leave_fixture
+        result["cases"].append({"name": "leave_fixture_clears_display", "ok": True})
+
         result["status"] = "PASS"
         result["clip_id"] = cid
     except Exception as exc:  # noqa: BLE001

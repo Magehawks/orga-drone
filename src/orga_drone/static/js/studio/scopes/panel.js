@@ -11,6 +11,7 @@ import {
   describeScopeSource,
   isScopeFrameCurrent,
   scopeFrameIdentity,
+  scopeViewKey,
 } from "./scope-frame.js";
 
 export const SCOPE_KINDS = Object.freeze(["histogram", "waveform", "parade", "vectorscope"]);
@@ -40,6 +41,12 @@ export function createColorScopesPanel({
       injectFrame() {
         return { accepted: false, reason: "missing-root" };
       },
+      syncView() {
+        return { changed: false, cleared: false };
+      },
+      invalidate() {
+        return { changed: false, cleared: false };
+      },
       getState() {
         return null;
       },
@@ -67,6 +74,7 @@ export function createColorScopesPanel({
   let droppedFrames = 0;
   let acceptedFrames = 0;
   let pending = false;
+  let boundViewKey = "";
 
   const label = (key, fallback) => messages[key] || fallback;
 
@@ -112,6 +120,13 @@ export function createColorScopesPanel({
     paintScope(canvas, activeKind, measurements);
   }
 
+  function clearCanvas() {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#141414";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
   function processFrame(frame) {
     const started = now();
     measurements = accumulateAllScopes(frame, {
@@ -140,13 +155,36 @@ export function createColorScopesPanel({
     currentFrame = null;
     measurements = null;
     latestIdentity = "";
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#141414";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    clearCanvas();
     setStatus(label("waiting", "No live scope tap yet"));
     setDisclosure();
+  }
+
+  /**
+   * Bind the panel to the current project/clip/grade context.
+   * Live measurements from a previous view are cleared immediately so they
+   * cannot appear as the current clip's analysis.
+   */
+  function syncView(nextView) {
+    const view = nextView || getView() || {};
+    const key = scopeViewKey(view);
+    if (key === boundViewKey) {
+      return { changed: false, cleared: false, viewKey: key };
+    }
+    boundViewKey = key;
+    if (fixtureMode) {
+      // Disclosed fixtures are not live media measurements; keep the pattern.
+      setDisclosure();
+      return { changed: true, cleared: false, viewKey: key };
+    }
+    const hadLive = Boolean(currentFrame || measurements);
+    if (hadLive) clearLive();
+    else {
+      clearCanvas();
+      setStatus(label("waiting", "No live scope tap yet"));
+      setDisclosure();
+    }
+    return { changed: true, cleared: hadLive, viewKey: key };
   }
 
   function applyFixture() {
@@ -158,20 +196,21 @@ export function createColorScopesPanel({
     processFrame(frame);
   }
 
-  /**
-   * Accept a ScopeFrameV1 from a future engine tap (#366).
-   * Stale identities are dropped and counted; fixtures stay labeled separately.
-   */
   function isOlderThanCurrent(frame) {
     if (!currentFrame) return false;
     if (frame.frameIndex < currentFrame.frameIndex) return true;
     if (frame.frameIndex > currentFrame.frameIndex) return false;
-    const nextPts = frame.ptsDen ? frame.ptsNum / frame.ptsDen : 0;
-    const curPts = currentFrame.ptsDen ? currentFrame.ptsNum / currentFrame.ptsDen : 0;
+    const nextPts = frame.ptsNum / frame.ptsDen;
+    const curPts = currentFrame.ptsNum / currentFrame.ptsDen;
     return nextPts < curPts;
   }
 
+  /**
+   * Accept a ScopeFrameV1 from a future engine tap (#366).
+   * Stale identities are dropped and counted; fixtures stay labeled separately.
+   */
   function injectFrame(frame) {
+    syncView();
     if (fixtureMode) {
       return { accepted: false, reason: "fixture-mode" };
     }
@@ -226,7 +265,11 @@ export function createColorScopesPanel({
     fixtureMode = Boolean(enableFixture?.checked);
     root.dataset.scopeFixtureMode = fixtureMode ? "1" : "0";
     if (fixtureMode) applyFixture();
-    else clearLive();
+    else {
+      // Leaving fixture mode must not keep a test pattern as a live reading.
+      clearLive();
+      syncView();
+    }
   }
 
   kindGroup?.addEventListener("click", onKindClick);
@@ -243,10 +286,13 @@ export function createColorScopesPanel({
     fixtureSelect.value = fixtureId;
   }
 
+  boundViewKey = scopeViewKey(getView() || {});
   clearLive();
 
   return {
     injectFrame,
+    syncView,
+    invalidate: syncView,
     showFixture(id) {
       fixtureMode = true;
       if (enableFixture) enableFixture.checked = true;
@@ -271,6 +317,7 @@ export function createColorScopesPanel({
         fixtureMode,
         fixtureId,
         latestIdentity,
+        boundViewKey,
         hasMeasurements: Boolean(measurements),
         sourceKind: currentFrame ? currentFrame.sourceKind : null,
       };
