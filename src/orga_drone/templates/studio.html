@@ -1273,7 +1273,7 @@
           </details>
           <details id="inspector-image-section-scopes" class="studio-image-section" data-scope-fixture-mode="0"
                    data-scope-fixture-disclosure="{{ _('Test patterns only. Not a measurement of your media.')|e }}"
-                   data-scope-unavailable-disclosure="{{ _('Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.')|e }}"
+                   data-scope-unavailable-disclosure="{{ _('Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.')|e }}"
                    data-scope-live-disclosure="{{ _('Engine tap measurement for the selected clip.')|e }}"
                    data-scope-waiting="{{ _('No live scope tap yet')|e }}"
                    data-scope-dropped="{{ _('Dropped frames: {count}')|e }}"
@@ -1282,7 +1282,7 @@
                    data-scope-source-composite="{{ _('Project composite tap')|e }}"
                    data-scope-source-downsampled="{{ _('Downsampled measurement')|e }}">
             <summary>{{ _('Scopes') }}</summary>
-            <p class="hint" data-scope-disclosure role="note">{{ _('Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.') }}</p>
+            <p class="hint" data-scope-disclosure role="note">{{ _('Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.') }}</p>
             <div class="studio-scopes-toolbar" role="group" aria-label="{{ _('Scope tools') }}">
               <div class="studio-scopes-kinds" data-scope-kinds role="group" aria-label="{{ _('Scope type') }}">
                 <button type="button" class="studio-scopes-kind-btn is-active" data-scope-kind="histogram"

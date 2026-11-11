@@ -1,8 +1,9 @@
 # Color Scopes UI (#362)
 
-Status: **UI against fixtures.** Not a shipping live media scope.
-Owners: Cursor (this UI). Engine tap: [#366](https://github.com/Magehawks/orga-drone/issues/366).
-Render integration: [#359](https://github.com/Magehawks/orga-drone/issues/359).
+Status: **UI against fixtures.** Live media tap not shipping (see
+[`COLOR_SCOPES_TAP.md`](COLOR_SCOPES_TAP.md) stop condition).
+Owners: Cursor (UI + tap orchestration prep). Engine capture plane: [#359](https://github.com/Magehawks/orga-drone/issues/359)
+then [#366](https://github.com/Magehawks/orga-drone/issues/366).
 Contract: [ADR 0035](../decisions/0035-color-workspace-contract.md),
 [COLOR_WORKSPACE_CONTRACT.md](COLOR_WORKSPACE_CONTRACT.md) § Scope tap.
 
@@ -15,6 +16,7 @@ Contract: [ADR 0035](../decisions/0035-color-workspace-contract.md),
 | `static/js/studio/scopes/fixtures.js` | Deterministic synthetic frames |
 | `static/js/studio/scopes/render.js` | Canvas painting (display only) |
 | `static/js/studio/scopes/panel.js` | Pro inspector panel; fixture disclosure; metrics |
+| `static/js/studio/scopes/engine-tap.js` | Capability probe + tagged-frame builder + controller (#366 prep) |
 | `static/js/studio/scopes/index.js` | Public exports |
 
 `studio.js` only mounts `createColorScopesPanel`. Scope math does not grow the entry.
@@ -57,16 +59,17 @@ Math (reference):
 
 ### #366 (engine ScopeFrameV1 tap)
 
-Codex owns producing immutable frames from graded pixels. When ready, Studio
-preview/render orchestration calls `colorScopes.injectFrame(frame)`. The panel
-rejects mismatched project/clip/revision/context and older frame indices, and
-counts dropped frames while busy.
+`createScopeTapController` may call `colorScopes.injectFrame(frame)` only after
+a capability probe reports a tagged engine source. Today's preview blit / CSS /
+JPEG / untagged WebGL candidates are refused. See
+[`COLOR_SCOPES_TAP.md`](COLOR_SCOPES_TAP.md).
 
 ### #359 (render adapters)
 
-Scopes never mutate the render plan. Adapter/cache work stays in #359. This UI
-reads frames only; it does not request stills per playback tick and does not
-add export filters.
+Scopes never mutate the render plan. #359 must publish the declared
+post-grade/pre-frame capture plane (profile/transfer tagged) before live scopes
+can become available. This UI does not request stills per playback tick and does
+not add export filters.
 
 ## API / MCP / Actions
 
@@ -91,8 +94,9 @@ WebView2 cost against live taps is **NOT_RUN** until #366 supplies frames.
 | Stale frame rejection | PASS |
 | Panel does not call save APIs | PASS |
 | Creative hides scopes; Pro shows section | PASS (CSS/template tests) |
-| Windows WebView2 fixture UI journey | PASS or NOT_RUN (packaging script; requires local WebView2) |
-| Live media scope accuracy | NOT_RUN — blocked on #366 / #359 |
+| Windows WebView2 fixture UI journey | PASS (`packaging/e2e/studio_color_scopes.py`) |
+| Live media scope accuracy | NOT_RUN — blocked on #359 tagged capture plane |
+| Engine-tap capability refusal of blit/CSS/JPEG | PASS (`tests/js/scopes_engine_tap.test.js`) |
 | Packaged MOTW E2E | NOT_RUN — not in scope |
 
 ## Screenshots

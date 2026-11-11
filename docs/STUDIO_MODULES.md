@@ -45,9 +45,10 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   grade-summary part formatting. The entry still owns DOM fills and saves.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
-  histogram/waveform/parade/vectorscope accumulation, canvas paint, and the Pro
-  scopes panel (#362). The entry only mounts the panel. Live engine taps are
-  owned by #366; this UI never treats fixtures as media measurements.
+  histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro
+  scopes panel (#362), and the #366 tap controller/capability probe. The entry
+  mounts the panel and probe only. Live media publishing stays unavailable until
+  #359 provides a tagged post-grade capture plane; fixtures stay disclosed.
 
 - `studio/control-bridge.js` owns the opt-in local control polling handshake and
   compact Studio disclosure. The entry injects snapshots, queued-save settling,

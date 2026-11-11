@@ -958,7 +958,6 @@
   "Black": "Black",
   "Mid gray": "Mid gray",
   "Test patterns only. Not a measurement of your media.": "Test patterns only. Not a measurement of your media.",
-  "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.": "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.",
   "Engine tap measurement for the selected clip.": "Engine tap measurement for the selected clip.",
   "No live scope tap yet": "No live scope tap yet",
   "Dropped frames: {count}": "Dropped frames: {count}",
@@ -966,5 +965,6 @@
   "Engine tap measurement": "Engine tap measurement",
   "Project composite tap": "Project composite tap",
   "Downsampled measurement": "Downsampled measurement",
-  "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.": "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
+  "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.": "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.",
+  "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.": "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged."
 }

@@ -47,3 +47,11 @@ export {
 } from "./render.js";
 
 export { SCOPE_KINDS, createColorScopesPanel } from "./panel.js";
+
+export {
+  SCOPE_TAP_REASONS,
+  buildScopeFrameFromTaggedRgb,
+  createScopeTapController,
+  probeScopeTapCapability,
+  refusePreviewCandidate,
+} from "./engine-tap.js";

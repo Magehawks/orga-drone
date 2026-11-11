@@ -102,7 +102,7 @@ export function createColorScopesPanel({
     }
     disclosureEl.textContent = label(
       "unavailableDisclosure",
-      "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged."
+      "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged."
     );
     disclosureEl.dataset.scopeSource = "unavailable";
   }
