@@ -780,3 +780,81 @@ msgstr "Source range changed. Re-enter Timelapse values."
 
 msgid "Timelapse applied."
 msgstr "Timelapse applied."
+
+msgid "Scopes"
+msgstr "Scopes"
+
+msgid "Scope tools"
+msgstr "Scope tools"
+
+msgid "Scope type"
+msgstr "Scope type"
+
+msgid "Histogram"
+msgstr "Histogram"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "RGB Parade"
+msgstr "RGB Parade"
+
+msgid "Vectorscope"
+msgstr "Vectorscope"
+
+msgid "Scope display"
+msgstr "Scope display"
+
+msgid "Show test pattern"
+msgstr "Show test pattern"
+
+msgid "Test pattern"
+msgstr "Test pattern"
+
+msgid "Color bars"
+msgstr "Color bars"
+
+msgid "Black"
+msgstr "Black"
+
+msgid "Mid gray"
+msgstr "Mid gray"
+
+msgid "Red"
+msgstr "Red"
+
+msgid "Green"
+msgstr "Green"
+
+msgid "Blue"
+msgstr "Blue"
+
+msgid "Test patterns only. Not a measurement of your media."
+msgstr "Test patterns only. Not a measurement of your media."
+
+msgid "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged."
+msgstr "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged."
+
+msgid "Engine tap measurement for the selected clip."
+msgstr "Engine tap measurement for the selected clip."
+
+msgid "No live scope tap yet"
+msgstr "No live scope tap yet"
+
+msgid "Dropped frames: {count}"
+msgstr "Dropped frames: {count}"
+
+msgid "Test pattern — not a media measurement"
+msgstr "Test pattern — not a media measurement"
+
+msgid "Engine tap measurement"
+msgstr "Engine tap measurement"
+
+msgid "Project composite tap"
+msgstr "Project composite tap"
+
+msgid "Downsampled measurement"
+msgstr "Downsampled measurement"
+
+msgid "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
+msgstr "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."

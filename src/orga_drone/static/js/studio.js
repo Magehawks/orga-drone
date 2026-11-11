@@ -55,6 +55,7 @@ import {
   runLatestQueuedRequest,
   shouldRefreshColorInspector,
 } from "./studio/color-workspace.js";
+import { createColorScopesPanel } from "./studio/scopes/index.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
@@ -11035,6 +11036,36 @@ import {
       await applyQuickLookFromUi(current === lookId ? "" : lookId);
     });
   });
+
+  const scopesRoot = document.getElementById("inspector-image-section-scopes");
+  const colorScopes = createColorScopesPanel({
+    root: scopesRoot,
+    getView: () => {
+      const clip = selectedAdjustableClip();
+      return {
+        projectId: String(projectId || ""),
+        clipId: clip ? String(clip.dataset.studioId || "") : "",
+        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
+        contextDigest: clip
+          ? String(clip.dataset.colorLook || "") + "|" + String(clip.dataset.imageAdjust || "")
+          : "",
+      };
+    },
+    messages: {
+      fixtureDisclosure: scopesRoot?.dataset.scopeFixtureDisclosure,
+      unavailableDisclosure: scopesRoot?.dataset.scopeUnavailableDisclosure,
+      liveDisclosure: scopesRoot?.dataset.scopeLiveDisclosure,
+      waiting: scopesRoot?.dataset.scopeWaiting,
+      droppedFrames: scopesRoot?.dataset.scopeDropped,
+      sourceFixture: scopesRoot?.dataset.scopeSourceFixture,
+      sourceLive: scopesRoot?.dataset.scopeSourceLive,
+      sourceComposite: scopesRoot?.dataset.scopeSourceComposite,
+      sourceDownsampled: scopesRoot?.dataset.scopeSourceDownsampled,
+    },
+  });
+  // Engine tap (#366) will call colorScopes.injectFrame(ScopeFrameV1). Until then
+  // the panel stays honest: no synthetic values are shown as media analysis.
+  void colorScopes;
 
   colorComparison = createColorCompare({
     button: document.getElementById("inspector-look-compare"),

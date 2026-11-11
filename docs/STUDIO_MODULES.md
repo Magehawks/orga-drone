@@ -44,6 +44,11 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   request tokens, inspector-refresh gating when selection changes mid-flight, and
   grade-summary part formatting. The entry still owns DOM fills and saves.
 
+- `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
+  histogram/waveform/parade/vectorscope accumulation, canvas paint, and the Pro
+  scopes panel (#362). The entry only mounts the panel. Live engine taps are
+  owned by #366; this UI never treats fixtures as media measurements.
+
 - `studio/control-bridge.js` owns the opt-in local control polling handshake and
   compact Studio disclosure. The entry injects snapshots, queued-save settling,
   and canonical image/color/HSL/wheels/detail/inspector/history/preview callbacks.

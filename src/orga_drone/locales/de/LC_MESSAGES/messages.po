@@ -780,3 +780,81 @@ msgstr "Quellbereich geändert. Timelapse-Werte erneut eingeben."
 
 msgid "Timelapse applied."
 msgstr "Zeitraffer angewendet."
+
+msgid "Scopes"
+msgstr "Scopes"
+
+msgid "Scope tools"
+msgstr "Scope-Werkzeuge"
+
+msgid "Scope type"
+msgstr "Scope-Typ"
+
+msgid "Histogram"
+msgstr "Histogramm"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "RGB Parade"
+msgstr "RGB-Parade"
+
+msgid "Vectorscope"
+msgstr "Vectorscope"
+
+msgid "Scope display"
+msgstr "Scope-Anzeige"
+
+msgid "Show test pattern"
+msgstr "Testmuster zeigen"
+
+msgid "Test pattern"
+msgstr "Testmuster"
+
+msgid "Color bars"
+msgstr "Farbbalken"
+
+msgid "Black"
+msgstr "Schwarz"
+
+msgid "Mid gray"
+msgstr "Mittelgrau"
+
+msgid "Red"
+msgstr "Rot"
+
+msgid "Green"
+msgstr "Grün"
+
+msgid "Blue"
+msgstr "Blau"
+
+msgid "Test patterns only. Not a measurement of your media."
+msgstr "Nur Testmuster. Keine Messung deiner Medien."
+
+msgid "Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged."
+msgstr "Live-Scopes warten auf den Engine-Pixel-Tap. Gespeicherte Grades und Export bleiben unverändert."
+
+msgid "Engine tap measurement for the selected clip."
+msgstr "Engine-Tap-Messung für den ausgewählten Clip."
+
+msgid "No live scope tap yet"
+msgstr "Noch kein Live-Scope-Tap"
+
+msgid "Dropped frames: {count}"
+msgstr "Ausgelassene Frames: {count}"
+
+msgid "Test pattern — not a media measurement"
+msgstr "Testmuster — keine Medienmessung"
+
+msgid "Engine tap measurement"
+msgstr "Engine-Tap-Messung"
+
+msgid "Project composite tap"
+msgstr "Projekt-Composite-Tap"
+
+msgid "Downsampled measurement"
+msgstr "Heruntergerechnete Messung"
+
+msgid "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
+msgstr "Scopes ändern weder den gespeicherten Grade noch den Export. Histogramm: 256 Bins. Waveform und Parade: Y′ / R′G′B′. Vectorscope: BT.709 Cb/Cr."
