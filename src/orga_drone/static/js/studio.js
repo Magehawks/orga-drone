@@ -46,6 +46,13 @@ import {
   shouldReconcileSeekSample,
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
+import {
+  beginRequestToken,
+  buildColorGradeSummaryParts,
+  formatColorGradeSummary,
+  isCurrentRequestToken,
+  shouldRefreshColorInspector,
+} from "./studio/color-workspace.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
@@ -3087,6 +3094,7 @@ import {
     clip.dataset.imagePreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill(clip);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
+    refreshColorGradeSummaryFor(clip);
   }
 
   function imageAdjustIsNeutral(adjust) {
@@ -3164,6 +3172,7 @@ import {
     clearLutPreviewStill(clip);
     if (!hslIsNeutral(hsl)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
+    refreshColorGradeSummaryFor(clip);
   }
 
   const COLOR_WHEEL_IDS = ["shadows", "midtones", "highlights"];
@@ -3244,6 +3253,7 @@ import {
     clearLutPreviewStill(clip);
     if (!colorWheelsIsNeutral(colorWheels)) setLutPreviewChip(msgLutChipUpdating);
     if (persisted && clip.dataset.kind === "video") scheduleLutProxyPrepare(clip);
+    refreshColorGradeSummaryFor(clip);
   }
 
   // Peak-normalized Tanner Helland blackbody. Keep in lockstep with
@@ -3371,6 +3381,7 @@ import {
     });
     clip.dataset.rampPreviewDirty = persisted ? "0" : "1";
     clearLutPreviewStill(clip);
+    refreshColorGradeSummaryFor(clip);
   }
 
   function saturationRampMultiplier(ramp, localS) {
@@ -3969,39 +3980,52 @@ import {
       summary.textContent = "";
       return;
     }
-    const parts = [];
     const lookId = clip.dataset.quickLook || "";
     const adjust = readImageAdjust(clip);
     const look = readColorLook(clip);
     const detail = readDetail(clip);
     const ramp = readSaturationRamp(clip);
-    if (lookId) {
-      parts.push(
-        formatTemplate(panel.dataset.gradeLook || "Look: {name}", { name: lookDisplayName(lookId) })
-      );
-    } else if (!imageAdjustIsNeutral({ ...adjust, highlights: 0, shadows: 0, blacks: 0 })) {
-      parts.push(panel.dataset.gradeSliders || "Manual sliders");
-    }
-    if (look.conversion_lut && look.conversion_confirmed) {
-      parts.push(panel.dataset.gradeConversion || "Camera conversion on");
-    }
-    if (look.creative_lut) {
-      parts.push(panel.dataset.gradeCreativeLut || "Creative LUT on");
-    }
-    if (!hslIsNeutral(readHsl(clip))) parts.push(panel.dataset.gradeHsl || "HSL active");
-    if (!colorWheelsIsNeutral(readColorWheels(clip))) {
-      parts.push(panel.dataset.gradeWheels || "Color wheels active");
-    }
-    if (adjust.highlights || adjust.shadows || adjust.blacks) {
-      parts.push(panel.dataset.gradeTonal || "Fine-tune active");
-    }
-    if ((detail && detail.sharpen) || (detail && detail.denoise)) {
-      parts.push(panel.dataset.gradeDetail || "Sharpen or denoise on");
-    }
-    if (ramp && ramp.enabled) parts.push(panel.dataset.gradeBw || "Black-and-white ramp on");
-    summary.textContent = parts.length
-      ? parts.join(" · ")
-      : panel.dataset.gradeNeutral || "No color changes yet";
+    const parts = buildColorGradeSummaryParts(
+      {
+        lookId,
+        lookName: lookDisplayName(lookId),
+        basicActive: !imageAdjustIsNeutral({
+          ...adjust,
+          highlights: 0,
+          shadows: 0,
+          blacks: 0,
+        }),
+        conversionOn: Boolean(look.conversion_lut && look.conversion_confirmed),
+        creativeLutOn: Boolean(look.creative_lut),
+        hslActive: !hslIsNeutral(readHsl(clip)),
+        wheelsActive: !colorWheelsIsNeutral(readColorWheels(clip)),
+        tonalActive: Boolean(adjust.highlights || adjust.shadows || adjust.blacks),
+        detailActive: Boolean(detail && (detail.sharpen || detail.denoise)),
+        bwActive: Boolean(ramp && ramp.enabled),
+      },
+      {
+        look: panel.dataset.gradeLook,
+        sliders: panel.dataset.gradeSliders,
+        conversion: panel.dataset.gradeConversion,
+        creativeLut: panel.dataset.gradeCreativeLut,
+        hsl: panel.dataset.gradeHsl,
+        wheels: panel.dataset.gradeWheels,
+        tonal: panel.dataset.gradeTonal,
+        detail: panel.dataset.gradeDetail,
+        bw: panel.dataset.gradeBw,
+      }
+    );
+    summary.textContent = formatColorGradeSummary(
+      parts,
+      panel.dataset.gradeNeutral || "No color changes yet"
+    );
+  }
+
+  function refreshColorGradeSummaryFor(clip) {
+    const selected = selectedAdjustableClip();
+    if (!clip || !selected) return;
+    if (String(selected.dataset.studioId) !== String(clip.dataset.studioId)) return;
+    updateColorGradeSummary(clip);
   }
 
   function fillImageAdjust(clip) {
@@ -4082,33 +4106,65 @@ import {
     setSaveState(false);
   }
 
+  const quickLookRequestTokens = new Map();
+
   async function applyQuickLook(clip, lookId) {
-    const studioId = clip.dataset.studioId;
-    const res = await fetch(`/api/studio/${studioId}/look`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ id: lookId || "" }),
-    });
-    const body = await readJson(res);
-    if (!res.ok || !body || !body.ok) {
-      throw new Error((body && body.detail) || msgLookFailed);
+    const studioId = String(clip.dataset.studioId);
+    const token = beginRequestToken(quickLookRequestTokens, studioId);
+    let body = null;
+    try {
+      const res = await fetch(`/api/studio/${studioId}/look`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ id: lookId || "" }),
+      });
+      body = await readJson(res);
+      if (!isCurrentRequestToken(quickLookRequestTokens, studioId, token)) {
+        return { superseded: true };
+      }
+      if (!res.ok || !body || !body.ok) {
+        throw new Error((body && body.detail) || msgLookFailed);
+      }
+    } catch (err) {
+      if (!isCurrentRequestToken(quickLookRequestTokens, studioId, token)) {
+        return { superseded: true };
+      }
+      throw err;
     }
     if (body.image) writeImageAdjust(clip, body.image, true);
     clip.dataset.quickLook = body.quick_look || "";
-    fillImageAdjust(clip);
+    const selected = selectedAdjustableClip();
+    if (
+      shouldRefreshColorInspector({
+        clipId: studioId,
+        selectedId: selected && selected.dataset.studioId,
+        requestCurrent: isCurrentRequestToken(quickLookRequestTokens, studioId, token),
+      })
+    ) {
+      fillImageAdjust(clip);
+    } else {
+      refreshColorGradeSummaryFor(clip);
+    }
     applyPreviewGrades(resolveAt(state.projectTimeS));
     scheduleLutProxyPrepare(clip);
     setSaveState(true);
+    return { superseded: false };
   }
 
   function clearQuickLookLabel(clip) {
     if (!clip) return;
     if (!clip.dataset.quickLook) return;
     clip.dataset.quickLook = "";
-    const lookSelect = document.getElementById("inspector-quick-look");
-    if (lookSelect) lookSelect.value = "";
-    syncQuickLookChips("");
-    updateColorGradeSummary(clip);
+    const selected = selectedAdjustableClip();
+    if (
+      selected &&
+      String(selected.dataset.studioId) === String(clip.dataset.studioId)
+    ) {
+      const lookSelect = document.getElementById("inspector-quick-look");
+      if (lookSelect) lookSelect.value = "";
+      syncQuickLookChips("");
+      updateColorGradeSummary(clip);
+    }
     fetch(`/api/studio/${clip.dataset.studioId}/look`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -4162,6 +4218,7 @@ import {
     clearLutPreviewStill(clip);
     scheduleLutProxyPrepare(clip);
     if (colorLookNeedsStill(look, clip)) setLutPreviewChip(msgLutChipUpdating);
+    refreshColorGradeSummaryFor(clip);
   }
 
   let colorAnimationModel = { maxKeys: 8, minKeyGapS: 0.1, presets: [] };
@@ -4712,6 +4769,7 @@ import {
     getClipById: detailClip,
     setSaved: setSaveState,
     showError: showFlash,
+    refresh: (clip) => refreshColorGradeSummaryFor(clip),
     errorMessage: msgDetailFailed,
   });
 
@@ -10932,14 +10990,33 @@ import {
   async function applyQuickLookFromUi(lookId) {
     const clip = selectedAdjustableClip();
     if (!clip) return;
+    const studioId = String(clip.dataset.studioId);
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = lookId || "";
-    syncQuickLookChips(lookId || "");
+    if (
+      shouldRefreshColorInspector({
+        clipId: studioId,
+        selectedId: studioId,
+        requestCurrent: true,
+      })
+    ) {
+      syncQuickLookChips(lookId || "");
+    }
     try {
-      await applyQuickLook(clip, lookId || "");
+      const result = await applyQuickLook(clip, lookId || "");
+      if (result && result.superseded) return;
     } catch (err) {
       showFlash((err && err.message) || msgLookFailed);
-      fillImageAdjust(clip);
+      const selected = selectedAdjustableClip();
+      if (
+        shouldRefreshColorInspector({
+          clipId: studioId,
+          selectedId: selected && selected.dataset.studioId,
+          requestCurrent: true,
+        })
+      ) {
+        fillImageAdjust(clip);
+      }
     }
   }
 

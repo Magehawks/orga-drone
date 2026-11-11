@@ -141,6 +141,7 @@ export function createDetailControls({
     writeDetail(clip, neutralDetail());
     fill(clip);
     setSaved(false);
+    refresh(clip);
     queueSave(clip);
   }
 

@@ -40,6 +40,10 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   the temporary picture for the selected layer, without replacing either normal
   still owner. Release restores the normal rendering path immediately.
 
+- `studio/color-workspace.js` owns pure Creative/Pro helpers: per-clip Quick Look
+  request tokens, inspector-refresh gating when selection changes mid-flight, and
+  grade-summary part formatting. The entry still owns DOM fills and saves.
+
 - `studio/control-bridge.js` owns the opt-in local control polling handshake and
   compact Studio disclosure. The entry injects snapshots, queued-save settling,
   and canonical image/color/HSL/wheels/detail/inspector/history/preview callbacks.
