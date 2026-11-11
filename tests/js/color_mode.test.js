@@ -94,4 +94,5 @@ test("creative mode CSS hides pro-only color sections", () => {
   assert.match(css, /\[data-image-mode="creative"\] #inspector-image-section-hsl/);
   assert.match(css, /\[data-image-mode="creative"\] #inspector-image-section-color-wheels/);
   assert.match(css, /\[data-image-mode="creative"\] #inspector-image-section-advanced/);
+  assert.match(css, /\[data-image-mode="creative"\] #inspector-image-section-scopes/);
 });

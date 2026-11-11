@@ -1271,6 +1271,51 @@
               </div>
             </div>
           </details>
+          <details id="inspector-image-section-scopes" class="studio-image-section" data-scope-fixture-mode="0"
+                   data-scope-fixture-disclosure="{{ _('Test patterns only. Not a measurement of your media.')|e }}"
+                   data-scope-unavailable-disclosure="{{ _('Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.')|e }}"
+                   data-scope-live-disclosure="{{ _('Engine tap measurement for the selected clip.')|e }}"
+                   data-scope-waiting="{{ _('No live scope tap yet')|e }}"
+                   data-scope-dropped="{{ _('Dropped frames: {count}')|e }}"
+                   data-scope-source-fixture="{{ _('Test pattern — not a media measurement')|e }}"
+                   data-scope-source-live="{{ _('Engine tap measurement')|e }}"
+                   data-scope-source-composite="{{ _('Project composite tap')|e }}"
+                   data-scope-source-downsampled="{{ _('Downsampled measurement')|e }}">
+            <summary>{{ _('Scopes') }}</summary>
+            <p class="hint" data-scope-disclosure role="note">{{ _('Live scopes wait for the engine pixel tap. Saved grades and export stay unchanged.') }}</p>
+            <div class="studio-scopes-toolbar" role="group" aria-label="{{ _('Scope tools') }}">
+              <div class="studio-scopes-kinds" data-scope-kinds role="group" aria-label="{{ _('Scope type') }}">
+                <button type="button" class="studio-scopes-kind-btn is-active" data-scope-kind="histogram"
+                        aria-pressed="true">{{ _('Histogram') }}</button>
+                <button type="button" class="studio-scopes-kind-btn" data-scope-kind="waveform"
+                        aria-pressed="false">{{ _('Waveform') }}</button>
+                <button type="button" class="studio-scopes-kind-btn" data-scope-kind="parade"
+                        aria-pressed="false">{{ _('RGB Parade') }}</button>
+                <button type="button" class="studio-scopes-kind-btn" data-scope-kind="vectorscope"
+                        aria-pressed="false">{{ _('Vectorscope') }}</button>
+              </div>
+            </div>
+            <canvas class="studio-scopes-canvas" data-scope-canvas width="320" height="180"
+                    role="img" aria-label="{{ _('Scope display') }}"></canvas>
+            <p class="meta-line" data-scope-status role="status" aria-live="polite"></p>
+            <p class="meta-line" data-scope-dropped></p>
+            <label class="studio-inspector-field studio-frame-motion">
+              <input type="checkbox" data-scope-fixture-enable>
+              <span>{{ _('Show test pattern') }}</span>
+            </label>
+            <label class="studio-inspector-field" for="inspector-scope-fixture">
+              <span>{{ _('Test pattern') }}</span>
+              <select id="inspector-scope-fixture" data-scope-fixture aria-label="{{ _('Test pattern') }}">
+                <option value="color-bars">{{ _('Color bars') }}</option>
+                <option value="black">{{ _('Black') }}</option>
+                <option value="gray">{{ _('Mid gray') }}</option>
+                <option value="red">{{ _('Red') }}</option>
+                <option value="green">{{ _('Green') }}</option>
+                <option value="blue">{{ _('Blue') }}</option>
+              </select>
+            </label>
+            <p class="hint">{{ _('Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.') }}</p>
+          </details>
           <details id="inspector-image-section-profile" class="studio-image-section">
             <summary>{{ _('Camera profile & LUTs') }}</summary>
             <p class="meta-line" id="inspector-color-profile-value" hidden></p>

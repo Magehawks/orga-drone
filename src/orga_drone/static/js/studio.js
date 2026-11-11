@@ -55,6 +55,7 @@ import {
   runLatestQueuedRequest,
   shouldRefreshColorInspector,
 } from "./studio/color-workspace.js";
+import { createColorScopesPanel } from "./studio/scopes/index.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
@@ -382,6 +383,7 @@ import {
   const msgDetailFailed = root.dataset.detailFailed || "Could not save sharpen or denoise.";
   const msgBwFailed = root.dataset.bwFailed || "Could not save the color change.";
   let colorComparison = null;
+  let colorScopes = null;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -3970,7 +3972,12 @@ import {
     return (option && option.textContent) || key;
   }
 
+  function syncColorScopesView() {
+    colorScopes?.syncView();
+  }
+
   function updateColorGradeSummary(clip) {
+    syncColorScopesView();
     const panel = document.getElementById("inspector-image-panel");
     const summary = document.getElementById("studio-color-grade-summary");
     if (!panel || !summary) return;
@@ -8275,6 +8282,7 @@ import {
       showInspector("inspector-titlecard");
       setInspectorHeading(kindLabels.title_card);
       fillTitlecardInspector(clip);
+      syncColorScopesView();
     } else {
       showInspector("inspector-clip");
       setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
@@ -8335,6 +8343,8 @@ import {
       if (canImage) {
         fillImageAdjust(clip);
         fillImageInspectorSections(clip, isVideo);
+      } else {
+        syncColorScopesView();
       }
       if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
@@ -11035,6 +11045,46 @@ import {
       await applyQuickLookFromUi(current === lookId ? "" : lookId);
     });
   });
+
+  const scopesRoot = document.getElementById("inspector-image-section-scopes");
+  colorScopes = createColorScopesPanel({
+    root: scopesRoot,
+    getView: () => {
+      const clip = selectedAdjustableClip();
+      return {
+        projectId: String(projectId || ""),
+        clipId: clip ? String(clip.dataset.studioId || "") : "",
+        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
+        // Include grade-affecting datasets so local edits invalidate live scopes
+        // until #366 supplies a matching revisioned tap.
+        contextDigest: clip
+          ? [
+              clip.dataset.colorLook || "",
+              clip.dataset.imageAdjust || "",
+              clip.dataset.hsl || "",
+              clip.dataset.colorWheels || "",
+              clip.dataset.detail || "",
+              clip.dataset.saturationRamp || "",
+              clip.dataset.quickLook || "",
+            ].join("|")
+          : "",
+      };
+    },
+    messages: {
+      fixtureDisclosure: scopesRoot?.dataset.scopeFixtureDisclosure,
+      unavailableDisclosure: scopesRoot?.dataset.scopeUnavailableDisclosure,
+      liveDisclosure: scopesRoot?.dataset.scopeLiveDisclosure,
+      waiting: scopesRoot?.dataset.scopeWaiting,
+      droppedFrames: scopesRoot?.dataset.scopeDropped,
+      sourceFixture: scopesRoot?.dataset.scopeSourceFixture,
+      sourceLive: scopesRoot?.dataset.scopeSourceLive,
+      sourceComposite: scopesRoot?.dataset.scopeSourceComposite,
+      sourceDownsampled: scopesRoot?.dataset.scopeSourceDownsampled,
+    },
+  });
+  // Engine tap (#366) will call colorScopes.injectFrame(ScopeFrameV1). Until then
+  // the panel stays honest: no synthetic values are shown as media analysis.
+  syncColorScopesView();
 
   colorComparison = createColorCompare({
     button: document.getElementById("inspector-look-compare"),
