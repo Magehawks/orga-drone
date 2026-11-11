@@ -571,8 +571,59 @@ msgstr "Bearbeiten"
 msgid "Expert"
 msgstr "Experte"
 
+msgid "Creative"
+msgstr "Kreativ"
+
+msgid "Pro"
+msgstr "Pro"
+
+msgid "Color workspace"
+msgstr "Farb-Arbeitsbereich"
+
 msgid "Color editing mode"
 msgstr "Farbbearbeitungsmodus"
+
+msgid "Looks and basic sliders. Same saved grade as Pro."
+msgstr "Looks und einfache Regler. Derselbe gespeicherte Look wie in Pro."
+
+msgid "HSL, wheels, and fine-tune. Same saved grade as Creative."
+msgstr "HSL, Wheels und Feinabstimmung. Derselbe gespeicherte Look wie in Kreativ."
+
+msgid "Creative and Pro edit the same grade. Switching modes never changes the picture."
+msgstr "Kreativ und Pro bearbeiten denselben Look. Der Moduswechsel ändert das Bild nicht."
+
+msgid "Quick Looks"
+msgstr "Quick Looks"
+
+msgid "No color changes yet"
+msgstr "Noch keine Farbänderungen"
+
+msgid "Look: {name}"
+msgstr "Look: {name}"
+
+msgid "Manual sliders"
+msgstr "Manuelle Regler"
+
+msgid "Camera conversion on"
+msgstr "Kamerakonvertierung aktiv"
+
+msgid "Creative LUT on"
+msgstr "Kreative LUT aktiv"
+
+msgid "HSL active"
+msgstr "HSL aktiv"
+
+msgid "Color wheels active"
+msgstr "Color Wheels aktiv"
+
+msgid "Fine-tune active"
+msgstr "Feinabstimmung aktiv"
+
+msgid "Sharpen or denoise on"
+msgstr "Schärfen oder Entrauschen aktiv"
+
+msgid "Black-and-white ramp on"
+msgstr "Schwarzweiß-Übergang aktiv"
 
 msgid "Camera profile & LUTs"
 msgstr "Kameraprofil & LUTs"

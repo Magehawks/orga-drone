@@ -110,6 +110,159 @@ def test_quick_look_replaces_sliders_and_persists(
     ]
 
 
+def test_quick_look_out_of_order_writes_last_commit_wins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prove unsynchronized Look writes persist last-commit-wins on the server.
+
+    The Studio UI now serializes Look PATCH calls and skips superseded intents
+    before fetch. This test documents the DB race that remains if two writers
+    bypass that queue, and checks save/reopen after a deliberate reverse finish.
+    """
+    import threading
+
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    app = create_app()
+    db: Database = app.state.db
+    root = tmp_path / "lib"
+    root.mkdir()
+    root_id = db.add_root(root, label="t")
+    photo = root / "p.jpg"
+    photo.write_bytes(b"jpg")
+    media_id = db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "photo",
+            "filename": photo.name,
+            "path": str(photo.resolve()),
+            "size_bytes": 3,
+            "duration_s": None,
+            "recorded_at": "2024-01-01T00:00:00",
+            "sequence": None,
+            "mode": None,
+            "drone_model": None,
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+    item = db.get_media(media_id)
+    assert item is not None
+    clip_id, _ = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+    )
+
+    release_older = threading.Event()
+    newer_done = threading.Event()
+    errors: list[BaseException] = []
+
+    def write_older() -> None:
+        try:
+            release_older.wait(timeout=2)
+            db.set_studio_quick_look(clip_id, {"id": "cinematic"})
+        except BaseException as exc:  # noqa: BLE001 - collect thread failures
+            errors.append(exc)
+
+    def write_newer() -> None:
+        try:
+            db.set_studio_quick_look(clip_id, {"id": "vibrant"})
+            newer_done.set()
+            release_older.set()
+        except BaseException as exc:  # noqa: BLE001 - collect thread failures
+            errors.append(exc)
+
+    older = threading.Thread(target=write_older)
+    newer = threading.Thread(target=write_newer)
+    older.start()
+    newer.start()
+    older.join(timeout=3)
+    newer.join(timeout=3)
+    assert not errors
+    assert newer_done.is_set()
+
+    stored = {row.id: row for row in db.list_studio_items()}[clip_id]
+    # Older commit finished last and overwrote the newer Look.
+    assert look_id_from_effect_settings(stored.effect_settings) == "cinematic"
+    assert (
+        image_adjust_from_effect_settings(stored.effect_settings).as_dict()
+        == look_image_adjust("cinematic").as_dict()
+    )
+
+    # Save/reopen through a fresh Database handle keeps the last commit.
+    reopened = Database(Settings(data_dir=tmp_path / "data").db_path)
+    again = {row.id: row for row in reopened.list_studio_items()}[clip_id]
+    assert look_id_from_effect_settings(again.effect_settings) == "cinematic"
+
+
+def test_quick_look_serialized_client_order_keeps_latest_on_reopen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When Look writes run in intent order, reopen matches the latest Look."""
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    app = create_app()
+    db: Database = app.state.db
+    root = tmp_path / "lib"
+    root.mkdir()
+    root_id = db.add_root(root, label="t")
+    photo = root / "p.jpg"
+    photo.write_bytes(b"jpg")
+    media_id = db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "photo",
+            "filename": photo.name,
+            "path": str(photo.resolve()),
+            "size_bytes": 3,
+            "duration_s": None,
+            "recorded_at": "2024-01-01T00:00:00",
+            "sequence": None,
+            "mode": None,
+            "drone_model": None,
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+    item = db.get_media(media_id)
+    assert item is not None
+    clip_id, _ = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+    )
+    client = TestClient(app)
+    first = client.patch(f"/api/studio/{clip_id}/look", json={"id": "cinematic"})
+    second = client.patch(f"/api/studio/{clip_id}/look", json={"id": "vibrant"})
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["quick_look"] == "vibrant"
+    stored = {row.id: row for row in db.list_studio_items()}[clip_id]
+    assert look_id_from_effect_settings(stored.effect_settings) == "vibrant"
+    reopened = Database(Settings(data_dir=tmp_path / "data").db_path)
+    again = {row.id: row for row in reopened.list_studio_items()}[clip_id]
+    assert look_id_from_effect_settings(again.effect_settings) == "vibrant"
+    assert (
+        image_adjust_from_effect_settings(again.effect_settings).as_dict()
+        == look_image_adjust("vibrant").as_dict()
+    )
+
+
 def test_dump_photo_adjust_keeps_legacy_flat_json_readable() -> None:
     legacy = '{"contrast": 10, "exposure": 5, "saturation": 0, "warmth": -2}'
     assert look_id_from_stored(legacy) == ""

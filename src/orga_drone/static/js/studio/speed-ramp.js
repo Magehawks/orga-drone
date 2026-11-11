@@ -143,12 +143,7 @@ export function rampPreset(id, start, end) {
  * When the span no longer covers the full play range, pin endpoint speeds to 1×
  * so outside the bar plays at normal speed (Slow-bar mental model).
  */
-export function remapRampSpan(
-  ramp,
-  newStart,
-  newEnd,
-  { playStart, playEnd, minSpan = 0.05 } = {}
-) {
+export function remapRampSpan(ramp, newStart, newEnd, { playStart, playEnd, minSpan = 0.05 } = {}) {
   if (!ramp || !Array.isArray(ramp.points) || ramp.points.length < 2) return null;
   if (!Number.isFinite(playStart) || !Number.isFinite(playEnd) || playEnd - playStart < minSpan) {
     return null;
@@ -203,11 +198,7 @@ export function remapRampSpan(
       });
       inner[0].source_s = innerStart;
       inner[inner.length - 1].source_s = innerEnd;
-      points = [
-        { source_s: start, speed: 1 },
-        ...inner,
-        { source_s: end, speed: 1 },
-      ];
+      points = [{ source_s: start, speed: 1 }, ...inner, { source_s: end, speed: 1 }];
     } else {
       points[0].speed = 1;
       points[points.length - 1].speed = 1;

@@ -168,7 +168,7 @@ professional video-editing knowledge.
 | Quick Looks + show-original compare | **Available now** (named presets replace basic sliders; compare is preview-only and does not change saved grades) |
 | Advanced tonal (highlights / shadows / blacks) | **Available now** (restrained; does not recover clipped data; preview approximates; Fine-tune accordion, closed by default) |
 | Local sharpen + denoise | **Available now** (default off; restrained FFmpeg filters; preview approximates; with tonal controls under Fine-tune) |
-| Image tab accordion (Look & color / Fine-tune / Color profiles & LUTs) | **Available now** (Look & color open by default; technical LUT and D-Log M controls stay under Color profiles & LUTs) |
+| Image tab accordion (Look & color / Fine-tune / Color profiles & LUTs) | **Available now** (Creative and Pro views over the same grade; Look & color open by default; HSL and wheels collapsed until opened in Pro; technical LUT and D-Log M controls stay under Camera profile & LUTs) |
 | Video saturation ramp (color toward black and white) | **Available now** (one linear range per video clip; start and end time; 100% keeps the current grade and 0% is black and white; preview approximates export; not a keyframe editor) |
 | Timed text, shape, and image overlays | **Available now** (up to 8 per photo or video clip; None / Fade in / Fade out / Slide in; preview approximates export; not a motion tracker) |
 | Rectangular privacy masks (blur, pixelate) | **Available now** (up to 8; rectangular, not tracking; on a video clip each mask is a timed bar on the one Effekt lane and is off outside that bar; photos have no Effekt lane; preview matches the MP4) |

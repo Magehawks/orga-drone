@@ -126,7 +126,7 @@ test("writes local input immediately and saves on change", async () => {
 });
 
 test("resets to neutral and saves", async () => {
-  const { controls, elements, clip, saved, requests } = setup();
+  const { controls, elements, clip, saved, requests, refreshes } = setup();
   controls.bind();
 
   elements["inspector-detail-reset"].dispatch("click");
@@ -135,6 +135,7 @@ test("resets to neutral and saves", async () => {
   assert.deepEqual(readDetail(clip), { sharpen: 0, denoise: 0 });
   assert.equal(elements["inspector-detail-sharpen"].value, "0");
   assert.equal(elements["inspector-detail-denoise"].value, "0");
+  assert.deepEqual(refreshes, [clip]);
   assert.deepEqual(saved, [false, true]);
   assert.equal(requests.length, 1);
 });

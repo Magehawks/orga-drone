@@ -981,16 +981,46 @@
           </label>
           <p class="hint">{{ _('Slow motion applies to this section and lengthens the story. Times are seconds from the start of this clip. The rest of the clip keeps its speed. Source audio on a slowed section is muted. Preview and export use the same speed. Smoothness depends on the source frame rate.') }}</p>
         </div>
-        <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image" data-image-mode="standard" hidden>
+        <div id="inspector-image-panel" class="studio-image-panel" data-inspector-tab="image"
+             data-image-mode="creative" hidden
+             role="region" aria-label="{{ _('Color workspace') }}"
+             data-grade-neutral="{{ _('No color changes yet')|e }}"
+             data-grade-look="{{ _('Look: {name}')|e }}"
+             data-grade-sliders="{{ _('Manual sliders')|e }}"
+             data-grade-conversion="{{ _('Camera conversion on')|e }}"
+             data-grade-creative-lut="{{ _('Creative LUT on')|e }}"
+             data-grade-hsl="{{ _('HSL active')|e }}"
+             data-grade-wheels="{{ _('Color wheels active')|e }}"
+             data-grade-tonal="{{ _('Fine-tune active')|e }}"
+             data-grade-detail="{{ _('Sharpen or denoise on')|e }}"
+             data-grade-bw="{{ _('Black-and-white ramp on')|e }}">
           <div class="studio-image-mode" role="group" aria-label="{{ _('Color editing mode') }}">
-            <button type="button" class="studio-image-mode-btn is-active" data-image-mode="standard"
-                    aria-pressed="true">{{ _('Standard') }}</button>
-            <button type="button" class="studio-image-mode-btn" data-image-mode="expert"
-                    aria-pressed="false">{{ _('Expert') }}</button>
+            <button type="button" class="studio-image-mode-btn is-active" data-image-mode="creative"
+                    aria-pressed="true"
+                    title="{{ _('Looks and basic sliders. Same saved grade as Pro.') }}">{{ _('Creative') }}</button>
+            <button type="button" class="studio-image-mode-btn" data-image-mode="pro"
+                    aria-pressed="false"
+                    title="{{ _('HSL, wheels, and fine-tune. Same saved grade as Creative.') }}">{{ _('Pro') }}</button>
           </div>
+          <p class="hint studio-color-mode-help" id="studio-color-mode-help">{{ _('Creative and Pro edit the same grade. Switching modes never changes the picture.') }}</p>
+          <p class="studio-color-grade-summary" id="studio-color-grade-summary" role="status" aria-live="polite"></p>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Look & color') }}</summary>
             <div id="inspector-image-adjust">
+              <div class="studio-quick-look-chips" role="radiogroup" aria-label="{{ _('Quick Looks') }}">
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="natural">{{ _('Natural') }}</button>
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="cinematic">{{ _('Cinematic') }}</button>
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="golden_hour">{{ _('Golden Hour') }}</button>
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="vibrant">{{ _('Vibrant') }}</button>
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="cool">{{ _('Cool') }}</button>
+                <button type="button" class="studio-quick-look-chip" role="radio" aria-checked="false"
+                        data-quick-look-chip="black_and_white">{{ _('Black & White') }}</button>
+              </div>
               <label class="studio-inspector-field" for="inspector-quick-look">
                 <span>{{ _('Look') }}</span>
                 <select id="inspector-quick-look" aria-label="{{ _('Look') }}"
@@ -1045,7 +1075,7 @@
                       title="{{ _('Also resets Fine-tune tonals (highlights, shadows, blacks). Sharpen and denoise stay.') }}">{{ _('Reset adjustments') }}</button>
             </div>
           </details>
-          <details id="inspector-image-section-hsl" class="studio-image-section" open>
+          <details id="inspector-image-section-hsl" class="studio-image-section">
             <summary>{{ _('HSL color mixer') }}</summary>
             <div id="inspector-hsl">
               <div class="studio-hsl-swatches" role="tablist" aria-label="{{ _('Color range') }}">
@@ -1105,7 +1135,7 @@
               </div>
             </div>
           </details>
-          <details id="inspector-image-section-color-wheels" class="studio-image-section" open>
+          <details id="inspector-image-section-color-wheels" class="studio-image-section">
             <summary>{{ _('Color Grading') }}</summary>
             <div id="inspector-color-wheels">
               <p class="hint">{{ _('Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.') }}</p>

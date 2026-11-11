@@ -46,11 +46,20 @@ import {
   shouldReconcileSeekSample,
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
+import {
+  beginRequestToken,
+  buildColorGradeSummaryParts,
+  createSerialRequestQueue,
+  formatColorGradeSummary,
+  isCurrentRequestToken,
+  runLatestQueuedRequest,
+  shouldRefreshColorInspector,
+} from "./studio/color-workspace.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
-import { createDetailControls, writeDetail } from "./studio/inspector/detail.js";
+import { createDetailControls, readDetail, writeDetail } from "./studio/inspector/detail.js";
 import { createImageAdjustSaver } from "./studio/inspector/image-save.js";
 import {
   clipDisplayTitle,
@@ -468,16 +477,22 @@ import {
 
   const COLOR_MODE_KEY = "orga-drone.studio.color-mode";
 
+  function normalizeColorMode(raw) {
+    const value = String(raw || "").toLowerCase();
+    if (value === "pro" || value === "expert") return "pro";
+    return "creative";
+  }
+
   function readColorModePreference() {
     try {
-      return window.localStorage.getItem(COLOR_MODE_KEY) === "expert" ? "expert" : "standard";
+      return normalizeColorMode(window.localStorage.getItem(COLOR_MODE_KEY));
     } catch (_) {
-      return "standard";
+      return "creative";
     }
   }
 
   function applyColorModePreference(mode, { persist = false } = {}) {
-    const next = mode === "expert" ? "expert" : "standard";
+    const next = normalizeColorMode(mode);
     const panel = document.getElementById("inspector-image-panel");
     if (panel) panel.dataset.imageMode = next;
     document.querySelectorAll("[data-image-mode]").forEach((button) => {
@@ -3938,6 +3953,79 @@ import {
     return clip;
   }
 
+  function syncQuickLookChips(lookId) {
+    const selected = String(lookId || "");
+    document.querySelectorAll("[data-quick-look-chip]").forEach((button) => {
+      const active = button.dataset.quickLookChip === selected && selected !== "";
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-checked", active ? "true" : "false");
+    });
+  }
+
+  function lookDisplayName(lookId) {
+    const key = String(lookId || "");
+    if (!key) return root.dataset.lookCustom || "Custom";
+    const select = document.getElementById("inspector-quick-look");
+    const option = select && [...select.options].find((item) => item.value === key);
+    return (option && option.textContent) || key;
+  }
+
+  function updateColorGradeSummary(clip) {
+    const panel = document.getElementById("inspector-image-panel");
+    const summary = document.getElementById("studio-color-grade-summary");
+    if (!panel || !summary) return;
+    if (!clip) {
+      summary.textContent = "";
+      return;
+    }
+    const lookId = clip.dataset.quickLook || "";
+    const adjust = readImageAdjust(clip);
+    const look = readColorLook(clip);
+    const detail = readDetail(clip);
+    const ramp = readSaturationRamp(clip);
+    const parts = buildColorGradeSummaryParts(
+      {
+        lookId,
+        lookName: lookDisplayName(lookId),
+        basicActive: !imageAdjustIsNeutral({
+          ...adjust,
+          highlights: 0,
+          shadows: 0,
+          blacks: 0,
+        }),
+        conversionOn: Boolean(look.conversion_lut && look.conversion_confirmed),
+        creativeLutOn: Boolean(look.creative_lut),
+        hslActive: !hslIsNeutral(readHsl(clip)),
+        wheelsActive: !colorWheelsIsNeutral(readColorWheels(clip)),
+        tonalActive: Boolean(adjust.highlights || adjust.shadows || adjust.blacks),
+        detailActive: Boolean(detail && (detail.sharpen || detail.denoise)),
+        bwActive: Boolean(ramp && ramp.enabled),
+      },
+      {
+        look: panel.dataset.gradeLook,
+        sliders: panel.dataset.gradeSliders,
+        conversion: panel.dataset.gradeConversion,
+        creativeLut: panel.dataset.gradeCreativeLut,
+        hsl: panel.dataset.gradeHsl,
+        wheels: panel.dataset.gradeWheels,
+        tonal: panel.dataset.gradeTonal,
+        detail: panel.dataset.gradeDetail,
+        bw: panel.dataset.gradeBw,
+      }
+    );
+    summary.textContent = formatColorGradeSummary(
+      parts,
+      panel.dataset.gradeNeutral || "No color changes yet"
+    );
+  }
+
+  function refreshColorGradeSummaryFor(clip) {
+    const selected = selectedAdjustableClip();
+    if (!clip || !selected) return;
+    if (String(selected.dataset.studioId) !== String(clip.dataset.studioId)) return;
+    updateColorGradeSummary(clip);
+  }
+
   function fillImageAdjust(clip) {
     const adjust = readImageAdjust(clip);
     IMAGE_ADJUST_FIELDS.forEach(([key, inputId, valueId]) => {
@@ -3949,9 +4037,11 @@ import {
     });
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
+    syncQuickLookChips(clip.dataset.quickLook || "");
     fillHsl(clip);
     fillColorWheels(clip);
     fillColorAnimationInspector(clip);
+    updateColorGradeSummary(clip);
   }
 
   function hslRangeFromControls(clip) {
@@ -4011,39 +4101,78 @@ import {
     colorWheels.wheels[wheelId] = point;
     writeColorWheels(clip, colorWheels);
     fillColorWheels(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
   }
 
-  async function applyQuickLook(clip, lookId) {
-    const studioId = clip.dataset.studioId;
-    const res = await fetch(`/api/studio/${studioId}/look`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ id: lookId || "" }),
+  const quickLookRequestTokens = new Map();
+  const quickLookSaveQueue = createSerialRequestQueue();
+
+  async function applyQuickLook(clip, lookId, { applyResponse = true } = {}) {
+    const studioId = String(clip.dataset.studioId);
+    const token = beginRequestToken(quickLookRequestTokens, studioId);
+    const desiredLook = lookId || "";
+    const outcome = await runLatestQueuedRequest({
+      store: quickLookRequestTokens,
+      key: studioId,
+      token,
+      queue: quickLookSaveQueue,
+      execute: async () => {
+        const res = await fetch(`/api/studio/${studioId}/look`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ id: desiredLook }),
+        });
+        const body = await readJson(res);
+        if (!res.ok || !body || !body.ok) {
+          throw new Error((body && body.detail) || msgLookFailed);
+        }
+        return body;
+      },
     });
-    const body = await readJson(res);
-    if (!res.ok || !body || !body.ok) {
-      throw new Error((body && body.detail) || msgLookFailed);
+    if (outcome.superseded) return { superseded: true };
+    if (!applyResponse) {
+      setSaveState(true);
+      return { superseded: false };
     }
+    const body = outcome.result;
     if (body.image) writeImageAdjust(clip, body.image, true);
     clip.dataset.quickLook = body.quick_look || "";
-    fillImageAdjust(clip);
+    const selected = selectedAdjustableClip();
+    if (
+      shouldRefreshColorInspector({
+        clipId: studioId,
+        selectedId: selected && selected.dataset.studioId,
+        requestCurrent: isCurrentRequestToken(quickLookRequestTokens, studioId, token),
+      })
+    ) {
+      fillImageAdjust(clip);
+    } else {
+      refreshColorGradeSummaryFor(clip);
+    }
     applyPreviewGrades(resolveAt(state.projectTimeS));
     scheduleLutProxyPrepare(clip);
     setSaveState(true);
+    return { superseded: false };
   }
 
   function clearQuickLookLabel(clip) {
     if (!clip) return;
     if (!clip.dataset.quickLook) return;
     clip.dataset.quickLook = "";
-    const lookSelect = document.getElementById("inspector-quick-look");
-    if (lookSelect) lookSelect.value = "";
-    fetch(`/api/studio/${clip.dataset.studioId}/look`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ id: "" }),
-    }).catch(() => {});
+    const selected = selectedAdjustableClip();
+    if (
+      selected &&
+      String(selected.dataset.studioId) === String(clip.dataset.studioId)
+    ) {
+      const lookSelect = document.getElementById("inspector-quick-look");
+      if (lookSelect) lookSelect.value = "";
+      syncQuickLookChips("");
+      updateColorGradeSummary(clip);
+    }
+    // Share the serialized Look queue so clear and Look PATCH cannot finish out of
+    // order. Do not apply the response image — local slider edits may be newer.
+    applyQuickLook(clip, "", { applyResponse: false }).catch(() => {});
   }
 
   function colorProfileDisplayLabel(token) {
@@ -4642,6 +4771,7 @@ import {
     getClipById: detailClip,
     setSaved: setSaveState,
     showError: showFlash,
+    refresh: (clip) => refreshColorGradeSummaryFor(clip),
     errorMessage: msgDetailFailed,
   });
 
@@ -4652,6 +4782,7 @@ import {
     detailControls.fill(clip);
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
+    updateColorGradeSummary(clip);
   }
 
   let colorSaveChain = Promise.resolve();
@@ -5699,10 +5830,19 @@ import {
       Math.abs(frame.y_start - 0.5) > 0.001 ||
       Math.abs(frame.x_end - 0.5) > 0.001 ||
       Math.abs(frame.y_end - 0.5) > 0.001;
+    const look = readColorLook(clip);
+    const detail = readDetail(clip);
     image.classList.toggle(
       "has-settings",
-      !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive ||
-        !hslIsNeutral(readHsl(clip)) || !colorWheelsIsNeutral(readColorWheels(clip))
+      !imageAdjustIsNeutral(adjust) ||
+        ramp.enabled === true ||
+        frameActive ||
+        !hslIsNeutral(readHsl(clip)) ||
+        !colorWheelsIsNeutral(readColorWheels(clip)) ||
+        !!(look.conversion_lut && look.conversion_confirmed) ||
+        !!look.creative_lut ||
+        !!(detail && (detail.sharpen || detail.denoise)) ||
+        !!clip.dataset.quickLook
     );
     const hud = readHud(clip);
     effects.classList.toggle("has-settings", readMasks(clip).length > 0 || hud.enabled === true);
@@ -10836,6 +10976,7 @@ import {
       clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
     });
     input.addEventListener("change", () => {
@@ -10843,19 +10984,56 @@ import {
       if (!clip) return;
       clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
+      updateColorGradeSummary(clip);
       queueImageAdjustSave(clip);
     });
   });
 
-  document.getElementById("inspector-quick-look")?.addEventListener("change", async (event) => {
+  async function applyQuickLookFromUi(lookId) {
     const clip = selectedAdjustableClip();
     if (!clip) return;
+    const studioId = String(clip.dataset.studioId);
+    const lookSelect = document.getElementById("inspector-quick-look");
+    if (lookSelect) lookSelect.value = lookId || "";
+    if (
+      shouldRefreshColorInspector({
+        clipId: studioId,
+        selectedId: studioId,
+        requestCurrent: true,
+      })
+    ) {
+      syncQuickLookChips(lookId || "");
+    }
     try {
-      await applyQuickLook(clip, event.target.value || "");
+      const result = await applyQuickLook(clip, lookId || "");
+      if (result && result.superseded) return;
     } catch (err) {
       showFlash((err && err.message) || msgLookFailed);
-      fillImageAdjust(clip);
+      const selected = selectedAdjustableClip();
+      if (
+        shouldRefreshColorInspector({
+          clipId: studioId,
+          selectedId: selected && selected.dataset.studioId,
+          requestCurrent: true,
+        })
+      ) {
+        fillImageAdjust(clip);
+      }
     }
+  }
+
+  document.getElementById("inspector-quick-look")?.addEventListener("change", async (event) => {
+    await applyQuickLookFromUi(event.target.value || "");
+  });
+
+  document.querySelectorAll("[data-quick-look-chip]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const lookId = button.dataset.quickLookChip || "";
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      const current = clip.dataset.quickLook || "";
+      await applyQuickLookFromUi(current === lookId ? "" : lookId);
+    });
   });
 
   colorComparison = createColorCompare({
@@ -10950,12 +11128,14 @@ import {
       if (!clip) return;
       writeHsl(clip, hslRangeFromControls(clip));
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
     });
     input.addEventListener("change", () => {
       const clip = selectedAdjustableClip();
       if (!clip) return;
       writeHsl(clip, hslRangeFromControls(clip));
+      updateColorGradeSummary(clip);
       queueHslSave(clip);
     });
   });
@@ -10978,6 +11158,7 @@ import {
     writeHsl(clip, hsl);
     fillHsl(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueHslSave(clip);
   });
@@ -10988,6 +11169,7 @@ import {
     writeHsl(clip, neutralHslAdjust());
     fillHsl(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueHslSave(clip);
   });
@@ -11052,6 +11234,7 @@ import {
       colorWheels.wheels[wheelId] = normalizeColorWheelPoint(point);
       writeColorWheels(clip, colorWheels);
       fillColorWheels(clip);
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorWheelsSave(clip);
     });
@@ -11066,6 +11249,7 @@ import {
       writeColorWheels(clip, colorWheels);
       fillColorWheels(clip);
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorWheelsSave(clip);
     });
@@ -11084,6 +11268,7 @@ import {
     look.conversion_confirmed = true;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11134,6 +11319,7 @@ import {
     look.conversion_confirmed = false;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11157,6 +11343,7 @@ import {
       if (!look.creative_strength) look.creative_strength = 100;
       writeColorLook(clip, look);
       fillColorLook(clip);
+      updateColorGradeSummary(clip);
       setSaveState(false);
       queueColorLookSave(clip);
     } catch (err) {
@@ -11175,6 +11362,7 @@ import {
     else if (!look.creative_strength) look.creative_strength = 100;
     writeColorLook(clip, look);
     fillColorLook(clip);
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueColorLookSave(clip);
   });
@@ -11188,6 +11376,7 @@ import {
     look.creative_strength = Math.max(0, Math.min(100, Math.round(Number(input && input.value) || 0)));
     if (valueEl) valueEl.textContent = String(look.creative_strength);
     writeColorLook(clip, look);
+    updateColorGradeSummary(clip);
     setSaveState(false);
   });
 
@@ -11303,6 +11492,7 @@ import {
     writeSaturationRamp(clip, ramp);
     fillSaturationRamp(clip);
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
     queueSaturationRampSave(clip);
   }
@@ -11326,6 +11516,7 @@ import {
     if (!clip) return;
     writeSaturationRamp(clip, saturationRampFromControls(clip));
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
     setSaveState(false);
   });
   document.getElementById("inspector-bw-strength")?.addEventListener("change", () => {

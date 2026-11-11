@@ -317,7 +317,7 @@ def test_color_wheel_api_and_page(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert "Color Grading" in page.text
     assert page.text.count('data-color-wheel="') == 3
     assert page.text.count('class="studio-color-wheel"') == 3
-    assert 'id="inspector-image-section-color-wheels" class="studio-image-section" open' in page.text
+    assert 'id="inspector-image-section-color-wheels" class="studio-image-section">' in page.text
     assert "data-color-wheels=" in page.text
     reset = client.patch(
         f"/api/studio/{clip_id}/color-wheels",
