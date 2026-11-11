@@ -393,6 +393,8 @@ test("Story crossfades and cinematic loops retain two layers only during blends"
     "drawFlightMap",
     "applyFramePreview",
     "syncHud",
+    "syncFullscreenControl",
+    "schedulePreviewBlit",
   ])
     c[name] = () => {};
   c.clipDuration = () => 13;
