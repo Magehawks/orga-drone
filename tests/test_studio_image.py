@@ -349,11 +349,14 @@ def test_http_image_adjust_validation_and_inspector(
     assert ("Kameraprofil &amp; LUTs" in page.text) or (
         "Camera profile &amp; LUTs" in page.text
     )
-    assert 'data-image-mode="standard"' in page.text
-    assert 'data-image-mode="expert"' in page.text
-    assert ("Original zum Vergleichen anzeigen" in page.text) or (
-        "Show original for comparison" in page.text
+    assert 'data-image-mode="creative"' in page.text
+    assert 'data-image-mode="pro"' in page.text
+    assert 'id="studio-color-grade-summary"' in page.text
+    assert 'data-quick-look-chip="cinematic"' in page.text
+    assert ("Zum Vergleichen gedrückt halten" in page.text) or (
+        "Hold to compare" in page.text
     )
+    assert ("Kreativ" in page.text) or ("Creative" in page.text)
     assert ("Look-Datei (.cube)" in page.text) or ("Look file (.cube)" in page.text)
     assert 'id="inspector-color-creative-select"' in page.text
     assert 'data-image-adjust=' in page.text

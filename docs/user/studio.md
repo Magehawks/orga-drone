@@ -22,8 +22,10 @@ while edits are unsaved, or inside a blend between two copies of the same loop.
 - Cut videos keep an **Original** entry so you can add another scene later.
 - Soundtrack can start later on the timeline (drag the music bed). Up to 8 local songs.
 - Preview approximates color and some effects; timing should match the MP4.
-  The image inspector has **Standard** and **Expert** views. Both use the same
-  clip settings, so switching views never changes the picture.
+  The image inspector has **Creative** and **Pro** views. Creative focuses on
+  camera conversion, Quick Looks, and the four basic sliders. Pro adds HSL,
+  color wheels, and Fine-tune. Both use the same clip settings, so switching
+  views never changes the picture. The grade summary lists what is active.
 - JPG/PNG photos with a `.cube` color file keep a cached graded still during
   playback and pause, including both photo layers of a crossfade. Preparing a
   new still is asynchronous; the status chip reports pending or failed previews.

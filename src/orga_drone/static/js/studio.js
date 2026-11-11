@@ -50,7 +50,7 @@ import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from 
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
-import { createDetailControls, writeDetail } from "./studio/inspector/detail.js";
+import { createDetailControls, readDetail, writeDetail } from "./studio/inspector/detail.js";
 import { createImageAdjustSaver } from "./studio/inspector/image-save.js";
 import {
   clipDisplayTitle,
@@ -468,16 +468,22 @@ import {
 
   const COLOR_MODE_KEY = "orga-drone.studio.color-mode";
 
+  function normalizeColorMode(raw) {
+    const value = String(raw || "").toLowerCase();
+    if (value === "pro" || value === "expert") return "pro";
+    return "creative";
+  }
+
   function readColorModePreference() {
     try {
-      return window.localStorage.getItem(COLOR_MODE_KEY) === "expert" ? "expert" : "standard";
+      return normalizeColorMode(window.localStorage.getItem(COLOR_MODE_KEY));
     } catch (_) {
-      return "standard";
+      return "creative";
     }
   }
 
   function applyColorModePreference(mode, { persist = false } = {}) {
-    const next = mode === "expert" ? "expert" : "standard";
+    const next = normalizeColorMode(mode);
     const panel = document.getElementById("inspector-image-panel");
     if (panel) panel.dataset.imageMode = next;
     document.querySelectorAll("[data-image-mode]").forEach((button) => {
@@ -3938,6 +3944,66 @@ import {
     return clip;
   }
 
+  function syncQuickLookChips(lookId) {
+    const selected = String(lookId || "");
+    document.querySelectorAll("[data-quick-look-chip]").forEach((button) => {
+      const active = button.dataset.quickLookChip === selected && selected !== "";
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-checked", active ? "true" : "false");
+    });
+  }
+
+  function lookDisplayName(lookId) {
+    const key = String(lookId || "");
+    if (!key) return root.dataset.lookCustom || "Custom";
+    const select = document.getElementById("inspector-quick-look");
+    const option = select && [...select.options].find((item) => item.value === key);
+    return (option && option.textContent) || key;
+  }
+
+  function updateColorGradeSummary(clip) {
+    const panel = document.getElementById("inspector-image-panel");
+    const summary = document.getElementById("studio-color-grade-summary");
+    if (!panel || !summary) return;
+    if (!clip) {
+      summary.textContent = "";
+      return;
+    }
+    const parts = [];
+    const lookId = clip.dataset.quickLook || "";
+    const adjust = readImageAdjust(clip);
+    const look = readColorLook(clip);
+    const detail = readDetail(clip);
+    const ramp = readSaturationRamp(clip);
+    if (lookId) {
+      parts.push(
+        formatTemplate(panel.dataset.gradeLook || "Look: {name}", { name: lookDisplayName(lookId) })
+      );
+    } else if (!imageAdjustIsNeutral({ ...adjust, highlights: 0, shadows: 0, blacks: 0 })) {
+      parts.push(panel.dataset.gradeSliders || "Manual sliders");
+    }
+    if (look.conversion_lut && look.conversion_confirmed) {
+      parts.push(panel.dataset.gradeConversion || "Camera conversion on");
+    }
+    if (look.creative_lut) {
+      parts.push(panel.dataset.gradeCreativeLut || "Creative LUT on");
+    }
+    if (!hslIsNeutral(readHsl(clip))) parts.push(panel.dataset.gradeHsl || "HSL active");
+    if (!colorWheelsIsNeutral(readColorWheels(clip))) {
+      parts.push(panel.dataset.gradeWheels || "Color wheels active");
+    }
+    if (adjust.highlights || adjust.shadows || adjust.blacks) {
+      parts.push(panel.dataset.gradeTonal || "Fine-tune active");
+    }
+    if ((detail && detail.sharpen) || (detail && detail.denoise)) {
+      parts.push(panel.dataset.gradeDetail || "Sharpen or denoise on");
+    }
+    if (ramp && ramp.enabled) parts.push(panel.dataset.gradeBw || "Black-and-white ramp on");
+    summary.textContent = parts.length
+      ? parts.join(" · ")
+      : panel.dataset.gradeNeutral || "No color changes yet";
+  }
+
   function fillImageAdjust(clip) {
     const adjust = readImageAdjust(clip);
     IMAGE_ADJUST_FIELDS.forEach(([key, inputId, valueId]) => {
@@ -3949,9 +4015,11 @@ import {
     });
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
+    syncQuickLookChips(clip.dataset.quickLook || "");
     fillHsl(clip);
     fillColorWheels(clip);
     fillColorAnimationInspector(clip);
+    updateColorGradeSummary(clip);
   }
 
   function hslRangeFromControls(clip) {
@@ -4039,6 +4107,8 @@ import {
     clip.dataset.quickLook = "";
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = "";
+    syncQuickLookChips("");
+    updateColorGradeSummary(clip);
     fetch(`/api/studio/${clip.dataset.studioId}/look`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -4652,6 +4722,7 @@ import {
     detailControls.fill(clip);
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
+    updateColorGradeSummary(clip);
   }
 
   let colorSaveChain = Promise.resolve();
@@ -5699,10 +5770,19 @@ import {
       Math.abs(frame.y_start - 0.5) > 0.001 ||
       Math.abs(frame.x_end - 0.5) > 0.001 ||
       Math.abs(frame.y_end - 0.5) > 0.001;
+    const look = readColorLook(clip);
+    const detail = readDetail(clip);
     image.classList.toggle(
       "has-settings",
-      !imageAdjustIsNeutral(adjust) || ramp.enabled === true || frameActive ||
-        !hslIsNeutral(readHsl(clip)) || !colorWheelsIsNeutral(readColorWheels(clip))
+      !imageAdjustIsNeutral(adjust) ||
+        ramp.enabled === true ||
+        frameActive ||
+        !hslIsNeutral(readHsl(clip)) ||
+        !colorWheelsIsNeutral(readColorWheels(clip)) ||
+        !!(look.conversion_lut && look.conversion_confirmed) ||
+        !!look.creative_lut ||
+        !!(detail && (detail.sharpen || detail.denoise)) ||
+        !!clip.dataset.quickLook
     );
     const hud = readHud(clip);
     effects.classList.toggle("has-settings", readMasks(clip).length > 0 || hud.enabled === true);
@@ -10836,6 +10916,7 @@ import {
       clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
       applyPreviewGrades(resolveAt(state.projectTimeS));
+      updateColorGradeSummary(clip);
       setSaveState(false);
     });
     input.addEventListener("change", () => {
@@ -10843,19 +10924,37 @@ import {
       if (!clip) return;
       clearQuickLookLabel(clip);
       writeImageAdjust(clip, imageAdjustFromControls());
+      updateColorGradeSummary(clip);
       queueImageAdjustSave(clip);
     });
   });
 
-  document.getElementById("inspector-quick-look")?.addEventListener("change", async (event) => {
+  async function applyQuickLookFromUi(lookId) {
     const clip = selectedAdjustableClip();
     if (!clip) return;
+    const lookSelect = document.getElementById("inspector-quick-look");
+    if (lookSelect) lookSelect.value = lookId || "";
+    syncQuickLookChips(lookId || "");
     try {
-      await applyQuickLook(clip, event.target.value || "");
+      await applyQuickLook(clip, lookId || "");
     } catch (err) {
       showFlash((err && err.message) || msgLookFailed);
       fillImageAdjust(clip);
     }
+  }
+
+  document.getElementById("inspector-quick-look")?.addEventListener("change", async (event) => {
+    await applyQuickLookFromUi(event.target.value || "");
+  });
+
+  document.querySelectorAll("[data-quick-look-chip]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const lookId = button.dataset.quickLookChip || "";
+      const clip = selectedAdjustableClip();
+      if (!clip) return;
+      const current = clip.dataset.quickLook || "";
+      await applyQuickLookFromUi(current === lookId ? "" : lookId);
+    });
   });
 
   colorComparison = createColorCompare({
