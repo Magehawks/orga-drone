@@ -6,6 +6,7 @@ import threading
 from dataclasses import dataclass
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from orga_drone.app_prefs import (
     get_last_export_directory,
@@ -1189,3 +1190,55 @@ def run_media_export(
         on_progress=on_progress,
         cancel_event=cancel_event,
     )
+
+
+def start_studio_export_job(
+    store: Any,
+    work: "Callable[[ProgressCallback | None, threading.Event | None], Path]",
+    translate: "Callable[[str], str]",
+) -> str:
+    """Start one Studio export job in a worker thread (issue #282).
+
+    Shared by the HTTP route and the Control API so both launch the same
+    render pipeline. The caller runs the preflight validation first and
+    supplies the blocking work closure. Returns the job id; raises
+    ``StudioExportError`` when an export is already running. ``store`` is the
+    app's ``ExportJobStore`` (imported lazily to keep this module's import
+    graph unchanged).
+    """
+
+    job = store.try_create()
+    if job is None:
+        raise StudioExportError(
+            "An export is already running. Wait for it to finish."
+        )
+    cancel_event = store.cancel_event(job.id)
+
+    def _worker() -> None:
+        store.mark_running(job.id)
+
+        def on_progress(progress: dict) -> None:
+            store.apply_progress(job.id, progress)
+
+        try:
+            result = work(on_progress, cancel_event)
+            store.complete(
+                job.id,
+                output_path=str(result),
+                directory=str(result.parent),
+            )
+        except ExportCancelled:
+            store.finish_cancelled(job.id)
+        except StudioExportError as exc:
+            if cancel_event is not None and cancel_event.is_set():
+                store.finish_cancelled(job.id)
+            else:
+                store.fail(job.id, translate_export_error(exc, translate))
+        except Exception as exc:  # noqa: BLE001
+            if cancel_event is not None and cancel_event.is_set():
+                store.finish_cancelled(job.id)
+            else:
+                store.fail(job.id, f"Export failed: {exc}")
+
+    threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
+    return job.id
