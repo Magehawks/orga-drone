@@ -43,7 +43,11 @@ Highlights:
   as generated Story items; basic rendered visual transitions; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
-  for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); optional flight map (stored GPS route and synced marker on OpenStreetMap tiles when online, otherwise a plain panel; tiles are cached locally and are not bundled); optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed time and relative altitude); time-based
+  for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); source-anchored
+  speed ramps (0.25×–20×, compact curve + presets, edge-drag of the Effekt-lane bar with 1×
+  outside, seek-sampled preview above 16×); Timelapse by target duration or 1×–20× speed with
+  explicit Apply that replaces slow motion with a flat ramp (conflict blocking against ramps,
+  repeats and loop; source audio muted; approximate Inspector frame estimate); optional flight map (stored GPS route and synced marker on OpenStreetMap tiles when online, otherwise a plain panel; tiles are cached locally and are not bundled); optional telemetry HUD on a video clip with a sibling DJI SRT (elapsed time and relative altitude); time-based
   Story canvas with Fit to story / zoom; time-proportional soundtrack coverage
   with one draggable project-level start on that canvas)
 
