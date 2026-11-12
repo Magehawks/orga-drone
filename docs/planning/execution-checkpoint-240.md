@@ -27,7 +27,7 @@ is not acceptance.
 | #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
-| #301 | Drone-friendly transitions | IN_PROGRESS | this branch amends ADR 0010 | Blur dissolve and four soft wipes share crossfade occupancy, preview, and xfade export. Luma wipe, whip pan, and zoom/spin stay out. Packaged WebView2 and a real MP4 for these types are NOT_RUN. | PO review | Do not add more transition types. |
+| #301 | Drone-friendly transitions | VERIFY | #401 | Blur dissolve and four soft wipes share crossfade occupancy, preview, and xfade export. Browser check on title cards: select, save, and reload kept the German blur-dissolve label. Luma wipe, whip pan, and zoom/spin stay out. Packaged WebView2 and a real MP4 for these types are NOT_RUN. | PO review | Do not add more transition types. |
 | #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
@@ -42,7 +42,7 @@ is not acceptance.
 
 - #399 grade backup. Canonical writes stay disabled.
 - #400 packaged SFX E2E. Local onefolder WebView2 PASS. GitHub CI green after the `placed` annotation. GitHub release-ZIP admission NOT_RUN.
-- #301 drone transitions, this branch. Preview/export unit tests passed. Packaged evidence NOT_RUN.
+- #401 drone transitions. Preview/export unit tests passed. Browser save/reload of blur dissolve passed on title cards. Packaged WebView2 and a real MP4 are NOT_RUN.
 
 ## Worktrees
 
@@ -65,4 +65,4 @@ is not acceptance.
 
 ## Exact next task
 
-Request PO review of #400 now that CI is green. Do not describe the GitHub release-ZIP admission as passed. After this transition PR, continue #298 feasibility evidence and the #273 security spike. Do not enable canonical grade writes.
+PO review is requested on #400. Do not describe the GitHub release-ZIP admission as passed. #401 is ready for review. Next implementation is the #298 feasibility spike, then the #273 security spike. Do not enable canonical grade writes.
