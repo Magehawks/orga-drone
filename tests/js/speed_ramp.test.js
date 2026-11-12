@@ -10,6 +10,8 @@ import {
   rampPreset,
   rampMediaTime,
   edgeSourceAfterRampDrag,
+  placeRampRegion,
+  rampAfterRegionDrag,
   remapRampSpan,
 } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
@@ -170,4 +172,74 @@ test("malformed, extreme and nonfinite speeds are refused", () => {
       ],
     })
   );
+});
+
+test("a bounded region plays at 1× outside and keeps the curve inside", () => {
+  const ramp = parseRamp({
+    v: 1,
+    interp: "reciprocal_smoothstep",
+    region: { start_s: 2, end_s: 4 },
+    points: [
+      { source_s: 2, speed: 0.5 },
+      { source_s: 4, speed: 0.5 },
+    ],
+  });
+  assert.equal(rampSpeed(ramp, 1), 1);
+  assert.equal(rampSpeed(ramp, 2), 0.5);
+  assert.equal(rampSpeed(ramp, 4.2), 1);
+  close(rampTime(ramp, 6) - rampTime(ramp, 0), 8);
+  const legacy = {
+    v: 1,
+    interp: "reciprocal_smoothstep",
+    points: ramp.points,
+  };
+  close(rampTime(ramp, 4) - rampTime(ramp, 2), rampTime(legacy, 4) - rampTime(legacy, 2));
+  assert.equal(parseRamp({ ...ramp, region: { start_s: 3, end_s: 3.5 } }), null);
+  assert.equal(parseRamp({ ...fixture.curve, region: { start_s: 1, end_s: 2 } }), null);
+});
+
+test("placing and dragging a region preserves curve speeds", () => {
+  const ramp = rampPreset("slow_fast_slow", 0, 60);
+  const placed = placeRampRegion(ramp, 10, 40, { playStart: 0, playEnd: 60 });
+  assert.equal(placed.region.start_s, 10);
+  assert.equal(placed.region.end_s, 40);
+  assert.deepEqual(
+    placed.points.map((point) => point.speed),
+    [0.5, 4, 0.5]
+  );
+  assert.equal(rampSpeed(placed, 9), 1);
+  assert.equal(rampSpeed(placed, 25), 4);
+  assert.equal(rampSpeed(placed, 41), 1);
+  const moved = rampAfterRegionDrag(placed, {
+    mode: "move",
+    deltaStory: 100,
+    playStart: 0,
+    playEnd: 60,
+  });
+  assert.equal(moved.region.start_s, 30);
+  assert.equal(moved.region.end_s, 60);
+  assert.deepEqual(
+    moved.points.map((point) => point.speed),
+    [0.5, 4, 0.5]
+  );
+  const before = rampTime(placed, 40) - rampTime(placed, 10);
+  const resized = rampAfterRegionDrag(placed, {
+    mode: "end",
+    deltaStory: 3,
+    playStart: 0,
+    playEnd: 60,
+  });
+  assert.equal(resized.region.start_s, 10);
+  assert.equal(resized.points[1].speed, 4);
+  const after = rampTime(resized, resized.region.end_s) - rampTime(resized, 10);
+  assert.ok(Math.abs(after - (before + 3)) < 0.02, `${after} != ${before + 3}`);
+  const started = rampAfterRegionDrag(placed, {
+    mode: "start",
+    deltaStory: -2,
+    playStart: 0,
+    playEnd: 60,
+  });
+  assert.equal(started.region.start_s, 8);
+  assert.equal(started.region.end_s, 40);
+  assert.equal(started.points[0].speed, 0.5);
 });

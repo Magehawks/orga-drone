@@ -21,9 +21,12 @@ from orga_drone.studio_color_animation import ColorAnimation, ColorKey
 from orga_drone.studio_estimate import effective_seconds
 from orga_drone.studio_speed_ramp import (
     Point,
+    Region,
     SpeedRamp,
     edge_source_after_ramp_drag,
     parse_ramp,
+    place_ramp_region,
+    ramp_after_region_drag,
     ramp_from_settings,
 )
 from orga_drone.studio_frame import FrameTransform
@@ -762,3 +765,236 @@ def test_late_nonkeyframe_seek_matches_full_decode(
         ).stdout
 
     assert pixels(bounded) == pixels(full)
+
+
+def _eval_ffmpeg_time(expression: str, source: float) -> float:
+    """Evaluate the ramp's FFmpeg primitive at one source time."""
+    text = expression.replace("T", f"({source:.12g})")
+    index = 0
+
+    def peek() -> str:
+        return text[index:]
+
+    def expr() -> float:
+        value = term()
+        while index < len(text) and text[index] in "+-":
+            op = text[index]
+            advance(1)
+            right = term()
+            value = value + right if op == "+" else value - right
+        return value
+
+    def term() -> float:
+        value = power()
+        while index < len(text) and text[index] in "*/":
+            op = text[index]
+            advance(1)
+            right = power()
+            value = value * right if op == "*" else value / right
+        return value
+
+    def power() -> float:
+        value = unary()
+        if index < len(text) and text[index] == "^":
+            advance(1)
+            return value ** power()
+        return value
+
+    def unary() -> float:
+        nonlocal index
+        if text[index] == "+":
+            advance(1)
+            return unary()
+        if text[index] == "-":
+            advance(1)
+            return -unary()
+        return primary()
+
+    def primary() -> float:
+        nonlocal index
+        if text.startswith("if", index) and not text[index + 2 : index + 3].isalnum():
+            advance(2)
+            expect("(")
+            cond = expr()
+            expect(",")
+            yes = expr()
+            expect(",")
+            no = expr()
+            expect(")")
+            return yes if cond else no
+        if text.startswith("lte", index):
+            advance(3)
+            expect("(")
+            left = expr()
+            expect(",")
+            right = expr()
+            expect(")")
+            return 1.0 if left <= right else 0.0
+        if text[index] == "(":
+            advance(1)
+            value = expr()
+            expect(")")
+            return value
+        token = ""
+        while index < len(text) and (text[index].isdigit() or text[index] == "."):
+            token += text[index]
+            index += 1
+        if index < len(text) and text[index] in "eE":
+            token += text[index]
+            index += 1
+            if index < len(text) and text[index] in "+-":
+                token += text[index]
+                index += 1
+            while index < len(text) and text[index].isdigit():
+                token += text[index]
+                index += 1
+        if not token:
+            raise ValueError(text[index : index + 24])
+        return float(token)
+
+    def advance(count: int) -> None:
+        nonlocal index
+        index += count
+
+    def expect(char: str) -> None:
+        nonlocal index
+        if text[index] != char:
+            raise ValueError(text[index : index + 24])
+        index += 1
+
+    value = expr()
+    if index != len(text):
+        raise ValueError(text[index : index + 24])
+    return value
+
+
+def test_bounded_region_is_one_outside_and_matches_export_primitive() -> None:
+    ramp = parse_ramp(
+        {
+            "v": 1,
+            "interp": "reciprocal_smoothstep",
+            "region": {"start_s": 2, "end_s": 4},
+            "points": [
+                {"source_s": 2, "speed": 0.5},
+                {"source_s": 4, "speed": 0.5},
+            ],
+        }
+    )
+    assert ramp.speed_at(1) == 1
+    assert ramp.speed_at(2) == pytest.approx(0.5)
+    assert ramp.speed_at(4.2) == 1
+    assert ramp.duration(0, 6) == pytest.approx(8)
+    legacy = SpeedRamp(ramp.points)
+    assert ramp.duration(2, 4) == pytest.approx(legacy.duration(2, 4))
+    legacy_expr = parse_ramp(FIXTURE["curve"]).ffmpeg_time()
+    for sample in FIXTURE["samples"]:
+        assert _eval_ffmpeg_time(legacy_expr, sample["source"]) == pytest.approx(sample["story"])
+    for source in (0, 1, 2, 3, 4, 5, 6):
+        assert _eval_ffmpeg_time(ramp.ffmpeg_time(), source) == pytest.approx(ramp.time_at(source))
+    with pytest.raises(ValueError):
+        parse_ramp({**ramp.as_dict(), "region": {"start_s": 3, "end_s": 3.5}})
+
+
+def test_place_and_drag_keep_curve_speeds() -> None:
+    base = SpeedRamp((Point(0, 0.5), Point(30, 4), Point(60, 0.5)))
+    placed = place_ramp_region(base, 10, 40, play_start=0, play_end=60)
+    assert placed.region == Region(10, 40)
+    assert [point.speed for point in placed.points] == [0.5, 4, 0.5]
+    assert placed.speed_at(9) == 1
+    assert placed.speed_at(25) == pytest.approx(4)
+    assert placed.speed_at(41) == 1
+    moved = ramp_after_region_drag(
+        placed, mode="move", delta_story_s=100, play_start=0, play_end=60
+    )
+    assert moved.region == Region(30, 60)
+    assert [point.speed for point in moved.points] == [0.5, 4, 0.5]
+    before = placed.duration(10, 40)
+    resized = ramp_after_region_drag(
+        placed, mode="end", delta_story_s=3, play_start=0, play_end=60
+    )
+    assert resized.region is not None and resized.region.start_s == 10
+    assert resized.points[1].speed == 4
+    assert resized.duration(resized.region.start_s, resized.region.end_s) == pytest.approx(
+        before + 3, abs=0.02
+    )
+    started = ramp_after_region_drag(
+        placed, mode="start", delta_story_s=-2, play_start=0, play_end=60
+    )
+    assert started.region == Region(8, 40)
+    assert started.points[0].speed == 0.5
+
+
+def test_bounded_region_reopens_and_shares_preview_duration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+    from orga_drone.studio_cut import resolve_source_range
+
+    app = create_app()
+    db: Database = app.state.db
+    cid = _add_item(
+        db,
+        _seed_media(
+            db,
+            tmp_path / "lib",
+            filename="bounded.mp4",
+            content=b"synthetic",
+            duration_s=6,
+        ),
+    )
+    payload = {
+        "v": 1,
+        "interp": "reciprocal_smoothstep",
+        "region": {"start_s": 2, "end_s": 4},
+        "points": [
+            {"source_s": 2, "speed": 0.5},
+            {"source_s": 3, "speed": 4},
+            {"source_s": 4, "speed": 0.5},
+        ],
+    }
+    client = TestClient(app)
+    route = f"/api/studio/{cid}/speed-ramp"
+    applied = client.patch(route, json={"speed_ramp": payload})
+    assert applied.status_code == 200
+    saved = next(item for item in db.list_studio_items() if item.id == cid)
+    ramp = ramp_from_settings(saved.effect_settings)
+    assert ramp is not None and ramp.region == Region(2, 4)
+    assert [point.speed for point in ramp.points] == [0.5, 4, 0.5]
+    seconds = effective_seconds(
+        kind="video",
+        available=True,
+        photo_duration_s=None,
+        duration_s=6,
+        source_in_s=0,
+        source_out_s=6,
+        effect_settings=saved.effect_settings,
+    )
+    assert seconds == pytest.approx(ramp.duration(0, 6))
+    assert applied.json()["effective_duration_s"] == pytest.approx(seconds)
+    assert client.post("/api/studio/history/undo").status_code == 200
+    assert ramp_from_settings(db.list_studio_items()[0].effect_settings) is None
+    assert client.post("/api/studio/history/redo").status_code == 200
+    reopened = Database(db.path)
+    again = next(item for item in reopened.list_studio_items() if item.id == cid)
+    assert ramp_from_settings(again.effect_settings) == ramp
+    cut = client.post(f"/api/studio/{cid}/cut", json={"local_s": 2})
+    assert cut.status_code == 200
+    for clip in db.list_studio_items():
+        kept = ramp_from_settings(clip.effect_settings)
+        assert kept is not None and kept.region == Region(2, 4)
+        rang = resolve_source_range(
+            source_in_s=clip.source_start,
+            source_out_s=clip.source_end,
+            media_duration_s=clip.duration_s,
+        )
+        assert rang is not None
+        assert effective_seconds(
+            kind="video",
+            available=True,
+            photo_duration_s=None,
+            duration_s=clip.duration_s,
+            source_in_s=clip.source_start,
+            source_out_s=clip.source_end,
+            effect_settings=clip.effect_settings,
+        ) == pytest.approx(kept.duration(rang.source_in_s, rang.source_out_s))

@@ -1,10 +1,10 @@
 import "./studio-lut-webgl.js";
 import {
   edgeSourceAfterRampDrag,
-  MIN_SPEED,
   parseRamp,
-  remapRampSpan,
+  rampAfterRegionDrag,
   rampMediaTime,
+  rampRegion,
   rampSource,
   rampSpeed,
   rampTime,
@@ -1207,13 +1207,16 @@ import {
       const bars = [];
       const rampBar = speedRampOf(clip);
       if (rampBar) {
-        const first = rampBar.points[0].source_s;
-        const last = rampBar.points.at(-1).source_s;
+        const region = rampRegion(rampBar);
+        const sourceIn = sourceInS(clip);
+        const dur = Math.max(0.05, sourceDurationS(clip));
+        const start = Math.max(0, Math.min(dur, region.start - sourceIn));
+        const end = Math.max(start, Math.min(dur, region.end - sourceIn));
         bars.push({
           kind: "ramp",
           id: "",
-          start: Math.max(0, first - sourceInS(clip)),
-          end: Math.max(0.05, last - sourceInS(clip)),
+          start,
+          end: Math.max(start + 0.05, end),
           label: effectLabel("ramp"),
         });
       }
@@ -1296,7 +1299,14 @@ import {
           el.classList.add("is-selected");
         }
         if (bar.kind === "ramp") {
+          const keys = lane.dataset.rampKeys || "";
+          if (keys) {
+            el.title = keys;
+            el.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight");
+            el.setAttribute("aria-label", `${bar.label}. ${keys}`);
+          }
           el.addEventListener("pointerdown", (event) => onRampPointerDown(event, el, clip));
+          el.addEventListener("keydown", (event) => onRampKeyDown(event, clip));
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -1892,43 +1902,24 @@ import {
     else el.classList.add("is-selected");
     const playStart = loopPlayInS(clip);
     const playEnd = loopPlayOutS(clip);
-    const originStart = ramp.points[0].source_s;
-    const originEnd = ramp.points.at(-1).source_s;
-    const span = originEnd - originStart;
-    if (!(span >= 0.05)) return;
+    const origin = rampRegion(ramp);
+    if (!(origin.end - origin.start >= 0.05)) return;
     const startX = event.clientX;
     const pps = timelinePxPerSecond() || 1;
     const clipLeft = Number.parseFloat(clip.style.left) || 0;
     el.classList.add("is-dragging");
     const move = (ev) => {
       const deltaStory = (ev.clientX - startX) / pps;
-      let newStart = originStart;
-      let newEnd = originEnd;
-      if (mode === "move") {
-        const midSpeed = Math.max(MIN_SPEED, rampSpeed(ramp, (originStart + originEnd) / 2) || 1);
-        const deltaSource = deltaStory * midSpeed;
-        newStart = originStart + deltaSource;
-        newEnd = newStart + span;
-        if (newStart < playStart) {
-          newStart = playStart;
-          newEnd = playStart + span;
-        }
-        if (newEnd > playEnd) {
-          newEnd = playEnd;
-          newStart = playEnd - span;
-        }
-      } else {
-        const edgeSource = mode === "start" ? originStart : originEnd;
-        const localSpeed = Math.max(MIN_SPEED, rampSpeed(ramp, edgeSource) || 1);
-        const deltaSource = deltaStory * localSpeed;
-        if (mode === "start") newStart = originStart + deltaSource;
-        else newEnd = originEnd + deltaSource;
-      }
-      const draft = remapRampSpan(ramp, newStart, newEnd, { playStart, playEnd });
+      const draft = rampAfterRegionDrag(ramp, {
+        mode,
+        deltaStory,
+        playStart,
+        playEnd,
+      });
       if (!draft) return;
-      const storyLeft = rampTime(draft, draft.points[0].source_s) - rampTime(draft, playStart);
-      const storyRight =
-        rampTime(draft, draft.points.at(-1).source_s) - rampTime(draft, playStart);
+      const region = rampRegion(draft);
+      const storyLeft = rampTime(draft, region.start) - rampTime(draft, playStart);
+      const storyRight = rampTime(draft, region.end) - rampTime(draft, playStart);
       el.style.left = `${clipLeft + Math.max(0, storyLeft) * pps}px`;
       el.style.width = `${Math.max(12, (storyRight - storyLeft) * pps)}px`;
       el.dataset.draftRamp = JSON.stringify(draft);
@@ -1958,6 +1949,31 @@ import {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
+  }
+
+  function onRampKeyDown(event, clip) {
+    if (event.ctrlKey || event.metaKey || (event.altKey && event.shiftKey)) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const ramp = speedRampOf(clip);
+    if (!ramp) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const mode = event.altKey ? "start" : event.shiftKey ? "end" : "move";
+    const next = rampAfterRegionDrag(ramp, {
+      mode,
+      deltaStory: (event.key === "ArrowRight" ? 1 : -1) * 0.1,
+      playStart: loopPlayInS(clip),
+      playEnd: loopPlayOutS(clip),
+    });
+    if (!next || JSON.stringify(next) === JSON.stringify(ramp)) return;
+    if (
+      !timedSelectionMatches(timedSelection, "ramp", clipId(clip), "")
+    ) {
+      selectTimedRamp(clip, { focusInspector: false, source: "keys" });
+    }
+    void saveSpeedRamp(clip, next).then(() => {
+      document.querySelector(effectBarSelector("ramp", clipId(clip), ""))?.focus();
+    });
   }
 
   function onEffectPointerDown(event, el, clip) {
@@ -2230,8 +2246,9 @@ import {
   function seekPlayheadIntoRamp(clip) {
     const ramp = speedRampOf(clip);
     if (!ramp || !clip) return;
-    const start = ramp.points[0].source_s;
-    const end = ramp.points.at(-1).source_s;
+    const region = rampRegion(ramp);
+    const start = region.start;
+    const end = region.end;
     if (!(end - start >= 0.05)) return;
     const absolute = absoluteSourceAtPlayhead(clip);
     if (absolute >= start - 0.001 && absolute <= end + 0.001) {
@@ -13790,10 +13807,9 @@ import {
       const ramp = speedRampOf(clip);
       if (!ramp) return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
       const playStart = loopPlayInS(clip);
-      const first = ramp.points[0].source_s;
-      const last = ramp.points.at(-1).source_s;
-      const storyLeft = Math.max(0, rampTime(ramp, first) - rampTime(ramp, playStart));
-      const storyRight = Math.max(storyLeft, rampTime(ramp, last) - rampTime(ramp, playStart));
+      const region = rampRegion(ramp);
+      const storyLeft = Math.max(0, rampTime(ramp, region.start) - rampTime(ramp, playStart));
+      const storyRight = Math.max(storyLeft, rampTime(ramp, region.end) - rampTime(ramp, playStart));
       const pps = timelinePxPerSecond();
       return {
         left: timeToX(clipStartTime(clip) + storyLeft),

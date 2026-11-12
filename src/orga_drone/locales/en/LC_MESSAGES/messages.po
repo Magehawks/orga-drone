@@ -736,6 +736,18 @@ msgstr "Remove ramp"
 msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 msgstr "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 
+msgid "Region start (s)"
+msgstr "Region start (s)"
+
+msgid "Region end (s)"
+msgstr "Region end (s)"
+
+msgid "Drag the bar to move the ramp and its edges to resize it. Playback outside the bar is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing the ramp returns to 1×."
+msgstr "Drag the bar to move the ramp and its edges to resize it. Playback outside the bar is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing the ramp returns to 1×."
+
+msgid "Arrow keys move. Shift+arrows resize the end. Alt+arrows resize the start."
+msgstr "Arrow keys move. Shift+arrows resize the end. Alt+arrows resize the start."
+
 msgid "Timelapse"
 msgstr "Timelapse"
 

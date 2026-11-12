@@ -133,6 +133,8 @@ function fixtureEditor(options = {}) {
   const speed = field("speed");
   const add = field("add");
   const removePoint = field("remove-point");
+  const regionStart = field("region-start");
+  const regionEnd = field("region-end");
   const fields = {
     controls,
     remove,
@@ -143,6 +145,8 @@ function fixtureEditor(options = {}) {
     speed,
     add,
     "remove-point": removePoint,
+    "region-start": regionStart,
+    "region-end": regionEnd,
   };
   const panel = {
     hidden: false,
@@ -199,6 +203,8 @@ function fixtureEditor(options = {}) {
     editor,
     controls,
     remove,
+    regionStart,
+    regionEnd,
     lane,
     saves,
     selects,
@@ -278,4 +284,20 @@ test("curve handle drag updates in place and saves once on pointerup", async () 
   await tick();
   assert.equal(f.saves.length, 1);
   assert.ok(f.saves[0]);
+});
+
+test("region fields resize the bar without changing curve speeds", async () => {
+  const f = fixtureEditor();
+  f.setRamp(fixture.curve);
+  f.editor.fill();
+  assert.equal(f.regionStart.value, "0.00");
+  assert.equal(f.regionEnd.value, "4.00");
+  f.regionEnd.value = "3";
+  f.regionEnd.dispatch("change");
+  await tick();
+  assert.equal(f.saves.length, 1);
+  assert.equal(f.saves[0].region.end_s, 3);
+  assert.equal(f.saves[0].points[0].speed, fixture.curve.points[0].speed);
+  assert.equal(f.saves[0].points.at(-1).speed, fixture.curve.points.at(-1).speed);
+  assert.equal(f.saves[0].points.at(-1).source_s, 3);
 });

@@ -120,6 +120,13 @@ it. `/speed-ramp` writes are ordinary Story edits. Missing/corrupt ramps fall
 back to legacy timing. Older builds that only accepted ≤4× treat faster stored
 ramps as malformed.
 
+One optional `region` (`start_s`, `end_s`, Source seconds) bounds that curve.
+Outside the region, preview and export play at 1×; inside, the reciprocal
+smoothstep curve is unchanged. A ramp with no region keeps the ADR 0034
+endpoint hold. Older builds ignore `region` and hold the endpoint speed outside
+the points. The timeline bar moves and resizes that one region; the inspector
+numbers and arrow keys edit the same Source bounds.
+
 `export/studio_ramp_encoder.py` is a timing adapter around the existing renderer
 and stitcher. It expands loop passes before unchanged color subdivision, assigns
 pieces to cumulative output-frame boundaries, and preserves source samples until
