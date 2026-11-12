@@ -2,8 +2,9 @@ import {
   MAX_SPEED,
   MIN_SPEED,
   parseRamp,
-  remapRampSpan,
+  placeRampRegion,
   rampPreset,
+  rampRegion,
   rampSource,
   rampSpeed,
   rampTime,
@@ -62,6 +63,16 @@ export function createSpeedRampEditor({
       return;
     }
     selected = Math.min(selected, ramp.points.length - 1);
+    const region = rampRegion(ramp);
+    const range = bounds(clip);
+    const regionStart = field("region-start");
+    const regionEnd = field("region-end");
+    if (regionStart && regionEnd) {
+      regionStart.value = (region.start - range.start).toFixed(2);
+      regionEnd.value = (region.end - range.start).toFixed(2);
+      regionStart.disabled = pending;
+      regionEnd.disabled = pending;
+    }
     const pick = field("point");
     pick.replaceChildren(
       ...ramp.points.map((_, i) => {
@@ -73,7 +84,6 @@ export function createSpeedRampEditor({
     );
     pick.value = String(selected);
     const point = ramp.points[selected];
-    const range = bounds(clip);
     field("time").value = (point.source_s - range.start).toFixed(2);
     field("speed").value = point.speed;
     field("time").disabled = pending;
@@ -123,6 +133,7 @@ export function createSpeedRampEditor({
       onError();
       return;
     }
+    next.region = { start_s: range.start, end_s: range.end };
     selected = 0;
     commit(next);
   });
@@ -142,18 +153,19 @@ export function createSpeedRampEditor({
     const isEnd = selected === 0 || selected === value.points.length - 1;
     const timeChanged = Number.isFinite(nextTime) && Math.abs(nextTime - point.source_s) > 1e-6;
     if (isEnd && timeChanged) {
-      const newStart = selected === 0 ? nextTime : value.points[0].source_s;
-      const newEnd = selected === value.points.length - 1 ? nextTime : value.points.at(-1).source_s;
-      const remapped = remapRampSpan(value, newStart, newEnd, {
+      const region = rampRegion(value);
+      const newStart = selected === 0 ? nextTime : region.start;
+      const newEnd = selected === value.points.length - 1 ? nextTime : region.end;
+      const placed = placeRampRegion(value, newStart, newEnd, {
         playStart: range.start,
         playEnd: range.end,
       });
-      if (!remapped || !parseRamp(remapped)) {
+      if (!placed) {
         onError();
         fill();
         return;
       }
-      commit(remapped);
+      commit(placed);
       return;
     }
     point.source_s = nextTime;
@@ -166,6 +178,30 @@ export function createSpeedRampEditor({
   }
   field("time").addEventListener("change", edit);
   field("speed").addEventListener("change", edit);
+  function editRegion() {
+    const value = copy(current());
+    const clip = getSelection();
+    const startField = field("region-start");
+    const endField = field("region-end");
+    if (!value || !clip || !startField || !endField) return;
+    const range = bounds(clip);
+    const placed = placeRampRegion(
+      value,
+      Number(startField.value) + range.start,
+      Number(endField.value) + range.start,
+      { playStart: range.start, playEnd: range.end }
+    );
+    if (!placed) {
+      onError();
+      fill();
+      return;
+    }
+    commit(placed);
+  }
+  const regionStartField = field("region-start");
+  const regionEndField = field("region-end");
+  if (regionStartField) regionStartField.addEventListener("change", editRegion);
+  if (regionEndField) regionEndField.addEventListener("change", editRegion);
   field("add").addEventListener("click", () => {
     const value = copy(current());
     if (!value || value.points.length >= 5) return;
@@ -188,7 +224,7 @@ export function createSpeedRampEditor({
     return node;
   }
   function displayRange(ramp) {
-    return { start: ramp.points[0].source_s, end: ramp.points.at(-1).source_s };
+    return rampRegion(ramp);
   }
   function curvePathD(ramp, range) {
     const start = rampTime(ramp, range.start);

@@ -23,10 +23,28 @@ export function parseRamp(value) {
       return null;
     previous = point.source_s;
   }
+  if (Object.prototype.hasOwnProperty.call(value, "region") && value.region !== null) {
+    const region = value.region;
+    if (!region || typeof region !== "object") return null;
+    const start = region.start_s;
+    const end = region.end_s;
+    if (
+      typeof start !== "number" ||
+      typeof end !== "number" ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      start < 0 ||
+      end - start < 0.05 - 1e-9
+    )
+      return null;
+    for (const point of value.points) {
+      if (point.source_s < start - 1e-6 || point.source_s > end + 1e-6) return null;
+    }
+  }
   return value;
 }
 
-export function rampTime(ramp, source) {
+function curveTime(ramp, source) {
   const points = ramp.points;
   let total = Math.min(source, points[0].source_s) / points[0].speed;
   if (source <= points[0].source_s) return total;
@@ -42,7 +60,17 @@ export function rampTime(ramp, source) {
   return total + (source - last.source_s) / last.speed;
 }
 
-export function rampSpeed(ramp, source) {
+export function rampTime(ramp, source) {
+  const region = ramp && ramp.region;
+  if (!region) return curveTime(ramp, source);
+  if (source <= region.start_s) return source;
+  const capped = Math.min(source, region.end_s);
+  const interior = curveTime(ramp, capped) - curveTime(ramp, region.start_s);
+  if (source <= region.end_s) return region.start_s + interior;
+  return region.start_s + interior + (source - region.end_s);
+}
+
+function curveSpeed(ramp, source) {
   const points = ramp.points;
   if (source <= points[0].source_s) return points[0].speed;
   for (let i = 1; i < points.length; i += 1) {
@@ -54,6 +82,24 @@ export function rampSpeed(ramp, source) {
     }
   }
   return points.at(-1).speed;
+}
+
+export function rampSpeed(ramp, source) {
+  const region = ramp && ramp.region;
+  if (region && (source < region.start_s || source > region.end_s)) return 1;
+  return curveSpeed(ramp, source);
+}
+
+export function rampRegion(ramp) {
+  if (
+    ramp &&
+    ramp.region &&
+    Number.isFinite(ramp.region.start_s) &&
+    Number.isFinite(ramp.region.end_s)
+  ) {
+    return { start: ramp.region.start_s, end: ramp.region.end_s };
+  }
+  return { start: ramp.points[0].source_s, end: ramp.points.at(-1).source_s };
 }
 
 export function rampSourceAtTime(ramp, absoluteStory, lo, hi) {
@@ -225,4 +271,112 @@ export function remapRampSpan(ramp, newStart, newEnd, { playStart, playEnd, minS
 
 export function rampMediaTime(ramp, story, start, end, mediaOrigin = 0) {
   return rampSource(ramp, story, start, end) - mediaOrigin;
+}
+
+function roundSource(value) {
+  return Number(Number(value).toFixed(2));
+}
+
+export function placeRampRegion(
+  ramp,
+  newStart,
+  newEnd,
+  { playStart, playEnd, minGap = 0.05 } = {}
+) {
+  if (!ramp || !Array.isArray(ramp.points) || ramp.points.length < 2) return null;
+  if (!Number.isFinite(playStart) || !Number.isFinite(playEnd) || !(playEnd > playStart))
+    return null;
+  const old = rampRegion(ramp);
+  const oldSpan = old.end - old.start;
+  if (!(oldSpan > 0)) return null;
+  let start = Number(newStart);
+  let end = Number(newEnd);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (end < start) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+  start = Math.min(Math.max(playStart, start), playEnd);
+  end = Math.min(Math.max(playStart, end), playEnd);
+  const floor = Math.max(minGap, (ramp.points.length - 1) * minGap);
+  if (end - start < floor) {
+    if (end >= playEnd - 1e-9) start = Math.max(playStart, end - floor);
+    else end = Math.min(playEnd, start + floor);
+  }
+  if (end - start < floor - 1e-9) return null;
+  start = roundSource(start);
+  end = roundSource(end);
+  start = Math.min(Math.max(playStart, start), playEnd);
+  end = Math.min(Math.max(playStart, end), playEnd);
+  if (end - start < floor - 1e-9) return null;
+  const points = ramp.points.map((point) => {
+    const fraction = (point.source_s - old.start) / oldSpan;
+    return { source_s: roundSource(start + fraction * (end - start)), speed: point.speed };
+  });
+  points[0].source_s = start;
+  points[points.length - 1].source_s = end;
+  for (let i = 1; i < points.length; i += 1) {
+    const next = roundSource(points[i - 1].source_s + minGap);
+    if (points[i].source_s < next) points[i].source_s = next;
+  }
+  if (points[points.length - 1].source_s > end) {
+    points[points.length - 1].source_s = end;
+    for (let i = points.length - 2; i >= 0; i -= 1) {
+      const ceiling = roundSource(points[i + 1].source_s - minGap);
+      if (points[i].source_s > ceiling) points[i].source_s = ceiling;
+    }
+    points[0].source_s = start;
+  }
+  const next = {
+    v: 1,
+    interp: "reciprocal_smoothstep",
+    points,
+    region: { start_s: start, end_s: end },
+  };
+  return parseRamp(next) ? next : null;
+}
+
+export function rampAfterRegionDrag(ramp, { mode, deltaStory, playStart, playEnd }) {
+  if (!ramp || (mode !== "move" && mode !== "start" && mode !== "end")) return null;
+  const region = rampRegion(ramp);
+  const span = region.end - region.start;
+  if (!(span > 0)) return null;
+  const originLeft = rampTime(ramp, region.start) - rampTime(ramp, playStart);
+  const story = rampTime(ramp, region.end) - rampTime(ramp, region.start);
+  const rate = story / span;
+  const minSpan = Math.max(0.05, (ramp.points.length - 1) * 0.05);
+  const playSpan = playEnd - playStart;
+  let start;
+  let end;
+  if (mode === "move") {
+    start = playStart + originLeft + Number(deltaStory);
+    end = start + span;
+    if (span >= playSpan) {
+      start = playStart;
+      end = playEnd;
+    } else {
+      if (start < playStart) {
+        start = playStart;
+        end = playStart + span;
+      }
+      if (end > playEnd) {
+        end = playEnd;
+        start = playEnd - span;
+      }
+    }
+  } else if (mode === "start") {
+    start = playStart + originLeft + Number(deltaStory);
+    end = region.end;
+    if (start < playStart) start = playStart;
+    if (end - start < minSpan) start = end - minSpan;
+    if (start < playStart) return null;
+  } else {
+    start = region.start;
+    end = start + span + Number(deltaStory) / Math.max(rate, 1e-6);
+    if (end > playEnd) end = playEnd;
+    if (end - start < minSpan) end = start + minSpan;
+    if (end > playEnd) return null;
+  }
+  return placeRampRegion(ramp, start, end, { playStart, playEnd });
 }

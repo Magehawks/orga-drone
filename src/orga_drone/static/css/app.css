@@ -3098,7 +3098,8 @@ img.studio-preview-media,
   cursor: grab;
   touch-action: none;
 }
-.studio-effect-bar.is-selected {
+.studio-effect-bar.is-selected,
+.studio-effect-bar:focus-visible {
   outline: 2px solid var(--accent);
 }
 .studio-effect-edge {
