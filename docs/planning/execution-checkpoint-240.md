@@ -37,7 +37,7 @@ is not acceptance.
 | #332 | Bounded speed-ramp region | VERIFY | #394 merged `9f927d4` | Focused Python/JS tests passed before merge. Packaged E2E NOT_RUN. PO has not accepted the issue. | PO acceptance | Do not reimplement. |
 | #333 | Timelapse/ramp conflict | VERIFY | #389 merged | Confirm UI merged. Issue may still be open if acceptance is wider. | — | Re-read before more code. |
 | #351 | Color persistence/recovery | IN_PROGRESS | #399 open (`e5c830e`) | ADR 0035 accepted. Backup/restore helper verified. Canonical writes and startup refusal are not enabled. | PO merge, then wire startup only with the canonical file | Do not migrate existing grades. |
-| #352–#366 | Color Workspace | READY | — | Architecture accepted. Read-only contracts may proceed. Production writes wait on verified #351 safeguards. | No canonical write | Do not add a second grade model. |
+| #352–#366 | Color Workspace | IN_PROGRESS | #352 managed LUT math on this branch | ADR 0035 accepted. Read-only sRGB/BT.709 transfers and 3D LUT sampling. Canonical writes stay disabled. Export still uses the legacy LUT parser. Managed parity gate NOT_RUN. | #351 verification before any canonical write | Do not write canonical grades. |
 
 ## Open pull requests
 
@@ -63,4 +63,4 @@ is not acceptance.
 
 ## Exact next task
 
-Amend ADR 0010 and implement blur dissolve plus one soft directional wipe on a branch from `f4e688a`, with preview, export, persistence, and timing tests. In parallel, the #298 feasibility spike can proceed without waiting for #398 or #399. Do not enable canonical grade writes.
+#352 adds read-only managed SDR transfer and 3D LUT sampling. It does not change legacy import or export, and it does not enable canonical writes. Packaged managed-color evidence remains NOT_RUN. Do not merge without PO approval.
