@@ -1,90 +1,71 @@
-# Discovery: Unified timed-effect Source/Story clocks (#331)
+# Discovery: Unified timed-effect clocks (#331)
 
-Status: **Discovery / decision proposal** — no behavior change in this document.
-Unblocks #332 (bounded speed-ramp region). Product Owner decides before schema
-or renderer changes.
+Status: **Discovery complete — decision recorded in
+[ADR 0037](../decisions/0037-studio-source-story-clocks.md) (Proposed).**  
+No runtime behavior change in this issue. Product Owner acceptance of ADR 0037
+unlocks [#332](https://github.com/Magehawks/orga-drone/issues/332).
+
+Baseline: branch `docs/331-unified-clocks` from current `origin/develop`.
 
 ## Problem
 
-Each Studio timed effect currently owns ad-hoc clock rules inside
-`effect_settings` (ADR 0034 ramps, color animation bars, framing, masks,
-overlays). Independently editable, time-bounded regions are hard to compose
-because Source vs Story clocks are special-cased per feature.
+Each Studio timed effect special-cases Source vs Story time. Composing
+independently editable, time-bounded effects (starting with one bounded
+speed-ramp region) needs a shared vocabulary without a Big-Bang rewrite or
+generic NLE.
 
-## Inventory (verified on develop)
+## Inventory (develop tip)
 
-| Feature | Clock | Bounds storage | Notes |
-|---------|-------|----------------|-------|
-| Speed ramp | Source | Absolute `source_s` points; bar may edge-trim | ADR 0034; whole-clip or edge-pinned 1× outside |
-| Timelapse | Source (flat ramp) | Same as ramp | #325 / #333 |
-| Color animation | Story (clip-local) | Effect-lane bar start/end + points | Absolute keyed values inside bar |
-| Slow bar | Story/clip | Legacy | Replaced when ramp applies |
-| Overlays | Story (clip-local) | `start_s`/`end_s` on overlay | Output clock |
-| Masks / framing / HUD / map | Source | Source-timed | Follow remapped source under ramp |
-| Music | Story (project) | Sequential + `music_start_s` | ADR 0008 / 0026 |
-| SFX (PR #391) | Story (project) | `start_s` + source trim | ADR 0036 |
+| Feature | Clock in practice | Key evidence |
+|---------|-------------------|--------------|
+| Speed ramp (ADR 0034) | Absolute file **Source** `source_s`; map + inverse to Story | `studio_speed_ramp.py`, `static/js/studio/speed-ramp.js` |
+| Timelapse | Flat two-point ramp via same Source contract | `studio_timelapse.py` → `/speed-ramp` |
+| Color animation | **Story-local** bar + keys from trimmed in-point | `studio_color_animation.py` (`bar_start_s` / keys); ramp path expands loops before color |
+| Saturation ramp | **Story-local** `start_s`/`end_s` | ADR 0019, `studio_image.py` |
+| Overlays | **Story-local** / output; after retiming on ramp export | ADR 0016; `studio_ramp_encoder.py` “Story overlays stay after retiming” |
+| Masks / framing / zoom bar | **Source** offset from in-point | `studio_effect_lane.py`, `studio_mask.py`, ADR 0017/0018 |
+| Slow bars | **Source** offset; outside = 1× | `studio_effect_lane.slow_bar` / `speed_at` |
+| Section repeat | Source span × count → Story; overlays/framing follow plays | ADR 0021 |
+| Forward loop | Derived Source plays to soundtrack Story length | `studio_forward_loop.py` |
+| Detached clip audio | Source trim + Story-local `place_s`; muted under ramp | `studio_audio.py` |
+| Project music | **Project Story** (+ lead-in) | ADR 0008 / 0026 |
+| HUD / map | **Source** | ADR 0022 / 0023; `sourceClock` in `studio.js` |
 
-## Shared API proposal (no Big-Bang rewrite)
+SFX / ADR 0036 are **not** present on this develop tip; if a later merge adds
+project-Story SFX, bind them like music (Project Story), not Source.
 
-Introduce a **small pure module** (Python + JS twins) — not a generic NLE engine:
+Edge-trim on the ramp bar already pins endpoint speeds to 1× when the active
+Source span is shorter than the playable window (`remapRampSpan` in
+`speed-ramp.js`) — the Slow-bar mental model ADR 0034 describes.
 
-```text
-ClipClocks
-  sourceSpan(clip) -> { in, out }
-  storySpan(clip, projectTiming) -> { start, end }   # after ramp/repeat/loop
-  sourceToStory(clip, source_s) -> story_s
-  storyToSource(clip, story_s) -> source_s
-  regionToSource(clip, { start, end, clock }) -> { source_in, source_out }
-  regionToStory(clip, { start, end, clock }) -> { story_in, story_out }
-```
+## Recommendation
 
-Rules:
+Adopt ADR 0037:
 
-1. **Persistence keys stay** until a separate ADR migrates them. The module
-   *interprets* existing JSON; it does not invent a second bag.
-2. Effects declare `clock: "source" | "story"` once (code constant today;
-   optional JSON later).
-3. Ramp / Timelapse remain the **only** timing remappers. Other source-clock
-   effects sample through `storyToSource` after remapping.
-4. Story-clock effects (overlays, color bars, SFX) never pass through the ramp
-   integral; they use clip/project Story time as today.
-5. One Effekt-lane bar per effect *kind* remains the default (#333 Option A /
-   ADR 0034). Multiple regions for one kind (#332) are an explicit extension
-   that stores a single bounded region first (`region_source_in` /
-   `region_source_out` or edge-trimmed points with exterior 1× — prefer reusing
-   ADR 0034 edge-pin semantics).
+1. Name three clocks only: Source, Story-local, Project Story.
+2. Bind each effect family once (table in the ADR); keep existing persistence
+   keys until a later ADR migrates them.
+3. Extract the smallest shared pure map helpers over time (Python/JS twins
+   beside `studio_speed_ramp` / `speed-ramp.js`), not a new engine. Illustrative
+   surface from the ADR: playable Source span, Story duration, Source↔Story-local
+   maps, and per-family clock ownership.
+4. For #332: one Source-bounded ramp region, outside = 1×, inside = existing
+   curve, still stored as `speed_ramp` (prefer formalizing edge-pin first).
 
-## #332 enablement (bounded ramp MVP)
+Rejected: Story-local-only ramp bounds; Big-Bang envelope; multi-region or
+Timelapse coexistence in the same slice (see
+`timelapse-ramp-coexistence-discovery.md` Option B — depends on this ADR + #332).
 
-Recommended contract for one bounded ramp region:
+## PO engineering criteria (docs-only issue)
 
-- Store the existing ADR 0034 point list **inside** the region only.
-- Outside `[region_source_in, region_source_out]` play at 1× (same mental model
-  as today's edge-trimmed ramp bar).
-- Timeline handles move/resize the region; inspector edits curve points.
-- Preview/export use the same `sourceToStory` / frame-grid path.
-- No new SQLite table; optional explicit region keys only if edge-pin alone is
-  insufficient — prefer edge-pin first to avoid schema churn.
+| Criterion | Applicability |
+|-----------|---------------|
+| Isolated worktree / PR to `develop` | Applies — this branch |
+| Modularity / reuse / existing UI | N/A for docs; ADR constrains #332 to existing ramp modules and Effect lane |
+| Shared API / MCP | N/A here; #332 should reuse `/speed-ramp` (or existing shared action) and document NOT_APPLICABLE rather than invent endpoints |
+| E2E | N/A for documentation; #332 owns mapping + preview/export evidence |
 
-## Migration path
+## Outcome for #332
 
-1. Extract mapping helpers from `studio_speed_ramp.py` / `speed-ramp.js` and the
-   JS Story layout into `studio_clocks.py` / `studio/clocks.js` (pure).
-2. Call sites switch incrementally (ramp first, then color bar, then overlays).
-3. #332 lands on the shared helpers with focused tests.
-4. Multiple regions / composition rules stay Later (follow-up after #332 MVP).
-
-## Non-goals
-
-- Full keyframe NLE, Bézier editor, beat sync
-- Schema churn without ADR
-- Changing music sequential semantics
-- Optical flow / interpolation
-
-## Recommendation for PO
-
-**Approve the shared ClipClocks helper extraction + #332 bounded region via
-ADR 0034 edge-pin semantics** (no new persistence shape unless probes fail).
-Defer multi-region composition until after #332 MVP ships.
-
-**READY_FOR_PO_DECISION**
+After PO accepts ADR 0037, #332 can proceed. It does not need further clock
+discovery beyond implementing the Source-region contract above.
