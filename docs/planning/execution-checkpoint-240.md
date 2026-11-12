@@ -11,7 +11,7 @@ is not acceptance.
 
 | Issue | Feature | State | PR | Acceptance | Blocker | Next action |
 |---|---|---|---|---|---|---|
-| #184 | Independent SFX timeline | VERIFY | #395, #396 merged. #400 open, CI green | Local onefolder WebView2 E2E PASS (two SFX, music, waveforms, drag/trim, undo, export). GitHub release-ZIP admission NOT_RUN; that workflow runs only on pull requests to `main`. | PO review of #400. Do not close on the local run. | Leave #184 open. |
+| #184 | Independent SFX timeline | VERIFY | #395, #396, #400 merged `2c1108a` | Local onefolder WebView2 E2E PASS. GitHub release-ZIP admission NOT_RUN. | PO acceptance | Leave #184 open. |
 | #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets, manual keys, LUT strength fade, undo/persistence exist. WebView2 start/mid/end vs MP4 with a user `.cube`, ease-in-out, and highlights/shadows/blacks are not evidenced. | Full frame-parity E2E | Do not claim #211 done. Next slice needs a bounded parity gap, not a second engine. |
 | #267 | Packaged Windows E2E | VERIFY | local onefolder run recorded in #400 | Local WebView2 journey PASS. GitHub release-ZIP admission NOT_RUN. | That admission runs only for a pull request to `main` | Do not call the local run a release admission. |
 | #273 | Secure pairing | READY | — | Production pairing not started. The bounded security spike is approved. | A reviewed security contract before production pairing | Do not implement production pairing. |
@@ -27,7 +27,7 @@ is not acceptance.
 | #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
-| #301 | Drone-friendly transitions | VERIFY | #401 | Blur dissolve and four soft wipes share crossfade occupancy, preview, and xfade export. Browser check on title cards: select, save, and reload kept the German blur-dissolve label. Luma wipe, whip pan, and zoom/spin stay out. Packaged WebView2 and a real MP4 for these types are NOT_RUN. | PO review | Do not add more transition types. |
+| #301 | Drone-friendly transitions | VERIFY | #401 | Blur dissolve and four soft wipes share crossfade occupancy. Smooth easing stays on crossfade only. Real FFmpeg MP4 frames distinguish hblur from a left wipe. Packaged WebView2 is NOT_RUN. | PO re-review after green CI | Do not add more transition types. |
 | #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
@@ -41,8 +41,8 @@ is not acceptance.
 ## Open pull requests
 
 - #399 grade backup. Canonical writes stay disabled.
-- #400 packaged SFX E2E. Local onefolder WebView2 PASS. GitHub CI green after the `placed` annotation. GitHub release-ZIP admission NOT_RUN.
-- #401 drone transitions. Preview/export unit tests passed. Browser save/reload of blur dissolve passed on title cards. Packaged WebView2 and a real MP4 are NOT_RUN.
+- #400 merged at `2c1108a`. Local onefolder WebView2 PASS. GitHub release-ZIP admission NOT_RUN.
+- #401 drone transitions. Smooth easing stays on crossfade. Real MP4 frames for blur dissolve and a left wipe. Packaged WebView2 NOT_RUN.
 
 ## Worktrees
 
@@ -65,4 +65,4 @@ is not acceptance.
 
 ## Exact next task
 
-PO review is requested on #400. Do not describe the GitHub release-ZIP admission as passed. #401 is ready for review. Next implementation is the #298 feasibility spike, then the #273 security spike. Do not enable canonical grade writes.
+#400 is merged at `2c1108a`. Local WebView2 E2E is PASS. GitHub release-ZIP admission remains NOT_RUN. #401 and #399 address the PO review findings and wait for green CI before re-review. Next implementation is the #298 feasibility spike, then the #273 security spike. Do not enable canonical grade writes.

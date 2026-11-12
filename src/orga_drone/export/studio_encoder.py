@@ -854,6 +854,9 @@ def _norm_audio_pad(src: str, alias: str) -> str:
 # smoothstep, so the incoming picture eases in, moves through the middle, and
 # settles. transition=fade stays the linear crossfade.
 XFADE_SMOOTH_EXPR = "B*(1-P*P*(3-2*P))+A*(P*P*(3-2*P))"
+_XFADE_NAMES = frozenset(
+    {"fade", "hblur", "smoothleft", "smoothright", "smoothup", "smoothdown"}
+)
 
 
 def _xfade_video(
@@ -865,12 +868,14 @@ def _xfade_video(
     curve: str,
     transition: str = "fade",
 ) -> str:
-    if curve == "smooth":
+    # The custom expression is the existing crossfade ease. Blur and wipes keep
+    # their native xfade names so a smooth curve cannot turn them into a fade.
+    if curve == "smooth" and transition == "fade":
         return (
             f"[{left}][{right}]xfade=transition=custom:expr={XFADE_SMOOTH_EXPR}:"
             f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
         )
-    name = transition if transition in {"fade", "hblur", "smoothleft", "smoothright", "smoothup", "smoothdown"} else "fade"
+    name = transition if transition in _XFADE_NAMES else "fade"
     return (
         f"[{left}][{right}]xfade=transition={name}:"
         f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"

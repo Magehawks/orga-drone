@@ -474,3 +474,38 @@ def test_stitch_filters_map_drone_pack_xfade() -> None:
     assert "atrim=0:2.7500" in blur
     assert "xfade=transition=smoothleft" in joined("soft_wipe_left")
     assert "xfade=transition=fade" in joined("crossfade")
+
+
+def test_smooth_curve_stays_on_crossfade() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+    from orga_drone.export.studio_encoder import XFADE_SMOOTH_EXPR, build_stitch_filters
+
+    expected = {
+        "crossfade": "custom",
+        "blur_dissolve": "hblur",
+        "soft_wipe_left": "smoothleft",
+        "soft_wipe_right": "smoothright",
+        "soft_wipe_up": "smoothup",
+        "soft_wipe_down": "smoothdown",
+    }
+    for kind, name in expected.items():
+        clips = (
+            StudioExportClip(
+                source_path=None,
+                kind="title_card",
+                duration_s=3.0,
+                transition_type=kind,
+                transition_s=0.5,
+                transition_curve="smooth",
+            ),
+            StudioExportClip(source_path=None, kind="title_card", duration_s=3.0),
+        )
+        joined = ";".join(build_stitch_filters(clips))
+        if name == "custom":
+            assert "xfade=transition=custom" in joined
+            assert XFADE_SMOOTH_EXPR in joined
+            assert "xfade=transition=hblur" not in joined
+        else:
+            assert f"xfade=transition={name}" in joined
+            assert "xfade=transition=custom" not in joined
+            assert "xfade=transition=fade" not in joined
