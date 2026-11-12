@@ -6,6 +6,7 @@ All writes serialize with Story history and may join one caller-owned transactio
 
 from __future__ import annotations
 
+import math
 import sqlite3
 from contextlib import contextmanager
 from typing import Any, Iterator, TypedDict
@@ -49,6 +50,19 @@ PROJECT_PARAMETERS: dict[str, dict[str, dict[str, Any]]] = {
     },
     "project.rename": {"title": {"type": "string", "max_length": 120}},
     "project.delete": {},
+    "music.append": {"file_path": {"type": "string", "max_length": 1024}},
+    "music.update": {
+        "clip_id": {"type": "integer", "minimum": 1, "maximum": 2**53 - 1},
+        "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        "fade_in_s": {"type": "number", "minimum": 0.0, "maximum": 10.0},
+        "fade_out_s": {"type": "number", "minimum": 0.0, "maximum": 10.0},
+        "loop": {"type": "boolean"},
+    },
+    "music.remove": {
+        "clip_id": {"type": "integer", "minimum": 1, "maximum": 2**53 - 1}
+    },
+    "music.reorder": {"ordered_ids": {"type": "integer_array"}},
+    "music.set_start": {"start_s": {"type": "number", "minimum": 0.0}},
 }
 
 
@@ -66,6 +80,39 @@ def validate_project_params(action: str, params: Any) -> dict[str, Any]:
         pid = params["project_id"]
         if type(pid) is not int or not 0 < pid <= 2**53 - 1:
             raise ProjectActionError("INVALID_IDENTIFIER")
+    if "file_path" in params:
+        file_path = params["file_path"]
+        if not isinstance(file_path, str) or not file_path.strip() or len(file_path) > 1024:
+            raise ProjectActionError("INVALID_PARAMS")
+    if "clip_id" in params:
+        clip_id = params["clip_id"]
+        if type(clip_id) is not int or not 0 < clip_id <= 2**53 - 1:
+            raise ProjectActionError("INVALID_IDENTIFIER")
+    if "ordered_ids" in params:
+        ids = params["ordered_ids"]
+        if (
+            not isinstance(ids, list)
+            or any(type(item) is not int or item < 1 for item in ids)
+            or len(set(ids)) != len(ids)
+        ):
+            raise ProjectActionError("INVALID_PARAMS")
+    if action == "music.update":
+        # All-or-nothing updates keep the shared schema strict: the client
+        # reads the current track first (issue #292 current-state-read rule).
+        volume, fade_in, fade_out, loop = (
+            params["volume"], params["fade_in_s"], params["fade_out_s"], params["loop"],
+        )
+        if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not math.isfinite(float(volume)):
+            raise ProjectActionError("INVALID_PARAMS")
+        for value in (fade_in, fade_out):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ProjectActionError("INVALID_PARAMS")
+        if type(loop) is not bool:
+            raise ProjectActionError("INVALID_PARAMS")
+    if "start_s" in params:
+        start = params["start_s"]
+        if isinstance(start, bool) or not isinstance(start, (int, float)) or not math.isfinite(float(start)) or start < 0.0:
+            raise ProjectActionError("INVALID_PARAMS")
     return dict(params)
 
 

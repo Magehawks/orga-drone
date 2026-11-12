@@ -691,6 +691,8 @@ class ControlService:
                 ):
                     return self._execute_export(cmd)
                 if target["type"] == "project_action":
+                    if str(target.get("action", "")).startswith("music."):
+                        return self._execute_music(cmd, state)
                     return self._execute_project(cmd, state)
                 if target["type"] == "timeline_action" or (
                     target["type"] == "undo_last_change"
@@ -1035,6 +1037,75 @@ class ControlService:
             canonical={"export_job_id": job_id, "started_at": time.time()},
             no_op=False,
         )
+        return cmd["result"]
+
+    def _execute_music(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+        """Project-scoped music commands (issue #281 part 2). The music DB
+        methods open their own connections, so these run OUTSIDE the project
+        transaction. Semantics mirror the UI routes exactly: append/update/
+        remove/reorder are not story-history captures, set_start is."""
+        from orga_drone.studio_history import story_edit
+
+        target = cmd["payload"]
+        pid, action, params = target["project_id"], target["action"], target["params"]
+        opened = self.db.get_open_studio_project()
+        if opened is None or opened.id != pid:
+            raise ControlError("STALE_STATE")
+        if self._token(state) != target["expected_state_token"]:
+            raise ControlError("STALE_STATE")
+        self._session(target["session_id"])
+        if self.clock() > cmd["deadline"]:
+            raise ControlError("COMMAND_EXPIRED")
+        try:
+            if action == "music.append":
+                # Same file validation as the UI route (existence + type).
+                from orga_drone.export.music_mix import validate_music_file_path
+
+                path = validate_music_file_path(str(params["file_path"]))
+                self.db.append_studio_music(pid, str(path))
+            elif action == "music.update":
+                self.db.patch_studio_music_clip(
+                    pid,
+                    int(params["clip_id"]),
+                    volume=float(params["volume"]),
+                    fade_in_s=float(params["fade_in_s"]),
+                    fade_out_s=float(params["fade_out_s"]),
+                    loop=bool(params["loop"]),
+                )
+            elif action == "music.remove":
+                if not self.db.delete_studio_music_clip(pid, int(params["clip_id"])):
+                    raise ControlError("TARGET_NOT_FOUND", 404)
+            elif action == "music.reorder":
+                self.db.reorder_studio_music(pid, [int(item) for item in params["ordered_ids"]])
+            elif action == "music.set_start":
+                with story_edit(self.db, pid):
+                    self.db.set_studio_music_start_s(pid, float(params["start_s"]))
+            else:
+                raise ControlError("UNKNOWN_ACTION", 400)
+        except FileNotFoundError as exc:
+            raise ControlError("INVALID_PAYLOAD", 400) from exc
+        except ValueError as exc:
+            # Music state errors (loop_single_only, not found, offline file)
+            # are payload problems, not database faults.
+            raise ControlError("INVALID_PAYLOAD", 400) from exc
+        self.latest_external = None
+        cmd["result"].update(
+            status="persisted",
+            persisted=True,
+            ui_applied=False,
+            scope="project",
+            project_id=pid,
+            clip_id=None,
+            canonical={"music_action": action},
+            no_op=False,
+            navigation_required=True,
+            **history_flags(pid),
+        )
+        cmd["ui_revision"] = history_revision()
+        # The editor's soundtrack view is stale; reload like project.open.
+        self.reload_ticket = None
+        assert self.session is not None
+        self.session["fenced"] = True
         return cmd["result"]
 
     def _execute_project(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
