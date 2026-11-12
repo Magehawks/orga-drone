@@ -969,5 +969,17 @@
   "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.": "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.",
   "Playing looped; color file preview appears on pause": "Playing looped; color file preview appears on pause",
   "Playing looped; HSL preview appears on pause": "Playing looped; HSL preview appears on pause",
-  "Playing looped; color grading preview appears on pause": "Playing looped; color grading preview appears on pause"
+  "Playing looped; color grading preview appears on pause": "Playing looped; color grading preview appears on pause",
+  "Add sound effect": "Add sound effect",
+  "SFX": "SFX",
+  "Sound effects": "Sound effects",
+  "Sound effect": "Sound effect",
+  "Start on Story (s)": "Start on Story (s)",
+  "Source in (s)": "Source in (s)",
+  "Source out (s)": "Source out (s)",
+  "Could not save sound-effect settings.": "Could not save sound-effect settings.",
+  "This story already has 16 sound effects.": "This story already has 16 sound effects.",
+  "No sound effects yet": "No sound effects yet",
+  "Choosing a sound effect needs the desktop app.": "Choosing a sound effect needs the desktop app.",
+  "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged.": "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."
 }

@@ -96,6 +96,19 @@ class StudioExportMusic:
 
 
 @dataclass(frozen=True)
+class StudioExportSfx:
+    """One freely placed SFX clip on the Story clock (ADR 0036)."""
+
+    source_path: Path
+    start_s: float = 0.0
+    source_in_s: float = 0.0
+    source_out_s: float = 0.0
+    volume: float = 0.8
+    fade_in_s: float = 0.0
+    fade_out_s: float = 0.0
+
+
+@dataclass(frozen=True)
 class StudioExportConfig:
     """User-facing export intent without encoder/codec details."""
 
@@ -109,6 +122,7 @@ class StudioExportConfig:
     music_tracks: tuple[StudioExportMusic, ...] = field(default_factory=tuple)
     music: StudioExportMusic | None = None
     music_start_s: float = 0.0
+    sfx_tracks: tuple[StudioExportSfx, ...] = field(default_factory=tuple)
     # Identities of protected originals, captured before encoding starts.
     protected_identities: tuple[tuple[int, int], ...] = ()
     # Catalog paths an export must not create or replace, even when the file is absent.
@@ -130,4 +144,5 @@ class StudioExportConfig:
             "clip_count": len(self.clips),
             "has_music": bool(self.music_tracks),
             "music_start_s": self.music_start_s,
+            "has_sfx": bool(self.sfx_tracks),
         }
