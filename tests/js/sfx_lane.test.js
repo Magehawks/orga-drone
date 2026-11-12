@@ -6,6 +6,8 @@ import {
   applySfxPayload,
   sfxAfterDrag,
   sfxClipStyle,
+  sfxPreviewGain,
+  sfxWaveformColumns,
 } from "../../src/orga_drone/static/js/studio/sfx-lane.js";
 
 test("SFX helpers map placement and payload clips", () => {
@@ -39,4 +41,28 @@ test("SFX drag moves the story start and edge resize trims the source", () => {
   assert.equal(tail.source_in_s, 0.5);
   assert.equal(sfxAfterDrag(clip, { mode: "move", deltaStory: -9 }).start_s, 0);
   assert.equal(sfxAfterDrag(clip, { mode: "start", deltaStory: -2 }).source_in_s, 0);
+});
+
+test("SFX waveform window follows source trim", () => {
+  const peaks = [0, 0, 0, 0, 1, 1, 1, 1];
+  const head = sfxWaveformColumns(peaks, 2, 0, 1, 4);
+  const tail = sfxWaveformColumns(peaks, 2, 1, 2, 4);
+  assert.ok(head.every((value) => value === 0));
+  assert.ok(tail.every((value) => value === 1));
+  const zoomed = sfxWaveformColumns(peaks, 2, 0, 2, 8);
+  assert.equal(zoomed.length, 8);
+  assert.ok(zoomed.slice(0, 4).every((value) => value === 0));
+  assert.ok(zoomed.slice(4).every((value) => value === 1));
+  assert.deepEqual(sfxWaveformColumns([], 2, 0, 1, 4), []);
+});
+
+test("SFX preview gain matches the export fade envelope", () => {
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9);
+  near(sfxPreviewGain(0.2, 1, 0.4, 0), 0.5);
+  near(sfxPreviewGain(0.9, 1, 0, 0.4), 0.25);
+  near(sfxPreviewGain(-0.1, 1, 0.2, 0.2), 0);
+  near(sfxPreviewGain(1, 1, 0.2, 0.2), 0);
+  // 0.8 + 0.8 is longer than the 1s clip, so each fade scales to 0.5s.
+  near(sfxPreviewGain(0.25, 1, 0.8, 0.8), 0.5);
+  near(sfxPreviewGain(0.5, 1, 0, 0), 1);
 });

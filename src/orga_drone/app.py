@@ -790,6 +790,11 @@ def create_app() -> FastAPI:
                 if available
                 else None
             ),
+            "waveform_url": (
+                f"/api/studio/projects/{project_id}/sfx/{clip.id}/waveform?v={token}"
+                if available
+                else None
+            ),
         }
 
     def _sfx_tracks_client_payload(project_id: int) -> dict[str, Any]:
@@ -1952,6 +1957,23 @@ def create_app() -> FastAPI:
                 "Accept-Ranges": "bytes",
                 "Cache-Control": "no-store",
             },
+        )
+
+    @app.get("/api/studio/projects/{project_id}/sfx/{clip_id}/waveform")
+    async def api_studio_sfx_waveform(project_id: int, clip_id: int) -> JSONResponse:
+        _require_studio_project(project_id)
+        clip = db.get_studio_sfx_clip(project_id, clip_id)
+        if clip is None:
+            raise HTTPException(status_code=404, detail="sfx_missing")
+        from orga_drone.studio_sfx_waveform import load_sfx_waveform, waveform_cache_dir
+
+        waveform = load_sfx_waveform(
+            Path(clip.file_path),
+            waveform_cache_dir(settings.data_dir),
+        )
+        return JSONResponse(
+            {"ok": True, **waveform.as_dict()},
+            headers={"Cache-Control": "no-store"},
         )
 
     @app.patch("/api/studio/projects/{project_id}")

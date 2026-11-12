@@ -14,6 +14,7 @@ REBUILDABLE_CACHE_DIRS = (
     "preview-stills",
     "hsl-luts",
     "color-wheel-luts",
+    "sfx-waveforms",
 )
 
 
@@ -49,7 +50,7 @@ def cache_sizes(data_dir: Path) -> dict[str, int]:
 
 
 def clear_regenerable_cache(data_dir: Path) -> int:
-    """Delete thumbnail, map-tile, and preview-still files under the app data folder.
+    """Delete rebuildable cache files under the app data folder.
 
     Returns the number of bytes removed. The folders are recreated empty.
     """

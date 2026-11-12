@@ -21,6 +21,10 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Current state
 
+- `studio/sfx-lane.js` owns SFX placement math, clip bars, peak-waveform
+  windowing, and the preview gain envelope. `studio.js` paints from the cached
+  peaks, persists through the existing SFX routes, and does not decode audio
+  during drag or resize. See ADR 0036 and `tests/js/sfx_lane.test.js`.
 - `studio/speed-ramp.js` is the pure curve/time-map counterpart to Python.
   `studio/speed-ramp-editor.js` owns the compact curve draft, pointer completion,
   cancellation and numeric controls. The entry injects selection, bounds,
