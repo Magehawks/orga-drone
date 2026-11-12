@@ -243,10 +243,14 @@ _ACTION_SPECS_BY_KEY = {(spec.name, spec.version): spec for spec in ACTION_SPECS
 
 def action_catalog() -> dict[str, Any]:
     """Versioned capability discovery without paths, credentials, or media URLs."""
-    return {
-        "contract_version": CONTRACT_VERSION,
-        "actions": [spec.as_dict() for spec in ACTION_SPECS],
-    }
+    from orga_drone.studio_action_semantics import attach_semantics
+
+    return attach_semantics(
+        {
+            "contract_version": CONTRACT_VERSION,
+            "actions": [spec.as_dict() for spec in ACTION_SPECS],
+        }
+    )
 
 
 def resolve_action_spec(name: Any, version: Any) -> ActionSpec:
