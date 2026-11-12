@@ -809,6 +809,13 @@ def create_app() -> FastAPI:
             if resolve_media_file(db, item) is not None
             and cached_thumbnail(settings.data_dir, item.id) is not None
         ]
+        # Issue #335: warm mid-res hero caches in the background after grid
+        # thumbnails exist, so a later Home visit paints the hero without an
+        # ffmpeg/Pillow generation pause. Fire-and-forget; the first paint
+        # keeps the logo/480 fallback until the cache exists.
+        from orga_drone.home_hero import warm_hero_cache_async
+
+        warm_hero_cache_async(db, limit=len(hero_pool))
         return render(
             request,
             "dashboard.html",
