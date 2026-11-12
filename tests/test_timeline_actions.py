@@ -1,7 +1,8 @@
-"""Timeline contracts use the same temporary catalog and Story history as Studio."""
+﻿"""Timeline contracts use the same temporary catalog and Story history as Studio."""
 from __future__ import annotations
 
 
+import json
 import subprocess
 
 import pytest
@@ -278,7 +279,7 @@ def test_noop_timeline_keeps_prior_undo_and_skips_reload(control, tmp_path):
     undo = execute(
         service, sid, state, command(service, sid, state, kind="undo_last_change")
     )
-    assert undo["persisted"], undo
+    assert undo["persisted"], json.dumps(undo, default=str)
     assert capture_story(db, pid) == before
 
 
