@@ -122,6 +122,12 @@ points share the single-active-export rule).
   the HTTP routes; `execute` reports rejection as `status=rejected` with
   `error_code` and never raises to the client. Exports never block on a
   paused/playing editor.
+- Issue #281 (clip-scoped slice) adds `clip.audio.edit` (video clips; source
+  range + story placement, explicit `place_s`, duration-clamped against the
+  clip context) and `clip.overlays.edit` (photos and videos; full overlay
+  list replacement with the same clamping/validation as the UI routes).
+  Project-scoped music commands (append/reorder/remove/start) are a
+  follow-up slice of #281.
 
 ### Semantic guidance for MCP assistants (#291)
 

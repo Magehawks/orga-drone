@@ -56,6 +56,13 @@ from orga_drone.studio_image import (
     image_adjust_from_effect_settings,
     parse_image_adjust_patch,
 )
+from orga_drone.studio_overlay import (
+    dump_overlays,
+    parse_overlays,
+)
+from orga_drone.studio_audio import (
+    dump_detached_audio,
+)
 from orga_drone.studio_lut import (
     INPUT_PROFILES,
     color_look_from_effect_settings,
@@ -107,6 +114,14 @@ WHEEL_PARAMETERS: dict[str, dict[str, Any]] = {
 DETAIL_PARAMETERS: dict[str, dict[str, Any]] = {
     "sharpen": {"type": "integer", "minimum": DETAIL_MIN, "maximum": DETAIL_MAX},
     "denoise": {"type": "integer", "minimum": DETAIL_MIN, "maximum": DETAIL_MAX},
+}
+AUDIO_PARAMETERS: dict[str, dict[str, Any]] = {
+    "source_in_s": {"type": "number", "minimum": 0.0},
+    "source_out_s": {"type": "number", "minimum": 0.0},
+    "place_s": {"type": "number", "minimum": 0.0},
+}
+OVERLAY_PARAMETERS: dict[str, dict[str, Any]] = {
+    "overlays": {"type": "array"},
 }
 
 
@@ -219,6 +234,29 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         reversible=True,
         description="Update the existing sharpen and denoise effect.",
         parameters=DETAIL_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.audio.edit",
+        version=1,
+        scope="clip",
+        target="video_clip",
+        reversible=True,
+        description=(
+            "Set the clip's own detached audio bar (source range and story "
+            "placement). The picture range and the source file stay unchanged."
+        ),
+        parameters=AUDIO_PARAMETERS,
+    ),
+    ActionSpec(
+        name="clip.overlays.edit",
+        version=1,
+        scope="clip",
+        target="media_clip",
+        reversible=True,
+        description=(
+            "Replace the clip's timed text/shape/image overlays (full list)."
+        ),
+        parameters=OVERLAY_PARAMETERS,
     ),
     *(ActionSpec(
         name=f"library.media.{operation}", version=1, scope="library",
@@ -509,12 +547,31 @@ def merge_properties(
     return json.dumps(data, separators=(",", ":"), sort_keys=True)
 
 
+def _validate_audio_params(params: Any) -> dict[str, Any]:  # type: ignore[name-defined]
+    """Structural validation for the detached audio action. Times must be
+    finite nonnegative numbers with an audible span; media-duration clamping
+    happens against the clip context in ``prepare_action``."""
+    if not isinstance(params, Mapping) or set(params) != set(AUDIO_PARAMETERS):
+        raise ActionValidationError("INVALID_PARAMS")
+    for key in AUDIO_PARAMETERS:
+        value = params[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ActionValidationError("INVALID_PARAMS")
+        if not math.isfinite(float(value)) or float(value) < 0.0:
+            raise ActionValidationError("INVALID_PARAMS")
+    if float(params["source_out_s"]) - float(params["source_in_s"]) < 0.05:
+        raise ActionValidationError("INVALID_PARAMS")
+    return dict(params)
+
+
 def prepare_action(
     spec: ActionSpec,
     raw: str | None,
     params: Mapping[str, Any],
     available_luts: set[str],
     data_dir: Path,
+    *,
+    clip_duration_s: float | None = None,
 ) -> str:
     """Apply one validated action to effect settings without writing the DB."""
     data = json.loads(raw or "{}")
@@ -553,4 +610,36 @@ def prepare_action(
         _validate_detail_params(params)
         detail = parse_detail_patch(params, detail_from_effect_settings(raw))
         return dump_detail(raw, detail)
+    if spec.name == "clip.audio.edit":
+        audio_params = _validate_audio_params(params)
+        start = float(audio_params["source_in_s"])
+        end = float(audio_params["source_out_s"])
+        place = float(audio_params["place_s"])
+        if clip_duration_s is not None:
+            limit = float(clip_duration_s)
+            start = min(start, limit)
+            end = min(end, limit)
+        if end - start < 0.05:
+            raise ActionValidationError("INVALID_PARAMS")
+        from orga_drone.studio_audio import DetachedAudio
+
+        audio = DetachedAudio(
+            active=True,
+            source_in_s=round(start, 4),
+            source_out_s=round(end, 4),
+            place_s=round(place, 4),
+        )
+        return dump_detached_audio(raw, audio)
+    if spec.name == "clip.overlays.edit":
+        if "overlays" not in params or not isinstance(params["overlays"], list):
+            raise ActionValidationError("INVALID_PARAMS")
+        if clip_duration_s is None:
+            raise ActionValidationError("INVALID_PARAMS")
+        try:
+            overlays, _clamped = parse_overlays(
+                params["overlays"], duration_s=float(clip_duration_s)
+            )
+        except (ValueError, TypeError, AttributeError):
+            raise ActionValidationError("INVALID_PARAMS") from None
+        return dump_overlays(raw, list(overlays))
     raise ActionValidationError("UNKNOWN_ACTION")

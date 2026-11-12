@@ -25,6 +25,7 @@ from orga_drone.db import Database
 from orga_drone.lut_library import list_catalog
 from orga_drone.library_actions import LibraryActionError, read_media
 from orga_drone.media_files import resolve_media_file
+from orga_drone.studio_estimate import effective_seconds
 from orga_drone.studio_actions import (
     LIMITS,
     ActionValidationError,
@@ -728,6 +729,19 @@ class ControlService:
                             target["params"],
                             available_luts,
                             self.data_dir,
+                            clip_duration_s=(
+                                effective_seconds(
+                                    kind=clip.kind,
+                                    photo_duration_s=clip.photo_duration_s,
+                                    duration_s=clip.duration_s,
+                                    available=bool(clip.available),
+                                    source_in_s=clip.source_start,
+                                    source_out_s=clip.source_end,
+                                    playback_speed=clip.playback_speed,
+                                )
+                                if clip.kind in {"photo", "video"}
+                                else None
+                            ),
                         )
                         no_op = action_canonical(raw) == action_canonical(
                             clip.effect_settings

@@ -156,6 +156,7 @@ def test_validate_clip_effect_settings_rejects_unsafe_state(
     assert exc.value.code == code
 def test_catalog_lists_only_implemented_color_and_effect_actions() -> None:
     actions = action_catalog()["actions"]
+    # Issue #281 adds the clip-scoped audio/overlay actions.
     assert [entry["name"] for entry in actions if entry["scope"] == "clip"] == [
         "clip.color.properties",
         "clip.color.image",
@@ -163,6 +164,8 @@ def test_catalog_lists_only_implemented_color_and_effect_actions() -> None:
         "clip.color.hsl",
         "clip.color.wheels",
         "clip.effects.detail",
+        "clip.audio.edit",
+        "clip.overlays.edit",
     ]
     assert all(entry["version"] == 1 for entry in actions)
 
