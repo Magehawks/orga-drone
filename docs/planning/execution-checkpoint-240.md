@@ -63,4 +63,4 @@ is not acceptance.
 
 ## Exact next task
 
-Amend ADR 0010 and implement blur dissolve plus one soft directional wipe on a branch from `f4e688a`, with preview, export, persistence, and timing tests. In parallel, the #298 feasibility spike can proceed without waiting for #398 or #399. Do not enable canonical grade writes.
+#353 adds read-only primaries-v1 arithmetic: exposure, luma-normalized balance, contrast, a monotone tone curve, and saturation. Kelvin/tint and blacks/shadows/highlights/whites are not implemented. Canonical writes stay disabled. Do not merge without PO approval.
