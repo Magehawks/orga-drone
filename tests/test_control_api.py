@@ -322,10 +322,13 @@ def test_security_lifecycle_and_payloads(control):
     assert not restarted.commands
 
 
-@pytest.mark.parametrize(
-    "field,value", [("item_kind", "title_card"), ("kind_snapshot", "photo")]
-)
+# Photo clips became supported color-action targets in issue #296; the
+# unsupported-target regression now covers the title-card case only.
+@pytest.mark.parametrize("field,value", [("item_kind", "title_card")])
 def test_unsupported_clip(control, field, value):
+    """Non-media items stay unsupported. Photo clips are supported targets
+    since issue #296 (see tests/test_control_image_targets.py); only the
+    title-card case remains here."""
     _, db, service, sid, state, _ = control
     with db.connect() as conn:
         if field == "item_kind":
