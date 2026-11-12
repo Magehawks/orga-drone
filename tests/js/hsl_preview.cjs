@@ -20,6 +20,7 @@ const context = {
   },
   state: { playing: false }, colorComparison: null, reuseDraft: null,
   readColorAnimation: () => null,
+  forwardLoopActive: () => false, sectionRepeats: () => 1,
   readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   readColorWheels: () => ({ wheels: {} }),
   colorWheelsIsNeutral: () => true,

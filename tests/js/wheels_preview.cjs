@@ -20,6 +20,7 @@ const context = {
   },
   state: { playing: false }, colorComparison: null, reuseDraft: null,
   readColorAnimation: () => null,
+  forwardLoopActive: () => false, sectionRepeats: () => 1,
   readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   readHsl: () => ({ ranges: {} }),
   hslIsNeutral: () => true,
@@ -95,5 +96,14 @@ async function reply(request, id) {
   context.state.playing = true;
   context.scheduleLutPreviewStill(clip, 2);
   assert.equal(chip.textContent, 'Playing without color grading preview; pause or seek to see it');
+  // Issue #294 Phase A: looped playback without a proxy names the loop cause.
+  context.forwardLoopActive = () => true;
+  context.scheduleLutPreviewStill(clip, 2);
+  assert.equal(chip.textContent, 'Playing looped; color grading preview appears on pause');
+  context.forwardLoopActive = () => false;
+  context.sectionRepeats = () => 3;
+  context.scheduleLutPreviewStill(clip, 2);
+  assert.equal(chip.textContent, 'Playing looped; color grading preview appears on pause');
+  context.sectionRepeats = () => 1;
   console.log('Colour-wheel preview lifecycle passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
