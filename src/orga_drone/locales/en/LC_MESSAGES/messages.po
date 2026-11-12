@@ -921,3 +921,21 @@ msgstr "Choosing a sound effect needs the desktop app."
 
 msgid "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."
 msgstr "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."
+
+msgid "Blur dissolve"
+msgstr "Blur dissolve"
+
+msgid "Soft wipe left"
+msgstr "Soft wipe left"
+
+msgid "Soft wipe right"
+msgstr "Soft wipe right"
+
+msgid "Soft wipe up"
+msgstr "Soft wipe up"
+
+msgid "Soft wipe down"
+msgstr "Soft wipe down"
+
+msgid "Drone pack"
+msgstr "Drone pack"
