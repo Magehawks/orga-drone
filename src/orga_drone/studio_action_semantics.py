@@ -33,6 +33,18 @@ from orga_drone.studio_actions import (
     LOOK_PARAMETERS,
     WHEEL_PARAMETERS,
 )
+from orga_drone.studio_detail import detail_preview_model
+from orga_drone.studio_hsl import hsl_preview_model
+from orga_drone.studio_image import image_adjust_preview_model
+
+_IMAGE_MODEL = image_adjust_preview_model()
+_HSL_MODEL = hsl_preview_model()
+_DETAIL_MODEL = detail_preview_model()
+
+
+def _number(model: dict[str, Any], key: str) -> float:
+    """Preview models carry untyped values; guidance only prints them."""
+    return float(model[key])  # type: ignore[arg-type]
 
 SEMANTICS_VERSION = 1
 
@@ -40,17 +52,20 @@ SEMANTICS_VERSION = 1
 DISAMBIGUATION: dict[str, str] = {
     "global_saturation_vs_hsl_saturation": (
         "clip.color.image.saturation and clip.color.properties.saturation_percent "
-        "scale the whole picture uniformly (image: -100..100 slider around the "
-        "current grade; properties: 0..200 percent). clip.color.hsl saturates "
-        "eight hue ranges independently with -100..100 sliders. Use HSL when "
-        "only specific colours should change."
+        f"scale the whole picture uniformly (image: {IMAGE_PARAMETERS['saturation']['minimum']}"
+        f"..{IMAGE_PARAMETERS['saturation']['maximum']} slider around the current grade; "
+        f"properties: {LIMITS['saturation_percent'][0]}..{LIMITS['saturation_percent'][1]} percent). "
+        "clip.color.hsl saturates eight hue ranges independently with "
+        f"{HSL_PARAMETERS['ranges']['minimum']}..{HSL_PARAMETERS['ranges']['maximum']} sliders. "
+        "Use HSL when only specific colours should change."
     ),
     "conversion_lut_vs_creative_lut": (
         "A conversion LUT (clip.color.look with input_profile dlog_m and "
         "conversion_confirmed=true) is a technical camera-log transform and "
-        "runs once before grading. A creative LUT is a stylistic look blended "
-        "by creative_strength 0..100. They are separate assets and separate "
-        "confirmations; do not fake a conversion with a creative LUT."
+        f"runs once before grading. A creative LUT is a stylistic look blended "
+        f"by creative_strength {LOOK_PARAMETERS['creative_strength']['minimum']}"
+        f"..{LOOK_PARAMETERS['creative_strength']['maximum']}. They are separate assets and "
+        "separate confirmations; do not fake a conversion with a creative LUT."
     ),
     "hue_edits_vs_object_masking": (
         "HSL ranges and hue curves select COLOURS, not objects: a blue range "
@@ -63,10 +78,12 @@ DISAMBIGUATION: dict[str, str] = {
 ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
     "clip.color.image": {
         "visual_effect": (
-            "Seven per-clip sliders (exposure, contrast, saturation, warmth, "
-            "highlights, shadows, blacks). Exposure is +/-1 stop at full "
-            "travel, warmth shifts +/-60 mired around 6500 K, tonal controls "
-            "reshape input bounds without recovering clipped data."
+            f"Seven per-clip sliders (exposure, contrast, saturation, warmth, "
+            f"highlights, shadows, blacks). Exposure is "
+            f"{_number(_IMAGE_MODEL, 'exposureEvAtFull'):+g} stop at full travel, "
+            f"warmth shifts {_number(_IMAGE_MODEL, 'warmthMiredAtFull'):+g} mired around "
+            f"{_number(_IMAGE_MODEL, 'neutralKelvin'):g} K, tonal controls reshape input "
+            "bounds without recovering clipped data."
         ),
         "intents": {
             "en": [
@@ -99,8 +116,10 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
     "clip.color.properties": {
         "visual_effect": (
             "Compact property set on the selected clip: contrast "
-            "(-100..100), uniform saturation_percent (0..200), an optional "
-            "creative LUT with strength 0..100."
+            f"({LIMITS['contrast'][0]}..{LIMITS['contrast'][1]}), uniform saturation_percent "
+            f"({LIMITS['saturation_percent'][0]}..{LIMITS['saturation_percent'][1]}), an optional "
+            f"creative LUT with strength {LIMITS['creative_lut_strength_percent'][0]}"
+            f"..{LIMITS['creative_lut_strength_percent'][1]}."
         ),
         "intents": {
             "en": [
@@ -128,9 +147,10 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
     },
     "clip.color.look": {
         "visual_effect": (
-            "Technical input profile (rec709, dlog_m, custom), optional "
-            "confirmed conversion LUT (runs once, before grading), optional "
-            "creative LUT blended by strength 0..100."
+            f"Technical input profile ({', '.join(LOOK_PARAMETERS['input_profile']['enum'])}), "
+            "optional confirmed conversion LUT (runs once, before grading), "
+            f"optional creative LUT blended by strength "
+            f"{LOOK_PARAMETERS['creative_strength']['minimum']}..{LOOK_PARAMETERS['creative_strength']['maximum']}."
         ),
         "intents": {
             "en": [
@@ -163,21 +183,24 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
     },
     "clip.color.hsl": {
         "visual_effect": (
-            "Eight hue ranges (red, orange, yellow, green, aqua, blue, purple, "
-            "magenta), each with hue (+/-45 degrees at full), saturation "
-            "(0..2x) and luminance (+/-0.30) sliders from -100..100. Smooth "
-            "hue crossfades; near-neutral pixels are gated out."
+            f"Eight hue ranges ({', '.join(HSL_PARAMETERS['ranges']['ranges'])}), "
+            f"each with hue ({_number(_HSL_MODEL, 'hueDegAtFull'):+g} degrees at full), "
+            f"saturation (0..{_number(_HSL_MODEL, 'saturationScaleAtFull') + 1:g}x) and "
+            f"luminance ({_number(_HSL_MODEL, 'luminanceDeltaAtFull'):+g}) sliders from "
+            f"{HSL_PARAMETERS['ranges']['minimum']}..{HSL_PARAMETERS['ranges']['maximum']}. "
+            f"Smooth hue crossfades; near-neutral pixels are gated out; baked "
+            f"to a {_number(_HSL_MODEL, 'lutSize'):g}-point cube."
         ),
         "intents": {
             "en": [
                 "desaturate everything except green (set every range's saturation to -100 and leave green at 0)",
-                "make the sky bluer",
-                "warm up the reds",
+                "strengthen or shift the blue colour range",
+                "warm up the red colour range",
             ],
             "de": [
                 "alles au\u00dfer Gr\u00fcn ent\u00e4ttigen (alle Bereiche auf -100, Gr\u00fcn auf 0 lassen)",
-                "den Himmel blauer machen",
-                "die Rott\u00f6ne w\u00e4rmer machen",
+                "den Blau-Bereich st\u00e4rken oder verschieben",
+                "den Rot-Bereich w\u00e4rmer machen",
             ],
         },
         "prerequisites": ["A selected Studio video or photo clip."],
@@ -191,15 +214,16 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
             "Selects COLOUR ranges, not objects or sky regions: every matching "
             "pixel in the clip changes. Object-selective editing is not "
             "implemented (see disambiguation).",
-            "Baked to a 33-point cube; not a curve editor.",
+            f"Baked to a {_number(_HSL_MODEL, 'lutSize'):g}-point cube; not a curve editor.",
         ],
     },
     "clip.color.wheels": {
         "visual_effect": (
-            "Three tonal wheels (shadows, midtones, highlights) as unit-disc "
-            "points (-1..1 per axis). Zero-luma tint: direction shifts colour "
-            "without changing luma, weighted smoothly across tonal bands. "
-            "These are not lift/gamma/gain controls."
+            f"Three tonal wheels ({', '.join(WHEEL_PARAMETERS['wheels']['wheels'])}) as "
+            f"unit-disc points ({WHEEL_PARAMETERS['wheels']['minimum']}.."
+            f"{WHEEL_PARAMETERS['wheels']['maximum']} per axis). Zero-luma tint: "
+            "direction shifts colour without changing luma, weighted smoothly "
+            "across tonal bands. These are not lift/gamma/gain controls."
         ),
         "intents": {
             "en": [
@@ -224,7 +248,10 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
     },
     "clip.effects.detail": {
         "visual_effect": (
-            "Sharpen and denoise 0..100 each on the selected clip."
+            f"Sharpen and denoise {DETAIL_PARAMETERS['sharpen']['minimum']}"
+            f"..{DETAIL_PARAMETERS['sharpen']['maximum']} each on the selected clip "
+        f"(sharpen amount {_number(_DETAIL_MODEL, 'sharpenAmountAtFull'):g}, denoise luma "
+        f"{_number(_DETAIL_MODEL, 'denoiseLumaAtFull'):g} at full travel)."
         ),
         "intents": {
             "en": ["sharpen the footage a bit", "reduce noise"],

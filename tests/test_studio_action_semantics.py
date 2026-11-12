@@ -164,6 +164,40 @@ def test_catalog_extension_is_additive_and_versioned() -> None:
             assert "semantics" not in entry
 
 
+def test_visual_effect_numbers_are_derived_from_live_models() -> None:
+    """Prose numbers in visual_effect must come from the live preview models
+    — a changed engine constant without a guidance update fails here."""
+    from orga_drone.studio_detail import detail_preview_model
+    from orga_drone.studio_hsl import hsl_preview_model
+    from orga_drone.studio_image import image_adjust_preview_model
+
+    image_effect = ACTION_SEMANTICS["clip.color.image"]["visual_effect"]
+    image_model = image_adjust_preview_model()
+    assert f"{image_model['exposureEvAtFull']:+g} stop" in image_effect
+    assert f"{image_model['warmthMiredAtFull']:+g} mired" in image_effect
+    assert f"{image_model['neutralKelvin']:g} K" in image_effect
+
+    hsl_effect = ACTION_SEMANTICS["clip.color.hsl"]["visual_effect"]
+    hsl_model = hsl_preview_model()
+    assert f"{hsl_model['hueDegAtFull']:+g} degrees" in hsl_effect
+    assert f"{hsl_model['lutSize']}-point cube" in hsl_effect
+
+    detail_effect = ACTION_SEMANTICS["clip.effects.detail"]["visual_effect"]
+    detail_model = detail_preview_model()
+    assert f"{detail_model['sharpenAmountAtFull']:g}" in detail_effect
+
+
+def test_hsl_intents_do_not_promise_object_or_sky_selectivity() -> None:
+    """Example intents must stay colour-range phrased: no 'sky', no object
+    isolation promises from hue-based tools."""
+    hsl = ACTION_SEMANTICS["clip.color.hsl"]
+    all_intents = " ".join(
+        hsl["intents"]["en"] + hsl["intents"]["de"]
+    ).lower()
+    assert "sky" not in all_intents and "himmel" not in all_intents
+    assert "objekt" not in all_intents and "subject" not in all_intents
+
+
 def test_semantics_payload_is_self_contained() -> None:
     """The discoverable payload carries version, disambiguation and actions
     without repository knowledge."""
