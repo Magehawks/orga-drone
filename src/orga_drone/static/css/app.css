@@ -3538,9 +3538,23 @@ html.is-edge-drag * {
   border-radius: 6px;
   background: color-mix(in srgb, #2f9e8f 18%, var(--panel));
   color: inherit;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   overflow: hidden;
 }
+.studio-sfx-clip:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.studio-sfx-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.studio-sfx-edge-in { left: 0; }
+.studio-sfx-edge-out { right: 0; }
 .studio-sfx-clip.is-selected,
 .studio-track-sfx.is-selected .studio-sfx-clip.is-selected {
   border-color: var(--accent);

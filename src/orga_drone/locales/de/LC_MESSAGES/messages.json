@@ -981,6 +981,7 @@
   "Could not save sound-effect settings.": "Soundeffekt-Einstellungen konnten nicht gespeichert werden.",
   "This story already has 16 sound effects.": "Diese Story hat bereits 16 Soundeffekte.",
   "No sound effects yet": "Noch keine Soundeffekte",
+  "Arrow keys move a sound effect. Shift+arrows resize its end. Alt+arrows resize its start.": "Pfeiltasten verschieben einen Soundeffekt. Umschalt+Pfeile ändern das Ende. Alt+Pfeile ändern den Anfang.",
   "Choosing a sound effect needs the desktop app.": "Soundeffekte auswählen erfordert die Desktop-App.",
   "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged.": "SFX-Clips liegen frei auf der Story-Zeit und mischen mit Musik. Laute Stapel können clippen — Lautstärke senken. Quelldateien bleiben unverändert."
 }
