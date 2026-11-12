@@ -195,7 +195,9 @@ Evergreen WebView2 Runtime. The harness in `packaging/e2e/windows_e2e.py` uses
 synthetic media and CDP (enabled only by `ORGA_DRONE_E2E=1` plus
 `ORGA_DRONE_CDP_PORT`) to check startup, import, Browse/detail, Studio open,
 playback, edit persistence after reload/relaunch, a 720p export decoded from
-the packaged FFmpeg, and unchanged source files.
+the packaged FFmpeg, and unchanged source files. The same run also places
+two synthetic sound effects plus music, checks painted waveforms, drags and
+trims a clip, undoes that trim, and updates one effect through the Control API.
 
 Artifacts, kept 30 days:
 

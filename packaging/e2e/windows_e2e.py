@@ -12,13 +12,17 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 import os
 import platform
 import re
+import secrets
 import socket
+import struct
 import subprocess
 import sys
 import time
+import wave
 import tomllib
 import traceback
 import urllib.error
@@ -261,8 +265,9 @@ def fetch_json(
     method: str = "GET",
     json_body: dict[str, Any] | None = None,
     form_body: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    headers: dict[str, str] = {}
+    headers = dict(headers or {})
     body = "null"
     if json_body is not None:
         headers["Content-Type"] = "application/json"
@@ -320,6 +325,22 @@ def fetch_binary(cdp: CDP, path: str, description: str) -> bytes:
 def make_jpeg(path: Path, color: tuple[int, int, int]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (160, 120), color).save(path, format="JPEG")
+
+
+def make_wav(path: Path, frequency: float, seconds: float = 0.6) -> None:
+    """16-bit mono WAV. ffmpeg and the waveform cache can both decode it."""
+    rate = 8000
+    count = int(rate * seconds)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "w") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(rate)
+        frames = bytearray()
+        for index in range(count):
+            sample = int(12000 * math.sin(2 * math.pi * frequency * index / rate))
+            frames += struct.pack("<h", sample)
+        handle.writeframes(frames)
 
 
 def make_mp4(path: Path, ffmpeg: Path) -> None:
@@ -424,6 +445,39 @@ def validate_export(ffmpeg: Path, output_path: Path) -> dict[str, Any]:
     }
 
 
+def audio_peak(ffmpeg: Path, output_path: Path) -> float:
+    """Max absolute sample of the first exported audio second."""
+    decoded = subprocess.run(
+        [
+            str(ffmpeg),
+            "-v",
+            "error",
+            "-i",
+            str(output_path),
+            "-map",
+            "0:a:0",
+            "-t",
+            "1",
+            "-ac",
+            "1",
+            "-f",
+            "f32le",
+            "-",
+        ],
+        capture_output=True,
+        timeout=60,
+    )
+    if decoded.returncode != 0 or len(decoded.stdout) < 4:
+        raise E2EError(f"Exported MP4 has no decodable audio: {decoded.stderr!r}")
+    usable = decoded.stdout[: len(decoded.stdout) - (len(decoded.stdout) % 4)]
+    peak = 0.0
+    for offset in range(0, len(usable), 4):
+        sample = abs(struct.unpack_from("<f", usable, offset)[0])
+        if sample > peak:
+            peak = sample
+    return peak
+
+
 def read_photo_adjust(cdp: CDP, filename: str) -> dict[str, Any]:
     expression = (
         "(() => {"
@@ -438,24 +492,28 @@ def read_photo_adjust(cdp: CDP, filename: str) -> dict[str, Any]:
 
 
 def main() -> int:
+    local = "--local" in sys.argv
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", required=True, type=Path)
-    parser.add_argument("--zip", required=True, type=Path)
-    parser.add_argument("--zip-sha256", required=True)
-    parser.add_argument("--artifact-name", required=True)
-    parser.add_argument("--artifact-api-digest", required=True)
-    parser.add_argument("--artifact-api-size", required=True, type=int)
+    parser.add_argument("--local", action="store_true")
+    parser.add_argument("--zip", required=not local, type=Path)
+    parser.add_argument("--zip-sha256", required=not local)
+    parser.add_argument("--artifact-name", required=not local)
+    parser.add_argument("--artifact-api-digest", required=not local)
+    parser.add_argument("--artifact-api-size", required=not local, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--ffmpeg", required=True, type=Path)
-    parser.add_argument("--repository", required=True)
-    parser.add_argument("--pr-number", required=True, type=int)
-    parser.add_argument("--head-sha", required=True)
-    parser.add_argument("--base-sha", required=True)
-    parser.add_argument("--merge-sha", required=True)
-    parser.add_argument("--tree-sha", required=True)
-    parser.add_argument("--run-id", required=True, type=int)
-    parser.add_argument("--run-attempt", required=True, type=int)
+    parser.add_argument("--repository", default="local")
+    parser.add_argument("--pr-number", default=0, type=int)
+    parser.add_argument("--head-sha", default="local")
+    parser.add_argument("--base-sha", default="local")
+    parser.add_argument("--merge-sha", default="local")
+    parser.add_argument("--tree-sha", default="local")
+    parser.add_argument("--run-id", default=0, type=int)
+    parser.add_argument("--run-attempt", default=0, type=int)
     args = parser.parse_args()
+    if not local and args.repository == "local":
+        parser.error("--repository is required unless --local is set")
 
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -513,18 +571,24 @@ def main() -> int:
     try:
         if not args.exe.is_file():
             raise E2EError(f"Packaged executable is missing: {args.exe}")
-        if not args.zip.is_file():
-            raise E2EError(f"Packaged ZIP is missing: {args.zip}")
-        if sha256_file(args.zip) != args.zip_sha256.lower():
-            raise E2EError("ZIP SHA-256 does not match the build output")
-        evidence["artifact_sha256"] = sha256_file(args.zip)
-        evidence["artifact_size"] = args.zip.stat().st_size
+        if local:
+            evidence["admission"] = "local-development"
+            evidence["artifact_sha256"] = ""
+            evidence["artifact_size"] = 0
+        else:
+            if args.zip is None or not args.zip.is_file():
+                raise E2EError(f"Packaged ZIP is missing: {args.zip}")
+            if sha256_file(args.zip) != str(args.zip_sha256).lower():
+                raise E2EError("ZIP SHA-256 does not match the build output")
+            evidence["artifact_sha256"] = sha256_file(args.zip)
+            evidence["artifact_size"] = args.zip.stat().st_size
 
         photo = library / "e2e-blue.jpg"
         video = library / "e2e-red.mp4"
         make_jpeg(photo, (0, 0, 220))
         make_mp4(video, args.ffmpeg)
-        originals = {path.name: sha256_file(path) for path in (photo, video)}
+        media_files = [photo, video]
+        originals = {path.name: sha256_file(path) for path in media_files}
         expected_photo = "e2e-blue.jpg"
         expected_video = "e2e-red.mp4"
 
@@ -720,10 +784,273 @@ def main() -> int:
 
         journey("edit_persistence", edit_persistence)
 
+        def sfx_lane() -> dict[str, Any]:
+            music = library / "e2e-bed.wav"
+            hit = library / "e2e-hit.wav"
+            whoosh = library / "e2e-whoosh.wav"
+            make_wav(music, 220, seconds=1.2)
+            make_wav(hit, 660, seconds=0.5)
+            make_wav(whoosh, 440, seconds=0.8)
+            for path in (music, hit, whoosh):
+                media_files.append(path)
+                originals[path.name] = sha256_file(path)
+            project_id = int(state["project_id"])
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/projects/{project_id}/music",
+                    method="POST",
+                    json_body={"path": str(music.resolve())},
+                ),
+                "Music add",
+            )
+            placed: list[Any] = []
+            for path, start in ((hit, 0.4), (whoosh, 1.1)):
+                payload = expect_ok(
+                    fetch_json(
+                        cdp,
+                        f"/api/studio/projects/{project_id}/sfx",
+                        method="POST",
+                        json_body={"path": str(path.resolve()), "start_s": start},
+                    ),
+                    "SFX add",
+                )
+                placed = payload.get("clips") or []
+            if len(placed) != 2:
+                raise E2EError(f"Expected two SFX clips: {placed!r}")
+            for clip in placed:
+                wave_url = str(clip.get("waveform_url") or "")
+                if not wave_url:
+                    raise E2EError(f"SFX clip has no waveform URL: {clip!r}")
+                waveform = expect_ok(fetch_json(cdp, wave_url.split("?")[0]), "SFX waveform")
+                if waveform.get("status") != "ready" or not waveform.get("peaks"):
+                    raise E2EError(f"SFX waveform is not ready: {waveform!r}")
+            navigate(cdp, app.app_port, "/studio")
+            wait_until(
+                cdp,
+                "document.querySelectorAll('.studio-sfx-clip').length === 2",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="two SFX clips",
+            )
+            wait_until(
+                cdp,
+                "(() => { const clips = [...document.querySelectorAll('.studio-sfx-clip')];"
+                " return clips.length === 2 && clips.every(el => el.dataset.waveform === 'ready'"
+                " && el.querySelector('.studio-sfx-wave')?.width > 0); })()",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="SFX waveforms painted",
+            )
+            before = float(placed[0]["start_s"])
+            dragged = cdp.evaluate(
+                "(() => { const el = document.querySelector('.studio-sfx-clip');"
+                " const rect = el.getBoundingClientRect();"
+                " const x = rect.left + rect.width / 2; const y = rect.top + rect.height / 2;"
+                " el.dispatchEvent(new PointerEvent('pointerdown', {button:0, clientX:x, clientY:y, bubbles:true, pointerId:1}));"
+                " window.dispatchEvent(new PointerEvent('pointermove', {button:0, clientX:x+120, clientY:y, bubbles:true, pointerId:1}));"
+                " window.dispatchEvent(new PointerEvent('pointerup', {button:0, clientX:x+120, clientY:y, bubbles:true, pointerId:1}));"
+                " return true; })()"
+            )
+            if dragged is not True:
+                raise E2EError("SFX drag did not dispatch")
+            deadline = time.monotonic() + 20
+            moved: dict[str, Any] | None = None
+            while time.monotonic() < deadline:
+                current = expect_ok(
+                    fetch_json(cdp, f"/api/studio/projects/{project_id}/sfx"),
+                    "SFX list after drag",
+                )
+                clips = current.get("clips") or []
+                match = next((item for item in clips if item.get("id") == placed[0]["id"]), None)
+                if isinstance(match, dict) and abs(float(match["start_s"]) - before) > 0.05:
+                    moved = match
+                    break
+                time.sleep(0.25)
+            if moved is None:
+                raise E2EError("SFX drag did not change the Story start")
+            second = next(item for item in placed if item.get("id") != moved["id"])
+            trimmed_out = float(second["source_out_s"])
+            cdp.evaluate(
+                "(() => { const el = document.querySelector("
+                f"'.studio-sfx-clip[data-sfx-id=\"{int(second['id'])}\"]');"
+                " if (!el) return false; el.focus();"
+                " el.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowLeft', shiftKey:true, bubbles:true}));"
+                " return true; })()"
+            )
+            deadline = time.monotonic() + 20
+            trimmed: dict[str, Any] | None = None
+            while time.monotonic() < deadline:
+                current = expect_ok(
+                    fetch_json(cdp, f"/api/studio/projects/{project_id}/sfx"),
+                    "SFX list after trim",
+                )
+                match = next(
+                    (item for item in current.get("clips") or [] if item.get("id") == second["id"]),
+                    None,
+                )
+                if isinstance(match, dict) and float(match["source_out_s"]) < trimmed_out - 0.05:
+                    trimmed = match
+                    break
+                time.sleep(0.25)
+            if trimmed is None:
+                raise E2EError("SFX keyboard trim did not shorten the clip")
+            undone = expect_ok(
+                fetch_json(cdp, "/api/studio/history/undo", method="POST"),
+                "SFX undo",
+            )
+            if not undone.get("ok", True) and undone.get("can_undo") is False:
+                raise E2EError(f"SFX undo failed: {undone!r}")
+            restored = expect_ok(
+                fetch_json(cdp, f"/api/studio/projects/{project_id}/sfx"),
+                "SFX list after undo",
+            )
+            restored_clip = next(
+                (item for item in restored.get("clips") or [] if item.get("id") == second["id"]),
+                None,
+            )
+            if not isinstance(restored_clip, dict) or abs(
+                float(restored_clip["source_out_s"]) - trimmed_out
+            ) > 0.02:
+                raise E2EError(f"Undo did not restore the SFX trim: {restored_clip!r}")
+            expect_ok(
+                fetch_json(cdp, "/api/studio/history/redo", method="POST"),
+                "SFX redo",
+            )
+            navigate(cdp, app.app_port, "/studio")
+            wait_until(
+                cdp,
+                "document.querySelectorAll('.studio-sfx-clip').length === 2",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="SFX clips after reopen",
+            )
+            state["expect_audio"] = True
+            return {
+                "clips": 2,
+                "dragged_start_s": moved["start_s"],
+                "trimmed_source_out_s": trimmed["source_out_s"],
+                "music": music.name,
+            }
+
+        journey("sfx_lane", sfx_lane)
+
+        def sfx_control() -> dict[str, Any]:
+            project_id = int(state["project_id"])
+            listing = expect_ok(
+                fetch_json(cdp, f"/api/studio/projects/{project_id}/sfx"),
+                "SFX list for control",
+            )
+            clip = (listing.get("clips") or [None])[0]
+            if not isinstance(clip, dict):
+                raise E2EError("Control API has no SFX clip to update")
+            studio_id = cdp.evaluate(
+                "(() => { const el = document.querySelector('.studio-clip[data-kind=\"video\"]');"
+                " return el ? Number(el.getAttribute('data-studio-id')) : 0; })()"
+            )
+            key = secrets.token_hex(32)
+            session_id = "packaged-e2e-sfx"
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    "/api/studio/control/enable",
+                    method="POST",
+                    json_body={"session_id": session_id, "pairing_key": key},
+                ),
+                "Control enable",
+            )
+            editor = {
+                "project_id": project_id,
+                "clip_id": int(studio_id) if studio_id else None,
+                "selection_revision": 1,
+                "playhead_s": 0,
+                "playing": False,
+                "busy": False,
+                "ready": True,
+            }
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    "/api/studio/control/poll",
+                    method="POST",
+                    json_body={"session_id": session_id, "state": editor},
+                ),
+                "Control poll",
+            )
+            token_body = expect_ok(
+                fetch_json(
+                    cdp,
+                    "/api/control/v1/editor-state",
+                    headers={"Authorization": f"Bearer {key}"},
+                ),
+                "Control editor state",
+            )
+            command_id = secrets.token_hex(8)
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    "/api/control/v1/commands",
+                    method="POST",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json_body={
+                        "command_id": command_id,
+                        "type": "project_action",
+                        "action": "sfx.update",
+                        "action_version": 1,
+                        "params": {
+                            "clip_id": clip["id"],
+                            "start_s": clip["start_s"],
+                            "source_in_s": clip["source_in_s"],
+                            "source_out_s": clip["source_out_s"],
+                            "volume": 0.35,
+                            "fade_in_s": clip["fade_in_s"],
+                            "fade_out_s": clip["fade_out_s"],
+                        },
+                        "session_id": session_id,
+                        "project_id": project_id,
+                        "clip_id": None,
+                        "expected_state_token": token_body["state_token"],
+                        "expires_at": time.time() + 30,
+                    },
+                ),
+                "Control submit",
+            )
+            executed = expect_ok(
+                fetch_json(
+                    cdp,
+                    "/api/studio/control/execute",
+                    method="POST",
+                    json_body={
+                        "session_id": session_id,
+                        "state": editor,
+                        "command_id": command_id,
+                    },
+                ),
+                "Control execute",
+            )
+            if executed.get("status") not in {"persisted", "persisted_ui_unconfirmed"}:
+                raise E2EError(f"Control SFX update did not persist: {executed!r}")
+            checked = expect_ok(
+                fetch_json(cdp, f"/api/studio/projects/{project_id}/sfx"),
+                "SFX list after control update",
+            )
+            updated = next(
+                (item for item in checked.get("clips") or [] if item.get("id") == clip["id"]),
+                None,
+            )
+            if not isinstance(updated, dict) or abs(float(updated["volume"]) - 0.35) > 0.02:
+                raise E2EError(f"Control API did not change SFX volume: {updated!r}")
+            if "file_path" in str(executed.get("canonical")):
+                raise E2EError("Control response included a source path")
+            return {"volume": updated["volume"], "status": executed.get("status")}
+
+        journey("sfx_control", sfx_control)
+
         def export() -> dict[str, Any]:
             output_path = output_dir / "e2e-export.mp4"
             job = run_export(cdp, int(state["project_id"]), output_path)
             result = validate_export(args.ffmpeg, output_path)
+            if state.get("expect_audio"):
+                result["audio_peak"] = audio_peak(args.ffmpeg, output_path)
+                if result["audio_peak"] <= 0.001:
+                    raise E2EError("Exported MP4 audio is silent")
             if str(job.get("output_path") or "") == "":
                 raise E2EError(f"Export job has no output path: {job!r}")
             return result
@@ -898,7 +1225,7 @@ def main() -> int:
         def source_integrity() -> dict[str, Any]:
             if {
                 path.name: sha256_file(path)
-                for path in (photo, video)
+                for path in media_files
             } != originals:
                 raise E2EError("Source media changed during the E2E run")
             return {"files": sorted(originals)}

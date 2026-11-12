@@ -1,7 +1,7 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-12. Integration branch `develop` at `e397c26`
-(`docs(discovery): measure local object-removal limits (#297) (#398)`).
+Updated: 2026-11-12. Integration branch `develop` at `2c1108a`
+(`test(e2e): verify packaged SFX lane and control actions (#184) (#400)`).
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -11,13 +11,13 @@ is not acceptance.
 
 | Issue | Feature | State | PR | Acceptance | Blocker | Next action |
 |---|---|---|---|---|---|---|
-| #184 | Independent SFX timeline | VERIFY | #395, #396, #400 merged `2c1108a` | Local onefolder WebView2 E2E PASS. GitHub release-ZIP admission NOT_RUN. | PO acceptance | Leave #184 open. |
+| #184 | Independent SFX timeline | VERIFY | #395, #396, #400 merged `2c1108a` | Local onefolder WebView2 E2E PASS: two SFX clips, music, waveforms, drag, trim, undo, export. Evidence `docs/planning/184-local-packaged-e2e.json`. GitHub release-ZIP admission NOT_RUN. | PO acceptance | Leave #184 open. |
 | #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets, manual keys, LUT strength fade, undo/persistence exist. WebView2 start/mid/end vs MP4 with a user `.cube`, ease-in-out, and highlights/shadows/blacks are not evidenced. | Full frame-parity E2E | Do not claim #211 done. Next slice needs a bounded parity gap, not a second engine. |
 | #267 | Packaged Windows E2E | VERIFY | local onefolder run recorded in #400 | Local WebView2 journey PASS. GitHub release-ZIP admission NOT_RUN. | That admission runs only for a pull request to `main` | Do not call the local run a release admission. |
-| #273 | Secure pairing | READY | — | Production pairing not started. The bounded security spike is approved. | A reviewed security contract before production pairing | Do not implement production pairing. |
+| #273 | Secure pairing | READY | — | Bounded security spike approved. Preferred design: per-connection credentials, DPAPI, user approval, revocation. Production pairing still needs a reviewed contract. | Production implementation | Write the threat-model spike. Do not ship pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
-| #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions (SFX in this checkpoint's PR). |
-| #281 | Shared audio/overlay actions | VERIFY | #397 merged | SFX actions are on develop. The local packaged journey set one SFX volume to 0.35. Full clip-audio and overlay artifact audit NOT_RUN. | PO acceptance | Do not close #281. |
+| #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions. |
+| #281 | Shared audio/overlay actions | VERIFY | #397 merged | Packaged WebView2 journey set one SFX volume to 0.35 through `sfx.update`. Full clip-audio and overlay artifact audit NOT_RUN. | PO acceptance | Do not close #281. |
 | #283 | Real drone footage fixtures | READY | — | Opt-in local media only; nothing committed | — | Privacy-safe manifest, no source media in git. |
 | #284 | Parallel development and release gates | READY | — | — | — | After packaged E2E evidence. |
 | #293 | Open Media Journey acceptance | VERIFY | #387 merged | API + synthetic evidence. Packaged EXE journey NOT_RUN. | Packaged dispatch | Do not close on unit tests. |
@@ -35,20 +35,19 @@ is not acceptance.
 | #331 | Source/Story clocks | VERIFY | #392 ADR 0037 merged `0cb3d35` | ADR accepted | — | Region work landed in #332. |
 | #332 | Bounded speed-ramp region | VERIFY | #394 merged `9f927d4` | Focused Python/JS tests passed before merge. Packaged E2E NOT_RUN. PO has not accepted the issue. | PO acceptance | Do not reimplement. |
 | #333 | Timelapse/ramp conflict | VERIFY | #389 merged | Confirm UI merged. Issue may still be open if acceptance is wider. | — | Re-read before more code. |
-| #351 | Color persistence/recovery | IN_PROGRESS | #399 open | Backup/restore helper exists. Canonical database file is not created. Startup refusal is not switched on. Production canonical writes stay disabled. | PO review, then verified backup before any canonical write | Do not enable canonical writes. |
+| #351 | Color persistence/recovery | IN_PROGRESS | #399 | Staged copy and atomic replace. Canonical writes and startup refusal stay disabled. | PO re-review after green CI | Do not enable canonical writes. |
 | #352–#366 | Color Workspace | READY | — | ADR 0035 accepted. Read-only contracts only until #351 safeguards are verified. | #351 verification | Do not write canonical grades. |
 
 ## Open pull requests
 
-- #399 grade backup. Canonical writes stay disabled.
-- #400 merged at `2c1108a`. Local onefolder WebView2 PASS. GitHub release-ZIP admission NOT_RUN.
+- #399 grade backup. Canonical writes stay disabled. Restore uses a verified sibling and `os.replace`.
 - #401 drone transitions. Smooth easing stays on crossfade. Real MP4 frames for blur dissolve and a left wipe. Packaged WebView2 NOT_RUN.
 
 ## Worktrees
 
-- `issue-184-sfx-wave` — `feat/184-sfx-waveform` (PR #396). Do not add commits unless review asks.
-- `issue-281-sfx-actions` — `feat/281-sfx-actions` from `6c38d24`. Active.
-- Older worktrees for #332 and #184 drag match merged commits. Do not keep editing them.
+- `issue-301-transitions` — PR #401.
+- `issue-351-grade-backup` — PR #399.
+- `issue-184-packaged-e2e` — merged as #400. Do not keep editing it.
 
 ## PO decisions already received
 
