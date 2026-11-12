@@ -288,8 +288,11 @@ second implementation risk, not a SOLID exercise.
 
 ## 6. Test and fixture gaps
 
-Existing coverage is strong for routes and effect math. Gaps for the shared
-contract:
+Living coverage matrix (PASS / PARTIAL / GAP / NOT_RUN):  
+[`docs/discovery/275-shared-action-contract-matrix.md`](../discovery/275-shared-action-contract-matrix.md) (#275).
+
+Existing coverage is strong for routes and effect math. Shared-contract status
+on current `develop` (summary; see the matrix for evidence pointers):
 
 - Color action parity between UI and Control API is covered by #287 contracts.
 - Library/read contracts, filter parity, availability and path privacy are covered
@@ -298,10 +301,13 @@ contract:
   lost-response navigation recovery are covered by #278 contracts.
 - Timeline add/remove/reorder/trim, two-clip wrong-target Undo, invalid trims,
   save/reopen and UI/API parity are covered by #279 contracts.
-- Audio/overlay actions have route tests but no API persistence/Undo contract.
-- Export jobs have job tests but no non-blocking Control API contract.
-- No privacy-safe fixture manifest separates synthetic MP4/JPG/PNG, optional
-  DJI/Potensic footage, and Windows-only visual checks.
+- Audio/overlay and project music Control API contracts shipped via #281
+  (parts 1–2); packaged WebView2 refresh remains NOT_RUN until dated evidence.
+- Export/render job commands shipped via #282; packaged export journey harness
+  exists — mark PASS only after a real run.
+- Open-media assistant journey evidence: #293 / #387 (API+synthetic); packaged
+  EXE journey still rides with the packaged dispatch (NOT_RUN here).
+- Privacy-safe fixture manifest for optional DJI/Potensic footage remains #283.
 
 Fixtures for 2.4.0 must use temporary synthetic media. Real creator footage is
 opt-in and must not be committed. API tests cannot prove rendered color,
