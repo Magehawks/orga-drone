@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
+from PIL import Image, ImageStat
 
 
 def _app_version() -> str:
@@ -292,6 +292,29 @@ def expect_ok(result: dict[str, Any], description: str) -> Any:
             f"{description} failed: status={result.get('status')} data={result.get('data')!r}"
         )
     return result.get("data")
+
+
+def fetch_binary(cdp: CDP, path: str, description: str) -> bytes:
+    """Fetch a binary resource through the page session (Origin checks apply)."""
+    expression = (
+        "(async () => {"
+        f"const response = await fetch({json.dumps(path)}, {{redirect: 'follow'}});"
+        "const buffer = await response.arrayBuffer();"
+        "let binary = '';"
+        "const bytes = new Uint8Array(buffer);"
+        "const chunk = 0x8000;"
+        "for (let i = 0; i < bytes.length; i += chunk) {"
+        "binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));"
+        "}"
+        "return {ok: response.ok, status: response.status, base64: btoa(binary)};"
+        "})()"
+    )
+    result = cdp.evaluate(expression, await_promise=True)
+    if not isinstance(result, dict) or not result.get("ok"):
+        raise E2EError(
+            f"{description} failed: status={result.get('status') if isinstance(result, dict) else result!r}"
+        )
+    return base64.b64decode(str(result.get("base64", "")))
 
 
 def make_jpeg(path: Path, color: tuple[int, int, int]) -> None:
@@ -767,6 +790,110 @@ def main() -> int:
             }
 
         journey("image_export", image_export)
+
+        def lut_parity() -> dict[str, Any]:
+            """Deterministic .cube fixture: Studio LUT preview vs exported
+            MP4 frame (issue #267). Fail closed on missing/mismatched
+            evidence; synthetic media only; tolerance is the documented
+            video budget (JPEG still + H.264 chroma/scaling)."""
+            tolerance = 8.0
+            cube = library / "e2e-parity.cube"
+            # Red input (1,0,0) -> (1, 0.35, 0.35): visible, measurable shift.
+            cube_lines = ['TITLE "Packaged E2E parity transform"', "LUT_3D_SIZE 2"]
+            for blue in (0, 1):
+                for green in (0, 1):
+                    for red in (0, 1):
+                        cube_lines.append(
+                            f"{red} {0.35 + green * 0.65} {0.35 + blue * 0.65}"
+                        )
+            cube.write_text("\n".join(cube_lines) + "\n", encoding="utf-8")
+            cube_sha256 = sha256_file(cube)
+
+            imported = expect_ok(
+                fetch_json(cdp, "/api/studio/luts", method="POST", json_body={"path": str(cube)}),
+                "LUT import",
+            )
+            asset = str(imported.get("asset_name") or "")
+            if not asset:
+                raise E2EError(f"LUT import returned no asset name: {imported!r}")
+
+            video_clip_id = cdp.evaluate(
+                "(() => { const clip = Array.from(document.querySelectorAll('.studio-clip'))"
+                f".find(el => el.getAttribute('data-filename') === {json.dumps(expected_video)});"
+                " return clip ? clip.getAttribute('data-studio-id') : null; })()"
+            )
+            if not video_clip_id:
+                raise E2EError("Video Studio clip id is missing")
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{video_clip_id}/color",
+                    method="PATCH",
+                    json_body={
+                        "input_profile": "rec709",
+                        "creative_lut": asset,
+                        "creative_strength": 100,
+                    },
+                ),
+                "LUT apply on video clip",
+            )
+
+            preview = fetch_binary(
+                cdp,
+                f"/api/studio/{video_clip_id}/preview-frame?t_s=0",
+                "LUT preview still",
+            )
+            preview_path = output_dir / "e2e-lut-preview.jpg"
+            preview_path.write_bytes(preview)
+
+            parity_export = output_dir / "e2e-lut-parity.mp4"
+            run_export(cdp, int(state["project_id"]), parity_export)
+
+            export_frame = output_dir / "e2e-lut-export-frame.png"
+            decoded = subprocess.run(
+                [
+                    str(args.ffmpeg), "-y", "-loglevel", "error",
+                    "-i", str(parity_export), "-frames:v", "1",
+                    "-vf", "scale=in_color_matrix=bt709:in_range=tv,format=rgb24",
+                    str(export_frame),
+                ],
+                capture_output=True,
+                timeout=120,
+            )
+            if decoded.returncode != 0 or not export_frame.is_file():
+                raise E2EError(f"Could not decode the export frame: {decoded.stderr!r}")
+
+            with Image.open(preview_path) as still, Image.open(export_frame) as frame:
+                still_rgb = still.convert("RGB").resize(frame.size)
+                frame_rgb = frame.convert("RGB")
+                width, height = frame_rgb.size
+                center = (width // 4, height // 4, width - width // 4, height - height // 4)
+                still_mean = ImageStat.Stat(still_rgb.crop(center)).mean
+                export_mean = ImageStat.Stat(frame_rgb.crop(center)).mean
+                errors = [abs(still_mean[i] - export_mean[i]) for i in range(3)]
+                if max(errors) > tolerance:
+                    raise E2EError(
+                        "LUT preview/export parity exceeded the tolerance: "
+                        f"still={still_mean} export={export_mean} "
+                        f"errors={errors} tolerance={tolerance}"
+                    )
+                # The LUT must visibly reach BOTH planes (a silently skipped
+                # grade would show G/B near the ungraded red baseline).
+                for plane_name, plane in (("preview", still_mean), ("export", export_mean)):
+                    if plane[1] < 20.0 or plane[2] < 20.0:
+                        raise E2EError(
+                            f"LUT is not visibly applied in the {plane_name}: {plane}"
+                        )
+            return {
+                "cube_sha256": cube_sha256,
+                "asset": asset,
+                "tolerance": tolerance,
+                "errors": [round(error, 3) for error in errors],
+                "preview_mean": [round(value, 2) for value in still_mean],
+                "export_mean": [round(value, 2) for value in export_mean],
+            }
+
+        journey("lut_parity", lut_parity)
 
         def source_integrity() -> dict[str, Any]:
             if {
