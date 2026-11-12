@@ -296,7 +296,11 @@ class ControlService:
         )
         if clip is None:
             raise ControlError("TARGET_NOT_FOUND", 404)
-        if clip.item_kind != "media" or clip.kind != "video":
+        # Photos support the same color actions as videos (image, look, hsl,
+        # wheels, detail) through the shared routes and shared effect
+        # settings storage; title cards and other item kinds stay
+        # unsupported (issue #296).
+        if clip.item_kind != "media" or clip.kind not in {"video", "photo"}:
             raise ControlError("UNSUPPORTED_CLIP")
         media = self.db.get_media(clip.media_id) if clip.media_id else None
         if media is None or resolve_media_file(self.db, media) is None:

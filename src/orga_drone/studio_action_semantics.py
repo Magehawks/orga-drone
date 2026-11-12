@@ -250,14 +250,14 @@ ACTION_SEMANTICS: dict[str, dict[str, Any]] = {
         "visual_effect": (
             f"Sharpen and denoise {DETAIL_PARAMETERS['sharpen']['minimum']}"
             f"..{DETAIL_PARAMETERS['sharpen']['maximum']} each on the selected clip "
-        f"(sharpen amount {_number(_DETAIL_MODEL, 'sharpenAmountAtFull'):g}, denoise luma "
-        f"{_number(_DETAIL_MODEL, 'denoiseLumaAtFull'):g} at full travel)."
+            f"(sharpen amount {_number(_DETAIL_MODEL, 'sharpenAmountAtFull'):g}, denoise luma "
+            f"{_number(_DETAIL_MODEL, 'denoiseLumaAtFull'):g} at full travel)."
         ),
         "intents": {
             "en": ["sharpen the footage a bit", "reduce noise"],
             "de": ["das Material etwas sch\u00e4rfen", "Rauschen reduzieren"],
         },
-        "prerequisites": ["A selected Studio video clip."],
+        "prerequisites": ["A selected Studio video or photo clip."],
         "side_effects": [
             "Replaces the clip's detail section.",
         ],
