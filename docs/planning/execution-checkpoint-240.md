@@ -25,7 +25,7 @@ is not acceptance.
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Backend refuses proxies for repeats and forward loop. Playing loop names HSL/wheels/LUT omission. Phase B loop playback parity is explicitly not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | READY | — | Discovery/audit, not a new editor | — | Read the issue and deliver the approved audit outcome. |
 | #297 | Local object removal | VERIFY | #398 updated `9a8d136` | Moving-camera before/after PNGs, shadow kept, synthetic flicker 0, align 2.238 s. Real footage NOT_RUN. NO-GO for a tool. | PO re-review | Do not add a removal UI or package OpenCV. |
-| #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
+| #298 | Local motion tracking | VERIFY | this spike | Synthetic Lucas-Kanade: pan error 0, occlusion lost at the missing frame, zoom still reports a box with 5 px drift. CSRT is absent. Real footage NOT_RUN. NO-GO for a 2.4.0 tracker. | PO acceptance of the NO-GO | Do not add a tracker UI or package OpenCV. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
 | #301 | Drone-friendly transitions | READY | #390 discovery merged | PO GO for blur dissolve and one soft directional wipe. ADR 0010 must be amended in the same implementation. Luma wipe and zoom/spin stay out. | Amend ADR 0010 before the new type ids ship | Implement those two types with preview and export. |
@@ -63,4 +63,4 @@ is not acceptance.
 
 ## Exact next task
 
-Amend ADR 0010 and implement blur dissolve plus one soft directional wipe on a branch from `f4e688a`, with preview, export, persistence, and timing tests. In parallel, the #298 feasibility spike can proceed without waiting for #398 or #399. Do not enable canonical grade writes.
+#298 measurement is in this branch. Recommendation is NO-GO for a production tracker. Next bounded spike is #273 (threat model only, no production pairing). Do not enable canonical grade writes.
