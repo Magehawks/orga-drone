@@ -271,8 +271,12 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
 
 ACTION_SPECS += tuple(
     ActionSpec(name=name, version=1, scope="project_read" if name in {"project.list", "project.get"} else "project",
-               target="project", reversible=False,
-               description="Use existing persisted Studio project lifecycle.", parameters=params)
+               target="project", reversible=name.startswith("sfx."),
+               description=(
+                   "Place, move, trim, or remove one local sound effect on the Story."
+                   if name.startswith("sfx.")
+                   else "Use existing persisted Studio project lifecycle."
+               ), parameters=params)
     for name, params in PROJECT_PARAMETERS.items()
 )
 

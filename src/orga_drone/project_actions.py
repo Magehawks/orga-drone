@@ -63,7 +63,37 @@ PROJECT_PARAMETERS: dict[str, dict[str, dict[str, Any]]] = {
     },
     "music.reorder": {"ordered_ids": {"type": "integer_array"}},
     "music.set_start": {"start_s": {"type": "number", "minimum": 0.0}},
+    # SFX placement is project-scoped like music, but every write is a Story
+    # history step (the UI route uses story_edit; music playlist edits do not).
+    "sfx.append": {
+        "file_path": {"type": "string", "max_length": 1024},
+        "start_s": {"type": "number", "minimum": 0.0, "maximum": 86400.0},
+    },
+    "sfx.update": {
+        "clip_id": {"type": "integer", "minimum": 1, "maximum": 2**53 - 1},
+        "start_s": {"type": "number", "minimum": 0.0, "maximum": 86400.0},
+        "source_in_s": {"type": "number", "minimum": 0.0, "maximum": 86400.0},
+        "source_out_s": {"type": "number", "minimum": 0.0, "maximum": 86400.0},
+        "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        "fade_in_s": {"type": "number", "minimum": 0.0, "maximum": 10.0},
+        "fade_out_s": {"type": "number", "minimum": 0.0, "maximum": 10.0},
+    },
+    "sfx.remove": {
+        "clip_id": {"type": "integer", "minimum": 1, "maximum": 2**53 - 1}
+    },
 }
+
+
+def _require_range(value: Any, *, minimum: float, maximum: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProjectActionError("INVALID_PARAMS")
+    number = float(value)
+    if not math.isfinite(number) or number < minimum or number > maximum:
+        raise ProjectActionError("INVALID_PARAMS")
+
+
+def _require_unit_interval(value: Any) -> None:
+    _require_range(value, minimum=0.0, maximum=1.0)
 
 
 def validate_project_params(action: str, params: Any) -> dict[str, Any]:
@@ -109,7 +139,17 @@ def validate_project_params(action: str, params: Any) -> dict[str, Any]:
                 raise ProjectActionError("INVALID_PARAMS")
         if type(loop) is not bool:
             raise ProjectActionError("INVALID_PARAMS")
-    if "start_s" in params:
+    if action == "sfx.update":
+        _require_unit_interval(params["volume"])
+        for key in ("fade_in_s", "fade_out_s"):
+            _require_range(params[key], minimum=0.0, maximum=10.0)
+        _require_range(params["source_in_s"], minimum=0.0, maximum=86400.0)
+        _require_range(params["source_out_s"], minimum=0.0, maximum=86400.0)
+        if float(params["source_out_s"]) <= float(params["source_in_s"]):
+            raise ProjectActionError("INVALID_PARAMS")
+    if action in {"sfx.append", "sfx.update"}:
+        _require_range(params["start_s"], minimum=0.0, maximum=86400.0)
+    if "start_s" in params and action not in {"sfx.append", "sfx.update"}:
         start = params["start_s"]
         if isinstance(start, bool) or not isinstance(start, (int, float)) or not math.isfinite(float(start)) or start < 0.0:
             raise ProjectActionError("INVALID_PARAMS")

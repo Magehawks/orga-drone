@@ -34,6 +34,7 @@ def test_catalog_is_versioned_and_path_free() -> None:
         "project.create", "project.open", "project.rename", "project.delete",
         "music.append", "music.update", "music.remove", "music.reorder",
         "music.set_start",
+        "sfx.append", "sfx.update", "sfx.remove",
     }
     assert {a["name"] for a in actions if a["scope"] == "project_read"} == {
         "project.list", "project.get",
