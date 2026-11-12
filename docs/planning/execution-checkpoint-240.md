@@ -17,13 +17,13 @@ is not acceptance.
 | #273 | Secure pairing | BLOCKED | — | Production pairing not started | Security-architecture approval before production implementation. Bounded spike is the only allowed step. | Do not implement production pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
 | #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions (SFX in this checkpoint's PR). |
-| #281 | Shared audio/overlay actions | IN_PROGRESS | #397 open (`414b2ae`) | Music, clip audio, and overlays were already on develop. SFX append/update/remove now share those routes' database methods and Story undo. 48 focused tests passed. Packaged Windows artifact check NOT_RUN. | PO merge of #397; packaged export evidence | Do not close #281. |
+| #281 | Shared audio/overlay actions | IN_PROGRESS | #397 open (`377c8f1`) | Music, clip audio, and overlays were already on develop. SFX append/update/remove now share those routes' database methods and Story undo. 48 focused tests passed. Packaged Windows artifact check NOT_RUN. | PO merge of #397; packaged export evidence | Do not close #281. |
 | #283 | Real drone footage fixtures | READY | — | Opt-in local media only; nothing committed | — | Privacy-safe manifest, no source media in git. |
 | #284 | Parallel development and release gates | READY | — | — | — | After packaged E2E evidence. |
 | #293 | Open Media Journey acceptance | VERIFY | #387 merged | API + synthetic evidence. Packaged EXE journey NOT_RUN. | Packaged dispatch | Do not close on unit tests. |
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Backend refuses proxies for repeats and forward loop. Playing loop names HSL/wheels/LUT omission. Phase B loop playback parity is explicitly not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | READY | — | Discovery/audit, not a new editor | — | Read the issue and deliver the approved audit outcome. |
-| #297 | Local object removal | READY | — | Research/feasibility unless the issue text is an implementation | — | Read acceptance before any code. |
+| #297 | Local object removal | VERIFY | #398 open (`d4067fe`) | Spike only. Pillow tests: outside-mask identity, real-pixel fill, unchanged when the background is never visible, two-depth failure. OpenCV phase correlation PASS locally (4.9), NOT_RUN in CI if `cv2` is absent. Real footage NOT_RUN. NO-GO for a 2.4.0 tool. | PO acceptance of the NO-GO | Do not add a removal UI or OpenCV to the package. |
 | #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
@@ -41,7 +41,8 @@ is not acceptance.
 ## Open pull requests
 
 - #396 `feat/184-sfx-waveform` at `7242d96`. CI success, mergeable. Does not close #184. Packaged Windows E2E NOT_RUN. Do not merge without PO authorization.
-- #397 `feat/281-sfx-actions` at `414b2ae`. SFX project actions. Focused tests 48 passed; ruff and mypy passed. Packaged Windows E2E NOT_RUN. Does not close #281.
+- #397 `feat/281-sfx-actions` at `377c8f1`. SFX project actions. Focused tests 48 passed; ruff and mypy passed. Packaged Windows E2E NOT_RUN. Does not close #281.
+- #398 `feat/297-removal-spike` at `d4067fe`. Object-removal spike, NO-GO for a Studio tool. 6 tests passed locally. Does not add a feature.
 
 ## Worktrees
 
@@ -66,4 +67,4 @@ is not acceptance.
 
 ## Exact next task
 
-Read #297's research acceptance and deliver only that approved local, non-generative outcome. Do not start object removal, portrait following, or new transitions while those issues are research, Later, or blocked by ADR 0010. Do not build the Windows package until #396 is merged if the package is supposed to include waveforms.
+#297's approved spike is in PR #398. Do not start a removal UI. Next independent work is the #298 bounded OpenCV tracking spike (feasibility only, not a product tracker), still from `origin/develop`, without waiting for #396, #397, or #398 to merge. Do not build the Windows package until #396 is merged if the package is supposed to include waveforms.
