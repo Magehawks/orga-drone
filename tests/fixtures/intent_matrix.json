@@ -1,0 +1,221 @@
+{
+  "schema": "orga-drone-intent-matrix-v1",
+  "rubric": {
+    "PASS": "The expected action family exists, every parameter validates against the live action schema, neutral/default values match the recorded ones, unsupported cases return the recorded disclosure instead of a mutation, and a repeated identical command reports no_op.",
+    "FAIL": "Any deterministic check disagrees: unknown action, out-of-bounds parameter, unsupported case mutating or hiding its limitation, or a repeated command claiming a change.",
+    "MANUAL": "Semantic phrasing quality and visual result judgement need a human or an external MCP assistant; recorded separately from CI and never claimed as pixel proof."
+  },
+  "note": "persisted/ui_applied proves command persistence, never rendered pixels (see #292 false-confidence rule). Pixel parity evidence lives in tests/test_studio_color_scenarios.py and the packaged E2E; #320's strict gate stays FAIL/tracked.",
+  "cases": [
+    {
+      "id": "more-colorful-natural",
+      "request_en": "Make it more colorful but natural",
+      "request_de": "Mach es farbiger, aber nat\u00fcrlich",
+      "expected_action": "clip.color.properties",
+      "params": {"saturation_percent": 115, "contrast": 5},
+      "checks": ["in_bounds", "no_side_effect_on_lut", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Strength choice (115 instead of 200) is semantic judgement: stay near neutral for 'natural'."
+    },
+    {
+      "id": "warmer",
+      "request_en": "Make it warmer",
+      "request_de": "Mach es w\u00e4rmer",
+      "expected_action": "clip.color.image",
+      "params": {"warmth": 25},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": null
+    },
+    {
+      "id": "black-and-white",
+      "request_en": "Make it black and white",
+      "request_de": "Mach es schwarz-wei\u00df",
+      "expected_action": "clip.color.image",
+      "params": {"saturation": -100},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "The saturation ramp effect (grade toward B/W over time) is a separate timed effect, not part of this action."
+    },
+    {
+      "id": "only-green-stays-colored",
+      "request_en": "Desaturate everything except green",
+      "request_de": "Alles au\u00dfer Gr\u00fcn ents\u00e4ttigen",
+      "expected_action": "clip.color.hsl",
+      "params": {
+        "ranges": {
+          "red": {"saturation": -100},
+          "orange": {"saturation": -100},
+          "yellow": {"saturation": -100},
+          "aqua": {"saturation": -100},
+          "blue": {"saturation": -100},
+          "purple": {"saturation": -100},
+          "magenta": {"saturation": -100}
+        }
+      },
+      "checks": ["in_bounds", "hue_not_object_disclosure", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Green stays at 0; colour-range selectivity only, not object selectivity."
+    },
+    {
+      "id": "less-washed-out",
+      "request_en": "Make it less washed out",
+      "request_de": "Weniger ausgewaschen machen",
+      "expected_action": "clip.color.image",
+      "params": {"contrast": 20, "blacks": -15},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Tonal controls reshape input bounds; they do not recover clipped data."
+    },
+    {
+      "id": "more-cinematic",
+      "request_en": "Make it more cinematic",
+      "request_de": "Mach es kinoreifer",
+      "expected_action": "clip.color.wheels",
+      "params": {"wheels": {"shadows": {"x": -0.4, "y": 0.2}, "highlights": {"x": 0.4}}},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Teal shadows + warm highlights; tonal tint only (no luma shift)."
+    },
+    {
+      "id": "make-only-the-sky-blue",
+      "request_en": "Make only the sky blue",
+      "request_de": "Mach nur den Himmel blau",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required"],
+      "unsupported_disclosure": "Object/sky-selective editing is not implemented. HSL ranges change every matching colour in the clip; masks/qualifiers are not available yet. Offer clip.color.hsl on the blue range as an approximation only with an explicit caveat, or decline.",
+      "manual_note": "The assistant must decline or disclose; never claim sky isolation."
+    },
+    {
+      "id": "convert-dlog-m",
+      "request_en": "Convert my DJI D-Log M footage",
+      "request_de": "Wandle mein DJI D-Log M Material um",
+      "expected_action": "clip.color.look",
+      "params": {"input_profile": "dlog_m", "conversion_lut": "<imported-asset-id>", "conversion_confirmed": true},
+      "checks": ["in_bounds", "requires_imported_lut", "requires_confirmation"],
+      "unsupported_disclosure": null,
+      "manual_note": "The assistant must ask the user for the .cube file and the confirmation; no telemetry-hint auto-conversion."
+    },
+    {
+      "id": "dlog-without-confirmation",
+      "request_en": "Convert D-Log M (assistant assumes)",
+      "request_de": "D-Log M umwandeln (Assistent setzt es selbst)",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required"],
+      "unsupported_disclosure": "A conversion LUT for D-Log M requires an imported .cube asset AND an explicit user confirmation (conversion_confirmed). The assistant must ask first.",
+      "manual_note": "Safe-decline behaviour for missing prerequisites."
+    },
+    {
+      "id": "double-lut-prevention",
+      "request_en": "Apply another creative LUT on top",
+      "request_de": "Setz einen weiteren kreativen LUT obendrauf",
+      "expected_action": "clip.color.look",
+      "params": {"creative_lut": "<other-asset-id>"},
+      "checks": ["replaces_not_stacks", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": "One creative LUT per clip: the new look REPLACES the previous creative LUT (conversion stays). The assistant should read the current look first and say so.",
+      "manual_note": "Prevents accidental double LUT application."
+    },
+    {
+      "id": "sharpen-a-bit",
+      "request_en": "Sharpen it a bit",
+      "request_de": "Sch\u00e4rfe es etwas",
+      "expected_action": "clip.effects.detail",
+      "params": {"sharpen": 20},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": null
+    },
+    {
+      "id": "cinematic-teal-orange-photo",
+      "request_en": "Give this photo the teal-and-orange look",
+      "request_de": "Gib diesem Foto den Teal-Orange-Look",
+      "expected_action": "clip.color.wheels",
+      "params": {"wheels": {"shadows": {"x": -0.5, "y": 0.25}, "highlights": {"x": 0.5}}},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Photo targets are supported for wheels (issue #296)."
+    },
+    {
+      "id": "brighten-shadows",
+      "request_en": "Brighten the shadows without touching the highlights",
+      "request_de": "Helle die Schatten auf, ohne die Lichter anzufassen",
+      "expected_action": "clip.color.image",
+      "params": {"shadows": 30, "highlights": 0},
+      "checks": ["in_bounds", "unchanged_unrelated_keys", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Partial patch: highlights stays 0 (unchanged)."
+    },
+    {
+      "id": "cooler-shadows",
+      "request_en": "Cool down only the shadows",
+      "request_de": "K\u00fchl nur die Schatten ab",
+      "expected_action": "clip.color.wheels",
+      "params": {"wheels": {"shadows": {"x": -0.3, "y": 0.3}}},
+      "checks": ["in_bounds", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": null
+    },
+    {
+      "id": "vivid-sunset",
+      "request_en": "Make the sunset colors pop",
+      "request_de": "Lass die Abendrot-Farben poppen",
+      "expected_action": "clip.color.hsl",
+      "params": {"ranges": {"red": {"saturation": 30}, "orange": {"saturation": 30}}},
+      "checks": ["in_bounds", "hue_not_object_disclosure", "idempotent_noop_on_repeat"],
+      "unsupported_disclosure": null,
+      "manual_note": "Red/orange ranges; reaches every matching pixel (disclose)."
+    },
+    {
+      "id": "blur-background",
+      "request_en": "Blur the background",
+      "request_de": "Mach den Hintergrund unscharf",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required"],
+      "unsupported_disclosure": "Background/object blur needs tracking or selection; privacy masks are rectangular, fixed for the whole clip and meant for anonymisation, not looks. Decline or offer the rectangular mask with its limitations.",
+      "manual_note": "Masks exist but do not do object selection; honest boundary."
+    },
+    {
+      "id": "remove-object",
+      "request_en": "Remove that boat from the water",
+      "request_de": "Entferne das Boot aus dem Wasser",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required"],
+      "unsupported_disclosure": "Object removal is not implemented (research #297). Decline.",
+      "manual_note": "Honest unsupported-capability disclosure."
+    },
+    {
+      "id": "smooth-motion-slowmo",
+      "request_en": "Slow it down to 25 percent with smooth motion",
+      "request_de": "Langsam auf 25 Prozent mit fl\u00fcssiger Bewegung",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required"],
+      "unsupported_disclosure": "Slow motion exists at 0.25x inside a Verlangsamen bar, but optical-flow interpolation is not implemented; motion will not be smoothed. The source audio is muted on a slowed bar.",
+      "manual_note": "Partial support with an honest quality boundary."
+    },
+    {
+      "id": "loop-to-music",
+      "request_en": "Loop this clip until the music ends",
+      "request_de": "Wiederhole diesen Clip bis zum Musikende",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required", "ui_only_capability"],
+      "unsupported_disclosure": "Forward loop exists in the Studio UI (needs a soundtrack with known duration) but has NO shared action yet, so an assistant cannot trigger it. Playback color preview is not mapped onto loop playback (#294 Phase A shipped the truthful chip; Phase B pending).",
+      "manual_note": "The user applies it in the UI; conflict with Timelapse/repeats is blocked with actionable messages."
+    },
+    {
+      "id": "ten-second-timelapse",
+      "request_en": "Turn this 2-minute clip into a 10 second timelapse",
+      "request_de": "Mach aus dieser 2-Minuten-Aufnahme einen 10-Sekunden-Zeitraffer",
+      "expected_action": null,
+      "params": null,
+      "checks": ["unsupported_disclosure_required", "ui_only_capability"],
+      "unsupported_disclosure": "Timelapse by target duration exists in the Studio UI (explicit Apply, conflict blocking, 1x-20x) but has NO shared action yet, so an assistant cannot trigger it. The user applies it in the Studio inspector.",
+      "manual_note": "UI-only capability; a future action belongs to the shared-actions gate (#281 follow-ups)."
+    }
+  ]
+}
