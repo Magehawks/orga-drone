@@ -303,6 +303,16 @@ export function createCanonicalApplier({
   };
 }
 
+export function timelineReloadTarget(result) {
+  /** Issue #293: an externally added clip should become the visible
+      selection after the reload. The /studio route supports ?select=…
+      natively, so navigate there instead of a plain reload. */
+  if (result?.action === "timeline.add" && result.affected_clip_id) {
+    return "/studio?select=" + result.affected_clip_id;
+  }
+  return null;
+}
+
 export function mountControlUi({
   panel,
   snapshot,
@@ -388,6 +398,11 @@ export function mountControlUi({
         window.sessionStorage.setItem(resumeKey, result.resume_ticket);
       } catch {
         window.name = resumeKey + ":" + result.resume_ticket;
+      }
+      const target = timelineReloadTarget(result);
+      if (target) {
+        window.location.assign(target);
+        return;
       }
       window.location.reload();
     },

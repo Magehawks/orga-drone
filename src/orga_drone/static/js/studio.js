@@ -13629,6 +13629,12 @@ import {
         if (!findClip(grid, id)) throw new Error("Timeline selection unavailable");
         selectClip(String(id), { movePlayhead: false, controlRestore: true });
       } else {
+        // Issue #293: a null anchor means "no mandatory selection". Keep a
+        // still-valid current selection (e.g. the ?select= target of an
+        // external timeline.add reload); deselect only when the previously
+        // selected clip is really gone.
+        const current = state.selected.type === "clip" ? findClip(grid, state.selected.id) : null;
+        if (current) return;
         state.selected = { type: "none", id: null };
         clips().forEach((clip) => {
           clip.classList.remove("is-selected");

@@ -5,7 +5,19 @@ import {
   createBridgeRequest,
   createCanonicalApplier,
   hasActiveControlGesture,
+  timelineReloadTarget,
 } from "../../src/orga_drone/static/js/studio/control-bridge.js";
+
+test("timeline reload target navigates to the added clip's selection url", () => {
+  assert.equal(
+    timelineReloadTarget({ action: "timeline.add", affected_clip_id: 7 }),
+    "/studio?select=7"
+  );
+  // Other actions (and add without an affected clip) keep a plain reload.
+  assert.equal(timelineReloadTarget({ action: "timeline.trim", affected_clip_id: 2 }), null);
+  assert.equal(timelineReloadTarget({ action: "timeline.add", affected_clip_id: null }), null);
+  assert.equal(timelineReloadTarget(null), null);
+});
 
 function harness() {
   let state = {

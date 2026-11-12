@@ -155,33 +155,27 @@ def test_search_add_persist_without_manual_selection(journey) -> None:  # type: 
     assert len(stored) == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Issue #293 gap: the timeline bridge resumes without selecting the "
-        "newly added clip (selection_clip_id=None) when the editor had no "
-        "prior selection; the fix needs a bridge/orchestration design "
-        "decision (studio.js applyProject/resumeSelection, serial gate)"
-    ),
-)
-def test_add_resumes_selection_of_the_new_clip(journey) -> None:  # type: ignore[no-untyped-def]
-    """GAP (issue #293): an external add with no prior selection resumes
-    WITHOUT selecting the new clip (selection_clip_id=None). Strict xfail
-    documents today's bridge behavior; the fix is a bridge/orchestration
-    design decision (studio.js + control contract), not part of this
-    evidence file."""
+def test_add_exposes_affected_clip_for_ui_selection(journey) -> None:  # type: ignore[no-untyped-def]
+    """The bridge result exposes the added clip (affected_clip_id) so the UI
+    reload can select it via the documented /studio?select= route (issue
+    #293 solution: UI-side selection from the bridge result; the Control
+    contract itself stays unchanged — selection_clip_id remains the targeted
+    clip, None for a cold assistant)."""
     _client, db, service, sid, state, media_id, pid = journey
     added = _execute(service, sid, state, _cmd(
         service, sid, state, "timeline_action",
         action="timeline.add", action_version=1, params={"media_id": media_id},
     ))
     assert added["persisted"] is True, added
-    # With the gap closed, the bridge resumes with the new clip selected.
     new_clip = next(
         item for item in db.list_studio_items(pid)
         if item.source_media_id == media_id
     )
-    assert added["selection_clip_id"] == new_clip.id, added
+    assert added["affected_clip_id"] == new_clip.id, added
+    # The UI navigates to /studio?select=<affected> after the reload; that
+    # route accepts the clip id as the visible selection.
+    page = _client.get(f"/studio?select={new_clip.id}")
+    assert page.status_code == 200
 
 
 def test_color_action_on_added_clip_after_ui_selection(journey) -> None:  # type: ignore[no-untyped-def]
