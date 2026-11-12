@@ -33,9 +33,7 @@ export function createTimelapseEditor({
   const calc = panel.querySelector("[data-timelapse-calc]");
   const hint = panel.querySelector("[data-timelapse-hint]");
   const askConfirm =
-    typeof confirmFn === "function"
-      ? confirmFn
-      : (message) => globalThis.confirm(message);
+    typeof confirmFn === "function" ? confirmFn : (message) => globalThis.confirm(message);
   let selectedClip = null;
   let syncing = false;
   let pending = false;
@@ -238,8 +236,7 @@ export function createTimelapseEditor({
     const needsReplaceConfirm = hardConflict === CONFIRM_REPLACE_RAMP;
     if (needsReplaceConfirm) {
       const ok = askConfirm(
-        messages.replaceConfirm ||
-          "Applying Timelapse replaces the existing speed ramp. Continue?"
+        messages.replaceConfirm || "Applying Timelapse replaces the existing speed ramp. Continue?"
       );
       if (!ok) {
         // Cancel preserves the original ramp and the validated draft.
