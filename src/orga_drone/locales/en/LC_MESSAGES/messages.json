@@ -966,5 +966,8 @@
   "Project composite tap": "Project composite tap",
   "Downsampled measurement": "Downsampled measurement",
   "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.": "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr.",
-  "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.": "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged."
+  "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.": "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged.",
+  "Playing looped; color file preview appears on pause": "Playing looped; color file preview appears on pause",
+  "Playing looped; HSL preview appears on pause": "Playing looped; HSL preview appears on pause",
+  "Playing looped; color grading preview appears on pause": "Playing looped; color grading preview appears on pause"
 }

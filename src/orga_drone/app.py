@@ -50,6 +50,7 @@ from orga_drone.studio_cut import section_repeats_from_effect_settings
 from orga_drone.studio_forward_loop import (
     clip_forward_loop_view,
     effective_item_seconds,
+    loop_to_soundtrack_enabled,
     resolve_forward_loop,
     soundtrack_once_s,
 )
@@ -426,6 +427,12 @@ def create_app() -> FastAPI:
         if stored_lane(clip.effect_settings).get("slow_bar") is not None:
             return None
         if section_repeats_from_effect_settings(clip.effect_settings) != 1:
+            return None
+        # Forward loop plays the range repeatedly against a soundtrack; the
+        # JS preview cannot map proxy bounds onto wraps/overlaps yet (issue
+        # #294). Never generate or advertise a proxy that playback would
+        # reject anyway.
+        if loop_to_soundtrack_enabled(clip.effect_settings):
             return None
         start = max(0.0, float(clip.source_start or 0.0))
         end_raw = clip.source_end if clip.source_end is not None else clip.duration_s

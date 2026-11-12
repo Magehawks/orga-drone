@@ -858,3 +858,12 @@ msgstr "Downsampled measurement"
 
 msgid "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
 msgstr "Scopes never change the saved grade or export. Histogram uses 256 bins. Waveform and parade use Y′ / R′G′B′. Vectorscope uses BT.709 Cb/Cr."
+
+msgid "Playing looped; color file preview appears on pause"
+msgstr "Playing looped; color file preview appears on pause"
+
+msgid "Playing looped; HSL preview appears on pause"
+msgstr "Playing looped; HSL preview appears on pause"
+
+msgid "Playing looped; color grading preview appears on pause"
+msgstr "Playing looped; color grading preview appears on pause"
