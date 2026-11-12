@@ -89,11 +89,27 @@ export function flatTimelapseRamp(sourceIn, sourceOut, speed) {
   return parseRamp(ramp) ? ramp : null;
 }
 
-export function timelapseConflict({ hasRamp, sectionRepeats, forwardLoop }) {
-  if (hasRamp) return "Remove the speed ramp before applying Timelapse.";
-  if (Number(sectionRepeats) > 1) return "Turn off section repeat before applying Timelapse.";
-  if (forwardLoop) return "Turn off Repeat to soundtrack before applying Timelapse.";
+/** Soft gate: Apply may proceed only after an explicit UI confirmation (#333 A). */
+export const CONFIRM_REPLACE_RAMP = "confirm_replace_ramp";
+
+export function timelapseConflict({
+  hasRamp,
+  sectionRepeats,
+  forwardLoop,
+  replaceConfirmed = false,
+}) {
+  if (Number(sectionRepeats) > 1) {
+    return "Turn off section repeat before applying Timelapse.";
+  }
+  if (forwardLoop) {
+    return "Turn off Repeat to soundtrack before applying Timelapse.";
+  }
+  if (hasRamp && !replaceConfirmed) return CONFIRM_REPLACE_RAMP;
   return null;
+}
+
+export function isHardTimelapseConflict(code) {
+  return !!code && code !== CONFIRM_REPLACE_RAMP;
 }
 
 export function clampPreviewPlaybackRate(speed) {

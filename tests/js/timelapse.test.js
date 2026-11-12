@@ -9,7 +9,9 @@ import {
   clampPreviewPlaybackRate,
   draftFromSpeed,
   draftFromTarget,
+  CONFIRM_REPLACE_RAMP,
   flatTimelapseRamp,
+  isHardTimelapseConflict,
   rampNeedsSeekPreview,
   shouldReconcileSeekSample,
   timelapseConflict,
@@ -38,9 +40,38 @@ test("unsupported values and conflicts refuse mutation helpers", () => {
   assert.equal(draftFromSpeed(10, 0.5), null);
   assert.equal(draftFromSpeed(10, 20.001), null);
   assert.equal(flatTimelapseRamp(0, 10, 1), null);
-  assert.ok(timelapseConflict({ hasRamp: true, sectionRepeats: 1, forwardLoop: false }));
-  assert.ok(timelapseConflict({ hasRamp: false, sectionRepeats: 2, forwardLoop: false }));
-  assert.ok(timelapseConflict({ hasRamp: false, sectionRepeats: 1, forwardLoop: true }));
+  assert.equal(
+    timelapseConflict({ hasRamp: true, sectionRepeats: 1, forwardLoop: false }),
+    CONFIRM_REPLACE_RAMP
+  );
+  assert.equal(isHardTimelapseConflict(CONFIRM_REPLACE_RAMP), false);
+  assert.equal(
+    timelapseConflict({
+      hasRamp: true,
+      sectionRepeats: 1,
+      forwardLoop: false,
+      replaceConfirmed: true,
+    }),
+    null
+  );
+  assert.equal(
+    isHardTimelapseConflict(
+      timelapseConflict({ hasRamp: false, sectionRepeats: 2, forwardLoop: false })
+    ),
+    true
+  );
+  assert.equal(
+    isHardTimelapseConflict(
+      timelapseConflict({ hasRamp: false, sectionRepeats: 1, forwardLoop: true })
+    ),
+    true
+  );
+  assert.equal(
+    isHardTimelapseConflict(
+      timelapseConflict({ hasRamp: true, sectionRepeats: 2, forwardLoop: false })
+    ),
+    true
+  );
   assert.equal(timelapseConflict({ hasRamp: false, sectionRepeats: 1, forwardLoop: false }), null);
   const range = allowedTargetRange(120);
   assert.ok(range);

@@ -101,17 +101,32 @@ def flat_timelapse_payload(source_in_s: float, source_out_s: float, speed: float
     }
 
 
+# Soft gate: Apply may proceed after an explicit UI confirmation (#333 Option A).
+CONFIRM_REPLACE_RAMP = "confirm_replace_ramp"
+
+
 def timelapse_conflict(
     *,
     has_ramp: bool,
     section_repeats: int,
     forward_loop: bool,
+    replace_confirmed: bool = False,
 ) -> str | None:
-    if has_ramp:
-        return "Remove the speed ramp before applying Timelapse."
+    """Return a hard block message, a soft replace-confirm code, or None.
+
+    Section repeats and soundtrack loops stay hard blocks. An existing speed
+    ramp is replaceable only after ``replace_confirmed`` is true — never
+    silently overwrite a variable ramp.
+    """
     if int(section_repeats) > 1:
         return "Turn off section repeat before applying Timelapse."
     if forward_loop:
         return "Turn off Repeat to soundtrack before applying Timelapse."
+    if has_ramp and not replace_confirmed:
+        return CONFIRM_REPLACE_RAMP
     return None
+
+
+def is_hard_timelapse_conflict(code: str | None) -> bool:
+    return bool(code) and code != CONFIRM_REPLACE_RAMP
 

@@ -754,8 +754,11 @@ msgstr "Zeitraffer ersetzt die Zeitlupe durch eine flache Geschwindigkeitsrampe.
 msgid "Apply Timelapse"
 msgstr "Zeitraffer anwenden"
 
-msgid "Remove the speed ramp before applying Timelapse."
-msgstr "Entferne die Geschwindigkeitsrampe, bevor du Zeitraffer anwendest."
+msgid "Applying Timelapse replaces the existing speed ramp. Continue?"
+msgstr "Zeitraffer ersetzt die vorhandene Geschwindigkeitsrampe. Fortfahren?"
+
+msgid "This clip has a speed ramp. Apply will ask to replace it."
+msgstr "Dieser Clip hat eine Geschwindigkeitsrampe. Anwenden fragt nach dem Ersetzen."
 
 msgid "Turn off section repeat before applying Timelapse."
 msgstr "Schalte die Abschnittswiederholung aus, bevor du Zeitraffer anwendest."

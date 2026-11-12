@@ -1,4 +1,5 @@
 import {
+  CONFIRM_REPLACE_RAMP,
   MAX_TIMELAPSE_SPEED,
   MIN_TIMELAPSE_SPEED,
   allowedTargetRange,
@@ -6,6 +7,7 @@ import {
   draftFromSpeed,
   draftFromTarget,
   flatTimelapseRamp,
+  isHardTimelapseConflict,
   timelapseConflict,
   validatedDraftMatches,
 } from "./timelapse.js";
@@ -21,6 +23,7 @@ export function createTimelapseEditor({
   pause,
   onError,
   messages,
+  confirm: confirmFn,
 }) {
   if (!panel) return { fill() {} };
   const targetInput = panel.querySelector("[data-timelapse-target]");
@@ -29,6 +32,8 @@ export function createTimelapseEditor({
   const status = panel.querySelector("[data-timelapse-status]");
   const calc = panel.querySelector("[data-timelapse-calc]");
   const hint = panel.querySelector("[data-timelapse-hint]");
+  const askConfirm =
+    typeof confirmFn === "function" ? confirmFn : (message) => globalThis.confirm(message);
   let selectedClip = null;
   let syncing = false;
   let pending = false;
@@ -52,17 +57,20 @@ export function createTimelapseEditor({
     return { start: range.start, end: range.end, span: range.end - range.start };
   }
 
-  function conflictFor(clip) {
+  function conflictFor(clip, { replaceConfirmed = false } = {}) {
     return timelapseConflict({
       hasRamp: !!readRamp(clip),
       sectionRepeats: sectionRepeats(clip),
       forwardLoop: forwardLoop(clip),
+      replaceConfirmed,
     });
   }
 
   function localizeConflict(code) {
     if (!code) return "";
-    if (code.includes("speed ramp")) return messages.removeRamp || code;
+    if (code === CONFIRM_REPLACE_RAMP) {
+      return messages.replaceNotice || messages.replaceConfirm || code;
+    }
     if (code.includes("section repeat")) return messages.removeRepeat || code;
     if (code.includes("soundtrack")) return messages.removeLoop || code;
     return code;
@@ -109,7 +117,7 @@ export function createTimelapseEditor({
     try {
       const { start, end, span } = currentBounds(clip);
       const conflict = conflictFor(clip);
-      if (conflict) {
+      if (isHardTimelapseConflict(conflict)) {
         clearValidated();
         setStatus(localizeConflict(conflict), { error: true });
         updateCalc(null, span);
@@ -140,7 +148,9 @@ export function createTimelapseEditor({
         field,
         draft,
       });
-      if (draft.speed > 16) {
+      if (conflict === CONFIRM_REPLACE_RAMP) {
+        setStatus(localizeConflict(conflict), { error: false });
+      } else if (draft.speed > 16) {
         setStatus(messages.previewApprox || "", { error: false });
       } else {
         setStatus("");
@@ -188,7 +198,7 @@ export function createTimelapseEditor({
     speedInput.disabled = !available || pending;
     applyBtn.disabled = !available || pending || !validated;
     const conflict = conflictFor(clip);
-    if (conflict) {
+    if (isHardTimelapseConflict(conflict)) {
       clearValidated();
       setStatus(localizeConflict(conflict), { error: true });
       updateCalc(null, span);
@@ -198,17 +208,21 @@ export function createTimelapseEditor({
     else {
       updateCalc(validated, span);
       applyBtn.disabled = !available || pending;
-      if (validated.speed > 16) setStatus(messages.previewApprox || "", { error: false });
+      if (conflict === CONFIRM_REPLACE_RAMP) {
+        setStatus(localizeConflict(conflict), { error: false });
+      } else if (validated.speed > 16) {
+        setStatus(messages.previewApprox || "", { error: false });
+      }
     }
   }
 
   async function apply() {
     const clip = getSelection();
     if (!clip || pending) return;
-    const conflict = conflictFor(clip);
-    if (conflict) {
+    const hardConflict = conflictFor(clip);
+    if (isHardTimelapseConflict(hardConflict)) {
       clearValidated();
-      setStatus(localizeConflict(conflict), { error: true });
+      setStatus(localizeConflict(hardConflict), { error: true });
       return;
     }
     const { start, end } = currentBounds(clip);
@@ -217,6 +231,26 @@ export function createTimelapseEditor({
       setStatus(messages.stale || "Source range changed. Re-enter Timelapse values.", {
         error: true,
       });
+      return;
+    }
+    const needsReplaceConfirm = hardConflict === CONFIRM_REPLACE_RAMP;
+    if (needsReplaceConfirm) {
+      const ok = askConfirm(
+        messages.replaceConfirm || "Applying Timelapse replaces the existing speed ramp. Continue?"
+      );
+      if (!ok) {
+        // Cancel preserves the original ramp and the validated draft.
+        setStatus(localizeConflict(CONFIRM_REPLACE_RAMP), { error: false });
+        return;
+      }
+    }
+    // Re-check after the confirm dialog: a concurrent edit must not mutate.
+    const afterConfirm = conflictFor(clip, {
+      replaceConfirmed: needsReplaceConfirm,
+    });
+    if (isHardTimelapseConflict(afterConfirm)) {
+      clearValidated();
+      setStatus(localizeConflict(afterConfirm), { error: true });
       return;
     }
     const draft = validated;
@@ -234,6 +268,7 @@ export function createTimelapseEditor({
       el.disabled = true;
     });
     const appliedKey = draft.key;
+    let applied = false;
     try {
       // Re-check immediately before save so a concurrent trim cannot mutate.
       const live = currentBounds(clip);
@@ -254,6 +289,7 @@ export function createTimelapseEditor({
       await save(clip, payload);
       clearValidated();
       setStatus(messages.applied || "");
+      applied = true;
     } catch (error) {
       // Keep the last validated draft so a failed save does not look applied.
       onError(error);
@@ -263,7 +299,15 @@ export function createTimelapseEditor({
       panel.querySelectorAll("button,input").forEach((el) => {
         el.disabled = false;
       });
-      fill();
+      if (applied) {
+        // Keep the success status; do not immediately re-sync into a replace notice.
+        const available = clip.dataset.available === "1";
+        targetInput.disabled = !available;
+        speedInput.disabled = !available;
+        applyBtn.disabled = true;
+      } else {
+        fill();
+      }
     }
   }
 
