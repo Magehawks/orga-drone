@@ -17,7 +17,7 @@ is not acceptance.
 | #273 | Secure pairing | BLOCKED | — | Production pairing not started | Security-architecture approval before production implementation. Bounded spike is the only allowed step. | Do not implement production pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
 | #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions (SFX in this checkpoint's PR). |
-| #281 | Shared audio/overlay actions | IN_PROGRESS | music + `clip.audio.edit` + `clip.overlays.edit` on develop; SFX commands in the current branch | Music/clip-audio/overlay API tests exist. SFX had UI routes only. Packaged Windows artifact check NOT_RUN. | Packaged export evidence | Land SFX project actions, then exported artifact check. |
+| #281 | Shared audio/overlay actions | IN_PROGRESS | #397 open (`414b2ae`) | Music, clip audio, and overlays were already on develop. SFX append/update/remove now share those routes' database methods and Story undo. 48 focused tests passed. Packaged Windows artifact check NOT_RUN. | PO merge of #397; packaged export evidence | Do not close #281. |
 | #283 | Real drone footage fixtures | READY | — | Opt-in local media only; nothing committed | — | Privacy-safe manifest, no source media in git. |
 | #284 | Parallel development and release gates | READY | — | — | — | After packaged E2E evidence. |
 | #293 | Open Media Journey acceptance | VERIFY | #387 merged | API + synthetic evidence. Packaged EXE journey NOT_RUN. | Packaged dispatch | Do not close on unit tests. |
@@ -26,7 +26,7 @@ is not acceptance.
 | #297 | Local object removal | READY | — | Research/feasibility unless the issue text is an implementation | — | Read acceptance before any code. |
 | #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
-| #300 | Portrait auto-reframing | READY | — | — | — | Read acceptance; reuse framing, no new engine. |
+| #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
 | #301 | Drone-friendly transitions | VERIFY | #390 discovery merged | Discovery GO for blur dissolve + soft directional wipe. Luma wipe and zoom/spin are NO-GO for V1. ADR 0010 still says wipes stay Later. | ADR 0010 amendment or an explicit implementation approval before shipping new types | Do not ship transitions against ADR 0010. |
 | #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
@@ -41,6 +41,7 @@ is not acceptance.
 ## Open pull requests
 
 - #396 `feat/184-sfx-waveform` at `7242d96`. CI success, mergeable. Does not close #184. Packaged Windows E2E NOT_RUN. Do not merge without PO authorization.
+- #397 `feat/281-sfx-actions` at `414b2ae`. SFX project actions. Focused tests 48 passed; ruff and mypy passed. Packaged Windows E2E NOT_RUN. Does not close #281.
 
 ## Worktrees
 
@@ -65,4 +66,4 @@ is not acceptance.
 
 ## Exact next task
 
-Finish and open the SFX Control API PR from `feat/281-sfx-actions`. Then continue the next READY issue that does not wait on #396 or the approvals above (#295 audit, or #300/#297 after reading their acceptance). Do not build the Windows package until #396 is merged if the package is supposed to include waveforms.
+Read #297's research acceptance and deliver only that approved local, non-generative outcome. Do not start object removal, portrait following, or new transitions while those issues are research, Later, or blocked by ADR 0010. Do not build the Windows package until #396 is merged if the package is supposed to include waveforms.
