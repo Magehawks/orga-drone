@@ -31,6 +31,8 @@ import {
   audibleSfxDurationS,
   applySfxPayload,
   renderSfxClips,
+  sfxAfterDrag,
+  sfxClipStyle,
 } from "./studio/sfx-lane.js";
 import {
   createTimedSelection,
@@ -7734,7 +7736,97 @@ import {
       pxPerSecond: Math.max(pps, 1),
       selectedId: state.selected.type === "sfx" ? state.selected.id : null,
       emptyLabel: msgSfxEmpty,
+      keyHint: trackEl?.dataset.sfxKeys || "",
       onSelect: (id) => selectSfx(id),
+      onPointerDown: (event, clip) => onSfxPointerDown(event, clip),
+      onKeyDown: (event, clip) => onSfxKeyDown(event, clip),
+    });
+  }
+
+  function sfxDragMode(event) {
+    const edge = event.target.closest ? event.target.closest(".studio-sfx-edge") : null;
+    if (edge && edge.classList.contains("studio-sfx-edge-in")) return "start";
+    if (edge && edge.classList.contains("studio-sfx-edge-out")) return "end";
+    return "move";
+  }
+
+  function onSfxPointerDown(event, clip) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const mode = sfxDragMode(event);
+    const origin = clip;
+    const startX = event.clientX;
+    selectSfx(clip.id);
+    const el = document.querySelector(
+      `.studio-sfx-clip[data-sfx-id="${CSS.escape(String(clip.id))}"]`
+    );
+    if (!el) return;
+    const pps = timelinePxPerSecond() || 1;
+    const move = (ev) => {
+      const draft = sfxAfterDrag(origin, {
+        mode,
+        deltaStory: (ev.clientX - startX) / pps,
+      });
+      if (!draft) return;
+      const style = sfxClipStyle({ ...origin, ...draft }, pps);
+      el.style.left = style.left;
+      el.style.width = style.width;
+      el.dataset.draftSfx = JSON.stringify(draft);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      const raw = el.dataset.draftSfx;
+      delete el.dataset.draftSfx;
+      if (!raw) return;
+      let draft = null;
+      try {
+        draft = JSON.parse(raw);
+      } catch (_) {
+        draft = null;
+      }
+      if (!draft) return;
+      if (
+        Math.abs(draft.start_s - (Number(origin.start_s) || 0)) < 0.001 &&
+        Math.abs(draft.source_in_s - (Number(origin.source_in_s) || 0)) < 0.001 &&
+        Math.abs(draft.source_out_s - (Number(origin.source_out_s) || 0)) < 0.001
+      ) {
+        return;
+      }
+      void patchSelectedSfx(draft);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  function onSfxKeyDown(event, clip) {
+    if (event.ctrlKey || event.metaKey || (event.altKey && event.shiftKey)) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const mode = event.altKey ? "start" : event.shiftKey ? "end" : "move";
+    const draft = sfxAfterDrag(clip, {
+      mode,
+      deltaStory: (event.key === "ArrowRight" ? 1 : -1) * 0.1,
+    });
+    if (!draft) return;
+    if (
+      Math.abs(draft.start_s - (Number(clip.start_s) || 0)) < 0.001 &&
+      Math.abs(draft.source_in_s - (Number(clip.source_in_s) || 0)) < 0.001 &&
+      Math.abs(draft.source_out_s - (Number(clip.source_out_s) || 0)) < 0.001
+    ) {
+      return;
+    }
+    if (state.selected.type !== "sfx" || String(state.selected.id) !== String(clip.id)) {
+      selectSfx(clip.id);
+    }
+    void patchSelectedSfx(draft).then(() => {
+      document
+        .querySelector(`.studio-sfx-clip[data-sfx-id="${CSS.escape(String(clip.id))}"]`)
+        ?.focus();
     });
   }
 

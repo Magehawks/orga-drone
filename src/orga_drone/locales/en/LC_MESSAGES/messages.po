@@ -913,6 +913,9 @@ msgstr "This story already has 16 sound effects."
 msgid "No sound effects yet"
 msgstr "No sound effects yet"
 
+msgid "Arrow keys move a sound effect. Shift+arrows resize its end. Alt+arrows resize its start."
+msgstr "Arrow keys move a sound effect. Shift+arrows resize its end. Alt+arrows resize its start."
+
 msgid "Choosing a sound effect needs the desktop app."
 msgstr "Choosing a sound effect needs the desktop app."
 
