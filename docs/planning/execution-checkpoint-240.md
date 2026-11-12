@@ -15,7 +15,7 @@ is not acceptance.
 | #184 | Independent SFX timeline | VERIFY | #391, #395, #396 merged (`1c929bd`) | Local onefolder WebView2 run PASS: two SFX clips, music, painted waveforms, drag to 1.97 s, keyboard trim, undo/redo, reopen, export audio peak 0.412. Evidence `docs/planning/184-local-packaged-e2e.json`. GitHub ZIP admission NOT_RUN (that workflow runs on PRs to `main`). | PO acceptance | Do not close #184 on the local run alone. |
 | #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets, manual keys, LUT strength fade, undo/persistence exist. WebView2 start/mid/end vs MP4 with a user `.cube`, ease-in-out, and highlights/shadows/blacks are not evidenced. | Full frame-parity E2E | Do not claim #211 done. Next slice needs a bounded parity gap, not a second engine. |
 | #267 | Packaged Windows E2E | VERIFY | local onefolder from `f4e688a` | Same run as #184. Isolated data dir. Not the GitHub admission artifact. | ZIP admission on a PR to `main` | Do not publish. |
-| #273 | Secure pairing | READY | — | Bounded security spike approved. Preferred design: per-connection credentials, DPAPI, user approval, revocation. Production pairing still needs a reviewed contract. | Production implementation | Write the threat-model spike. Do not ship pairing. |
+| #273 | Secure pairing | VERIFY | this spike | Threat model only. Today's key is caller-supplied and kept as an in-memory digest. Same-user processes can still read a DPAPI blob. Production pairing is not implemented. | A reviewed contract before any pairing change | Do not ship pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
 | #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions (SFX in this checkpoint's PR). |
 | #281 | Shared audio/overlay actions | VERIFY | #397 merged `f4e688a` | Packaged WebView2 journey set one SFX volume to 0.35 through `sfx.update` and the export still decoded. Clip audio and overlay artifact checks beyond that command are not in this run. | PO acceptance | Do not close #281 yet. |
@@ -63,4 +63,4 @@ is not acceptance.
 
 ## Exact next task
 
-Amend ADR 0010 and implement blur dissolve plus one soft directional wipe on a branch from `f4e688a`, with preview, export, persistence, and timing tests. In parallel, the #298 feasibility spike can proceed without waiting for #398 or #399. Do not enable canonical grade writes.
+#273 threat model is in this branch. Production pairing stays unimplemented. Same-user processes remain inside the trust boundary. Do not enable canonical grade writes.
