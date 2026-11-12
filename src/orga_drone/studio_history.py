@@ -1,9 +1,9 @@
 """In-memory Undo/Redo for the open Studio story.
 
-The stack keeps snapshots of ``studio_clips`` plus the project-level soundtrack
-start for one project. It is not written to SQLite and is empty when the process
-starts. Undo restores those Story values. It does not touch media files,
-library rows, albums, or other projects.
+The stack keeps snapshots of ``studio_clips``, the project-level soundtrack
+start, and SFX lane rows for one project. It is not written to SQLite and is
+empty when the process starts. Undo restores those Story values. It does not
+touch media files, library rows, albums, music playlist rows, or other projects.
 
 A slider gesture sends the same ``X-Studio-History-Group`` on each save.
 Those saves share one step, taken from the state before the gesture. A later
@@ -51,12 +51,32 @@ _CLIP_COLUMNS: tuple[str, ...] = (
 )
 
 ClipSnapshot = tuple[tuple[Any, ...], ...]
+SfxSnapshot = tuple[tuple[Any, ...], ...]
+
+_SFX_COLUMNS: tuple[str, ...] = (
+    "id",
+    "project_id",
+    "lane",
+    "position",
+    "file_path",
+    "display_name",
+    "volume",
+    "fade_in_s",
+    "fade_out_s",
+    "loop",
+    "duration_s",
+    "start_s",
+    "source_in_s",
+    "source_out_s",
+    "added_at",
+)
 
 
 @dataclass(frozen=True)
 class Snapshot:
     clips: ClipSnapshot
     music_start_s: float
+    sfx: SfxSnapshot = ()
 
 _lock = threading.RLock()
 _revision = 0
@@ -136,11 +156,20 @@ def _capture_story(conn: sqlite3.Connection, project_id: int) -> Snapshot:
         "SELECT music_start_s FROM studio_projects WHERE id = ?",
         (project_id,),
     ).fetchone()
+    sfx_columns = ", ".join(_SFX_COLUMNS)
+    sfx_rows = conn.execute(
+        f"""SELECT {sfx_columns}
+                FROM studio_audio_clips
+                WHERE project_id = ? AND lane = 'sfx'
+                ORDER BY start_s ASC, position ASC, id ASC""",
+        (project_id,),
+    ).fetchall()
     return Snapshot(
         clips=tuple(tuple(row[name] for name in _CLIP_COLUMNS) for row in rows),
         music_start_s=(
             float(project["music_start_s"] or 0.0) if project is not None else 0.0
         ),
+        sfx=tuple(tuple(row[name] for name in _SFX_COLUMNS) for row in sfx_rows),
     )
 
 
@@ -193,6 +222,61 @@ def restore_story(db: Database, project_id: int, snapshot: Snapshot, *, connecti
                WHERE id = ?""",
             (snapshot.music_start_s, now, project_id),
         )
+        _restore_sfx(conn, project_id, snapshot.sfx, now=now)
+
+
+def _restore_sfx(
+    conn: sqlite3.Connection,
+    project_id: int,
+    sfx: SfxSnapshot,
+    *,
+    now: str,
+) -> None:
+    keep_ids = [int(row[0]) for row in sfx]
+    if keep_ids:
+        placeholders = ",".join("?" for _ in keep_ids)
+        conn.execute(
+            f"""DELETE FROM studio_audio_clips
+                WHERE project_id = ? AND lane = 'sfx' AND id NOT IN ({placeholders})""",
+            (project_id, *keep_ids),
+        )
+    else:
+        conn.execute(
+            """DELETE FROM studio_audio_clips
+               WHERE project_id = ? AND lane = 'sfx'""",
+            (project_id,),
+        )
+    existing = {
+        int(row["id"])
+        for row in conn.execute(
+            """SELECT id FROM studio_audio_clips
+               WHERE project_id = ? AND lane = 'sfx'""",
+            (project_id,),
+        ).fetchall()
+    }
+    assignments = ", ".join(
+        f"{name} = ?" for name in _SFX_COLUMNS if name not in {"id", "project_id"}
+    )
+    insert_columns = ", ".join(_SFX_COLUMNS)
+    insert_values = ", ".join("?" for _ in _SFX_COLUMNS)
+    for row in sfx:
+        if int(row[0]) in existing:
+            conn.execute(
+                f"""UPDATE studio_audio_clips
+                    SET {assignments}
+                    WHERE id = ? AND project_id = ? AND lane = 'sfx'""",
+                (*row[2:], row[0], project_id),
+            )
+        else:
+            conn.execute(
+                f"""INSERT INTO studio_audio_clips ({insert_columns})
+                    VALUES ({insert_values})""",
+                row,
+            )
+    conn.execute(
+        "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+        (now, project_id),
+    )
 
 
 @contextmanager

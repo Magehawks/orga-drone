@@ -26,6 +26,7 @@ from orga_drone.export.studio_config import (
     StudioExportClip,
     StudioExportConfig,
     StudioExportMusic,
+    StudioExportSfx,
 )
 from orga_drone.export.studio_encoder import (
     ProgressCallback,
@@ -784,6 +785,30 @@ def prepare_studio_export(
             )
         )
 
+    from orga_drone.studio_sfx import resolve_sfx_trim
+
+    sfx_rows = db.list_studio_sfx(project.id)
+    sfx_tracks: list[StudioExportSfx] = []
+    for sfx_row in sfx_rows:
+        sfx_path = Path(sfx_row.file_path)
+        duration_s = require_readable_music(sfx_path)
+        source_in, source_out = resolve_sfx_trim(
+            duration_s=duration_s,
+            source_in_s=sfx_row.source_in_s,
+            source_out_s=sfx_row.source_out_s,
+        )
+        sfx_tracks.append(
+            StudioExportSfx(
+                source_path=sfx_path,
+                start_s=float(sfx_row.start_s),
+                source_in_s=source_in,
+                source_out_s=source_out,
+                volume=float(sfx_row.volume),
+                fade_in_s=float(sfx_row.fade_in_s),
+                fade_out_s=float(sfx_row.fade_out_s),
+            )
+        )
+
     set_last_export_quality(chosen_quality)
     return StudioExportConfig(
         output_path=dest,
@@ -794,6 +819,7 @@ def prepare_studio_export(
         project_title=project.title,
         music_tracks=tuple(music_tracks),
         music_start_s=project.music_start_s,
+        sfx_tracks=tuple(sfx_tracks),
         protected_identities=protected_identities,
         protected_paths=protected_path_strs,
     )

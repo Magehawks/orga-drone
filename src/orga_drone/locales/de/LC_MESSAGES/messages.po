@@ -870,3 +870,39 @@ msgstr "Loop-Wiedergabe; HSL-Vorschau erscheint bei Pause"
 
 msgid "Playing looped; color grading preview appears on pause"
 msgstr "Loop-Wiedergabe; Farbkorrektur-Vorschau erscheint bei Pause"
+
+msgid "Add sound effect"
+msgstr "Soundeffekt hinzufügen"
+
+msgid "SFX"
+msgstr "SFX"
+
+msgid "Sound effects"
+msgstr "Soundeffekte"
+
+msgid "Sound effect"
+msgstr "Soundeffekt"
+
+msgid "Start on Story (s)"
+msgstr "Start in der Story (s)"
+
+msgid "Source in (s)"
+msgstr "Quelle ein (s)"
+
+msgid "Source out (s)"
+msgstr "Quelle aus (s)"
+
+msgid "Could not save sound-effect settings."
+msgstr "Soundeffekt-Einstellungen konnten nicht gespeichert werden."
+
+msgid "This story already has 16 sound effects."
+msgstr "Diese Story hat bereits 16 Soundeffekte."
+
+msgid "No sound effects yet"
+msgstr "Noch keine Soundeffekte"
+
+msgid "Choosing a sound effect needs the desktop app."
+msgstr "Soundeffekte auswählen erfordert die Desktop-App."
+
+msgid "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."
+msgstr "SFX-Clips liegen frei auf der Story-Zeit und mischen mit Musik. Laute Stapel können clippen — Lautstärke senken. Quelldateien bleiben unverändert."

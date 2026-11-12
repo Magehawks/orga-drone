@@ -1593,6 +1593,17 @@ class FfmpegStudioEncoder:
                 mixed = tmp_dir / "export_mixed.mp4"
                 self._mix_music(ffmpeg, tmp_out, mixed, config)
                 tmp_out = mixed
+            if config.sfx_tracks:
+                _emit(
+                    on_progress,
+                    phase="mixing",
+                    clip_index=clip_total,
+                    clip_total=clip_total,
+                    current_label=config.sfx_tracks[0].source_path.name,
+                )
+                mixed_sfx = tmp_dir / "export_mixed_sfx.mp4"
+                self._mix_sfx(ffmpeg, tmp_out, mixed_sfx, config)
+                tmp_out = mixed_sfx
             if not tmp_out.is_file() or tmp_out.stat().st_size <= 0:
                 raise StudioExportError("Export failed: empty output.")
             _raise_if_cancelled()
@@ -2365,6 +2376,66 @@ class FfmpegStudioEncoder:
             )
             for music in tracks:
                 cmd.extend(["-i", str(music.source_path)])
+        cmd.extend(
+            [
+                "-filter_complex",
+                filter_complex,
+                "-map",
+                "0:v:0",
+                "-map",
+                "[a]",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "-movflags",
+                "+faststart",
+                str(out),
+            ]
+        )
+        _run_ffmpeg(cmd)
+
+    def _mix_sfx(
+        self,
+        ffmpeg: str,
+        concat_path: Path,
+        out: Path,
+        config: StudioExportConfig,
+    ) -> None:
+        from orga_drone.export.music_mix import (
+            build_sfx_overlay_filter,
+            require_readable_music,
+        )
+
+        tracks = config.sfx_tracks
+        if not tracks:
+            raise StudioExportError("SFX mix requested without SFX tracks.")
+        story_s = _export_story_length_s(config.clips)
+        if story_s <= 0:
+            raise StudioExportError("Studio project has no exportable duration.")
+        clip_payload: list[dict[str, float]] = []
+        cmd: list[str] = [ffmpeg, "-y", "-i", str(concat_path)]
+        for track in tracks:
+            require_readable_music(track.source_path)
+            cmd.extend(["-i", str(track.source_path)])
+            clip_payload.append(
+                {
+                    "start_s": float(track.start_s),
+                    "source_in_s": float(track.source_in_s),
+                    "source_out_s": float(track.source_out_s),
+                    "volume": float(track.volume),
+                    "fade_in_s": float(track.fade_in_s),
+                    "fade_out_s": float(track.fade_out_s),
+                }
+            )
+        filter_complex = build_sfx_overlay_filter(
+            story_s=story_s,
+            clips=clip_payload,
+        )
         cmd.extend(
             [
                 "-filter_complex",

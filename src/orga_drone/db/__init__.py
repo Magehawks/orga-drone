@@ -216,6 +216,9 @@ CREATE TABLE IF NOT EXISTS studio_audio_clips (
     loop INTEGER NOT NULL DEFAULT 0
         CHECK (loop IN (0, 1)),
     duration_s REAL,
+    start_s REAL NOT NULL DEFAULT 0.0,
+    source_in_s REAL,
+    source_out_s REAL,
     added_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_studio_audio_clips_project
@@ -390,11 +393,13 @@ STUDIO_LAST_OPENED_KEY = "studio_last_opened_project_id"
 STUDIO_MUSIC_MAX_TRACKS = 8
 STUDIO_MUSIC_LANE = "music"
 STUDIO_MUSIC_START_MAX_S = 86400.0
+STUDIO_SFX_LANE = "sfx"
+STUDIO_SFX_MAX_CLIPS = 16
 
 
 @dataclass
 class StudioAudioClip:
-    """One soundtrack reference in a Studio project playlist (never copies the file)."""
+    """One soundtrack or SFX reference in a Studio project (never copies the file)."""
 
     id: int
     project_id: int
@@ -408,6 +413,10 @@ class StudioAudioClip:
     loop: bool
     added_at: str
     duration_s: float | None = None
+    # SFX-only Story placement / source trim (music ignores defaults).
+    start_s: float = 0.0
+    source_in_s: float | None = None
+    source_out_s: float | None = None
 
 
 @dataclass
@@ -1039,6 +1048,9 @@ class Database:
                 loop INTEGER NOT NULL DEFAULT 0
                     CHECK (loop IN (0, 1)),
                 duration_s REAL,
+                start_s REAL NOT NULL DEFAULT 0.0,
+                source_in_s REAL,
+                source_out_s REAL,
                 added_at TEXT NOT NULL
             )"""
         )
@@ -1052,6 +1064,14 @@ class Database:
         }
         if "duration_s" not in cols:
             conn.execute("ALTER TABLE studio_audio_clips ADD COLUMN duration_s REAL")
+        if "start_s" not in cols:
+            conn.execute(
+                "ALTER TABLE studio_audio_clips ADD COLUMN start_s REAL NOT NULL DEFAULT 0.0"
+            )
+        if "source_in_s" not in cols:
+            conn.execute("ALTER TABLE studio_audio_clips ADD COLUMN source_in_s REAL")
+        if "source_out_s" not in cols:
+            conn.execute("ALTER TABLE studio_audio_clips ADD COLUMN source_out_s REAL")
 
     @staticmethod
     def _migrate_albums(conn: sqlite3.Connection) -> None:
@@ -2318,8 +2338,12 @@ class Database:
             return True
 
     def _audio_clip_from_row(self, row: sqlite3.Row) -> StudioAudioClip:
-        raw_duration = row["duration_s"] if "duration_s" in row.keys() else None
+        keys = row.keys()
+        raw_duration = row["duration_s"] if "duration_s" in keys else None
         duration_s = float(raw_duration) if raw_duration is not None else None
+        raw_start = row["start_s"] if "start_s" in keys else 0.0
+        raw_in = row["source_in_s"] if "source_in_s" in keys else None
+        raw_out = row["source_out_s"] if "source_out_s" in keys else None
         return StudioAudioClip(
             id=int(row["id"]),
             project_id=int(row["project_id"]),
@@ -2333,6 +2357,9 @@ class Database:
             loop=bool(int(row["loop"])),
             added_at=str(row["added_at"]),
             duration_s=duration_s,
+            start_s=float(raw_start or 0.0),
+            source_in_s=float(raw_in) if raw_in is not None else None,
+            source_out_s=float(raw_out) if raw_out is not None else None,
         )
 
     def _probe_music_duration_s(self, file_path: str) -> float | None:
@@ -2586,7 +2613,223 @@ class Database:
                 "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
                 (now, project_id),
             )
-        return [clip.id for clip in self.list_studio_music(project_id)]
+            return [clip.id for clip in self.list_studio_music(project_id)]
+
+    def list_studio_sfx(
+        self, project_id: int, *, connection: sqlite3.Connection | None = None
+    ) -> list[StudioAudioClip]:
+        with (nullcontext(connection) if connection is not None else self.connect()) as conn:
+            rows = conn.execute(
+                """SELECT id, project_id, lane, position, file_path, display_name,
+                          volume, fade_in_s, fade_out_s, loop, duration_s,
+                          start_s, source_in_s, source_out_s, added_at
+                   FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = ?
+                   ORDER BY start_s ASC, position ASC, id ASC""",
+                (project_id, STUDIO_SFX_LANE),
+            ).fetchall()
+        return [self._audio_clip_from_row(row) for row in rows]
+
+    def get_studio_sfx_clip(
+        self, project_id: int, clip_id: int
+    ) -> StudioAudioClip | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, project_id, lane, position, file_path, display_name,
+                          volume, fade_in_s, fade_out_s, loop, duration_s,
+                          start_s, source_in_s, source_out_s, added_at
+                   FROM studio_audio_clips
+                   WHERE project_id = ? AND id = ? AND lane = ?""",
+                (project_id, clip_id, STUDIO_SFX_LANE),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._audio_clip_from_row(row)
+
+    def append_studio_sfx(
+        self,
+        project_id: int,
+        file_path: str,
+        *,
+        start_s: float = 0.0,
+        source_in_s: float | None = None,
+        source_out_s: float | None = None,
+        volume: float = 0.8,
+        fade_in_s: float = 0.0,
+        fade_out_s: float = 0.0,
+    ) -> StudioAudioClip:
+        """Insert a freely placed SFX clip. Never copies the file."""
+        from orga_drone.studio_sfx import (
+            clamp_sfx_fade_s,
+            clamp_sfx_start_s,
+            clamp_sfx_volume,
+            resolve_sfx_trim,
+        )
+
+        dest = Path(file_path)
+        display = dest.name
+        now = datetime.now().isoformat(timespec="seconds")
+        duration_s = self._probe_music_duration_s(str(dest))
+        start = clamp_sfx_start_s(start_s)
+        trim_in, trim_out = resolve_sfx_trim(
+            duration_s=duration_s,
+            source_in_s=source_in_s,
+            source_out_s=source_out_s,
+        )
+        vol = clamp_sfx_volume(volume)
+        fade_in = clamp_sfx_fade_s(fade_in_s)
+        fade_out = clamp_sfx_fade_s(fade_out_s)
+        with self.connect() as conn:
+            project = conn.execute(
+                "SELECT id FROM studio_projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+            if project is None:
+                raise ValueError("studio project not found")
+            count_row = conn.execute(
+                """SELECT COUNT(*) AS n FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = ?""",
+                (project_id, STUDIO_SFX_LANE),
+            ).fetchone()
+            count = int(count_row["n"]) if count_row is not None else 0
+            if count >= STUDIO_SFX_MAX_CLIPS:
+                raise ValueError("sfx_limit")
+            cur = conn.execute(
+                """INSERT INTO studio_audio_clips(
+                       project_id, lane, position, file_path, display_name,
+                       volume, fade_in_s, fade_out_s, loop, duration_s,
+                       start_s, source_in_s, source_out_s, added_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)""",
+                (
+                    project_id,
+                    STUDIO_SFX_LANE,
+                    count,
+                    str(dest),
+                    display,
+                    vol,
+                    fade_in,
+                    fade_out,
+                    duration_s,
+                    start,
+                    trim_in,
+                    trim_out,
+                    now,
+                ),
+            )
+            clip_id = int(cur.lastrowid or 0)
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        clip = self.get_studio_sfx_clip(project_id, clip_id)
+        assert clip is not None
+        return clip
+
+    def patch_studio_sfx_clip(
+        self,
+        project_id: int,
+        clip_id: int,
+        *,
+        volume: float | None = None,
+        fade_in_s: float | None = None,
+        fade_out_s: float | None = None,
+        start_s: float | None = None,
+        source_in_s: float | None = None,
+        source_out_s: float | None = None,
+        file_path: str | None = None,
+    ) -> StudioAudioClip:
+        from orga_drone.studio_sfx import (
+            clamp_sfx_fade_s,
+            clamp_sfx_start_s,
+            clamp_sfx_volume,
+            resolve_sfx_trim,
+        )
+
+        current = self.get_studio_sfx_clip(project_id, clip_id)
+        if current is None:
+            raise ValueError("studio sfx not found")
+        next_path = current.file_path
+        next_name = current.display_name
+        next_duration = current.duration_s
+        if file_path is not None:
+            dest = Path(file_path)
+            next_path = str(dest)
+            next_name = dest.name
+            next_duration = self._probe_music_duration_s(next_path)
+        next_volume = current.volume if volume is None else clamp_sfx_volume(volume)
+        next_fade_in = (
+            current.fade_in_s if fade_in_s is None else clamp_sfx_fade_s(fade_in_s)
+        )
+        next_fade_out = (
+            current.fade_out_s if fade_out_s is None else clamp_sfx_fade_s(fade_out_s)
+        )
+        next_start = current.start_s if start_s is None else clamp_sfx_start_s(start_s)
+        want_in = current.source_in_s if source_in_s is None else source_in_s
+        want_out = current.source_out_s if source_out_s is None else source_out_s
+        trim_in, trim_out = resolve_sfx_trim(
+            duration_s=next_duration,
+            source_in_s=want_in,
+            source_out_s=want_out,
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE studio_audio_clips
+                   SET volume = ?, fade_in_s = ?, fade_out_s = ?,
+                       file_path = ?, display_name = ?, duration_s = ?,
+                       start_s = ?, source_in_s = ?, source_out_s = ?
+                   WHERE id = ? AND project_id = ? AND lane = ?""",
+                (
+                    next_volume,
+                    next_fade_in,
+                    next_fade_out,
+                    next_path,
+                    next_name,
+                    next_duration,
+                    next_start,
+                    trim_in,
+                    trim_out,
+                    clip_id,
+                    project_id,
+                    STUDIO_SFX_LANE,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        clip = self.get_studio_sfx_clip(project_id, clip_id)
+        assert clip is not None
+        return clip
+
+    def delete_studio_sfx_clip(self, project_id: int, clip_id: int) -> bool:
+        """Drop one SFX reference. Never deletes the audio file on disk."""
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            cur = conn.execute(
+                """DELETE FROM studio_audio_clips
+                   WHERE project_id = ? AND id = ? AND lane = ?""",
+                (project_id, clip_id, STUDIO_SFX_LANE),
+            )
+            if cur.rowcount == 0:
+                return False
+            rows = conn.execute(
+                """SELECT id FROM studio_audio_clips
+                   WHERE project_id = ? AND lane = ?
+                   ORDER BY start_s ASC, position ASC, id ASC""",
+                (project_id, STUDIO_SFX_LANE),
+            ).fetchall()
+            for position, row in enumerate(rows):
+                conn.execute(
+                    """UPDATE studio_audio_clips SET position = ?
+                       WHERE id = ? AND project_id = ?""",
+                    (position, int(row["id"]), project_id),
+                )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+            return True
 
     def add_studio_item(
         self,

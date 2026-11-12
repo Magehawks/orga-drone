@@ -3502,6 +3502,56 @@ html.is-edge-drag * {
   position: relative;
   min-height: 2.35rem;
 }
+.studio-track-sfx {
+  display: block;
+  position: relative;
+  min-height: 2.1rem;
+  margin-top: 0.2rem;
+}
+.studio-sfx-body,
+.studio-sfx-clips {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 2.1rem;
+  height: 2.1rem;
+}
+.studio-sfx-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+.studio-sfx-clip {
+  position: absolute;
+  top: 0.15rem;
+  bottom: 0.15rem;
+  display: flex;
+  align-items: center;
+  min-width: 8px;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, #2f9e8f 18%, var(--panel));
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+.studio-sfx-clip.is-selected,
+.studio-track-sfx.is-selected .studio-sfx-clip.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.studio-sfx-clip-label {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .studio-music-body {
   position: relative;
   display: block;

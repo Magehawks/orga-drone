@@ -870,3 +870,39 @@ msgstr "Playing looped; HSL preview appears on pause"
 
 msgid "Playing looped; color grading preview appears on pause"
 msgstr "Playing looped; color grading preview appears on pause"
+
+msgid "Add sound effect"
+msgstr "Add sound effect"
+
+msgid "SFX"
+msgstr "SFX"
+
+msgid "Sound effects"
+msgstr "Sound effects"
+
+msgid "Sound effect"
+msgstr "Sound effect"
+
+msgid "Start on Story (s)"
+msgstr "Start on Story (s)"
+
+msgid "Source in (s)"
+msgstr "Source in (s)"
+
+msgid "Source out (s)"
+msgstr "Source out (s)"
+
+msgid "Could not save sound-effect settings."
+msgstr "Could not save sound-effect settings."
+
+msgid "This story already has 16 sound effects."
+msgstr "This story already has 16 sound effects."
+
+msgid "No sound effects yet"
+msgstr "No sound effects yet"
+
+msgid "Choosing a sound effect needs the desktop app."
+msgstr "Choosing a sound effect needs the desktop app."
+
+msgid "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."
+msgstr "SFX clips sit freely on the Story clock and mix with music. Loud stacks can clip — lower the volume. Source files stay unchanged."

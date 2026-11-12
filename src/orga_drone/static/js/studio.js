@@ -27,6 +27,12 @@ import {
   shouldApplyMusicPlaylistResponse,
 } from "./studio/music-persist.js";
 import {
+  SFX_MAX_CLIPS,
+  audibleSfxDurationS,
+  applySfxPayload,
+  renderSfxClips,
+} from "./studio/sfx-lane.js";
+import {
   createTimedSelection,
   isActiveTimedSelection,
   isAudioTimedKind,
@@ -2435,6 +2441,7 @@ import {
     updatePlayheadChrome();
     updateZoomControls();
     layoutMusicSpans();
+    layoutSfxSpans();
     layoutEffectBars();
     layoutClipAudio();
   }
@@ -7679,6 +7686,166 @@ import {
   }
 
   const MUSIC_MAX_TRACKS = 8;
+  const sfxState = { clips: [] };
+  try {
+    applySfxPayload(sfxState, JSON.parse(root.dataset.sfxPayload || '{"clips":[]}'));
+  } catch (_) {
+    sfxState.clips = [];
+  }
+  const msgSfxFailed = root.dataset.sfxFailed || "Could not save sound-effect settings.";
+  const msgSfxLimit = root.dataset.sfxLimit || "This story already has 16 sound effects.";
+  const msgSfxEmpty = root.dataset.sfxEmpty || "No sound effects yet";
+  const msgSfxPickerUnavailable =
+    root.dataset.sfxPickerUnavailable || "Choosing a sound effect needs the desktop app.";
+
+  function selectedSfxClip() {
+    if (state.selected.type !== "sfx") return null;
+    return sfxState.clips.find((c) => String(c.id) === String(state.selected.id)) || null;
+  }
+
+  function layoutSfxSpans() {
+    const trackEl = document.getElementById("studio-sfx-track");
+    const clipsEl = document.getElementById("studio-sfx-clips");
+    if (trackEl) {
+      trackEl.classList.toggle("is-selected", state.selected.type === "sfx");
+    }
+    const pps =
+      totalDuration() > 0 ? timeToX(1) - timeToX(0) : timelinePxPerSecond();
+    renderSfxClips({
+      container: clipsEl,
+      clips: sfxState.clips,
+      pxPerSecond: Math.max(pps, 1),
+      selectedId: state.selected.type === "sfx" ? state.selected.id : null,
+      emptyLabel: msgSfxEmpty,
+      onSelect: (id) => selectSfx(id),
+    });
+  }
+
+  function fillSfxInspector(clip) {
+    const nameEl = document.querySelector("#inspector-sfx [data-field='sfx-name']");
+    if (nameEl) nameEl.textContent = clip.display_name || "SFX";
+    const startEl = document.getElementById("inspector-sfx-start");
+    const inEl = document.getElementById("inspector-sfx-source-in");
+    const outEl = document.getElementById("inspector-sfx-source-out");
+    const volEl = document.getElementById("inspector-sfx-volume");
+    const fadeInEl = document.getElementById("inspector-sfx-fade-in");
+    const fadeOutEl = document.getElementById("inspector-sfx-fade-out");
+    if (startEl) startEl.value = String(Number(clip.start_s) || 0);
+    if (inEl) inEl.value = String(Number(clip.source_in_s) || 0);
+    const fallbackOut =
+      Number(clip.source_out_s) ||
+      audibleSfxDurationS(clip) ||
+      Number(clip.duration_s) ||
+      0;
+    if (outEl) outEl.value = String(fallbackOut);
+    if (volEl) volEl.value = String(Math.round((Number(clip.volume) || 0) * 100));
+    if (fadeInEl) fadeInEl.value = String(Number(clip.fade_in_s) || 0);
+    if (fadeOutEl) fadeOutEl.value = String(Number(clip.fade_out_s) || 0);
+  }
+
+  function selectSfx(id) {
+    clearTimedSelection();
+    state.selected = { type: "sfx", id: String(id) };
+    const clip = selectedSfxClip();
+    if (!clip) {
+      showInspector("inspector-empty");
+      layoutSfxSpans();
+      return;
+    }
+    fillSfxInspector(clip);
+    showInspector("inspector-sfx");
+    layoutSfxSpans();
+    updateRemoveEnabled();
+  }
+
+  async function addSfxClip() {
+    if (!projectId) return;
+    if (sfxState.clips.length >= SFX_MAX_CLIPS) {
+      showFlash(msgSfxLimit);
+      return;
+    }
+    try {
+      const path = await pickMusicPath();
+      if (!path) return;
+      setSaveState(false);
+      const saved = await fetch(`/api/studio/projects/${projectId}/sfx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ path, start_s: state.projectTimeS || 0 }),
+      });
+      const body = await saved.json().catch(() => null);
+      if (!saved.ok || !body || !body.ok) {
+        if (body && body.detail === "sfx_limit") showFlash(msgSfxLimit);
+        else if (saved.status === 503) showFlash(msgSfxPickerUnavailable);
+        else showFlash(msgSfxFailed);
+        return;
+      }
+      applySfxPayload(sfxState, body);
+      layoutSfxSpans();
+      const last = sfxState.clips[sfxState.clips.length - 1];
+      if (last) selectSfx(last.id);
+      setSaveState(true);
+      syncHistoryButtons(true, false);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgSfxFailed);
+    }
+  }
+
+  async function patchSelectedSfx(fields) {
+    if (!projectId) return;
+    const clip = selectedSfxClip();
+    if (!clip) return;
+    try {
+      setSaveState(false);
+      const saved = await fetch(`/api/studio/projects/${projectId}/sfx/${clip.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(fields),
+      });
+      const body = await saved.json().catch(() => null);
+      if (!saved.ok || !body || !body.ok) {
+        showFlash(msgSfxFailed);
+        return;
+      }
+      applySfxPayload(sfxState, body);
+      layoutSfxSpans();
+      const next = selectedSfxClip();
+      if (next) fillSfxInspector(next);
+      setSaveState(true);
+      syncHistoryButtons(true, false);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgSfxFailed);
+    }
+  }
+
+  async function removeSelectedSfx() {
+    if (!projectId) return;
+    const clip = selectedSfxClip();
+    if (!clip) return;
+    try {
+      setSaveState(false);
+      const saved = await fetch(`/api/studio/projects/${projectId}/sfx/${clip.id}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const body = await saved.json().catch(() => null);
+      if (!saved.ok || !body || !body.ok) {
+        showFlash(msgSfxFailed);
+        return;
+      }
+      applySfxPayload(sfxState, body);
+      state.selected = { type: null, id: null };
+      showInspector("inspector-empty");
+      layoutSfxSpans();
+      setSaveState(true);
+      syncHistoryButtons(true, false);
+      showFlash("");
+    } catch (_) {
+      showFlash(msgSfxFailed);
+    }
+  }
 
   function musicFromPayload(payload) {
     if (!payload) return null;
@@ -8020,7 +8187,90 @@ import {
     return true;
   }
 
+  const sfxAudioPool = [];
+
+  function ensureSfxAudioSlot(index) {
+    while (sfxAudioPool.length <= index) {
+      const el = document.createElement("audio");
+      el.preload = "metadata";
+      el.hidden = true;
+      document.getElementById("studio-sfx-audio-pool")?.appendChild(el);
+      sfxAudioPool.push(el);
+    }
+    return sfxAudioPool[index];
+  }
+
+  function syncSfxAudio() {
+    const storyT = state.projectTimeS;
+    const master = Number.isFinite(state.volume) ? state.volume : 1;
+    sfxState.clips.forEach((clip, index) => {
+      const el = ensureSfxAudioSlot(index);
+      const start = Math.max(0, Number(clip.start_s) || 0);
+      const duration = audibleSfxDurationS(clip);
+      const sourceIn = Math.max(0, Number(clip.source_in_s) || 0);
+      const local = storyT - start;
+      const active =
+        !!clip.stream_url &&
+        duration > 0 &&
+        local >= -0.05 &&
+        local < duration;
+      if (!active) {
+        try {
+          el.pause();
+        } catch (_) {
+          /* ignore */
+        }
+        return;
+      }
+      if (el.dataset.sfxSrc !== String(clip.stream_url)) {
+        el.dataset.sfxSrc = String(clip.stream_url);
+        el.src = clip.stream_url;
+      }
+      const fadeIn = Math.max(0, Number(clip.fade_in_s) || 0);
+      const fadeOut = Math.max(0, Number(clip.fade_out_s) || 0);
+      let gain = 1;
+      if (fadeIn > 0 && local < fadeIn) gain = Math.max(0, local / fadeIn);
+      if (fadeOut > 0 && local > duration - fadeOut) {
+        gain = Math.min(gain, Math.max(0, (duration - local) / fadeOut));
+      }
+      el.volume = Math.max(
+        0,
+        Math.min(1, master * (Number(clip.volume) || 0) * gain)
+      );
+      const playPos = sourceIn + Math.max(0, local);
+      try {
+        if (Math.abs((el.currentTime || 0) - playPos) > 0.35) {
+          el.currentTime = playPos;
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      if (!state.playing) {
+        try {
+          el.pause();
+        } catch (_) {
+          /* ignore */
+        }
+        return;
+      }
+      const playPromise = el.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          /* autoplay / decode */
+        });
+      }
+    });
+    for (let i = sfxState.clips.length; i < sfxAudioPool.length; i += 1) {
+      try {
+        sfxAudioPool[i].pause();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
   function syncMusicAudio() {
+    syncSfxAudio();
     const hit = playlistHit(state.projectTimeS);
     if (!hit || !hit.track.streamUrl) {
       pauseMusicAudio();
@@ -8269,12 +8519,17 @@ import {
   }
 
   function showInspector(kind) {
-    ["inspector-empty", "inspector-clip", "inspector-transition", "inspector-music", "inspector-titlecard"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el) el.hidden = id !== kind;
-      }
-    );
+    [
+      "inspector-empty",
+      "inspector-clip",
+      "inspector-transition",
+      "inspector-music",
+      "inspector-sfx",
+      "inspector-titlecard",
+    ].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = id !== kind;
+    });
     if (kind === "inspector-empty") fillEmptyInspector();
   }
 
@@ -10772,6 +11027,31 @@ import {
   document.getElementById("studio-music-add")?.addEventListener("click", (event) => {
     event.stopPropagation();
     addMusicTrack();
+  });
+  document.getElementById("studio-sfx-add")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    addSfxClip();
+  });
+  const bindSfxField = (id, readValue) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const commit = () => {
+      const value = readValue(el);
+      if (value == null) return;
+      patchSelectedSfx(value);
+    };
+    el.addEventListener("change", commit);
+  };
+  bindSfxField("inspector-sfx-start", (el) => ({ start_s: Number(el.value) }));
+  bindSfxField("inspector-sfx-source-in", (el) => ({ source_in_s: Number(el.value) }));
+  bindSfxField("inspector-sfx-source-out", (el) => ({ source_out_s: Number(el.value) }));
+  bindSfxField("inspector-sfx-fade-in", (el) => ({ fade_in_s: Number(el.value) }));
+  bindSfxField("inspector-sfx-fade-out", (el) => ({ fade_out_s: Number(el.value) }));
+  document.getElementById("inspector-sfx-volume")?.addEventListener("change", (event) => {
+    patchSelectedSfx({ volume: Number(event.currentTarget.value) / 100 });
+  });
+  document.getElementById("inspector-sfx-remove")?.addEventListener("click", () => {
+    removeSelectedSfx();
   });
   const musicClipsEl = document.getElementById("studio-music-clips");
   musicClipsEl?.addEventListener("click", (event) => {

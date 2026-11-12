@@ -286,6 +286,75 @@ def probe_audio_duration_s(path: Path) -> float | None:
     return None
 
 
+def build_sfx_overlay_filter(
+    *,
+    story_s: float,
+    clips: list[dict[str, float]],
+) -> str:
+    """Overlay freely placed SFX inputs onto Story audio ``[0:a]``.
+
+    Each clip dict uses keys: ``start_s``, ``source_in_s``, ``source_out_s``,
+    ``volume``, ``fade_in_s``, ``fade_out_s``. Inputs are ``[1:a]``..``[N:a]``.
+    ``amix`` uses ``normalize=0`` — stacked loud beds can clip; lower volumes.
+    """
+    story = max(0.0, float(story_s))
+    if story <= 0 or not clips:
+        return "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
+    chains: list[str] = []
+    labels: list[str] = ["[src]"]
+    for index, clip in enumerate(clips):
+        start = max(0.0, float(clip.get("start_s") or 0.0))
+        source_in = max(0.0, float(clip.get("source_in_s") or 0.0))
+        source_out = max(source_in, float(clip.get("source_out_s") or source_in))
+        audible = source_out - source_in
+        if audible <= 0 or start >= story:
+            continue
+        # Truncate at Story end so delayed audio cannot extend the export.
+        remaining = max(0.0, story - start)
+        audible = min(audible, remaining)
+        if audible <= 0:
+            continue
+        volume = clamp_music_volume(
+            DEFAULT_MUSIC_VOLUME
+            if clip.get("volume") is None
+            else float(clip["volume"])
+        )
+        fade_in, fade_out = scaled_fades(
+            float(clip.get("fade_in_s") or 0.0),
+            float(clip.get("fade_out_s") or 0.0),
+            audible,
+        )
+        parts = [
+            f"[{index + 1}:a]aformat=sample_rates=48000:channel_layouts=stereo,"
+            f"volume={_fmt(volume)}",
+            f"atrim={_fmt(source_in)}:{_fmt(source_in + audible)}",
+            "asetpts=PTS-STARTPTS",
+        ]
+        if fade_in > 0:
+            parts.append(f"afade=t=in:st=0:d={_fmt(fade_in)}")
+        if fade_out > 0:
+            parts.append(
+                f"afade=t=out:st={_fmt(fade_out_start_s(audible, fade_out))}:"
+                f"d={_fmt(fade_out)}"
+            )
+        if start > 0:
+            parts.append(f"adelay={round(start * 1000)}:all=1")
+        label = f"sfx{index}"
+        chains.append(",".join(parts) + f"[{label}]")
+        labels.append(f"[{label}]")
+    if len(labels) == 1:
+        return "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
+    mix = (
+        f"{''.join(labels)}amix=inputs={len(labels)}:duration=first:"
+        "dropout_transition=0:normalize=0[a]"
+    )
+    return (
+        "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[src];"
+        + (f"{';'.join(chains)};" if chains else "")
+        + mix
+    )
+
+
 def require_readable_music(path: Path) -> float:
     """Validate music file for export. Returns duration seconds.
 

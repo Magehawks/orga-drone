@@ -761,6 +761,53 @@ def create_app() -> FastAPI:
             ]
         }
 
+    def _sfx_clip_client_payload(project_id: int, clip: Any) -> dict[str, Any]:
+        path = Path(clip.file_path)
+        available = path.is_file()
+        token = "0"
+        if available:
+            try:
+                st = path.stat()
+                token = hashlib.sha256(
+                    f"sfx:{clip.id}:{clip.file_path}:{int(st.st_mtime)}:{st.st_size}".encode()
+                ).hexdigest()[:16]
+            except OSError:
+                token = "0"
+        return {
+            "id": clip.id,
+            "position": clip.position,
+            "available": available,
+            "display_name": clip.display_name,
+            "volume": clip.volume,
+            "fade_in_s": clip.fade_in_s,
+            "fade_out_s": clip.fade_out_s,
+            "duration_s": clip.duration_s,
+            "start_s": clip.start_s,
+            "source_in_s": clip.source_in_s,
+            "source_out_s": clip.source_out_s,
+            "stream_url": (
+                f"/api/studio/projects/{project_id}/sfx/{clip.id}/stream?v={token}"
+                if available
+                else None
+            ),
+        }
+
+    def _sfx_tracks_client_payload(project_id: int) -> dict[str, Any]:
+        return {
+            "clips": [
+                _sfx_clip_client_payload(project_id, clip)
+                for clip in db.list_studio_sfx(project_id)
+            ]
+        }
+
+    def _raise_sfx_value_error(exc: ValueError) -> NoReturn:
+        msg = str(exc)
+        if msg == "sfx_limit":
+            raise HTTPException(status_code=409, detail="sfx_limit") from exc
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+
     def _studio_summary(project_id: int, items: list[Any]) -> Any:
         return summarize_studio_items(
             items,
@@ -1594,6 +1641,11 @@ def create_app() -> FastAPI:
             if project is not None
             else {"tracks": []}
         )
+        sfx_payload = (
+            _sfx_tracks_client_payload(project.id)
+            if project is not None
+            else {"clips": []}
+        )
         studio_originals: list[dict[str, Any]] = []
         if project is not None:
             db.sync_studio_originals(project.id)
@@ -1657,6 +1709,7 @@ def create_app() -> FastAPI:
             favorite_media=favorite_media,
             studio_originals=studio_originals,
             music_payload=music_payload,
+            sfx_payload=sfx_payload,
             can_undo=story_history["can_undo"],
             can_redo=story_history["can_redo"],
             flash_msg=msg,
@@ -1801,6 +1854,95 @@ def create_app() -> FastAPI:
         path = Path(clip.file_path)
         if not path.is_file():
             raise HTTPException(status_code=404, detail="music_missing")
+        media_type = MIME_BY_SUFFIX.get(path.suffix.lower(), "application/octet-stream")
+        return FileResponse(
+            path,
+            media_type=media_type,
+            content_disposition_type="inline",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @app.get("/api/studio/projects/{project_id}/sfx")
+    async def api_studio_sfx_get(project_id: int) -> JSONResponse:
+        _require_studio_project(project_id)
+        return JSONResponse({"ok": True, **_sfx_tracks_client_payload(project_id)})
+
+    @app.post("/api/studio/projects/{project_id}/sfx")
+    async def api_studio_sfx_post(project_id: int, request: Request) -> JSONResponse:
+        _require_studio_project(project_id)
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        path = _music_path_from_payload(payload)
+        kwargs: dict[str, Any] = {}
+        for key in ("start_s", "source_in_s", "source_out_s", "volume", "fade_in_s", "fade_out_s"):
+            if key in payload:
+                try:
+                    kwargs[key] = float(payload[key])
+                except (TypeError, ValueError):
+                    raise HTTPException(
+                        status_code=400, detail=f"{key} must be a number"
+                    ) from None
+        try:
+            with story_edit(db, project_id, group=_history_group(request)):
+                db.append_studio_sfx(project_id, str(path), **kwargs)
+        except ValueError as exc:
+            _raise_sfx_value_error(exc)
+        return JSONResponse({"ok": True, **_sfx_tracks_client_payload(project_id)})
+
+    @app.patch("/api/studio/projects/{project_id}/sfx/{clip_id}")
+    async def api_studio_sfx_patch(
+        project_id: int, clip_id: int, request: Request
+    ) -> JSONResponse:
+        _require_studio_project(project_id)
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        kwargs: dict[str, Any] = {}
+        for key in ("start_s", "source_in_s", "source_out_s", "volume", "fade_in_s", "fade_out_s"):
+            if key in payload:
+                try:
+                    kwargs[key] = float(payload[key])
+                except (TypeError, ValueError):
+                    raise HTTPException(
+                        status_code=400, detail=f"{key} must be a number"
+                    ) from None
+        if "path" in payload:
+            kwargs["file_path"] = str(_music_path_from_payload(payload))
+        try:
+            with story_edit(db, project_id, group=_history_group(request)):
+                db.patch_studio_sfx_clip(project_id, clip_id, **kwargs)
+        except ValueError as exc:
+            _raise_sfx_value_error(exc)
+        return JSONResponse({"ok": True, **_sfx_tracks_client_payload(project_id)})
+
+    @app.delete("/api/studio/projects/{project_id}/sfx/{clip_id}")
+    async def api_studio_sfx_delete(project_id: int, clip_id: int, request: Request) -> JSONResponse:
+        _require_studio_project(project_id)
+        with story_edit(db, project_id, group=_history_group(request)):
+            deleted = db.delete_studio_sfx_clip(project_id, clip_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="studio sfx not found")
+        return JSONResponse({"ok": True, **_sfx_tracks_client_payload(project_id)})
+
+    @app.get("/api/studio/projects/{project_id}/sfx/{clip_id}/stream")
+    async def api_studio_sfx_stream(project_id: int, clip_id: int) -> Response:
+        _require_studio_project(project_id)
+        clip = db.get_studio_sfx_clip(project_id, clip_id)
+        if clip is None:
+            raise HTTPException(status_code=404, detail="sfx_missing")
+        path = Path(clip.file_path)
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="sfx_missing")
         media_type = MIME_BY_SUFFIX.get(path.suffix.lower(), "application/octet-stream")
         return FileResponse(
             path,
