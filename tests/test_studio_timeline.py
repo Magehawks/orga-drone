@@ -187,7 +187,7 @@ def test_studio_page_has_time_canvas_and_zoom_controls(
         "function timelineViewportPx", 1
     )[0]
     assert "index < listLength - 1" in occupancy_src
-    assert "crossfade" in occupancy_src
+    assert 'isOverlapType(clip.dataset.appliedType || "cut")' in occupancy_src
     assert "function nextZoomIndexAbove" in js
     assert "function updateZoomControls" in js
     assert "if (next < 0) return false;" in js
