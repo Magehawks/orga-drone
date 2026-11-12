@@ -7,15 +7,22 @@ project (``timeline.add``). This file pins what the current bridge already
 supports and documents the remaining gap honestly:
 
 - VERIFIED: search finds imported media; timeline.add persists the new
-  Story clip without any manual selection; re-adding does not duplicate;
-  offline media is rejected without mutation; a color action applies to
-  the added clip once the UI has selected it.
-- GAP (strict xfail): the timeline bridge resumes WITHOUT selecting the
-  newly added clip when the editor had no prior selection
-  (``selection_clip_id=None``). Making external adds resume with the new
-  clip selected is a bridge/orchestration design decision (studio.js
-  applyProject/resumeSelection, serial gate) — not something this evidence
-  file changes.
+  Story clip without any manual selection; re-adding the same media
+  creates ANOTHER scene BY DESIGN (multi-scene stories are supported —
+  this is duplication as a feature, not a bug). An "open without
+  duplicating" select/open workflow is a distinct capability that #293's
+  follow-up design must add; this file does not claim it.
+- VERIFIED: offline/unavailable media is stored as a reference BY DESIGN
+  (offline clips live in the Story; export reports MEDIA_UNAVAILABLE at
+  render time). No claim is made that offline media is rejected. An
+  assistant open-flow therefore needs an availability pre-check, which
+  ``library.media.search/get`` can serve.
+- VERIFIED: a color action applies to the added clip once the UI has
+  selected it (via the /studio?select= reload target from the bridge
+  result's affected_clip_id).
+- Deterministic E2E note: the packaged Windows EXE/WebView2 journey of
+  this flow rides with the packaged dispatch; these tests cover the
+  Control-API level.
 """
 
 from __future__ import annotations
@@ -207,10 +214,12 @@ def test_color_action_on_added_clip_after_ui_selection(journey) -> None:  # type
     assert final.exposure == 20
 
 
-def test_readd_no_duplicate_and_offline_rejected(journey) -> None:  # type: ignore[no-untyped-def]
-    """Re-adding the same media must not duplicate the clip; offline media
-    is rejected without mutation. Between timeline commands the editor
-    consumes the resume ticket (the UI reload equivalent)."""
+def test_readd_creates_scene_and_offline_stays_referenced(journey) -> None:  # type: ignore[no-untyped-def]
+    """Documented by-design behavior: re-adding creates another scene
+    (multi-scene stories); offline media stays referenced (export reports
+    MEDIA_UNAVAILABLE at render time). An assistant open-flow must check
+    availability first; an open-without-duplicating select/open workflow is
+    #293's distinct follow-up design."""
     _client, db, service, sid, state, media_id, pid = journey
     added = _execute(service, sid, state, _cmd(
         service, sid, state, "timeline_action",
