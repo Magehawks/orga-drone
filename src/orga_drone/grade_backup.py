@@ -199,7 +199,10 @@ def _destination_is_locked(path: Path) -> bool:
     import ctypes
     from ctypes import wintypes
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    windll_factory = getattr(ctypes, "WinDLL", None)
+    if windll_factory is None:
+        return False
+    kernel32 = windll_factory("kernel32", use_last_error=True)
     kernel32.CreateFileW.argtypes = [
         wintypes.LPCWSTR,
         wintypes.DWORD,
