@@ -6677,7 +6677,17 @@ import {
     }
     const clip = hit.clip;
     if (clip.dataset.kind !== "video" || clip.dataset.canPlay !== "1") return false;
-    if (!isOverlapType(clip.dataset.appliedType || "cut")) return false;
+    const applied = clip.dataset.appliedType || "cut";
+    if (
+      applied !== "crossfade" &&
+      applied !== "blur_dissolve" &&
+      applied !== "soft_wipe_left" &&
+      applied !== "soft_wipe_right" &&
+      applied !== "soft_wipe_up" &&
+      applied !== "soft_wipe_down"
+    ) {
+      return false;
+    }
     const duration = Number(clip.dataset.appliedDuration) || 0;
     if (duration <= 0 || loopOverlapS(clip) > 0) return false;
     const list = clips().filter((c) => clipDuration(c) > 0);
@@ -6946,7 +6956,7 @@ import {
     const overlap = !loopBlend && hit && hit.overlapClip && hit.crossfadeProgress != null;
     if (loopBlend) {
       crossfadePreloadId = null;
-      clearOverlapPaint();
+      if (typeof clearOverlapPaint === "function") clearOverlapPaint();
     }
     const preloading = !overlap && !loopBlend && prepareOutgoingCrossfade(hit);
     if (!overlap && !loopBlend) {
@@ -6968,7 +6978,7 @@ import {
       if (previewImage) previewImage.style.opacity = "";
       if (previewVideo) previewVideo.style.opacity = "";
       if (previewTitlecard) previewTitlecard.style.opacity = "";
-      clearOverlapPaint();
+      if (typeof clearOverlapPaint === "function") clearOverlapPaint();
     } else if (overlap) {
       clearCrossfadePreload({ pause: false });
       showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
@@ -6976,7 +6986,7 @@ import {
       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
       if (previewVideo && !previewVideo.hidden) previewVideo.style.opacity = String(progress);
       if (previewTitlecard && !previewTitlecard.hidden) previewTitlecard.style.opacity = String(progress);
-      paintOverlap(hit, progress);
+      if (typeof paintOverlap === "function") paintOverlap(hit, progress);
     }
     if (hit && hit.fadeBlackOpacity > 0.001 && previewFadeBlack) {
       previewFadeBlack.hidden = false;
