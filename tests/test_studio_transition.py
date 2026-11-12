@@ -252,6 +252,8 @@ def test_persist_isolate_and_http_patch(
     assert 'value="slide"' not in inspector
     assert 'value="none"' not in inspector
     assert "Cut" in inspector or "Schnitt" in inspector
+    assert 'value="blur_dissolve"' in inspector
+    assert 'value="soft_wipe_left"' in inspector
 
     other = db.list_studio_items(b.id)
     assert all(normalize_type(i.transition) == TYPE_CUT for i in other)
@@ -426,3 +428,49 @@ def test_preview_refreshes_transition_overlap_after_duration_changes() -> None:
     starts = story_starts_s([3.0, 0.5, 3.0], crowded)
     assert starts[1] == pytest.approx(2.6)
     assert starts[2] == pytest.approx(3.1)
+
+
+def test_drone_pack_overlaps_like_crossfade() -> None:
+    from orga_drone.studio_transition import (
+        TYPE_BLUR_DISSOLVE,
+        TYPE_SOFT_WIPE_LEFT,
+        AppliedTransition,
+    )
+
+    assert normalize_type("blur_dissolve") == TYPE_BLUR_DISSOLVE
+    assert normalize_type("whip") == TYPE_CUT
+    durations = [4.0, 4.0]
+    blur = AppliedTransition(TYPE_BLUR_DISSOLVE, 0.5, TYPE_BLUR_DISSOLVE, 0.5, False, False)
+    fade = AppliedTransition(TYPE_CROSSFADE, 0.5, TYPE_CROSSFADE, 0.5, False, False)
+    assert story_length_s(durations, [blur]) == pytest.approx(story_length_s(durations, [fade]))
+    hit = resolve_story_time(durations, [blur], 3.8)
+    assert hit is not None
+    assert hit.crossfade_progress == pytest.approx(0.6)
+    wipe = apply_one_boundary(TYPE_SOFT_WIPE_LEFT, 0.5, 4.0, 4.0)
+    assert wipe.type == TYPE_SOFT_WIPE_LEFT
+    assert occupancy_s(wipe.type, wipe.duration_s) == pytest.approx(0.5)
+
+
+def test_stitch_filters_map_drone_pack_xfade() -> None:
+    from orga_drone.export.studio_config import StudioExportClip
+    from orga_drone.export.studio_encoder import build_stitch_filters
+
+    def joined(kind: str) -> str:
+        clips = (
+            StudioExportClip(
+                source_path=None,
+                kind="title_card",
+                duration_s=3.0,
+                transition_type=kind,
+                transition_s=0.5,
+            ),
+            StudioExportClip(source_path=None, kind="title_card", duration_s=3.0),
+        )
+        return ";".join(build_stitch_filters(clips))
+
+    blur = joined("blur_dissolve")
+    assert "xfade=transition=hblur" in blur
+    assert "acrossfade" not in blur
+    assert "atrim=0:2.7500" in blur
+    assert "xfade=transition=smoothleft" in joined("soft_wipe_left")
+    assert "xfade=transition=fade" in joined("crossfade")

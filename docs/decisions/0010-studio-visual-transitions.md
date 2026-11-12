@@ -14,19 +14,24 @@ timing: one is sequential, the other overlaps and shortens the Story.
 
 ## Decision
 
-1. Persist canonical type ids (`cut`, `fade_black`, `crossfade`) in
-   `studio_clips.transition` and a remembered duration in
-   `studio_clips.transition_duration_s`. The outgoing clip owns the boundary.
-   NULL / unknown / stub ids (`none`, `fade`, `slide`) resolve to Cut. Never
-   store ffmpeg strings or `effect_settings`.
+1. Persist canonical type ids in `studio_clips.transition` and a remembered
+   duration in `studio_clips.transition_duration_s`. The outgoing clip owns the
+   boundary. NULL / unknown / stub ids (`none`, `fade`, `slide`) resolve to
+   Cut. Never store ffmpeg strings or `effect_settings`.
+   The ids are `cut`, `fade_black`, `crossfade`, and, since the 2026-11-12
+   amendment, `blur_dissolve`, `soft_wipe_left`, `soft_wipe_right`,
+   `soft_wipe_up`, and `soft_wipe_down`.
 2. Shared math in `studio_transition.py` is used by estimate, preview playhead,
-   export, and music trim. Crossfade subtracts overlap `D` from Story length.
-   Fade-through-black does not (D/2 out + D/2 in, no extra black hold).
+   export, and music trim. Every overlap id subtracts `D` from Story length,
+   the same way a crossfade does. Fade-through-black does not (D/2 out + D/2
+   in, no extra black hold).
 3. Applied `D` must leave ≥0.1 s of each neighbor outside the effect; otherwise
    clamp or fall back to Cut. Export never crashes.
 4. Export bakes fade-through-black with ffmpeg `fade=` on segments then concat.
-   Crossfade uses `xfade=transition=fade` only. Source audio hard-cuts (midpoint
-   of a crossfade overlap; clip edge otherwise). Music is not faded by this
+   Overlap ids use one `xfade`: `fade`, `hblur`, `smoothleft`, `smoothright`,
+   `smoothup`, or `smoothdown`. A smooth curve on a crossfade still uses the
+   existing custom expression. Source audio hard-cuts (midpoint
+   of an overlap; clip edge otherwise). Music is not faded by this
    feature. Before each xfade/concat, video pads are normalized with
    `fps` + `settb=1/30` so a chained xfade after concat does not hit FFmpeg 7's
    mismatched timebase (`1/1000000` vs MP4 `tbn`) and encoder-EOF failure.
@@ -47,4 +52,12 @@ timing: one is sequential, the other overlaps and shortens the Story.
 - Negative / trade-offs: HTML preview can fall back to a still + incoming video
   for heavy dual-decode. `xfade` stitch is an extra re-encode when any
   crossfade is applied.
-- Follow-up: wipes, audio crossfades, and easing stay Later.
+- Follow-up: audio crossfades and extra easing stay Later. Luma wipes, whip
+  pans, and zoom or spin transitions stay out.
+
+## Amendment (2026-11-12, issue #301)
+
+Blur dissolve and four soft directional wipes are canonical overlap ids.
+They share the existing duration control, occupancy, and `xfade` stitch.
+Preview uses CSS blur plus opacity for blur dissolve, and a soft CSS mask
+for the wipes. This amendment does not add a transition library.

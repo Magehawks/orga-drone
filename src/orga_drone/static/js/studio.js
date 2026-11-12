@@ -10,6 +10,7 @@ import {
   rampTime,
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
+import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import {
   bumpOverlayRevision,
@@ -297,6 +298,11 @@ import {
     cut: root.dataset.transitionChipCut || root.dataset.transitionCut || "Cut",
     fade_black: root.dataset.transitionChipFadeBlack || "Fade",
     crossfade: root.dataset.transitionChipCrossfade || "Crossfade",
+    blur_dissolve: root.dataset.transitionChipBlurDissolve || "Blur dissolve",
+    soft_wipe_left: root.dataset.transitionChipSoftWipeLeft || "Soft wipe left",
+    soft_wipe_right: root.dataset.transitionChipSoftWipeRight || "Soft wipe right",
+    soft_wipe_up: root.dataset.transitionChipSoftWipeUp || "Soft wipe up",
+    soft_wipe_down: root.dataset.transitionChipSoftWipeDown || "Soft wipe down",
   };
   const kindLabels = {
     photo: root.dataset.kindPhoto || "Photo",
@@ -1093,7 +1099,7 @@ import {
     let total = 0;
     list.forEach((clip, index) => {
       total += clipDuration(clip);
-      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
+      if (index < list.length - 1 && isOverlapType(clip.dataset.appliedType || "cut")) {
         total -= Number(clip.dataset.appliedDuration) || 0;
       }
     });
@@ -1109,7 +1115,7 @@ import {
     let duration = clipDuration(clip);
     if (
       index < listLength - 1 &&
-      (clip.dataset.appliedType || "cut") === "crossfade"
+      isOverlapType(clip.dataset.appliedType || "cut")
     ) {
       duration -= Number(clip.dataset.appliedDuration) || 0;
     }
@@ -2451,6 +2457,8 @@ import {
       el.classList.toggle("is-cut", type === "cut" || dur <= 0);
       el.classList.toggle("is-fade", type === "fade_black");
       el.classList.toggle("is-crossfade", type === "crossfade");
+      el.classList.toggle("is-blur", type === "blur_dissolve");
+      el.classList.toggle("is-wipe", String(type).startsWith("soft_wipe_"));
       el.style.display = dragCard ? "none" : "";
       const span = el.querySelector("[data-transition-span]");
       if (span) {
@@ -2593,7 +2601,7 @@ import {
       const c = list[i];
       if (c === clip) return cursor;
       cursor += clipDuration(c);
-      if (i < list.length - 1 && (c.dataset.appliedType || "cut") === "crossfade") {
+      if (i < list.length - 1 && isOverlapType(c.dataset.appliedType || "cut")) {
         cursor -= Number(c.dataset.appliedDuration) || 0;
       }
     }
@@ -2612,7 +2620,7 @@ import {
     list.forEach((clip, index) => {
       starts.push(cursor);
       cursor += clipDuration(clip);
-      if (index < list.length - 1 && (clip.dataset.appliedType || "cut") === "crossfade") {
+      if (index < list.length - 1 && isOverlapType(clip.dataset.appliedType || "cut")) {
         cursor -= Number(clip.dataset.appliedDuration) || 0;
       }
     });
@@ -2658,7 +2666,7 @@ import {
         fadeBlackOpacity = Math.max(fadeBlackOpacity, 1 - localS / half);
       }
     }
-    if (incoming && (incoming.dataset.appliedType || "cut") === "crossfade") {
+    if (incoming && isOverlapType(incoming.dataset.appliedType || "cut")) {
       const d = Number(incoming.dataset.appliedDuration) || 0;
       const intoIncoming = t - start;
       if (d > 0 && intoIncoming <= d) {
@@ -2677,7 +2685,7 @@ import {
         };
       }
     }
-    if (outgoingType === "crossfade" && outgoingD > 0 && primary < list.length - 1) {
+    if (isOverlapType(outgoingType) && outgoingD > 0 && primary < list.length - 1) {
       const nextStart = starts[primary + 1];
       if (t >= nextStart) {
         const next = list[primary + 1];
@@ -3506,7 +3514,7 @@ import {
     scheduleLutPreviewStill(primary, primaryLocal);
     // Prepare the next photo in the otherwise unused owner. It is a single
     // static request, not clock-tick rendering, and can move to primary intact.
-    const nextPhoto = !incomingClip && primary && primary.dataset.appliedType === "crossfade"
+    const nextPhoto = !incomingClip && primary && isOverlapType(primary.dataset.appliedType)
       ? clips().filter((clip) => clipDuration(clip) > 0)[hit.index + 1]
       : null;
     schedulePhotoOverlapStill(incomingClip || nextPhoto, incomingLocal);
@@ -6669,7 +6677,7 @@ import {
     }
     const clip = hit.clip;
     if (clip.dataset.kind !== "video" || clip.dataset.canPlay !== "1") return false;
-    if ((clip.dataset.appliedType || "cut") !== "crossfade") return false;
+    if (!isOverlapType(clip.dataset.appliedType || "cut")) return false;
     const duration = Number(clip.dataset.appliedDuration) || 0;
     if (duration <= 0 || loopOverlapS(clip) > 0) return false;
     const list = clips().filter((c) => clipDuration(c) > 0);
@@ -6885,6 +6893,50 @@ import {
     return true;
   }
 
+  function overlapLayers() {
+    return [
+      previewImage,
+      previewVideo,
+      previewTitlecard,
+      previewImageB,
+      previewVideoB,
+      previewTitlecardB,
+    ];
+  }
+
+  function clearOverlapPaint() {
+    overlapLayers().forEach((el) => {
+      if (!el) return;
+      el.style.filter = "";
+      el.style.maskImage = "";
+      el.style.webkitMaskImage = "";
+    });
+  }
+
+  function paintOverlap(hit, progress) {
+    clearOverlapPaint();
+    const type =
+      hit && hit.overlapClip ? hit.overlapClip.dataset.appliedType || "cut" : "cut";
+    if (type === "blur_dissolve") {
+      const radius = blurRadiusPx(progress);
+      overlapLayers().forEach((el) => {
+        if (el && !el.hidden) el.style.filter = `blur(${radius}px)`;
+      });
+      return;
+    }
+    const mask = wipeMask(type, progress);
+    if (!mask) return;
+    [previewImage, previewVideo, previewTitlecard].forEach((el) => {
+      if (!el || el.hidden) return;
+      el.style.opacity = "1";
+      el.style.maskImage = mask;
+      el.style.webkitMaskImage = mask;
+    });
+    [previewImageB, previewVideoB, previewTitlecardB].forEach((el) => {
+      if (el && !el.hidden) el.style.opacity = "1";
+    });
+  }
+
   function applyTransitionPreview(hit) {
     const loopPoint =
       hit && hit.clip && !hit.overlapClip && loopOverlapS(hit.clip) > 0
@@ -6892,7 +6944,10 @@ import {
         : null;
     const loopBlend = !!(loopPoint && loopPoint.blending && showLoopIncoming(hit.clip, loopPoint));
     const overlap = !loopBlend && hit && hit.overlapClip && hit.crossfadeProgress != null;
-    if (loopBlend) crossfadePreloadId = null;
+    if (loopBlend) {
+      crossfadePreloadId = null;
+      clearOverlapPaint();
+    }
     const preloading = !overlap && !loopBlend && prepareOutgoingCrossfade(hit);
     if (!overlap && !loopBlend) {
       if (previewImageB) {
@@ -6913,6 +6968,7 @@ import {
       if (previewImage) previewImage.style.opacity = "";
       if (previewVideo) previewVideo.style.opacity = "";
       if (previewTitlecard) previewTitlecard.style.opacity = "";
+      clearOverlapPaint();
     } else if (overlap) {
       clearCrossfadePreload({ pause: false });
       showOutgoingLayer(hit.overlapClip, hit.overlapLocalS || 0);
@@ -6920,6 +6976,7 @@ import {
       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
       if (previewVideo && !previewVideo.hidden) previewVideo.style.opacity = String(progress);
       if (previewTitlecard && !previewTitlecard.hidden) previewTitlecard.style.opacity = String(progress);
+      paintOverlap(hit, progress);
     }
     if (hit && hit.fadeBlackOpacity > 0.001 && previewFadeBlack) {
       previewFadeBlack.hidden = false;
@@ -8564,7 +8621,7 @@ import {
   function transitionOccupancyS(type, duration) {
     const seconds = Number(duration) || 0;
     if (type === "fade_black") return Math.max(0, seconds / 2);
-    if (type === "crossfade") return Math.max(0, seconds);
+    if (isOverlapType(type)) return Math.max(0, seconds);
     return 0;
   }
 
@@ -9186,7 +9243,9 @@ import {
     }
     const select = document.getElementById("inspector-transition-type");
     const stored = el.dataset.storedType || el.dataset.transitionType || "cut";
-    if (select) select.value = stored === "cut" || stored === "fade_black" || stored === "crossfade" ? stored : "cut";
+    if (select) {
+      select.value = stored === "cut" || stored === "fade_black" || isOverlapType(stored) ? stored : "cut";
+    }
     const durWrap = document.getElementById("inspector-transition-duration-wrap");
     const durInput = document.getElementById("inspector-transition-duration");
     const isCut = (select ? select.value : stored) === "cut";
@@ -11441,7 +11500,7 @@ import {
         clip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
         const flex =
           clipDuration(clip) -
-          ((body.applied_type === "crossfade" ? Number(body.applied_duration_s) : 0) || 0);
+          ((isOverlapType(body.applied_type) ? Number(body.applied_duration_s) : 0) || 0);
         clip.style.setProperty("--clip-flex", String(Math.max(0, flex).toFixed(4)));
       }
       const chip = grid.querySelector(

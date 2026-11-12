@@ -34,6 +34,7 @@ from orga_drone.export.studio_quality import (
 )
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_cut import MAX_SECTION_REPEATS
+from orga_drone.studio_transition import xfade_name
 from orga_drone.studio_frame import (
     FrameTransform,
     ffmpeg_frame_prefix,
@@ -809,7 +810,7 @@ def _segment_video_args(clip: StudioExportClip, width: int, height: int) -> list
 
 def _has_crossfade(clips: tuple[StudioExportClip, ...]) -> bool:
     for clip in clips[:-1]:
-        if clip.transition_type == "crossfade" and float(clip.transition_s) > 0:
+        if xfade_name(clip.transition_type) and float(clip.transition_s) > 0:
             return True
     return False
 
@@ -855,14 +856,23 @@ def _norm_audio_pad(src: str, alias: str) -> str:
 XFADE_SMOOTH_EXPR = "B*(1-P*P*(3-2*P))+A*(P*P*(3-2*P))"
 
 
-def _xfade_video(left: str, right: str, out: str, overlap: float, offset: float, curve: str) -> str:
+def _xfade_video(
+    left: str,
+    right: str,
+    out: str,
+    overlap: float,
+    offset: float,
+    curve: str,
+    transition: str = "fade",
+) -> str:
     if curve == "smooth":
         return (
             f"[{left}][{right}]xfade=transition=custom:expr={XFADE_SMOOTH_EXPR}:"
             f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
         )
+    name = transition if transition in {"fade", "hblur", "smoothleft", "smoothright", "smoothup", "smoothdown"} else "fade"
     return (
-        f"[{left}][{right}]xfade=transition=fade:"
+        f"[{left}][{right}]xfade=transition={name}:"
         f"duration={overlap:.4f}:offset={offset:.4f}[{out}]"
     )
 
@@ -891,7 +901,8 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
         filters.append(_norm_audio_pad(current_a, left_a))
         filters.append(_norm_audio_pad(next_a, right_a))
         outgoing = clips[index]
-        if outgoing.transition_type == "crossfade" and outgoing.transition_s > 0:
+        xfade = xfade_name(outgoing.transition_type)
+        if xfade and outgoing.transition_s > 0:
             overlap = float(outgoing.transition_s)
             offset = max(0.0, current_dur - overlap)
             filters.append(
@@ -902,6 +913,7 @@ def build_stitch_filters(clips: tuple[StudioExportClip, ...]) -> list[str]:
                     overlap,
                     offset,
                     outgoing.transition_curve,
+                    xfade,
                 )
             )
             a_keep = max(0.0, current_dur - overlap / 2.0)

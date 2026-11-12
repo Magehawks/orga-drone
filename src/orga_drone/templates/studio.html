@@ -117,6 +117,16 @@
          data-transition-chip-cut="{{ _('Cut')|e }}"
          data-transition-chip-fade-black="{{ _('Fade')|e }}"
          data-transition-chip-crossfade="{{ _('Crossfade')|e }}"
+         data-transition-chip-blur-dissolve="{{ _('Blur dissolve')|e }}"
+         data-transition-chip-soft-wipe-left="{{ _('Soft wipe left')|e }}"
+         data-transition-chip-soft-wipe-right="{{ _('Soft wipe right')|e }}"
+         data-transition-chip-soft-wipe-up="{{ _('Soft wipe up')|e }}"
+         data-transition-chip-soft-wipe-down="{{ _('Soft wipe down')|e }}"
+         data-transition-chip-blur-dissolve="{{ _('Blur dissolve')|e }}"
+         data-transition-chip-soft-wipe-left="{{ _('Soft wipe left')|e }}"
+         data-transition-chip-soft-wipe-right="{{ _('Soft wipe right')|e }}"
+         data-transition-chip-soft-wipe-up="{{ _('Soft wipe up')|e }}"
+         data-transition-chip-soft-wipe-down="{{ _('Soft wipe down')|e }}"
          data-transition-fallback="{{ _('This transition was skipped because a neighboring clip is too short.')|e }}"
          data-transition-clamped="{{ _('Duration was shortened to fit the neighboring clips.')|e }}"
          data-transition-failed="{{ _('Could not save the transition.')|e }}"
@@ -701,8 +711,8 @@
                   data-clamped="{{ '1' if applied and applied.clamped else '0' }}"
                   tabindex="0"
                   role="button"
-                  aria-label="{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% else %}{{ _('Cut') }}{% endif %}">
-                <span class="studio-transition-chip" data-transition-label>{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% else %}{{ _('Cut') }}{% endif %}</span>
+                  aria-label="{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% elif ttype == 'blur_dissolve' %}{{ _('Blur dissolve') }}{% elif ttype == 'soft_wipe_left' %}{{ _('Soft wipe left') }}{% elif ttype == 'soft_wipe_right' %}{{ _('Soft wipe right') }}{% elif ttype == 'soft_wipe_up' %}{{ _('Soft wipe up') }}{% elif ttype == 'soft_wipe_down' %}{{ _('Soft wipe down') }}{% else %}{{ _('Cut') }}{% endif %}">
+                <span class="studio-transition-chip" data-transition-label>{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% elif ttype == 'blur_dissolve' %}{{ _('Blur dissolve') }}{% elif ttype == 'soft_wipe_left' %}{{ _('Soft wipe left') }}{% elif ttype == 'soft_wipe_right' %}{{ _('Soft wipe right') }}{% elif ttype == 'soft_wipe_up' %}{{ _('Soft wipe up') }}{% elif ttype == 'soft_wipe_down' %}{{ _('Soft wipe down') }}{% else %}{{ _('Cut') }}{% endif %}</span>
               </li>
               {% endif %}
               <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'title_card' %}is-title-card{% elif item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
@@ -1693,6 +1703,13 @@
             <option value="cut">{{ _('Cut') }}</option>
             <option value="fade_black">{{ _('Fade through black') }}</option>
             <option value="crossfade">{{ _('Crossfade') }}</option>
+            <optgroup label="{{ _('Drone pack') }}">
+              <option value="blur_dissolve">{{ _('Blur dissolve') }}</option>
+              <option value="soft_wipe_left">{{ _('Soft wipe left') }}</option>
+              <option value="soft_wipe_right">{{ _('Soft wipe right') }}</option>
+              <option value="soft_wipe_up">{{ _('Soft wipe up') }}</option>
+              <option value="soft_wipe_down">{{ _('Soft wipe down') }}</option>
+            </optgroup>
           </select>
         </label>
         <label class="studio-inspector-field" id="inspector-transition-duration-wrap">
