@@ -8,7 +8,9 @@ runs when a local OpenCV install is present and is skipped otherwise.
 
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 from typing import Iterable
 
 import pytest
@@ -279,6 +281,113 @@ def test_search_cost_on_a_small_frame_stays_bounded() -> None:
     elapsed = time.perf_counter() - started
     assert shift == (-4, 2)
     assert elapsed < 5.0
+
+
+def _view(world: Image.Image, origin_x: int, size: tuple[int, int]) -> Image.Image:
+    width, height = size
+    view = Image.new("RGB", size, (0, 0, 0))
+    view.paste(world.crop((origin_x, 0, origin_x + width, height)), (0, 0))
+    return view
+
+
+def test_moving_camera_reuses_the_same_shot() -> None:
+    """A translating camera and a moving object, still one physical shot."""
+    world = _pattern(220, 64)
+    view_size = (96, 64)
+    hole = (18, 14, 34, 34)
+    frames: list[Image.Image] = []
+    for step in range(6):
+        view = _view(world, step * 4, view_size)
+        object_box = (18 + step * 6, 14, 34 + step * 6, 34)
+        frame = _paint_rect(view, object_box, (220, 10, 10))
+        shadow = (object_box[2] + 2, 26, object_box[2] + 10, 34)
+        frames.append(_paint_rect(frame, shadow, (8, 8, 8)))
+    mask = _mask(view_size, hole)
+    donor_step = 4
+    started = time.perf_counter()
+    shift = estimate_translation(frames[0], frames[donor_step], mask, max_shift=20)
+    align_s = time.perf_counter() - started
+    assert shift == (16, 0)
+    filled, ok = fill_from_frame(
+        frames[0], frames[donor_step], mask, shift=shift, feather=1
+    )
+    assert ok is True
+    out = filled.load()
+    src = frames[0].load()
+    truth = _view(world, 0, view_size).load()
+    assert out is not None and src is not None and truth is not None
+    outside_changed = 0
+    interior_wrong = 0
+    for x, y in _outside(mask, 1):
+        if out[x, y] != src[x, y]:
+            outside_changed += 1
+    for y in range(15, 34):
+        for x in range(19, 34):
+            if out[x, y] != truth[x, y]:
+                interior_wrong += 1
+    assert outside_changed == 0
+    assert interior_wrong == 0
+    # The shadow sits outside the mask and must stay. It is not reconstructed.
+    assert out[40, 30] == (8, 8, 8)
+    # Feather ring is a one-pixel average, the only seam treatment.
+    cover = _dilate(mask, 1).load()
+    hard = mask.load()
+    assert cover is not None and hard is not None
+    blended = 0
+    for y in range(64):
+        for x in range(96):
+            if cover[x, y] and not hard[x, y] and out[x, y] != src[x, y]:
+                blended += 1
+    # Matching donor background makes the one-pixel feather identical to the
+    # original. The visible change is the mask interior, not a halo.
+    assert blended == 0
+    removed = 0
+    for y in range(15, 34):
+        for x in range(19, 34):
+            if out[x, y] != src[x, y]:
+                removed += 1
+    assert removed > 0
+    later_hole = (24, 14, 40, 34)
+    later_mask = _mask(view_size, later_hole)
+    filled_later, later_ok = fill_from_frame(
+        frames[1], frames[5], later_mask, shift=(16, 0), feather=1
+    )
+    assert later_ok is True
+    later_out = filled_later.load()
+    later_truth = _view(world, 4, view_size).load()
+    assert later_out is not None and later_truth is not None
+    flicker = 0
+    for y in range(15, 34):
+        for x in range(25, 40):
+            if later_out[x, y] != later_truth[x, y]:
+                flicker += 1
+    assert flicker == 0
+    evidence = Path(__file__).resolve().parents[1] / "docs" / "discovery" / "297-evidence"
+    evidence.mkdir(parents=True, exist_ok=True)
+    frames[0].save(evidence / "before.png")
+    frames[donor_step].save(evidence / "donor.png")
+    filled.save(evidence / "after.png")
+    (evidence / "metrics.json").write_text(
+        json.dumps(
+            {
+                "camera": "synthetic translation, 4 px per frame",
+                "outside_mask_changed_pixels": outside_changed,
+                "interior_mismatch_pixels": interior_wrong,
+                "shadow_pixel_kept": list(out[40, 30]),
+                "feather_pixels_changed": blended,
+                "mask_pixels_replaced": removed,
+                "synthetic_flicker_mismatch_pixels": flicker,
+                "align_seconds": round(align_s, 3),
+                "frame_size": [96, 64],
+                "search_radius_px": 20,
+                "real_footage": "NOT_RUN",
+                "flicker_on_real_footage": "NOT_RUN",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_opencv_phase_correlation_matches_the_same_shift() -> None:

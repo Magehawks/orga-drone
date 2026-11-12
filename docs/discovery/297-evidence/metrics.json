@@ -1,0 +1,21 @@
+{
+  "camera": "synthetic translation, 4 px per frame",
+  "outside_mask_changed_pixels": 0,
+  "interior_mismatch_pixels": 0,
+  "shadow_pixel_kept": [
+    8,
+    8,
+    8
+  ],
+  "feather_pixels_changed": 0,
+  "mask_pixels_replaced": 285,
+  "synthetic_flicker_mismatch_pixels": 0,
+  "align_seconds": 2.238,
+  "frame_size": [
+    96,
+    64
+  ],
+  "search_radius_px": 20,
+  "real_footage": "NOT_RUN",
+  "flicker_on_real_footage": "NOT_RUN"
+}
