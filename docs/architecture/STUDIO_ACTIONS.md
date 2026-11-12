@@ -202,6 +202,7 @@ and is not certified by API tests.
 | Operation | UI entry | Backend | Persistence | Undo | API today | Tests |
 |---|---|---|---|---|---|---|
 | Project music playlist | inspector Music | `studio_audio.py`, `app.py` 1679-1807 | `studio_audio_clips`, project music start | yes | none | `test_studio_music.py` |
+| SFX lane | timeline SFX track | `studio_sfx.py`, Studio SFX routes | `studio_audio_clips` lane `sfx` | yes | `sfx.append`, `sfx.update`, `sfx.remove` | `test_control_sfx_actions.py` |
 | Clip audio detach / volume | inspector Audio | `studio_audio.py`, `app.py` 2650 | clip columns / effect_settings | yes | none | `test_studio_clip_audio.py` |
 | Text/image overlays | overlays panel | `studio_overlay.py`, `app.py` 2680, 2722 | `effect_settings.overlays` + local asset | yes | none | `test_studio_overlay.py` |
 | Masks | mask panel | `studio_mask.py`, `app.py` 2746 | `effect_settings.masks` | yes | none | `test_studio_mask.py` |
@@ -302,7 +303,9 @@ on current `develop` (summary; see the matrix for evidence pointers):
 - Timeline add/remove/reorder/trim, two-clip wrong-target Undo, invalid trims,
   save/reopen and UI/API parity are covered by #279 contracts.
 - Audio/overlay and project music Control API contracts shipped via #281
-  (parts 1–2); packaged WebView2 refresh remains NOT_RUN until dated evidence.
+  (parts 1–2). SFX placement uses the same project-action transport
+  (`sfx.append`, `sfx.update`, `sfx.remove`) and Story undo. Packaged
+  WebView2 refresh remains NOT_RUN until dated evidence.
 - Export/render job commands shipped via #282; packaged export journey harness
   exists — mark PASS only after a real run.
 - Open-media assistant journey evidence: #293 / #387 (API+synthetic); packaged

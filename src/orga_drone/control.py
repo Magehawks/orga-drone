@@ -691,8 +691,11 @@ class ControlService:
                 ):
                     return self._execute_export(cmd)
                 if target["type"] == "project_action":
-                    if str(target.get("action", "")).startswith("music."):
+                    action_name = str(target.get("action", ""))
+                    if action_name.startswith("music."):
                         return self._execute_music(cmd, state)
+                    if action_name.startswith("sfx."):
+                        return self._execute_sfx(cmd, state)
                     return self._execute_project(cmd, state)
                 if target["type"] == "timeline_action" or (
                     target["type"] == "undo_last_change"
@@ -1103,6 +1106,83 @@ class ControlService:
         )
         cmd["ui_revision"] = history_revision()
         # The editor's soundtrack view is stale; reload like project.open.
+        self.reload_ticket = None
+        assert self.session is not None
+        self.session["fenced"] = True
+        return cmd["result"]
+
+    def _execute_sfx(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+        """Project-scoped SFX commands (issue #281). Writes use the same DB
+        methods and Story history as the Studio routes. The response lists
+        placement only — never the source path."""
+        from orga_drone.export.music_mix import validate_music_file_path
+        from orga_drone.studio_history import story_edit
+
+        target = cmd["payload"]
+        pid, action, params = target["project_id"], target["action"], target["params"]
+        opened = self.db.get_open_studio_project()
+        if opened is None or opened.id != pid:
+            raise ControlError("STALE_STATE")
+        if self._token(state) != target["expected_state_token"]:
+            raise ControlError("STALE_STATE")
+        self._session(target["session_id"])
+        if self.clock() > cmd["deadline"]:
+            raise ControlError("COMMAND_EXPIRED")
+        try:
+            with story_edit(self.db, pid):
+                if action == "sfx.append":
+                    path = validate_music_file_path(str(params["file_path"]))
+                    self.db.append_studio_sfx(
+                        pid, str(path), start_s=float(params["start_s"])
+                    )
+                elif action == "sfx.update":
+                    self.db.patch_studio_sfx_clip(
+                        pid,
+                        int(params["clip_id"]),
+                        start_s=float(params["start_s"]),
+                        source_in_s=float(params["source_in_s"]),
+                        source_out_s=float(params["source_out_s"]),
+                        volume=float(params["volume"]),
+                        fade_in_s=float(params["fade_in_s"]),
+                        fade_out_s=float(params["fade_out_s"]),
+                    )
+                elif action == "sfx.remove":
+                    if not self.db.delete_studio_sfx_clip(pid, int(params["clip_id"])):
+                        raise ControlError("TARGET_NOT_FOUND", 404)
+                else:
+                    raise ControlError("UNKNOWN_ACTION", 400)
+        except FileNotFoundError as exc:
+            raise ControlError("INVALID_PAYLOAD", 400) from exc
+        except ValueError as exc:
+            if "not found" in str(exc):
+                raise ControlError("TARGET_NOT_FOUND", 404) from exc
+            raise ControlError("INVALID_PAYLOAD", 400) from exc
+        clips = [
+            {
+                "id": clip.id,
+                "start_s": clip.start_s,
+                "source_in_s": clip.source_in_s,
+                "source_out_s": clip.source_out_s,
+                "volume": clip.volume,
+                "fade_in_s": clip.fade_in_s,
+                "fade_out_s": clip.fade_out_s,
+            }
+            for clip in self.db.list_studio_sfx(pid)
+        ]
+        self.latest_external = None
+        cmd["result"].update(
+            status="persisted",
+            persisted=True,
+            ui_applied=False,
+            scope="project",
+            project_id=pid,
+            clip_id=None,
+            canonical={"sfx_action": action, "clips": clips},
+            no_op=False,
+            navigation_required=True,
+            **history_flags(pid),
+        )
+        cmd["ui_revision"] = history_revision()
         self.reload_ticket = None
         assert self.session is not None
         self.session["fenced"] = True
