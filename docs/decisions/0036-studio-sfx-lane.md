@@ -26,10 +26,16 @@ undo/redo and save/reopen — without modifying source audio.
 6. Story undo/redo snapshots include SFX rows so timeline edits restore.
 7. UI/API live in dedicated modules/routes (`sfx.*`); `studio.js` only
    orchestrates.
+8. Each SFX clip draws a peak waveform of its local file. Peaks are decoded
+   once with the existing ffmpeg binary and stored in the rebuildable
+   `{data_dir}/sfx-waveforms/` cache. Drag, resize, and zoom slice those peaks
+   for the current trim and timeline scale. A missing, corrupt, or undecodable
+   file leaves the clip label and gestures intact and draws no waveform.
 
 ## Consequences
 
 - Schema migration is required; older builds ignore unknown columns / `sfx` rows.
 - Music free-placement remains Later (product vision); this ADR does not change it.
 - Gain strategy is documented, not an automatic limiter.
-- Waveform drawing may be MVP labels first; timing must still match export.
+- Waveform peaks are a local cache of the source file. They follow trim and
+  zoom, and they do not change the preview or export mix.

@@ -30,9 +30,11 @@ import {
   SFX_MAX_CLIPS,
   audibleSfxDurationS,
   applySfxPayload,
+  paintSfxWaveform,
   renderSfxClips,
   sfxAfterDrag,
   sfxClipStyle,
+  sfxPreviewGain,
 } from "./studio/sfx-lane.js";
 import {
   createTimedSelection,
@@ -7706,6 +7708,8 @@ import {
 
   const MUSIC_MAX_TRACKS = 8;
   const sfxState = { clips: [] };
+  const sfxWaveforms = new Map();
+  let sfxWavePaintQueued = false;
   try {
     applySfxPayload(sfxState, JSON.parse(root.dataset.sfxPayload || '{"clips":[]}'));
   } catch (_) {
@@ -7741,6 +7745,60 @@ import {
       onPointerDown: (event, clip) => onSfxPointerDown(event, clip),
       onKeyDown: (event, clip) => onSfxKeyDown(event, clip),
     });
+    queueSfxWavePaint();
+    ensureSfxWaveforms();
+  }
+
+  function queueSfxWavePaint() {
+    if (sfxWavePaintQueued) return;
+    sfxWavePaintQueued = true;
+    const paint = () => {
+      sfxWavePaintQueued = false;
+      paintVisibleSfxWaveforms();
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(paint);
+    else paint();
+  }
+
+  function paintVisibleSfxWaveforms() {
+    document.querySelectorAll(".studio-sfx-clip").forEach((el) => {
+      const clip = sfxState.clips.find((item) => String(item.id) === el.dataset.sfxId);
+      if (!clip) return;
+      let view = clip;
+      if (el.dataset.draftSfx) {
+        try {
+          view = { ...clip, ...JSON.parse(el.dataset.draftSfx) };
+        } catch (_) {
+          view = clip;
+        }
+      }
+      const waveform = sfxWaveforms.get(clip.waveform_url);
+      paintSfxWaveform(el.querySelector(".studio-sfx-wave"), waveform, view);
+      if (waveform && waveform.status === "ready") el.dataset.waveform = "ready";
+      else if (waveform && waveform.status === "unavailable") el.dataset.waveform = "unavailable";
+    });
+  }
+
+  function ensureSfxWaveforms() {
+    if (!projectId) return;
+    sfxState.clips.forEach((clip) => {
+      const url = clip.waveform_url;
+      if (!url || sfxWaveforms.has(url)) return;
+      sfxWaveforms.set(url, { status: "loading", peaks: [], duration_s: 0 });
+      fetch(url, { headers: { Accept: "application/json" } })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body) => {
+          const ready =
+            body && body.status === "ready" && Array.isArray(body.peaks)
+              ? body
+              : { status: "unavailable", peaks: [], duration_s: 0 };
+          sfxWaveforms.set(url, ready);
+          queueSfxWavePaint();
+        })
+        .catch(() => {
+          sfxWaveforms.set(url, { status: "unavailable", peaks: [], duration_s: 0 });
+        });
+    });
   }
 
   function sfxDragMode(event) {
@@ -7773,6 +7831,11 @@ import {
       el.style.left = style.left;
       el.style.width = style.width;
       el.dataset.draftSfx = JSON.stringify(draft);
+      paintSfxWaveform(
+        el.querySelector(".studio-sfx-wave"),
+        sfxWaveforms.get(origin.waveform_url),
+        { ...origin, ...draft }
+      );
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -8335,13 +8398,12 @@ import {
         el.dataset.sfxSrc = String(clip.stream_url);
         el.src = clip.stream_url;
       }
-      const fadeIn = Math.max(0, Number(clip.fade_in_s) || 0);
-      const fadeOut = Math.max(0, Number(clip.fade_out_s) || 0);
-      let gain = 1;
-      if (fadeIn > 0 && local < fadeIn) gain = Math.max(0, local / fadeIn);
-      if (fadeOut > 0 && local > duration - fadeOut) {
-        gain = Math.min(gain, Math.max(0, (duration - local) / fadeOut));
-      }
+      const gain = sfxPreviewGain(
+        local,
+        duration,
+        Number(clip.fade_in_s) || 0,
+        Number(clip.fade_out_s) || 0
+      );
       el.volume = Math.max(
         0,
         Math.min(1, master * (Number(clip.volume) || 0) * gain)

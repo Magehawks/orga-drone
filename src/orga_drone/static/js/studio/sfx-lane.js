@@ -55,6 +55,102 @@ export function sfxAfterDrag(clip, { mode, deltaStory, minSpan = 0.05 } = {}) {
   };
 }
 
+export function sfxPreviewGain(localS, durationS, fadeInS, fadeOutS) {
+  const t = Number(localS);
+  const bed = Number(durationS);
+  if (!Number.isFinite(t) || !Number.isFinite(bed) || t < 0 || t >= bed) return 0;
+  let fadeIn = Math.max(0, Number(fadeInS) || 0);
+  let fadeOut = Math.max(0, Number(fadeOutS) || 0);
+  const total = fadeIn + fadeOut;
+  if (!(bed > 0) || total <= 0) {
+    fadeIn = 0;
+    fadeOut = 0;
+  } else if (total > bed) {
+    const scale = bed / total;
+    fadeIn *= scale;
+    fadeOut *= scale;
+  }
+  let gain = 1;
+  if (fadeIn > 0 && t < fadeIn) gain = t / fadeIn;
+  const fadeOutStart = Math.max(0, bed - fadeOut);
+  if (fadeOut > 0 && t > fadeOutStart) {
+    gain = Math.min(gain, Math.max(0, (bed - t) / fadeOut));
+  }
+  return Math.max(0, Math.min(1, gain));
+}
+
+export function sfxWaveformColumns(peaks, durationS, sourceInS, sourceOutS, columnCount) {
+  if (!Array.isArray(peaks) || peaks.length === 0) return [];
+  const duration = Number(durationS);
+  const sourceIn = Number(sourceInS);
+  const sourceOut = Number(sourceOutS);
+  const columns = Math.max(1, Math.floor(Number(columnCount) || 1));
+  if (!(duration > 0) || !Number.isFinite(sourceIn) || !Number.isFinite(sourceOut)) return [];
+  if (!(sourceOut > sourceIn)) return [];
+  const span = sourceOut - sourceIn;
+  const out = [];
+  for (let index = 0; index < columns; index += 1) {
+    const t0 = sourceIn + (span * index) / columns;
+    const t1 = sourceIn + (span * (index + 1)) / columns;
+    let start = Math.floor((t0 / duration) * peaks.length);
+    let end = Math.ceil((t1 / duration) * peaks.length);
+    start = Math.max(0, Math.min(peaks.length - 1, start));
+    end = Math.max(start + 1, Math.min(peaks.length, end));
+    let peak = 0;
+    for (let cursor = start; cursor < end; cursor += 1) {
+      const value = Number(peaks[cursor]);
+      if (Number.isFinite(value) && value > peak) peak = value;
+    }
+    out.push(peak);
+  }
+  return out;
+}
+
+export function paintSfxWaveform(canvas, waveform, clip) {
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  if (!(cssWidth > 0) || !(cssHeight > 0)) return;
+  const pixelRatio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(cssWidth * pixelRatio));
+  const height = Math.max(1, Math.round(cssHeight * pixelRatio));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  context.clearRect(0, 0, width, height);
+  if (!waveform || waveform.status !== "ready" || !Array.isArray(waveform.peaks)) return;
+  const duration = Number(waveform.duration_s) || Number(clip?.duration_s) || 0;
+  const sourceIn = Math.max(0, Number(clip?.source_in_s) || 0);
+  let sourceOut = Number(clip?.source_out_s);
+  if (!Number.isFinite(sourceOut) || !(sourceOut > sourceIn)) {
+    sourceOut = sourceIn + audibleSfxDurationS(clip);
+  }
+  const columns = sfxWaveformColumns(
+    waveform.peaks,
+    duration,
+    sourceIn,
+    sourceOut,
+    Math.max(8, Math.floor(cssWidth / 2))
+  );
+  if (!columns.length) return;
+  context.fillStyle = "rgba(47, 158, 143, 0.9)";
+  const mid = height / 2;
+  const gap = Math.max(1, Math.floor(pixelRatio));
+  const barWidth = width / columns.length;
+  columns.forEach((peak, index) => {
+    const barHeight = Math.max(pixelRatio, peak * height * 0.82);
+    context.fillRect(
+      index * barWidth,
+      mid - barHeight / 2,
+      Math.max(pixelRatio, barWidth - gap),
+      barHeight
+    );
+  });
+}
+
 export function sfxClipStyle(clip, pxPerSecond) {
   const start = Math.max(0, Number(clip?.start_s) || 0);
   const width = Math.max(audibleSfxDurationS(clip), 0.05);
@@ -107,6 +203,10 @@ export function renderSfxClips({
         "ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight"
       );
     }
+    const wave = document.createElement("canvas");
+    wave.className = "studio-sfx-wave";
+    wave.setAttribute("aria-hidden", "true");
+    button.dataset.waveform = clip.waveform_url ? "pending" : "none";
     const label = document.createElement("span");
     label.className = "studio-sfx-clip-label";
     label.textContent = name;
@@ -114,7 +214,7 @@ export function renderSfxClips({
     edgeIn.className = "studio-sfx-edge studio-sfx-edge-in";
     const edgeOut = document.createElement("span");
     edgeOut.className = "studio-sfx-edge studio-sfx-edge-out";
-    button.append(edgeIn, label, edgeOut);
+    button.append(wave, edgeIn, label, edgeOut);
     button.addEventListener("click", (event) => {
       event.preventDefault();
       onSelect?.(clip.id);
