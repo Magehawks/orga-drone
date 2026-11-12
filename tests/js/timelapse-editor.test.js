@@ -63,6 +63,8 @@ function fixture(overrides = {}) {
   };
   const pauses = [];
   const errors = [];
+  const confirms = [];
+  let confirmResult = true;
   const editor = createTimelapseEditor({
     panel,
     getSelection: () => clip,
@@ -72,11 +74,16 @@ function fixture(overrides = {}) {
     forwardLoop: (c) => c.dataset.forwardLoop === "1",
     pause: () => pauses.push(1),
     onError: (error) => errors.push(error || true),
+    confirm: (message) => {
+      confirms.push(message);
+      return confirmResult;
+    },
     messages: {
       invalid: "invalid",
       stale: "stale",
       applied: "applied",
-      removeRamp: "remove-ramp",
+      replaceConfirm: "replace-confirm?",
+      replaceNotice: "replace-notice",
       removeRepeat: "remove-repeat",
       removeLoop: "remove-loop",
       calc: "About {frames} frames (~{duration} s)",
@@ -97,6 +104,10 @@ function fixture(overrides = {}) {
     saves,
     pauses,
     errors,
+    confirms,
+    setConfirmResult(value) {
+      confirmResult = value;
+    },
     setClip(next) {
       clip = next;
     },
@@ -111,10 +122,11 @@ function fixture(overrides = {}) {
       saveImpl = fn;
     },
     getClip: () => clip,
+    getRamp: () => ramp,
   };
 }
 
-test("editor Apply commits the validated draft once and blocks repeats until cleared", async () => {
+test("editor Apply commits the validated draft once", async () => {
   const f = fixture();
   f.editor.fill();
   f.target.value = "15";
@@ -126,11 +138,58 @@ test("editor Apply commits the validated draft once and blocks repeats until cle
   assert.equal(f.saves.length, 1);
   assert.deepEqual(f.saves[0].payload, flatTimelapseRamp(0, 120, 8));
   assert.equal(f.pauses.length, 1);
-  assert.match(f.status.textContent, /remove-ramp|applied/);
-  // Active ramp blocks another Apply without an explicit remove.
+  assert.equal(f.status.textContent, "applied");
+  assert.equal(f.confirms.length, 0);
+});
+
+test("editor asks to replace an existing ramp and Cancel preserves it", async () => {
+  const f = fixture();
+  const existing = flatTimelapseRamp(0, 120, 2);
+  f.setRamp(existing);
+  f.editor.fill();
+  f.target.value = "15";
+  f.target.dispatch("input");
+  assert.equal(f.status.textContent, "replace-notice");
+  assert.equal(f.apply.disabled, false);
+  f.setConfirmResult(false);
   f.apply.dispatch("click");
   await tick();
+  assert.equal(f.confirms.length, 1);
+  assert.equal(f.confirms[0], "replace-confirm?");
+  assert.equal(f.saves.length, 0);
+  assert.deepEqual(f.getRamp(), existing);
+  assert.equal(f.status.textContent, "replace-notice");
+  assert.equal(f.speed.value, "8");
+});
+
+test("editor replace-confirm Apply writes the flat Timelapse ramp", async () => {
+  const f = fixture();
+  f.setRamp(flatTimelapseRamp(0, 120, 2));
+  f.editor.fill();
+  f.target.value = "15";
+  f.target.dispatch("input");
+  f.setConfirmResult(true);
+  f.apply.dispatch("click");
+  await tick();
+  assert.equal(f.confirms.length, 1);
   assert.equal(f.saves.length, 1);
+  assert.deepEqual(f.saves[0].payload, flatTimelapseRamp(0, 120, 8));
+  assert.equal(f.status.textContent, "applied");
+});
+
+test("editor still hard-blocks section repeat even when a ramp is present", async () => {
+  const f = fixture();
+  f.setRamp(flatTimelapseRamp(0, 120, 2));
+  f.getClip().dataset.sectionRepeats = "2";
+  f.editor.fill();
+  f.target.value = "15";
+  f.target.dispatch("input");
+  assert.equal(f.status.textContent, "remove-repeat");
+  assert.equal(f.apply.disabled, true);
+  f.apply.dispatch("click");
+  await tick();
+  assert.equal(f.saves.length, 0);
+  assert.equal(f.confirms.length, 0);
 });
 
 test("editor rejects stale trim after a validated draft without mutating", async () => {

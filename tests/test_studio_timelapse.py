@@ -14,9 +14,11 @@ from orga_drone.export.studio_frame_plan import frame_index, plan_story_frames
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_speed_ramp import MAX_SPEED, Point, SpeedRamp, parse_ramp
 from orga_drone.studio_timelapse import (
+    CONFIRM_REPLACE_RAMP,
     draft_from_speed,
     draft_from_target,
     flat_timelapse_payload,
+    is_hard_timelapse_conflict,
     timelapse_conflict,
 )
 
@@ -43,9 +45,25 @@ def test_unsupported_ratios_and_conflicts_do_not_mutate() -> None:
         draft_from_speed(10.0, 20.001)
     with pytest.raises(ValueError):
         flat_timelapse_payload(0.0, 10.0, 1.0)
-    assert timelapse_conflict(has_ramp=True, section_repeats=1, forward_loop=False)
-    assert timelapse_conflict(has_ramp=False, section_repeats=2, forward_loop=False)
-    assert timelapse_conflict(has_ramp=False, section_repeats=1, forward_loop=True)
+    soft = timelapse_conflict(has_ramp=True, section_repeats=1, forward_loop=False)
+    assert soft == CONFIRM_REPLACE_RAMP
+    assert not is_hard_timelapse_conflict(soft)
+    assert (
+        timelapse_conflict(
+            has_ramp=True, section_repeats=1, forward_loop=False, replace_confirmed=True
+        )
+        is None
+    )
+    assert is_hard_timelapse_conflict(
+        timelapse_conflict(has_ramp=False, section_repeats=2, forward_loop=False)
+    )
+    assert is_hard_timelapse_conflict(
+        timelapse_conflict(has_ramp=False, section_repeats=1, forward_loop=True)
+    )
+    # Hard blocks win over a pending ramp replace confirm.
+    assert is_hard_timelapse_conflict(
+        timelapse_conflict(has_ramp=True, section_repeats=2, forward_loop=False)
+    )
     assert timelapse_conflict(has_ramp=False, section_repeats=1, forward_loop=False) is None
 
 

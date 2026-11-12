@@ -754,8 +754,11 @@ msgstr "Applying Timelapse replaces slow motion with a flat speed ramp. Source a
 msgid "Apply Timelapse"
 msgstr "Apply Timelapse"
 
-msgid "Remove the speed ramp before applying Timelapse."
-msgstr "Remove the speed ramp before applying Timelapse."
+msgid "Applying Timelapse replaces the existing speed ramp. Continue?"
+msgstr "Applying Timelapse replaces the existing speed ramp. Continue?"
+
+msgid "This clip has a speed ramp. Apply will ask to replace it."
+msgstr "This clip has a speed ramp. Apply will ask to replace it."
 
 msgid "Turn off section repeat before applying Timelapse."
 msgstr "Turn off section repeat before applying Timelapse."

@@ -1,7 +1,8 @@
 # Discovery: Timelapse and variable speed-ramp coexistence (#333)
 
-Status: **Discovery / decision proposal** — no behavior change. Product
-Owner decides; implementation follows in a separately approved issue.
+Status: **Option A approved and implemented** (explicit replace confirm).
+Product Owner selected Option A; see the Timelapse editor confirm path and
+`CONFIRM_REPLACE_RAMP` soft gate. Option B remains deferred behind #331.
 
 ## Current behavior (verified on develop, `studio_timelapse.py`)
 

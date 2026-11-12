@@ -13539,7 +13539,8 @@ import {
     pause: pausePlayback,
     onError: () => showFlash(msgSpeedFailed),
     messages: {
-      removeRamp: timelapsePanel?.dataset.msgRemoveRamp,
+      replaceConfirm: timelapsePanel?.dataset.msgReplaceConfirm,
+      replaceNotice: timelapsePanel?.dataset.msgReplaceNotice,
       removeRepeat: timelapsePanel?.dataset.msgRemoveRepeat,
       removeLoop: timelapsePanel?.dataset.msgRemoveLoop,
       invalid: timelapsePanel?.dataset.msgInvalid,
