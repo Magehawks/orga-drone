@@ -804,7 +804,7 @@ def main() -> int:
                 ),
                 "Music add",
             )
-            placed = []
+            placed: list[Any] = []
             for path, start in ((hit, 0.4), (whoosh, 1.1)):
                 payload = expect_ok(
                     fetch_json(
