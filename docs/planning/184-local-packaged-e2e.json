@@ -1,0 +1,169 @@
+{
+  "admission": "local-development",
+  "app_version": "2.3.3",
+  "artifact_api_digest": null,
+  "artifact_api_size": null,
+  "artifact_name": null,
+  "artifact_sha256": "",
+  "artifact_size": 0,
+  "base_sha": "local",
+  "elapsed_ms": 18780,
+  "generated_at": "2026-11-12T20:04:07.898319+00:00",
+  "head_sha": "local",
+  "journeys": {
+    "edit_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 328,
+      "ok": true
+    },
+    "export": {
+      "detail": {
+        "audio_peak": 0.412109375,
+        "blue_frames": 3,
+        "bytes": 55698,
+        "frames": 5,
+        "red_frames": 2,
+        "sha256": "ee24d0864eba79ca8cc7c0aba53ca78c5aa1128f3bf73cbf469735606d640141"
+      },
+      "elapsed_ms": 2014,
+      "ok": true
+    },
+    "image_export": {
+      "detail": {
+        "bytes": 8958,
+        "preset": "instagram",
+        "sha256": "da4e80ee800e0657e56b62ae54bfdddbe91891292c80ee1bbc39c231ef218626"
+      },
+      "elapsed_ms": 282,
+      "ok": true
+    },
+    "library_navigation": {
+      "detail": {
+        "browse_chars": 890
+      },
+      "elapsed_ms": 609,
+      "ok": true
+    },
+    "lut_parity": {
+      "detail": {
+        "asset": "c8c4832063c14b3ba7999a248b8cc473.cube",
+        "cube_sha256": "5bda4a9ca328a0b664b540833870b7b33faacf837c82017d497c50c6e305c189",
+        "errors": [
+          0.897,
+          0.103,
+          1.672
+        ],
+        "export_mean": [
+          252.0,
+          87.0,
+          87.01
+        ],
+        "preview_mean": [
+          251.1,
+          87.1,
+          85.34
+        ],
+        "tolerance": 8.0
+      },
+      "elapsed_ms": 2031,
+      "ok": true
+    },
+    "media_import": {
+      "detail": {
+        "counts": {
+          "assets": 2,
+          "flows": 0,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "offline": 0,
+          "photos": 1,
+          "preserved": 0,
+          "removed": 0,
+          "sessions": 0,
+          "unavailable": 0,
+          "unchanged": 0,
+          "unreadable": 0,
+          "videos": 1
+        },
+        "job_id": "e5386e2a-caa3-43c9-99ee-3d52f0efd481"
+      },
+      "elapsed_ms": 1093,
+      "ok": true
+    },
+    "playback": {
+      "detail": {
+        "currentTime": 0.961374,
+        "paused": false,
+        "readyState": 4
+      },
+      "elapsed_ms": 1327,
+      "ok": true
+    },
+    "relaunch_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 3811,
+      "ok": true
+    },
+    "sfx_control": {
+      "detail": {
+        "status": "persisted",
+        "volume": 0.35
+      },
+      "elapsed_ms": 62,
+      "ok": true
+    },
+    "sfx_lane": {
+      "detail": {
+        "clips": 2,
+        "dragged_start_s": 1.97,
+        "music": "e2e-bed.wav",
+        "trimmed_source_out_s": 0.7
+      },
+      "elapsed_ms": 1733,
+      "ok": true
+    },
+    "source_integrity": {
+      "detail": {
+        "files": [
+          "e2e-bed.wav",
+          "e2e-blue.jpg",
+          "e2e-hit.wav",
+          "e2e-red.mp4",
+          "e2e-whoosh.wav"
+        ]
+      },
+      "elapsed_ms": 0,
+      "ok": true
+    },
+    "startup": {
+      "detail": {
+        "title": "Start \u00b7 orga-drone",
+        "version": "2.3.3"
+      },
+      "elapsed_ms": 281,
+      "ok": true
+    },
+    "studio_open": {
+      "detail": {
+        "project_id": 1
+      },
+      "elapsed_ms": 812,
+      "ok": true
+    }
+  },
+  "manual_checks_claimed": false,
+  "pr_number": 0,
+  "repository": "local",
+  "result": "pass",
+  "run_attempt": 0,
+  "run_id": 0,
+  "runner_image": "Windows-11-10.0.26300-SP0",
+  "schema": "orga-drone-packaged-e2e-v1",
+  "tested_merge_sha": "local",
+  "tested_tree_sha": "local",
+  "webview2_version": "157.0.4341.46"
+}
