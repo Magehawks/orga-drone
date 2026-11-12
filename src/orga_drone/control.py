@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from orga_drone.timeline_actions import TimelineActionError, apply_timeline, timeline_view
+from orga_drone.export.studio_encoder import StudioExportError
+from orga_drone.studio_export import start_studio_export_job
 from orga_drone.studio_history import transactional_story_undo, capture_story
 from orga_drone.project_actions import (
     ProjectActionError, create_project, open_project, rename_project, delete_project,
@@ -104,6 +106,10 @@ class ControlService:
         self.timeline_anchor: int | None = None
         self.timeline_anchor_revision = 0
         self.clock = time.monotonic
+        # Injected by the app after the job store exists (issue #282):
+        # export_status/export_cancel/export_start share the HTTP route's
+        # store, so both paths see the same single active export.
+        self.export_jobs: Any = None
 
     @property
     def enabled(self) -> bool:
@@ -397,6 +403,11 @@ class ControlService:
     def _check(self, body: dict[str, Any], state: dict[str, Any]) -> None:
         self._session(body["session_id"])
         project_action = body["type"] == "project_action"
+        export_command = body["type"] in (
+            "export_start",
+            "export_status",
+            "export_cancel",
+        )
         timeline_command = self._timeline_command(body)
         timeline_undo = (
             body["type"] == "undo_last_change" and timeline_command is not None
@@ -416,7 +427,7 @@ class ControlService:
             # must still match the editor's current selection.
             if body["clip_id"] is not None and body["clip_id"] != state["clip_id"]:
                 raise ControlError("STALE_SELECTION")
-        elif not project_action and expected_clip != state["clip_id"]:
+        elif not project_action and not export_command and expected_clip != state["clip_id"]:
             raise ControlError("STALE_SELECTION")
         if timeline_undo and self.timeline_anchor is None and state["selection_revision"] != self.timeline_anchor_revision:
             raise ControlError("UNDO_CONFLICT")
@@ -433,7 +444,16 @@ class ControlService:
                 raise ControlError("UNDO_CONFLICT")
         if body["expected_state_token"] != self._token(state):
             raise ControlError("STALE_STATE")
-        if state["playing"] or state["busy"] or (not project_action and not timeline and not state["ready"]):
+        if (
+            not export_command
+            and (
+                state["playing"]
+                or state["busy"]
+                or (not project_action and not timeline and not state["ready"])
+            )
+        ):
+            # Export commands never mutate editor state; a playing or busy
+            # editor does not block starting/observing a render job.
             raise ControlError("EDITOR_BUSY")
         if project_action or timeline:
             opened = self.db.get_open_studio_project()
@@ -441,7 +461,7 @@ class ControlService:
                 raise ControlError("STALE_STATE")
             if timeline and self.reload_ticket is not None:
                 raise ControlError("EDITOR_BUSY")
-        else:
+        elif not export_command:
             self._clip(body["project_id"], body["clip_id"])
 
     def submit(self, payload: Any) -> dict[str, Any]:
@@ -460,6 +480,10 @@ class ControlService:
                 "action",
                 "action_version",
                 "params",
+                "height",
+                "quality",
+                "output_path",
+                "job_id",
             },
             {
                 "command_id",
@@ -474,7 +498,25 @@ class ControlService:
         cid = identifier(body["command_id"])
         identifier(body["session_id"])
         positive_id(body["project_id"])
-        if body["type"] in {"timeline_action", "undo_last_change"} and body["clip_id"] is None:
+        if body["type"] in ("export_status", "export_cancel"):
+            # Job commands are project-scoped reads/cancel only.
+            if body["clip_id"] is not None:
+                raise ControlError("INVALID_TARGET", 400)
+            if not isinstance(body["job_id"], str) or not body["job_id"]:
+                raise ControlError("INVALID_PAYLOAD", 400)
+        elif body["type"] == "export_start":
+            if body["clip_id"] is not None:
+                raise ControlError("INVALID_TARGET", 400)
+            if not isinstance(body.get("height"), int) or isinstance(body.get("height"), bool):
+                raise ControlError("INVALID_PAYLOAD", 400)
+            if not isinstance(body.get("output_path"), str) or not str(body["output_path"]).strip():
+                raise ControlError("INVALID_PAYLOAD", 400)
+            if body.get("quality") is not None and not isinstance(body["quality"], str):
+                raise ControlError("INVALID_PAYLOAD", 400)
+            # "overwrite" is not an accepted field at all: shape() rejects it,
+            # so a silent overwrite is impossible through the Control API and
+            # an existing file stays a 409-class error.
+        elif body["type"] in {"timeline_action", "undo_last_change"} and body["clip_id"] is None:
             pass
         elif body["type"] == "project_action":
             if body["clip_id"] is not None:
@@ -492,9 +534,21 @@ class ControlService:
             "apply_action",
             "project_action",
             "timeline_action",
+            "export_start",
+            "export_status",
+            "export_cancel",
         ):
             raise ControlError("UNKNOWN_COMMAND", 400)
-        if body["type"] == "set_clip_properties":
+        if body["type"] in ("export_status", "export_cancel"):
+            if set(body) & {"properties", "undo_command_id", "action",
+                            "action_version", "params", "height", "quality",
+                            "output_path"}:
+                raise ControlError("INVALID_PAYLOAD", 400)
+        elif body["type"] == "export_start":
+            if set(body) & {"properties", "undo_command_id", "action",
+                            "action_version", "params", "job_id"}:
+                raise ControlError("INVALID_PAYLOAD", 400)
+        elif body["type"] == "set_clip_properties":
             if "undo_command_id" in body or set(body) & {
                 "action",
                 "action_version",
@@ -629,6 +683,12 @@ class ControlService:
             target = cmd["payload"]
             try:
                 self._check(target, state)
+                if target["type"] in (
+                    "export_start",
+                    "export_status",
+                    "export_cancel",
+                ):
+                    return self._execute_export(cmd)
                 if target["type"] == "project_action":
                     return self._execute_project(cmd, state)
                 if target["type"] == "timeline_action" or (
@@ -886,6 +946,82 @@ class ControlService:
                 "selection_clip_id": ticket["anchor"],
                 "command_id": ticket["command_id"],
             }
+
+    def _execute_export(self, cmd: dict[str, Any]) -> dict[str, Any]:
+        """export_start/status/cancel share the HTTP route's job store so both
+        paths launch the same render pipeline (issue #282)."""
+        from orga_drone.studio_export import (
+            prepare_studio_export,
+            run_studio_export,
+        )
+
+        target = cmd["payload"]
+        store = self.export_jobs
+        if store is None:
+            raise ControlError("EDITOR_NOT_READY")
+        kind = target["type"]
+        if kind == "export_status":
+            job = store.get(str(target["job_id"]))
+            if job is None:
+                raise ControlError("TARGET_NOT_FOUND", 404)
+            cmd["result"].update(
+                status="persisted",
+                persisted=True,
+                ui_applied=False,
+                canonical={"export_job": job.to_dict()},
+                no_op=False,
+            )
+            return cmd["result"]
+        if kind == "export_cancel":
+            event = store.cancel_event(str(target["job_id"]))
+            if event is None:
+                raise ControlError("TARGET_NOT_FOUND", 404)
+            event.set()
+            cmd["result"].update(
+                status="persisted",
+                persisted=True,
+                ui_applied=False,
+                canonical={"cancel_requested": str(target["job_id"])},
+                no_op=False,
+            )
+            return cmd["result"]
+        # export_start: same preflight + same pipeline as the HTTP route.
+        output_path = str(target["output_path"])
+        try:
+            prepare_studio_export(
+                self.db,
+                height=int(target["height"]),
+                output_path=Path(output_path),
+                project_id=target["project_id"],
+                quality=target.get("quality"),
+            )
+        except StudioExportError as exc:
+            raise ControlError("INVALID_PAYLOAD", 409) from exc
+        def work(on_progress, cancel_event):  # type: ignore[no-untyped-def]
+            return run_studio_export(
+                self.db,
+                height=int(target["height"]),
+                output_path=Path(output_path),
+                project_id=target["project_id"],
+                quality=target.get("quality"),
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
+
+        try:
+            job_id = start_studio_export_job(
+                store, work, lambda message: message
+            )
+        except StudioExportError as exc:
+            raise ControlError("EXPORT_BUSY", 409) from exc
+        cmd["result"].update(
+            status="persisted",
+            persisted=True,
+            ui_applied=False,
+            canonical={"export_job_id": job_id, "started_at": time.time()},
+            no_op=False,
+        )
+        return cmd["result"]
 
     def _execute_project(self, cmd: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
         target = cmd["payload"]

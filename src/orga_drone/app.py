@@ -455,6 +455,7 @@ def create_app() -> FastAPI:
 
     app.state.scan_jobs = ScanJobStore()
     app.state.export_jobs = ExportJobStore()
+    control.export_jobs = app.state.export_jobs
     app.state.update_checker = UpdateChecker()
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -3534,47 +3535,18 @@ def create_app() -> FastAPI:
         work: Callable[..., Path],
         translate: Callable[[str], str],
     ) -> JSONResponse:
-        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
-
-        from orga_drone.studio_export import translate_export_error
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_export import start_studio_export_job
 
         store: ExportJobStore = app.state.export_jobs
-        job = store.try_create()
-        if job is None:
+        try:
+            job_id = start_studio_export_job(store, work, translate)
+        except StudioExportError as exc:
             raise HTTPException(
                 status_code=409,
-                detail="An export is already running. Wait for it to finish.",
-            )
-        cancel_event = store.cancel_event(job.id)
-
-        def _worker() -> None:
-            store.mark_running(job.id)
-
-            def on_progress(progress: dict[str, Any]) -> None:
-                store.apply_progress(job.id, progress)
-
-            try:
-                result = work(on_progress, cancel_event)
-                store.complete(
-                    job.id,
-                    output_path=str(result),
-                    directory=str(result.parent),
-                )
-            except ExportCancelled:
-                store.finish_cancelled(job.id)
-            except StudioExportError as exc:
-                if cancel_event is not None and cancel_event.is_set():
-                    store.finish_cancelled(job.id)
-                else:
-                    store.fail(job.id, translate_export_error(exc, translate))
-            except Exception as exc:  # noqa: BLE001
-                if cancel_event is not None and cancel_event.is_set():
-                    store.finish_cancelled(job.id)
-                else:
-                    store.fail(job.id, f"Export failed: {exc}")
-
-        threading.Thread(target=_worker, name=f"studio-export-{job.id}", daemon=True).start()
-        return JSONResponse({"ok": True, "job_id": job.id})
+                detail=translate(str(exc)),
+            ) from exc
+        return JSONResponse({"ok": True, "job_id": job_id})
 
     def _media_export_error(exc: BaseException, translate: Callable[[str], str]) -> HTTPException:
         from orga_drone.export.studio_encoder import StudioExportError

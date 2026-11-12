@@ -101,6 +101,8 @@ Stable codes are part of the contract: `CONTROL_DISABLED`, `INVALID_CREDENTIAL`,
 `COMMAND_ID_CONFLICT`, `COMMAND_CAPACITY_REACHED`, `LUT_UNAVAILABLE`,
 `MEDIA_UNAVAILABLE`, `UNSUPPORTED_CLIP`, `ANIMATED_SETTINGS_UNSUPPORTED`,
 `UNDO_CONFLICT`, `INVALID_CLIP_SETTINGS`, and `DATABASE_ERROR`.
+Issue #282 adds `EXPORT_BUSY` (a render job is already active; both entry
+points share the single-active-export rule).
 
 ### Versioning
 
@@ -112,6 +114,14 @@ Stable codes are part of the contract: `CONTROL_DISABLED`, `INVALID_CREDENTIAL`,
   new command type and do not silently change its payload.
 - Persisted `effect_settings` and the SQLite schema are not changed by the action
   contract. Project compatibility is preserved.
+- Issue #282 adds three compatible command types: `export_start`
+  (project-scoped; height from the shared export-options resolution, quality,
+  output path; **no** `overwrite` field — a silent overwrite is impossible and
+  the encoder only claims free names), `export_status` (job state/progress),
+  and `export_cancel`. All three use the same job store and render pipeline as
+  the HTTP routes; `execute` reports rejection as `status=rejected` with
+  `error_code` and never raises to the client. Exports never block on a
+  paused/playing editor.
 
 ### Semantic guidance for MCP assistants (#291)
 
