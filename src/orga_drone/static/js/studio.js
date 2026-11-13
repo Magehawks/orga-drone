@@ -18,7 +18,7 @@ import {
   managedBakeUrl,
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
-import { fetchGrade } from "./studio/grade-api.js";
+import { fetchGrade, postGradeCommand } from "./studio/grade-api.js";
 import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
 import {
   buildPreviewFrameUrl,
@@ -4360,6 +4360,56 @@ import {
       token,
       queue: quickLookSaveQueue,
       execute: async () => {
+        // Managed grades compile Quick Looks to inspectable primaries (#361).
+        let managed = managedGradeForClip(clip);
+        if (!managed) {
+          try {
+            managed = await fetchGrade(studioId);
+            cacheManagedGradeOnClip(clip, managed);
+          } catch (_err) {
+            managed = null;
+          }
+        }
+        if (managed && managed.evaluator === "managed-sdr-v1") {
+          if (!desiredLook) {
+            const primaries = (managed.grade?.steps || []).find(
+              (step) => step && step.type === "primaries-v1"
+            );
+            if (!primaries?.id) {
+              return { ok: true, quick_look: "", grade: managed };
+            }
+            const payload = await postGradeCommand(studioId, {
+              type: "upsert_step_params",
+              expectedRevision: managed.revision,
+              params: {
+                step_id: primaries.id,
+                type: "primaries-v1",
+                params: {
+                  exposure: 0,
+                  kelvin: 6500,
+                  tint: 0,
+                  contrast: 1,
+                  pivot: 0.18,
+                  saturation: 1,
+                  blacks: 0,
+                  shadows: 0,
+                  highlights: 0,
+                  whites: 0,
+                },
+                enabled: true,
+              },
+              historyGroup: `quick-look-${studioId}`,
+            });
+            return { ok: true, quick_look: "", grade: payload };
+          }
+          const payload = await postGradeCommand(studioId, {
+            type: "apply_preset",
+            expectedRevision: managed.revision,
+            params: { preset_id: desiredLook },
+            historyGroup: `quick-look-${studioId}`,
+          });
+          return { ok: true, quick_look: desiredLook, grade: payload };
+        }
         const res = await fetch(`/api/studio/${studioId}/look`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -4379,6 +4429,12 @@ import {
     }
     const body = outcome.result;
     if (body.image) writeImageAdjust(clip, body.image, true);
+    if (body.grade) {
+      cacheManagedGradeOnClip(clip, body.grade);
+      if (managedColorEditor?.fill) {
+        void managedColorEditor.fill();
+      }
+    }
     clip.dataset.quickLook = body.quick_look || "";
     const selected = selectedAdjustableClip();
     if (

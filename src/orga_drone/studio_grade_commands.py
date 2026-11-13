@@ -27,6 +27,7 @@ COMMAND_CAPABILITIES = (
     "remove_step",
     "upsert_selection",
     "bind_step_selection",
+    "apply_preset",
     "upsert_animation",
     "remove_animation",
     "reorder_animation",
@@ -243,6 +244,38 @@ def validate_patch(
                 for entry in grade.get("selections") or []
                 if entry.get("id") in used
             ]
+    elif kind == "apply_preset":
+        if set(params) != {"preset_id"}:
+            fail("command.params", "Expected preset_id only")
+        from orga_drone.studio_grade_presets import compile_quick_look_to_primaries
+
+        try:
+            compiled = compile_quick_look_to_primaries(str(params["preset_id"]))
+        except ValueError as exc:
+            fail("command.params.preset_id", str(exc))
+        body = object_value(compiled["params"], "command.params.compiled.params")
+        step = next((entry for entry in steps if entry["type"] == "primaries-v1"), None)
+        if step is None:
+            grade["steps"] = list(steps) + [
+                {
+                    "id": "primaries-preset",
+                    "type": "primaries-v1",
+                    "enabled": True,
+                    "mix": 1.0,
+                    "params": dict(body),
+                    "selection_id": None,
+                }
+            ]
+        else:
+            step["enabled"] = True
+            step["params"] = dict(body)
+        extensions = object_value(grade.get("extensions") or {}, "grade.extensions")
+        extensions["creative_preset"] = {
+            "id": compiled["preset_id"],
+            "source": compiled["source"],
+            "compiled_type": compiled["type"],
+        }
+        grade["extensions"] = extensions
     else:
         field = "enabled" if kind == "set_step_enabled" else "mix"
         if set(params) != {"step_id", field}:
