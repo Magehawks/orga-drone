@@ -20,7 +20,7 @@ def test_rgb_hsl_luma_and_gray_gate() -> None:
     # Intervals are (inner fully selected, outer zero). High red uses inner=1.
     assert rgb_qualifier(red, ((1.0, 0.8), (0.0, 0.2), (0.0, 0.2))) == 1.0
     assert rgb_qualifier(red, ((0.0, 0.2), (0.0, 0.2), (0.0, 0.2))) == 0.0
-    assert hsl_qualifier(red, hue=(0.0, 40.0)) == 1.0
+    assert hsl_qualifier(red, hue=(320.0, 40.0)) == 1.0
     assert hsl_qualifier((0.5, 0.5, 0.5), hue=(0.0, 60.0)) == 0.0
     assert luma_qualifier(red, 0.2126, 0.05) == 1.0
     assert selection_coverage(1.0, 0.5, invert=True) == pytest.approx(0.5)
