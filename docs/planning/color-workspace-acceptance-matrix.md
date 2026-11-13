@@ -130,7 +130,7 @@ pytest tests/test_studio_grade_animation.py \
 |---|---|
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
-| #361 | Step editor + Quick Look `apply_preset` compile shipped; desktop E2E NOT_RUN — deferred by PO |
+| #361 | Step editor + Quick Look `apply_preset` compile shipped |
 | #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

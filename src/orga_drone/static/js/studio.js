@@ -4277,9 +4277,18 @@ import {
       if (input) input.value = String(shown);
       if (valueEl) valueEl.textContent = String(shown);
     });
+    const managed = managedGradeForClip(clip);
+    const managedPreset =
+      managed?.evaluator === "managed-sdr-v1"
+        ? managed?.grade?.extensions?.creative_preset?.id || ""
+        : "";
+    if (managedPreset) {
+      clip.dataset.quickLook = managedPreset;
+    }
+    const lookId = clip.dataset.quickLook || managedPreset || "";
     const lookSelect = document.getElementById("inspector-quick-look");
-    if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
-    syncQuickLookChips(clip.dataset.quickLook || "");
+    if (lookSelect) lookSelect.value = lookId;
+    syncQuickLookChips(lookId);
     fillHsl(clip);
     fillColorWheels(clip);
     fillColorAnimationInspector(clip);
@@ -4371,44 +4380,15 @@ import {
           }
         }
         if (managed && managed.evaluator === "managed-sdr-v1") {
-          if (!desiredLook) {
-            const primaries = (managed.grade?.steps || []).find(
-              (step) => step && step.type === "primaries-v1"
-            );
-            if (!primaries?.id) {
-              return { ok: true, quick_look: "", grade: managed };
-            }
-            const payload = await postGradeCommand(studioId, {
-              type: "upsert_step_params",
-              expectedRevision: managed.revision,
-              params: {
-                step_id: primaries.id,
-                type: "primaries-v1",
-                params: {
-                  exposure: 0,
-                  kelvin: 6500,
-                  tint: 0,
-                  contrast: 1,
-                  pivot: 0.18,
-                  saturation: 1,
-                  blacks: 0,
-                  shadows: 0,
-                  highlights: 0,
-                  whites: 0,
-                },
-                enabled: true,
-              },
-              historyGroup: `quick-look-${studioId}`,
-            });
-            return { ok: true, quick_look: "", grade: payload };
-          }
           const payload = await postGradeCommand(studioId, {
             type: "apply_preset",
             expectedRevision: managed.revision,
             params: { preset_id: desiredLook },
             historyGroup: `quick-look-${studioId}`,
           });
-          return { ok: true, quick_look: desiredLook, grade: payload };
+          const presetId =
+            payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
+          return { ok: true, quick_look: presetId, grade: payload };
         }
         const res = await fetch(`/api/studio/${studioId}/look`, {
           method: "PATCH",

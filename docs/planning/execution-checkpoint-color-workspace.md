@@ -1,7 +1,7 @@
 # Color Workspace execution checkpoint
 
 Updated: 2026-11-13. Integration branch `develop` tip
-`cb807a3` (after #436–#440; follow-up `apply_preset` in flight).
+`cb807a3` (after #436–#440; `apply_preset` follow-up PR).
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.

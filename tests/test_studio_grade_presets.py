@@ -78,3 +78,40 @@ def test_apply_preset_rejects_unknown_ids() -> None:
             },
             7,
         )
+
+
+def test_apply_preset_clear_removes_extension() -> None:
+    model = read_grade(managed())
+    applied = validate_patch(
+        model,
+        {
+            "type": "apply_preset",
+            "project_id": 1,
+            "clip_id": 2,
+            "expected_revision": 7,
+            "params": {"preset_id": "cool"},
+        },
+        7,
+    )
+    cleared = validate_patch(
+        applied.proposed,
+        {
+            "type": "apply_preset",
+            "project_id": 1,
+            "clip_id": 2,
+            "expected_revision": 7,
+            "params": {"preset_id": ""},
+        },
+        7,
+    )
+    assert "creative_preset" not in cleared.proposed.grade["extensions"]
+    assert cleared.proposed.grade["steps"][0]["params"]["exposure"] == 0
+
+
+def test_apply_preset_listed_in_command_capabilities() -> None:
+    from orga_drone.studio_grade_commands import COMMAND_CAPABILITIES
+    from orga_drone.studio_grade_bridge import grade_capability_report
+
+    assert "apply_preset" in COMMAND_CAPABILITIES
+    report = grade_capability_report(read_grade(managed()))
+    assert "apply_preset" in report["commands"]

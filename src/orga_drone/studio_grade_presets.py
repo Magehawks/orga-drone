@@ -47,8 +47,24 @@ def compile_quick_look_to_primaries(look_id: str) -> dict[str, Any]:
     }
 
 
+def neutral_primaries_params() -> dict[str, float | int]:
+    """Documented managed primaries neutrals used when clearing a Creative preset."""
+    return image_adjust_to_primaries_params(ImageAdjust())
+
+
 def apply_preset_params(params: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate ``apply_preset`` command params and return the compile payload."""
+    """Validate ``apply_preset`` command params and return the compile payload.
+
+    Empty ``preset_id`` clears the Creative preset label and returns neutrals.
+    """
     if set(params) != {"preset_id"}:
         raise ValueError("Expected preset_id only")
-    return compile_quick_look_to_primaries(str(params["preset_id"]))
+    raw = params["preset_id"]
+    if raw in ("", None):
+        return {
+            "preset_id": "",
+            "type": "primaries-v1",
+            "params": neutral_primaries_params(),
+            "source": "quick-look-v1",
+        }
+    return compile_quick_look_to_primaries(str(raw))
