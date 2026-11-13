@@ -2387,7 +2387,7 @@ def create_app() -> FastAPI:
         if "expected_revision" not in payload or "type" not in payload:
             raise HTTPException(
                 status_code=400,
-                detail="type, expected_revision and params are required",
+                detail="type and expected_revision are required",
             )
         try:
             expected = int(payload["expected_revision"])

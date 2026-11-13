@@ -728,10 +728,23 @@ class ControlService:
                         spec = resolve_action_spec(
                             target["action"], target["action_version"]
                         )
+                        action_params = dict(target["params"])
+                        if spec.name == "clip.grade.command":
+                            # Identity comes from the Control target; reject
+                            # mismatched client-supplied project/clip ids.
+                            for key, expected in (
+                                ("project_id", target["project_id"]),
+                                ("clip_id", target["clip_id"]),
+                            ):
+                                if key in action_params and int(
+                                    action_params[key]
+                                ) != int(expected):
+                                    raise ControlError("INVALID_TARGET")
+                                action_params[key] = int(expected)
                         raw = prepare_action(
                             spec,
                             clip.effect_settings,
-                            target["params"],
+                            action_params,
                             available_luts,
                             self.data_dir,
                             clip_duration_s=(

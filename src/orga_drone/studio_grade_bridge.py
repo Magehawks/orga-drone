@@ -63,8 +63,15 @@ def apply_grade_command_text(
     command: Mapping[str, Any],
     *,
     expected_revision: int,
+    data_dir: Any | None = None,
 ) -> str:
     """Return published effect_settings JSON for one shared grade command."""
+    from pathlib import Path
+
+    from orga_drone.studio_grade_persistence import require_writes_enabled
+
+    if data_dir is not None:
+        require_writes_enabled(Path(data_dir))
     current = read_grade(effect_settings)
     result = validate_patch(current, command, expected_revision=expected_revision)
     return publish_grade_document(

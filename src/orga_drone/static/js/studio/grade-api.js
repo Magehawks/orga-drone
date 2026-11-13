@@ -72,10 +72,7 @@ export async function putGrade(studioId, { grade, expectedRevision, extras = {} 
 }
 
 /** Shared bounded grade command (#363). Prefer over full PUT for enable/mix/reorder/animation. */
-export async function postGradeCommand(
-  studioId,
-  { type, expectedRevision, params = {} },
-) {
+export async function postGradeCommand(studioId, { type, expectedRevision, params = {} }) {
   const response = await fetch(`/api/studio/${studioId}/grade/command`, {
     method: "POST",
     headers: {
@@ -90,9 +87,7 @@ export async function postGradeCommand(
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(
-      data?.detail?.message || data?.detail || "grade command failed",
-    );
+    const error = new Error(data?.detail?.message || data?.detail || "grade command failed");
     error.status = response.status;
     error.code = data?.detail?.code;
     throw error;

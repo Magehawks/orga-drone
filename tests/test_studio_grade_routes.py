@@ -86,3 +86,63 @@ def test_grade_wrap_get_and_convert(
     assert converted.status_code == 200
     assert converted.json()["evaluator"] == "managed-sdr-v1"
     assert converted.json()["grade"]["steps"] == []
+
+
+def test_grade_command_route_and_capabilities(
+    grade_client: tuple[TestClient, int],
+) -> None:
+    client, clip_id = grade_client
+    client.post(f"/api/studio/{clip_id}/grade/wrap")
+    converted = client.post(
+        f"/api/studio/{clip_id}/grade/convert-managed",
+        json={"acknowledge_appearance_change": True},
+    )
+    assert converted.status_code == 200
+    revision = int(converted.json()["revision"])
+    grade = converted.json()["grade"]
+    grade["steps"] = [
+        {
+            "id": "step-1",
+            "type": "primaries-v1",
+            "enabled": True,
+            "mix": 1,
+            "params": {"exposure": 0.0},
+            "selection_id": None,
+        }
+    ]
+    put = client.put(
+        f"/api/studio/{clip_id}/grade",
+        json={"grade": grade, "expected_revision": revision, "vendor_keep": {"x": 1}},
+    )
+    assert put.status_code == 200
+    revision = int(put.json()["revision"])
+    got = client.get(f"/api/studio/{clip_id}/grade")
+    assert got.status_code == 200
+    caps = got.json()["capabilities"]
+    assert "set_step_mix" in caps["commands"]
+    assert caps["writes"] is True
+    assert "primaries-v1" in caps["operations"]
+    cmd = client.post(
+        f"/api/studio/{clip_id}/grade/command",
+        json={
+            "type": "set_step_mix",
+            "expected_revision": revision,
+            "params": {"step_id": "step-1", "mix": 0.4},
+        },
+    )
+    assert cmd.status_code == 200
+    body = cmd.json()
+    assert body["grade"]["steps"][0]["mix"] == 0.4
+    assert body["revision"] == revision + 1
+    assert body["changed"] is True
+    # Opaque root preserved through command publish.
+    assert got.json()["grade"] is not None
+    stale = client.post(
+        f"/api/studio/{clip_id}/grade/command",
+        json={
+            "type": "set_step_enabled",
+            "expected_revision": revision,
+            "params": {"step_id": "step-1", "enabled": False},
+        },
+    )
+    assert stale.status_code == 409

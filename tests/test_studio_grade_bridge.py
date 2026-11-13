@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -85,7 +86,18 @@ def test_stale_revision_rejects() -> None:
     assert excinfo.value.code == "STALE_REVISION"
 
 
-def test_control_prepare_action_grade_command() -> None:
+def test_control_prepare_action_grade_command(tmp_path: Path) -> None:
+    from orga_drone.db import Database
+    from orga_drone.grade_backup import LIVE_DB_NAME
+    from orga_drone.studio_grade_persistence import (
+        startup_backup_if_needed,
+        writes_enabled,
+    )
+
+    data_dir = tmp_path / "data"
+    Database(data_dir / LIVE_DB_NAME)
+    startup_backup_if_needed(data_dir, app_version="test")
+    assert writes_enabled(data_dir) is True
     raw = json.dumps(_managed_document())
     spec = resolve_action_spec("clip.grade.command", 1)
     prepared = prepare_action(
@@ -99,8 +111,9 @@ def test_control_prepare_action_grade_command() -> None:
             "clip_id": 3,
         },
         set(),
-        __import__("pathlib").Path("."),
+        data_dir,
     )
     model = read_grade(prepared)
     assert model.steps[0]["enabled"] is False
     assert model.revision == 5
+

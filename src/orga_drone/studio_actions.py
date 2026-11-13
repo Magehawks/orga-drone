@@ -644,7 +644,10 @@ def prepare_action(
                 "params": params["params"],
             }
             return apply_grade_command_text(
-                raw, command, expected_revision=expected
+                raw,
+                command,
+                expected_revision=expected,
+                data_dir=data_dir,
             )
         except GradeError as exc:
             raise ActionValidationError(exc.code) from None
