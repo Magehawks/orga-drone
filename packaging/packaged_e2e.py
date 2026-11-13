@@ -23,10 +23,15 @@ REQUIRED_JOURNEYS = (
     "studio_open",
     "playback",
     "edit_persistence",
+    "timeline_transitions",
+    "speed_and_timelapse",
+    "undo_redo_timeline",
+    "export_1080p",
     "export",
     "image_export",
     "source_integrity",
     "relaunch_persistence",
+    "shutdown",
 )
 MAX_EVIDENCE_ZIP_BYTES = 16 * 1024 * 1024
 MAX_EVIDENCE_JSON_BYTES = 256 * 1024
