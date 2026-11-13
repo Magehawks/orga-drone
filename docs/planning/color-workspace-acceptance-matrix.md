@@ -61,7 +61,7 @@ and stopped #320 precision experiments are not weakened.
 | Shared grade commands | PASS | #433 |
 | Save/reopen / clip switch | PASS (API) | grade route tests |
 | Editor command migration (enable/mix/reorder) | PASS | `postGradeCommand` in step editor |
-| Editor param body → `upsert_step_params` | PASS (unit) | primaries/wheels/HSL/curves/LUT/selection via commands + history group; PUT escape hatch; packaged E2E NOT_RUN |
+| Editor param body → `upsert_step_params` | PASS (unit) | primaries/wheels/HSL/curves/LUT/selection via commands + history group; PUT escape hatch |
 | Async preview tokens | PASS (partial) | keyed store + fill/cache gating |
 
 ## 6. Preview / export numerical parity

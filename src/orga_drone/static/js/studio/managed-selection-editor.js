@@ -190,6 +190,7 @@ export function createManagedSelectionEditor({
     const expectedId = String(studioId);
     const bindType = bindSelect?.value || "primaries-v1";
     let expectedRevision = gradeDoc.revision;
+    const historyGroup = `selection-${expectedId}-${Date.now().toString(36)}`;
     try {
       let payload = gradeDoc;
       let step = findStep(gradeDoc.grade, bindType);
@@ -203,6 +204,7 @@ export function createManagedSelectionEditor({
           type: "bind_step_selection",
           expectedRevision,
           params: { step_id: step.id, selection_id: null },
+          historyGroup,
         });
       } else {
         if (!step) {
@@ -221,6 +223,7 @@ export function createManagedSelectionEditor({
               params: neutrals,
               enabled: true,
             },
+            historyGroup,
           });
           expectedRevision = payload.revision;
           step = findStep(payload.grade, bindType);
@@ -262,12 +265,14 @@ export function createManagedSelectionEditor({
           type: "upsert_selection",
           expectedRevision,
           params: { selection },
+          historyGroup,
         });
         expectedRevision = payload.revision;
         payload = await postGradeCommand(studioId, {
           type: "bind_step_selection",
           expectedRevision,
           params: { step_id: step.id, selection_id: selection.id },
+          historyGroup,
         });
       }
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
