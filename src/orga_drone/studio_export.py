@@ -1068,12 +1068,22 @@ def _execute_export_config(
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
 ) -> Path:
+    had_deferred_spatial = any(
+        clip.managed_spatial_grade_json for clip in config.clips
+    )
     config = _materialize_deferred_spatial_clips(
         config, on_progress=on_progress, cancel_event=cancel_event
+    )
+    spatial_done = had_deferred_spatial and any(
+        clip.managed_grade_media is not None and clip.kind == "video"
+        for clip in config.clips
     )
 
     def _encode_progress(progress: dict) -> None:
         if on_progress is None:
+            return
+        if not spatial_done:
+            on_progress(progress)
             return
         mapped = dict(progress)
         raw = mapped.get("percent")
@@ -1091,12 +1101,7 @@ def _execute_export_config(
                 "phase": "preparing",
                 "clip_index": 0,
                 "clip_total": len(config.clips),
-                "percent": 25
-                if any(
-                    c.managed_grade_media is not None and c.kind == "video"
-                    for c in config.clips
-                )
-                else 0,
+                "percent": 25 if spatial_done else 0,
             }
         )
     enc = encoder or get_default_encoder()

@@ -382,6 +382,12 @@ def _grade_rgb_video(
         _check_cancel(cancel_event)
         # Force CFR at the probed rate so VFR sources cannot drift audio/video.
         fps_filter = f"{fps:.6f}".rstrip("0").rstrip(".")
+        # Hard-cap extraction so a bad duration probe cannot fill the disk.
+        frame_cap = min(
+            MAX_SPATIAL_VIDEO_FRAMES,
+            max(1, MAX_SPATIAL_VIDEO_PIXEL_FRAMES // max(1, width * height)),
+            int(duration * fps + 1.5),
+        )
         extract = _run_ffmpeg(
             [
                 "-i",
@@ -390,6 +396,8 @@ def _grade_rgb_video(
                 "0:v:0",
                 "-vf",
                 f"fps={fps_filter}",
+                "-frames:v",
+                str(frame_cap),
                 "-start_number",
                 "0",
                 str(frames_dir / "frame_%06d.png"),
