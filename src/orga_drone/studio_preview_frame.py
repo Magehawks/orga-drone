@@ -28,8 +28,7 @@ from orga_drone.studio_grade_model import read_grade
 from orga_drone.studio_managed_apply import (
     apply_managed_grade_image,
     ffmpeg_managed_grade_chain,
-    grade_has_spatial_selections,
-    grade_is_managed_pointwise,
+    grade_needs_cpu_materialize,
     managed_grade_digest,
 )
 
@@ -70,6 +69,12 @@ class PreviewFrameRequest:
     saturation: float = 1.0
     # When set and managed-pointwise, preview uses the #359 baked grade LUT.
     effect_settings: str | None = None
+    # Clip trim in-point and optional Story time for #358 animation clocks.
+    source_in_s: float = 0.0
+    source_out_s: float | None = None
+    story_time_s: float | None = None
+    transition_side: str = "single"
+    repeat_pass: int = 0
 
 
 def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
@@ -142,13 +147,53 @@ def color_needs_preview_still(
     )
 
 
-def _apply_spatial_managed_jpeg(path: Path, effect_settings: str | None) -> None:
-    """CPU-apply a spatial managed grade onto a decoded preview JPEG in place."""
+def _apply_spatial_managed_jpeg(
+    path: Path,
+    effect_settings: str | None,
+    *,
+    source_time_s: float = 0.0,
+    source_in_s: float = 0.0,
+    source_out_s: float | None = None,
+    story_time_s: float | None = None,
+    transition_side: str = "single",
+    repeat_pass: int = 0,
+) -> None:
+    """CPU-apply a spatial/animated managed grade onto a decoded preview JPEG."""
     from PIL import Image
+
+    from orga_drone.studio_grade_animation import (
+        grade_has_animation,
+        grade_uses_story_local_animation,
+        materialize_grade_at,
+        render_context_for_source_sample,
+    )
+    from orga_drone.studio_grade_contract import GradeError
 
     model = read_grade(effect_settings)
     if model.grade is None:
         return
+    grade = model.grade
+    if grade_has_animation(grade):
+        if grade_uses_story_local_animation(grade) and story_time_s is None:
+            raise PreviewFrameError(
+                "Story-local grade animation needs an explicit Story time",
+                code="unsupported",
+            )
+        try:
+            grade = materialize_grade_at(
+                grade,
+                render_context_for_source_sample(
+                    source_id="preview",
+                    source_pts_s=float(source_time_s),
+                    source_in_s=float(source_in_s),
+                    source_out_s=source_out_s,
+                    story_time_s=story_time_s,
+                    transition_side=transition_side,
+                    repeat_pass=repeat_pass,
+                ),
+            )
+        except GradeError as exc:
+            raise PreviewFrameError(str(exc), code="unsupported") from exc
     with Image.open(path) as image:
         rgb = image.convert("RGB")
         width, height = rgb.size
@@ -160,7 +205,7 @@ def _apply_spatial_managed_jpeg(path: Path, effect_settings: str | None) -> None
             ]
             for y in range(height)
         ]
-        graded = apply_managed_grade_image(rows, model.grade, lattice_domain="srgb")
+        graded = apply_managed_grade_image(rows, grade, lattice_domain="srgb")
         out = Image.new("RGB", (width, height))
         out.putdata(
             [
@@ -251,6 +296,21 @@ def cache_key_for(
         "size": media_size,
         "kind": req.kind,
         "t": quantize_preview_time(req.source_time_s),
+        # #358 animation clocks: same absolute PTS can sample different
+        # source-local / Story values after trim or Story placement changes.
+        "source_in": round(float(req.source_in_s), 4),
+        "source_out": (
+            None
+            if req.source_out_s is None
+            else round(float(req.source_out_s), 4)
+        ),
+        "story_t": (
+            None
+            if req.story_time_s is None
+            else quantize_preview_time(float(req.story_time_s))
+        ),
+        "transition_side": str(req.transition_side or "single"),
+        "repeat_pass": int(req.repeat_pass or 0),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
@@ -259,7 +319,7 @@ def cache_key_for(
         "edge": int(req.max_edge),
         "saturation": req.saturation,
         "managed": managed_grade_digest(req.effect_settings, data_dir=data_dir),
-        "v": 8,
+        "v": 9,
     }
     if req.kind == "photo":
         payload["photo_even_dimensions"] = True
@@ -431,12 +491,17 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
-        if (
-            req.effect_settings
-            and grade_has_spatial_selections(req.effect_settings)
-            and not grade_is_managed_pointwise(req.effect_settings)
-        ):
-            _apply_spatial_managed_jpeg(completed, req.effect_settings)
+        if req.effect_settings and grade_needs_cpu_materialize(req.effect_settings):
+            _apply_spatial_managed_jpeg(
+                completed,
+                req.effect_settings,
+                source_time_s=float(req.source_time_s),
+                source_in_s=float(req.source_in_s),
+                source_out_s=req.source_out_s,
+                story_time_s=req.story_time_s,
+                transition_side=str(req.transition_side or "single"),
+                repeat_pass=int(req.repeat_pass or 0),
+            )
         completed.replace(dest)
         _evict_if_needed(folder)
         return dest

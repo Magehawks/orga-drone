@@ -183,6 +183,7 @@ def evaluate_grade(
 
     input_stage: dict[str, Any]
     output_stage: dict[str, Any]
+    evaluated_animation: list[dict[str, Any]] = []
     if model.evaluator == "legacy-v1":
         raw = _legacy_payload(model)
         animation = color_animation_from_effect_settings(raw)
@@ -265,24 +266,50 @@ def evaluate_grade(
             "export_format": "yuv420p",
             "alpha": "straight-before-composite",
         }
-        # Emit enabled managed steps in serial order. Pixel adapters remain
-        # not-integrated until #359/#360 consume the plan.
+        # Emit enabled managed steps in serial order with #358 clock evaluation.
+        from orga_drone.studio_grade_animation import (
+            evaluated_overrides,
+            grade_has_animation,
+        )
         from orga_drone.studio_grade_model import OPERATION_DESCRIPTORS
 
+        overrides = evaluated_overrides(grade, context)
         for step in grade["steps"]:
             if not step["enabled"]:
                 continue
             descriptor = OPERATION_DESCRIPTORS.get(step["type"])
             assert descriptor is not None  # Validated by read_grade for enabled steps.
             domain = descriptor["domain"]
+            params = dict(step["params"])
+            step_overrides = overrides.get(str(step["id"]))
+            if step_overrides:
+                params.update(step_overrides)
+                for parameter, value in step_overrides.items():
+                    evaluated_animation.append(
+                        {
+                            "step_id": step["id"],
+                            "parameter": parameter,
+                            "value": value,
+                            "clock": next(
+                                (
+                                    entry.get("clock")
+                                    for entry in grade.get("animation") or []
+                                    if isinstance(entry, dict)
+                                    and entry.get("step_id") == step["id"]
+                                    and entry.get("parameter") == parameter
+                                ),
+                                None,
+                            ),
+                        }
+                    )
             if domain == "declared":
-                domain = str(step["params"].get("domain") or "linear-bt709")
+                domain = str(params.get("domain") or "linear-bt709")
             operations.append(
                 {
                     "type": step["type"],
                     "input_domain": domain,
                     "output_domain": domain,
-                    "params": dict(step["params"]),
+                    "params": params,
                     "pointwise": bool(descriptor["pointwise"]),
                     "selection_id": step.get("selection_id"),
                     "mix": step.get("mix", 1),
@@ -291,10 +318,12 @@ def evaluate_grade(
                 }
             )
             if step["type"] == "creative-lut-v1":
-                asset_id = step["params"].get("asset_id")
-                if isinstance(asset_id, str) and asset_id:
-                    asset(asset_id, "creative")
+                creative_asset = params.get("asset_id")
+                if isinstance(creative_asset, str) and creative_asset:
+                    asset(creative_asset, "creative")
         requirements = ["managed-sdr-adapter"]
+        if grade_has_animation(grade):
+            requirements = list(requirements) + ["managed-animation-segmentation"]
     resolved = all(entry["sha256"] is not None for entry in assets)
     managed_bake = False
     if model.evaluator == "managed-sdr-v1" and model.grade is not None:
@@ -312,6 +341,7 @@ def evaluate_grade(
         "operations": operations,
         "output": output_stage,
         "assets": assets,
+        "evaluated_animation": evaluated_animation,
         "capabilities": {
             "planning": True,
             "pixel_execution": managed_bake,

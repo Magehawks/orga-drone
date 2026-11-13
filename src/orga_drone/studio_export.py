@@ -493,9 +493,9 @@ def _clip_to_export_clip(
         from orga_drone.studio_managed_apply import (
             ManagedApplyError,
             bake_managed_grade_cube,
-            grade_has_spatial_selections,
             grade_is_managed_pointwise,
             grade_is_managed_sdr,
+            grade_needs_cpu_materialize,
             managed_grade_digest,
             require_managed_executable,
             require_managed_pointwise,
@@ -532,7 +532,20 @@ def _clip_to_export_clip(
                         )
                 except ManagedApplyError as exc:
                     raise StudioExportError(str(exc), code=exc.code.lower()) from exc
-            elif grade_has_spatial_selections(clip.effect_settings):
+            elif grade_needs_cpu_materialize(clip.effect_settings):
+                from orga_drone.studio_grade_animation import (
+                    grade_uses_story_local_animation,
+                )
+
+                if grade_uses_story_local_animation(model.grade):
+                    raise StudioExportError(
+                        "Story-local grade animation cannot use full-source CPU bake",
+                        code="unsupported_grade",
+                    )
+                clip_in = float(clip.source_start or 0.0)
+                clip_out = (
+                    float(clip.source_end) if clip.source_end is not None else None
+                )
                 if kind == "photo":
                     try:
                         managed_grade_media = materialize_spatial_managed_media(
@@ -541,6 +554,8 @@ def _clip_to_export_clip(
                             work,
                             kind=kind,
                             grade_digest=digest,
+                            source_in_s=clip_in,
+                            source_out_s=clip_out,
                         )
                     except ManagedApplyError as exc:
                         raise StudioExportError(
@@ -1039,6 +1054,12 @@ def _materialize_deferred_spatial_clips(
                 work,
                 kind="video",
                 grade_digest=clip.managed_spatial_digest,
+                source_in_s=float(clip.source_start_s or 0.0),
+                source_out_s=(
+                    float(clip.source_end_s)
+                    if clip.source_end_s is not None
+                    else None
+                ),
                 cancel_event=cancel_event,
                 on_progress=_frame_progress,
             )

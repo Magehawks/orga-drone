@@ -7,7 +7,7 @@ The caller must verify target identity/local authorization and publish atomicall
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping  # Any used by upsert_animation list typing
 
 from orga_drone.studio_grade_contract import (
     fail,
@@ -19,7 +19,14 @@ from orga_drone.studio_grade_contract import (
 )
 from orga_drone.studio_grade_model import GradeModel, read_grade
 
-COMMAND_CAPABILITIES = ("set_step_enabled", "set_step_mix", "reorder_steps")
+COMMAND_CAPABILITIES = (
+    "set_step_enabled",
+    "set_step_mix",
+    "reorder_steps",
+    "upsert_animation",
+    "remove_animation",
+    "reorder_animation",
+)
 
 
 @dataclass(frozen=True)
@@ -75,6 +82,7 @@ def validate_patch(
             "UNSUPPORTED_GRADE",
         )
     steps = grade["steps"]
+    animations = list(grade.get("animation") or [])
     if kind == "reorder_steps":
         if set(params) != {"ids"} or not isinstance(params["ids"], list):
             fail("command.params", "Expected ids array only")
@@ -83,6 +91,38 @@ def validate_patch(
         if len(ids) != len(set(ids)) or set(ids) != set(lookup):
             fail("command.params.ids", "Expected an exact permutation of step IDs")
         grade["steps"] = [lookup[item] for item in ids]
+    elif kind == "reorder_animation":
+        if set(params) != {"ids"} or not isinstance(params["ids"], list):
+            fail("command.params", "Expected ids array only")
+        ids = [identifier(item, "command.params.ids") for item in params["ids"]]
+        lookup = {entry["id"]: entry for entry in animations}
+        if len(ids) != len(set(ids)) or set(ids) != set(lookup):
+            fail("command.params.ids", "Expected an exact permutation of animation IDs")
+        grade["animation"] = [lookup[item] for item in ids]
+    elif kind == "remove_animation":
+        if set(params) != {"animation_id"}:
+            fail("command.params", "Expected animation_id only")
+        animation_id = identifier(params["animation_id"], "command.params.animation_id")
+        kept = [entry for entry in animations if entry.get("id") != animation_id]
+        if len(kept) == len(animations):
+            fail("command.params.animation_id", "Unknown animation ID")
+        grade["animation"] = kept
+    elif kind == "upsert_animation":
+        if set(params) != {"animation"}:
+            fail("command.params", "Expected animation object only")
+        entry = object_value(params["animation"], "command.params.animation")
+        animation_id = identifier(entry.get("id"), "command.params.animation.id")
+        replaced = False
+        next_animations: list[Any] = []
+        for existing in animations:
+            if existing.get("id") == animation_id:
+                next_animations.append(dict(entry))
+                replaced = True
+            else:
+                next_animations.append(existing)
+        if not replaced:
+            next_animations.append(dict(entry))
+        grade["animation"] = next_animations
     else:
         field = "enabled" if kind == "set_step_enabled" else "mix"
         if set(params) != {"step_id", field}:
@@ -98,6 +138,7 @@ def validate_patch(
         step[field] = params[field]
     document = current.to_dict()
     document["grade"] = grade
+    # read_grade revalidates animation references and unsupported targets.
     proposed = read_grade(document)
     changed = snapshot(proposed.to_dict()) != snapshot(current.to_dict())
     return GradeCommandResult(proposed, project, clip, revision, changed)

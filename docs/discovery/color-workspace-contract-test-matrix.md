@@ -68,8 +68,9 @@ The first activation run had 10 failures. Classification:
    doc and test-locked in
    `test_corrupt_canonical_json_splits_recognizable_from_ambiguous`.
 3. **Animation entries: unconditional UNSUPPORTED_GRADE** after
-   reference/clock validation — deliberate #358 gate, tested AS rejection
-   (`test_animation_entries_are_unsupported_until_358`).
+   reference/clock validation — #358 accepts advertised scalar targets;
+   unsupported targets still reject (`test_unsupported_animation_targets_still_reject`,
+   `tests/test_studio_grade_animation.py`).
 4. **Non-null technical LUT metadata: UNSUPPORTED_GRADE at read** —
    deliberate #352 gate, tested as rejection
    (`test_technical_lut_metadata_rejects_until_352`).
@@ -114,12 +115,12 @@ Legend: **PASS** = runs and passes against merged develop 51d9de3;
 | 4.1 | Stale revision → STALE_REVISION, no mutation | `test_stale_revision_conflicts_without_mutation` | PASS |
 | 4.2 | Detached proposals, persisted=false, exact permutation | `test_command_result_is_detached_and_unpersisted` | PASS |
 | 4.3 | Unknown/extra command fields reject; legacy never wrapped | `test_unknown_command_rejects_without_mutation` | PASS |
-| 4.4 | Animation gate (#358) | `test_animation_entries_are_unsupported_until_358` | PASS (as rejection) |
+| 4.4 | Animation gate (#358) | `test_unsupported_animation_targets_still_reject`, `test_supported_primaries_animation_is_accepted`, `tests/test_studio_grade_animation.py` | PASS |
 | 4.5 | Technical LUT gate (#352) | `test_technical_lut_metadata_rejects_until_352` | PASS (as rejection) |
 | 4.6 | UNSUPPORTED_INPUT_PROFILE (HDR/log) | `test_unsupported_managed_input_profile_is_typed` | PASS |
 | 4.7 | Transfer/alpha vectors + operator semantics vs oracle | 23 vector/semantic tests | PASS |
 | 5.1 | Managed ACTIVE operator evaluation (primaries-v1 …) | — | GATE → #352 |
-| 5.2 | Animation clock evaluation | — | GATE → #358 |
+| 5.2 | Animation clock evaluation | `tests/test_studio_grade_animation.py` | PASS (plan/clock + trim context + story-local bake reject); packaged WebView2 NOT_RUN — deferred by PO |
 | 5.3 | Render adapters consume plans (still/proxy/export) | — | GATE → #359/#360 |
 | 5.4 | Persistence/history/revision publication | — | GATE → #351 |
 | 5.5 | Routes/actions/DOM/MCP binding, error transport | — | GATE → #363 |
