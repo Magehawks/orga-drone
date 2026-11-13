@@ -49,9 +49,7 @@ function buildPanel() {
     highlights: range({ value: 0, disabled: true }),
     whites: range({ value: 0, disabled: true }),
   };
-  const labels = Object.fromEntries(
-    Object.keys(fields).map((key) => [key, label()])
-  );
+  const labels = Object.fromEntries(Object.keys(fields).map((key) => [key, label()]));
   const status = { textContent: "" };
   const wrapBtn = button(false);
   const convertBtn = button(false);
@@ -187,8 +185,7 @@ test("managed editor paints primaries and PUT-saves after reset", async () => {
   assert.equal(puts.length, 1);
   assert.equal(puts[0].body.expected_revision, 7);
   assert.equal(
-    puts[0].body.grade.steps.find((step) => step.type === "primaries-v1").params
-      .exposure,
+    puts[0].body.grade.steps.find((step) => step.type === "primaries-v1").params.exposure,
     0
   );
   assert.deepEqual(changed, [8]);

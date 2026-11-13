@@ -201,10 +201,7 @@ export function createManagedColorEditor({
     if (!studioId) return;
     const ok = confirmConvert
       ? await confirmConvert()
-      : (
-          globalThis.confirm ||
-          (() => false)
-        )(
+      : (globalThis.confirm || (() => false))(
           "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math."
         );
     if (!ok) return;

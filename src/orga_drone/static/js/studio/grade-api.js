@@ -40,9 +40,7 @@ export async function convertManagedGrade(studioId, { acknowledge = true } = {})
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(
-      data?.detail?.message || data?.detail || "managed convert failed"
-    );
+    const error = new Error(data?.detail?.message || data?.detail || "managed convert failed");
     error.status = response.status;
     error.code = data?.detail?.code;
     throw error;
