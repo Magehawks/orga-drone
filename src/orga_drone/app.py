@@ -2557,6 +2557,94 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=status, detail=str(exc)) from exc
         return JSONResponse({"ok": True, "id": clip.id, "sample": sample})
 
+    @app.get("/api/studio/{studio_item_id}/grade/bake.cube")
+    async def api_studio_grade_bake_cube(
+        studio_item_id: int, rev: int | None = Query(None)
+    ) -> Response:
+        """Serve a pointwise managed bake for the WebGL LUT adapter (#360).
+
+        Spatial grades are rejected; the client must use the CPU preview path.
+        """
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_managed_apply import (
+            ManagedApplyError,
+            bake_managed_grade_cube,
+            grade_is_managed_pointwise,
+            grade_is_managed_sdr,
+            managed_grade_digest,
+            require_managed_pointwise,
+        )
+
+        try:
+            project_id = _clip_project_id(studio_item_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        if not grade_is_managed_sdr(clip.effect_settings):
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "Managed bake requires managed-sdr-v1", "code": "UNSUPPORTED_GRADE"},
+            )
+        model = read_grade(clip.effect_settings)
+        if rev is not None and int(model.revision) != int(rev):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Grade changed since this bake was requested",
+                    "code": "STALE_REVISION",
+                    "revision": model.revision,
+                },
+            )
+        if not grade_is_managed_pointwise(clip.effect_settings):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Spatial managed grades need the CPU preview path",
+                    "code": "UNSUPPORTED_GRADE",
+                },
+            )
+        try:
+            require_managed_pointwise(clip.effect_settings)
+        except ManagedApplyError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": str(exc), "code": exc.code},
+            ) from exc
+        digest = managed_grade_digest(clip.effect_settings, data_dir=settings.data_dir)
+        assert digest is not None and model.grade is not None
+        work = settings.data_dir / "export-work" / "managed-grades"
+        work.mkdir(parents=True, exist_ok=True)
+        cube = work / f"managed_{digest[:16]}.cube"
+        try:
+            if not cube.is_file():
+                await asyncio.to_thread(
+                    bake_managed_grade_cube,
+                    model.grade,
+                    cube,
+                    data_dir=settings.data_dir,
+                )
+        except ManagedApplyError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": str(exc), "code": exc.code},
+            ) from exc
+        return FileResponse(
+            cube,
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Orga-Managed-Bake": digest[:16],
+                "X-Orga-Grade-Revision": str(model.revision),
+            },
+        )
+
     async def _import_lut_from_request(request: Request) -> JSONResponse:
         """Shared import for ``/api/luts`` and the Studio alias."""
         content_type = (request.headers.get("content-type") or "").lower()
