@@ -131,8 +131,9 @@ OPERATION_DESCRIPTORS = {
         "evaluator": "managed-sdr-v1",
         "domain": "declared",
         "pointwise": True,
-        "lut_bakeable": False,
-        "parameters": ["asset_id", "strength", "sha256", "interpolation"],
+        # Bakeable once a confined asset resolver supplies the cube at bake time.
+        "lut_bakeable": True,
+        "parameters": ["asset_id", "strength", "sha256", "interpolation", "domain"],
         "animation": "none",
     },
 }

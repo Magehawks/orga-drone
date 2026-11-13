@@ -1160,6 +1160,26 @@
                 <button type="button" class="button ghost" data-managed-selection-clear>{{ _('Clear selection') }}</button>
               </div>
             </div>
+            <div class="studio-managed-lut" data-managed-lut-panel hidden>
+              <p class="hint">{{ _('Managed creative LUT uses a local .cube on the same grade. Technical conversion stays separate.') }}</p>
+              <p class="meta-line" data-managed-lut-status role="status" aria-live="polite"></p>
+              <label class="studio-inspector-field">
+                <span>{{ _('Creative LUT asset') }}</span>
+                <select data-managed-lut-asset aria-label="{{ _('Creative LUT asset') }}"></select>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('LUT strength') }} <span data-managed-lut-strength-value>1.00</span></span>
+                <input type="range" data-managed-lut-strength min="0" max="1" step="0.01" value="1" disabled>
+              </label>
+              <label class="studio-inspector-field studio-inspector-check">
+                <input type="checkbox" data-managed-lut-enable checked disabled>
+                <span>{{ _('Enable creative LUT') }}</span>
+              </label>
+              <div class="studio-managed-lut-actions">
+                <button type="button" class="button" data-managed-lut-apply>{{ _('Apply creative LUT') }}</button>
+                <button type="button" class="button ghost" data-managed-lut-clear>{{ _('Clear creative LUT') }}</button>
+              </div>
+            </div>
             <div class="studio-managed-curves" data-managed-curve-panel hidden>
               <p class="hint">{{ _('Curves edit the same managed grade. Double-click to add a point.') }}</p>
               <p class="meta-line" data-managed-curve-status role="status" aria-live="polite"></p>

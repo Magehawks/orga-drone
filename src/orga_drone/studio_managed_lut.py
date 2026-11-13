@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 
 class ManagedLutError(ValueError):
@@ -287,3 +290,46 @@ def confirm_technical_lut(*, confirmed: bool, already_applied: bool) -> None:
             "technical conversion requires confirmation",
             code="TECHNICAL_LUT_UNCONFIRMED",
         )
+
+
+def resolve_creative_lut_cube(
+    data_dir: Path,
+    params: Mapping[str, Any],
+) -> ManagedCube:
+    """Load and validate a creative .cube from confined LUT assets.
+
+    Params use ``asset_id`` (filename under data_dir/luts) plus optional
+    ``sha256``, ``input_profile``, and ``output_profile``. Missing or
+    mismatched digests fail closed.
+    """
+    from orga_drone.studio_lut import LutMissingError, require_lut_asset
+
+    asset_id = params.get("asset_id") or params.get("creative_lut")
+    if not isinstance(asset_id, str) or not asset_id.strip():
+        raise ManagedLutError("creative LUT asset_id is required", code="LUT_MISSING")
+    try:
+        path = require_lut_asset(data_dir, asset_id.strip())
+    except (LutMissingError, ValueError) as exc:
+        raise ManagedLutError(str(exc) or "creative LUT missing", code="LUT_MISSING") from exc
+    text = path.read_text(encoding="utf-8")
+    input_profile = str(params.get("input_profile") or "bt709")
+    output_profile = str(params.get("output_profile") or input_profile)
+    cube = parse_managed_cube(
+        text, input_profile=input_profile, output_profile=output_profile
+    )
+    expected = params.get("sha256")
+    if expected is not None and str(expected) and str(expected) != cube.digest:
+        raise ManagedLutError(
+            "creative LUT content does not match sha256",
+            code="LUT_DIGEST",
+        )
+    return cube
+
+
+def make_lut_resolver(data_dir: Path):
+    """Return a callable suitable for ``apply_managed_step(..., lut_resolver=)``."""
+
+    def resolve(params: Mapping[str, Any]) -> ManagedCube:
+        return resolve_creative_lut_cube(data_dir, params)
+
+    return resolve

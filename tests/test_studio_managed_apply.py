@@ -148,9 +148,7 @@ def test_legacy_effect_settings_skip_managed_chain() -> None:
     assert ffmpeg_managed_grade_chain('{"image":{"exposure":10}}', work_dir=Path(".")) == ""
 
 
-def test_creative_lut_managed_grade_is_rejected_before_bake() -> None:
-    from orga_drone.studio_managed_apply import require_managed_pointwise
-
+def test_creative_lut_missing_asset_fails_closed(tmp_path: Path) -> None:
     grade = _managed_grade(
         steps=[
             {
@@ -160,17 +158,81 @@ def test_creative_lut_managed_grade_is_rejected_before_bake() -> None:
                 "mix": 1,
                 "selection_id": None,
                 "params": {
-                    "asset_id": "abc.cube",
+                    "asset_id": "b" * 32 + ".cube",
                     "strength": 1,
-                    "sha256": "a" * 64,
-                    "interpolation": "tetrahedral",
+                    "domain": "encoded-bt709",
+                    "input_profile": "bt709",
+                    "output_profile": "bt709",
+                },
+            }
+        ]
+    )
+    with pytest.raises(ManagedApplyError):
+        bake_managed_grade_cube(grade, tmp_path / "out.cube", size=3, data_dir=tmp_path)
+    with pytest.raises(ManagedApplyError):
+        ffmpeg_managed_grade_chain(
+            json.dumps({"grade": grade}),
+            work_dir=tmp_path / "work",
+            data_dir=tmp_path,
+        )
+
+
+def test_creative_lut_without_asset_is_not_pointwise() -> None:
+    grade = _managed_grade(
+        steps=[
+            {
+                "id": "lut1",
+                "type": "creative-lut-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"strength": 1},
+            }
+        ]
+    )
+    effect = json.dumps({"grade": grade})
+    assert grade_is_managed_pointwise(effect) is False
+    assert ffmpeg_managed_grade_chain(effect, work_dir=Path(".")) == ""
+
+
+def test_creative_lut_bakes_with_confined_asset(tmp_path: Path) -> None:
+    from orga_drone.studio_lut import lut_asset_dir
+    from orga_drone.studio_managed_lut import parse_managed_cube
+
+    rows = [(r / 1.0, g / 1.0, b / 1.0) for b in (0, 1) for g in (0, 1) for r in (0, 1)]
+    # Identity-ish 2^3 cube with a boosted red corner.
+    rows[7] = (1.0, 0.2, 0.2)
+    body = "\n".join(f"{r} {g} {b}" for r, g, b in rows)
+    text = f'TITLE "t"\nLUT_3D_SIZE 2\n{body}\n'
+    asset_dir = lut_asset_dir(tmp_path)
+    asset_name = "a" * 32 + ".cube"
+    (asset_dir / asset_name).write_text(text, encoding="utf-8")
+    cube = parse_managed_cube(text, input_profile="bt709", output_profile="bt709")
+    grade = _managed_grade(
+        steps=[
+            {
+                "id": "lut1",
+                "type": "creative-lut-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {
+                    "asset_id": asset_name,
+                    "strength": 1,
+                    "sha256": cube.digest,
+                    "domain": "encoded-bt709",
+                    "input_profile": "bt709",
+                    "output_profile": "bt709",
                 },
             }
         ]
     )
     effect = json.dumps({"grade": grade})
-    with pytest.raises(ManagedApplyError) as exc:
-        require_managed_pointwise(effect)
-    assert exc.value.code == "UNSUPPORTED_GRADE"
-    assert grade_is_managed_pointwise(effect) is False
-    assert ffmpeg_managed_grade_chain(effect, work_dir=Path(".")) == ""
+    assert grade_is_managed_pointwise(effect)
+    out = tmp_path / "baked.cube"
+    bake_managed_grade_cube(grade, out, size=3, data_dir=tmp_path)
+    assert out.is_file()
+    chain = ffmpeg_managed_grade_chain(
+        effect, work_dir=tmp_path / "work", data_dir=tmp_path
+    )
+    assert "lut3d=file=" in chain

@@ -59,6 +59,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   `studio/managed-selection-editor.js` owns linear/radial/brush masks and
   RGB/HSL/luma qualifiers bound to a managed step. See
   `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
+  `studio/managed-lut-editor.js` owns the managed creative-lut-v1 step against
+  confined local `.cube` assets. See `tests/js/grade_api.test.js` and
+  `tests/js/managed_color_editor.test.js`.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
   histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro
