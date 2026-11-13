@@ -2258,6 +2258,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/studio/{studio_item_id}/grade")
     async def api_studio_grade_get(studio_item_id: int) -> JSONResponse:
+        from orga_drone.studio_grade_bridge import grade_capability_report
         from orga_drone.studio_grade_model import read_grade
 
         try:
@@ -2273,11 +2274,13 @@ def create_app() -> FastAPI:
             {
                 "ok": True,
                 "id": item.id,
+                "project_id": project_id,
                 "authority": model.authority,
                 "evaluator": model.evaluator,
                 "revision": model.revision,
                 "grade": model.grade,
                 "descriptors": model.descriptors,
+                "capabilities": grade_capability_report(model),
             }
         )
 
@@ -2358,6 +2361,84 @@ def create_app() -> FastAPI:
                 "evaluator": model.evaluator,
                 "revision": model.revision,
                 "grade": model.grade,
+            }
+        )
+
+    @app.post("/api/studio/{studio_item_id}/grade/command")
+    async def api_studio_grade_command(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        """Apply one shared bounded grade command (#363).
+
+        Same validate_patch + publish path as Control API ``clip.grade.command``.
+        """
+        from orga_drone.studio_grade_bridge import propose_grade_command
+        from orga_drone.studio_grade_model import read_grade
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body required")
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="studio item not found")
+        if "expected_revision" not in payload or "type" not in payload:
+            raise HTTPException(
+                status_code=400,
+                detail="type and expected_revision are required",
+            )
+        try:
+            expected = int(payload["expected_revision"])
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400, detail="expected_revision must be an integer"
+            ) from exc
+        current = next(
+            (
+                entry
+                for entry in db.list_studio_items(project_id)
+                if entry.id == studio_item_id
+            ),
+            None,
+        )
+        if current is None:
+            raise HTTPException(status_code=404, detail="studio item not found")
+        command = {
+            "type": payload["type"],
+            "project_id": int(project_id),
+            "clip_id": int(studio_item_id),
+            "expected_revision": expected,
+            "params": payload.get("params") or {},
+        }
+        try:
+            proposed = propose_grade_command(
+                current.effect_settings,
+                command,
+                expected_revision=expected,
+            )
+            with transactional_story_edit(
+                db, project_id, group=_history_group(request)
+            ) as conn:
+                item = db.set_studio_canonical_grade(
+                    studio_item_id,
+                    proposed.proposed.to_dict(),
+                    expected_revision=expected,
+                    connection=conn,
+                )
+        except Exception as exc:  # noqa: BLE001 - map typed grade errors
+            raise _grade_http_error(exc) from exc
+        model = read_grade(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "authority": model.authority,
+                "evaluator": model.evaluator,
+                "revision": model.revision,
+                "grade": model.grade,
+                "changed": proposed.changed,
             }
         )
 
