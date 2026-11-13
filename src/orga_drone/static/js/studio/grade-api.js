@@ -234,7 +234,7 @@ export function emptySelection(id) {
   return {
     id: id || `sel-${Date.now().toString(36)}`,
     mask: { combine: "union", leaves: [] },
-    qualifier: null,
+    qualifier: {},
     invert: false,
   };
 }

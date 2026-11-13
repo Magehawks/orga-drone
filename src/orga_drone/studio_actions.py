@@ -205,7 +205,7 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         reversible=True,
         description=(
             "Apply one bounded canonical grade command (enable/mix/reorder/"
-            "animation) through the shared #363 bridge."
+            "upsert_step_params/selection/animation) through the shared #363 bridge."
         ),
         parameters={
             "type": {"type": "string"},

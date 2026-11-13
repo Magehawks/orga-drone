@@ -1,7 +1,7 @@
 /** Managed creative LUT step editor (#352). */
 
 import { beginRequestToken, isCurrentRequestToken } from "./color-workspace.js";
-import { findStep, putGrade, upsertTypedStep } from "./grade-api.js";
+import { findStep, postGradeCommand, upsertTypedStep } from "./grade-api.js";
 
 export function upsertCreativeLutStep(grade, params) {
   return upsertTypedStep(grade, "creative-lut-v1", params, {
@@ -13,6 +13,23 @@ export function upsertCreativeLutStep(grade, params) {
     sha256: null,
     interpolation: "tetrahedral",
   });
+}
+
+export function creativeLutCommandParams(params, { stepId, enabled = true } = {}) {
+  return {
+    step_id: stepId || `creative-lut-${Date.now().toString(36)}`,
+    type: "creative-lut-v1",
+    params: {
+      asset_id: params.asset_id || "",
+      strength: Number.isFinite(Number(params.strength)) ? Number(params.strength) : 1,
+      domain: params.domain || "encoded-bt709",
+      input_profile: params.input_profile || "bt709",
+      output_profile: params.output_profile || "bt709",
+      sha256: params.sha256 ?? null,
+      interpolation: params.interpolation || "tetrahedral",
+    },
+    enabled: Boolean(enabled),
+  };
 }
 
 export function createManagedLutEditor({
@@ -89,34 +106,47 @@ export function createManagedLutEditor({
     }
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
-    let grade = structuredClone(gradeDoc.grade);
-    if (clear) {
-      grade.steps = (grade.steps || []).filter((step) => step.type !== "creative-lut-v1");
-    } else {
-      const assetId = assetSelect?.value || "";
-      if (!assetId) {
-        setStatus("choose a .cube asset");
-        return;
-      }
-      const strength = Number(strengthInput?.value);
-      const selected = assetSelect?.selectedOptions?.[0];
-      const sha256 = selected?.dataset?.sha256 || null;
-      grade = upsertCreativeLutStep(grade, {
-        asset_id: assetId,
-        strength: Number.isFinite(strength) ? strength : 1,
-        domain: "encoded-bt709",
-        input_profile: "bt709",
-        output_profile: "bt709",
-        sha256,
-      });
-      const step = findStep(grade, "creative-lut-v1");
-      if (step) step.enabled = enableInput ? Boolean(enableInput.checked) : true;
-    }
+    const existing = findStep(gradeDoc.grade, "creative-lut-v1");
     try {
-      const payload = await putGrade(studioId, {
-        grade,
-        expectedRevision: gradeDoc.revision,
-      });
+      let payload;
+      if (clear) {
+        if (!existing?.id) {
+          setStatus("creative LUT cleared");
+          return;
+        }
+        payload = await postGradeCommand(studioId, {
+          type: "remove_step",
+          expectedRevision: gradeDoc.revision,
+          params: { step_id: existing.id },
+        });
+      } else {
+        const assetId = assetSelect?.value || "";
+        if (!assetId) {
+          setStatus("choose a .cube asset");
+          return;
+        }
+        const strength = Number(strengthInput?.value);
+        const selected = assetSelect?.selectedOptions?.[0];
+        const sha256 = selected?.dataset?.sha256 || null;
+        payload = await postGradeCommand(studioId, {
+          type: "upsert_step_params",
+          expectedRevision: gradeDoc.revision,
+          params: creativeLutCommandParams(
+            {
+              asset_id: assetId,
+              strength: Number.isFinite(strength) ? strength : 1,
+              domain: "encoded-bt709",
+              input_profile: "bt709",
+              output_profile: "bt709",
+              sha256,
+            },
+            {
+              stepId: existing?.id,
+              enabled: enableInput ? Boolean(enableInput.checked) : true,
+            }
+          ),
+        });
+      }
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;

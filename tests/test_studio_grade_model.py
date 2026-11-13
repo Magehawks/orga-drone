@@ -751,3 +751,117 @@ def test_valid_legacy_strings_and_nested_grade_keep_original_values(raw) -> None
     assert model.authority == "legacy" and not model.diagnostics
     assert model.to_dict() == json.loads(raw)
     assert model.original_effect_settings() == raw
+def test_upsert_step_params_create_update_and_unknown_keys() -> None:
+    source = managed()
+    model = read_grade(source)
+    created = validate_patch(
+        model,
+        command(
+            "upsert_step_params",
+            step_id="p1",
+            type="primaries-v1",
+            params={"exposure": 0.5, "saturation": 1.1},
+            enabled=True,
+        ),
+        7,
+    )
+    assert created.changed
+    step = created.proposed.grade["steps"][0]
+    assert step["id"] == "p1" and step["params"]["exposure"] == 0.5
+    updated = validate_patch(
+        created.proposed,
+        dict(
+            command(
+                "upsert_step_params",
+                step_id="p1",
+                type="primaries-v1",
+                params={"exposure": 1.0},
+            ),
+            expected_revision=7,
+        ),
+        7,
+    )
+    assert updated.proposed.grade["steps"][0]["params"]["exposure"] == 1.0
+    assert updated.proposed.grade["steps"][0]["params"]["saturation"] == 1.1
+    with pytest.raises(GradeError):
+        validate_patch(
+            created.proposed,
+            dict(
+                command(
+                    "upsert_step_params",
+                    step_id="p1",
+                    type="primaries-v1",
+                    params={"not_a_real_param": 1},
+                ),
+                expected_revision=7,
+            ),
+            7,
+        )
+    with pytest.raises(GradeError):
+        validate_patch(
+            created.proposed,
+            dict(
+                command(
+                    "upsert_step_params",
+                    step_id="p1",
+                    type="wheels-v1",
+                    params={"lift": 0},
+                ),
+                expected_revision=7,
+            ),
+            7,
+        )
+
+
+def test_upsert_selection_bind_and_remove_step() -> None:
+    source = managed()
+    source["grade"]["steps"] = [
+        {
+            "id": "p1",
+            "type": "primaries-v1",
+            "enabled": True,
+            "mix": 1,
+            "params": {"exposure": 0},
+            "selection_id": None,
+        }
+    ]
+    model = read_grade(source)
+    with_sel = validate_patch(
+        model,
+        command(
+            "upsert_selection",
+            selection={
+                "id": "s1",
+                "mask": {"combine": "union", "leaves": []},
+                "qualifier": {},
+                "invert": False,
+            },
+        ),
+        7,
+    )
+    bound = validate_patch(
+        with_sel.proposed,
+        dict(
+            command("bind_step_selection", step_id="p1", selection_id="s1"),
+            expected_revision=7,
+        ),
+        7,
+    )
+    assert bound.proposed.grade["steps"][0]["selection_id"] == "s1"
+    cleared = validate_patch(
+        bound.proposed,
+        dict(
+            command("bind_step_selection", step_id="p1", selection_id=None),
+            expected_revision=7,
+        ),
+        7,
+    )
+    assert cleared.proposed.grade["steps"][0]["selection_id"] is None
+    assert cleared.proposed.grade["selections"] == []
+    removed = validate_patch(
+        bound.proposed,
+        dict(command("remove_step", step_id="p1"), expected_revision=7),
+        7,
+    )
+    assert removed.proposed.grade["steps"] == []
+    assert removed.proposed.grade["selections"] == []

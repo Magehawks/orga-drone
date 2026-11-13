@@ -61,7 +61,7 @@ and stopped #320 precision experiments are not weakened.
 | Shared grade commands | PASS | #433 |
 | Save/reopen / clip switch | PASS (API) | grade route tests |
 | Editor command migration (enable/mix/reorder) | PASS | `postGradeCommand` in step editor |
-| Editor param body PUT | PASS (retained) | primaries/curves/LUT/selection still PUT until params command |
+| Editor param body → `upsert_step_params` | PASS | primaries/wheels/HSL/curves/LUT/selection via commands; PUT retained as escape hatch |
 | Async preview tokens | PASS (partial) | keyed store + fill/cache gating |
 
 ## 6. Preview / export numerical parity
@@ -130,5 +130,5 @@ pytest tests/test_studio_grade_animation.py \
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
 | #361 | Serial step enable/mix/reorder shipped; packaged E2E NOT_RUN |
 | #362/#366 | Open only for packaged latency/memory if AC require it |
-| #363 | Preview tokens + command path for step ops; param PUT retained |
+| #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

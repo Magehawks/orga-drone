@@ -1,12 +1,6 @@
 /** Interactive managed curve families for Color Workspace (#354/#361). */
 
-import {
-  CURVE_STEP_TYPES,
-  findStep,
-  neutralCurveParams,
-  putGrade,
-  upsertCurveStep,
-} from "./grade-api.js";
+import { CURVE_STEP_TYPES, findStep, neutralCurveParams, postGradeCommand } from "./grade-api.js";
 import {
   beginRequestToken,
   isCurrentRequestToken,
@@ -222,10 +216,16 @@ export function createManagedCurveEditor({ panel, getSelectedStudioId, getGrade,
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
     try {
-      const nextGrade = upsertCurveStep(gradeDoc.grade, family, draft);
-      const payload = await putGrade(studioId, {
-        grade: nextGrade,
+      const existing = findStep(gradeDoc.grade, family);
+      const payload = await postGradeCommand(studioId, {
+        type: "upsert_step_params",
         expectedRevision: gradeDoc.revision,
+        params: {
+          step_id: existing?.id || `${family}-${Date.now().toString(36)}`,
+          type: family,
+          params: { ...neutralCurveParams(family), ...draft },
+          enabled: true,
+        },
       });
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       if (String(getSelectedStudioId?.()) !== expectedId) return;

@@ -151,7 +151,15 @@ OPERATION_DESCRIPTORS = {
         "pointwise": True,
         # Bakeable once a confined asset resolver supplies the cube at bake time.
         "lut_bakeable": True,
-        "parameters": ["asset_id", "strength", "sha256", "interpolation", "domain"],
+        "parameters": [
+            "asset_id",
+            "strength",
+            "sha256",
+            "interpolation",
+            "domain",
+            "input_profile",
+            "output_profile",
+        ],
         "animation": _animatable_descriptor("creative-lut-v1"),
     },
 }

@@ -17,12 +17,16 @@ from orga_drone.studio_grade_contract import (
     object_value,
     snapshot,
 )
-from orga_drone.studio_grade_model import GradeModel, read_grade
+from orga_drone.studio_grade_model import OPERATION_DESCRIPTORS, GradeModel, read_grade
 
 COMMAND_CAPABILITIES = (
     "set_step_enabled",
     "set_step_mix",
     "reorder_steps",
+    "upsert_step_params",
+    "remove_step",
+    "upsert_selection",
+    "bind_step_selection",
     "upsert_animation",
     "remove_animation",
     "reorder_animation",
@@ -123,6 +127,116 @@ def validate_patch(
         if not replaced:
             next_animations.append(dict(entry))
         grade["animation"] = next_animations
+    elif kind == "upsert_step_params":
+        allowed_keys = {"step_id", "type", "params", "enabled", "mix", "selection_id"}
+        if not {"step_id", "type", "params"}.issubset(params) or set(params) - allowed_keys:
+            fail(
+                "command.params",
+                "Expected step_id, type, params and optional enabled/mix/selection_id",
+            )
+        step_id = identifier(params["step_id"], "command.params.step_id")
+        step_type = identifier(params["type"], "command.params.type")
+        body = object_value(params["params"], "command.params.params")
+        descriptor = OPERATION_DESCRIPTORS.get(step_type)
+        if descriptor is None:
+            fail(
+                "command.params.type",
+                "Unsupported step type for upsert_step_params",
+                "UNSUPPORTED_GRADE",
+            )
+        allowed_params = set(descriptor["parameters"])
+        unknown = set(body) - allowed_params
+        if unknown:
+            fail(
+                "command.params.params",
+                "Unknown parameter keys for " + step_type + ": " + ", ".join(sorted(unknown)),
+            )
+        if "enabled" in params and type(params["enabled"]) is not bool:
+            fail("command.params.enabled", "Expected a boolean")
+        if "mix" in params:
+            number(params["mix"], "command.params.mix", 0, 1)
+        selection_value = params.get("selection_id", None)
+        if "selection_id" in params and selection_value is not None:
+            identifier(selection_value, "command.params.selection_id")
+        step = next((entry for entry in steps if entry["id"] == step_id), None)
+        if step is None:
+            grade["steps"] = list(steps) + [
+                {
+                    "id": step_id,
+                    "type": step_type,
+                    "enabled": bool(params["enabled"]) if "enabled" in params else True,
+                    "mix": float(params["mix"]) if "mix" in params else 1.0,
+                    "params": dict(body),
+                    "selection_id": selection_value if "selection_id" in params else None,
+                }
+            ]
+        else:
+            if step["type"] != step_type:
+                fail("command.params.type", "Cannot change step type via upsert_step_params")
+            merged = dict(step.get("params") or {})
+            merged.update(body)
+            step["params"] = merged
+            if "enabled" in params:
+                step["enabled"] = bool(params["enabled"])
+            if "mix" in params:
+                step["mix"] = float(params["mix"])
+            if "selection_id" in params:
+                step["selection_id"] = selection_value
+    elif kind == "remove_step":
+        if set(params) != {"step_id"}:
+            fail("command.params", "Expected step_id only")
+        step_id = identifier(params["step_id"], "command.params.step_id")
+        kept = [entry for entry in steps if entry["id"] != step_id]
+        if len(kept) == len(steps):
+            fail("command.params.step_id", "Unknown step ID")
+        used = {
+            entry.get("selection_id")
+            for entry in kept
+            if entry.get("selection_id") is not None
+        }
+        grade["steps"] = kept
+        grade["selections"] = [
+            entry for entry in grade.get("selections") or [] if entry.get("id") in used
+        ]
+    elif kind == "upsert_selection":
+        if set(params) != {"selection"}:
+            fail("command.params", "Expected selection object only")
+        entry = object_value(params["selection"], "command.params.selection")
+        selection_id = identifier(entry.get("id"), "command.params.selection.id")
+        selections = list(grade.get("selections") or [])
+        replaced = False
+        next_selections: list[Any] = []
+        for existing in selections:
+            if existing.get("id") == selection_id:
+                next_selections.append(dict(entry))
+                replaced = True
+            else:
+                next_selections.append(existing)
+        if not replaced:
+            next_selections.append(dict(entry))
+        grade["selections"] = next_selections
+    elif kind == "bind_step_selection":
+        if set(params) != {"step_id", "selection_id"}:
+            fail("command.params", "Expected step_id and selection_id only")
+        step_id = identifier(params["step_id"], "command.params.step_id")
+        selection_value = params["selection_id"]
+        if selection_value is not None:
+            identifier(selection_value, "command.params.selection_id")
+        step = next((entry for entry in steps if entry["id"] == step_id), None)
+        if step is None:
+            fail("command.params.step_id", "Unknown step ID")
+        step["selection_id"] = selection_value
+        if selection_value is None:
+            used = {
+                entry.get("selection_id")
+                for entry in steps
+                if entry.get("selection_id") is not None
+            }
+            grade["selections"] = [
+                entry
+                for entry in grade.get("selections") or []
+                if entry.get("id") in used
+            ]
     else:
         field = "enabled" if kind == "set_step_enabled" else "mix"
         if set(params) != {"step_id", field}:
