@@ -115,6 +115,34 @@ def test_bake_cube_and_ffmpeg_chain(tmp_path: Path) -> None:
     assert "tetrahedral" in chain
 
 
+def test_wheels_gain_zero_and_hsl_saturation_zero_are_preserved() -> None:
+    grade = _managed_grade(
+        steps=[
+            {
+                "id": "w1",
+                "type": "wheels-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"lift": 0, "gamma": 1, "gain": 0, "offset": 0},
+            },
+            {
+                "id": "h1",
+                "type": "managed-hsl-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"hue": 0, "saturation": 0, "lightness": 0},
+            },
+        ]
+    )
+    # Encoded mid gray → linear → gain 0 → black → encoded black; then HSL sat 0 keeps gray.
+    out = apply_managed_grade_rgb((0.5, 0.4, 0.3), grade)
+    assert out[0] == pytest.approx(0.0, abs=1e-5)
+    assert out[1] == pytest.approx(0.0, abs=1e-5)
+    assert out[2] == pytest.approx(0.0, abs=1e-5)
+
+
 def test_legacy_effect_settings_skip_managed_chain() -> None:
     assert grade_is_managed_pointwise('{"image":{"exposure":10}}') is False
     assert ffmpeg_managed_grade_chain('{"image":{"exposure":10}}', work_dir=Path(".")) == ""

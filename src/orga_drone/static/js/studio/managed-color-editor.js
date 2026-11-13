@@ -264,9 +264,25 @@ export function createManagedColorEditor({
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
     const expectedRevision = current.revision;
-    let grade = upsertPrimariesStep(current.grade, readPrimaries());
-    grade = upsertWheelsStep(grade, readWheels());
-    grade = upsertManagedHslStep(grade, readHsl());
+    const primaries = readPrimaries();
+    const wheels = readWheels();
+    const hsl = readHsl();
+    let grade = current.grade;
+    const hasPrimaries = Boolean(findStep(grade, "primaries-v1"));
+    const hasWheels = Boolean(findStep(grade, "wheels-v1"));
+    const hasHsl = Boolean(findStep(grade, "managed-hsl-v1"));
+    const primariesChanged = JSON.stringify(primaries) !== JSON.stringify(neutralPrimariesParams());
+    const wheelsChanged = JSON.stringify(wheels) !== JSON.stringify(neutralWheelsParams());
+    const hslChanged = JSON.stringify(hsl) !== JSON.stringify(neutralManagedHslParams());
+    if (hasPrimaries || primariesChanged) {
+      grade = upsertPrimariesStep(grade, primaries);
+    }
+    if (hasWheels || wheelsChanged) {
+      grade = upsertWheelsStep(grade, wheels);
+    }
+    if (hasHsl || hslChanged) {
+      grade = upsertManagedHslStep(grade, hsl);
+    }
     busy = true;
     setEnabled(true);
     try {
