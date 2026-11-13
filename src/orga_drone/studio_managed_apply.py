@@ -137,8 +137,10 @@ def _to_domain(rgb: Rgb, *, current: str, target: str) -> Rgb:
 
 
 def _normalize_domain(name: str) -> str:
-    if name in {"linear-bt709", "encoded-bt709", "srgb", "bt709-sdr", "bt709"}:
-        return "bt709-sdr" if name in {"bt709", "bt709-sdr"} else name
+    if name in {"linear-bt709", "srgb"}:
+        return name
+    if name in {"encoded-bt709", "bt709-sdr", "bt709"}:
+        return "bt709-sdr"
     if name == "declared":
         return "linear-bt709"
     raise ManagedApplyError(f"unsupported domain: {name}", code="UNSUPPORTED_GRADE")
