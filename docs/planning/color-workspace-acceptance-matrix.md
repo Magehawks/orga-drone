@@ -68,7 +68,7 @@ and stopped #320 precision experiments are not weakened.
 | Managed-SDR API journey + CPU delta | PASS | #430 `test_managed_sdr_parity_journey.py` |
 | GPU bake-approx vs CPU | PASS (approx labeled) | #427 `exact:false` |
 | GPU tetrahedral interpolation | PASS | #360 `lut-tetrahedral.js` + WebGL texelFetch; float CPU reference |
-| Exact GPU float parity (RGBA8 boundary) | PASS (labeled exact:false) | `rgba8-quantization`; packaged budgets NOT_RUN |
+| Exact GPU float parity | NOT_RUN | RGBA8 table storage; labeled `exact:false` / `rgba8-quantization` |
 | Packaged WebView2 parity | NOT_RUN — deferred by PO | — |
 
 ## 7. Scopes (#362 / #366)

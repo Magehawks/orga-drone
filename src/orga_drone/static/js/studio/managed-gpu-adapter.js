@@ -81,6 +81,11 @@ export function probeManagedGpuCapabilities(gradeDoc) {
   };
 }
 
+/** Modes that may drive the existing WebGL LUT bake preview path. */
+export function isManagedWebglBakeMode(mode) {
+  return mode === "webgl-bake" || mode === "webgl-bake-approx" || mode === "webgl-bake-tetrahedral";
+}
+
 export function managedBakeUrl(studioId, revision) {
   if (!studioId) return "";
   const rev =

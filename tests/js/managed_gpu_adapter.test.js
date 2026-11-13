@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  isManagedWebglBakeMode,
   managedBakeUrl,
   probeManagedGpuCapabilities,
 } from "../../src/orga_drone/static/js/studio/managed-gpu-adapter.js";
@@ -48,4 +49,11 @@ test("spatial selection forces cpu fallback", () => {
 
 test("managedBakeUrl includes revision", () => {
   assert.equal(managedBakeUrl(12, 4), "/api/studio/12/grade/bake.cube?rev=4");
+});
+
+test("isManagedWebglBakeMode accepts tetrahedral and legacy bake modes", () => {
+  assert.equal(isManagedWebglBakeMode("webgl-bake-tetrahedral"), true);
+  assert.equal(isManagedWebglBakeMode("webgl-bake-approx"), true);
+  assert.equal(isManagedWebglBakeMode("webgl-bake"), true);
+  assert.equal(isManagedWebglBakeMode("cpu-fallback"), false);
 });
