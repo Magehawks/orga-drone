@@ -2,15 +2,17 @@
 
 import { beginRequestToken, isCurrentRequestToken } from "./color-workspace.js";
 import {
-  bindStepSelection,
   brushLeaf,
   emptySelection,
-  putGrade,
+  findStep,
+  neutralManagedHslParams,
+  neutralPrimariesParams,
+  neutralWheelsParams,
+  postGradeCommand,
   qualifierFromSample,
   radialLeaf,
   linearLeaf,
   sampleEyedropper,
-  upsertSelection,
 } from "./grade-api.js";
 import { createManagedViewerTools, resolveActivePreviewMedia } from "./managed-viewer-tools.js";
 
@@ -186,56 +188,93 @@ export function createManagedSelectionEditor({
     }
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
-    let grade = structuredClone(gradeDoc.grade);
     const bindType = bindSelect?.value || "primaries-v1";
-    if (clear) {
-      const step = (grade.steps || []).find((entry) => entry.type === bindType);
-      if (step) step.selection_id = null;
-      grade.selections = (grade.selections || []).filter((entry) => {
-        const used = (grade.steps || []).some((s) => s.selection_id === entry.id);
-        return used;
-      });
-      showSample(null);
-    } else {
-      const existing = (grade.steps || []).find((entry) => entry.type === bindType);
-      const reuseId = existing?.selection_id || null;
-      const previous = (grade.selections || []).find((entry) => entry.id === reuseId);
-      const selection = previous ? structuredClone(previous) : emptySelection(reuseId || undefined);
-      if (!selection.mask || typeof selection.mask !== "object") {
-        selection.mask = { combine: "union", leaves: [] };
-      }
-      if (!Array.isArray(selection.mask.leaves)) selection.mask.leaves = [];
-      if (stroke) {
-        const leaf = buildLeaf(stroke);
-        const brushIndex = selection.mask.leaves.findIndex((entry) => entry?.type === "brush");
-        if (brushIndex >= 0) {
-          const brush = selection.mask.leaves[brushIndex];
-          const strokes = Array.isArray(brush.strokes) ? brush.strokes.slice() : [];
-          strokes.push(...(leaf.strokes || []));
-          selection.mask.leaves[brushIndex] = { ...brush, strokes };
-        } else if (selection.mask.leaves.length === 0) {
-          selection.mask.leaves = [leaf];
-        } else {
-          selection.mask.leaves.push(leaf);
-        }
-        if (shapeSelect) shapeSelect.value = "brush";
-      } else if (!acceptSample) {
-        selection.mask = { combine: "union", leaves: [buildLeaf(null)] };
-      }
-      if (acceptSample || !stroke) {
-        selection.qualifier = buildQualifier();
-      }
-      selection.invert = Boolean(invertInput?.checked);
-      grade = upsertSelection(grade, selection);
-      grade = bindStepSelection(grade, bindType, selection.id);
-      const used = new Set((grade.steps || []).map((step) => step.selection_id).filter(Boolean));
-      grade.selections = (grade.selections || []).filter((entry) => used.has(entry.id));
-    }
+    let expectedRevision = gradeDoc.revision;
+    const historyGroup = `selection-${expectedId}-${Date.now().toString(36)}`;
     try {
-      const payload = await putGrade(studioId, {
-        grade,
-        expectedRevision: gradeDoc.revision,
-      });
+      let payload = gradeDoc;
+      let step = findStep(gradeDoc.grade, bindType);
+      if (clear) {
+        showSample(null);
+        if (!step?.id) {
+          setStatus(messages.selectionCleared || "Selection cleared");
+          return;
+        }
+        payload = await postGradeCommand(studioId, {
+          type: "bind_step_selection",
+          expectedRevision,
+          params: { step_id: step.id, selection_id: null },
+          historyGroup,
+        });
+      } else {
+        if (!step) {
+          const neutrals =
+            bindType === "wheels-v1"
+              ? neutralWheelsParams()
+              : bindType === "managed-hsl-v1"
+                ? neutralManagedHslParams()
+                : neutralPrimariesParams();
+          payload = await postGradeCommand(studioId, {
+            type: "upsert_step_params",
+            expectedRevision,
+            params: {
+              step_id: `${bindType}-${Date.now().toString(36)}`,
+              type: bindType,
+              params: neutrals,
+              enabled: true,
+            },
+            historyGroup,
+          });
+          expectedRevision = payload.revision;
+          step = findStep(payload.grade, bindType);
+        }
+        if (!step?.id) throw new Error("step not found");
+        const reuseId = step.selection_id || null;
+        const previous = (payload.grade.selections || []).find((entry) => entry.id === reuseId);
+        const selection = previous
+          ? structuredClone(previous)
+          : emptySelection(reuseId || undefined);
+        if (!selection.mask || typeof selection.mask !== "object") {
+          selection.mask = { combine: "union", leaves: [] };
+        }
+        if (!Array.isArray(selection.mask.leaves)) selection.mask.leaves = [];
+        if (stroke) {
+          const leaf = buildLeaf(stroke);
+          const brushIndex = selection.mask.leaves.findIndex((entry) => entry?.type === "brush");
+          if (brushIndex >= 0) {
+            const brush = selection.mask.leaves[brushIndex];
+            const strokes = Array.isArray(brush.strokes) ? brush.strokes.slice() : [];
+            strokes.push(...(leaf.strokes || []));
+            selection.mask.leaves[brushIndex] = { ...brush, strokes };
+          } else if (selection.mask.leaves.length === 0) {
+            selection.mask.leaves = [leaf];
+          } else {
+            selection.mask.leaves.push(leaf);
+          }
+          if (shapeSelect) shapeSelect.value = "brush";
+        } else if (!acceptSample) {
+          selection.mask = { combine: "union", leaves: [buildLeaf(null)] };
+        }
+        if (acceptSample || !stroke) {
+          selection.qualifier = buildQualifier();
+        } else if (!selection.qualifier || typeof selection.qualifier !== "object") {
+          selection.qualifier = {};
+        }
+        selection.invert = Boolean(invertInput?.checked);
+        payload = await postGradeCommand(studioId, {
+          type: "upsert_selection",
+          expectedRevision,
+          params: { selection },
+          historyGroup,
+        });
+        expectedRevision = payload.revision;
+        payload = await postGradeCommand(studioId, {
+          type: "bind_step_selection",
+          expectedRevision,
+          params: { step_id: step.id, selection_id: selection.id },
+          historyGroup,
+        });
+      }
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;
