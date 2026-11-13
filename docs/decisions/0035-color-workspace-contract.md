@@ -1,7 +1,7 @@
 # ADR 0035: Canonical Color Workspace grade and render contracts
 
-- **Status:** Proposed; merging this documentation does not authorize implementation or adopt the model. Explicit Product Owner architecture approval is required.
-- **Date:** 2026-11-11
+- **Status:** Accepted on 2026-11-12. The Product Owner approved this architecture. Canonical production writes stay disabled until the #351 backup, restore, and startup safeguards are implemented and verified.
+- **Date:** 2026-11-11; accepted 2026-11-12
 - **Deciders:** Product Owner, following independent review
 - **Scope:** [Issue #348](https://github.com/Magehawks/orga-drone/issues/348), Phase A only
 - **Baseline:** `origin/develop` at `8ff25454672de14b312e5b9e4d553a9c57d1b8ef`
@@ -71,4 +71,6 @@ This revision addresses [REVIEW_CHANGES_REQUESTED](https://github.com/Magehawks/
 
 The proposal selects BT.709 SDR as the first managed working profile; HDR/wide-gamut delivery is an extension requiring its own profile contract, not a removal of input/output transforms. Confirm this profile, the bounded operation/resource limits, and the proposed performance budgets at architecture approval. If a required local FFmpeg build cannot implement a stage faithfully, do not substitute different math: record an adapter capability failure and obtain a scoped implementation decision. Before any canonical write the PO must approve concrete minimum-reader/startup enforcement, separate database and backup naming/location/permissions, backup checksum/restore validation, downgrade recovery and explicit loss-of-later-edits consent. #351 cannot resolve these by silently enabling writes. All implementation, including fixture-backed work, first requires ADR acceptance. Tracking remains an explicit dependency of moving masks, not an implicit Phase-A commitment.
 
-No production implementation, migration, parity measurement or architecture approval is provided by this ADR. Independent review and Product Owner decision are pending.
+Product Owner approval on 2026-11-12 accepts this architecture: one versioned grade envelope, explicit `legacy-v1` and `managed-sdr-v1` evaluators, one serial grade for Creative and Pro, and one inspectable render plan. There is no automatic managed conversion and no second grade model.
+
+Canonical production writes remain disabled. The approved #351 safeguard is a separate verified SQLite backup, checksum, user-only permissions, and a tested restore that warns about lost later edits (`docs/planning/351-grade-backup-layout.md`). Startup minimum-reader enforcement is not switched on until a canonical database file exists.
