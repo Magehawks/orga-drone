@@ -1,7 +1,7 @@
 # Color Workspace execution checkpoint
 
 Updated: 2026-11-13. Integration branch `develop` tip
-`cb807a3` (after #436–#440; `apply_preset` follow-up PR).
+`6950f72` (after #441–#443; GPU float precision + complex story timing).
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.
@@ -26,6 +26,9 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #438 | `f8382be…` | GPU tetrahedral sampling (#360) |
 | #439 | `cb807a3…` | Node scopes latency/heap harness |
 | #440 | `a60cbbc…` | `upsert_step_params` / selection commands |
+| #441 | `a0d37c1…` | Creative Quick Look → managed primaries |
+| #442 | `6950f72…` | GPU float precision / RGBA8 measured (#360) |
+| #443 | `946ae13…` | Complex Story-local timing export (#358) |
 
 ## Feature matrix (honest)
 
@@ -72,6 +75,7 @@ Record packaged-only evidence as `NOT_RUN — deferred by PO`.
 
 ## Exact next tasks
 
-1. Final EXE verification phase (packaged WebView2 / GPU / scopes / cold-warm).
-2. Issue evidence comments; close only when AC fully met including packaged gates or PO waiver.
+1. PO decision to start the final packaged Windows verification phase (EXE / WebView2).
+2. Packaged rows still NOT_RUN: WebView2 parity, scopes latency/memory, GPU budgets, ≥5 cold/warm samples.
 3. Do not build packaged Windows EXE until PO starts that phase.
+4. Remaining technical fail-closed (document, not silent PASS): story-local `slow_span`, `forward_loop`+ramp, ramp+repeats; GPU exact only on RGBA32F.
