@@ -391,7 +391,10 @@ def test_managed_serial_primaries_emit_plan_operations() -> None:
     assert ops[0]["input_domain"] == "linear-bt709"
     assert ops[1]["mix"] == 0.5
     assert plan.grade_identity is False
-    assert plan.to_dict()["capabilities"]["pixel_execution"] is False
+    caps = plan.to_dict()["capabilities"]
+    assert caps["pixel_execution"] is True
+    assert caps["ffmpeg"] == "managed-lut-bake-v1"
+    assert caps["adapter"] == "managed-sdr-cpu-v1"
 
 
 def test_revision_opaque_fields_and_disabled_ops_do_not_change_semantic_digest() -> (
@@ -592,7 +595,7 @@ def test_legacy_command_does_not_implicitly_migrate() -> None:
         ("linear-bt709", "identity"),
     ],
 )
-def test_managed_domain_adapters_are_explicit_not_pixel_execution(
+def test_managed_domain_adapters_are_explicit_with_cpu_pixel_execution(
     profile, transfer
 ) -> None:
     source = managed()
@@ -601,7 +604,9 @@ def test_managed_domain_adapters_are_explicit_not_pixel_execution(
     assert plan["input"]["transfer"] == transfer
     assert plan["output"]["export_range"] == "limited"
     assert plan["output"]["export_format"] == "yuv420p"
-    assert plan["capabilities"]["pixel_execution"] is False
+    assert plan["capabilities"]["pixel_execution"] is True
+    assert plan["capabilities"]["ffmpeg"] == "managed-lut-bake-v1"
+    assert plan["capabilities"]["gpu"] == "not-integrated"
 
 
 def test_legacy_stack_bypass_and_incompatible_mix_are_explicit() -> None:

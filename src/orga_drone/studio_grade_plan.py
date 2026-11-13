@@ -296,6 +296,7 @@ def evaluate_grade(
                     asset(asset_id, "creative")
         requirements = ["managed-sdr-adapter"]
     resolved = all(entry["sha256"] is not None for entry in assets)
+    managed_pixels = model.evaluator == "managed-sdr-v1"
     content = {
         "plan_version": 1,
         "schema_version": 1,
@@ -307,11 +308,12 @@ def evaluate_grade(
         "assets": assets,
         "capabilities": {
             "planning": True,
-            "pixel_execution": False,
-            "ffmpeg": "not-integrated",
+            "pixel_execution": managed_pixels,
+            "ffmpeg": "managed-lut-bake-v1" if managed_pixels else "not-integrated",
             "gpu": "not-integrated",
             "requirements": requirements,
             "assets_resolved": resolved,
+            "adapter": "managed-sdr-cpu-v1" if managed_pixels else None,
         },
     }
     encoded = snapshot(content)

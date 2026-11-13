@@ -48,9 +48,9 @@ from orga_drone.studio_image import (
     saturation_ramp_from_effect_settings,
 )
 from orga_drone.studio_detail import detail_from_effect_settings
-from orga_drone.studio_color_wheels import color_wheels_from_effect_settings
-from orga_drone.studio_hsl import hsl_adjust_from_effect_settings
-from orga_drone.studio_lut import color_look_from_effect_settings
+from orga_drone.studio_color_wheels import ColorWheels, color_wheels_from_effect_settings
+from orga_drone.studio_hsl import HslAdjust, hsl_adjust_from_effect_settings
+from orga_drone.studio_lut import ColorLook, color_look_from_effect_settings
 from orga_drone.studio_map import gps_from_stored, map_from_effect_settings
 from orga_drone.studio_mask import masks_from_effect_settings
 from orga_drone.studio_overlay import overlays_from_effect_settings
@@ -481,32 +481,64 @@ def _clip_to_export_clip(
         )
         if loop_join > 0 and seconds is not None:
             seconds = float(seconds) - loop_join * (repeats - 1)
+    managed_grade_lut = None
+    if kind in {"photo", "video"}:
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_managed_apply import (
+            ManagedApplyError,
+            bake_managed_grade_cube,
+            grade_is_managed_pointwise,
+            managed_grade_digest,
+        )
+
+        if grade_is_managed_pointwise(clip.effect_settings):
+            digest = managed_grade_digest(clip.effect_settings)
+            model = read_grade(clip.effect_settings)
+            assert digest is not None and model.grade is not None
+            work = settings.data_dir / "export-work" / "managed-grades"
+            work.mkdir(parents=True, exist_ok=True)
+            managed_grade_lut = work / f"managed_{digest[:16]}.cube"
+            try:
+                if not managed_grade_lut.is_file():
+                    bake_managed_grade_cube(model.grade, managed_grade_lut)
+            except ManagedApplyError as exc:
+                raise StudioExportError(str(exc), code=exc.code.lower()) from exc
     image = (
-        image_adjust_from_effect_settings(clip.effect_settings)
+        ImageAdjust()
+        if managed_grade_lut is not None
+        else image_adjust_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else ImageAdjust()
     )
     from orga_drone.studio_color_animation import color_animation_from_effect_settings
 
     color_anim = (
-        color_animation_from_effect_settings(clip.effect_settings)
+        None
+        if managed_grade_lut is not None
+        else color_animation_from_effect_settings(clip.effect_settings)
         if kind == "video"
         else None
     )
     if color_anim is not None and not color_anim.is_active:
         color_anim = None
     color_look = (
-        color_look_from_effect_settings(clip.effect_settings)
+        ColorLook()
+        if managed_grade_lut is not None
+        else color_look_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else color_look_from_effect_settings(None)
     )
     hsl = (
-        hsl_adjust_from_effect_settings(clip.effect_settings)
+        HslAdjust()
+        if managed_grade_lut is not None
+        else hsl_adjust_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else hsl_adjust_from_effect_settings(None)
     )
     color_wheels = (
-        color_wheels_from_effect_settings(clip.effect_settings)
+        ColorWheels()
+        if managed_grade_lut is not None
+        else color_wheels_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else color_wheels_from_effect_settings(None)
     )
@@ -626,6 +658,7 @@ def _clip_to_export_clip(
         ),
         image=image,
         color_animation=color_anim,
+        managed_grade_lut=managed_grade_lut,
         color_look=color_look,
         hsl=hsl,
         color_wheels=color_wheels,

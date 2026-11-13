@@ -57,6 +57,9 @@ class StudioExportClip:
     fade_out_s: float = 0.0
     image: ImageAdjust = field(default_factory=ImageAdjust)
     color_animation: ColorAnimation | None = None
+    # When set, FFmpeg applies this baked managed-sdr grade instead of legacy
+    # image/LUT/HSL/wheels chains (#359). Source media stays untouched.
+    managed_grade_lut: Path | None = None
     color_look: ColorLook = field(default_factory=ColorLook)
     hsl: HslAdjust = field(default_factory=HslAdjust)
     color_wheels: ColorWheels = field(default_factory=ColorWheels)
