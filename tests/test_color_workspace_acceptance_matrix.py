@@ -37,7 +37,7 @@ def test_acceptance_matrix_document_exists_and_is_honest() -> None:
 
 def test_matrix_does_not_claim_packaged_webview2_pass() -> None:
     text = MATRIX.read_text(encoding="utf-8")
-    # Any table row that mentions packaged/WebView2/EXE must not verdict PASS.
+    # Inventory rows that mention packaged/WebView2/EXE must not verdict PASS.
     for line in text.splitlines():
         if not line.startswith("|"):
             continue
@@ -48,8 +48,15 @@ def test_matrix_does_not_claim_packaged_webview2_pass() -> None:
         ):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) < 2:
+        verdicts = [
+            cell
+            for cell in cells
+            if cell.startswith(("PASS", "FAIL", "NOT_RUN", "BLOCKED"))
+        ]
+        if not verdicts:
             continue
-        verdict = cells[1]
-        assert verdict.startswith(("NOT_RUN", "FAIL", "BLOCKED")), line
+        assert all(
+            not cell.startswith("PASS") for cell in verdicts
+        ), line
+
 
