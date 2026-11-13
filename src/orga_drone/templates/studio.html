@@ -1119,6 +1119,47 @@
               <input type="range" data-managed-hsl-light min="-0.5" max="0.5" step="0.01" value="0" disabled>
             </label>
             <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
+            <div class="studio-managed-selection" data-managed-selection-panel hidden>
+              <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
+              <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
+              <label class="studio-inspector-field">
+                <span>{{ _('Mask shape') }}</span>
+                <select data-managed-mask-shape aria-label="{{ _('Mask shape') }}">
+                  <option value="radial">{{ _('Radial') }}</option>
+                  <option value="linear">{{ _('Linear') }}</option>
+                  <option value="brush">{{ _('Brush') }}</option>
+                </select>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Feather') }}</span>
+                <input type="range" data-managed-mask-feather min="0" max="0.4" step="0.01" value="0.05" disabled>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Qualifier') }}</span>
+                <select data-managed-qualifier-type aria-label="{{ _('Qualifier') }}">
+                  <option value="none">{{ _('None') }}</option>
+                  <option value="rgb">{{ _('RGB') }}</option>
+                  <option value="hsl">{{ _('HSL') }}</option>
+                  <option value="luma">{{ _('Luma') }}</option>
+                </select>
+              </label>
+              <label class="studio-inspector-field studio-inspector-check">
+                <input type="checkbox" data-managed-selection-invert disabled>
+                <span>{{ _('Invert selection') }}</span>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Bind to step') }}</span>
+                <select data-managed-selection-bind aria-label="{{ _('Bind to step') }}">
+                  <option value="primaries-v1">{{ _('Primaries') }}</option>
+                  <option value="wheels-v1">{{ _('Wheels') }}</option>
+                  <option value="managed-hsl-v1">{{ _('Managed HSL') }}</option>
+                </select>
+              </label>
+              <div class="studio-managed-selection-actions">
+                <button type="button" class="button" data-managed-selection-apply>{{ _('Apply selection') }}</button>
+                <button type="button" class="button ghost" data-managed-selection-clear>{{ _('Clear selection') }}</button>
+              </div>
+            </div>
             <div class="studio-managed-curves" data-managed-curve-panel hidden>
               <p class="hint">{{ _('Curves edit the same managed grade. Double-click to add a point.') }}</p>
               <p class="meta-line" data-managed-curve-status role="status" aria-live="polite"></p>

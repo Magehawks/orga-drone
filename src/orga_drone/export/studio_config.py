@@ -60,6 +60,9 @@ class StudioExportClip:
     # When set, FFmpeg applies this baked managed-sdr grade instead of legacy
     # image/LUT/HSL/wheels chains (#359). Source media stays untouched.
     managed_grade_lut: Path | None = None
+    # Pre-graded media for spatial managed grades (masks/qualifiers). Replaces
+    # source for color; framing/masks/overlays still run afterward.
+    managed_grade_media: Path | None = None
     color_look: ColorLook = field(default_factory=ColorLook)
     hsl: HslAdjust = field(default_factory=HslAdjust)
     color_wheels: ColorWheels = field(default_factory=ColorWheels)

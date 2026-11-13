@@ -55,7 +55,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   (wrap/convert/reset and primaries sliders). The entry mounts the panel and
   refreshes it from image-inspector fill; preview invalidation stays in the
   entry. `studio/managed-curve-editor.js` owns the seven managed curve families
-  (RGB/luma/hue-sat maps) against the same grade PUT path. See
+  (RGB/luma/hue-sat maps) against the same grade PUT path.
+  `studio/managed-selection-editor.js` owns linear/radial/brush masks and
+  RGB/HSL/luma qualifiers bound to a managed step. See
   `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference

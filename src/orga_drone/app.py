@@ -2638,13 +2638,13 @@ def create_app() -> FastAPI:
         from orga_drone.studio_managed_apply import (
             ManagedApplyError,
             grade_is_managed_sdr,
-            require_managed_pointwise,
+            require_managed_executable,
         )
 
         managed_preview = False
         if grade_is_managed_sdr(clip.effect_settings):
             try:
-                require_managed_pointwise(clip.effect_settings)
+                require_managed_executable(clip.effect_settings)
             except ManagedApplyError as exc:
                 raise HTTPException(
                     status_code=422,

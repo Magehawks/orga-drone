@@ -24,8 +24,12 @@ from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chai
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, require_lut_asset
+from orga_drone.studio_grade_model import read_grade
 from orga_drone.studio_managed_apply import (
+    apply_managed_grade_image,
     ffmpeg_managed_grade_chain,
+    grade_has_spatial_selections,
+    grade_is_managed_pointwise,
     managed_grade_digest,
 )
 
@@ -136,6 +140,40 @@ def color_needs_preview_still(
         or hsl_needs_preview_still(hsl)
         or color_wheels_need_preview_still(wheels)
     )
+
+
+def _apply_spatial_managed_jpeg(path: Path, effect_settings: str | None) -> None:
+    """CPU-apply a spatial managed grade onto a decoded preview JPEG in place."""
+    from PIL import Image
+
+    model = read_grade(effect_settings)
+    if model.grade is None:
+        return
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        width, height = rgb.size
+        raw = list(rgb.getdata())
+        rows = [
+            [
+                (raw[y * width + x][0] / 255.0, raw[y * width + x][1] / 255.0, raw[y * width + x][2] / 255.0)
+                for x in range(width)
+            ]
+            for y in range(height)
+        ]
+        graded = apply_managed_grade_image(rows, model.grade, lattice_domain="srgb")
+        out = Image.new("RGB", (width, height))
+        out.putdata(
+            [
+                (
+                    int(min(255, max(0, round(sample[0] * 255)))),
+                    int(min(255, max(0, round(sample[1] * 255)))),
+                    int(min(255, max(0, round(sample[2] * 255)))),
+                )
+                for row in graded
+                for sample in row
+            ]
+        )
+        out.save(path, format="JPEG", quality=92, optimize=True)
 
 
 def quantize_preview_time(t_s: float, *, step: float = PREVIEW_QUANTIZE_S) -> float:
@@ -386,6 +424,12 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
+        if (
+            req.effect_settings
+            and grade_has_spatial_selections(req.effect_settings)
+            and not grade_is_managed_pointwise(req.effect_settings)
+        ):
+            _apply_spatial_managed_jpeg(completed, req.effect_settings)
         completed.replace(dest)
         _evict_if_needed(folder)
         return dest

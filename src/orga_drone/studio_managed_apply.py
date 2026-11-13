@@ -1,14 +1,14 @@
-"""CPU reference applicator for managed-sdr-v1 grades (#359).
+"""CPU reference applicator for managed-sdr-v1 grades (#359/#356/#357).
 
 Applies serial pointwise operations using the published managed math modules.
-Spatial selections and creative LUT assets are not silently omitted: they raise
-``ManagedApplyError`` so preview/export can reject before publication.
+Spatial selections require a source UV; creative LUT assets require a resolver.
+Neither is silently omitted.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,17 +24,26 @@ from orga_drone.studio_managed_curves import (
     saturation_vs_saturation,
 )
 from orga_drone.studio_managed_lut import (
+    ManagedCube,
     decode_bt709,
     decode_srgb,
     encode_bt709,
     encode_srgb,
+    sample_creative_lut,
 )
 from orga_drone.studio_managed_masks import no_selection_coverage, step_blend
 from orga_drone.studio_managed_primaries import apply_primaries
+from orga_drone.studio_managed_selection import (
+    ManagedSelectionError,
+    evaluate_selection,
+    selection_by_id,
+)
 from orga_drone.studio_managed_wheels import managed_hsl, wheels_v1
 
 Rgb = tuple[float, float, float]
 Curve = tuple[tuple[float, float], ...]
+Uv = tuple[float, float]
+LutResolver = Callable[[Mapping[str, Any]], ManagedCube]
 
 ADAPTER_VERSION = "managed-sdr-cpu-v1"
 BAKE_SIZE = 33
@@ -146,8 +155,18 @@ def _normalize_domain(name: str) -> str:
     raise ManagedApplyError(f"unsupported domain: {name}", code="UNSUPPORTED_GRADE")
 
 
-def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
-    """Apply one enabled managed step in its declared domain."""
+def apply_managed_step(
+    rgb: Rgb,
+    step: Mapping[str, Any],
+    *,
+    coverage: float = 1.0,
+    lut_resolver: LutResolver | None = None,
+) -> Rgb:
+    """Apply one enabled managed step in its declared domain.
+
+    ``coverage`` is the selection matte (1 = full). Mix and coverage both blend
+    toward the step input: ``C + mix*coverage*(P-C)``.
+    """
     kind = step.get("type")
     if not isinstance(kind, str):
         raise ManagedApplyError("step type is required", code="UNSUPPORTED_GRADE")
@@ -159,14 +178,11 @@ def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
             f"spatial step cannot run in the pointwise applicator: {kind}",
             code="UNSUPPORTED_GRADE",
         )
-    if step.get("selection_id"):
-        raise ManagedApplyError(
-            "masked steps require a spatial adapter",
-            code="UNSUPPORTED_GRADE",
-        )
+    if not 0.0 <= coverage <= 1.0:
+        raise ManagedApplyError("coverage must be from 0 to 1", code="RANGE")
     raw_params = step.get("params")
     params: dict[str, Any] = dict(raw_params) if isinstance(raw_params, Mapping) else {}
-    mix = float(step.get("mix", 1) or 0)
+    mix = float(step.get("mix", 1) if step.get("mix") is not None else 0)
     if not 0.0 <= mix <= 1.0:
         raise ManagedApplyError("mix must be from 0 to 1", code="RANGE")
 
@@ -237,10 +253,14 @@ def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
             ),
         )
     elif kind == "creative-lut-v1":
-        raise ManagedApplyError(
-            "creative LUT assets require the managed LUT adapter",
-            code="UNSUPPORTED_GRADE",
-        )
+        if lut_resolver is None:
+            raise ManagedApplyError(
+                "creative LUT assets require the managed LUT adapter",
+                code="UNSUPPORTED_GRADE",
+            )
+        cube = lut_resolver(params)
+        strength = _param_float(params, "strength", 1.0)
+        processed = sample_creative_lut(cube, rgb, strength)
     elif kind == "legacy-stack-v1":
         raise ManagedApplyError(
             "legacy-stack must use the legacy builders",
@@ -249,9 +269,21 @@ def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
     else:
         raise ManagedApplyError(f"unhandled step type: {kind}", code="UNSUPPORTED_GRADE")
 
-    if mix >= 1.0:
+    if mix >= 1.0 and coverage >= 1.0:
         return processed
-    return step_blend(rgb, processed, mix, no_selection_coverage())
+    return step_blend(rgb, processed, mix, coverage)
+
+
+def _encoded_bt709_sample(rgb: Rgb, *, domain: str) -> Rgb:
+    """Qualifier contract samples the step input in bounded encoded BT.709."""
+    if domain in {"encoded-bt709", "bt709-sdr", "bt709"}:
+        return rgb
+    if domain == "srgb":
+        linear = _decode_profile("srgb", rgb)
+        return _encode_profile("bt709-sdr", linear)
+    if domain == "linear-bt709":
+        return _encode_profile("bt709-sdr", rgb)
+    raise ManagedApplyError(f"unsupported qualifier domain: {domain}", code="UNSUPPORTED_GRADE")
 
 
 def apply_managed_grade_rgb(
@@ -259,6 +291,8 @@ def apply_managed_grade_rgb(
     grade: Mapping[str, Any] | GradeModel,
     *,
     lattice_domain: str = "encoded-bt709",
+    uv: Uv | None = None,
+    lut_resolver: LutResolver | None = None,
 ) -> Rgb:
     """Apply a managed grade to one RGB sample.
 
@@ -266,6 +300,9 @@ def apply_managed_grade_rgb(
     FFmpeg RGB filters use encoded BT.709/sRGB code values). The applicator
     decodes to linear, converts into each step domain, then encodes to the grade
     output profile for presentation/export boundaries.
+
+    Steps with ``selection_id`` require ``uv`` (normalized source coordinates).
+    Creative LUT steps require ``lut_resolver``.
     """
     if isinstance(grade, GradeModel):
         if grade.evaluator != "managed-sdr-v1" or grade.grade is None:
@@ -302,6 +339,13 @@ def apply_managed_grade_rgb(
     working: Rgb = linear
     domain = "linear-bt709"
 
+    raw_selections = document.get("selections")
+    selections: list[Mapping[str, Any]] = [
+        entry
+        for entry in (list(raw_selections) if isinstance(raw_selections, list) else [])
+        if isinstance(entry, Mapping)
+    ]
+
     raw_steps = document.get("steps")
     steps: list[Any] = list(raw_steps) if isinstance(raw_steps, list) else []
     for step in steps:
@@ -324,7 +368,31 @@ def apply_managed_grade_rgb(
         target = _normalize_domain(str(target))
         working = _to_domain(working, current=domain, target=target)
         domain = target
-        working = apply_managed_step(working, step)
+
+        coverage = no_selection_coverage()
+        selection_id = step.get("selection_id")
+        if selection_id:
+            if uv is None:
+                raise ManagedApplyError(
+                    "masked steps require a spatial adapter",
+                    code="UNSUPPORTED_GRADE",
+                )
+            try:
+                selection = selection_by_id(selections, str(selection_id))
+                sample = _encoded_bt709_sample(working, domain=domain)
+                coverage = evaluate_selection(selection, point=uv, rgb=sample)
+            except ManagedSelectionError as exc:
+                raise ManagedApplyError(
+                    str(exc) or "masked steps require a spatial adapter",
+                    code="UNSUPPORTED_GRADE",
+                ) from exc
+
+        working = apply_managed_step(
+            working,
+            step,
+            coverage=coverage,
+            lut_resolver=lut_resolver,
+        )
 
     working = _to_domain(working, current=domain, target="linear-bt709")
     return _encode_profile(output_profile if output_profile != "bt709" else "bt709-sdr", working)
@@ -338,8 +406,21 @@ def grade_is_managed_sdr(
     return model.evaluator == "managed-sdr-v1" and model.grade is not None
 
 
+def grade_has_spatial_selections(
+    effect_settings: str | Mapping[str, Any] | None,
+) -> bool:
+    """True when any enabled step binds a selection_id."""
+    model = read_grade(effect_settings)
+    if model.evaluator != "managed-sdr-v1" or model.grade is None:
+        return False
+    for step in model.grade.get("steps") or []:
+        if step.get("enabled", True) and step.get("selection_id"):
+            return True
+    return False
+
+
 def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) -> bool:
-    """True when preview/export should use the managed applicator instead of legacy."""
+    """True when preview/export can bake a global 3D LUT (no spatial/LUT assets)."""
     model = read_grade(effect_settings)
     if model.evaluator != "managed-sdr-v1" or model.grade is None:
         return False
@@ -357,10 +438,34 @@ def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) 
     return True
 
 
+def grade_is_managed_cpu_executable(
+    effect_settings: str | Mapping[str, Any] | None,
+    *,
+    has_lut_resolver: bool = False,
+) -> bool:
+    """True when the CPU applicator can execute every enabled step.
+
+    Spatial selections are supported. Creative LUT requires ``has_lut_resolver``.
+    """
+    model = read_grade(effect_settings)
+    if model.evaluator != "managed-sdr-v1" or model.grade is None:
+        return False
+    for step in model.grade.get("steps") or []:
+        if not step.get("enabled", True):
+            continue
+        kind = step.get("type")
+        descriptor = OPERATION_DESCRIPTORS.get(str(kind))
+        if descriptor is None or not descriptor.get("pointwise", False):
+            return False
+        if kind == "creative-lut-v1" and not has_lut_resolver:
+            return False
+    return True
+
+
 def require_managed_pointwise(
     effect_settings: str | Mapping[str, Any] | None,
 ) -> None:
-    """Reject managed grades that cannot be executed by the bake adapter."""
+    """Reject managed grades that cannot be executed by the lut3d bake adapter."""
     if not grade_is_managed_sdr(effect_settings):
         return
     if grade_is_managed_pointwise(effect_settings):
@@ -369,6 +474,60 @@ def require_managed_pointwise(
         "This managed grade needs masks, a creative LUT, or another adapter before preview/export",
         code="UNSUPPORTED_GRADE",
     )
+
+
+def require_managed_executable(
+    effect_settings: str | Mapping[str, Any] | None,
+    *,
+    has_lut_resolver: bool = False,
+) -> None:
+    """Reject managed grades the CPU applicator cannot execute."""
+    if not grade_is_managed_sdr(effect_settings):
+        return
+    if grade_is_managed_pointwise(effect_settings):
+        return
+    if grade_is_managed_cpu_executable(
+        effect_settings, has_lut_resolver=has_lut_resolver
+    ):
+        return
+    raise ManagedApplyError(
+        "This managed grade needs a creative LUT resolver or another adapter before preview/export",
+        code="UNSUPPORTED_GRADE",
+    )
+
+
+def apply_managed_grade_image(
+    pixels: Sequence[Sequence[Rgb]],
+    grade: Mapping[str, Any] | GradeModel,
+    *,
+    lattice_domain: str = "encoded-bt709",
+    lut_resolver: LutResolver | None = None,
+) -> list[list[Rgb]]:
+    """Apply a managed grade to a row-major RGB image using pixel-center UVs."""
+    if not pixels:
+        return []
+    height = len(pixels)
+    width = len(pixels[0]) if height else 0
+    if width <= 0:
+        return [list(row) for row in pixels]
+    out: list[list[Rgb]] = []
+    for y, row in enumerate(pixels):
+        if len(row) != width:
+            raise ManagedApplyError("image rows must share a width", code="RANGE")
+        out_row: list[Rgb] = []
+        for x, sample in enumerate(row):
+            uv = ((x + 0.5) / width, (y + 0.5) / height)
+            out_row.append(
+                apply_managed_grade_rgb(
+                    sample,
+                    grade,
+                    lattice_domain=lattice_domain,
+                    uv=uv,
+                    lut_resolver=lut_resolver,
+                )
+            )
+        out.append(out_row)
+    return out
 
 
 def bake_managed_grade_cube(
@@ -404,18 +563,23 @@ def bake_managed_grade_cube(
 
 
 def managed_grade_digest(effect_settings: str | Mapping[str, Any] | None) -> str | None:
-    """Stable content digest for cache keys, or None when not managed pointwise."""
+    """Stable content digest for cache keys, or None when not managed-sdr."""
     import hashlib
     import json
 
     model = read_grade(effect_settings)
-    if not grade_is_managed_pointwise(effect_settings) or model.grade is None:
+    if model.evaluator != "managed-sdr-v1" or model.grade is None:
         return None
     payload = {
         "adapter": ADAPTER_VERSION,
         "evaluator": model.evaluator,
         "revision": model.revision,
         "grade": model.grade,
+        "mode": (
+            "lut-bake"
+            if grade_is_managed_pointwise(effect_settings)
+            else "cpu-spatial"
+        ),
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
