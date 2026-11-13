@@ -296,6 +296,21 @@ def cache_key_for(
         "size": media_size,
         "kind": req.kind,
         "t": quantize_preview_time(req.source_time_s),
+        # #358 animation clocks: same absolute PTS can sample different
+        # source-local / Story values after trim or Story placement changes.
+        "source_in": round(float(req.source_in_s), 4),
+        "source_out": (
+            None
+            if req.source_out_s is None
+            else round(float(req.source_out_s), 4)
+        ),
+        "story_t": (
+            None
+            if req.story_time_s is None
+            else quantize_preview_time(float(req.story_time_s))
+        ),
+        "transition_side": str(req.transition_side or "single"),
+        "repeat_pass": int(req.repeat_pass or 0),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
@@ -304,7 +319,7 @@ def cache_key_for(
         "edge": int(req.max_edge),
         "saturation": req.saturation,
         "managed": managed_grade_digest(req.effect_settings, data_dir=data_dir),
-        "v": 8,
+        "v": 9,
     }
     if req.kind == "photo":
         payload["photo_even_dimensions"] = True

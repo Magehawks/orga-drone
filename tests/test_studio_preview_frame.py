@@ -242,6 +242,41 @@ def test_cache_key_stable_for_same_inputs(tmp_path: Path) -> None:
     assert cache_key_for(other, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size) != a
 
 
+def test_cache_key_includes_animation_clock_fields(tmp_path: Path) -> None:
+    photo = _make_photo(tmp_path / "clock.jpg")
+    st = photo.stat()
+    base = PreviewFrameRequest(
+        media_path=photo,
+        kind="video",
+        source_time_s=3.0,
+        image=ImageAdjust(),
+        look=ColorLook(),
+        source_in_s=1.0,
+        story_time_s=10.0,
+    )
+    key = cache_key_for(base, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
+    trimmed = PreviewFrameRequest(
+        media_path=photo,
+        kind="video",
+        source_time_s=3.0,
+        image=ImageAdjust(),
+        look=ColorLook(),
+        source_in_s=2.0,
+        story_time_s=10.0,
+    )
+    assert cache_key_for(trimmed, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size) != key
+    story = PreviewFrameRequest(
+        media_path=photo,
+        kind="video",
+        source_time_s=3.0,
+        image=ImageAdjust(),
+        look=ColorLook(),
+        source_in_s=1.0,
+        story_time_s=11.0,
+    )
+    assert cache_key_for(story, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size) != key
+
+
 def test_preview_frame_api_and_cache_clear(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
