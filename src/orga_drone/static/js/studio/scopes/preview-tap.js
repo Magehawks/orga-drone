@@ -129,7 +129,8 @@ export function createManagedPreviewScopeProducer({
 } = {}) {
   let generation = 0;
   let lastAttemptMs = null;
-  let lastSeekKey = "";
+  let lastIdentityKey = "";
+  let lastPausedSeek = "";
   let destroyed = false;
 
   function bump() {
@@ -137,12 +138,12 @@ export function createManagedPreviewScopeProducer({
     return generation;
   }
 
-  function seekKey(view, sourceTimeS) {
+  function identityKey(view) {
     return [
+      String(view?.projectId || ""),
       String(view?.clipId || ""),
       String(view?.gradeRevision || ""),
       String(view?.contextDigest || ""),
-      String(quantizePreviewScopeTime(sourceTimeS)),
     ].join("\u001f");
   }
 
@@ -151,14 +152,20 @@ export function createManagedPreviewScopeProducer({
     const view = getView?.() || {};
     if (!view.clipId) return { accepted: false, reason: "no-clip" };
     const sourceTimeS = Number(getSourceTimeS?.() || 0);
-    const key = seekKey(view, sourceTimeS);
-    const seekChanged = key !== lastSeekKey;
-    if (seekChanged) {
-      lastSeekKey = key;
+    const playing = Boolean(isPlaying?.());
+    const idKey = identityKey(view);
+    const pausedSeek = quantizePreviewScopeTime(sourceTimeS);
+    if (idKey !== lastIdentityKey) {
+      lastIdentityKey = idKey;
+      lastPausedSeek = String(pausedSeek);
+      bump();
+      lastAttemptMs = null;
+    } else if (!playing && String(pausedSeek) !== lastPausedSeek) {
+      // Explicit scrub while paused: drop in-flight frames and reset throttle.
+      lastPausedSeek = String(pausedSeek);
       bump();
       lastAttemptMs = null;
     }
-    const playing = Boolean(isPlaying?.());
     const minInterval = playing ? playIntervalMs : pauseIntervalMs;
     const t = now();
     if (lastAttemptMs !== null && t - lastAttemptMs < minInterval) {
@@ -195,15 +202,14 @@ export function createManagedPreviewScopeProducer({
       return { accepted: false, reason: "stale-generation" };
     }
     const latest = getView?.() || {};
-    if (
-      String(latest.clipId) !== String(view.clipId) ||
-      String(latest.gradeRevision) !== String(view.gradeRevision) ||
-      String(latest.contextDigest) !== String(view.contextDigest)
-    ) {
+    if (identityKey(latest) !== idKey) {
       return { accepted: false, reason: "stale-view" };
     }
-    if (seekKey(latest, getSourceTimeS?.() || 0) !== key) {
-      return { accepted: false, reason: "stale-seek" };
+    if (!playing) {
+      const latestSeek = quantizePreviewScopeTime(getSourceTimeS?.() || 0);
+      if (String(latestSeek) !== String(pausedSeek)) {
+        return { accepted: false, reason: "stale-seek" };
+      }
     }
     const frame = buildManagedPreviewScopeFrame({
       rgba: decoded.rgba,

@@ -4129,7 +4129,12 @@ import {
     const managedDigest = grade
       ? `managed:${gradeRevision}:${grade.evaluator || ""}`
       : "";
-    const seekToken = `t:${quantizePreviewScopeTime(currentScopeSourceTimeS()).toFixed(1)}`;
+    // While playing, keep the view key stable so 0.1s PTS advances do not
+    // clear measurements or reset the producer throttle. Scrub-while-paused
+    // still changes the seek token so reverse seeks drop the old frame.
+    const seekToken = state.playing
+      ? "playing"
+      : `t:${quantizePreviewScopeTime(currentScopeSourceTimeS()).toFixed(1)}`;
     return {
       projectId: String(projectId || ""),
       clipId: clip ? String(clip.dataset.studioId || "") : "",

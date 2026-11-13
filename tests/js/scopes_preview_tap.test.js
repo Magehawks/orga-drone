@@ -157,6 +157,60 @@ test("producer rejects response when grade revision drifts", async () => {
   assert.equal(result.reason, "stale-revision");
 });
 
+test("playback time advances do not reset throttle or starve in-flight fetches", async () => {
+  let fetches = 0;
+  let clock = 0;
+  let sourceTime = 0;
+  const delays = [];
+  const producer = createManagedPreviewScopeProducer({
+    getView: () => ({
+      projectId: "p",
+      clipId: "11",
+      gradeRevision: "1",
+      contextDigest: "playing",
+    }),
+    getSourceTimeS: () => sourceTime,
+    isPlaying: () => true,
+    playIntervalMs: 500,
+    pauseIntervalMs: 100,
+    now: () => clock,
+    fetchPreviewJpeg: () => {
+      fetches += 1;
+      return new Promise((resolve) => {
+        delays.push(() =>
+          resolve({
+            bytes: new ArrayBuffer(4),
+            gradeRevision: "1",
+            sourceTimeS: sourceTime,
+          })
+        );
+      });
+    },
+    decodeJpegToRgba: async () => ({
+      width: 1,
+      height: 1,
+      rgba: new Uint8ClampedArray([255, 0, 0, 255]),
+    }),
+    tryPublish: () => ({ accepted: true }),
+  });
+
+  const first = producer.refresh("playback");
+  assert.equal(fetches, 1);
+  sourceTime = 0.2;
+  clock = 100;
+  const second = await producer.refresh("playback");
+  assert.equal(second.reason, "rate-limited");
+  assert.equal(fetches, 1);
+  clock = 600;
+  sourceTime = 0.5;
+  const third = producer.refresh("playback");
+  assert.equal(fetches, 2);
+  delays[0]();
+  delays[1]();
+  assert.equal((await first).accepted, true);
+  assert.equal((await third).accepted, true);
+});
+
 test("controller accepts managed preview frames when capability is open", () => {
   const injected = [];
   const controller = createScopeTapController({

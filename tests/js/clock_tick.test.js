@@ -75,6 +75,7 @@ function scenario(options = {}) {
     pausePlayback() {},
     sourceToStory: (_, t) => t,
     paintPreviewBlit: () => painted.push(state.projectTimeS),
+    refreshColorScopesTap() {},
     requestAnimationFrame: (callback) => {
       queue.push(callback);
       return queue.length;
