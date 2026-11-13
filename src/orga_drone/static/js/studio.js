@@ -14,6 +14,7 @@ import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import { createManagedColorEditor } from "./studio/managed-color-editor.js";
 import {
+  isManagedWebglBakeMode,
   managedBakeUrl,
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
@@ -2824,10 +2825,7 @@ import {
     if (managedProbe) {
       // Spatial / unsupported managed ops stay on the CPU still path.
       // Approx bake is allowed for live preview; export stays on CPU/FFmpeg.
-      return (
-        managedProbe.supported &&
-        (managedProbe.mode === "webgl-bake" || managedProbe.mode === "webgl-bake-approx")
-      );
+      return managedProbe.supported && isManagedWebglBakeMode(managedProbe.mode);
     }
     return evaluateLutWebglHandling({
       kind: clip.dataset.kind,
@@ -2843,10 +2841,7 @@ import {
     const grade = managedGradeForClip(clip);
     if (!grade) return null;
     const probe = probeManagedGpuCapabilities(grade);
-    if (
-      !probe.supported ||
-      (probe.mode !== "webgl-bake" && probe.mode !== "webgl-bake-approx")
-    ) {
+    if (!probe.supported || !isManagedWebglBakeMode(probe.mode)) {
       return null;
     }
     const studioId = clip?.dataset?.studioId;

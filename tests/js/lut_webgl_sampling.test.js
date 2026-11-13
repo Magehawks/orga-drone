@@ -11,13 +11,12 @@ const source = fs.readFileSync(
 );
 const shader = /const fs = `([\s\S]*?)`;/.exec(source)?.[1] || "";
 
-test("WebGL LUT sampling maps domain values to texel centres", () => {
+test("WebGL LUT sampling uses tetrahedral texelFetch (#360)", () => {
   assert.match(shader, /float uConvSize/);
   assert.match(shader, /float uCreativeSize/);
-  assert.match(
-    shader,
-    /vec3 lutCoord\(vec3 c, float size\)\s*{\s*return \(clamp\(c, 0\.0, 1\.0\) \* \(size - 1\.0\) \+ 0\.5\) \/ size;\s*}/
-  );
+  assert.match(shader, /bool tetBefore\(/);
+  assert.match(shader, /texelFetch\(lut,/);
+  assert.doesNotMatch(shader, /vec3 lutCoord\(/);
   assert.match(shader, /applyLut\(uConv, c, uConvSize\)/);
   assert.match(shader, /applyLut\(uCreative, c, uCreativeSize\)/);
 });

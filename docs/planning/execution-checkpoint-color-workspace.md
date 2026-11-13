@@ -32,7 +32,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Spatial masks/qualifiers | Available now | Photo + video CPU export |
 | Eyedropper / brush | Available now | #426 |
 | Animation clocks (#358) | Available now (partial) | Source-local preview/export; story-local plan + fail-closed full-source bake; client `story_s` pending |
-| GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; packaged budgets NOT_RUN |
+| GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Available now (slice) | Commands for enable/mix/reorder; preview tokens; param body PUT retained |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
@@ -52,7 +52,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #351 | CLOSED | — |
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
 | #358 | #431 merged | Client `story_s`; story-local export beyond fail-closed; full ClipTimingInputs wiring |
-| #360 | Bake-approx shipped | Exact tetrahedral / Windows budgets NOT_RUN |
+| #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
 | #361 | Step editor shipped | Packaged keyboard/E2E NOT_RUN; Creative preset compile depth |
 | #362/#366 | Live tap shipped | Packaged latency/memory NOT_RUN |
 | #363 | Tokens + step commands | Param body PUT retained (no upsert_step_params yet) |

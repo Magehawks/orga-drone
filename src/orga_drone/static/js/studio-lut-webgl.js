@@ -109,11 +109,36 @@
       in vec2 uv;
       out vec4 outColor;
       float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-      vec3 lutCoord(vec3 c, float size) {
-        return (clamp(c, 0.0, 1.0) * (size - 1.0) + 0.5) / size;
+      bool tetBefore(vec3 frac, int left, int right) {
+        float fl = left == 0 ? frac.r : (left == 1 ? frac.g : frac.b);
+        float fr = right == 0 ? frac.r : (right == 1 ? frac.g : frac.b);
+        return fl > fr || (fl == fr && left < right);
       }
+      // Tetrahedral sampling matches FFmpeg/CPU (#360). RGBA8 storage remains
+      // an explicit quantization boundary (exact:false in the capability probe).
       vec3 applyLut(sampler3D lut, vec3 c, float size) {
-        return texture(lut, lutCoord(c, size)).rgb;
+        vec3 clamped = clamp(c, 0.0, 1.0);
+        vec3 coords = clamped * (size - 1.0);
+        vec3 baseF = floor(coords);
+        vec3 frac = coords - baseF;
+        int o0 = 0;
+        int o1 = 1;
+        int o2 = 2;
+        if (!tetBefore(frac, o0, o1)) { int t = o0; o0 = o1; o1 = t; }
+        if (!tetBefore(frac, o1, o2)) { int t = o1; o1 = o2; o2 = t; }
+        if (!tetBefore(frac, o0, o1)) { int t = o0; o0 = o1; o1 = t; }
+        ivec3 i0 = ivec3(baseF);
+        ivec3 i1 = ivec3(min(baseF + 1.0, vec3(size - 1.0)));
+        vec3 v000 = texelFetch(lut, i0, 0).rgb;
+        vec3 axis0 = o0 == 0 ? vec3(1.0, 0.0, 0.0) : (o0 == 1 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0));
+        vec3 axis1 = o1 == 0 ? vec3(1.0, 0.0, 0.0) : (o1 == 1 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0));
+        vec3 alongFirst = texelFetch(lut, ivec3(min(baseF + axis0, vec3(size - 1.0))), 0).rgb;
+        vec3 alongTwo = texelFetch(lut, ivec3(min(baseF + axis0 + axis1, vec3(size - 1.0))), 0).rgb;
+        vec3 far = texelFetch(lut, i1, 0).rgb;
+        float w1 = o0 == 0 ? frac.r : (o0 == 1 ? frac.g : frac.b);
+        float w2 = o1 == 0 ? frac.r : (o1 == 1 ? frac.g : frac.b);
+        float w3 = o2 == 0 ? frac.r : (o2 == 1 ? frac.g : frac.b);
+        return v000 + w1 * (alongFirst - v000) + w2 * (alongTwo - alongFirst) + w3 * (far - alongTwo);
       }
       void main() {
         vec3 c = texture(uVideo, uv).rgb * uWarmth * uBrightness;
