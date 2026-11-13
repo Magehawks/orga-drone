@@ -34,7 +34,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Animation clocks (#358) | Available now (partial) | Client `story_s`; story-local export with Story anchor (constant-speed single play); ramps/repeats/loop fail-closed |
 | GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
-| Shared Control API grade actions (#363) | Available now (slice) | Commands for enable/mix/reorder; preview tokens; param body PUT retained |
+| Shared Control API grade actions (#363) | Available now (unit) | Commands for enable/mix/reorder/params/selection; preview tokens; PUT escape hatch; packaged E2E NOT_RUN |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
 | Full #365 acceptance matrix | OPEN | Remaining AC + packaged deferred by PO |
 
@@ -55,7 +55,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
 | #361 | Step editor shipped | Packaged keyboard/E2E NOT_RUN; Creative preset compile depth |
 | #362/#366 | Live tap + Node accumulate harness | Packaged latency/memory NOT_RUN |
-| #363 | Tokens + step commands | Param body PUT retained (no upsert_step_params yet) |
+| #363 | Tokens + upsert_step_params/selection | PUT escape hatch only; packaged E2E NOT_RUN |
 | #364/#365 | OPEN | Strict matrix + packaged deferred |
 
 ## Explicitly deferred by PO (this sprint)

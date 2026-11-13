@@ -12,10 +12,7 @@ import {
   neutralManagedHslParams,
   neutralPrimariesParams,
   neutralWheelsParams,
-  putGrade,
-  upsertManagedHslStep,
-  upsertPrimariesStep,
-  upsertWheelsStep,
+  postGradeCommand,
   wrapGrade,
 } from "./grade-api.js";
 import { createManagedCurveEditor } from "./managed-curve-editor.js";
@@ -387,33 +384,69 @@ export function createManagedColorEditor({
     }
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
-    const expectedRevision = current.revision;
+    let expectedRevision = current.revision;
     const primaries = readPrimaries();
     const wheels = readWheels();
     const hsl = readHsl();
-    let grade = current.grade;
-    const hasPrimaries = Boolean(findStep(grade, "primaries-v1"));
-    const hasWheels = Boolean(findStep(grade, "wheels-v1"));
-    const hasHsl = Boolean(findStep(grade, "managed-hsl-v1"));
-    const primariesChanged = JSON.stringify(primaries) !== JSON.stringify(neutralPrimariesParams());
-    const wheelsChanged = JSON.stringify(wheels) !== JSON.stringify(neutralWheelsParams());
-    const hslChanged = JSON.stringify(hsl) !== JSON.stringify(neutralManagedHslParams());
-    if (hasPrimaries || primariesChanged) {
-      grade = upsertPrimariesStep(grade, primaries);
+    const grade = current.grade;
+    const commands = [];
+    function familyDirty(type, nextParams, neutrals) {
+      const step = findStep(grade, type);
+      const baseline = { ...neutrals, ...(step?.params || {}) };
+      const candidate = { ...neutrals, ...nextParams };
+      return JSON.stringify(baseline) !== JSON.stringify(candidate);
     }
-    if (hasWheels || wheelsChanged) {
-      grade = upsertWheelsStep(grade, wheels);
+    const primariesDirty = familyDirty("primaries-v1", primaries, neutralPrimariesParams());
+    const wheelsDirty = familyDirty("wheels-v1", wheels, neutralWheelsParams());
+    const hslDirty = familyDirty("managed-hsl-v1", hsl, neutralManagedHslParams());
+    if (primariesDirty) {
+      commands.push({
+        type: "upsert_step_params",
+        params: {
+          step_id: findStep(grade, "primaries-v1")?.id || `primaries-${Date.now().toString(36)}`,
+          type: "primaries-v1",
+          params: primaries,
+          enabled: true,
+        },
+      });
     }
-    if (hasHsl || hslChanged) {
-      grade = upsertManagedHslStep(grade, hsl);
+    if (wheelsDirty) {
+      commands.push({
+        type: "upsert_step_params",
+        params: {
+          step_id: findStep(grade, "wheels-v1")?.id || `wheels-${Date.now().toString(36)}`,
+          type: "wheels-v1",
+          params: wheels,
+          enabled: true,
+        },
+      });
     }
+    if (hslDirty) {
+      commands.push({
+        type: "upsert_step_params",
+        params: {
+          step_id: findStep(grade, "managed-hsl-v1")?.id || `hsl-${Date.now().toString(36)}`,
+          type: "managed-hsl-v1",
+          params: hsl,
+          enabled: true,
+        },
+      });
+    }
+    if (!commands.length) return;
+    const historyGroup = `grade-save-${expectedId}-${Date.now().toString(36)}`;
     busy = true;
     setEnabled(true);
     try {
-      const payload = await putGrade(studioId, {
-        grade,
-        expectedRevision,
-      });
+      let payload = current;
+      for (const command of commands) {
+        payload = await postGradeCommand(studioId, {
+          type: command.type,
+          expectedRevision,
+          params: command.params,
+          historyGroup,
+        });
+        expectedRevision = payload.revision;
+      }
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;

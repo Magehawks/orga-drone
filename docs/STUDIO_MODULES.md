@@ -58,7 +58,7 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   inspector panel (wrap/convert/reset and primaries sliders). The entry mounts
   the panel and refreshes it from image-inspector fill; preview invalidation
   stays in the entry. `studio/managed-curve-editor.js` owns the seven managed
-  curve families (RGB/luma/hue-sat maps) against the same grade PUT path.
+  curve families (RGB/luma/hue-sat maps) via `upsert_step_params` commands.
   `studio/managed-selection-editor.js` owns linear/radial/brush masks and
   RGB/HSL/luma qualifiers bound to a managed step. See
   `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
@@ -66,7 +66,8 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   confined local `.cube` assets. `studio/managed-step-editor.js` owns the
   serial step list (enable/mix/reorder) via `postGradeCommand`.
   `studio/preview-token.js` owns async preview identity tokens (#363).
-  Parameter body edits still use full grade PUT until a params command exists.
+  Parameter body edits use `upsert_step_params` / selection commands; full grade
+  PUT remains an escape hatch only.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
   histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro
