@@ -47,6 +47,8 @@ function paintGroup(fields, values) {
 export function createManagedColorEditor({
   panel,
   getSelectedStudioId,
+  getPreviewMediaEl,
+  getPreviewSourceTimeS,
   onChanged,
   confirmConvert,
   listLuts,
@@ -116,6 +118,8 @@ export function createManagedColorEditor({
     panel: panel.querySelector("[data-managed-selection-panel]"),
     getSelectedStudioId,
     getGrade: () => current,
+    getPreviewMediaEl,
+    getPreviewSourceTimeS,
     onChanged: (payload) => {
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());

@@ -1155,6 +1155,23 @@
                   <option value="managed-hsl-v1">{{ _('Managed HSL') }}</option>
                 </select>
               </label>
+              <div class="studio-managed-selection-tools">
+                <button type="button" class="button ghost" data-managed-eyedropper aria-pressed="false">{{ _('Eyedropper') }}</button>
+                <button type="button" class="button ghost" data-managed-brush-draw aria-pressed="false">{{ _('Draw brush') }}</button>
+                <button type="button" class="button ghost" data-managed-eyedropper-accept disabled>{{ _('Accept sample') }}</button>
+              </div>
+              <div class="studio-managed-eyedropper-feedback" aria-live="polite">
+                <span class="studio-managed-eyedropper-swatch" data-managed-eyedropper-swatch></span>
+                <span class="meta-line" data-managed-eyedropper-meta></span>
+              </div>
+              <label class="studio-inspector-field">
+                <span>{{ _('Brush radius') }}</span>
+                <input type="range" data-managed-brush-radius min="0.02" max="0.25" step="0.01" value="0.08" disabled>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Brush hardness') }}</span>
+                <input type="range" data-managed-brush-hardness min="0" max="1" step="0.05" value="0.5" disabled>
+              </label>
               <div class="studio-managed-selection-actions">
                 <button type="button" class="button" data-managed-selection-apply>{{ _('Apply selection') }}</button>
                 <button type="button" class="button ghost" data-managed-selection-clear>{{ _('Clear selection') }}</button>

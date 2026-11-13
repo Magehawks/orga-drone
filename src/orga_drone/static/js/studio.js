@@ -14078,6 +14078,23 @@ import {
   managedColorEditor = createManagedColorEditor({
     panel: managedColorPanel,
     getSelectedStudioId: () => selectedAdjustableClip()?.dataset?.studioId || null,
+    getPreviewMediaEl: () =>
+      document.getElementById("studio-preview-video") ||
+      document.getElementById("studio-preview-image") ||
+      previewFrame,
+    getPreviewSourceTimeS: () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return 0;
+      try {
+        const hit = resolveAt(state.projectTimeS);
+        if (hit && String(hit.clip?.dataset?.studioId) === String(clip.dataset.studioId)) {
+          return Number(playSourceOffset(clip, hit.localS) || 0);
+        }
+        return 0;
+      } catch (_) {
+        return 0;
+      }
+    },
     listLuts: async () => {
       try {
         const res = await fetch("/api/luts", { headers: { Accept: "application/json" } });

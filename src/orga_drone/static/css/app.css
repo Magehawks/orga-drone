@@ -5142,3 +5142,24 @@ footer {
   fill: var(--accent, #7db7ff);
   cursor: grab;
 }
+
+.studio-managed-eyedropper-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+}
+.studio-managed-eyedropper-swatch {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--border, #666);
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+.studio-managed-selection-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0;
+}
