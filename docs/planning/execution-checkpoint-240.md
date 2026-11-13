@@ -50,7 +50,8 @@ is not acceptance.
 - #404 target-duration export evidence. Journey clip order fixed. Packaged Timelapse Inspector NOT_RUN.
 - #405 managed LUT sampling. Not wired to export.
 - #406 managed primaries. Kelvin/tint unpublished.
-- This branch: managed curve operators for #354. No UI.
+- This branch: managed wheels/HSL for #355. No UI.
+- `issue-354-curves` — PR #407.
 
 ## Worktrees
 
@@ -78,4 +79,4 @@ is not acceptance.
 
 ## Exact next task
 
-#354 adds read-only managed curve operators. No UI and no canonical writes. After CI, continue #355 wheels/HSL adapters. Packaged Timelapse Inspector and GitHub release-ZIP admission remain NOT_RUN. Do not merge without PO approval.
+#355 adds read-only wheels-v1 and managed HSL. No UI and no canonical writes. Continue #356 masks next. Packaged Timelapse Inspector and GitHub release-ZIP admission remain NOT_RUN. Do not merge without PO approval.
