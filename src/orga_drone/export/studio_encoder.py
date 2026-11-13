@@ -224,47 +224,57 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip, *, frame_cha
     The saturation ramp follows the grade so a fade to black still ends on black.
     """
     base = _segment_vf(width, height)
-    grade = ffmpeg_grade_chain(clip.image) if clip.kind in {"photo", "video"} else ""
+    managed = ""
+    grade = ""
     lut = ""
-    if clip.kind in {"photo", "video"} and not clip.color_look.is_neutral:
-        from orga_drone.config import settings
+    hsl = ""
+    wheels = ""
+    if clip.kind in {"photo", "video"} and clip.managed_grade_lut is not None:
+        from orga_drone.studio_lut import escape_ffmpeg_lut_path
 
-        try:
-            lut = ffmpeg_lut_chain(
-                clip.color_look,
-                data_dir=settings.data_dir,
-                work_dir=settings.data_dir / "export-work" / "luts",
-            )
-        except LutMissingError as exc:
-            raise StudioExportError(
-                "A LUT file is missing. Choose the .cube again in Bild, or clear the look.",
-                code="lut_missing",
-            ) from exc
+        managed = (
+            f"lut3d=file={escape_ffmpeg_lut_path(clip.managed_grade_lut)}"
+            ":interp=tetrahedral"
+        )
+    elif clip.kind in {"photo", "video"}:
+        grade = ffmpeg_grade_chain(clip.image)
+        if not clip.color_look.is_neutral:
+            from orga_drone.config import settings
+
+            try:
+                lut = ffmpeg_lut_chain(
+                    clip.color_look,
+                    data_dir=settings.data_dir,
+                    work_dir=settings.data_dir / "export-work" / "luts",
+                )
+            except LutMissingError as exc:
+                raise StudioExportError(
+                    "A LUT file is missing. Choose the .cube again in Bild, or clear the look.",
+                    code="lut_missing",
+                ) from exc
+        if not clip.hsl.is_neutral:
+            from orga_drone.config import settings
+
+            try:
+                hsl = ffmpeg_hsl_chain(clip.hsl, data_dir=settings.data_dir)
+            except OSError as exc:
+                raise StudioExportError(
+                    "Could not build the HSL color preview.", code="hsl_failed"
+                ) from exc
+        if not clip.color_wheels.is_neutral:
+            from orga_drone.config import settings
+
+            try:
+                wheels = ffmpeg_color_wheels_chain(
+                    clip.color_wheels, data_dir=settings.data_dir
+                )
+            except OSError as exc:
+                raise StudioExportError(
+                    "Could not build the colour wheel preview.", code="wheels_failed"
+                ) from exc
     detail = (
         ffmpeg_detail_chain(clip.detail) if clip.kind in {"photo", "video"} else ""
     )
-    hsl = ""
-    if clip.kind in {"photo", "video"} and not clip.hsl.is_neutral:
-        from orga_drone.config import settings
-
-        try:
-            hsl = ffmpeg_hsl_chain(clip.hsl, data_dir=settings.data_dir)
-        except OSError as exc:
-            raise StudioExportError(
-                "Could not build the HSL color preview.", code="hsl_failed"
-            ) from exc
-    wheels = ""
-    if clip.kind in {"photo", "video"} and not clip.color_wheels.is_neutral:
-        from orga_drone.config import settings
-
-        try:
-            wheels = ffmpeg_color_wheels_chain(
-                clip.color_wheels, data_dir=settings.data_dir
-            )
-        except OSError as exc:
-            raise StudioExportError(
-                "Could not build the colour wheel preview.", code="wheels_failed"
-            ) from exc
     ramp = (
         ffmpeg_saturation_ramp(clip.saturation_ramp, origin_s=0.0)
         if clip.kind == "video"
@@ -316,7 +326,20 @@ def _segment_chain(width: int, height: int, clip: StudioExportClip, *, frame_cha
         prefix, suffix = frame_chain, ""
     return ",".join(
         part
-        for part in (trim, grade, lut, hsl, wheels, detail, ramp, prefix, base, suffix, stretch)
+        for part in (
+            trim,
+            managed,
+            grade,
+            lut,
+            hsl,
+            wheels,
+            detail,
+            ramp,
+            prefix,
+            base,
+            suffix,
+            stretch,
+        )
         if part
     )
 

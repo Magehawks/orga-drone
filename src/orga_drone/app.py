@@ -2635,7 +2635,27 @@ def create_app() -> FastAPI:
         else:
             image = image_adjust_from_effect_settings(clip.effect_settings)
             look = base_look
-        if not before and not color_needs_preview_still(look, hsl, color_wheels):
+        from orga_drone.studio_managed_apply import (
+            ManagedApplyError,
+            grade_is_managed_sdr,
+            require_managed_pointwise,
+        )
+
+        managed_preview = False
+        if grade_is_managed_sdr(clip.effect_settings):
+            try:
+                require_managed_pointwise(clip.effect_settings)
+            except ManagedApplyError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": str(exc), "code": exc.code},
+                ) from exc
+            managed_preview = True
+        if (
+            not before
+            and not managed_preview
+            and not color_needs_preview_still(look, hsl, color_wheels)
+        ):
             raise HTTPException(
                 status_code=422,
                 detail="No color file, HSL adjustment, or color wheels are active on this clip.",
@@ -2658,6 +2678,7 @@ def create_app() -> FastAPI:
             color_wheels=color_wheels,
             detail=bool(detail),
             saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
+            effect_settings=clip.effect_settings if managed_preview else None,
         )
         if before:
             from orga_drone.studio_preview_frame import before_color_request

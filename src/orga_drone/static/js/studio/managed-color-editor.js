@@ -161,7 +161,7 @@ export function createManagedColorEditor({
         paintParams(step?.params || neutralPrimariesParams());
         setStatus(
           messages.managedStatus?.replace("{rev}", String(current.revision)) ||
-            `managed-sdr · rev ${current.revision} · preview preparing`
+            `managed-sdr · rev ${current.revision} · preview/export bake`
         );
       } else if (current.authority === "canonical") {
         setStatus(
@@ -208,7 +208,7 @@ export function createManagedColorEditor({
       currentId = expectedId;
       setStatus(
         messages.managedStatus?.replace("{rev}", String(current.revision)) ||
-          `managed-sdr · rev ${current.revision} · preview preparing`
+          `managed-sdr · rev ${current.revision} · preview/export bake`
       );
       onChanged?.(current);
     } catch (error) {

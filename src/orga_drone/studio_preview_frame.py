@@ -24,6 +24,10 @@ from orga_drone.studio_color_wheels import ColorWheels, ffmpeg_color_wheels_chai
 from orga_drone.studio_hsl import HslAdjust, ffmpeg_hsl_chain
 from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
 from orga_drone.studio_lut import ColorLook, LutMissingError, ffmpeg_lut_chain, require_lut_asset
+from orga_drone.studio_managed_apply import (
+    ffmpeg_managed_grade_chain,
+    managed_grade_digest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,21 +64,32 @@ class PreviewFrameRequest:
     detail: bool = False
     max_edge: int = PREVIEW_MAX_EDGE
     saturation: float = 1.0
+    # When set and managed-pointwise, preview uses the #359 baked grade LUT.
+    effect_settings: str | None = None
 
 
 def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
     """Temporary comparison inputs; preserve only configured technical conversion.
 
     Reuse the existing effective-input cache identity. Never write clip settings
-    or change the normal still/proxy/export builders.
+    or change the normal still/proxy/export builders. Clear managed
+    ``effect_settings`` so before-compare does not keep the managed bake.
     """
     look = ColorLook(
         input_profile=req.look.input_profile,
         conversion_lut=req.look.conversion_lut if req.look.conversion_confirmed else "",
         conversion_confirmed=req.look.conversion_confirmed,
     )
-    return replace(req, image=ImageAdjust(), look=look, hsl=HslAdjust(),
-                   color_wheels=ColorWheels(), saturation=1.0, detail=False)
+    return replace(
+        req,
+        image=ImageAdjust(),
+        look=look,
+        hsl=HslAdjust(),
+        color_wheels=ColorWheels(),
+        saturation=1.0,
+        detail=False,
+        effect_settings=None,
+    )
 
 
 class PreviewFrameError(Exception):
@@ -143,20 +158,28 @@ def preview_filter_chain(
     saturation: float = 1.0,
     hsl: HslAdjust | None = None,
     color_wheels: ColorWheels | None = None,
+    effect_settings: str | None = None,
 ) -> str:
     """Same grade→LUT→HSL→wheels order as export; scale for preview."""
     parts: list[str] = []
-    grade = ffmpeg_grade_chain(image)
-    if grade:
-        parts.append(grade)
-    if not look.is_neutral:
-        lut = ffmpeg_lut_chain(look, data_dir=data_dir, work_dir=work_dir)
-        if lut:
-            parts.append(lut)
-    if hsl is not None and not hsl.is_neutral:
-        parts.append(ffmpeg_hsl_chain(hsl, data_dir=data_dir))
-    if color_wheels is not None and not color_wheels.is_neutral:
-        parts.append(ffmpeg_color_wheels_chain(color_wheels, data_dir=data_dir))
+    managed = ffmpeg_managed_grade_chain(
+        effect_settings,
+        work_dir=work_dir / "managed-grades",
+    )
+    if managed:
+        parts.append(managed)
+    else:
+        grade = ffmpeg_grade_chain(image)
+        if grade:
+            parts.append(grade)
+        if not look.is_neutral:
+            lut = ffmpeg_lut_chain(look, data_dir=data_dir, work_dir=work_dir)
+            if lut:
+                parts.append(lut)
+        if hsl is not None and not hsl.is_neutral:
+            parts.append(ffmpeg_hsl_chain(hsl, data_dir=data_dir))
+        if color_wheels is not None and not color_wheels.is_neutral:
+            parts.append(ffmpeg_color_wheels_chain(color_wheels, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
     edge = max(64, min(2160, int(max_edge)))
@@ -195,7 +218,8 @@ def cache_key_for(
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "v": 7,
+        "managed": managed_grade_digest(req.effect_settings),
+        "v": 8,
     }
     if req.kind == "photo":
         payload["photo_even_dimensions"] = True
@@ -305,6 +329,7 @@ def render_preview_frame(
                 saturation=req.saturation,
                 hsl=req.hsl,
                 color_wheels=req.color_wheels,
+                effect_settings=req.effect_settings,
             )
         except LutMissingError:
             raise
