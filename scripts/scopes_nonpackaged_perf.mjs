@@ -29,10 +29,7 @@ const SIZES = [
 
 function percentile(sorted, p) {
   if (!sorted.length) return null;
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
-  );
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return sorted[idx];
 }
 
@@ -160,8 +157,7 @@ function parseArgs(argv) {
 }
 
 const isMain =
-  process.argv[1] &&
-  process.argv[1].replace(/\\/g, "/").endsWith("scopes_nonpackaged_perf.mjs");
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scopes_nonpackaged_perf.mjs");
 if (isMain) {
   const args = parseArgs(process.argv.slice(2));
   const report = runScopesNonpackagedPerf({ samples: args.samples });
