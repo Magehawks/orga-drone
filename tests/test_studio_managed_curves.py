@@ -7,7 +7,6 @@ import math
 import pytest
 
 from orga_drone.studio_managed_curves import (
-    IDENTITY_CURVE,
     MAX_CURVE_POINTS,
     ManagedCurveError,
     hue_vs_hue,
