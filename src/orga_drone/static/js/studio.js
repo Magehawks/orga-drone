@@ -18,7 +18,7 @@ import {
   managedBakeUrl,
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
-import { fetchGrade } from "./studio/grade-api.js";
+import { fetchGrade, postGradeCommand } from "./studio/grade-api.js";
 import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
 import {
   buildPreviewFrameUrl,
@@ -4277,9 +4277,18 @@ import {
       if (input) input.value = String(shown);
       if (valueEl) valueEl.textContent = String(shown);
     });
+    const managed = managedGradeForClip(clip);
+    const managedPreset =
+      managed?.evaluator === "managed-sdr-v1"
+        ? managed?.grade?.extensions?.creative_preset?.id || ""
+        : "";
+    if (managedPreset) {
+      clip.dataset.quickLook = managedPreset;
+    }
+    const lookId = clip.dataset.quickLook || managedPreset || "";
     const lookSelect = document.getElementById("inspector-quick-look");
-    if (lookSelect) lookSelect.value = clip.dataset.quickLook || "";
-    syncQuickLookChips(clip.dataset.quickLook || "");
+    if (lookSelect) lookSelect.value = lookId;
+    syncQuickLookChips(lookId);
     fillHsl(clip);
     fillColorWheels(clip);
     fillColorAnimationInspector(clip);
@@ -4360,6 +4369,27 @@ import {
       token,
       queue: quickLookSaveQueue,
       execute: async () => {
+        // Managed grades compile Quick Looks to inspectable primaries (#361).
+        let managed = managedGradeForClip(clip);
+        if (!managed) {
+          try {
+            managed = await fetchGrade(studioId);
+            cacheManagedGradeOnClip(clip, managed);
+          } catch (_err) {
+            managed = null;
+          }
+        }
+        if (managed && managed.evaluator === "managed-sdr-v1") {
+          const payload = await postGradeCommand(studioId, {
+            type: "apply_preset",
+            expectedRevision: managed.revision,
+            params: { preset_id: desiredLook },
+            historyGroup: `quick-look-${studioId}`,
+          });
+          const presetId =
+            payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
+          return { ok: true, quick_look: presetId, grade: payload };
+        }
         const res = await fetch(`/api/studio/${studioId}/look`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -4379,6 +4409,12 @@ import {
     }
     const body = outcome.result;
     if (body.image) writeImageAdjust(clip, body.image, true);
+    if (body.grade) {
+      cacheManagedGradeOnClip(clip, body.grade);
+      if (managedColorEditor?.fill) {
+        void managedColorEditor.fill();
+      }
+    }
     clip.dataset.quickLook = body.quick_look || "";
     const selected = selectedAdjustableClip();
     if (
@@ -5031,6 +5067,15 @@ import {
         editorStudioId: managedColorEditor?.currentStudioId?.(),
         grade: managedColorEditor?.currentGrade?.(),
       });
+      // Re-hydrate Quick Look chips from grade.extensions.creative_preset once
+      // the managed grade cache is warm (SSR look id stays empty for managed).
+      const selected = selectedAdjustableClip();
+      if (
+        selected &&
+        String(selected.dataset.studioId) === String(requestedStudioId || "")
+      ) {
+        fillImageAdjust(selected);
+      }
     })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;

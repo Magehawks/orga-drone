@@ -1,7 +1,7 @@
 # Color Workspace execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` tip after #438
-tetrahedral GPU sampling.
+Updated: 2026-11-13. Integration branch `develop` tip
+`cb807a3` (after #436–#440; `apply_preset` follow-up PR).
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.
@@ -21,7 +21,11 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #431 | `2d788a1…` | #358 canonical animation clocks |
 | #432 | `f7bfb13…` | Warn on stale imageio-ffmpeg <0.8.0 |
 | #433 | `c47b9b3…` | #363 shared grade command bridge |
-| #438 | `f8382be…` | #360 tetrahedral WebGL LUT sampling |
+| #436 | `28d1f3b…` | Client `story_s` + story-local export |
+| #437 | `7e14ebe…` | Serial step editor + preview tokens |
+| #438 | `f8382be…` | GPU tetrahedral sampling (#360) |
+| #439 | `cb807a3…` | Node scopes latency/heap harness |
+| #440 | `a60cbbc…` | `upsert_step_params` / selection commands |
 
 ## Feature matrix (honest)
 
@@ -33,10 +37,11 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Eyedropper / brush | Available now | #426 |
 | Animation clocks (#358) | Available now (partial) | Client `story_s`; story-local export with Story anchor (constant-speed single play); ramps/repeats/loop fail-closed |
 | GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
-| Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
-| Shared Control API grade actions (#363) | Available now (unit) | Commands for enable/mix/reorder/params/selection; preview tokens; PUT escape hatch; packaged E2E NOT_RUN |
+| Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; Node harness; packaged latency NOT_RUN |
+| Shared Control API grade actions (#363) | Available now (unit) | Commands for enable/mix/reorder/params/selection/preset; preview tokens; PUT escape hatch; packaged E2E NOT_RUN |
+| Creative Quick Look → managed primaries | Available now (unit) | `apply_preset` + studio.js managed path |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
-| Full #365 acceptance matrix | OPEN | Remaining AC + packaged deferred by PO |
+| Full #365 acceptance matrix | OPEN | Packaged rows deferred by PO |
 
 ## Regression investigation (3 suite failures)
 
@@ -53,9 +58,9 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
 | #358 | #436 merged (`story_s` + story-local export) | Complex ClipTimingInputs export (ramp/repeat/loop) NOT_RUN |
 | #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
-| #361 | Step editor shipped | Packaged keyboard/E2E NOT_RUN; Creative preset compile depth |
+| #361 | Step editor + `apply_preset` compile | Packaged keyboard/E2E NOT_RUN |
 | #362/#366 | Live tap + Node accumulate harness | Packaged latency/memory NOT_RUN |
-| #363 | Tokens + upsert_step_params/selection | PUT escape hatch only; packaged E2E NOT_RUN |
+| #363 | Tokens + upsert_step_params/selection/preset | PUT escape hatch only; packaged E2E NOT_RUN |
 | #364/#365 | OPEN | Strict matrix + packaged deferred |
 
 ## Explicitly deferred by PO (this sprint)
@@ -67,7 +72,6 @@ Record packaged-only evidence as `NOT_RUN — deferred by PO`.
 
 ## Exact next tasks
 
-1. Merge #437 step editor + tokens; then `upsert_step_params` editor migration.
-2. Non-packaged scopes harness evidence linked; packaged scopes remain NOT_RUN.
-3. Issue evidence comments; close only when AC fully met.
-4. Do not build packaged Windows EXE in this sprint.
+1. Final EXE verification phase (packaged WebView2 / GPU / scopes / cold-warm).
+2. Issue evidence comments; close only when AC fully met including packaged gates or PO waiver.
+3. Do not build packaged Windows EXE until PO starts that phase.

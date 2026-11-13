@@ -19,7 +19,7 @@ and stopped #320 precision experiments are not weakened.
 | Creative LUT resolve/bake | PASS | #422 |
 | Technical LUT metadata | PASS / reject | #352; non-null technical LUT typed reject until resolved asset |
 | Serial step enable/mix/reorder | PASS | #433 `clip.grade.command` |
-| Full serial step editor UX | PASS (slice) | enable/mix/reorder via `managed-step-editor.js` + grade commands; params via upsert commands |
+| Full serial step editor UX | PASS (slice) | enable/mix/reorder + Quick Look `apply_preset` → inspectable primaries |
 
 ## 2. LUTs, photo/video export
 
@@ -130,7 +130,7 @@ pytest tests/test_studio_grade_animation.py \
 |---|---|
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
-| #361 | Serial step enable/mix/reorder shipped; packaged E2E NOT_RUN |
+| #361 | Step editor + Quick Look `apply_preset` compile shipped |
 | #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |
