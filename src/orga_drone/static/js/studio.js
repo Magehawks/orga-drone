@@ -80,6 +80,7 @@ import {
   decodeJpegBytesToRgba,
   managedPreviewTaggedCapturePlane,
   probeScopeTapCapability,
+  quantizePreviewScopeTime,
   SCOPE_TAP_IDS,
 } from "./studio/scopes/index.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
@@ -4103,6 +4104,20 @@ import {
     return (option && option.textContent) || key;
   }
 
+  function currentScopeSourceTimeS() {
+    const clip = selectedAdjustableClip();
+    if (!clip) return 0;
+    try {
+      const hit = resolveAt(state.projectTimeS);
+      if (hit && String(hit.clip?.dataset?.studioId) === String(clip.dataset.studioId)) {
+        return Number(playSourceOffset(clip, hit.localS) || 0);
+      }
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function currentScopeView() {
     const clip = selectedAdjustableClip();
     const grade = managedGradeForClip(clip);
@@ -4114,6 +4129,7 @@ import {
     const managedDigest = grade
       ? `managed:${gradeRevision}:${grade.evaluator || ""}`
       : "";
+    const seekToken = `t:${quantizePreviewScopeTime(currentScopeSourceTimeS()).toFixed(1)}`;
     return {
       projectId: String(projectId || ""),
       clipId: clip ? String(clip.dataset.studioId || "") : "",
@@ -4121,6 +4137,7 @@ import {
       contextDigest: clip
         ? [
             managedDigest,
+            seekToken,
             clip.dataset.colorLook || "",
             clip.dataset.imageAdjust || "",
             clip.dataset.hsl || "",
@@ -4134,15 +4151,19 @@ import {
     };
   }
 
-  function syncColorScopesView() {
+  function refreshColorScopesTap(reason = "view-sync") {
     colorScopes?.syncView();
     colorScopeTap?.sync();
     const capability = colorScopeTap?.probe?.() || currentScopeTapCapability();
     if (capability?.available) {
-      void colorScopePreviewProducer?.refresh?.("view-sync");
+      void colorScopePreviewProducer?.refresh?.(reason);
     } else {
       colorScopePreviewProducer?.invalidate?.();
     }
+  }
+
+  function syncColorScopesView() {
+    refreshColorScopesTap("view-sync");
   }
 
   function currentScopeTapCapability() {
@@ -7340,12 +7361,16 @@ import {
       const playing = [previewVideo, previewVideoB].some(
         (video) => video && !video.hidden && !video.paused && !video.ended
       );
-      if (playing) schedulePreviewBlit();
+      if (playing) {
+        refreshColorScopesTap("playback");
+        schedulePreviewBlit();
+      }
     });
   }
 
   function syncPreviewMedia({ seek = false } = {}) {
     if (reuseDraft) return;
+    if (seek) refreshColorScopesTap("seek");
     void seek;
     const hit = resolveAt(state.projectTimeS);
     if (!hit) {
@@ -11790,32 +11815,36 @@ import {
   });
   colorScopePreviewProducer = createManagedPreviewScopeProducer({
     getView: currentScopeView,
-    getSourceTimeS: () => {
-      const clip = selectedAdjustableClip();
-      if (!clip) return 0;
-      try {
-        const hit = resolveAt(state.projectTimeS);
-        if (hit && String(hit.clip?.dataset?.studioId) === String(clip.dataset.studioId)) {
-          return Number(playSourceOffset(clip, hit.localS) || 0);
-        }
-        return 0;
-      } catch (_) {
-        return 0;
-      }
-    },
+    getSourceTimeS: currentScopeSourceTimeS,
     isPlaying: () => Boolean(state.playing),
     tryPublish: (frame) => colorScopeTap?.tryPublish(frame),
     decodeJpegToRgba: decodeJpegBytesToRgba,
-    fetchPreviewJpeg: async (studioId, sourceTimeS) => {
-      const quant = Math.round(Number(sourceTimeS || 0) * 30) / 30;
+    fetchPreviewJpeg: async (studioId, sourceTimeS, meta = {}) => {
+      const quant = quantizePreviewScopeTime(sourceTimeS);
+      const revision = meta.gradeRevision != null ? String(meta.gradeRevision) : "";
+      const params = new URLSearchParams({
+        t_s: String(quant),
+        detail: "0",
+      });
+      if (revision) params.set("expected_revision", revision);
       const url =
-        `/api/studio/${encodeURIComponent(studioId)}/preview-frame` +
-        `?t_s=${encodeURIComponent(String(quant))}&detail=0`;
+        `/api/studio/${encodeURIComponent(studioId)}/preview-frame?${params.toString()}`;
       const res = await fetch(url, { headers: { Accept: "image/jpeg" } });
       if (!res.ok) {
         throw new Error(`preview-frame ${res.status}`);
       }
-      return res.arrayBuffer();
+      const bytes = await res.arrayBuffer();
+      const headerRevision = res.headers.get("X-Orga-Grade-Revision");
+      const headerTime = res.headers.get("X-Orga-Preview-Time-S");
+      return {
+        bytes,
+        gradeRevision: headerRevision != null && headerRevision !== ""
+          ? headerRevision
+          : revision,
+        sourceTimeS: headerTime != null && headerTime !== ""
+          ? Number(headerTime)
+          : quant,
+      };
     },
   });
   syncColorScopesView();

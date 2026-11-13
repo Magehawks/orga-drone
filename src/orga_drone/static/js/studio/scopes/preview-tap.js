@@ -2,8 +2,8 @@
  * Managed-grade preview-frame producer for ScopeFrameV1 (#362/#366).
  *
  * Reuses the #359 CPU preview-frame path (same grade as export stills).
- * Transport is JPEG; sampleFactor and notes disclose downsample + quantization.
- * Not a display-blit / CSS / untagged WebGL tap.
+ * Transport is JPEG; sampleFactor is applied once by accumulate (no second
+ * physical shrink). Not a display-blit / CSS / untagged WebGL tap.
  */
 
 import { SCOPE_TAP_IDS } from "./scope-frame.js";
@@ -14,6 +14,7 @@ import {
 } from "./engine-tap.js";
 
 export const MANAGED_PREVIEW_SCOPE_PRODUCER = "managed-preview-frame-v1";
+export const PREVIEW_SCOPE_QUANTIZE_S = 0.1;
 
 /** Build taggedCapturePlane snapshot for probeScopeTapCapability. */
 export function managedPreviewTaggedCapturePlane(ready) {
@@ -27,32 +28,39 @@ export function managedPreviewTaggedCapturePlane(ready) {
   });
 }
 
+/** Quantize source time to the same 0.1 s grid as preview-frame. */
+export function quantizePreviewScopeTime(tS, step = PREVIEW_SCOPE_QUANTIZE_S) {
+  const value = Number(tS);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  if (!(step > 0)) return value;
+  return Math.round(value / step) * step;
+}
+
 /**
- * Deterministic box downsample. sampleFactor is max(1, ceil(srcLong/maxEdge)).
+ * sampleFactor for accumulate: step through the decoded buffer once so the
+ * effective long edge stays near maxEdge. Does not resize the buffer.
  */
-export function downsampleRgba(rgba, width, height, maxEdge = 320) {
+export function sampleFactorForMaxEdge(width, height, maxEdge = 320) {
+  const longEdge = Math.max(1, width | 0, height | 0);
+  return Math.max(1, Math.ceil(longEdge / Math.max(1, maxEdge)));
+}
+
+/** Convert 8-bit RGBA into a full-size float ScopeFrame buffer. */
+export function rgba8ToFloatRgb(rgba, width, height) {
   const w = Math.max(1, width | 0);
   const h = Math.max(1, height | 0);
-  const longEdge = Math.max(w, h);
-  const sampleFactor = Math.max(1, Math.ceil(longEdge / Math.max(1, maxEdge)));
-  const outW = Math.max(1, Math.floor(w / sampleFactor));
-  const outH = Math.max(1, Math.floor(h / sampleFactor));
   const channels = 4;
-  const stride = outW * channels;
-  const out = new Float32Array(outH * stride);
-  for (let y = 0; y < outH; y += 1) {
-    const sy = Math.min(h - 1, y * sampleFactor);
-    for (let x = 0; x < outW; x += 1) {
-      const sx = Math.min(w - 1, x * sampleFactor);
-      const si = (sy * w + sx) * 4;
-      const di = y * stride + x * channels;
-      out[di] = (rgba[si] || 0) / 255;
-      out[di + 1] = (rgba[si + 1] || 0) / 255;
-      out[di + 2] = (rgba[si + 2] || 0) / 255;
-      out[di + 3] = rgba.length > si + 3 ? (rgba[si + 3] || 0) / 255 : 1;
-    }
+  const stride = w * channels;
+  const out = new Float32Array(h * stride);
+  for (let i = 0; i < w * h; i += 1) {
+    const si = i * 4;
+    const di = i * channels;
+    out[di] = (rgba[si] || 0) / 255;
+    out[di + 1] = (rgba[si + 1] || 0) / 255;
+    out[di + 2] = (rgba[si + 2] || 0) / 255;
+    out[di + 3] = rgba.length > si + 3 ? (rgba[si + 3] || 0) / 255 : 1;
   }
-  return { width: outW, height: outH, stride, channels, rgb: out, sampleFactor };
+  return { width: w, height: h, stride, channels, rgb: out };
 }
 
 export function buildManagedPreviewScopeDescriptor({
@@ -65,12 +73,14 @@ export function buildManagedPreviewScopeDescriptor({
   gradeRevision,
   contextDigest,
   sourceTimeS = 0,
-  ptsDen = 30,
+  ptsDen = 10,
 }) {
-  const plane = downsampleRgba(rgba, width, height, maxEdge);
-  const t = Number(sourceTimeS);
-  const safeT = Number.isFinite(t) && t >= 0 ? t : 0;
-  const frameIndex = Math.max(0, Math.round(safeT * ptsDen));
+  const plane = rgba8ToFloatRgb(rgba, width, height);
+  const sampleFactor = sampleFactorForMaxEdge(plane.width, plane.height, maxEdge);
+  const t = quantizePreviewScopeTime(sourceTimeS);
+  // ptsDen=10 matches 0.1 s preview quantize so frameIndex tracks seek grid.
+  const den = Math.max(1, Math.round(Number(ptsDen) || 10));
+  const frameIndex = Math.max(0, Math.round(t * den));
   return {
     width: plane.width,
     height: plane.height,
@@ -85,14 +95,14 @@ export function buildManagedPreviewScopeDescriptor({
     straightAlpha: true,
     legalRange: false,
     ptsNum: frameIndex,
-    ptsDen,
+    ptsDen: den,
     frameIndex,
     projectId: String(projectId || ""),
     clipId: String(clipId || ""),
     gradeRevision: String(gradeRevision || "0"),
     contextDigest: String(contextDigest || ""),
     roi: { x: 0, y: 0, width: plane.width, height: plane.height },
-    sampleFactor: plane.sampleFactor,
+    sampleFactor,
   };
 }
 
@@ -102,6 +112,7 @@ export function buildManagedPreviewScopeFrame(input) {
 
 /**
  * Orchestrates fetch → decode → tag → tryPublish with generation stale rejection.
+ * fetchPreviewJpeg may return { bytes, gradeRevision, sourceTimeS }.
  */
 export function createManagedPreviewScopeProducer({
   getView,
@@ -110,7 +121,7 @@ export function createManagedPreviewScopeProducer({
   decodeJpegToRgba,
   tryPublish,
   maxEdge = 320,
-  ptsDen = 30,
+  ptsDen = 10,
   isPlaying = () => false,
   pauseIntervalMs = 100,
   playIntervalMs = 500,
@@ -118,6 +129,7 @@ export function createManagedPreviewScopeProducer({
 } = {}) {
   let generation = 0;
   let lastAttemptMs = null;
+  let lastSeekKey = "";
   let destroyed = false;
 
   function bump() {
@@ -125,10 +137,27 @@ export function createManagedPreviewScopeProducer({
     return generation;
   }
 
+  function seekKey(view, sourceTimeS) {
+    return [
+      String(view?.clipId || ""),
+      String(view?.gradeRevision || ""),
+      String(view?.contextDigest || ""),
+      String(quantizePreviewScopeTime(sourceTimeS)),
+    ].join("\u001f");
+  }
+
   async function refresh(reason = "manual") {
     if (destroyed) return { accepted: false, reason: "destroyed" };
     const view = getView?.() || {};
     if (!view.clipId) return { accepted: false, reason: "no-clip" };
+    const sourceTimeS = Number(getSourceTimeS?.() || 0);
+    const key = seekKey(view, sourceTimeS);
+    const seekChanged = key !== lastSeekKey;
+    if (seekChanged) {
+      lastSeekKey = key;
+      bump();
+      lastAttemptMs = null;
+    }
     const playing = Boolean(isPlaying?.());
     const minInterval = playing ? playIntervalMs : pauseIntervalMs;
     const t = now();
@@ -136,11 +165,10 @@ export function createManagedPreviewScopeProducer({
       return { accepted: false, reason: "rate-limited", detail: reason };
     }
     lastAttemptMs = t;
-    const gen = bump();
-    const sourceTimeS = Number(getSourceTimeS?.() || 0);
-    let jpeg;
+    const gen = generation;
+    let payload;
     try {
-      jpeg = await fetchPreviewJpeg(String(view.clipId), sourceTimeS, {
+      payload = await fetchPreviewJpeg(String(view.clipId), sourceTimeS, {
         gradeRevision: view.gradeRevision,
         generation: gen,
       });
@@ -150,7 +178,19 @@ export function createManagedPreviewScopeProducer({
     if (destroyed || gen !== generation) {
       return { accepted: false, reason: "stale-generation" };
     }
-    const decoded = await decodeJpegToRgba(jpeg);
+    const bytes = payload?.bytes ?? payload;
+    const responseRevision =
+      payload?.gradeRevision != null
+        ? String(payload.gradeRevision)
+        : String(view.gradeRevision || "");
+    const responseTime =
+      payload?.sourceTimeS != null
+        ? Number(payload.sourceTimeS)
+        : quantizePreviewScopeTime(sourceTimeS);
+    if (String(responseRevision) !== String(view.gradeRevision || "")) {
+      return { accepted: false, reason: "stale-revision" };
+    }
+    const decoded = await decodeJpegToRgba(bytes);
     if (destroyed || gen !== generation) {
       return { accepted: false, reason: "stale-generation" };
     }
@@ -162,6 +202,9 @@ export function createManagedPreviewScopeProducer({
     ) {
       return { accepted: false, reason: "stale-view" };
     }
+    if (seekKey(latest, getSourceTimeS?.() || 0) !== key) {
+      return { accepted: false, reason: "stale-seek" };
+    }
     const frame = buildManagedPreviewScopeFrame({
       rgba: decoded.rgba,
       width: decoded.width,
@@ -169,9 +212,9 @@ export function createManagedPreviewScopeProducer({
       maxEdge,
       projectId: latest.projectId,
       clipId: latest.clipId,
-      gradeRevision: latest.gradeRevision,
+      gradeRevision: responseRevision,
       contextDigest: latest.contextDigest,
-      sourceTimeS,
+      sourceTimeS: responseTime,
       ptsDen,
     });
     return tryPublish?.(frame) || { accepted: false, reason: "missing-publish" };

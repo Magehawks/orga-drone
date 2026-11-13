@@ -61,10 +61,13 @@ export {
 
 export {
   MANAGED_PREVIEW_SCOPE_PRODUCER,
+  PREVIEW_SCOPE_QUANTIZE_S,
   buildManagedPreviewScopeDescriptor,
   buildManagedPreviewScopeFrame,
   createManagedPreviewScopeProducer,
   decodeJpegBytesToRgba,
-  downsampleRgba,
   managedPreviewTaggedCapturePlane,
+  quantizePreviewScopeTime,
+  rgba8ToFloatRgb,
+  sampleFactorForMaxEdge,
 } from "./preview-tap.js";

@@ -60,8 +60,11 @@ Rules:
 6. Display blit / CSS / untagged WebGL / undeclared JPEG candidates stay refused
    in the capability notes even when the managed producer is active.
 7. Producer uses generation tokens to drop stale async results after seek/clip/grade change.
-8. Pause/seek/grade refresh is preferred; playback refresh is rate-limited
-   (`playIntervalMs`, default 500 ms) to avoid still spam.
+8. Seek tokens are part of the scope view digest so reverse scrubs clear the prior frame.
+9. Playback refresh is rate-limited (`playIntervalMs`, default 500 ms) to avoid still spam.
+10. `sampleFactor` is applied once by accumulate on the full decoded buffer (no second shrink).
+11. `/preview-frame` returns `X-Orga-Grade-Revision` and `X-Orga-Preview-Time-S`; clients may
+    pass `expected_revision` and must bind PTS to the quantized server time.
 
 ## Delivered
 

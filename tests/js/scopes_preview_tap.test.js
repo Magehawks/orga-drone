@@ -4,12 +4,14 @@ import {
   SCOPE_SOURCE_KINDS,
   SCOPE_TAP_IDS,
   SCOPE_TAP_REASONS,
+  accumulateHistogram,
   buildManagedPreviewScopeFrame,
   createManagedPreviewScopeProducer,
   createScopeTapController,
-  downsampleRgba,
   managedPreviewTaggedCapturePlane,
   probeScopeTapCapability,
+  quantizePreviewScopeTime,
+  sampleFactorForMaxEdge,
 } from "../../src/orga_drone/static/js/studio/scopes/index.js";
 
 test("tagged managed preview plane enables capability without trusting blit", () => {
@@ -43,7 +45,7 @@ test("incomplete tagged plane stays unavailable", () => {
   assert.equal(capability.reason, SCOPE_TAP_REASONS.AWAITING_RENDER_ADAPTER);
 });
 
-test("downsample discloses sampleFactor and shrinks buffer", () => {
+test("sampleFactor is applied once by accumulate on full-size buffer", () => {
   const width = 40;
   const height = 20;
   const rgba = new Uint8ClampedArray(width * height * 4);
@@ -51,14 +53,27 @@ test("downsample discloses sampleFactor and shrinks buffer", () => {
     rgba[i] = 255;
     rgba[i + 3] = 255;
   }
-  const plane = downsampleRgba(rgba, width, height, 10);
-  assert.equal(plane.sampleFactor, 4);
-  assert.equal(plane.width, 10);
-  assert.equal(plane.height, 5);
-  assert.equal(plane.rgb[0], 1);
+  const factor = sampleFactorForMaxEdge(width, height, 10);
+  assert.equal(factor, 4);
+  const frame = buildManagedPreviewScopeFrame({
+    rgba,
+    width,
+    height,
+    maxEdge: 10,
+    projectId: "p",
+    clipId: "c",
+    gradeRevision: "1",
+    contextDigest: "d",
+  });
+  assert.equal(frame.width, 40);
+  assert.equal(frame.height, 20);
+  assert.equal(frame.sampleFactor, 4);
+  const hist = accumulateHistogram(frame);
+  assert.equal(hist.sampleFactor, 4);
+  assert.equal(hist.sampleCount, Math.ceil(40 / 4) * Math.ceil(20 / 4));
 });
 
-test("managed preview descriptor builds engine-tap frame", () => {
+test("managed preview descriptor builds engine-tap frame from quantized time", () => {
   const rgba = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 255]);
   const frame = buildManagedPreviewScopeFrame({
     rgba,
@@ -69,12 +84,13 @@ test("managed preview descriptor builds engine-tap frame", () => {
     clipId: "c",
     gradeRevision: "7",
     contextDigest: "d",
-    sourceTimeS: 1.0,
-    ptsDen: 30,
+    sourceTimeS: 1.04,
+    ptsDen: 10,
   });
   assert.equal(frame.sourceKind, SCOPE_SOURCE_KINDS.ENGINE_TAP);
   assert.equal(frame.gradeRevision, "7");
-  assert.equal(frame.frameIndex, 30);
+  assert.equal(quantizePreviewScopeTime(1.04), 1.0);
+  assert.equal(frame.frameIndex, 10);
   assert.equal(frame.profile, "bt709");
 });
 
@@ -90,7 +106,11 @@ test("producer rejects stale generation after invalidate", async () => {
     getSourceTimeS: () => 0,
     isPlaying: () => false,
     pauseIntervalMs: 0,
-    fetchPreviewJpeg: async () => new ArrayBuffer(8),
+    fetchPreviewJpeg: async () => ({
+      bytes: new ArrayBuffer(8),
+      gradeRevision: "1",
+      sourceTimeS: 0,
+    }),
     decodeJpegToRgba: async () => ({
       width: 2,
       height: 1,
@@ -107,6 +127,34 @@ test("producer rejects stale generation after invalidate", async () => {
   assert.equal(result.accepted, false);
   assert.equal(result.reason, "stale-generation");
   assert.equal(publishes, 0);
+});
+
+test("producer rejects response when grade revision drifts", async () => {
+  const producer = createManagedPreviewScopeProducer({
+    getView: () => ({
+      projectId: "p",
+      clipId: "11",
+      gradeRevision: "1",
+      contextDigest: "x",
+    }),
+    getSourceTimeS: () => 0,
+    isPlaying: () => false,
+    pauseIntervalMs: 0,
+    fetchPreviewJpeg: async () => ({
+      bytes: new ArrayBuffer(8),
+      gradeRevision: "9",
+      sourceTimeS: 0,
+    }),
+    decodeJpegToRgba: async () => ({
+      width: 1,
+      height: 1,
+      rgba: new Uint8ClampedArray([1, 2, 3, 255]),
+    }),
+    tryPublish: () => ({ accepted: true }),
+  });
+  const result = await producer.refresh("rev");
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "stale-revision");
 });
 
 test("controller accepts managed preview frames when capability is open", () => {
