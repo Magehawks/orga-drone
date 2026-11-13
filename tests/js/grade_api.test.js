@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   findStep,
   neutralPrimariesParams,
+  upsertManagedHslStep,
   upsertPrimariesStep,
+  upsertWheelsStep,
 } from "../../src/orga_drone/static/js/studio/grade-api.js";
 
 test("neutral primaries match managed defaults", () => {
@@ -50,4 +52,13 @@ test("upsertPrimariesStep inserts or updates without dropping other steps", () =
   assert.equal(step.params.kelvin, 5600);
   assert.equal(step.params.tint, 12);
   assert.equal(step.enabled, true);
+});
+
+test("upsertWheelsStep and upsertManagedHslStep share the grade steps array", () => {
+  let grade = { steps: [] };
+  grade = upsertWheelsStep(grade, { lift: 0.1, gamma: 1.1 });
+  grade = upsertManagedHslStep(grade, { hue: 12, saturation: 1.2 });
+  assert.equal(findStep(grade, "wheels-v1").params.lift, 0.1);
+  assert.equal(findStep(grade, "managed-hsl-v1").params.hue, 12);
+  assert.equal(grade.steps.length, 2);
 });

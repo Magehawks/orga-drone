@@ -1,4 +1,4 @@
-/** Managed Color Workspace primaries editor (#361). */
+/** Managed Color Workspace primaries/wheels/HSL editor (#361/#355). */
 
 import {
   beginRequestToken,
@@ -9,9 +9,13 @@ import {
   convertManagedGrade,
   fetchGrade,
   findStep,
+  neutralManagedHslParams,
   neutralPrimariesParams,
+  neutralWheelsParams,
   putGrade,
+  upsertManagedHslStep,
   upsertPrimariesStep,
+  upsertWheelsStep,
   wrapGrade,
 } from "./grade-api.js";
 
@@ -29,6 +33,14 @@ function bindValueLabel(input, label, format) {
   paint();
 }
 
+function paintGroup(fields, values) {
+  Object.entries(fields).forEach(([key, input]) => {
+    if (!input || !(key in values)) return;
+    input.value = String(values[key]);
+    input.dispatchEvent(new Event("input"));
+  });
+}
+
 export function createManagedColorEditor({
   panel,
   getSelectedStudioId,
@@ -43,6 +55,8 @@ export function createManagedColorEditor({
   const wrapBtn = panel.querySelector("[data-managed-color-wrap]");
   const convertBtn = panel.querySelector("[data-managed-color-convert]");
   const resetBtn = panel.querySelector("[data-managed-color-reset]");
+  const wheelsResetBtn = panel.querySelector("[data-managed-wheels-reset]");
+  const hslResetBtn = panel.querySelector("[data-managed-hsl-reset]");
   const fields = {
     exposure: panel.querySelector("[data-managed-exposure]"),
     kelvin: panel.querySelector("[data-managed-kelvin]"),
@@ -54,6 +68,17 @@ export function createManagedColorEditor({
     shadows: panel.querySelector("[data-managed-shadows]"),
     highlights: panel.querySelector("[data-managed-highlights]"),
     whites: panel.querySelector("[data-managed-whites]"),
+  };
+  const wheelFields = {
+    lift: panel.querySelector("[data-managed-lift]"),
+    gamma: panel.querySelector("[data-managed-gamma]"),
+    gain: panel.querySelector("[data-managed-gain]"),
+    offset: panel.querySelector("[data-managed-offset]"),
+  };
+  const hslFields = {
+    hue: panel.querySelector("[data-managed-hue]"),
+    saturation: panel.querySelector("[data-managed-hsl-sat]"),
+    lightness: panel.querySelector("[data-managed-hsl-light]"),
   };
   const labels = {
     exposure: panel.querySelector("[data-managed-exposure-value]"),
@@ -84,28 +109,46 @@ export function createManagedColorEditor({
   bindValueLabel(fields.shadows, labels.shadows, (v) => `${Math.round(v)}`);
   bindValueLabel(fields.highlights, labels.highlights, (v) => `${Math.round(v)}`);
   bindValueLabel(fields.whites, labels.whites, (v) => `${Math.round(v)}`);
+  bindValueLabel(wheelFields.lift, panel.querySelector("[data-managed-lift-value]"), (v) =>
+    v.toFixed(2)
+  );
+  bindValueLabel(wheelFields.gamma, panel.querySelector("[data-managed-gamma-value]"), (v) =>
+    v.toFixed(2)
+  );
+  bindValueLabel(wheelFields.gain, panel.querySelector("[data-managed-gain-value]"), (v) =>
+    v.toFixed(2)
+  );
+  bindValueLabel(wheelFields.offset, panel.querySelector("[data-managed-offset-value]"), (v) =>
+    v.toFixed(2)
+  );
+  bindValueLabel(
+    hslFields.hue,
+    panel.querySelector("[data-managed-hue-value]"),
+    (v) => `${Math.round(v)}°`
+  );
+  bindValueLabel(hslFields.saturation, panel.querySelector("[data-managed-hsl-sat-value]"), (v) =>
+    v.toFixed(2)
+  );
+  bindValueLabel(hslFields.lightness, panel.querySelector("[data-managed-hsl-light-value]"), (v) =>
+    v.toFixed(2)
+  );
 
   function setStatus(message) {
     if (status) status.textContent = message || "";
   }
 
   function setEnabled(enabled) {
-    Object.values(fields).forEach((input) => {
-      if (input) input.disabled = !enabled || busy;
-    });
-    if (resetBtn) resetBtn.disabled = !enabled || busy;
-  }
-
-  function paintParams(params) {
-    const values = { ...neutralPrimariesParams(), ...params };
-    Object.entries(fields).forEach(([key, input]) => {
-      if (!input) return;
-      input.value = String(values[key]);
-      input.dispatchEvent(new Event("input"));
+    [...Object.values(fields), ...Object.values(wheelFields), ...Object.values(hslFields)].forEach(
+      (input) => {
+        if (input) input.disabled = !enabled || busy;
+      }
+    );
+    [resetBtn, wheelsResetBtn, hslResetBtn].forEach((button) => {
+      if (button) button.disabled = !enabled || busy;
     });
   }
 
-  function readParams() {
+  function readPrimaries() {
     return {
       exposure: numberFromInput(fields.exposure, 0),
       kelvin: numberFromInput(fields.kelvin, 6500),
@@ -117,6 +160,23 @@ export function createManagedColorEditor({
       shadows: numberFromInput(fields.shadows, 0),
       highlights: numberFromInput(fields.highlights, 0),
       whites: numberFromInput(fields.whites, 0),
+    };
+  }
+
+  function readWheels() {
+    return {
+      lift: numberFromInput(wheelFields.lift, 0),
+      gamma: numberFromInput(wheelFields.gamma, 1),
+      gain: numberFromInput(wheelFields.gain, 1),
+      offset: numberFromInput(wheelFields.offset, 0),
+    };
+  }
+
+  function readHsl() {
+    return {
+      hue: numberFromInput(hslFields.hue, 0),
+      saturation: numberFromInput(hslFields.saturation, 1),
+      lightness: numberFromInput(hslFields.lightness, 0),
     };
   }
 
@@ -157,8 +217,18 @@ export function createManagedColorEditor({
         convertBtn.disabled = busy;
       }
       if (managed) {
-        const step = findStep(current.grade, "primaries-v1");
-        paintParams(step?.params || neutralPrimariesParams());
+        paintGroup(fields, {
+          ...neutralPrimariesParams(),
+          ...(findStep(current.grade, "primaries-v1")?.params || {}),
+        });
+        paintGroup(wheelFields, {
+          ...neutralWheelsParams(),
+          ...(findStep(current.grade, "wheels-v1")?.params || {}),
+        });
+        paintGroup(hslFields, {
+          ...neutralManagedHslParams(),
+          ...(findStep(current.grade, "managed-hsl-v1")?.params || {}),
+        });
         setStatus(
           messages.managedStatus?.replace("{rev}", String(current.revision)) ||
             `managed-sdr · rev ${current.revision} · preview/export bake`
@@ -181,7 +251,7 @@ export function createManagedColorEditor({
     }
   }
 
-  async function savePrimaries() {
+  async function saveManaged() {
     const studioId = getSelectedStudioId?.();
     if (
       !studioId ||
@@ -194,7 +264,9 @@ export function createManagedColorEditor({
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
     const expectedRevision = current.revision;
-    const grade = upsertPrimariesStep(current.grade, readParams());
+    let grade = upsertPrimariesStep(current.grade, readPrimaries());
+    grade = upsertWheelsStep(grade, readWheels());
+    grade = upsertManagedHslStep(grade, readHsl());
     busy = true;
     setEnabled(true);
     try {
@@ -225,14 +297,16 @@ export function createManagedColorEditor({
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      void savePrimaries();
+      void saveManaged();
     }, 180);
   }
 
-  Object.values(fields).forEach((input) => {
-    input?.addEventListener("change", scheduleSave);
-    input?.addEventListener("pointerup", scheduleSave);
-  });
+  [...Object.values(fields), ...Object.values(wheelFields), ...Object.values(hslFields)].forEach(
+    (input) => {
+      input?.addEventListener("change", scheduleSave);
+      input?.addEventListener("pointerup", scheduleSave);
+    }
+  );
 
   wrapBtn?.addEventListener("click", async () => {
     const studioId = getSelectedStudioId?.();
@@ -288,14 +362,24 @@ export function createManagedColorEditor({
   });
 
   resetBtn?.addEventListener("click", () => {
-    paintParams(neutralPrimariesParams());
+    paintGroup(fields, neutralPrimariesParams());
+    scheduleSave();
+  });
+  wheelsResetBtn?.addEventListener("click", () => {
+    paintGroup(wheelFields, neutralWheelsParams());
+    scheduleSave();
+  });
+  hslResetBtn?.addEventListener("click", () => {
+    paintGroup(hslFields, neutralManagedHslParams());
     scheduleSave();
   });
 
   return {
     fill,
     reset() {
-      paintParams(neutralPrimariesParams());
+      paintGroup(fields, neutralPrimariesParams());
+      paintGroup(wheelFields, neutralWheelsParams());
+      paintGroup(hslFields, neutralManagedHslParams());
     },
   };
 }
