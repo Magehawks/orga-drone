@@ -19,13 +19,15 @@ function grade(steps) {
   };
 }
 
-test("pointwise primaries are webgl-bake-approx supported", () => {
+test("pointwise primaries are webgl-bake-tetrahedral supported", () => {
   const probe = probeManagedGpuCapabilities(
     grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }])
   );
   assert.equal(probe.supported, true);
-  assert.equal(probe.mode, "webgl-bake-approx");
+  assert.equal(probe.mode, "webgl-bake-tetrahedral");
+  assert.equal(probe.interpolation, "tetrahedral");
   assert.equal(probe.exact, false);
+  assert.ok(probe.reasons.includes("rgba8-quantization"));
 });
 
 test("spatial selection forces cpu fallback", () => {
