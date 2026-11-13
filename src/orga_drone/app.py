@@ -2388,6 +2388,175 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.post("/api/studio/{studio_item_id}/grade/eyedropper")
+    async def api_studio_grade_eyedropper(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        """Sample a preview still. Never mutates the grade (#357)."""
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_managed_apply import (
+            ManagedApplyError,
+            grade_is_managed_sdr,
+            require_managed_executable,
+        )
+        from orga_drone.studio_managed_eyedropper import (
+            ManagedEyedropperError,
+            build_eyedropper_payload,
+            sample_preview_jpeg,
+        )
+        from orga_drone.studio_preview_frame import (
+            PreviewFrameError,
+            PreviewFrameRequest,
+            quantize_preview_time,
+            render_preview_frame,
+        )
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_u = payload.get("u")
+        raw_v = payload.get("v")
+        if raw_u is None or raw_v is None:
+            raise HTTPException(status_code=400, detail="u and v are required")
+        try:
+            u = float(raw_u)
+            v = float(raw_v)
+            t_s = float(payload["t_s"]) if payload.get("t_s") is not None else 0.0
+            neighborhood = (
+                float(payload["neighborhood"])
+                if payload.get("neighborhood") is not None
+                else 0.01
+            )
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400, detail="u, v, t_s and neighborhood must be numbers"
+            ) from exc
+        if u != u or v != v or t_s != t_s or neighborhood != neighborhood:
+            raise HTTPException(status_code=400, detail="u, v, t_s and neighborhood must be finite")
+        domain = "srgb"
+        expected_revision = payload.get("expected_revision")
+        try:
+            project_id = _clip_project_id(studio_item_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        if clip.item_kind != "media" or clip.kind not in {"photo", "video"}:
+            raise HTTPException(
+                status_code=422,
+                detail="Eyedropper works on photo and video clips only.",
+            )
+        media_row = (
+            db.get_media(int(clip.source_media_id))
+            if clip.source_media_id is not None
+            else None
+        )
+        media_path = resolve_media_file(db, media_row) if media_row is not None else None
+        if media_path is None:
+            raise HTTPException(status_code=409, detail="This media file is offline.")
+        model = read_grade(clip.effect_settings)
+        expected: int | None = None
+        if expected_revision is not None:
+            try:
+                expected = int(expected_revision)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="expected_revision must be an integer"
+                ) from exc
+            if int(model.revision) != expected:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": "Grade changed since this sample started",
+                        "code": "STALE_REVISION",
+                        "revision": model.revision,
+                    },
+                )
+        if grade_is_managed_sdr(clip.effect_settings):
+            try:
+                require_managed_executable(clip.effect_settings)
+            except ManagedApplyError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": str(exc), "code": exc.code},
+                ) from exc
+        local = quantize_preview_time(t_s)
+        origin = float(clip.source_start or 0.0)
+        abs_t = origin + local
+        if clip.source_end is not None:
+            abs_t = min(abs_t, float(clip.source_end))
+        abs_t = max(0.0, abs_t)
+        frame_request = PreviewFrameRequest(
+            media_path=media_path,
+            kind=str(clip.kind),
+            source_time_s=abs_t if clip.kind == "video" else 0.0,
+            image=image_adjust_from_effect_settings(None),
+            look=color_look_from_effect_settings(None),
+            effect_settings=clip.effect_settings
+            if grade_is_managed_sdr(clip.effect_settings)
+            else None,
+        )
+        try:
+            jpeg = await asyncio.to_thread(
+                render_preview_frame,
+                frame_request,
+                data_dir=settings.data_dir,
+            )
+            # Re-read grade after the potentially slow render.
+            fresh = next(
+                (
+                    item
+                    for item in db.list_studio_items(project_id)
+                    if item.id == studio_item_id
+                ),
+                None,
+            )
+            if fresh is None:
+                raise HTTPException(status_code=404, detail="Studio item not found")
+            model = read_grade(fresh.effect_settings)
+            if expected is not None and int(model.revision) != expected:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": "Grade changed since this sample started",
+                        "code": "STALE_REVISION",
+                        "revision": model.revision,
+                    },
+                )
+            rgb, box, size = sample_preview_jpeg(
+                jpeg, u=u, v=v, neighborhood=neighborhood
+            )
+            sample = build_eyedropper_payload(
+                rgb=rgb,
+                frame=int(round(abs_t * 30.0)),
+                revision=int(model.revision),
+                domain=domain,
+                neighborhood=box,
+                source_time_s=local,
+                size=size,
+            )
+        except ManagedEyedropperError as exc:
+            status = 409 if exc.code == "STALE_FRAME" else 400
+            raise HTTPException(
+                status_code=status,
+                detail={"message": str(exc), "code": exc.code},
+            ) from exc
+        except PreviewFrameError as exc:
+            status = 409 if exc.code in {"media_missing", "lut_invalid"} else 500
+            if exc.code == "unsupported":
+                status = 422
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return JSONResponse({"ok": True, "id": clip.id, "sample": sample})
+
     async def _import_lut_from_request(request: Request) -> JSONResponse:
         """Shared import for ``/api/luts`` and the Studio alias."""
         content_type = (request.headers.get("content-type") or "").lower()

@@ -1064,5 +1064,22 @@
   "Unsupported spatial media kind": "Nicht unterstützte räumliche Medienart",
   "source media is missing": "Quellmedium fehlt",
   "Spatial managed video exceeds the CPU grade scratch budget": "Räumliches Managed-Video überschreitet das CPU-Grade-Scratch-Budget",
-  "Spatial managed video grades need ffprobe for frame-rate checks": "Räumliche Managed-Video-Grades benötigen ffprobe für Bildratenprüfungen"
+  "Spatial managed video grades need ffprobe for frame-rate checks": "Räumliche Managed-Video-Grades benötigen ffprobe für Bildratenprüfungen",
+  "Eyedropper": "Pipette",
+  "Draw brush": "Pinsel zeichnen",
+  "Accept sample": "Probe übernehmen",
+  "Brush radius": "Pinselradius",
+  "Brush hardness": "Pinselhärte",
+  "Sampling…": "Abproben…",
+  "Sampled — accept to apply qualifier": "Abgetastet — Probe übernehmen, um den Qualifier anzuwenden",
+  "Sample is stale. Sample again.": "Probe ist veraltet. Bitte erneut abtasten.",
+  "Eyedropper: click the preview": "Pipette: Vorschau anklicken",
+  "Brush: draw on the preview": "Pinsel: auf der Vorschau zeichnen",
+  "Brush drawing…": "Pinselzeichnung…",
+  "Brush cancelled": "Pinsel abgebrochen",
+  "Selection saved": "Auswahl gespeichert",
+  "Selection cleared": "Auswahl gelöscht",
+  "Sample · rev {rev} · {domain} · frame {frame}": "Probe · Rev {rev} · {domain} · Frame {frame}",
+  "Selection · {id} · rev {rev}": "Auswahl · {id} · Rev {rev}",
+  "No selection · rev {rev}": "Keine Auswahl · Rev {rev}"
 }

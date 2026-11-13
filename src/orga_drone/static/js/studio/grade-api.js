@@ -258,3 +258,41 @@ export function bindStepSelection(grade, stepType, selectionId) {
   step.selection_id = selectionId;
   return next;
 }
+
+export async function sampleEyedropper(
+  studioId,
+  { u, v, t_s = 0, expectedRevision, neighborhood = 0.01, domain = "srgb" } = {}
+) {
+  const response = await fetch(`/api/studio/${studioId}/grade/eyedropper`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      u,
+      v,
+      t_s,
+      neighborhood,
+      domain,
+      expected_revision: expectedRevision,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.detail?.message || data?.detail || "eyedropper sample failed");
+    error.status = response.status;
+    error.code = data?.detail?.code;
+    throw error;
+  }
+  return data;
+}
+
+/** Pick a suggested qualifier object from an eyedropper sample payload. */
+export function qualifierFromSample(sample, kind = "rgb") {
+  const suggested = sample?.suggested?.[kind] || sample?.sample?.suggested?.[kind];
+  if (!suggested) {
+    throw new Error(`no suggested ${kind} qualifier on sample`);
+  }
+  return structuredClone(suggested);
+}

@@ -47,6 +47,8 @@ function paintGroup(fields, values) {
 export function createManagedColorEditor({
   panel,
   getSelectedStudioId,
+  getPreviewMediaEl,
+  getPreviewSourceTimeS,
   onChanged,
   confirmConvert,
   listLuts,
@@ -116,6 +118,24 @@ export function createManagedColorEditor({
     panel: panel.querySelector("[data-managed-selection-panel]"),
     getSelectedStudioId,
     getGrade: () => current,
+    getPreviewMediaEl,
+    getPreviewSourceTimeS,
+    messages: {
+      sampling: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampling,
+      sampledHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampled,
+      sampleStale: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleStale,
+      sampleMeta: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleMeta,
+      eyedropperHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgEyedropper,
+      brushHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrush,
+      brushDrawing: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrushDrawing,
+      brushCancelled: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgBrushCancelled,
+      selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
+      selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
+      selectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSelection,
+      noSelectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgNoSelection,
+    },
     onChanged: (payload) => {
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());

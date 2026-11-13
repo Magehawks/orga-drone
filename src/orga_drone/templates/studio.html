@@ -1119,7 +1119,19 @@
               <input type="range" data-managed-hsl-light min="-0.5" max="0.5" step="0.01" value="0" disabled>
             </label>
             <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
-            <div class="studio-managed-selection" data-managed-selection-panel hidden>
+            <div class="studio-managed-selection" data-managed-selection-panel hidden
+                 data-msg-sampling="{{ _('Sampling…') }}"
+                 data-msg-sampled="{{ _('Sampled — accept to apply qualifier') }}"
+                 data-msg-sample-stale="{{ _('Sample is stale. Sample again.') }}"
+                 data-msg-eyedropper="{{ _('Eyedropper: click the preview') }}"
+                 data-msg-brush="{{ _('Brush: draw on the preview') }}"
+                 data-msg-brush-drawing="{{ _('Brush drawing…') }}"
+                 data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
+                 data-msg-saved="{{ _('Selection saved') }}"
+                 data-msg-cleared="{{ _('Selection cleared') }}"
+                 data-msg-sample-meta="{{ _('Sample · rev {rev} · {domain} · frame {frame}') }}"
+                 data-msg-selection="{{ _('Selection · {id} · rev {rev}') }}"
+                 data-msg-no-selection="{{ _('No selection · rev {rev}') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
               <label class="studio-inspector-field">
@@ -1154,6 +1166,23 @@
                   <option value="wheels-v1">{{ _('Wheels') }}</option>
                   <option value="managed-hsl-v1">{{ _('Managed HSL') }}</option>
                 </select>
+              </label>
+              <div class="studio-managed-selection-tools">
+                <button type="button" class="button ghost" data-managed-eyedropper aria-pressed="false">{{ _('Eyedropper') }}</button>
+                <button type="button" class="button ghost" data-managed-brush-draw aria-pressed="false">{{ _('Draw brush') }}</button>
+                <button type="button" class="button ghost" data-managed-eyedropper-accept disabled>{{ _('Accept sample') }}</button>
+              </div>
+              <div class="studio-managed-eyedropper-feedback" aria-live="polite">
+                <span class="studio-managed-eyedropper-swatch" data-managed-eyedropper-swatch></span>
+                <span class="meta-line" data-managed-eyedropper-meta></span>
+              </div>
+              <label class="studio-inspector-field">
+                <span>{{ _('Brush radius') }}</span>
+                <input type="range" data-managed-brush-radius min="0.02" max="0.25" step="0.01" value="0.08" disabled>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Brush hardness') }}</span>
+                <input type="range" data-managed-brush-hardness min="0" max="1" step="0.05" value="0.5" disabled>
               </label>
               <div class="studio-managed-selection-actions">
                 <button type="button" class="button" data-managed-selection-apply>{{ _('Apply selection') }}</button>
