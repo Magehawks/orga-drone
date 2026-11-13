@@ -12,6 +12,7 @@ import {
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
+import { createManagedColorEditor } from "./studio/managed-color-editor.js";
 import {
   bumpOverlayRevision,
   overlayRevisionOf,
@@ -115,6 +116,7 @@ import {
   let controlBridge = null;
   let rampEditor = null;
   let timelapseEditor = null;
+  let managedColorEditor = null;
   let controlPendingWrites = 0;
   let controlWriteFailed = false;
   const nativeFetch = window.fetch.bind(window);
@@ -4867,6 +4869,7 @@ import {
     // Do not write section.open or section.hidden here.
     fillColorLook(clip);
     detailControls.fill(clip);
+    managedColorEditor?.fill();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
     updateColorGradeSummary(clip);
@@ -14070,6 +14073,24 @@ import {
       applied: timelapsePanel?.dataset.msgApplied,
     },
     save: saveSpeedRamp,
+  });
+  const managedColorPanel = document.getElementById("inspector-managed-color");
+  managedColorEditor = createManagedColorEditor({
+    panel: managedColorPanel,
+    getSelectedStudioId: () => selectedAdjustableClip()?.dataset?.studioId || null,
+    messages: {
+      convertConfirm: managedColorPanel?.dataset.msgConvertConfirm,
+      managedStatus: managedColorPanel?.dataset.msgManagedStatus,
+      wrappedStatus: managedColorPanel?.dataset.msgWrappedStatus,
+      legacyStatus: managedColorPanel?.dataset.msgLegacyStatus,
+    },
+    onChanged: () => {
+      const clip = selectedAdjustableClip();
+      if (clip) {
+        scheduleLutProxyPrepare(clip);
+        syncPreviewMedia({ seek: true });
+      }
+    },
   });
   applyVolume();
   applyTransitionsToDom();

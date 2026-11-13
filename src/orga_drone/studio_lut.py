@@ -220,8 +220,11 @@ def _read_strength(value: object) -> int:
 
 
 def color_look_from_effect_settings(raw: str | None) -> ColorLook:
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
     try:
-        parsed = json.loads(raw) if raw else {}
+        parsed = json.loads(view) if view else {}
     except json.JSONDecodeError:
         return ColorLook()
     if not isinstance(parsed, dict):

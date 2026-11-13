@@ -168,10 +168,13 @@ def _read_range(value: object) -> HslRange:
 
 def hsl_adjust_from_effect_settings(raw: str | None) -> HslAdjust:
     """Missing, empty, or invalid JSON is the neutral mixer."""
-    if raw is None or not str(raw).strip():
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
+    if view is None or not str(view).strip():
         return HslAdjust()
     try:
-        data = json.loads(raw)
+        data = json.loads(view)
     except json.JSONDecodeError:
         return HslAdjust()
     if not isinstance(data, dict):

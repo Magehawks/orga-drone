@@ -1034,6 +1034,60 @@
           </div>
           <p class="hint studio-color-mode-help" id="studio-color-mode-help">{{ _('Creative and Pro edit the same grade. Switching modes never changes the picture.') }}</p>
           <p class="studio-color-grade-summary" id="studio-color-grade-summary" role="status" aria-live="polite"></p>
+          <details id="inspector-managed-color" class="studio-image-section" data-managed-color-panel
+                   data-msg-convert-confirm="{{ _('Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math.') }}"
+                   data-msg-managed-status="{{ _('managed-sdr · rev {rev} · preview preparing') }}"
+                   data-msg-wrapped-status="{{ _('legacy wrapper · rev {rev} · Look & color locked') }}"
+                   data-msg-legacy-status="{{ _('legacy color') }}">
+            <summary>{{ _('Managed Color Workspace') }}</summary>
+            <p class="hint">{{ _('Managed SDR uses one serial grade for Creative and Pro. Convert only when you accept that appearance can change.') }}</p>
+            <p class="meta-line" data-managed-color-status role="status" aria-live="polite"></p>
+            <div class="studio-inspector-actions">
+              <button type="button" class="button ghost" data-managed-color-wrap>{{ _('Wrap legacy grade') }}</button>
+              <button type="button" class="button" data-managed-color-convert>{{ _('Convert to managed') }}</button>
+              <button type="button" class="button ghost" data-managed-color-reset>{{ _('Reset primaries') }}</button>
+            </div>
+            <label class="studio-inspector-field">
+              <span>{{ _('Exposure (stops)') }} <span data-managed-exposure-value>0.00 EV</span></span>
+              <input type="range" data-managed-exposure min="-4" max="4" step="0.05" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Temperature') }} <span data-managed-kelvin-value>6500 K</span></span>
+              <input type="range" data-managed-kelvin min="2000" max="15000" step="50" value="6500" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Tint') }} <span data-managed-tint-value>0</span></span>
+              <input type="range" data-managed-tint min="-100" max="100" step="1" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Contrast') }} <span data-managed-contrast-value>1.00</span></span>
+              <input type="range" data-managed-contrast min="0" max="4" step="0.01" value="1" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Pivot') }} <span data-managed-pivot-value>0.180</span></span>
+              <input type="range" data-managed-pivot min="0.001" max="1" step="0.001" value="0.18" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Saturation') }} <span data-managed-saturation-value>1.00</span></span>
+              <input type="range" data-managed-saturation min="0" max="4" step="0.01" value="1" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Blacks') }} <span data-managed-blacks-value>0</span></span>
+              <input type="range" data-managed-blacks min="-100" max="100" step="1" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Shadows') }} <span data-managed-shadows-value>0</span></span>
+              <input type="range" data-managed-shadows min="-100" max="100" step="1" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Highlights') }} <span data-managed-highlights-value>0</span></span>
+              <input type="range" data-managed-highlights min="-100" max="100" step="1" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Whites') }} <span data-managed-whites-value>0</span></span>
+              <input type="range" data-managed-whites min="-100" max="100" step="1" value="0" disabled>
+            </label>
+          </details>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Look & color') }}</summary>
             <div id="inspector-image-adjust">

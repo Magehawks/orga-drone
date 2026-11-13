@@ -580,6 +580,36 @@ msgstr "Pro"
 msgid "Color workspace"
 msgstr "Color workspace"
 
+msgid "Managed Color Workspace"
+msgstr "Managed Color Workspace"
+
+msgid "Managed SDR uses one serial grade for Creative and Pro. Convert only when you accept that appearance can change."
+msgstr "Managed SDR uses one serial grade for Creative and Pro. Convert only when you accept that appearance can change."
+
+msgid "Wrap legacy grade"
+msgstr "Wrap legacy grade"
+
+msgid "Convert to managed"
+msgstr "Convert to managed"
+
+msgid "Reset primaries"
+msgstr "Reset primaries"
+
+msgid "Exposure (stops)"
+msgstr "Exposure (stops)"
+
+msgid "Temperature"
+msgstr "Temperature"
+
+msgid "Tint"
+msgstr "Tint"
+
+msgid "Pivot"
+msgstr "Pivot"
+
+msgid "Whites"
+msgstr "Whites"
+
 msgid "Color editing mode"
 msgstr "Color editing mode"
 
