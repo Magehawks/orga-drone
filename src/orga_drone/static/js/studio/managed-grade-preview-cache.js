@@ -63,6 +63,7 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
     if (pending) return pending;
 
     const token = previewTokens.begin({
+      key: studioId,
       clipId: studioId,
       revision: clip.dataset.managedGradeRevision || "",
       contextDigest: contextDigestFromParts([

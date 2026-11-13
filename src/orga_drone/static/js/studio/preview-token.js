@@ -1,6 +1,8 @@
 /**
  * Async preview tokens for Color Workspace (#363).
  * Bind project/clip/revision/context/generation so stale responses cannot paint.
+ * Tokens are keyed (default: clipId) so parallel A/B preview fetches do not
+ * invalidate each other.
  */
 
 /**
@@ -12,49 +14,64 @@ export function contextDigestFromParts(parts) {
 }
 
 /**
+ * @param {{
+ *   projectId?: string|number|null,
+ *   clipId?: string|number|null,
+ *   revision?: string|number|null,
+ *   contextDigest?: string|null,
+ *   key?: string|null,
+ * }} identity
+ * @returns {string}
+ */
+export function previewTokenKey(identity = {}) {
+  if (identity.key !== null && identity.key !== undefined && identity.key !== "") {
+    return String(identity.key);
+  }
+  return String(identity.clipId ?? "");
+}
+
+/**
  * @returns {{
- *   begin: (identity: {
- *     projectId?: string|number|null,
- *     clipId?: string|number|null,
- *     revision?: string|number|null,
- *     contextDigest?: string|null,
- *   }) => {
- *     projectId: string,
- *     clipId: string,
- *     revision: string,
- *     contextDigest: string,
- *     generation: number,
- *   },
+ *   begin: (identity: object) => object,
  *   isCurrent: (token: object|null|undefined) => boolean,
- *   invalidate: () => void,
- *   peek: () => object|null,
+ *   invalidate: (key?: string|null) => void,
+ *   peek: (key?: string|null) => object|null,
  * }}
  */
 export function createPreviewTokenStore() {
-  let generation = 0;
-  /** @type {null | {
+  /** @type {Map<string, {
    *   projectId: string,
    *   clipId: string,
    *   revision: string,
    *   contextDigest: string,
    *   generation: number,
-   * }} */
-  let current = null;
+   *   key: string,
+   * }>} */
+  const currentByKey = new Map();
+  /** @type {Map<string, number>} */
+  const generationByKey = new Map();
 
   function begin(identity = {}) {
-    generation += 1;
-    current = {
+    const key = previewTokenKey(identity);
+    const generation = (Number(generationByKey.get(key)) || 0) + 1;
+    generationByKey.set(key, generation);
+    const token = {
       projectId: String(identity.projectId ?? ""),
       clipId: String(identity.clipId ?? ""),
       revision: String(identity.revision ?? ""),
       contextDigest: String(identity.contextDigest ?? ""),
       generation,
+      key,
     };
-    return { ...current };
+    currentByKey.set(key, token);
+    return { ...token };
   }
 
   function isCurrent(token) {
-    if (!token || !current) return false;
+    if (!token) return false;
+    const key = String(token.key ?? previewTokenKey(token));
+    const current = currentByKey.get(key);
+    if (!current) return false;
     return (
       Number(token.generation) === Number(current.generation) &&
       String(token.projectId) === current.projectId &&
@@ -64,12 +81,25 @@ export function createPreviewTokenStore() {
     );
   }
 
-  function invalidate() {
-    generation += 1;
-    current = null;
+  function invalidate(key) {
+    if (key === null || key === undefined || key === "") {
+      for (const existing of [...generationByKey.keys()]) {
+        generationByKey.set(existing, (Number(generationByKey.get(existing)) || 0) + 1);
+      }
+      currentByKey.clear();
+      return;
+    }
+    const id = String(key);
+    generationByKey.set(id, (Number(generationByKey.get(id)) || 0) + 1);
+    currentByKey.delete(id);
   }
 
-  function peek() {
+  function peek(key) {
+    if (key === null || key === undefined || key === "") {
+      const first = currentByKey.values().next();
+      return first.done ? null : { ...first.value };
+    }
+    const current = currentByKey.get(String(key));
     return current ? { ...current } : null;
   }
 

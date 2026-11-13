@@ -1002,3 +1002,12 @@ msgstr "Serial steps run once in order. Bypass and mix use the shared grade comm
 
 msgid "Serial grade steps"
 msgstr "Serial grade steps"
+
+msgid "Move up"
+msgstr "Move up"
+
+msgid "Move down"
+msgstr "Move down"
+
+msgid "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
+msgstr "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."

@@ -289,22 +289,31 @@ export function createManagedColorEditor({
       return;
     }
     const token = beginRequestToken(tokens, studioId);
+    const previewToken = previewTokens.begin({
+      key: String(studioId),
+      clipId: studioId,
+      revision: "",
+      contextDigest: contextDigestFromParts(["managed-fill", studioId]),
+    });
     try {
       const payload = await fetchGrade(studioId);
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!previewTokens.isCurrent(previewToken)) return;
       if (!selectedStillCurrent(studioId)) return;
-      current = payload;
-      currentId = String(studioId);
-      previewTokens.begin({
+      // Re-bind revision after the fetch so later paints match this response.
+      const paintToken = previewTokens.begin({
+        key: String(studioId),
         clipId: studioId,
-        revision: current.revision,
+        revision: payload?.revision,
         contextDigest: contextDigestFromParts([
           "managed-fill",
           studioId,
-          current.revision,
-          current.evaluator,
+          payload?.revision,
+          payload?.evaluator,
         ]),
       });
+      current = payload;
+      currentId = String(studioId);
       const managed = current.evaluator === "managed-sdr-v1";
       setEnabled(managed);
       if (wrapBtn) {
@@ -315,6 +324,7 @@ export function createManagedColorEditor({
         convertBtn.hidden = managed;
         convertBtn.disabled = busy;
       }
+      if (!previewTokens.isCurrent(paintToken) || !selectedStillCurrent(studioId)) return;
       if (managed) {
         paintGroup(fields, {
           ...neutralPrimariesParams(),
@@ -354,10 +364,11 @@ export function createManagedColorEditor({
       }
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!previewTokens.isCurrent(previewToken)) return;
       if (!selectedStillCurrent(studioId)) return;
       current = null;
       currentId = null;
-      previewTokens.invalidate();
+      previewTokens.invalidate(String(studioId));
       setEnabled(false);
       setStatus(String(error.message || error));
       stepEditor.reset();

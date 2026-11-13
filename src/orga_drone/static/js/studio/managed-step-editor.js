@@ -149,7 +149,7 @@ export function createManagedStepEditor({
     const up = document.createElement("button");
     up.type = "button";
     up.className = "button ghost";
-    up.textContent = messages.moveUp || "Up";
+    up.textContent = messages.moveUp || "Move up";
     up.disabled = index === 0;
     up.addEventListener("click", () => {
       const grade = getGrade?.()?.grade;
@@ -161,7 +161,7 @@ export function createManagedStepEditor({
     const down = document.createElement("button");
     down.type = "button";
     down.className = "button ghost";
-    down.textContent = messages.moveDown || "Down";
+    down.textContent = messages.moveDown || "Move down";
     down.disabled = index >= total - 1;
     down.addEventListener("click", () => {
       const grade = getGrade?.()?.grade;

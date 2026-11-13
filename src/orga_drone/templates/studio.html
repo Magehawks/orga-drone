@@ -1051,13 +1051,13 @@
                  data-msg-enable="{{ _('On')|e }}"
                  data-msg-enable-aria="{{ _('Enable step')|e }}"
                  data-msg-mix-aria="{{ _('Step mix')|e }}"
-                 data-msg-move-up="{{ _('Up')|e }}"
-                 data-msg-move-down="{{ _('Down')|e }}"
+                 data-msg-move-up="{{ _('Move up')|e }}"
+                 data-msg-move-down="{{ _('Move down')|e }}"
                  data-msg-empty="{{ _('No steps yet')|e }}"
                  data-msg-ready="{{ _('{count} steps · serial')|e }}"
                  data-msg-saved="{{ _('steps · rev {rev}')|e }}"
                  data-msg-unavailable="{{ _('Serial steps need a managed grade')|e }}">
-              <p class="hint">{{ _('Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.') }}</p>
+              <p class="hint">{{ _('Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save.') }}</p>
               <p class="meta-line" data-managed-step-status role="status" aria-live="polite"></p>
               <div class="studio-managed-step-list" data-managed-step-list role="list" aria-label="{{ _('Serial grade steps') }}"></div>
             </div>

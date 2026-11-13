@@ -60,7 +60,7 @@ and stopped #320 precision experiments are not weakened.
 | Save/reopen / clip switch | PASS (API) | grade route tests |
 | Editor command migration (enable/mix/reorder) | PASS | `postGradeCommand` in step editor |
 | Editor param body PUT | PASS (retained) | primaries/curves/LUT/selection still PUT until params command |
-| Async preview tokens | PASS | `preview-token.js` + managed fill/cache |
+| Async preview tokens | PASS (partial) | keyed store + fill/cache gating; packaged E2E NOT_RUN |
 
 ## 6. Preview / export numerical parity
 
