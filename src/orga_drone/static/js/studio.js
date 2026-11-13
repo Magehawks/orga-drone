@@ -17,6 +17,7 @@ import {
   managedBakeUrl,
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
+import { fetchGrade } from "./studio/grade-api.js";
 import {
   bumpOverlayRevision,
   overlayRevisionOf,
@@ -2800,6 +2801,23 @@ import {
     return grade;
   }
 
+  async function ensureManagedGradeCached(clip) {
+    if (!clip?.dataset?.studioId) return null;
+    const existing = managedGradeForClip(clip);
+    if (existing) return existing;
+    try {
+      const payload = await fetchGrade(clip.dataset.studioId);
+      if (payload?.evaluator === "managed-sdr-v1") {
+        cacheManagedGradeOnClip(clip, payload);
+        return payload;
+      }
+      cacheManagedGradeOnClip(clip, null);
+    } catch (_) {
+      /* offline / missing */
+    }
+    return managedGradeForClip(clip);
+  }
+
   function cacheManagedGradeOnClip(clip, grade) {
     if (!clip) return;
     if (grade?.evaluator === "managed-sdr-v1") {
@@ -2907,6 +2925,11 @@ import {
 
   function previewLutFrameFor(media, frameW, frameH) {
     const clip = clipForPreviewMedia(media);
+    if (clip && !managedGradeForClip(clip) && clip.dataset.kind === "video") {
+      void ensureManagedGradeCached(clip).then((grade) => {
+        if (grade) schedulePreviewBlit();
+      });
+    }
     if (!lutWebglCanHandle(clip)) return null;
     const renderer = lutRendererFor(media);
     if (!renderer) return null;
@@ -4939,7 +4962,10 @@ import {
     // Do not write section.open or section.hidden here.
     fillColorLook(clip);
     detailControls.fill(clip);
-    managedColorEditor?.fill();
+    void (async () => {
+      await managedColorEditor?.fill?.();
+      cacheManagedGradeOnClip(clip, managedColorEditor?.currentGrade?.());
+    })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
     updateColorGradeSummary(clip);
