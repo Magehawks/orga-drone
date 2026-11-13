@@ -175,9 +175,24 @@ def _capture_story(conn: sqlite3.Connection, project_id: int) -> Snapshot:
 
 def restore_story(db: Database, project_id: int, snapshot: Snapshot, *, connection: sqlite3.Connection | None = None) -> None:
     """Replace one project's clip rows. Media files and other tables stay."""
+    from orga_drone.studio_grade_model import read_grade
+    from orga_drone.studio_grade_persistence import remint_restored_grade_revision
+
     now = datetime.now().isoformat(timespec="seconds")
     keep_ids = [int(row[0]) for row in snapshot.clips]
+    effect_idx = _CLIP_COLUMNS.index("effect_settings")
     with (nullcontext(connection) if connection is not None else db.connect()) as conn:
+        live_floor = 0
+        for row in conn.execute(
+            "SELECT effect_settings FROM studio_clips WHERE project_id = ?",
+            (project_id,),
+        ).fetchall():
+            try:
+                model = read_grade(str(row["effect_settings"] or ""))
+            except Exception:
+                continue
+            if model.authority == "canonical":
+                live_floor = max(live_floor, int(model.revision))
         if keep_ids:
             placeholders = ",".join("?" for _ in keep_ids)
             conn.execute(
@@ -203,18 +218,31 @@ def restore_story(db: Database, project_id: int, snapshot: Snapshot, *, connecti
         insert_columns = ", ".join(_CLIP_COLUMNS)
         insert_values = ", ".join("?" for _ in _CLIP_COLUMNS)
         for row in snapshot.clips:
-            if int(row[0]) in existing:
+            values = list(row)
+            reminted = remint_restored_grade_revision(
+                str(values[effect_idx] or ""), floor=live_floor
+            )
+            if reminted is not None:
+                values[effect_idx] = reminted
+                try:
+                    live_floor = max(
+                        live_floor, int(read_grade(reminted).revision)
+                    )
+                except Exception:
+                    pass
+            values_t = tuple(values)
+            if int(values_t[0]) in existing:
                 conn.execute(
                     f"""UPDATE studio_clips
                         SET {assignments}
                         WHERE id = ? AND project_id = ?""",
-                    (*row[2:], row[0], project_id),
+                    (*values_t[2:], values_t[0], project_id),
                 )
             else:
                 conn.execute(
                     f"""INSERT INTO studio_clips ({insert_columns})
                         VALUES ({insert_values})""",
-                    row,
+                    values_t,
                 )
         conn.execute(
             """UPDATE studio_projects

@@ -110,6 +110,33 @@ def allocate_revision(current: GradeModel) -> int:
     return int(current.revision) + 1
 
 
+def merge_grade_into_current(
+    current: GradeModel,
+    proposed: Mapping[str, Any] | GradeModel,
+) -> dict[str, Any]:
+    """Build a publish document that preserves opaque root fields.
+
+    UI clients typically PUT only ``{grade, expected_revision}``. Replacing the
+    whole effect_settings document would drop overlays, masks, audio and other
+    non-grade root keys. Start from the current canonical document and replace
+    only keys explicitly present on the proposal (always including ``grade``).
+    """
+    base = current.to_dict()
+    incoming = (
+        proposed.to_dict()
+        if isinstance(proposed, GradeModel)
+        else dict(proposed)
+    )
+    if "grade" not in incoming or not isinstance(incoming.get("grade"), dict):
+        fail("grade", "Proposed document is missing grade")
+    merged = dict(base)
+    for key, value in incoming.items():
+        if key == "expected_revision":
+            continue
+        merged[key] = value
+    return merged
+
+
 def publish_grade_document(
     current: GradeModel,
     proposed: Mapping[str, Any] | GradeModel,
@@ -125,11 +152,7 @@ def publish_grade_document(
         )
     if int(expected_revision) != int(current.revision):
         fail("grade.revision", "Grade revision conflict", "STALE_REVISION")
-    document = (
-        proposed.to_dict()
-        if isinstance(proposed, GradeModel)
-        else dict(proposed)
-    )
+    document = merge_grade_into_current(current, proposed)
     grade = document.get("grade")
     if not isinstance(grade, dict):
         fail("grade", "Proposed document is missing grade")
@@ -141,6 +164,24 @@ def publish_grade_document(
     if published.authority != "canonical":
         fail("grade", "Proposed document is not canonical", "INVALID_GRADE")
     return snapshot(published.to_dict())
+
+
+def remint_restored_grade_revision(raw: str | None, *, floor: int) -> str | None:
+    """Assign a monotonic revision after Undo/Redo restores older grade bytes."""
+    if raw is None:
+        return None
+    try:
+        model = read_grade(raw)
+    except Exception:
+        return raw
+    if model.authority != "canonical" or model.grade is None:
+        return raw
+    document = model.to_dict()
+    grade = dict(document["grade"])
+    next_revision = max(int(grade.get("revision") or 0), int(floor)) + 1
+    grade["revision"] = next_revision
+    document["grade"] = grade
+    return snapshot(read_grade(document).to_dict())
 
 
 def writes_enabled(data_dir: Path) -> bool:

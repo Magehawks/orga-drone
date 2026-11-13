@@ -2328,16 +2328,24 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=400, detail="expected_revision must be an integer"
             ) from exc
-        document = {"grade": payload["grade"]}
+        # Clients may send only grade + expected_revision. Opaque root fields
+        # (overlays, masks, audio, …) are preserved by publish_grade_document.
+        document: dict[str, object] = {"grade": payload["grade"]}
         for key, value in payload.items():
             if key not in {"grade", "expected_revision"}:
                 document[key] = value
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="studio item not found")
         try:
-            with story_edit(
-                db, _clip_project_id(studio_item_id), group=_history_group(request)
-            ):
+            with transactional_story_edit(
+                db, project_id, group=_history_group(request)
+            ) as conn:
                 item = db.set_studio_canonical_grade(
-                    studio_item_id, document, expected_revision=expected
+                    studio_item_id,
+                    document,
+                    expected_revision=expected,
+                    connection=conn,
                 )
         except Exception as exc:  # noqa: BLE001 - map typed grade errors
             raise _grade_http_error(exc) from exc
