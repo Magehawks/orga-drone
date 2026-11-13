@@ -193,6 +193,102 @@ def test_encoder_video_music_one_crossfade_exports(tmp_path: Path) -> None:
     assert duration_s == pytest.approx(1.6, abs=0.25)
 
 
+def _png_frame(ffmpeg: str, video: Path, when_s: float, dest: Path) -> None:
+    made = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(video),
+            "-ss",
+            f"{when_s:.3f}",
+            "-frames:v",
+            "1",
+            str(dest),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert made.returncode == 0, made.stderr
+
+
+def _region_means(path: Path) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    from PIL import Image
+
+    image = Image.open(path).convert("RGB")
+    width, height = image.size
+    raw = image.tobytes()
+    pixels = [raw[index : index + 3] for index in range(0, len(raw), 3)]
+
+    def mean(x0: int, x1: int) -> tuple[float, float, float]:
+        totals = [0.0, 0.0, 0.0]
+        count = 0
+        for y in range(height):
+            for x in range(x0, x1):
+                red, green, blue = pixels[y * width + x]
+                totals[0] += red
+                totals[1] += green
+                totals[2] += blue
+                count += 1
+        return tuple(channel / count for channel in totals)
+
+    return mean(0, max(1, width // 3)), mean(width - max(1, width // 3), width)
+
+
+def test_encoder_exports_blur_dissolve_and_soft_wipe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real MP4 frames, not only the filter string, for the drone-pack overlaps."""
+    ffmpeg = _ffmpeg()
+    from orga_drone.export import studio_encoder as encoder_module
+
+    graphs: list[str] = []
+    real_run = encoder_module._run_ffmpeg
+
+    def recording_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        if "-filter_complex" in cmd:
+            graphs.append(cmd[cmd.index("-filter_complex") + 1])
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(encoder_module, "_run_ffmpeg", recording_run)
+    red = _write_av_clip(ffmpeg, tmp_path / "red.mp4", color="red", duration_s=1.0)
+    blue = _write_av_clip(ffmpeg, tmp_path / "blue.mp4", color="blue", duration_s=1.0)
+
+    def export(kind: str, name: str) -> Path:
+        return _render(
+            tmp_path,
+            (
+                _video_clip(red, 1.0, transition_type=kind, transition_s=0.4),
+                _video_clip(blue, 1.0),
+            ),
+            name=name,
+        )
+
+    blur = export("blur_dissolve", "blur.mp4")
+    wipe = export("soft_wipe_left", "wipe.mp4")
+    assert any("xfade=transition=hblur" in graph for graph in graphs)
+    assert any("xfade=transition=smoothleft" in graph for graph in graphs)
+    assert not any("xfade=transition=custom" in graph for graph in graphs)
+
+    for video in (blur, wipe):
+        duration_s, _has_aac = _probe(ffmpeg, video)
+        assert duration_s == pytest.approx(1.6, abs=0.25)
+        _png_frame(ffmpeg, video, 0.15, tmp_path / f"{video.stem}-early.png")
+        early_left, _early_right = _region_means(tmp_path / f"{video.stem}-early.png")
+        assert early_left[0] > early_left[2] + 40
+
+    _png_frame(ffmpeg, blur, 0.8, tmp_path / "blur-mid.png")
+    _png_frame(ffmpeg, wipe, 0.8, tmp_path / "wipe-mid.png")
+    blur_left, blur_right = _region_means(tmp_path / "blur-mid.png")
+    wipe_left, wipe_right = _region_means(tmp_path / "wipe-mid.png")
+    # hblur mixes the two colors across the frame. The wipe keeps a side.
+    assert abs(blur_left[0] - blur_right[0]) < 35
+    assert blur_left[0] > 20 and blur_left[2] > 20
+    assert abs(wipe_left[0] - wipe_right[0]) > 40
+    assert abs(wipe_left[2] - wipe_right[2]) > 40
+
+
 def test_encoder_video_music_fade_black_exports(tmp_path: Path) -> None:
     ffmpeg = _ffmpeg()
     a = _write_av_clip(ffmpeg, tmp_path / "a.mp4", color="red")
