@@ -18,6 +18,7 @@ import {
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
 import { fetchGrade } from "./studio/grade-api.js";
+import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
 import {
   bumpOverlayRevision,
   overlayRevisionOf,
@@ -2783,17 +2784,12 @@ import {
     );
   }
 
+  const managedGradePreviewCache = createManagedGradePreviewCache({ fetchGrade });
+
   function managedGradeForClip(clip) {
     if (!clip) return null;
-    const raw = clip.dataset.managedGradeJson;
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed?.evaluator === "managed-sdr-v1") return parsed;
-      } catch (_) {
-        /* ignore corrupt cache */
-      }
-    }
+    const cached = managedGradePreviewCache.readManagedGrade(clip);
+    if (cached) return cached;
     if (!managedColorEditor) return null;
     const grade = managedColorEditor.currentGrade?.();
     const gradeId = managedColorEditor.currentStudioId?.();
@@ -2802,29 +2798,11 @@ import {
   }
 
   async function ensureManagedGradeCached(clip) {
-    if (!clip?.dataset?.studioId) return null;
-    const existing = managedGradeForClip(clip);
-    if (existing) return existing;
-    try {
-      const payload = await fetchGrade(clip.dataset.studioId);
-      if (payload?.evaluator === "managed-sdr-v1") {
-        cacheManagedGradeOnClip(clip, payload);
-        return payload;
-      }
-      cacheManagedGradeOnClip(clip, null);
-    } catch (_) {
-      /* offline / missing */
-    }
-    return managedGradeForClip(clip);
+    return managedGradePreviewCache.ensureCached(clip);
   }
 
   function cacheManagedGradeOnClip(clip, grade) {
-    if (!clip) return;
-    if (grade?.evaluator === "managed-sdr-v1") {
-      clip.dataset.managedGradeJson = JSON.stringify(grade);
-    } else if (clip.dataset.managedGradeJson) {
-      delete clip.dataset.managedGradeJson;
-    }
+    managedGradePreviewCache.writeManagedGrade(clip, grade);
   }
 
   function managedGpuProbeFor(clip) {
@@ -4963,8 +4941,14 @@ import {
     fillColorLook(clip);
     detailControls.fill(clip);
     void (async () => {
+      const requestedStudioId = clip?.dataset?.studioId;
       await managedColorEditor?.fill?.();
-      cacheManagedGradeOnClip(clip, managedColorEditor?.currentGrade?.());
+      managedGradePreviewCache.cacheFillResult({
+        clip,
+        requestedStudioId,
+        editorStudioId: managedColorEditor?.currentStudioId?.(),
+        grade: managedColorEditor?.currentGrade?.(),
+      });
     })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
