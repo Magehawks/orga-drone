@@ -49,6 +49,13 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/color-workspace.js` owns pure Creative/Pro helpers: per-clip Quick Look
   request tokens, inspector-refresh gating when selection changes mid-flight, and
   grade-summary part formatting. The entry still owns DOM fills and saves.
+- `studio/grade-api.js` owns Grade HTTP helpers (GET/PUT/wrap/convert-managed)
+  and primaries step upsert helpers for ADR 0035 managed grades. `studio/
+  managed-color-editor.js` owns the Managed Color Workspace inspector panel
+  (wrap/convert/reset and primaries sliders). The entry mounts the panel and
+  refreshes it from image-inspector fill; preview invalidation stays in the
+  entry. See `tests/js/grade_api.test.js` and
+  `tests/js/managed_color_editor.test.js`.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
   histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro
