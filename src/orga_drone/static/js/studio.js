@@ -5067,6 +5067,15 @@ import {
         editorStudioId: managedColorEditor?.currentStudioId?.(),
         grade: managedColorEditor?.currentGrade?.(),
       });
+      // Re-hydrate Quick Look chips from grade.extensions.creative_preset once
+      // the managed grade cache is warm (SSR look id stays empty for managed).
+      const selected = selectedAdjustableClip();
+      if (
+        selected &&
+        String(selected.dataset.studioId) === String(requestedStudioId || "")
+      ) {
+        fillImageAdjust(selected);
+      }
     })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
