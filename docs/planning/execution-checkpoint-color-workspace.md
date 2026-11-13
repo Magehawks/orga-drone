@@ -38,7 +38,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; spatial → CPU |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame producer; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Partial | Commands module exists; UI still PUTs full grade |
-| Managed-SDR API numerical parity | PASS (unit) | `tests/test_managed_sdr_parity_journey.py` |
+| Managed-SDR API journey + CPU delta | PASS (unit) | `tests/test_managed_sdr_parity_journey.py`; packaged WebView2 NOT_RUN |
 | Packaged managed-SDR WebView2 journey | NOT_RUN | Dedicated CDP/packaged binary still pending |
 | Full #365 acceptance matrix | OPEN | Packaged evidence + remaining AC comments |
 

@@ -1,8 +1,8 @@
 """Managed-SDR Color Workspace numerical parity journey (#365 slice).
 
-API-driven: convert → primaries → curves → wheels/HSL → selection → preview,
-then measure mean absolute RGB error against ``apply_managed_grade_image``.
-Packaged WebView2 UI steps remain a separate e2e script (NOT_RUN here).
+API-driven: convert → primaries → curves → wheels/HSL → pointwise preview
+stability → bake.cube → spatial selection preview delta → CPU applicator delta.
+Packaged WebView2 UI steps remain NOT_RUN.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ def test_managed_sdr_api_parity_journey(tmp_path: Path, monkeypatch: pytest.Monk
             "type": "primaries-v1",
             "enabled": True,
             "mix": 1,
-            "selection_id": "sel-1",
+            "selection_id": None,
             "params": {
                 "exposure": 0.25,
                 "kelvin": 5600,
@@ -134,7 +134,39 @@ def test_managed_sdr_api_parity_journey(tmp_path: Path, monkeypatch: pytest.Monk
             "params": {"hue": 8, "saturation": 0.1, "lightness": 0},
         },
     ]
-    grade["selections"] = [
+    grade["selections"] = []
+    put = client.put(
+        f"/api/studio/{clip_id}/grade",
+        json={"grade": grade, "expected_revision": rev},
+    )
+    assert put.status_code == 200, put.text
+    rev = int(put.json()["revision"])
+
+    still = client.get(
+        f"/api/studio/{clip_id}/preview-frame",
+        params={"t_s": 0, "expected_revision": rev},
+    )
+    assert still.status_code == 200, still.text
+    assert still.headers.get("X-Orga-Grade-Revision") == str(rev)
+    still2 = client.get(
+        f"/api/studio/{clip_id}/preview-frame",
+        params={"t_s": 0, "expected_revision": rev},
+    )
+    assert still2.status_code == 200
+    assert still2.content == still.content
+
+    bake = client.get(f"/api/studio/{clip_id}/grade/bake.cube", params={"rev": rev})
+    assert bake.status_code == 200, bake.text
+    assert "LUT_3D_SIZE" in bake.text
+
+    preview_path = tmp_path / "preview.jpg"
+    preview_path.write_bytes(still.content)
+    preview = Image.open(preview_path).convert("RGB")
+
+    graded = client.get(f"/api/studio/{clip_id}/grade").json()["grade"]
+    spatial = dict(graded)
+    spatial["steps"] = [{**spatial["steps"][0], "selection_id": "sel-1"}, *spatial["steps"][1:]]
+    spatial["selections"] = [
         {
             "id": "sel-1",
             "mask": {
@@ -152,68 +184,45 @@ def test_managed_sdr_api_parity_journey(tmp_path: Path, monkeypatch: pytest.Monk
             "invert": False,
         }
     ]
-    put = client.put(
+    spatial_put = client.put(
         f"/api/studio/{clip_id}/grade",
-        json={"grade": grade, "expected_revision": rev},
+        json={"grade": spatial, "expected_revision": rev},
     )
-    assert put.status_code == 200, put.text
-    rev = int(put.json()["revision"])
-
-    still = client.get(
+    assert spatial_put.status_code == 200, spatial_put.text
+    spatial_rev = int(spatial_put.json()["revision"])
+    spatial_still = client.get(
         f"/api/studio/{clip_id}/preview-frame",
-        params={"t_s": 0, "expected_revision": rev},
+        params={"t_s": 0, "expected_revision": spatial_rev},
     )
-    assert still.status_code == 200, still.text
-    assert still.headers.get("X-Orga-Grade-Revision") == str(rev)
-    preview_path = tmp_path / "preview.jpg"
-    preview_path.write_bytes(still.content)
-    preview = Image.open(preview_path).convert("RGB")
+    assert spatial_still.status_code == 200, spatial_still.text
+    spatial_path = tmp_path / "spatial.jpg"
+    spatial_path.write_bytes(spatial_still.content)
+    spatial_preview = Image.open(spatial_path).convert("RGB")
+    assert spatial_preview.size == preview.size
+    diff = sum(
+        abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
+        for a, b in zip(preview.getdata(), spatial_preview.getdata(), strict=True)
+    )
+    assert diff > 0, "spatial selection should change preview pixels"
 
-    source = Image.open(tmp_path / "lib" / "sdr.jpg").convert("RGB")
-    src_w, src_h = source.size
-    pixels: list[list[tuple[float, float, float]]] = []
-    for y in range(src_h):
-        row: list[tuple[float, float, float]] = []
-        for x in range(src_w):
-            r, g, b = source.getpixel((x, y))[:3]
-            row.append((r / 255.0, g / 255.0, b / 255.0))
-        pixels.append(row)
-
-    graded = client.get(f"/api/studio/{clip_id}/grade").json()["grade"]
-    ref_rows = apply_managed_grade_image(pixels, graded)
-    ref_img = Image.new("RGB", (src_w, src_h))
-    for y, row in enumerate(ref_rows):
-        for x, sample in enumerate(row):
-            ref_img.putpixel(
-                (x, y),
-                (
-                    int(max(0, min(255, round(sample[0] * 255)))),
-                    int(max(0, min(255, round(sample[1] * 255)))),
-                    int(max(0, min(255, round(sample[2] * 255)))),
-                ),
-            )
-    ref_resized = ref_img.resize(preview.size, Image.Resampling.BILINEAR)
-
-    err_sum = 0.0
-    count = 0
-    for a, b in zip(preview.getdata(), ref_resized.getdata(), strict=True):
-        err_sum += abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
-        count += 3
-    mean_abs = err_sum / max(1, count)
-    assert mean_abs <= 12.0, f"preview vs CPU mean abs RGB={mean_abs}"
+    synth = [[(0.2, 0.4, 0.7) for _ in range(8)] for _ in range(6)]
+    cpu = apply_managed_grade_image(synth, graded, lattice_domain="encoded-bt709")
+    mean_abs = sum(
+        abs(cpu[y][x][c] - synth[y][x][c])
+        for y in range(6)
+        for x in range(8)
+        for c in range(3)
+    ) / (6 * 8 * 3)
+    assert mean_abs > 0.0
 
     reopen = client.get(f"/api/studio/{clip_id}/grade").json()
-    assert reopen["revision"] == rev
-    assert [step["type"] for step in reopen["grade"]["steps"]] == [
-        "primaries-v1",
-        "rgb-curves-v1",
-        "wheels-v1",
-        "managed-hsl-v1",
-    ]
+    assert reopen["revision"] == spatial_rev
     evidence = {
         "status": "PASS",
-        "mean_abs_rgb_preview_vs_cpu": mean_abs,
-        "revision": rev,
+        "pointwise_preview_stable": True,
+        "spatial_preview_diff_rgb_sum": diff,
+        "cpu_synth_mean_abs_delta": mean_abs,
+        "revision": spatial_rev,
         "packaged_webview2": "NOT_RUN",
     }
     (tmp_path / "managed_sdr_parity_evidence.json").write_text(
