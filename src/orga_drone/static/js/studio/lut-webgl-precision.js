@@ -72,19 +72,8 @@ function _canUpload3d(gl, internalFormat, type) {
         ? new Uint16Array(8 * 4)
         : new Uint8Array(8 * 4);
   try {
-    gl.texImage3D(
-      gl.TEXTURE_3D,
-      0,
-      internalFormat,
-      2,
-      2,
-      2,
-      0,
-      gl.RGBA,
-      type,
-      pixels
-    );
-  } catch (_) {
+    gl.texImage3D(gl.TEXTURE_3D, 0, internalFormat, 2, 2, 2, 0, gl.RGBA, type, pixels);
+  } catch {
     gl.bindTexture(gl.TEXTURE_3D, null);
     gl.deleteTexture(texture);
     return false;

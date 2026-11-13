@@ -112,9 +112,7 @@ test("probe exact:true only when float LUT precision is available", () => {
     grade: {
       schema_version: 1,
       evaluator: "managed-sdr-v1",
-      steps: [
-        { id: "p1", type: "primaries-v1", enabled: true, selection_id: null },
-      ],
+      steps: [{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }],
       selections: [],
       animation: [],
     },
