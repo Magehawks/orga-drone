@@ -80,7 +80,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Histogram / waveform / parade / vectorscope | PASS (source) | #428 |
 | ScopeFrameV1 + stale reject | PASS | unit/JS |
-| Node synthetic accumulate latency + heap delta | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
+| Node synthetic accumulate latency + heap delta | PASS | `docs/planning/362-scopes-node-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
 | Packaged latency/memory | NOT_RUN — deferred by PO | — |
 
 ## 8. Performance / memory

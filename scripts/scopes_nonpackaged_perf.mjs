@@ -8,7 +8,7 @@
  *
  * Usage:
  *   node scripts/scopes_nonpackaged_perf.mjs
- *   node scripts/scopes_nonpackaged_perf.mjs --write docs/planning/362-scopes-nonpackaged-perf.json
+ *   node scripts/scopes_nonpackaged_perf.mjs --write docs/planning/362-scopes-node-perf.json
  */
 
 import { writeFileSync } from "node:fs";

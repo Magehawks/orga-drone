@@ -41,7 +41,7 @@ test("1080p synthetic buffer size and sampleFactor visits are disclosed", () => 
 });
 
 test("committed evidence JSON matches harness schema and non-packaged flag", () => {
-  const raw = readFileSync(join(root, "docs/planning/362-scopes-nonpackaged-perf.json"), "utf8");
+  const raw = readFileSync(join(root, "docs/planning/362-scopes-node-perf.json"), "utf8");
   const evidence = JSON.parse(raw);
   assert.equal(evidence.harness, "scopes_nonpackaged_perf");
   assert.equal(evidence.environment.packaged_webview2, false);
