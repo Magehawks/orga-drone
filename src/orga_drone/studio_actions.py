@@ -198,6 +198,24 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
         parameters=IMAGE_PARAMETERS,
     ),
     ActionSpec(
+        name="clip.grade.command",
+        version=1,
+        scope="clip",
+        target="media_clip",
+        reversible=True,
+        description=(
+            "Apply one bounded canonical grade command (enable/mix/reorder/"
+            "animation) through the shared #363 bridge."
+        ),
+        parameters={
+            "type": {"type": "string"},
+            "expected_revision": {"type": "integer", "minimum": 0},
+            "params": {"type": "object"},
+            "project_id": {"type": "integer", "minimum": 1},
+            "clip_id": {"type": "integer", "minimum": 1},
+        },
+    ),
+    ActionSpec(
         name="clip.color.look",
         version=1,
         scope="clip",
@@ -468,11 +486,39 @@ def validate_action_params(spec: ActionSpec, params: Any) -> dict[str, Any]:
         "clip.color.hsl": _validate_hsl_params,
         "clip.color.wheels": _validate_wheel_params,
         "clip.effects.detail": _validate_detail_params,
+        "clip.grade.command": _validate_grade_command_params,
     }
     validator = validators.get(spec.name)
     if validator is None:
         raise ActionValidationError("UNKNOWN_ACTION")
     return dict(validator(params))
+
+
+def _validate_grade_command_params(params: Mapping[str, Any]) -> dict[str, Any]:
+    from orga_drone.studio_grade_commands import COMMAND_CAPABILITIES
+
+    if not isinstance(params, Mapping):
+        raise ActionValidationError("INVALID_PARAMS")
+    required = {"type", "expected_revision", "params", "project_id", "clip_id"}
+    if set(params) != required:
+        raise ActionValidationError("INVALID_PARAMS")
+    if params["type"] not in COMMAND_CAPABILITIES:
+        raise ActionValidationError("INVALID_PARAMS")
+    if type(params["expected_revision"]) is not int or params["expected_revision"] < 0:
+        raise ActionValidationError("INVALID_PARAMS")
+    if type(params["project_id"]) is not int or params["project_id"] < 1:
+        raise ActionValidationError("INVALID_PARAMS")
+    if type(params["clip_id"]) is not int or params["clip_id"] < 1:
+        raise ActionValidationError("INVALID_PARAMS")
+    if not isinstance(params["params"], dict):
+        raise ActionValidationError("INVALID_PARAMS")
+    return {
+        "type": params["type"],
+        "expected_revision": params["expected_revision"],
+        "params": dict(params["params"]),
+        "project_id": params["project_id"],
+        "clip_id": params["clip_id"],
+    }
 
 
 def validate_clip_effect_settings(raw: str | None) -> None:
@@ -581,6 +627,29 @@ def prepare_action(
     data = json.loads(raw or "{}")
     if not isinstance(data, dict):
         raise ActionValidationError("INVALID_CLIP_SETTINGS")
+    if spec.name == "clip.grade.command":
+        from orga_drone.studio_grade_bridge import apply_grade_command_text
+        from orga_drone.studio_grade_contract import GradeError
+
+        required = {"type", "expected_revision", "params", "project_id", "clip_id"}
+        if set(params) != required:
+            raise ActionValidationError("INVALID_PARAMS")
+        try:
+            expected = int(params["expected_revision"])
+            command = {
+                "type": params["type"],
+                "project_id": int(params["project_id"]),
+                "clip_id": int(params["clip_id"]),
+                "expected_revision": expected,
+                "params": params["params"],
+            }
+            return apply_grade_command_text(
+                raw, command, expected_revision=expected
+            )
+        except GradeError as exc:
+            raise ActionValidationError(exc.code) from None
+        except (TypeError, ValueError):
+            raise ActionValidationError("INVALID_PARAMS") from None
     if spec.name.startswith("clip.color.") or spec.name == "clip.effects.detail":
         from orga_drone.studio_grade_contract import GradeError
         from orga_drone.studio_grade_persistence import grade_write_guard

@@ -163,6 +163,7 @@ def test_catalog_lists_only_implemented_color_and_effect_actions() -> None:
     assert [entry["name"] for entry in actions if entry["scope"] == "clip"] == [
         "clip.color.properties",
         "clip.color.image",
+        "clip.grade.command",
         "clip.color.look",
         "clip.color.hsl",
         "clip.color.wheels",
