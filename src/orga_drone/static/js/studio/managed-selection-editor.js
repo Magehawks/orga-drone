@@ -102,12 +102,17 @@ export function createManagedSelectionEditor({ panel, getSelectedStudioId, getGr
         return used;
       });
     } else {
-      const selection = emptySelection();
+      const existing = (grade.steps || []).find((entry) => entry.type === bindType);
+      const reuseId = existing?.selection_id || null;
+      const selection = emptySelection(reuseId || undefined);
       selection.mask = { combine: "union", leaves: [buildLeaf()] };
       selection.qualifier = buildQualifier();
       selection.invert = Boolean(invertInput?.checked);
       grade = upsertSelection(grade, selection);
       grade = bindStepSelection(grade, bindType, selection.id);
+      // Drop unused selection resources so the 32-cap stays tidy.
+      const used = new Set((grade.steps || []).map((step) => step.selection_id).filter(Boolean));
+      grade.selections = (grade.selections || []).filter((entry) => used.has(entry.id));
     }
     try {
       const payload = await putGrade(studioId, {

@@ -525,8 +525,9 @@ def _clip_to_export_clip(
                     managed_grade_media = materialize_spatial_managed_media(
                         path,
                         model.grade,
-                        work / f"spatial_{digest[:16]}",
+                        work,
                         kind=kind,
+                        grade_digest=digest,
                     )
                 except ManagedApplyError as exc:
                     raise StudioExportError(str(exc), code=exc.code.lower()) from exc

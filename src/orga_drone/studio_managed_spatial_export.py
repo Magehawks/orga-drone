@@ -3,20 +3,37 @@
 Pointwise grades stay on the lut3d bake path. Spatial selections cannot fold
 into a global cube, so this module writes a temporary graded copy. Source
 media is never overwritten.
+
+Video spatial export is fail-closed until a timing/audio-accurate adapter
+exists; photo export is supported.
 """
 
 from __future__ import annotations
 
-import subprocess
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
 from orga_drone.studio_managed_apply import (
     ManagedApplyError,
     apply_managed_grade_image,
 )
+
+
+def source_identity(path: Path) -> str:
+    """Stable cache fragment from path + size + mtime."""
+    try:
+        st = path.stat()
+    except OSError as exc:
+        raise ManagedApplyError("source media is missing", code="MEDIA_MISSING") from exc
+    payload = f"{path.resolve()}|{st.st_size}|{st.st_mtime_ns}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
+
+
+def spatial_work_dir(base: Path, *, grade_digest: str, source: Path) -> Path:
+    """Work directory that cannot collide across different source files."""
+    return base / f"spatial_{grade_digest[:16]}_{source_identity(source)}"
 
 
 def _grade_rgb_image(path: Path, grade: Mapping[str, Any], dest: Path) -> Path:
@@ -61,103 +78,33 @@ def materialize_spatial_managed_media(
     work_dir: Path,
     *,
     kind: str,
-    max_frames: int = 3600,
+    grade_digest: str | None = None,
 ) -> Path:
-    """Return a temporary graded media path under ``work_dir``."""
+    """Return a temporary graded media path under ``work_dir``.
+
+    ``work_dir`` should already incorporate source identity (see
+    ``spatial_work_dir``). Video is rejected until a timing-accurate adapter
+    ships.
+    """
     if not source.is_file():
         raise ManagedApplyError("source media is missing", code="MEDIA_MISSING")
-    work_dir.mkdir(parents=True, exist_ok=True)
-    if kind == "photo":
-        dest = work_dir / "graded.png"
-        if dest.is_file() and dest.stat().st_size > 0:
-            return dest
-        from orga_drone.export.studio_encoder import _materialize_photo_still
-
-        still = work_dir / "source.jpg"
-        _materialize_photo_still(source, still)
-        return _grade_rgb_image(still, grade, dest)
-
-    if kind != "video":
+    if kind == "video":
+        raise ManagedApplyError(
+            "Spatial managed grades on video need a timing-accurate adapter before export",
+            code="UNSUPPORTED_GRADE",
+        )
+    if kind != "photo":
         raise ManagedApplyError(f"unsupported spatial kind: {kind}", code="UNSUPPORTED_GRADE")
 
-    dest = work_dir / "graded.mp4"
+    # Prefer an isolated work dir when the caller passes a shared base + digest.
+    if grade_digest:
+        work_dir = spatial_work_dir(work_dir, grade_digest=grade_digest, source=source)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    dest = work_dir / "graded.png"
     if dest.is_file() and dest.stat().st_size > 0:
         return dest
+    from orga_drone.export.studio_encoder import _materialize_photo_still
 
-    ffmpeg = find_ffmpeg()
-    if not ffmpeg:
-        raise ManagedApplyError("ffmpeg is required for spatial video export", code="FFMPEG_MISSING")
-
-    frames_dir = work_dir / "frames"
-    frames_dir.mkdir(parents=True, exist_ok=True)
-    pattern = frames_dir / "frame_%06d.png"
-    extract = subprocess.run(
-        [
-            ffmpeg,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            str(source),
-            "-vsync",
-            "0",
-            "-frames:v",
-            str(max_frames),
-            str(pattern),
-        ],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        **subprocess_below_normal_kwargs(),
-    )
-    if extract.returncode != 0:
-        detail = (extract.stderr or b"").decode("utf-8", errors="replace").strip()
-        raise ManagedApplyError(
-            detail or "could not extract frames for spatial grade",
-            code="SPATIAL_EXPORT",
-        )
-
-    frames = sorted(frames_dir.glob("frame_*.png"))
-    if not frames:
-        raise ManagedApplyError("no frames extracted for spatial grade", code="SPATIAL_EXPORT")
-    graded_dir = work_dir / "graded-frames"
-    graded_dir.mkdir(parents=True, exist_ok=True)
-    for index, frame in enumerate(frames):
-        _grade_rgb_image(frame, grade, graded_dir / f"frame_{index:06d}.png")
-
-    assemble = subprocess.run(
-        [
-            ffmpeg,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-framerate",
-            "30",
-            "-i",
-            str(graded_dir / "frame_%06d.png"),
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-colorspace",
-            "bt709",
-            "-color_primaries",
-            "bt709",
-            "-color_trc",
-            "bt709",
-            str(dest),
-        ],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        **subprocess_below_normal_kwargs(),
-    )
-    if assemble.returncode != 0 or not dest.is_file():
-        detail = (assemble.stderr or b"").decode("utf-8", errors="replace").strip()
-        raise ManagedApplyError(
-            detail or "could not assemble spatial graded video",
-            code="SPATIAL_EXPORT",
-        )
-    return dest
+    still = work_dir / "source.jpg"
+    _materialize_photo_still(source, still)
+    return _grade_rgb_image(still, grade, dest)
