@@ -208,7 +208,9 @@ export function createManagedCurveEditor({ panel, getSelectedStudioId, getGrade,
 
   async function save() {
     const studioId = getSelectedStudioId?.();
-    const gradeDoc = current || getGrade?.();
+    // Prefer the parent grade snapshot so primaries/wheels saves cannot leave a
+    // stale expected_revision on this editor.
+    const gradeDoc = getGrade?.() || current;
     if (
       !studioId ||
       !gradeDoc?.grade ||
@@ -237,6 +239,8 @@ export function createManagedCurveEditor({ panel, getSelectedStudioId, getGrade,
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       setStatus(String(error.message || error));
+      const fresh = getGrade?.();
+      if (fresh) syncFromGrade(fresh, studioId);
     }
   }
 
