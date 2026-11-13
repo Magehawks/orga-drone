@@ -1,6 +1,6 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` includes `#401` and `#402`.
+Updated: 2026-11-13. Integration branch `develop` includes `#401`, `#402`, and `#403`.
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -13,7 +13,7 @@ is not acceptance.
 | #184 | Independent SFX timeline | VERIFY | #395, #396, #400 merged `2c1108a` | Local onefolder WebView2 E2E PASS. Evidence `docs/planning/184-local-packaged-e2e.json`. GitHub release-ZIP admission NOT_RUN. | PO acceptance | Leave #184 open. |
 | #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets exist. WebView2 start/mid/end vs MP4 frame-parity is not evidenced. | Full frame-parity E2E | Do not claim #211 done. |
 | #267 | Packaged Windows E2E | VERIFY | local onefolder run recorded in #400 | Local WebView2 journey PASS. GitHub release-ZIP admission NOT_RUN. | PR to `main` admission | Do not call the local run a release admission. |
-| #273 | Secure pairing | VERIFY | #403 | Threat model only. No production pairing, no stored key. Same-user process risk remains. | Reviewed security contract | Do not ship pairing. |
+| #273 | Secure pairing | VERIFY | #403 merged | Threat model only. No production pairing, no stored key. Same-user process risk remains. | Reviewed security contract | Do not ship pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
 | #275 | Shared action contract and E2E | VERIFY | matrix exists | Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions. |
 | #281 | Shared audio/overlay actions | VERIFY | #397 merged | Packaged journey set one SFX volume to 0.35 through `sfx.update`. Full artifact audit NOT_RUN. | PO acceptance | Do not close #281. |
@@ -30,17 +30,17 @@ is not acceptance.
 | #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
-| #325 | Timelapse target duration | VERIFY | #404 | Target-duration draft drives decoded MP4 evidence. Journey smoke uses fixed red-then-blue clip order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |
+| #325 | Timelapse target duration | VERIFY | #404 merged | Target-duration draft drives decoded MP4 evidence. Journey smoke uses fixed red-then-blue clip order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |
 | #331 | Source/Story clocks | VERIFY | #392 ADR 0037 merged `0cb3d35` | ADR accepted | — | Region work landed in #332. |
 | #332 | Bounded speed-ramp region | VERIFY | #394 merged `9f927d4` | Packaged E2E NOT_RUN. PO has not accepted the issue. | PO acceptance | Do not reimplement. |
 | #333 | Timelapse/ramp conflict | VERIFY | #389 merged | Confirm UI merged. Issue may still be open if acceptance is wider. | — | Re-read before more code. |
-| #351 | Color persistence/recovery | VERIFY | #399 | Staged copy and atomic replace. Canonical writes and startup refusal stay disabled. Helper-only; does not close #351. | PO acceptance; wire only with verified safeguards | Do not enable canonical writes. |
-| #352 | Managed SDR LUT contract | VERIFY | #405 | Read-only transfers and tetrahedral 3D LUT sampling. Legacy import/export unchanged. Managed parity gate NOT_RUN. | Preview/export wiring; #351 before canonical writes | Do not claim #352 complete. |
-| #353 | Managed primaries | VERIFY | #406 | Read-only exposure/balance/contrast/tone/saturation. Kelvin/tint unpublished. | Kelvin/tint vectors; UI/render | Do not claim #353 complete. |
-| #354 | Managed curve operators | VERIFY | #407 | Read-only RGB/luma/hue/saturation curves. No UI. | UI/render wiring | Do not claim #354 complete. |
-| #355 | Managed wheels/HSL | VERIFY | #408 | Read-only wheels-v1 and managed HSL. Legacy modules unchanged. | UI/render wiring | Do not claim #355 complete. |
-| #356 | Managed grading masks | VERIFY | #409 | Read-only linear/radial/brush mattes. No privacy-mask replacement. No tracking. | UI/render wiring | Do not claim #356 complete. |
-| #357 | Managed qualifiers | VERIFY | #410 | Read-only RGB/HSL/luma qualifiers and eyedropper metadata. | UI/render wiring | Do not claim #357 complete. |
+| #351 | Color persistence/recovery | VERIFY | #399 merged | Staged copy and atomic replace. Canonical writes and startup refusal stay disabled. Helper-only; does not close #351. | PO acceptance; wire only with verified safeguards | Do not enable canonical writes. |
+| #352 | Managed SDR LUT contract | VERIFY | #405 merged | Read-only transfers and tetrahedral 3D LUT sampling. Legacy import/export unchanged. Managed parity gate NOT_RUN. | Preview/export wiring; #351 before canonical writes | Do not claim #352 complete. |
+| #353 | Managed primaries | VERIFY | #406 merged | Read-only exposure/balance/contrast/tone/saturation. Kelvin/tint unpublished. | Kelvin/tint vectors; UI/render | Do not claim #353 complete. |
+| #354 | Managed curve operators | VERIFY | #407 merged | Read-only RGB/luma/hue/saturation curves. No UI. | UI/render wiring | Do not claim #354 complete. |
+| #355 | Managed wheels/HSL | VERIFY | #408 merged | Read-only wheels-v1 and managed HSL. Legacy modules unchanged. | UI/render wiring | Do not claim #355 complete. |
+| #356 | Managed grading masks | VERIFY | #409 merged | Read-only linear/radial/brush mattes. No privacy-mask replacement. No tracking. | UI/render wiring | Do not claim #356 complete. |
+| #357 | Managed qualifiers | VERIFY | #410 merged | Read-only RGB/HSL/luma qualifiers and eyedropper metadata. | UI/render wiring | Do not claim #357 complete. |
 | #358–#366 | Color Workspace remainder | READY | — | Continue after #351 and prior color foundations. | #351 verification | No silent legacy conversion. No canonical writes. |
 
 ## Open pull requests
