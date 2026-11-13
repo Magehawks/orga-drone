@@ -41,6 +41,16 @@ const context = {
   setLutPreviewChip() {},
   syncPreviewMedia() { context.syncCount += 1; },
   syncCount: 0,
+  createManagedGradePreviewCache: () => ({
+    readManagedGrade: () => null,
+    writeManagedGrade: () => {},
+    ensureCached: async () => null,
+    cacheFillResult: () => false,
+  }),
+  fetchGrade: async () => null,
+  probeManagedGpuCapabilities: () => ({ supported: false, mode: "cpu" }),
+  managedBakeUrl: () => "",
+  managedColorEditor: null,
   String, JSON, Math,
 };
 const clip = {

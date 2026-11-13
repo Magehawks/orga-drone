@@ -25,6 +25,16 @@ const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy
     }),
     readClipAudio: () => customAudio,
     evaluateLutProxyEligibility: policy.evaluateLutProxyEligibility,
+    createManagedGradePreviewCache: () => ({
+      readManagedGrade: () => null,
+      writeManagedGrade: () => {},
+      ensureCached: async () => null,
+      cacheFillResult: () => false,
+    }),
+    fetchGrade: async () => null,
+    probeManagedGpuCapabilities: () => ({ supported: false, mode: "cpu" }),
+    managedBakeUrl: () => "",
+    managedColorEditor: null,
     window: {},
     String, Math, Array,
   };

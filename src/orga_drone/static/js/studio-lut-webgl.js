@@ -28,11 +28,18 @@
     return { size, data };
   }
 
+  function lutFetchUrl(assetName) {
+    if (!assetName) return "";
+    // Managed bake URLs are absolute API paths (#360).
+    if (assetName.startsWith("/api/")) return assetName;
+    return `/api/luts/${encodeURIComponent(assetName)}`;
+  }
+
   async function lutData(assetName) {
     if (lutDataCache.has(assetName)) return lutDataCache.get(assetName);
     if (!lutTextCache.has(assetName)) {
-      const response = await fetch(`/api/luts/${encodeURIComponent(assetName)}`, {
-        cache: "force-cache",
+      const response = await fetch(lutFetchUrl(assetName), {
+        cache: assetName.startsWith("/api/studio/") ? "no-store" : "force-cache",
         headers: { Accept: "text/plain" },
       });
       if (!response.ok) throw new Error("LUT fetch failed");

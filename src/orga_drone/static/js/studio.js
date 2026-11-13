@@ -14,6 +14,12 @@ import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import { createManagedColorEditor } from "./studio/managed-color-editor.js";
 import {
+  managedBakeUrl,
+  probeManagedGpuCapabilities,
+} from "./studio/managed-gpu-adapter.js";
+import { fetchGrade } from "./studio/grade-api.js";
+import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
+import {
   bumpOverlayRevision,
   overlayRevisionOf,
   recoverFailedOverlayRemoval,
@@ -2778,9 +2784,45 @@ import {
     );
   }
 
+  const managedGradePreviewCache = createManagedGradePreviewCache({ fetchGrade });
+
+  function managedGradeForClip(clip) {
+    if (!clip) return null;
+    const cached = managedGradePreviewCache.readManagedGrade(clip);
+    if (cached) return cached;
+    if (!managedColorEditor) return null;
+    const grade = managedColorEditor.currentGrade?.();
+    const gradeId = managedColorEditor.currentStudioId?.();
+    if (!grade || String(gradeId) !== String(clip.dataset.studioId)) return null;
+    return grade;
+  }
+
+  async function ensureManagedGradeCached(clip) {
+    return managedGradePreviewCache.ensureCached(clip);
+  }
+
+  function cacheManagedGradeOnClip(clip, grade) {
+    managedGradePreviewCache.writeManagedGrade(clip, grade);
+  }
+
+  function managedGpuProbeFor(clip) {
+    const grade = managedGradeForClip(clip);
+    if (!grade || grade.evaluator !== "managed-sdr-v1") return null;
+    return probeManagedGpuCapabilities(grade);
+  }
+
   function lutWebglCanHandle(clip) {
     if (!clip || clip.dataset.kind !== "video") return false;
     if (!window.OrgaLutPreview || !window.OrgaLutPreview.supported) return false;
+    const managedProbe = managedGpuProbeFor(clip);
+    if (managedProbe) {
+      // Spatial / unsupported managed ops stay on the CPU still path.
+      // Approx bake is allowed for live preview; export stays on CPU/FFmpeg.
+      return (
+        managedProbe.supported &&
+        (managedProbe.mode === "webgl-bake" || managedProbe.mode === "webgl-bake-approx")
+      );
+    }
     return evaluateLutWebglHandling({
       kind: clip.dataset.kind,
       webglSupported: true,
@@ -2789,6 +2831,30 @@ import {
       colorWheelsActive: colorWheelsActive(clip),
       hasLut: lookHasLut(readColorLook(clip)),
     });
+  }
+
+  function managedWebglLook(clip) {
+    const grade = managedGradeForClip(clip);
+    if (!grade) return null;
+    const probe = probeManagedGpuCapabilities(grade);
+    if (
+      !probe.supported ||
+      (probe.mode !== "webgl-bake" && probe.mode !== "webgl-bake-approx")
+    ) {
+      return null;
+    }
+    const studioId = clip?.dataset?.studioId;
+    if (!studioId) return null;
+    return {
+      conversion_lut: "",
+      conversion_confirmed: false,
+      creative_lut: managedBakeUrl(studioId, grade.revision),
+      creative_strength: 100,
+    };
+  }
+
+  function previewLookFor(clip) {
+    return managedWebglLook(clip) || readColorLook(clip);
   }
 
   function lutRendererFor(media) {
@@ -2826,7 +2892,7 @@ import {
       : (clipForPreviewMedia(previewVideoB) === clip ? previewVideoB : null);
     if (!media) return false;
     const renderer = lutRendererFor(media);
-    return !!renderer && renderer.isReady(readColorLook(clip));
+    return !!renderer && renderer.isReady(previewLookFor(clip));
   }
 
   const FULLSCREEN_PREVIEW_MAX_EDGE = 1280;
@@ -2837,10 +2903,15 @@ import {
 
   function previewLutFrameFor(media, frameW, frameH) {
     const clip = clipForPreviewMedia(media);
+    if (clip && !managedGradeForClip(clip) && clip.dataset.kind === "video") {
+      void ensureManagedGradeCached(clip).then((grade) => {
+        if (grade) schedulePreviewBlit();
+      });
+    }
     if (!lutWebglCanHandle(clip)) return null;
     const renderer = lutRendererFor(media);
     if (!renderer) return null;
-    const look = readColorLook(clip);
+    const look = previewLookFor(clip);
     const hit = resolveAt(state.projectTimeS);
     const localS = hit && hit.overlapClip === clip
       ? hit.overlapLocalS
@@ -2874,7 +2945,7 @@ import {
     const clip = clipForPreviewMedia(media);
     if (!lutWebglCanHandle(clip)) return null;
     const renderer = lutRendererFor(media);
-    if (!renderer || !renderer.isReady(readColorLook(clip))) return null;
+    if (!renderer || !renderer.isReady(previewLookFor(clip))) return null;
     return renderer.canvas;
   }
 
@@ -4869,7 +4940,16 @@ import {
     // Do not write section.open or section.hidden here.
     fillColorLook(clip);
     detailControls.fill(clip);
-    managedColorEditor?.fill();
+    void (async () => {
+      const requestedStudioId = clip?.dataset?.studioId;
+      await managedColorEditor?.fill?.();
+      managedGradePreviewCache.cacheFillResult({
+        clip,
+        requestedStudioId,
+        editorStudioId: managedColorEditor?.currentStudioId?.(),
+        grade: managedColorEditor?.currentGrade?.(),
+      });
+    })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
     if (bwRamp) bwRamp.hidden = !isVideo;
     updateColorGradeSummary(clip);
@@ -14118,6 +14198,7 @@ import {
     onChanged: () => {
       const clip = selectedAdjustableClip();
       if (clip) {
+        cacheManagedGradeOnClip(clip, managedColorEditor?.currentGrade?.());
         scheduleLutProxyPrepare(clip);
         syncPreviewMedia({ seek: true });
       }

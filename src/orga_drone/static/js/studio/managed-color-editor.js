@@ -461,6 +461,12 @@ export function createManagedColorEditor({
 
   return {
     fill,
+    currentGrade() {
+      return current;
+    },
+    currentStudioId() {
+      return currentId;
+    },
     reset() {
       paintGroup(fields, neutralPrimariesParams());
       paintGroup(wheelFields, neutralWheelsParams());
