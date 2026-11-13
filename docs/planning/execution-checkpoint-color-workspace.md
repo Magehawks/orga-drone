@@ -1,7 +1,7 @@
 # Color Workspace execution checkpoint
 
 Updated: 2026-11-13. Integration branch `develop` tip
-`8f4cbc8edab5740b40f80032587f10cd25037231`.
+`02418f7` (after #427 GPU + #428 live scopes).
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.
@@ -19,72 +19,45 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #419 | `11bd8ea…` | Seven curve families UI |
 | #421 | `c3eabdc…` | Mask/qualifier apply + UI; photo spatial; video fail-closed |
 | #422 | `8f4cbc8…` | Creative LUT resolve/bake/UI |
-
-Final `develop` SHA for this checkpoint: `71936cebac9db4dab850c053bc82aeecfbd640fa`
-(includes Color Workspace feature merges through `#422` plus checkpoint docs `#423`).
+| #425 | `c33f59d…` | Spatial managed video export |
+| #426 | `ddbf018…` | Eyedropper + interactive brush tools |
+| #427 | `e223528…` | WebGL managed bake-approx adapter (#360) |
+| #428 | `02418f7…` | Live managed-preview scopes (#362/#366) |
 
 ## Feature matrix (honest)
 
 | Capability | Status | Evidence |
 |---|---|---|
-| Canonical grade + writes after safeguards | Available now (managed) | #413 + grade routes |
-| Primaries (exposure…whites, Kelvin/tint) | Available now | UI + bake + unit vectors |
-| Seven curve families | Available now | UI + bake |
-| Wheels Lift/Gamma/Gain/Offset + managed HSL | Available now | UI + bake; zero-value preserved |
-| Linear/radial/brush selection eval | Available now (math + UI presets) | #421; brush strokes are preset not viewer painting |
-| Qualifiers RGB/HSL/luma | Available now (math + UI presets) | #421; eyedropper accept-to-range UI still open |
-| Creative .cube LUT strength enable/clear | Available now | #422; confined assets + digest cache |
+| Canonical grade + writes after safeguards | Available now (hardening in flight) | #413; opaque-merge + transactional PUT hardening |
+| Primaries / curves / wheels / HSL / LUT | Available now | UI + bake |
+| Spatial masks/qualifiers | Available now | Photo + video CPU export; interactive viewer tools |
+| Eyedropper | Available now | Sample API + Accept → qualifier |
 | Preview/export pointwise bake | Available now | lut3d bake |
-| Spatial photo preview/export | Available now | CPU path; JPEG-boundary preview limitation |
-| Spatial video export | Implemented (CPU CFR path) | Deferred job materialize + audio remux; packaged evidence pending |
-| Playback proxy spatial/managed LUT | Gap | Proxy path not fully wired for all managed cases |
-| GPU WebGL managed adapter (#360) | Later | Not shipped |
-| Scopes tap (#362/#366) | Partial fixtures | Live tap depends on #359 plane |
-| Packaged regression E2E (tip `71936ceb`) | PASS (local) | All journeys in `windows_e2e.py` ok incl. transitions, 1080p, lut_parity; evidence `tmp-packaged-e2e-color/run-71936ceb/` |
-| Source-app Creative/Pro workspace journey | PASS | `packaging/e2e/studio_color_workspace.py` |
-| Managed convert→curves→masks→LUT packaged journey | NOT_RUN | Needs dedicated CDP steps beyond Creative/Pro smoke |
-| Full #365 acceptance matrix | OPEN | Synthetic harness + managed-grade packaged evidence pending |
+| Spatial video export | Available now | CPU CFR materialize + remux |
+| GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; spatial → CPU |
+| Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame producer; packaged latency NOT_RUN |
+| Shared Control API grade actions (#363) | Partial | Commands module exists; UI still PUTs full grade |
+| Packaged managed-SDR journey | NOT_RUN | Dedicated CDP parity journey still pending |
+| Full #365 acceptance matrix | OPEN | Synthetic harness + packaged evidence pending |
 
 ## Open Color Workspace issues
 
-Do not close foundations as complete user-facing features without AC evidence.
-
 | Issue | After this cycle | Remaining |
 |---|---|---|
-| #351 | Writes enabled with safeguards | Confirm recovery/backup AC comments; PO close |
-| #352 | Creative LUT wired | Technical conversion UX/once gate polish; parity gate |
-| #353 | Primaries UI+bake | PO acceptance; packaged evidence |
-| #354 | Curves UI+bake | PO acceptance |
-| #355 | Wheels/HSL UI+bake | PO acceptance |
-| #356 | Mask apply+UI + video spatial materialize | Viewer brush/handles; orientation/DPR fixtures |
-| #357 | Qualifier apply+UI | Eyedropper accept-to-range |
+| #351 | Writes + opaque merge / remint hardening | Separate DB/min-reader; full failure-injection |
+| #352–#357 | Feature slices merged | Packaged AC comments / PO close |
 | #358 | Animation clocks | Still unsupported (fail-closed) |
-| #359 | FFmpeg/CPU adapters | Bake + spatial photo/video; playback-proxy gaps remain |
-| #360 | GPU adapter | Open |
-| #361 | Creative/Pro workspace | Large UI slice landed; serial step editor incomplete |
-| #362/#366 | Scopes | Open |
-| #363 | Shared actions/bridge | Partial |
+| #359 | FFmpeg/CPU adapters | Playback-proxy gaps remain |
+| #360 | GPU bake-approx | Exact tetrahedral / Windows budgets NOT_RUN |
+| #361 | Creative/Pro workspace | Serial step editor incomplete |
+| #362/#366 | Live managed tap | Packaged WebView2 latency/memory NOT_RUN |
+| #363 | Shared actions/bridge | Wire Control API to grade commands |
 | #364/#365 | Parity harness / final matrix | Open |
 
 ## Exact next tasks
 
-1. Packaged Windows WebView2 retest on tip `8f4cbc8` covering convert→primaries→curves→wheels→selection (photo)→creative LUT→720p/1080p export.
-2. Issue cleanup comments with evidence; close only when AC fully met.
-3. Eyedropper + interactive viewer mask/brush editing (#356/#357).
-4. GPU managed adapter (#360), live scopes (#362/#366), remaining #358/#361/#363–#365.
+1. Merge persistence hardening (opaque root preserve, transactional grade PUT, undo remint).
+2. Shared Control API grade actions (#363) + remaining #358/#361/#364/#365.
+3. Packaged managed-SDR Color Workspace journey with numerical parity.
+4. Issue cleanup comments with evidence; close only when AC fully met.
 5. Do not merge to `main` or publish a release.
-
-## Finishing-sprint acceptance matrix (from `9f6ad52`)
-
-| Area | State |
-|---|---|
-| #417–#422 UI/bake/masks/LUT | Implemented + merged; packaged regression PASS; managed CDP NOT_RUN |
-| #423/#424 checkpoint/E2E docs | Merged |
-| Spatial photo | Implemented + verified |
-| Spatial video export | Implemented (CFR CPU path; job-deferred; limits) |
-| Eyedropper / viewer brush | Missing |
-| GPU #360 | Missing |
-| Live scopes #362/#366 | Partial fixtures only |
-| Persistence #351 | Writes enabled; full recovery evidence pending |
-| Animation #358 | Fail-closed |
-| Packaged managed-SDR journey | NOT_RUN |

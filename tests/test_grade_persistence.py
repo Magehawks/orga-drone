@@ -127,6 +127,30 @@ def test_publish_bumps_revision_and_rejects_stale() -> None:
     assert updated.steps[0]["enabled"] is False
 
 
+def test_publish_preserves_opaque_root_when_only_grade_is_sent() -> None:
+    document = wrap_legacy_to_canonical(_legacy_blob())
+    current = read_grade(document)
+    assert current.to_dict()["mystery"] == {"keep": True}
+    assert current.to_dict()["overlays"] == []
+    grade_only = {"grade": current.to_dict()["grade"]}
+    blob = publish_grade_document(current, grade_only, expected_revision=1)
+    saved = json.loads(blob)
+    assert saved["mystery"] == {"keep": True}
+    assert saved["overlays"] == []
+    assert "mystery" not in grade_only
+    assert saved["grade"]["revision"] == 2
+
+
+def test_remint_restored_grade_revision_is_monotonic() -> None:
+    from orga_drone.studio_grade_persistence import remint_restored_grade_revision
+
+    document = wrap_legacy_to_canonical(_legacy_blob())
+    raw = json.dumps(document, separators=(",", ":"), sort_keys=True)
+    reminted = remint_restored_grade_revision(raw, floor=9)
+    assert reminted is not None
+    assert read_grade(reminted).revision == 10
+
+
 def test_startup_backup_enables_writes(tmp_path: Path) -> None:
     live = tmp_path / "orga-drone.sqlite3"
     Database(live)

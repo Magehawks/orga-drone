@@ -4032,6 +4032,7 @@ class Database:
         proposed: dict[str, object],
         *,
         expected_revision: int,
+        connection: sqlite3.Connection | None = None,
     ) -> StudioClip:
         """Publish one validated canonical grade document with a new revision."""
         from orga_drone.studio_grade_model import read_grade
@@ -4041,7 +4042,8 @@ class Database:
         )
 
         require_writes_enabled(self.path.parent)
-        with self.connect() as conn:
+
+        def _write(conn: sqlite3.Connection) -> int:
             row = conn.execute(
                 "SELECT id, project_id, effect_settings FROM studio_clips WHERE id = ?",
                 (studio_item_id,),
@@ -4062,6 +4064,18 @@ class Database:
                 "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
                 (now, project_id),
             )
+            return project_id
+
+        if connection is not None:
+            project_id = _write(connection)
+            items = {
+                i.id: i
+                for i in self.list_studio_items(project_id, connection=connection)
+            }
+            return items[studio_item_id]
+
+        with self.connect() as conn:
+            project_id = _write(conn)
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
