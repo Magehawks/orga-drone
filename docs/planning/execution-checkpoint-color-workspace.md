@@ -51,10 +51,10 @@ remaining gaps after the PO complete-Color-Workspace directive.
 |---|---|---|
 | #351 | CLOSED | — |
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
-| #358 | #431 + story_s/export PR | Complex ClipTimingInputs export (ramp/repeat/loop) NOT_RUN |
+| #358 | #436 merged (`story_s` + story-local export) | Complex ClipTimingInputs export (ramp/repeat/loop) NOT_RUN |
 | #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
 | #361 | Step editor shipped | Packaged keyboard/E2E NOT_RUN; Creative preset compile depth |
-| #362/#366 | Live tap shipped | Packaged latency/memory NOT_RUN |
+| #362/#366 | Live tap + Node accumulate harness | Packaged latency/memory NOT_RUN |
 | #363 | Tokens + upsert_step_params/selection | PUT escape hatch only; packaged E2E NOT_RUN |
 | #364/#365 | OPEN | Strict matrix + packaged deferred |
 
@@ -67,6 +67,7 @@ Record packaged-only evidence as `NOT_RUN — deferred by PO`.
 
 ## Exact next tasks
 
-1. Merge #436 story_s/export and #437 step editor + tokens.
-2. Issue evidence comments; close only when AC fully met.
-3. Do not build packaged Windows EXE in this sprint.
+1. Merge #437 step editor + tokens; then `upsert_step_params` editor migration.
+2. Non-packaged scopes harness evidence linked; packaged scopes remain NOT_RUN.
+3. Issue evidence comments; close only when AC fully met.
+4. Do not build packaged Windows EXE in this sprint.
