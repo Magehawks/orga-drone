@@ -22,7 +22,7 @@ is not acceptance.
 | #284 | Parallel development and release gates | READY | — | — | — | After packaged E2E evidence. |
 | #293 | Open Media Journey acceptance | VERIFY | #387 merged | API + synthetic evidence. Packaged EXE journey NOT_RUN. | Packaged dispatch | Do not close on unit tests. |
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Backend refuses proxies for repeats and forward loop. Playing loop names HSL/wheels/LUT omission. Phase B loop playback parity is explicitly not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
-| #295 | Studio UX acceptance | READY | — | Discovery/audit, not a new editor | — | Read the issue and deliver the approved audit outcome. |
+| #295 | Studio UX acceptance | VERIFY | this branch | Discovery recommends Concept C: keep shipped hybrid ramp, declutter Speed panel. Packaged WebView2 NOT_RUN. | PO selection of Concept C | Do not rebuild the speed engine. | READY | — | Discovery/audit, not a new editor | — | Read the issue and deliver the approved audit outcome. |
 | #297 | Local object removal | DONE | #398 merged `e397c26` | PO accepted the NO-GO. No removal UI. OpenCV is not packaged for this purpose. | — | Do not reopen as a feature. |
 | #298 | Local motion tracking | VERIFY | #402 | Synthetic optical-flow spike. Recommendation NO-GO for a 2.4.0 tracker. CI green. Real footage NOT_RUN. | PO acceptance of the NO-GO | Do not ship a tracker or package OpenCV. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
@@ -68,4 +68,4 @@ is not acceptance.
 
 ## Exact next task
 
-#400 is merged at `2c1108a`. Local WebView2 E2E is PASS. GitHub release-ZIP admission remains NOT_RUN. #399 CI is green and waiting on PO re-review. #401 has a follow-up fix so extracted preview tests can see overlap types; request re-review only after that CI is green. #402 and #403 are open with green CI. Next implementation is #325 export evidence for the existing target-duration control, then read-only Color Workspace contracts. Do not enable canonical grade writes. Do not build a second speed engine.
+#295 discovery recommends Concept C (declutter Speed panel; keep hybrid ramp). Packaged WebView2 for the audit is NOT_RUN. Color Workspace read-only PRs continue without canonical writes. Do not merge without PO approval.
