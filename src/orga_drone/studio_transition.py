@@ -12,7 +12,30 @@ from typing import Iterable, Mapping, Sequence
 TYPE_CUT = "cut"
 TYPE_FADE_BLACK = "fade_black"
 TYPE_CROSSFADE = "crossfade"
-CANONICAL_TYPES = frozenset({TYPE_CUT, TYPE_FADE_BLACK, TYPE_CROSSFADE})
+TYPE_BLUR_DISSOLVE = "blur_dissolve"
+TYPE_SOFT_WIPE_LEFT = "soft_wipe_left"
+TYPE_SOFT_WIPE_RIGHT = "soft_wipe_right"
+TYPE_SOFT_WIPE_UP = "soft_wipe_up"
+TYPE_SOFT_WIPE_DOWN = "soft_wipe_down"
+OVERLAP_TYPES = frozenset(
+    {
+        TYPE_CROSSFADE,
+        TYPE_BLUR_DISSOLVE,
+        TYPE_SOFT_WIPE_LEFT,
+        TYPE_SOFT_WIPE_RIGHT,
+        TYPE_SOFT_WIPE_UP,
+        TYPE_SOFT_WIPE_DOWN,
+    }
+)
+XFADE_BY_TYPE = {
+    TYPE_CROSSFADE: "fade",
+    TYPE_BLUR_DISSOLVE: "hblur",
+    TYPE_SOFT_WIPE_LEFT: "smoothleft",
+    TYPE_SOFT_WIPE_RIGHT: "smoothright",
+    TYPE_SOFT_WIPE_UP: "smoothup",
+    TYPE_SOFT_WIPE_DOWN: "smoothdown",
+}
+CANONICAL_TYPES = frozenset({TYPE_CUT, TYPE_FADE_BLACK, *OVERLAP_TYPES})
 # Stub / legacy values stored by the unrendered client UI or unused TEXT column.
 LEGACY_CUT_TYPES = frozenset({"", "none", "fade", "slide"})
 
@@ -21,6 +44,11 @@ MIN_DURATION_S = 0.1
 MAX_DURATION_S = 2.0
 DURATION_STEP_S = 0.1
 MIN_OUTSIDE_S = 0.1
+
+
+def xfade_name(stored: str) -> str | None:
+    """FFmpeg xfade name for an overlap id. Cut and fade-through-black have none."""
+    return XFADE_BY_TYPE.get(stored)
 
 
 def normalize_type(raw: str | None) -> str:
@@ -44,7 +72,7 @@ def occupancy_s(applied_type: str, applied_d: float) -> float:
     """How much of a clip this boundary occupies on one side."""
     if applied_type == TYPE_FADE_BLACK:
         return max(0.0, float(applied_d) / 2.0)
-    if applied_type == TYPE_CROSSFADE:
+    if applied_type in OVERLAP_TYPES:
         return max(0.0, float(applied_d))
     return 0.0
 
@@ -63,6 +91,10 @@ class AppliedTransition:
     @property
     def is_crossfade(self) -> bool:
         return self.type == TYPE_CROSSFADE and self.duration_s > 0
+
+    @property
+    def is_overlap(self) -> bool:
+        return self.type in OVERLAP_TYPES and self.duration_s > 0
 
     @property
     def is_fade_black(self) -> bool:
@@ -189,7 +221,7 @@ def story_length_s(
     """Cut/fade-black: sum(items). Crossfade subtracts each applied overlap D."""
     total = sum(max(0.0, float(d)) for d in durations_s)
     for boundary in applied:
-        if boundary.is_crossfade:
+        if boundary.is_overlap:
             total -= boundary.duration_s
     return max(0.0, total)
 
@@ -205,7 +237,7 @@ def story_starts_s(
     for i, raw in enumerate(durations_s):
         starts[i] = cursor
         cursor += max(0.0, float(raw))
-        if i < len(applied) and applied[i].is_crossfade:
+        if i < len(applied) and applied[i].is_overlap:
             cursor -= applied[i].duration_s
     return starts
 
@@ -213,7 +245,7 @@ def story_starts_s(
 def clip_flex_s(duration_s: float, outgoing: AppliedTransition | None) -> float:
     """Story-track tile width: shrink by outgoing crossfade overlap only."""
     d = max(0.0, float(duration_s))
-    if outgoing is not None and outgoing.is_crossfade:
+    if outgoing is not None and outgoing.is_overlap:
         return max(0.0, d - outgoing.duration_s)
     return d
 
@@ -330,7 +362,7 @@ def resolve_story_time(
     overlap_local = None
     overlap_start = None
     progress = None
-    if incoming is not None and incoming.is_crossfade:
+    if incoming is not None and incoming.is_overlap:
         d = incoming.duration_s
         into = t - start
         if d > 0 and into <= d + 1e-9:
@@ -338,7 +370,7 @@ def resolve_story_time(
             overlap_start = starts[overlap_index]
             overlap_local = t - overlap_start
             progress = min(1.0, max(0.0, into / d))
-    elif outgoing is not None and outgoing.is_crossfade:
+    elif outgoing is not None and outgoing.is_overlap:
         next_start = starts[primary + 1]
         if t >= next_start:
             overlap_index = primary + 1
