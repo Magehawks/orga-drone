@@ -106,7 +106,7 @@ test("expandLutToRgba32f preserves lattice values", () => {
   assert.equal(rgba[rgba.length - 4], 1);
 });
 
-test("probe exact:true only when float LUT precision is available", () => {
+test("probe exact:true only for RGBA32F LUT precision", () => {
   const grade = {
     evaluator: "managed-sdr-v1",
     grade: {

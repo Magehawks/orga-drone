@@ -136,10 +136,19 @@ def test_rgba8_quantization_measured_and_documented(tmp_path: Path) -> None:
         "gate_float_operator_max_abs": 1e-5,
         "gate_encoded_swatch_rgb": 3.0,
         "float_path": {
-            "status": "capability_gated_rgba16f_or_rgba32f",
+            "status": "capability_gated_rgba32f_exact",
             "note": (
-                "WebGL uploads float LUT tables when RGBA16F/32F texImage3D "
-                "succeeds; probe sets exact:true. Export/CPU remain reference."
+                "WebGL prefers RGBA32F then RGBA16F then RGBA8. Only RGBA32F "
+                "sets exact:true (≤1e-5 operator gate). RGBA16F stays "
+                "exact:false (half-float). Export/CPU remain reference."
+            ),
+        },
+        "rgba16f_path": {
+            "status": "exact_false",
+            "reason": "rgba16f-quantization",
+            "cause": (
+                "Half-float LUT storage can exceed the 1e-5 float operator "
+                "gate even though it is finer than RGBA8."
             ),
         },
         "rgba8_fallback": {

@@ -4,7 +4,7 @@
   "gate_encoded_swatch_rgb": 3.0,
   "float_path": {
     "status": "capability_gated_rgba32f_exact",
-    "note": "WebGL prefers RGBA32F then RGBA16F then RGBA8. Only RGBA32F sets exact:true (≤1e-5 operator gate). RGBA16F stays exact:false (half-float). Export/CPU remain reference."
+    "note": "WebGL prefers RGBA32F then RGBA16F then RGBA8. Only RGBA32F sets exact:true (\u22641e-5 operator gate). RGBA16F stays exact:false (half-float). Export/CPU remain reference."
   },
   "rgba16f_path": {
     "status": "exact_false",
