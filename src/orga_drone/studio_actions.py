@@ -581,6 +581,14 @@ def prepare_action(
     data = json.loads(raw or "{}")
     if not isinstance(data, dict):
         raise ActionValidationError("INVALID_CLIP_SETTINGS")
+    if spec.name.startswith("clip.color.") or spec.name == "clip.effects.detail":
+        from orga_drone.studio_grade_contract import GradeError
+        from orga_drone.studio_grade_persistence import grade_write_guard
+
+        try:
+            grade_write_guard(raw)
+        except GradeError as exc:
+            raise ActionValidationError(exc.code) from None
     if spec.name == "clip.color.properties":
         patch = parse_properties_patch(params)
         return merge_properties(raw, patch, available_luts, data_dir)

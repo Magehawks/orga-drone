@@ -1,7 +1,10 @@
 # Grade backup layout and rollback (#351)
 
-Status: procedure and verified backup/restore helpers. Canonical grade writes
-stay disabled. Startup does not switch databases yet.
+Status: verified backup/restore helpers are shipping. Startup takes the backup
+when a live database exists and writes
+`recovery/pre-grade-migration/canonical-writes-enabled.json`. Canonical wrap and
+grade publication require that marker. Startup still opens the live
+`orga-drone.sqlite3` (no separate canonical database file yet).
 
 ## Files
 
@@ -14,11 +17,11 @@ directory and is never copied.
 | `orga-drone.sqlite3` | Live library. Unchanged by this step. |
 | `recovery/pre-grade-migration/orga-drone.sqlite3` | SQLite backup API copy, taken before any future canonical migration. |
 | `recovery/pre-grade-migration/manifest.json` | SHA-256, byte size, `user_version`, app version, UTC time, and the warning that restore discards later edits. |
+| `recovery/pre-grade-migration/canonical-writes-enabled.json` | Present only after a verified backup. Gates wrap/publication APIs. |
 
-No canonical database file is created. A future write may use a separate file
-only after this backup verifies. Older executables keep opening
-`orga-drone.sqlite3` until that separate file exists and startup enforcement
-is switched on.
+No separate canonical database file is created in this step. Older executables
+keep opening `orga-drone.sqlite3` and ignore the grade envelope; legacy color
+setters refuse canonical clips (`CANONICAL_GUARD`).
 
 ## Permissions
 
@@ -43,8 +46,8 @@ stops and does not publish a manifest.
 6. Do not delete or rewrite source media.
 
 If the backup file is published and the manifest replace then fails, run the
-backup again. The next run replaces both files. Canonical grade writes and
-startup database selection stay disabled.
+backup again. The next run replaces both files. Restoring the backup discards
+later edits, including any canonical grades written after the marker existed.
 
 `tests/test_grade_backup.py` covers a round trip, a tampered checksum, an open
 connection, a write-ahead log, a failed copy, a failed replace, and a second
