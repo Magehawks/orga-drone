@@ -108,4 +108,31 @@ describe("managed grade preview cache", () => {
     assert.equal(await pending, null);
     assert.equal(cache.readManagedGrade(clip), null);
   });
+
+  it("keeps concurrent ensureCached tokens independent per studio id", async () => {
+    let resolveA;
+    let resolveB;
+    const cache = createManagedGradePreviewCache({
+      fetchGrade: async (studioId) => {
+        if (String(studioId) === "100") {
+          return new Promise((resolve) => {
+            resolveA = resolve;
+          });
+        }
+        return new Promise((resolve) => {
+          resolveB = resolve;
+        });
+      },
+    });
+    const clipA = makeClip(100);
+    const clipB = makeClip(200);
+    const pendingA = cache.ensureCached(clipA);
+    const pendingB = cache.ensureCached(clipB);
+    resolveB({ evaluator: "managed-sdr-v1", revision: 2 });
+    assert.equal((await pendingB).revision, 2);
+    resolveA({ evaluator: "managed-sdr-v1", revision: 1 });
+    assert.equal((await pendingA).revision, 1);
+    assert.equal(cache.readManagedGrade(clipA).revision, 1);
+    assert.equal(cache.readManagedGrade(clipB).revision, 2);
+  });
 });

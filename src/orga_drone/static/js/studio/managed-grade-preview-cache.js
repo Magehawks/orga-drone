@@ -4,8 +4,11 @@
  * rejects stale async results after a clip switch.
  */
 
+import { createPreviewTokenStore, contextDigestFromParts } from "./preview-token.js";
+
 export function createManagedGradePreviewCache({ fetchGrade }) {
   const inflightByStudioId = new Map();
+  const previewTokens = createPreviewTokenStore();
 
   function readManagedGrade(clip) {
     if (!clip) return null;
@@ -59,18 +62,32 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
     const pending = inflightByStudioId.get(studioId);
     if (pending) return pending;
 
+    const token = previewTokens.begin({
+      key: studioId,
+      clipId: studioId,
+      revision: clip.dataset.managedGradeRevision || "",
+      contextDigest: contextDigestFromParts([
+        "managed-preview-cache",
+        studioId,
+        clip.dataset.mediaId || "",
+      ]),
+    });
     const promise = (async () => {
       try {
         const payload = await fetchGrade(studioId);
+        if (!previewTokens.isCurrent(token)) return null;
         if (String(clip.dataset.studioId) !== studioId) return null;
         if (payload?.evaluator === "managed-sdr-v1") {
           writeManagedGrade(clip, payload);
+          if (clip.dataset) {
+            clip.dataset.managedGradeRevision = String(payload.revision ?? "");
+          }
           return payload;
         }
         markMiss(clip);
         return null;
       } catch {
-        if (String(clip.dataset.studioId) === studioId) {
+        if (previewTokens.isCurrent(token) && String(clip.dataset.studioId) === studioId) {
           markMiss(clip);
         }
         return null;
@@ -104,6 +121,7 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
     shouldStartFetch,
     ensureCached,
     cacheFillResult,
+    previewTokens,
     _inflightByStudioId: inflightByStudioId,
   };
 }

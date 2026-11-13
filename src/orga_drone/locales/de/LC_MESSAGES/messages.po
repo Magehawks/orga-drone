@@ -969,3 +969,45 @@ msgstr "Weicher Wisch nach unten"
 
 msgid "Drone pack"
 msgstr "Drohnen-Übergänge"
+
+msgid "On"
+msgstr "An"
+
+msgid "Enable step"
+msgstr "Schritt aktivieren"
+
+msgid "Step mix"
+msgstr "Schritt-Mix"
+
+msgid "Up"
+msgstr "Oben"
+
+msgid "Down"
+msgstr "Unten"
+
+msgid "No steps yet"
+msgstr "Noch keine Schritte"
+
+msgid "{count} steps · serial"
+msgstr "{count} Schritte · seriell"
+
+msgid "steps · rev {rev}"
+msgstr "Schritte · Rev. {rev}"
+
+msgid "Serial steps need a managed grade"
+msgstr "Serielle Schritte brauchen einen Managed Grade"
+
+msgid "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document."
+msgstr "Serielle Schritte laufen einmal in Reihenfolge. Bypass und Mix nutzen den gemeinsamen Grade-Befehlsweg; Parameteränderungen speichern weiterhin über das Grade-Dokument."
+
+msgid "Serial grade steps"
+msgstr "Serielle Grade-Schritte"
+
+msgid "Move up"
+msgstr "Nach oben"
+
+msgid "Move down"
+msgstr "Nach unten"
+
+msgid "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
+msgstr "Schritte laufen einmal von oben nach unten. Schalten Sie einen Schritt hier aus oder ändern Sie den Mix. Schieberegler speichern weiterhin wie gewohnt."
