@@ -785,6 +785,7 @@
   "Pivot": "Pivot",
   "Whites": "Whites",
   "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math.": "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math.",
+  "managed-sdr · rev {rev} · preview preparing": "managed-sdr · rev {rev} · preview preparing",
   "managed-sdr · rev {rev} · preview/export bake": "managed-sdr · rev {rev} · preview/export bake",
   "legacy wrapper · rev {rev} · Look & color locked": "legacy wrapper · rev {rev} · Look & color locked",
   "legacy color": "legacy color",

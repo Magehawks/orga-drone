@@ -785,6 +785,7 @@
   "Pivot": "Pivot",
   "Whites": "Weiß",
   "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math.": "In den verwalteten Farb-Arbeitsbereich konvertieren? Das Bild kann sich ändern. Die Legacy-Berechnung bleibt nicht exakt erhalten.",
+  "managed-sdr · rev {rev} · preview preparing": "managed-sdr · Rev {rev} · Vorschau wird vorbereitet",
   "managed-sdr · rev {rev} · preview/export bake": "managed-sdr · Rev {rev} · Preview/Export-Bake",
   "legacy wrapper · rev {rev} · Look & color locked": "Legacy-Wrapper · Rev {rev} · Look & Farben gesperrt",
   "legacy color": "Legacy-Farben",

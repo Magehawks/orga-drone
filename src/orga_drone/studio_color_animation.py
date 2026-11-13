@@ -163,10 +163,13 @@ def _parse_key(raw: object) -> ColorKey | None:
 
 def color_animation_from_effect_settings(raw: str | None) -> ColorAnimation:
     """Missing or invalid → inactive (compat with older projects)."""
-    if raw is None or not str(raw).strip():
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
+    if view is None or not str(view).strip():
         return ColorAnimation()
     try:
-        data = json.loads(raw)
+        data = json.loads(view)
     except json.JSONDecodeError:
         return ColorAnimation()
     if not isinstance(data, dict):
