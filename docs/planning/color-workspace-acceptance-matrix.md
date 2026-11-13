@@ -80,7 +80,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Histogram / waveform / parade / vectorscope | PASS (source) | #428 |
 | ScopeFrameV1 + stale reject | PASS | unit/JS |
-| Non-packaged accumulate latency + Node heap delta | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
+| Node synthetic accumulate latency + heap delta | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
 | Packaged latency/memory | NOT_RUN — deferred by PO | — |
 
 ## 8. Performance / memory
@@ -88,7 +88,7 @@ and stopped #320 precision experiments are not weakened.
 | Row | Verdict | Evidence |
 |---|---|---|
 | Source-level export/spatial budgets | PASS (where tested) | spatial export limits |
-| Non-packaged scopes cold/warm p50/p95 + heap | PASS | #362 Node harness; not WebView2 |
+| Node scopes cold/warm p50/p95 + heap | PASS | #362 Node harness (source-level); WebView2 budgets separate |
 | ≥5 cold/warm p50/p95 packaged samples | NOT_RUN — deferred by PO | #364 AC |
 | WebView2 GPU budgets | NOT_RUN — deferred by PO | #360 |
 
@@ -131,6 +131,6 @@ pytest tests/test_studio_grade_animation.py \
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
 | #361 | Serial step enable/mix/reorder shipped; packaged E2E NOT_RUN |
-| #362/#366 | Non-packaged accumulate harness PASS; packaged latency/memory NOT_RUN |
+| #362/#366 | Node accumulate harness PASS; WebView2 latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + command path for step ops; param PUT retained |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |
