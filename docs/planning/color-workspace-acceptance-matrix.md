@@ -79,6 +79,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Histogram / waveform / parade / vectorscope | PASS (source) | #428 |
 | ScopeFrameV1 + stale reject | PASS | unit/JS |
+| Non-packaged accumulate latency/memory | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; Node synthetic) |
 | Packaged latency/memory | NOT_RUN — deferred by PO | — |
 
 ## 8. Performance / memory
@@ -86,6 +87,7 @@ and stopped #320 precision experiments are not weakened.
 | Row | Verdict | Evidence |
 |---|---|---|
 | Source-level export/spatial budgets | PASS (where tested) | spatial export limits |
+| Non-packaged scopes cold/warm p50/p95 | PASS | #362 harness (Node); not WebView2 |
 | ≥5 cold/warm p50/p95 packaged samples | NOT_RUN — deferred by PO | #364 AC |
 | WebView2 GPU budgets | NOT_RUN — deferred by PO | #360 |
 
@@ -128,6 +130,6 @@ pytest tests/test_studio_grade_animation.py \
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
 | #361 | Open: serial editor UX (PR #437) |
-| #362/#366 | Open only for packaged latency/memory if AC require it |
+| #362/#366 | Non-packaged accumulate harness PASS; packaged latency/memory NOT_RUN |
 | #363 | Open: preview tokens + editor PUT migration (PR #437) |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

@@ -1,0 +1,95 @@
+{
+  "harness": "scopes_nonpackaged_perf",
+  "issues": [
+    "#362",
+    "#366"
+  ],
+  "environment": {
+    "runtime": "node",
+    "node": "v26.13.0",
+    "platform": "win32",
+    "arch": "x64",
+    "packaged_webview2": false
+  },
+  "samples_per_phase": 7,
+  "measured_at": "2026-11-13T20:24:24.743Z",
+  "cases": [
+    {
+      "label": "preview-960x540",
+      "width": 960,
+      "height": 540,
+      "sampleFactor": 2,
+      "buffer_bytes": 8294400,
+      "buffer_mib": 7.91,
+      "cold": {
+        "n": 7,
+        "min_ms": 16.391500000000008,
+        "max_ms": 27.771600000000007,
+        "mean_ms": 19.622228571428575,
+        "p50_ms": 16.410900000000012,
+        "p95_ms": 27.771600000000007
+      },
+      "warm": {
+        "n": 7,
+        "min_ms": 16.377100000000013,
+        "max_ms": 16.64519999999999,
+        "mean_ms": 16.51447142857143,
+        "p50_ms": 16.512100000000004,
+        "p95_ms": 16.64519999999999
+      }
+    },
+    {
+      "label": "preview-1920x1080",
+      "width": 1920,
+      "height": 1080,
+      "sampleFactor": 4,
+      "buffer_bytes": 33177600,
+      "buffer_mib": 31.641,
+      "cold": {
+        "n": 7,
+        "min_ms": 16.408299999999997,
+        "max_ms": 25.314300000000003,
+        "mean_ms": 17.87745714285716,
+        "p50_ms": 16.631200000000035,
+        "p95_ms": 25.314300000000003
+      },
+      "warm": {
+        "n": 7,
+        "min_ms": 15.564399999999978,
+        "max_ms": 16.76679999999999,
+        "mean_ms": 15.977657142857131,
+        "p50_ms": 15.71859999999998,
+        "p95_ms": 16.76679999999999
+      }
+    },
+    {
+      "label": "fixture-color-bars",
+      "width": 280,
+      "height": 160,
+      "sampleFactor": 1,
+      "buffer_bytes": 716800,
+      "buffer_mib": 0.684,
+      "cold": {
+        "n": 7,
+        "min_ms": 5.532800000000066,
+        "max_ms": 6.172800000000052,
+        "mean_ms": 5.713242857142875,
+        "p50_ms": 5.6375000000000455,
+        "p95_ms": 6.172800000000052
+      },
+      "warm": {
+        "n": 7,
+        "min_ms": 5.516799999999989,
+        "max_ms": 14.528299999999945,
+        "mean_ms": 7.175357142857138,
+        "p50_ms": 5.688299999999913,
+        "p95_ms": 14.528299999999945
+      }
+    }
+  ],
+  "limitations": [
+    "Node synthetic ScopeFrameV1 only — not packaged WebView2 / Chromium GPU path",
+    "Does not include JPEG decode, preview-frame fetch, or panel canvas paint",
+    "Packaged latency/memory remain NOT_RUN until EXE verification phase"
+  ]
+}
