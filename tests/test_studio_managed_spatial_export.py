@@ -305,3 +305,104 @@ def test_unknown_kind_fail_closed(tmp_path: Path) -> None:
             photo, _grade(), tmp_path / "work", kind="audio", grade_digest="c" * 40
         )
     assert exc.value.code == "UNSUPPORTED_GRADE"
+
+
+def _story_local_grade() -> dict:
+    """Pointwise primaries + story-local exposure (no spatial selection)."""
+    return {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": 1,
+        "input": {"profile": "bt709-sdr", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [
+            {
+                "id": "p1",
+                "type": "primaries-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {
+                    "exposure": 0.0,
+                    "kelvin": 6500,
+                    "tint": 0,
+                    "contrast": 1,
+                    "pivot": 0.18,
+                    "saturation": 1.0,
+                    "blacks": 0,
+                    "shadows": 0,
+                    "highlights": 0,
+                    "whites": 0,
+                },
+            }
+        ],
+        "selections": [],
+        "animation": [
+            {
+                "id": "anim-1",
+                "step_id": "p1",
+                "clock": "story-local",
+                "parameter": "exposure",
+                "interpolation": "linear",
+                "outside": "hold",
+                "keys": [
+                    {"t": [0, 1], "value": 0.0},
+                    {"t": [2, 1], "value": 1.0},
+                ],
+            }
+        ],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {},
+    }
+
+
+def test_story_local_without_anchor_fail_closed(tmp_path: Path) -> None:
+    photo = _write_photo(tmp_path / "a.jpg", (20, 20, 20))
+    with pytest.raises(ManagedApplyError) as exc:
+        materialize_spatial_managed_media(
+            photo,
+            _story_local_grade(),
+            tmp_path / "work",
+            kind="photo",
+            grade_digest="f" * 40,
+        )
+    assert exc.value.code == "UNSUPPORTED_GRADE"
+
+
+def test_story_local_photo_with_anchor_materializes(tmp_path: Path) -> None:
+    photo = _write_photo(tmp_path / "a.jpg", (40, 80, 120))
+    out = materialize_spatial_managed_media(
+        photo,
+        _story_local_grade(),
+        tmp_path / "work",
+        kind="photo",
+        grade_digest="g" * 40,
+        story_anchor_s=10.0,
+    )
+    assert out.is_file() and out.stat().st_size > 0
+
+
+def test_story_time_for_source_pts_maps_constant_speed() -> None:
+    from orga_drone.studio_managed_spatial_export import _story_time_for_source_pts
+
+    assert _story_time_for_source_pts(
+        source_pts_s=3.0,
+        source_in_s=1.0,
+        story_anchor_s=10.0,
+        playback_speed=1.0,
+    ) == pytest.approx(12.0)
+    assert _story_time_for_source_pts(
+        source_pts_s=3.0,
+        source_in_s=1.0,
+        story_anchor_s=10.0,
+        playback_speed=2.0,
+    ) == pytest.approx(11.0)
+    assert (
+        _story_time_for_source_pts(
+            source_pts_s=1.0,
+            source_in_s=0.0,
+            story_anchor_s=None,
+            playback_speed=1.0,
+        )
+        is None
+    )

@@ -20,6 +20,10 @@ import {
 import { fetchGrade } from "./studio/grade-api.js";
 import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
 import {
+  buildPreviewFrameUrl,
+  quantizePreviewTime,
+} from "./studio/preview-frame-url.js";
+import {
   bumpOverlayRevision,
   overlayRevisionOf,
   recoverFailedOverlayRemoval,
@@ -3765,9 +3769,10 @@ import {
       }
       // t_s is source offset from the clip in-point (same mapping as seekVideoLocal).
       const sourceOff = lutStillSourceOffset(clip, localS);
-      const quant = Math.round(sourceOff * 10) / 10;
+      const quant = quantizePreviewTime(sourceOff);
+      const storyQuant = quantizePreviewTime(state.projectTimeS);
       const key = JSON.stringify([studioId, clip.dataset.mediaId, clip.dataset.streamUrl,
-        clip.dataset.previewUrl, clip.dataset.thumb, quant, clip.dataset.sourceIn,
+        clip.dataset.previewUrl, clip.dataset.thumb, quant, storyQuant, clip.dataset.sourceIn,
         clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, colorWheels,
         clip.dataset.saturationRamp]);
       if (key === lutStillKey) return;
@@ -3785,7 +3790,11 @@ import {
         if (token !== lutStillToken) return;
         const controller = new AbortController();
         lutStillAbort = controller;
-        const url = `/api/studio/${studioId}/preview-frame?t_s=${encodeURIComponent(String(quant))}&detail=0`;
+        const url = buildPreviewFrameUrl(studioId, {
+          t_s: quant,
+          story_s: storyQuant,
+          detail: 0,
+        });
         fetch(url, { cache: "no-store", headers: { Accept: "image/jpeg" }, signal: controller.signal })
           .then(async (res) => {
             if (token !== lutStillToken) return null;
@@ -11825,15 +11834,17 @@ import {
     tryPublish: (frame) => colorScopeTap?.tryPublish(frame),
     decodeJpegToRgba: decodeJpegBytesToRgba,
     fetchPreviewJpeg: async (studioId, sourceTimeS, meta = {}) => {
-      const quant = quantizePreviewScopeTime(sourceTimeS);
+      const quant = quantizePreviewTime(sourceTimeS);
+      const storyQuant = quantizePreviewTime(
+        meta.storyTimeS != null ? meta.storyTimeS : state.projectTimeS
+      );
       const revision = meta.gradeRevision != null ? String(meta.gradeRevision) : "";
-      const params = new URLSearchParams({
-        t_s: String(quant),
-        detail: "0",
+      const url = buildPreviewFrameUrl(studioId, {
+        t_s: quant,
+        story_s: storyQuant,
+        detail: 0,
+        expectedRevision: revision || null,
       });
-      if (revision) params.set("expected_revision", revision);
-      const url =
-        `/api/studio/${encodeURIComponent(studioId)}/preview-frame?${params.toString()}`;
       const res = await fetch(url, { headers: { Accept: "image/jpeg" } });
       if (!res.ok) {
         throw new Error(`preview-frame ${res.status}`);
@@ -11849,6 +11860,7 @@ import {
         sourceTimeS: headerTime != null && headerTime !== ""
           ? Number(headerTime)
           : quant,
+        storyTimeS: storyQuant,
       };
     },
   });
@@ -11872,12 +11884,17 @@ import {
       // Two copies of one source can have different offsets inside a loop join.
       // A single comparison still cannot represent both; retain the normal join.
       if (point.blending) return null;
-      const offset = Math.round(lutStillSourceOffset(clip, point.offset) * 10) / 10;
+      const offset = quantizePreviewTime(lutStillSourceOffset(clip, point.offset));
+      const storyQuant = quantizePreviewTime(state.projectTimeS);
       const id = String(clip.dataset.studioId);
       return {
         id,
-        key: JSON.stringify([projectId, id, offset, clip.dataset]),
-        url: `/api/studio/${encodeURIComponent(id)}/preview-frame?t_s=${offset}&before=1`,
+        key: JSON.stringify([projectId, id, offset, storyQuant, clip.dataset]),
+        url: buildPreviewFrameUrl(id, {
+          t_s: offset,
+          story_s: storyQuant,
+          before: true,
+        }),
       };
     },
     whenIdle: () => Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]),

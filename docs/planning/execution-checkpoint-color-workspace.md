@@ -31,7 +31,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Primaries / curves / wheels / HSL / LUT | Available now | UI + bake |
 | Spatial masks/qualifiers | Available now | Photo + video CPU export |
 | Eyedropper / brush | Available now | #426 |
-| Animation clocks (#358) | Available now (partial) | Source-local preview/export; story-local plan + fail-closed full-source bake; client `story_s` pending |
+| Animation clocks (#358) | Available now (partial) | Client `story_s`; story-local export with Story anchor (constant-speed single play); ramps/repeats/loop fail-closed |
 | GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Available now (slice) | `clip.grade.command` + HTTP `/grade/command`; editor PUT migration partial |
@@ -51,7 +51,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 |---|---|---|
 | #351 | CLOSED | — |
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
-| #358 | #431 merged | Client `story_s`; story-local export beyond fail-closed; full ClipTimingInputs wiring |
+| #358 | #431 + story_s/export PR | Complex ClipTimingInputs export (ramp/repeat/loop) NOT_RUN |
 | #360 | Bake-approx shipped | Exact tetrahedral / Windows budgets NOT_RUN |
 | #361 | Serial workspace incomplete | Step editor UX |
 | #362/#366 | Live tap shipped | Packaged latency/memory NOT_RUN |

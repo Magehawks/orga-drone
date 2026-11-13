@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -23,10 +24,13 @@ from orga_drone.export.studio_encoder import (
 )
 from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_export import (
+    _attach_story_local_spatial_anchors,
+    _story_local_spatial_export_eligible,
     prepare_studio_export,
     probe_video_dimensions,
     run_studio_export,
 )
+from orga_drone.studio_transition import AppliedTransition
 
 
 _FFMPEG_I_STDERR = """
@@ -1497,3 +1501,76 @@ def test_export_reimport_preview_and_second_export_keep_duration_and_audio(
     second_parsed = parse_media_file(second)
     assert second_parsed.duration_s is not None
     assert second_parsed.duration_s == pytest.approx(float(reimported.duration_s), abs=0.25)
+
+def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
+    grade = {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": 1,
+        "input": {"profile": "srgb", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [
+            {
+                "id": "p1",
+                "type": "primaries-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"exposure": 0.0},
+            }
+        ],
+        "selections": [],
+        "animation": [
+            {
+                "id": "a1",
+                "step_id": "p1",
+                "clock": "story-local",
+                "parameter": "exposure",
+                "interpolation": "linear",
+                "outside": "hold",
+                "keys": [{"t": [0, 1], "value": 0.0}, {"t": [1, 1], "value": 1.0}],
+            }
+        ],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {},
+    }
+    payload = json.dumps(grade)
+    first = StudioExportClip(
+        source_path=Path("a.mp4"),
+        kind="video",
+        duration_s=4.0,
+        managed_spatial_grade_json=payload,
+        section_repeats=1,
+    )
+    second = StudioExportClip(
+        source_path=Path("b.mp4"),
+        kind="video",
+        duration_s=4.0,
+        managed_spatial_grade_json=payload,
+        section_repeats=1,
+    )
+    assert _story_local_spatial_export_eligible(first) is True
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("c.mp4"),
+                kind="video",
+                duration_s=4.0,
+                section_repeats=2,
+            )
+        )
+        is False
+    )
+    applied = [
+        AppliedTransition(
+            type="cut",
+            duration_s=0.0,
+            stored_type="cut",
+            stored_duration_s=None,
+            fallback_cut=False,
+            clamped=False,
+        )
+    ]
+    bound = _attach_story_local_spatial_anchors([first, second], applied)
+    assert bound[0].managed_spatial_story_anchor_s == pytest.approx(0.0)
+    assert bound[1].managed_spatial_story_anchor_s == pytest.approx(4.0)
