@@ -1,7 +1,7 @@
 # Color Workspace execution checkpoint
 
 Updated: 2026-11-13. Integration branch `develop` tip
-`02418f7` (after #427 GPU + #428 live scopes).
+`99424fb` (after #429 persistence hardening).
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.
@@ -23,6 +23,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #426 | `ddbf018…` | Eyedropper + interactive brush tools |
 | #427 | `e223528…` | WebGL managed bake-approx adapter (#360) |
 | #428 | `02418f7…` | Live managed-preview scopes (#362/#366) |
+| #429 | `99424fb…` | Canonical grade opaque merge + undo remint |
 
 ## Feature matrix (honest)
 
@@ -37,8 +38,9 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; spatial → CPU |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame producer; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Partial | Commands module exists; UI still PUTs full grade |
-| Packaged managed-SDR journey | NOT_RUN | Dedicated CDP parity journey still pending |
-| Full #365 acceptance matrix | OPEN | Synthetic harness + packaged evidence pending |
+| Managed-SDR API numerical parity | PASS (unit) | `tests/test_managed_sdr_parity_journey.py` |
+| Packaged managed-SDR WebView2 journey | NOT_RUN | Dedicated CDP/packaged binary still pending |
+| Full #365 acceptance matrix | OPEN | Packaged evidence + remaining AC comments |
 
 ## Open Color Workspace issues
 
