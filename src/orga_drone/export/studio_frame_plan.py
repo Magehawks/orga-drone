@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from orga_drone.export.studio_config import StudioExportClip
+from orga_drone.studio_transition import xfade_name
 
 
 def frame_index(seconds: float) -> int:
@@ -23,7 +24,7 @@ def plan_story_frames(
         count = frame_index(end) - frame_index(cursor)
         overlap = (
             clip.transition_s
-            if index + 1 < len(clips) and clip.transition_type == "crossfade"
+            if index + 1 < len(clips) and xfade_name(clip.transition_type)
             else 0.0
         )
         overlap_frames = frame_index(end) - frame_index(end - overlap)
