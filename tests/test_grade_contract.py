@@ -321,9 +321,8 @@ def test_nonfinite_numbers_are_rejected() -> None:
 
 
 @requires_grade_model
-def test_animation_entries_are_unsupported_until_358() -> None:
-    """Canonical animation references/clock validate, then fail with
-    UNSUPPORTED_GRADE — #358's gate; nothing is silently flattened."""
+def test_unsupported_animation_targets_still_reject() -> None:
+    """Unsupported canonical animation targets reject — never flatten (#358)."""
     from orga_drone.studio_grade_contract import GradeError  # type: ignore[import-untyped]
 
     animated = _managed_grade(
@@ -336,7 +335,26 @@ def test_animation_entries_are_unsupported_until_358() -> None:
     with pytest.raises(GradeError) as excinfo:
         _read(_effect_settings_with_grade(animated))
     assert excinfo.value.code == "UNSUPPORTED_GRADE"
-    assert excinfo.value.path == "grade.animation[0]"
+
+
+@requires_grade_model
+def test_supported_primaries_animation_is_accepted() -> None:
+    """#358: scalar primaries animation with explicit clocks is valid."""
+    animated = _managed_grade(
+        steps=[_step("step-0001", "primaries-v1", params={"exposure": 0.0})],
+        animation=[{
+            "id": "anim-0001",
+            "step_id": "step-0001",
+            "clock": "source-local",
+            "parameter": "exposure",
+            "interpolation": "linear",
+            "outside": "hold",
+            "keys": [{"t": [0, 1], "value": 0.0}, {"t": [1, 1], "value": 1.0}],
+        }],
+    )
+    model = _read(_effect_settings_with_grade(animated))
+    assert len(model.animation) == 1
+    assert model.descriptors["primaries-v1"]["animation"]["exposure"]["interpolation"] == "linear"
 
 
 @requires_grade_model

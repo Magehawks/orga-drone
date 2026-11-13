@@ -72,9 +72,32 @@ def _grade_rgb_image(
     dest: Path,
     *,
     lattice_domain: str = "srgb",
+    source_time_s: float = 0.0,
 ) -> Path:
+    from fractions import Fraction
+
     from PIL import Image
 
+    from orga_drone.studio_grade_animation import (
+        grade_has_animation,
+        materialize_grade_at,
+    )
+    from orga_drone.studio_grade_plan import RenderContext
+
+    active_grade: Mapping[str, Any] = grade
+    if grade_has_animation(grade):
+        pts = Fraction(max(0.0, float(source_time_s))).limit_denominator(1_000_000)
+        active_grade = materialize_grade_at(
+            grade,
+            RenderContext(
+                source_id="spatial-still",
+                source_pts=pts,
+                source_frame=int(round(float(pts) * 30.0)),
+                source_in=Fraction(0),
+                source_local=pts,
+                story_time=pts,
+            ),
+        )
     with Image.open(path) as image:
         rgb = image.convert("RGB")
         width, height = rgb.size
@@ -91,7 +114,7 @@ def _grade_rgb_image(
             for y in range(height)
         ]
         graded = apply_managed_grade_image(
-            rows, grade, lattice_domain=lattice_domain
+            rows, active_grade, lattice_domain=lattice_domain
         )
         out = Image.new("RGB", (width, height))
         out.putdata(
@@ -423,11 +446,36 @@ def _grade_rgb_video(
                 code="UNSUPPORTED_GRADE",
             )
         total = len(sources)
+        from fractions import Fraction
+
+        from orga_drone.studio_grade_animation import (
+            grade_has_animation,
+            materialize_grade_at,
+        )
+        from orga_drone.studio_grade_plan import RenderContext
+
+        animated = grade_has_animation(grade)
         for index, frame_path in enumerate(sources):
             _check_cancel(cancel_event)
+            frame_grade = grade
+            if animated:
+                # Full-source materialize: source-local == frame PTS. Story-local
+                # uses the same PTS here; timeline owners remap trim/speed later.
+                pts = Fraction(index, 1) / Fraction(fps).limit_denominator(1_000_000)
+                frame_grade = materialize_grade_at(
+                    grade,
+                    RenderContext(
+                        source_id="spatial-export",
+                        source_pts=pts,
+                        source_frame=index,
+                        source_in=Fraction(0),
+                        source_local=pts,
+                        story_time=pts,
+                    ),
+                )
             _grade_rgb_image(
                 frame_path,
-                grade,
+                frame_grade,
                 graded_dir / f"frame_{index:06d}.png",
                 lattice_domain="encoded-bt709",
             )

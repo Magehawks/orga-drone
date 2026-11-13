@@ -493,9 +493,9 @@ def _clip_to_export_clip(
         from orga_drone.studio_managed_apply import (
             ManagedApplyError,
             bake_managed_grade_cube,
-            grade_has_spatial_selections,
             grade_is_managed_pointwise,
             grade_is_managed_sdr,
+            grade_needs_cpu_materialize,
             managed_grade_digest,
             require_managed_executable,
             require_managed_pointwise,
@@ -532,7 +532,7 @@ def _clip_to_export_clip(
                         )
                 except ManagedApplyError as exc:
                     raise StudioExportError(str(exc), code=exc.code.lower()) from exc
-            elif grade_has_spatial_selections(clip.effect_settings):
+            elif grade_needs_cpu_materialize(clip.effect_settings):
                 if kind == "photo":
                     try:
                         managed_grade_media = materialize_spatial_managed_media(

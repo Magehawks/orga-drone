@@ -25,6 +25,24 @@ from orga_drone.studio_grade_contract import (
 
 EVALUATORS = ("legacy-v1", "managed-sdr-v1")
 # Metadata registry for plan construction. Pixel adapters remain separate.
+def _animatable_descriptor(op_type: str) -> dict[str, Any] | str:
+    """Advertise exact interpolation/outside policy per supported parameter."""
+    from orga_drone.studio_grade_animation import ANIMATABLE_PARAMETERS
+
+    params = ANIMATABLE_PARAMETERS.get(op_type)
+    if not params:
+        return "none"
+    return {
+        name: {
+            "interpolation": policy["interpolation"],
+            "outside": list(policy["outside"]),
+            "min": policy["min"],
+            "max": policy["max"],
+        }
+        for name, policy in params.items()
+    }
+
+
 OPERATION_DESCRIPTORS = {
     "legacy-stack-v1": {
         "evaluator": "legacy-v1",
@@ -53,7 +71,7 @@ OPERATION_DESCRIPTORS = {
             "whites",
             "saturation",
         ],
-        "animation": "none",
+        "animation": _animatable_descriptor("primaries-v1"),
     },
     "rgb-curves-v1": {
         "evaluator": "managed-sdr-v1",
@@ -134,7 +152,7 @@ OPERATION_DESCRIPTORS = {
         # Bakeable once a confined asset resolver supplies the cube at bake time.
         "lut_bakeable": True,
         "parameters": ["asset_id", "strength", "sha256", "interpolation", "domain"],
-        "animation": "none",
+        "animation": _animatable_descriptor("creative-lut-v1"),
     },
 }
 
@@ -260,7 +278,6 @@ def _validate_grade(grade: dict[str, Any]) -> None:
     animations = array_value(grade.get("animation"), "grade.animation", MAX_STEPS)
     ids: set[str] = set()
     selection_ids: set[str] = set()
-    step_ids: set[str] = set()
     for kind, values in (
         ("selections", selections),
         ("steps", steps),
@@ -279,8 +296,6 @@ def _validate_grade(grade: dict[str, Any]) -> None:
                 object_value(item.get("qualifier"), path + ".qualifier")
                 if type(item.get("invert")) is not bool:
                     fail(path + ".invert", "Expected a boolean")
-            elif kind == "steps":
-                step_ids.add(item_id)
     for index, step in enumerate(steps):
         path = f"grade.steps[{index}]"
         op = identifier(step.get("type"), path + ".type")
@@ -312,15 +327,10 @@ def _validate_grade(grade: dict[str, Any]) -> None:
         len(steps) != 1 or steps[0]["type"] != "legacy-stack-v1"
     ):
         fail("grade.steps", "Legacy wrapper requires exactly one legacy-stack-v1")
-    for index, anim in enumerate(animations):
-        path = f"grade.animation[{index}]"
-        if identifier(anim.get("step_id"), path + ".step_id") not in step_ids:
-            fail(path + ".step_id", "Dangling step reference")
-        if anim.get("clock") not in ("source-local", "story-local"):
-            fail(path + ".clock", "Explicit animation clock required")
-        identifier(anim.get("parameter"), path + ".parameter")
-        # General animation is #358. Do not silently flatten future animation.
-        fail(path, "Canonical animation is not supported yet", "UNSUPPORTED_GRADE")
+    from orga_drone.studio_grade_animation import validate_grade_animations
+
+    # #358: validate clocks/targets/keys; unsupported combinations reject.
+    validate_grade_animations(animations, steps)
     if _point_limits(grade) > MAX_BRUSH_POINTS:
         fail("grade", "Brush points exceed per-clip limit")
 

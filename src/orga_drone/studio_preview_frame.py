@@ -28,8 +28,7 @@ from orga_drone.studio_grade_model import read_grade
 from orga_drone.studio_managed_apply import (
     apply_managed_grade_image,
     ffmpeg_managed_grade_chain,
-    grade_has_spatial_selections,
-    grade_is_managed_pointwise,
+    grade_needs_cpu_materialize,
     managed_grade_digest,
 )
 
@@ -142,13 +141,46 @@ def color_needs_preview_still(
     )
 
 
-def _apply_spatial_managed_jpeg(path: Path, effect_settings: str | None) -> None:
-    """CPU-apply a spatial managed grade onto a decoded preview JPEG in place."""
+def _apply_spatial_managed_jpeg(
+    path: Path,
+    effect_settings: str | None,
+    *,
+    source_time_s: float = 0.0,
+    story_time_s: float | None = None,
+) -> None:
+    """CPU-apply a spatial/animated managed grade onto a decoded preview JPEG."""
+    from fractions import Fraction
+
     from PIL import Image
+
+    from orga_drone.studio_grade_animation import (
+        grade_has_animation,
+        materialize_grade_at,
+    )
+    from orga_drone.studio_grade_plan import RenderContext
 
     model = read_grade(effect_settings)
     if model.grade is None:
         return
+    grade = model.grade
+    if grade_has_animation(grade):
+        pts = Fraction(max(0.0, float(source_time_s))).limit_denominator(1_000_000)
+        story = (
+            Fraction(max(0.0, float(story_time_s))).limit_denominator(1_000_000)
+            if story_time_s is not None
+            else pts
+        )
+        grade = materialize_grade_at(
+            grade,
+            RenderContext(
+                source_id="preview",
+                source_pts=pts,
+                source_frame=int(round(float(pts) * 30.0)),
+                source_in=Fraction(0),
+                source_local=pts,
+                story_time=story,
+            ),
+        )
     with Image.open(path) as image:
         rgb = image.convert("RGB")
         width, height = rgb.size
@@ -160,7 +192,7 @@ def _apply_spatial_managed_jpeg(path: Path, effect_settings: str | None) -> None
             ]
             for y in range(height)
         ]
-        graded = apply_managed_grade_image(rows, model.grade, lattice_domain="srgb")
+        graded = apply_managed_grade_image(rows, grade, lattice_domain="srgb")
         out = Image.new("RGB", (width, height))
         out.putdata(
             [
@@ -431,12 +463,12 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code="preview_failed",
             )
-        if (
-            req.effect_settings
-            and grade_has_spatial_selections(req.effect_settings)
-            and not grade_is_managed_pointwise(req.effect_settings)
-        ):
-            _apply_spatial_managed_jpeg(completed, req.effect_settings)
+        if req.effect_settings and grade_needs_cpu_materialize(req.effect_settings):
+            _apply_spatial_managed_jpeg(
+                completed,
+                req.effect_settings,
+                source_time_s=float(req.source_time_s),
+            )
         completed.replace(dest)
         _evict_if_needed(folder)
         return dest

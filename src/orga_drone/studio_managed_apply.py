@@ -426,10 +426,29 @@ def grade_has_spatial_selections(
     return False
 
 
-def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) -> bool:
-    """True when preview/export can bake a global 3D LUT (no spatial/LUT assets)."""
+def grade_needs_cpu_materialize(
+    effect_settings: str | Mapping[str, Any] | None,
+) -> bool:
+    """True when preview/export must CPU-grade frames (spatial and/or animation)."""
+    from orga_drone.studio_grade_animation import grade_has_animation
+
     model = read_grade(effect_settings)
     if model.evaluator != "managed-sdr-v1" or model.grade is None:
+        return False
+    if grade_has_animation(model.grade):
+        return True
+    return grade_has_spatial_selections(effect_settings)
+
+
+def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) -> bool:
+    """True when preview/export can bake a global 3D LUT (no spatial/LUT assets)."""
+    from orga_drone.studio_grade_animation import grade_has_animation
+
+    model = read_grade(effect_settings)
+    if model.evaluator != "managed-sdr-v1" or model.grade is None:
+        return False
+    # Canonical animation is time-varying; a single bake LUT would flatten it.
+    if grade_has_animation(model.grade):
         return False
     for step in model.grade.get("steps") or []:
         if not step.get("enabled", True):
