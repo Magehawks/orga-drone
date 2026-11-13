@@ -542,9 +542,10 @@ def _clip_to_export_clip(
                     float(clip.source_end) if clip.source_end is not None else None
                 )
                 story_local = grade_uses_story_local_animation(model.grade)
-                # Story-local needs the clip Story start from the decorated
-                # timeline; defer photo and video until anchors are attached.
-                if story_local or kind == "video":
+                # Source-local photos keep eager preflight bake.
+                # Video always defers. Story-local photos also defer so
+                # `_attach_story_local_spatial_anchors` can bind Story starts.
+                if kind == "video" or story_local:
                     if kind == "video":
                         try:
                             validate_spatial_video_limits(path)
@@ -559,6 +560,7 @@ def _clip_to_export_clip(
                     managed_spatial_digest = digest
                     managed_spatial_work = work
                 else:
+                    # Source-local photo CPU materialize (unchanged owner path).
                     try:
                         managed_grade_media = materialize_spatial_managed_media(
                             path,

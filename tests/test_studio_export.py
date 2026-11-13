@@ -1574,3 +1574,85 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
     bound = _attach_story_local_spatial_anchors([first, second], applied)
     assert bound[0].managed_spatial_story_anchor_s == pytest.approx(0.0)
     assert bound[1].managed_spatial_story_anchor_s == pytest.approx(4.0)
+
+    from orga_drone.studio_speed_ramp import Point, SpeedRamp
+
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("ramp.mp4"),
+                kind="video",
+                duration_s=2.0,
+                speed_ramp=SpeedRamp(points=(Point(0.0, 1.0), Point(1.0, 2.0))),
+            )
+        )
+        is False
+    )
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("loop.mp4"),
+                kind="video",
+                duration_s=2.0,
+                forward_loop=True,
+            )
+        )
+        is False
+    )
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("slow.mp4"),
+                kind="video",
+                duration_s=2.0,
+                slow_span=(0.0, 1.0, 0.5),
+            )
+        )
+        is False
+    )
+
+
+def test_story_local_photo_is_deferred_not_eager_materialized() -> None:
+    """Story-local photos must wait for Story anchors; source-local stay eager."""
+    grade = {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": 1,
+        "input": {"profile": "srgb", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [
+            {
+                "id": "p1",
+                "type": "primaries-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"exposure": 0.0},
+            }
+        ],
+        "selections": [],
+        "animation": [
+            {
+                "id": "a1",
+                "step_id": "p1",
+                "clock": "story-local",
+                "parameter": "exposure",
+                "interpolation": "linear",
+                "outside": "hold",
+                "keys": [{"t": [0, 1], "value": 0.0}, {"t": [1, 1], "value": 1.0}],
+            }
+        ],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {},
+    }
+    photo = StudioExportClip(
+        source_path=Path("still.jpg"),
+        kind="photo",
+        duration_s=3.0,
+        managed_spatial_grade_json=json.dumps(grade),
+        section_repeats=1,
+    )
+    applied: list[AppliedTransition] = []
+    bound = _attach_story_local_spatial_anchors([photo], applied)
+    assert bound[0].managed_spatial_story_anchor_s == pytest.approx(0.0)
+    assert bound[0].managed_spatial_grade_json is not None
