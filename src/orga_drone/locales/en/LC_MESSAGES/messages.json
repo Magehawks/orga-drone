@@ -1062,5 +1062,7 @@
   "Spatial managed video produced no frames": "Spatial managed video produced no frames",
   "Could not encode spatial managed video": "Could not encode spatial managed video",
   "Unsupported spatial media kind": "Unsupported spatial media kind",
-  "source media is missing": "source media is missing"
+  "source media is missing": "source media is missing",
+  "Spatial managed video exceeds the CPU grade scratch budget": "Spatial managed video exceeds the CPU grade scratch budget",
+  "Spatial managed video grades need ffprobe for frame-rate checks": "Spatial managed video grades need ffprobe for frame-rate checks"
 }

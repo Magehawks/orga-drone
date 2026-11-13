@@ -239,7 +239,7 @@ def test_video_spatial_matches_cpu_reference_within_encoding_tolerance(
             ]
             for y in range(height)
         ]
-        ref = apply_managed_grade_image(rows, grade, lattice_domain="srgb")
+        ref = apply_managed_grade_image(rows, grade, lattice_domain="encoded-bt709")
 
         def _err(x: int, y: int) -> int:
             rr, rg, rb = ref[y][x]

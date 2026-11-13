@@ -1062,5 +1062,7 @@
   "Spatial managed video produced no frames": "Räumliches Managed-Video erzeugte keine Frames",
   "Could not encode spatial managed video": "Räumliches Managed-Video konnte nicht kodiert werden",
   "Unsupported spatial media kind": "Nicht unterstützte räumliche Medienart",
-  "source media is missing": "Quellmedium fehlt"
+  "source media is missing": "Quellmedium fehlt",
+  "Spatial managed video exceeds the CPU grade scratch budget": "Räumliches Managed-Video überschreitet das CPU-Grade-Scratch-Budget",
+  "Spatial managed video grades need ffprobe for frame-rate checks": "Räumliche Managed-Video-Grades benötigen ffprobe für Bildratenprüfungen"
 }

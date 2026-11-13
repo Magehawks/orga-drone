@@ -36,9 +36,11 @@ from orga_drone.studio_managed_apply import (
 ProgressFn = Callable[[float], None]
 
 # Soft product limits for the CPU reference video path (not a performance claim).
-MAX_SPATIAL_VIDEO_PIXELS = 3840 * 2160
-MAX_SPATIAL_VIDEO_DURATION_S = 600.0
-MAX_SPATIAL_VIDEO_FRAMES = 18_000
+MAX_SPATIAL_VIDEO_PIXELS = 1920 * 1080
+MAX_SPATIAL_VIDEO_DURATION_S = 120.0
+MAX_SPATIAL_VIDEO_FRAMES = 3600
+# Combined decode+grade scratch budget (~uncompressed RGB8 frame equivalents).
+MAX_SPATIAL_VIDEO_PIXEL_FRAMES = MAX_SPATIAL_VIDEO_PIXELS * 900
 
 _FPS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*fps", re.IGNORECASE)
 _SIZE_RE = re.compile(r",\s*(\d{2,5})x(\d{2,5})\b")
@@ -60,30 +62,45 @@ def spatial_work_dir(base: Path, *, grade_digest: str, source: Path) -> Path:
     return base / f"spatial_{grade_digest[:16]}_{source_identity(source)}"
 
 
-def _grade_rgb_image(path: Path, grade: Mapping[str, Any], dest: Path) -> Path:
+def _grade_rgb_image(
+    path: Path,
+    grade: Mapping[str, Any],
+    dest: Path,
+    *,
+    lattice_domain: str = "srgb",
+) -> Path:
     from PIL import Image
 
     with Image.open(path) as image:
         rgb = image.convert("RGB")
         width, height = rgb.size
-        px = rgb.load()
+        flat = list(rgb.getdata())
         rows = [
             [
-                (px[x, y][0] / 255.0, px[x, y][1] / 255.0, px[x, y][2] / 255.0)
+                (
+                    flat[y * width + x][0] / 255.0,
+                    flat[y * width + x][1] / 255.0,
+                    flat[y * width + x][2] / 255.0,
+                )
                 for x in range(width)
             ]
             for y in range(height)
         ]
-        graded = apply_managed_grade_image(rows, grade, lattice_domain="srgb")
+        graded = apply_managed_grade_image(
+            rows, grade, lattice_domain=lattice_domain
+        )
         out = Image.new("RGB", (width, height))
-        out_px = out.load()
-        for y, row in enumerate(graded):
-            for x, sample in enumerate(row):
-                out_px[x, y] = (
+        out.putdata(
+            [
+                (
                     int(min(255, max(0, round(sample[0] * 255)))),
                     int(min(255, max(0, round(sample[1] * 255)))),
                     int(min(255, max(0, round(sample[2] * 255)))),
                 )
+                for row in graded
+                for sample in row
+            ]
+        )
         dest.parent.mkdir(parents=True, exist_ok=True)
         out.save(dest, format="PNG")
     return dest
@@ -169,7 +186,12 @@ def _parse_fps_fraction(value: str) -> float | None:
 
 
 def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
-    """Return width, height, fps, duration_s (prefer ffprobe; ffmpeg -i fallback)."""
+    """Return width, height, fps, duration_s.
+
+    Prefer ffprobe (CFR check via avg vs r_frame_rate). Without ffprobe
+    (bundled imageio-ffmpeg), fall back to ``ffmpeg -i`` and force CFR during
+    frame extract with ``-vf fps=``. Unknown duration fails closed.
+    """
     ffprobe = find_ffprobe()
     if ffprobe:
         try:
@@ -210,6 +232,15 @@ def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
                         width = height = 0
                     avg = _parse_fps_fraction(str(stream.get("avg_frame_rate") or ""))
                     r_fps = _parse_fps_fraction(str(stream.get("r_frame_rate") or ""))
+                    if (
+                        avg is not None
+                        and r_fps is not None
+                        and abs(avg - r_fps) / max(avg, r_fps) > 0.01
+                    ):
+                        raise ManagedApplyError(
+                            "Spatial managed video needs constant frame rate",
+                            code="UNSUPPORTED_GRADE",
+                        )
                     fps = avg or r_fps
                     duration = 0.0
                     if stream.get("duration") is not None:
@@ -223,13 +254,7 @@ def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
                             duration = float(fmt.get("duration") or 0)
                         except (TypeError, ValueError):
                             duration = 0.0
-                    if width >= 2 and height >= 2 and fps and fps > 0:
-                        # Treat large avg/r mismatch as VFR → fail closed.
-                        if avg and r_fps and abs(avg - r_fps) / max(avg, r_fps) > 0.05:
-                            raise ManagedApplyError(
-                                "Spatial managed video needs constant frame rate",
-                                code="UNSUPPORTED_GRADE",
-                            )
+                    if width >= 2 and height >= 2 and fps and fps > 0 and duration > 0:
                         return width, height, float(fps), float(duration)
 
     ffmpeg = find_ffmpeg()
@@ -246,24 +271,27 @@ def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
         **subprocess_no_window_kwargs(),
     )
     text = (proc.stderr or b"").decode("utf-8", errors="replace")
-    size = _SIZE_RE.search(text)
-    fps_m = _FPS_RE.search(text)
-    dur_m = _DURATION_RE.search(text)
-    if size is None or fps_m is None:
+    # Prefer the largest WxH so attached pics do not win over the main stream.
+    sizes = [(int(w), int(h)) for w, h in _SIZE_RE.findall(text)]
+    if not sizes:
         raise ManagedApplyError(
             "Could not probe spatial video dimensions or frame rate",
             code="UNSUPPORTED_GRADE",
         )
-    width = int(size.group(1))
-    height = int(size.group(2))
+    width, height = max(sizes, key=lambda wh: wh[0] * wh[1])
+    fps_m = _FPS_RE.search(text)
+    dur_m = _DURATION_RE.search(text)
+    if fps_m is None or dur_m is None:
+        raise ManagedApplyError(
+            "Could not probe spatial video dimensions or frame rate",
+            code="UNSUPPORTED_GRADE",
+        )
     fps = float(fps_m.group(1))
-    duration = 0.0
-    if dur_m is not None:
-        hours = int(dur_m.group(1))
-        minutes = int(dur_m.group(2))
-        seconds = float(dur_m.group(3))
-        duration = hours * 3600 + minutes * 60 + seconds
-    if width < 2 or height < 2 or fps <= 0:
+    hours = int(dur_m.group(1))
+    minutes = int(dur_m.group(2))
+    seconds = float(dur_m.group(3))
+    duration = hours * 3600 + minutes * 60 + seconds
+    if width < 2 or height < 2 or fps <= 0 or duration <= 0:
         raise ManagedApplyError(
             "Spatial video has invalid dimensions or frame rate",
             code="UNSUPPORTED_GRADE",
@@ -300,10 +328,20 @@ def validate_spatial_video_limits(path: Path) -> tuple[int, int, float, float]:
             "Spatial managed video is longer than the CPU grade limit",
             code="UNSUPPORTED_GRADE",
         )
-    estimated = int(duration * fps + 0.5) if duration > 0 else 0
+    estimated = int(duration * fps + 0.5)
+    if estimated <= 0:
+        raise ManagedApplyError(
+            "Spatial video has invalid dimensions or frame rate",
+            code="UNSUPPORTED_GRADE",
+        )
     if estimated > MAX_SPATIAL_VIDEO_FRAMES:
         raise ManagedApplyError(
             "Spatial managed video has more frames than the CPU grade limit",
+            code="UNSUPPORTED_GRADE",
+        )
+    if pixels * estimated > MAX_SPATIAL_VIDEO_PIXEL_FRAMES:
+        raise ManagedApplyError(
+            "Spatial managed video exceeds the CPU grade scratch budget",
             code="UNSUPPORTED_GRADE",
         )
     return width, height, fps, duration
@@ -338,14 +376,16 @@ def _grade_rgb_video(
 
     try:
         _check_cancel(cancel_event)
+        # Force CFR at the probed rate so VFR sources cannot drift audio/video.
+        fps_filter = f"{fps:.6f}".rstrip("0").rstrip(".")
         extract = _run_ffmpeg(
             [
                 "-i",
                 str(path),
                 "-map",
                 "0:v:0",
-                "-fps_mode",
-                "passthrough",
+                "-vf",
+                f"fps={fps_filter}",
                 "-start_number",
                 "0",
                 str(frames_dir / "frame_%06d.png"),
@@ -373,7 +413,12 @@ def _grade_rgb_video(
         total = len(sources)
         for index, frame_path in enumerate(sources):
             _check_cancel(cancel_event)
-            _grade_rgb_image(frame_path, grade, graded_dir / f"frame_{index:06d}.png")
+            _grade_rgb_image(
+                frame_path,
+                grade,
+                graded_dir / f"frame_{index:06d}.png",
+                lattice_domain="encoded-bt709",
+            )
             if on_progress is not None and (index % 5 == 0 or index + 1 == total):
                 on_progress((index + 1) / float(total))
 

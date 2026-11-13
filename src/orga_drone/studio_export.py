@@ -1020,14 +1020,15 @@ def _materialize_deferred_spatial_clips(
         def _frame_progress(fraction: float, clip_done: int = done) -> None:
             if on_progress is None:
                 return
-            base = (clip_done / total) * 100.0
-            span = (1.0 / total) * 100.0
+            # Reserve 0-25% for spatial materialization; encoder owns 25-100%.
+            base = (clip_done / total) * 25.0
+            span = (1.0 / total) * 25.0
             on_progress(
                 {
                     "phase": "spatial_grade",
                     "clip_index": clip_done,
                     "clip_total": total,
-                    "percent": int(min(99, max(0, base + span * fraction))),
+                    "percent": int(min(25, max(0, base + span * fraction))),
                 }
             )
 
@@ -1067,23 +1068,42 @@ def _execute_export_config(
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
 ) -> Path:
+    config = _materialize_deferred_spatial_clips(
+        config, on_progress=on_progress, cancel_event=cancel_event
+    )
+
+    def _encode_progress(progress: dict) -> None:
+        if on_progress is None:
+            return
+        mapped = dict(progress)
+        raw = mapped.get("percent")
+        if raw is not None:
+            try:
+                # Map encoder 0-100 onto remaining 25-100 after spatial grade.
+                mapped["percent"] = 25 + int(max(0, min(100, int(raw))) * 0.75)
+            except (TypeError, ValueError):
+                pass
+        on_progress(mapped)
+
     if on_progress is not None:
         on_progress(
             {
                 "phase": "preparing",
                 "clip_index": 0,
                 "clip_total": len(config.clips),
-                "percent": 0,
+                "percent": 25
+                if any(
+                    c.managed_grade_media is not None and c.kind == "video"
+                    for c in config.clips
+                )
+                else 0,
             }
         )
-    config = _materialize_deferred_spatial_clips(
-        config, on_progress=on_progress, cancel_event=cancel_event
-    )
     enc = encoder or get_default_encoder()
     try:
         result = enc.render(
             config,
-            on_progress=on_progress,
+            on_progress=_encode_progress if on_progress is not None else None,
             cancel_event=cancel_event,
         )
     except ExportCancelled:
