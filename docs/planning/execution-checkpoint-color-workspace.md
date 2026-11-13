@@ -36,7 +36,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Spatial masks/qualifiers | Available now | Photo + video CPU export |
 | Eyedropper / brush | Available now | #426 |
 | Animation clocks (#358) | Available now (bounded) | Client `story_s`; constant/trim/single-play ramp/repeats/forward-loop; fail-closed slow_span, loop+ramp, ramp+repeats; packaged NOT_RUN |
-| GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
+| GPU WebGL managed adapter (#360) | Available now (tetrahedral + float-gated) | `webgl-bake-tetrahedral`; RGBA32F → `exact:true`; RGBA16F/RGBA8 → `exact:false` + measured; packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; Node harness; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Available now (unit) | Commands for enable/mix/reorder/params/selection/preset; preview tokens; PUT escape hatch; packaged E2E NOT_RUN |
 | Creative Quick Look → managed primaries | Available now (unit) | `apply_preset` + studio.js managed path |
@@ -57,7 +57,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #351 | CLOSED | — |
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
 | #358 | Bounded ClipTimingInputs export | Packaged NOT_RUN; fail-closed slow_span, loop+ramp, ramp+repeats |
-| #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
+| #360 | Float-gated RGBA32F exact + measured RGBA8/16F fallback | Packaged GPU budgets NOT_RUN |
 | #361 | Step editor + `apply_preset` compile | Packaged keyboard/E2E NOT_RUN |
 | #362/#366 | Live tap + Node accumulate harness | Packaged latency/memory NOT_RUN |
 | #363 | Tokens + upsert_step_params/selection/preset | PUT escape hatch only; packaged E2E NOT_RUN |

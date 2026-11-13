@@ -2816,10 +2816,20 @@ import {
     managedGradePreviewCache.writeManagedGrade(clip, grade);
   }
 
+  function managedLutPrecisionHint() {
+    const fromRenderer =
+      lutRendererA?.lutPrecision ||
+      lutRendererB?.lutPrecision ||
+      window.OrgaLutPreview?.probePrecision?.()?.precision;
+    return fromRenderer || "rgba8";
+  }
+
   function managedGpuProbeFor(clip) {
     const grade = managedGradeForClip(clip);
     if (!grade || grade.evaluator !== "managed-sdr-v1") return null;
-    return probeManagedGpuCapabilities(grade);
+    return probeManagedGpuCapabilities(grade, {
+      lutPrecision: managedLutPrecisionHint(),
+    });
   }
 
   function lutWebglCanHandle(clip) {
@@ -2844,7 +2854,9 @@ import {
   function managedWebglLook(clip) {
     const grade = managedGradeForClip(clip);
     if (!grade) return null;
-    const probe = probeManagedGpuCapabilities(grade);
+    const probe = probeManagedGpuCapabilities(grade, {
+      lutPrecision: managedLutPrecisionHint(),
+    });
     if (!probe.supported || !isManagedWebglBakeMode(probe.mode)) {
       return null;
     }

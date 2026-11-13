@@ -69,9 +69,9 @@ and stopped #320 precision experiments are not weakened.
 | Row | Verdict | Evidence |
 |---|---|---|
 | Managed-SDR API journey + CPU delta | PASS | #430 `test_managed_sdr_parity_journey.py` |
-| GPU bake-approx vs CPU | PASS (approx labeled) | #427 `exact:false` |
+| GPU bake-approx vs CPU | PASS (approx labeled) | #427; RGBA8 path still `exact:false` |
 | GPU tetrahedral interpolation | PASS | #360 / #438 `lut-tetrahedral.js` + WebGL texelFetch |
-| Exact GPU float parity | NOT_RUN | RGBA8 table storage; labeled `exact:false` / `rgba8-quantization` |
+| Exact GPU float parity | PASS (capability-gated RGBA32F) | `exact:true` only for RGBA32F upload; RGBA16F/RGBA8 labeled `exact:false` (`rgba16f-quantization` / `rgba8-quantization`); RGBA8 contrast max≈0.00196 in `docs/planning/360-gpu-precision-parity.json`; CPU export reference unchanged |
 | Packaged WebView2 parity | NOT_RUN — deferred by PO | — |
 
 ## 7. Scopes (#362 / #366)
@@ -129,7 +129,7 @@ pytest tests/test_studio_grade_animation.py \
 | Issue | Matrix implication |
 |---|---|
 | #358 | Client story_s + bounded complex story-local export; fail-closed slow_span / loop+ramp / ramp+repeats; packaged NOT_RUN |
-| #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
+| #360 | Tetrahedral + capability-gated RGBA32F exact; RGBA16F/RGBA8 exact:false measured; packaged budgets NOT_RUN |
 | #361 | Step editor + Quick Look `apply_preset` compile shipped |
 | #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |

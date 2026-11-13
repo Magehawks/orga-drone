@@ -6,6 +6,10 @@
   const lutTextCache = new Map();
   const lutDataCache = new Map();
 
+  function clamp01(value) {
+    return Math.min(1, Math.max(0, Number(value) || 0));
+  }
+
   function parseCube(text) {
     const sizeMatch = /LUT_3D_SIZE\s+(\d+)/i.exec(text);
     const size = sizeMatch ? Number(sizeMatch[1]) : 0;
@@ -18,14 +22,65 @@
       if (parts.length === 3 && parts.every(Number.isFinite)) triples.push(parts);
     }
     if (triples.length !== size * size * size) throw new Error("invalid LUT rows");
-    const data = new Uint8Array(triples.length * 4);
+    // Keep float tables for capability-gated RGBA16F/32F upload (#360).
+    // RGBA8 remains the fallback path and is labeled exact:false.
+    const dataF32 = new Float32Array(triples.length * 4);
+    const dataU8 = new Uint8Array(triples.length * 4);
     for (let i = 0; i < triples.length; i += 1) {
-      data[i * 4] = Math.max(0, Math.min(255, Math.round(triples[i][0] * 255)));
-      data[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(triples[i][1] * 255)));
-      data[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(triples[i][2] * 255)));
-      data[i * 4 + 3] = 255;
+      const r = clamp01(triples[i][0]);
+      const g = clamp01(triples[i][1]);
+      const b = clamp01(triples[i][2]);
+      dataF32[i * 4] = r;
+      dataF32[i * 4 + 1] = g;
+      dataF32[i * 4 + 2] = b;
+      dataF32[i * 4 + 3] = 1;
+      dataU8[i * 4] = Math.max(0, Math.min(255, Math.round(r * 255)));
+      dataU8[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(g * 255)));
+      dataU8[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(b * 255)));
+      dataU8[i * 4 + 3] = 255;
     }
-    return { size, data };
+    return { size, dataF32, dataU8, data: dataU8 };
+  }
+
+  function canUpload3d(gl, internalFormat, type, pixels) {
+    const texture = gl.createTexture();
+    if (!texture) return false;
+    gl.bindTexture(gl.TEXTURE_3D, texture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.getError();
+    try {
+      gl.texImage3D(
+        gl.TEXTURE_3D, 0, internalFormat, 2, 2, 2, 0, gl.RGBA, type, pixels
+      );
+    } catch (_) {
+      gl.bindTexture(gl.TEXTURE_3D, null);
+      gl.deleteTexture(texture);
+      return false;
+    }
+    const err = gl.getError();
+    gl.bindTexture(gl.TEXTURE_3D, null);
+    gl.deleteTexture(texture);
+    return err === gl.NO_ERROR;
+  }
+
+  function probeLutPrecision(gl) {
+    if (!gl) {
+      return { precision: "rgba8", canSampleFloatLut: false, extensions: [] };
+    }
+    const extensions = [];
+    if (gl.getExtension("EXT_color_buffer_float")) {
+      extensions.push("EXT_color_buffer_float");
+    }
+    if (gl.getExtension("OES_texture_float_linear")) {
+      extensions.push("OES_texture_float_linear");
+    }
+    if (canUpload3d(gl, gl.RGBA32F, gl.FLOAT, new Float32Array(8 * 4))) {
+      return { precision: "rgba32f", canSampleFloatLut: true, extensions };
+    }
+    if (canUpload3d(gl, gl.RGBA16F, gl.HALF_FLOAT, new Uint16Array(8 * 4))) {
+      return { precision: "rgba16f", canSampleFloatLut: true, extensions };
+    }
+    return { precision: "rgba8", canSampleFloatLut: false, extensions };
   }
 
   function lutFetchUrl(assetName) {
@@ -81,6 +136,12 @@
       this.videoTex = null;
       this.scratch = document.createElement("canvas");
       this.scratchCtx = this.scratch.getContext("2d");
+      this.lutPrecision = "rgba8";
+      this.lutPrecisionInfo = {
+        precision: "rgba8",
+        canSampleFloatLut: false,
+        extensions: [],
+      };
       if (this.available) this._setup();
     }
 
@@ -114,8 +175,8 @@
         float fr = right == 0 ? frac.r : (right == 1 ? frac.g : frac.b);
         return fl > fr || (fl == fr && left < right);
       }
-      // Tetrahedral sampling matches FFmpeg/CPU (#360). RGBA8 storage remains
-      // an explicit quantization boundary (exact:false in the capability probe).
+      // Tetrahedral sampling matches FFmpeg/CPU (#360). Table storage is
+      // capability-gated (RGBA32F/16F when upload works; else RGBA8).
       vec3 applyLut(sampler3D lut, vec3 c, float size) {
         vec3 clamped = clamp(c, 0.0, 1.0);
         vec3 coords = clamped * (size - 1.0);
@@ -194,50 +255,70 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this.lutPrecisionInfo = probeLutPrecision(gl);
+        this.lutPrecision = this.lutPrecisionInfo.precision;
         this.identity = this._identityTexture();
       } catch (_) {
         this.available = false;
       }
     }
 
-    _identityTexture() {
+    _texImage3dLut(texture, size, parsed) {
       const gl = this.gl;
-      const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_3D, texture);
-      const data = new Uint8Array([
-        0, 0, 0, 255, 0, 0, 255, 255, 0, 0, 0, 255, 0, 0, 255, 255,
-        0, 255, 0, 255, 0, 255, 255, 255, 0, 255, 0, 255, 0, 255, 255, 255,
-      ]);
-      gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, 2, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      const precision = this.lutPrecision || "rgba8";
+      if (precision === "rgba32f" && parsed.dataF32) {
+        gl.texImage3D(
+          gl.TEXTURE_3D, 0, gl.RGBA32F, size, size, size,
+          0, gl.RGBA, gl.FLOAT, parsed.dataF32
+        );
+      } else if (precision === "rgba16f" && parsed.dataF32) {
+        // Upload float source; driver converts to half float storage.
+        gl.texImage3D(
+          gl.TEXTURE_3D, 0, gl.RGBA16F, size, size, size,
+          0, gl.RGBA, gl.FLOAT, parsed.dataF32
+        );
+      } else {
+        gl.texImage3D(
+          gl.TEXTURE_3D, 0, gl.RGBA8, size, size, size,
+          0, gl.RGBA, gl.UNSIGNED_BYTE, parsed.dataU8 || parsed.data
+        );
+      }
+      // texelFetch ignores filters; NEAREST avoids float-linear extension needs.
       for (const key of ["TEXTURE_MIN_FILTER", "TEXTURE_MAG_FILTER"]) {
-        gl.texParameteri(gl.TEXTURE_3D, gl[key], gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl[key], gl.NEAREST);
       }
       for (const key of ["TEXTURE_WRAP_S", "TEXTURE_WRAP_T", "TEXTURE_WRAP_R"]) {
         gl.texParameteri(gl.TEXTURE_3D, gl[key], gl.CLAMP_TO_EDGE);
       }
+    }
+
+    _identityTexture() {
+      const gl = this.gl;
+      const texture = gl.createTexture();
+      const dataF32 = new Float32Array([
+        0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1,
+        0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
+      ]);
+      const dataU8 = new Uint8Array([
+        0, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 255, 255, 0, 255,
+        0, 0, 255, 255, 255, 0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255,
+      ]);
+      this._texImage3dLut(texture, 2, { dataF32, dataU8 });
       return texture;
     }
 
     _textureFor(assetName) {
       const gl = this.gl;
       if (!assetName) return this.identity;
-      if (this.assets.has(assetName)) return this.assets.get(assetName);
+      const cacheKey = `${this.lutPrecision || "rgba8"}::${assetName}`;
+      if (this.assets.has(cacheKey)) return this.assets.get(cacheKey);
       const parsed = lutDataCache.get(assetName);
       if (!parsed) return null;
       const texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_3D, texture);
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-      gl.texImage3D(
-        gl.TEXTURE_3D, 0, gl.RGBA8, parsed.size, parsed.size, parsed.size,
-        0, gl.RGBA, gl.UNSIGNED_BYTE, parsed.data
-      );
-      for (const key of ["TEXTURE_MIN_FILTER", "TEXTURE_MAG_FILTER"]) {
-        gl.texParameteri(gl.TEXTURE_3D, gl[key], gl.LINEAR);
-      }
-      for (const key of ["TEXTURE_WRAP_S", "TEXTURE_WRAP_T", "TEXTURE_WRAP_R"]) {
-        gl.texParameteri(gl.TEXTURE_3D, gl[key], gl.CLAMP_TO_EDGE);
-      }
-      this.assets.set(assetName, texture);
+      this._texImage3dLut(texture, parsed.size, parsed);
+      this.assets.set(cacheKey, texture);
       return texture;
     }
 
@@ -347,5 +428,20 @@
   window.OrgaLutPreview = {
     supported: supported(),
     createRenderer: () => (supported() ? new Renderer() : null),
+    /** Best-effort static probe without retaining a renderer. */
+    probePrecision: () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl2", {
+          antialias: false,
+          alpha: false,
+          depth: false,
+          stencil: false,
+        });
+        return probeLutPrecision(gl);
+      } catch (_) {
+        return { precision: "rgba8", canSampleFloatLut: false, extensions: [] };
+      }
+    },
   };
 })();

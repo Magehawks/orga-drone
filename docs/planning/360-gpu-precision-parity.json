@@ -1,0 +1,81 @@
+{
+  "issue": 360,
+  "gate_float_operator_max_abs": 1e-05,
+  "gate_encoded_swatch_rgb": 3.0,
+  "float_path": {
+    "status": "capability_gated_rgba32f_exact",
+    "note": "WebGL prefers RGBA32F then RGBA16F then RGBA8. Only RGBA32F sets exact:true (\u22641e-5 operator gate). RGBA16F stays exact:false (half-float). Export/CPU remain reference."
+  },
+  "rgba16f_path": {
+    "status": "exact_false",
+    "reason": "rgba16f-quantization",
+    "cause": "Half-float LUT storage can exceed the 1e-5 float operator gate even though it is finer than RGBA8."
+  },
+  "rgba8_fallback": {
+    "status": "exact_false",
+    "reason": "rgba8-quantization",
+    "contrast_33": {
+      "max_error": 0.0019607843137254832,
+      "mean_error": 0.0005886774651794755,
+      "samples": 30
+    },
+    "identity_17": {
+      "max_error": 0.0019607843137254832,
+      "mean_error": 0.0007714596949891054,
+      "samples": 30
+    },
+    "cause": "Uint8 UNORM table storage rounds each lattice RGB before tetrahedral texelFetch; interpolation cannot recover lost bits."
+  },
+  "probes": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      1.0,
+      1.0,
+      1.0
+    ],
+    [
+      0.5,
+      0.5,
+      0.5
+    ],
+    [
+      0.25,
+      0.5,
+      0.75
+    ],
+    [
+      0.1,
+      0.2,
+      0.3
+    ],
+    [
+      0.9,
+      0.1,
+      0.5
+    ],
+    [
+      0.01,
+      0.01,
+      0.01
+    ],
+    [
+      0.99,
+      0.99,
+      0.5
+    ],
+    [
+      0.3333333333333333,
+      0.6666666666666666,
+      0.125
+    ],
+    [
+      0.42,
+      0.17,
+      0.83
+    ]
+  ]
+}
