@@ -2637,7 +2637,6 @@ def create_app() -> FastAPI:
             look = base_look
         from orga_drone.studio_managed_apply import (
             ManagedApplyError,
-            grade_is_managed_pointwise,
             grade_is_managed_sdr,
             require_managed_pointwise,
         )
