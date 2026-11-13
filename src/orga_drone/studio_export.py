@@ -7,7 +7,7 @@ import threading
 from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from orga_drone.app_prefs import (
     get_last_export_directory,
@@ -537,16 +537,31 @@ def _clip_to_export_clip(
                     grade_uses_story_local_animation,
                 )
 
-                if grade_uses_story_local_animation(model.grade):
-                    raise StudioExportError(
-                        "Story-local grade animation cannot use full-source CPU bake",
-                        code="unsupported_grade",
-                    )
                 clip_in = float(clip.source_start or 0.0)
                 clip_out = (
                     float(clip.source_end) if clip.source_end is not None else None
                 )
-                if kind == "photo":
+                story_local = grade_uses_story_local_animation(model.grade)
+                plan = spatial_cpu_materialize_plan(
+                    kind=str(kind), story_local=bool(story_local)
+                )
+                if plan == "defer":
+                    # Video + story-local photo: set deferred fields (anchors later).
+                    if kind == "video":
+                        try:
+                            validate_spatial_video_limits(path)
+                        except ManagedApplyError as exc:
+                            raise StudioExportError(
+                                str(exc), code=exc.code.lower()
+                            ) from exc
+                    managed_spatial_source = path
+                    managed_spatial_grade_json = json.dumps(
+                        model.grade, separators=(",", ":"), sort_keys=True
+                    )
+                    managed_spatial_digest = digest
+                    managed_spatial_work = work
+                else:
+                    # Source-local photo only: eager preflight bake.
                     try:
                         managed_grade_media = materialize_spatial_managed_media(
                             path,
@@ -561,20 +576,6 @@ def _clip_to_export_clip(
                         raise StudioExportError(
                             str(exc), code=exc.code.lower()
                         ) from exc
-                else:
-                    # Validate cheaply in preflight; grade frames in the job.
-                    try:
-                        validate_spatial_video_limits(path)
-                    except ManagedApplyError as exc:
-                        raise StudioExportError(
-                            str(exc), code=exc.code.lower()
-                        ) from exc
-                    managed_spatial_source = path
-                    managed_spatial_grade_json = json.dumps(
-                        model.grade, separators=(",", ":"), sort_keys=True
-                    )
-                    managed_spatial_digest = digest
-                    managed_spatial_work = work
             else:
                 raise StudioExportError(
                     "This managed grade needs a creative LUT resolver before export",
@@ -756,6 +757,7 @@ def _clip_to_export_clip(
         managed_spatial_grade_json=managed_spatial_grade_json,
         managed_spatial_digest=managed_spatial_digest,
         managed_spatial_work=managed_spatial_work,
+        managed_spatial_story_anchor_s=None,
         color_look=color_look,
         hsl=hsl,
         color_wheels=color_wheels,
@@ -812,6 +814,72 @@ def _snapshot_export_destination(
     with hold_media_mutation():
         protected_identities = _protected_identities(protected_paths)
     return dest, protected_identities, tuple(str(path) for path in protected_paths)
+
+
+def _story_local_spatial_export_eligible(clip: StudioExportClip) -> bool:
+    """Constant-speed single play can map source PTS → Story for a full bake."""
+    if int(clip.section_repeats or 1) != 1:
+        return False
+    if bool(clip.forward_loop):
+        return False
+    if clip.speed_ramp is not None:
+        return False
+    if clip.slow_span is not None:
+        return False
+    return True
+
+
+def spatial_cpu_materialize_plan(*, kind: str, story_local: bool) -> str:
+    """Decide eager vs deferred spatial CPU materialize for one clip.
+
+    Returns ``\"defer\"`` when Story anchors must be attached first (all video,
+    and story-local photos) or ``\"eager\"`` for source-local photo preflight.
+    """
+    if kind == "video" or story_local:
+        return "defer"
+    return "eager"
+
+
+def _attach_story_local_spatial_anchors(
+    clips: list[StudioExportClip],
+    applied: Sequence[object],
+) -> list[StudioExportClip]:
+    """Bind Story starts for deferred story-local spatial grades (#358)."""
+    from dataclasses import replace
+
+    from orga_drone.studio_grade_animation import grade_uses_story_local_animation
+    from orga_drone.studio_transition import AppliedTransition, story_starts_s
+
+    boundaries = [bound for bound in applied if isinstance(bound, AppliedTransition)]
+    starts = story_starts_s([c.duration_s for c in clips], boundaries)
+    out: list[StudioExportClip] = []
+    for index, clip in enumerate(clips):
+        if not clip.managed_spatial_grade_json:
+            out.append(clip)
+            continue
+        try:
+            grade = json.loads(clip.managed_spatial_grade_json)
+        except json.JSONDecodeError as exc:
+            raise StudioExportError(
+                "Managed spatial grade payload is invalid",
+                code="unsupported_grade",
+            ) from exc
+        if not grade_uses_story_local_animation(grade):
+            out.append(clip)
+            continue
+        if not _story_local_spatial_export_eligible(clip):
+            raise StudioExportError(
+                "Story-local grade animation export supports constant-speed "
+                "single play only (no repeats, forward loop, slow bar, or ramp)",
+                code="unsupported_grade",
+            )
+        out.append(
+            replace(
+                clip,
+                managed_spatial_story_anchor_s=float(starts[index]),
+            )
+        )
+    return out
 
 
 def prepare_studio_export(
@@ -894,7 +962,7 @@ def prepare_studio_export(
                 fade_out_s=fade_out_s(outgoing),
             )
         )
-    export_clips = decorated
+    export_clips = _attach_story_local_spatial_anchors(decorated, applied)
 
     from orga_drone.export.music_mix import require_readable_music
 
@@ -1052,7 +1120,7 @@ def _materialize_deferred_spatial_clips(
                 clip.managed_spatial_source,
                 grade,
                 work,
-                kind="video",
+                kind=str(clip.kind or "video"),
                 grade_digest=clip.managed_spatial_digest,
                 source_in_s=float(clip.source_start_s or 0.0),
                 source_out_s=(
@@ -1060,6 +1128,8 @@ def _materialize_deferred_spatial_clips(
                     if clip.source_end_s is not None
                     else None
                 ),
+                story_anchor_s=clip.managed_spatial_story_anchor_s,
+                playback_speed=float(clip.playback_speed or 1.0),
                 cancel_event=cancel_event,
                 on_progress=_frame_progress,
             )
@@ -1067,6 +1137,7 @@ def _materialize_deferred_spatial_clips(
             if exc.code == "CANCELLED":
                 raise ExportCancelled() from exc
             raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+        photo_graded = str(clip.kind) == "photo"
         built.append(
             replace(
                 clip,
@@ -1076,6 +1147,9 @@ def _materialize_deferred_spatial_clips(
                 managed_spatial_grade_json=None,
                 managed_spatial_digest=None,
                 managed_spatial_work=None,
+                managed_spatial_story_anchor_s=None,
+                source_start_s=0.0 if photo_graded else clip.source_start_s,
+                source_end_s=None if photo_graded else clip.source_end_s,
             )
         )
         done += 1

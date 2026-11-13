@@ -66,6 +66,25 @@ def spatial_work_dir(base: Path, *, grade_digest: str, source: Path) -> Path:
     return base / f"spatial_{grade_digest[:16]}_{source_identity(source)}"
 
 
+def _story_time_for_source_pts(
+    *,
+    source_pts_s: float,
+    source_in_s: float,
+    story_anchor_s: float | None,
+    playback_speed: float,
+) -> float | None:
+    """Map absolute media PTS to Story time for a constant-speed single play.
+
+    ``None`` leaves RenderContext on the source-local default (source-local
+    animation only). Story-local animation requires an explicit anchor.
+    """
+    if story_anchor_s is None:
+        return None
+    speed = max(1e-6, float(playback_speed))
+    source_local = max(0.0, float(source_pts_s) - float(source_in_s))
+    return float(story_anchor_s) + source_local / speed
+
+
 def _grade_rgb_image(
     path: Path,
     grade: Mapping[str, Any],
@@ -75,6 +94,8 @@ def _grade_rgb_image(
     source_time_s: float = 0.0,
     source_in_s: float = 0.0,
     source_out_s: float | None = None,
+    story_anchor_s: float | None = None,
+    playback_speed: float = 1.0,
 ) -> Path:
     from PIL import Image
 
@@ -93,9 +114,13 @@ def _grade_rgb_image(
                 source_pts_s=float(source_time_s),
                 source_in_s=float(source_in_s),
                 source_out_s=source_out_s,
-                # Full-source bake supports source-local only; story-local is
-                # rejected before this path runs.
-                story_time_s=None,
+                story_time_s=_story_time_for_source_pts(
+                    source_pts_s=float(source_time_s),
+                    source_in_s=float(source_in_s),
+                    story_anchor_s=story_anchor_s,
+                    playback_speed=playback_speed,
+                ),
+                speed=float(playback_speed),
             ),
         )
     with Image.open(path) as image:
@@ -386,6 +411,8 @@ def _grade_rgb_video(
     *,
     source_in_s: float = 0.0,
     source_out_s: float | None = None,
+    story_anchor_s: float | None = None,
+    playback_speed: float = 1.0,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -463,6 +490,8 @@ def _grade_rgb_video(
                 source_time_s=pts_s if animated else 0.0,
                 source_in_s=float(source_in_s),
                 source_out_s=source_out_s,
+                story_anchor_s=story_anchor_s if animated else None,
+                playback_speed=float(playback_speed),
             )
             frame_path.unlink(missing_ok=True)
             if on_progress is not None and (index % 5 == 0 or index + 1 == total):
@@ -576,6 +605,8 @@ def materialize_spatial_managed_media(
     grade_digest: str | None = None,
     source_in_s: float = 0.0,
     source_out_s: float | None = None,
+    story_anchor_s: float | None = None,
+    playback_speed: float = 1.0,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -583,7 +614,9 @@ def materialize_spatial_managed_media(
 
     Video grades keep full source timing so callers can preserve trim/speed/
     repeat on the export clip. Partial outputs never become cache hits.
-    Story-local animation cannot be flattened into a full-source bake.
+    Story-local animation requires an explicit ``story_anchor_s`` (clip Story
+    start) and a constant-speed single play; repeats/ramps stay fail-closed at
+    the export owner.
     """
     from orga_drone.studio_grade_animation import grade_uses_story_local_animation
 
@@ -594,15 +627,19 @@ def materialize_spatial_managed_media(
             "Unsupported spatial media kind",
             code="UNSUPPORTED_GRADE",
         )
-    if grade_uses_story_local_animation(grade):
+    if grade_uses_story_local_animation(grade) and story_anchor_s is None:
         raise ManagedApplyError(
-            "Story-local grade animation cannot use full-source CPU bake; "
-            "evaluate with an explicit Story RenderContext instead",
+            "Story-local grade animation needs an explicit Story anchor; "
+            "full-source bake without Story mapping is refused",
             code="UNSUPPORTED_GRADE",
         )
 
     if grade_digest:
         work_dir = spatial_work_dir(work_dir, grade_digest=grade_digest, source=source)
+        if story_anchor_s is not None:
+            # Story mapping changes graded frames without changing grade digest.
+            anchor_key = f"{float(story_anchor_s):.3f}_{float(playback_speed):.4f}"
+            work_dir = work_dir / f"story_{hashlib.sha1(anchor_key.encode()).hexdigest()[:10]}"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     if kind == "photo":
@@ -623,6 +660,8 @@ def materialize_spatial_managed_media(
             source_time_s=float(source_in_s),
             source_in_s=float(source_in_s),
             source_out_s=source_out_s,
+            story_anchor_s=story_anchor_s,
+            playback_speed=float(playback_speed),
         )
         _atomic_replace(tmp, dest)
         return dest
@@ -640,6 +679,8 @@ def materialize_spatial_managed_media(
         dest,
         source_in_s=float(source_in_s),
         source_out_s=source_out_s,
+        story_anchor_s=story_anchor_s,
+        playback_speed=float(playback_speed),
         cancel_event=cancel_event,
         on_progress=on_progress,
     )

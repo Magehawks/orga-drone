@@ -13,6 +13,20 @@ let proxySrc = "";
 const context = {
   root: { dataset: {} }, document: { getElementById: id => id.endsWith('still') ? still : chip },
   window: { setTimeout: f => { const id = nextTimer++; timers.set(id, f); return id; }, clearTimeout: id => timers.delete(id) },
+  quantizePreviewTime: (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+  },
+  buildPreviewFrameUrl: (studioId, opts = {}) => {
+    const params = new URLSearchParams();
+    if (opts.t_s != null && opts.t_s !== '') params.set('t_s', String(opts.t_s));
+    if (opts.story_s != null && Number.isFinite(Number(opts.story_s))) {
+      params.set('story_s', String(Number(opts.story_s)));
+    }
+    if (opts.detail != null && opts.detail !== '') params.set('detail', String(opts.detail));
+    if (opts.before) params.set('before', '1');
+    return `/api/studio/${encodeURIComponent(String(studioId))}/preview-frame?${params}`;
+  },
   state: { playing: false }, colorComparison: null, reuseDraft: null,
   readColorAnimation: () => null, readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
   forwardLoopActive: () => false, sectionRepeats: () => 1,
@@ -45,7 +59,7 @@ const context = {
   isOverlapType: type => ["crossfade", "blur_dissolve", "soft_wipe_left", "soft_wipe_right", "soft_wipe_up", "soft_wipe_down"].includes(String(type || "cut")),
   URL: { createObjectURL: blob => blob.id, revokeObjectURL() {} },
   Image: class { constructor() { this.hidden = true; this.naturalWidth = 320; this.naturalHeight = 180; } removeAttribute() {} decode() { return new Promise((resolve, reject) => decodes.push({ resolve, reject })); } },
-  AbortController, Number, JSON, Math,
+  AbortController, Number, JSON, Math, URLSearchParams,
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
 };
 vm.createContext(context); vm.runInContext(source, context);
