@@ -141,12 +141,16 @@ def build_render_context(inputs: ClipTimingInputs) -> RenderContext:
     )
 
 
-def transition_side_for_hit(hit: Any) -> str:
-    """Map ``StoryTimeHit`` overlap fields onto RenderContext.transition_side."""
+def transition_side_for_hit(hit: Any, *, role: str = "primary") -> str:
+    """Map ``StoryTimeHit`` overlap fields onto RenderContext.transition_side.
+
+    ``role="primary"`` → outgoing during a crossfade; ``role="partner"`` →
+    incoming for the overlap clip. No overlap → single.
+    """
     overlap = getattr(hit, "overlap_index", None)
     progress = getattr(hit, "crossfade_progress", None)
     if overlap is None or progress is None:
         return "single"
-    # During a crossfade the primary clip is outgoing while the partner is
-    # incoming; callers that evaluate the primary use outgoing.
+    if role == "partner":
+        return "incoming"
     return "outgoing"

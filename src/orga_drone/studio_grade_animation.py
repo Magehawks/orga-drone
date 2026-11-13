@@ -21,7 +21,9 @@ from orga_drone.studio_grade_contract import (
 )
 
 MAX_ANIMATION_KEYS = 8
-MIN_KEY_GAP = Fraction(1, 100)  # 10 ms floor; matches legacy 0.1s intent at store precision
+# 10 ms key spacing floor keeps rational keys distinct without implying the
+# legacy color-bar 0.1 s authoring gap.
+MIN_KEY_GAP = Fraction(1, 100)
 CLOCKS = ("source-local", "story-local")
 INTERPOLATIONS = ("linear",)
 OUTSIDE_POLICIES = ("hold", "base")
@@ -358,3 +360,74 @@ def grade_has_animation(grade: Mapping[str, Any] | None) -> bool:
         return False
     animations = grade.get("animation")
     return isinstance(animations, list) and len(animations) > 0
+
+
+def grade_uses_story_local_animation(grade: Mapping[str, Any] | None) -> bool:
+    """True when any animation entry binds the Story-local clock."""
+    if not grade_has_animation(grade):
+        return False
+    assert isinstance(grade, Mapping)
+    for entry in grade.get("animation") or []:
+        if isinstance(entry, Mapping) and entry.get("clock") == "story-local":
+            return True
+    return False
+
+
+def render_context_for_source_sample(
+    *,
+    source_id: str,
+    source_pts_s: float,
+    source_in_s: float = 0.0,
+    source_out_s: float | None = None,
+    story_time_s: float | None = None,
+    speed: float = 1.0,
+    repeat_pass: int = 0,
+    transition_side: str = "single",
+    width: int = 1920,
+    height: int = 1080,
+    orientation: int = 1,
+    source_frame_rate: float = 30.0,
+) -> Any:
+    """Build RenderContext for one sample using clip-local source math.
+
+    ``source_pts_s`` is absolute media time; ``source_local`` is pts − in.
+    Story time defaults to source-local only when the caller has no Story
+    owner; Story-local animation must pass an explicit ``story_time_s``.
+    """
+    from orga_drone.studio_grade_plan import RenderContext
+
+    source_in = Fraction(max(0.0, float(source_in_s))).limit_denominator(1_000_000)
+    source_pts = Fraction(max(0.0, float(source_pts_s))).limit_denominator(1_000_000)
+    if source_pts < source_in:
+        source_pts = source_in
+    source_local = source_pts - source_in
+    source_out = (
+        Fraction(float(source_out_s)).limit_denominator(1_000_000)
+        if source_out_s is not None
+        else None
+    )
+    if story_time_s is None:
+        story = source_local
+    else:
+        story = Fraction(max(0.0, float(story_time_s))).limit_denominator(1_000_000)
+    speed_frac = Fraction(max(1e-6, float(speed))).limit_denominator(1_000_000)
+    side = (
+        transition_side
+        if transition_side in ("single", "incoming", "outgoing")
+        else "single"
+    )
+    return RenderContext(
+        source_id=str(source_id),
+        source_pts=source_pts,
+        source_frame=max(0, int(round(float(source_pts) * float(source_frame_rate)))),
+        source_in=source_in,
+        source_out=source_out,
+        source_local=source_local,
+        story_time=story,
+        speed=speed_frac,
+        repeat_pass=max(0, int(repeat_pass)),
+        transition_side=side,
+        width=max(1, int(width)),
+        height=max(1, int(height)),
+        orientation=max(1, min(8, int(orientation))),
+    )

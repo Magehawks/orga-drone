@@ -2512,6 +2512,10 @@ def create_app() -> FastAPI:
             effect_settings=clip.effect_settings
             if grade_is_managed_sdr(clip.effect_settings)
             else None,
+            source_in_s=origin,
+            source_out_s=(
+                float(clip.source_end) if clip.source_end is not None else None
+            ),
         )
         try:
             jpeg = await asyncio.to_thread(
@@ -2859,11 +2863,13 @@ def create_app() -> FastAPI:
         detail: int = Query(0),
         before: bool = Query(False),
         expected_revision: str | None = Query(None),
+        story_s: float | None = Query(None),
     ) -> Response:
         """JPEG still using the same grade+LUT builders as export (ADR 0028).
 
         ``t_s`` is the source offset from the clip in-point (after slow-motion /
-        speed mapping on the client), not Story time.
+        speed mapping on the client), not Story time. ``story_s`` is optional
+        absolute Story time for #358 story-local grade animation.
         """
         project_id = _clip_project_id(studio_item_id)
         if project_id is None:
@@ -2945,6 +2951,11 @@ def create_app() -> FastAPI:
             detail=bool(detail),
             saturation=saturation_multiplier(ramp, local) if clip.kind == "video" else 1.0,
             effect_settings=clip.effect_settings if managed_preview else None,
+            source_in_s=origin,
+            source_out_s=(
+                float(clip.source_end) if clip.source_end is not None else None
+            ),
+            story_time_s=float(story_s) if story_s is not None else None,
         )
         if before:
             from orga_drone.studio_preview_frame import before_color_request

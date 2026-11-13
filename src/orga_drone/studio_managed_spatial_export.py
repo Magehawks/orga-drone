@@ -73,29 +73,29 @@ def _grade_rgb_image(
     *,
     lattice_domain: str = "srgb",
     source_time_s: float = 0.0,
+    source_in_s: float = 0.0,
+    source_out_s: float | None = None,
 ) -> Path:
-    from fractions import Fraction
-
     from PIL import Image
 
     from orga_drone.studio_grade_animation import (
         grade_has_animation,
         materialize_grade_at,
+        render_context_for_source_sample,
     )
-    from orga_drone.studio_grade_plan import RenderContext
 
     active_grade: Mapping[str, Any] = grade
     if grade_has_animation(grade):
-        pts = Fraction(max(0.0, float(source_time_s))).limit_denominator(1_000_000)
         active_grade = materialize_grade_at(
             grade,
-            RenderContext(
+            render_context_for_source_sample(
                 source_id="spatial-still",
-                source_pts=pts,
-                source_frame=int(round(float(pts) * 30.0)),
-                source_in=Fraction(0),
-                source_local=pts,
-                story_time=pts,
+                source_pts_s=float(source_time_s),
+                source_in_s=float(source_in_s),
+                source_out_s=source_out_s,
+                # Full-source bake supports source-local only; story-local is
+                # rejected before this path runs.
+                story_time_s=None,
             ),
         )
     with Image.open(path) as image:
@@ -384,6 +384,8 @@ def _grade_rgb_video(
     grade: Mapping[str, Any],
     dest: Path,
     *,
+    source_in_s: float = 0.0,
+    source_out_s: float | None = None,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -446,38 +448,21 @@ def _grade_rgb_video(
                 code="UNSUPPORTED_GRADE",
             )
         total = len(sources)
-        from fractions import Fraction
-
-        from orga_drone.studio_grade_animation import (
-            grade_has_animation,
-            materialize_grade_at,
-        )
-        from orga_drone.studio_grade_plan import RenderContext
+        from orga_drone.studio_grade_animation import grade_has_animation
 
         animated = grade_has_animation(grade)
         for index, frame_path in enumerate(sources):
             _check_cancel(cancel_event)
-            frame_grade = grade
-            if animated:
-                # Full-source materialize: source-local == frame PTS. Story-local
-                # uses the same PTS here; timeline owners remap trim/speed later.
-                pts = Fraction(index, 1) / Fraction(fps).limit_denominator(1_000_000)
-                frame_grade = materialize_grade_at(
-                    grade,
-                    RenderContext(
-                        source_id="spatial-export",
-                        source_pts=pts,
-                        source_frame=index,
-                        source_in=Fraction(0),
-                        source_local=pts,
-                        story_time=pts,
-                    ),
-                )
+            # Absolute media PTS for this extracted frame.
+            pts_s = float(index) / float(fps) if fps > 0 else 0.0
             _grade_rgb_image(
                 frame_path,
-                frame_grade,
+                grade,
                 graded_dir / f"frame_{index:06d}.png",
                 lattice_domain="encoded-bt709",
+                source_time_s=pts_s if animated else 0.0,
+                source_in_s=float(source_in_s),
+                source_out_s=source_out_s,
             )
             frame_path.unlink(missing_ok=True)
             if on_progress is not None and (index % 5 == 0 or index + 1 == total):
@@ -589,6 +574,8 @@ def materialize_spatial_managed_media(
     *,
     kind: str,
     grade_digest: str | None = None,
+    source_in_s: float = 0.0,
+    source_out_s: float | None = None,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -596,12 +583,21 @@ def materialize_spatial_managed_media(
 
     Video grades keep full source timing so callers can preserve trim/speed/
     repeat on the export clip. Partial outputs never become cache hits.
+    Story-local animation cannot be flattened into a full-source bake.
     """
+    from orga_drone.studio_grade_animation import grade_uses_story_local_animation
+
     if not source.is_file():
         raise ManagedApplyError("source media is missing", code="MEDIA_MISSING")
     if kind not in {"photo", "video"}:
         raise ManagedApplyError(
             "Unsupported spatial media kind",
+            code="UNSUPPORTED_GRADE",
+        )
+    if grade_uses_story_local_animation(grade):
+        raise ManagedApplyError(
+            "Story-local grade animation cannot use full-source CPU bake; "
+            "evaluate with an explicit Story RenderContext instead",
             code="UNSUPPORTED_GRADE",
         )
 
@@ -620,7 +616,14 @@ def materialize_spatial_managed_media(
         tmp = work_dir / "graded.tmp.png"
         if tmp.is_file():
             tmp.unlink(missing_ok=True)
-        _grade_rgb_image(still, grade, tmp)
+        _grade_rgb_image(
+            still,
+            grade,
+            tmp,
+            source_time_s=float(source_in_s),
+            source_in_s=float(source_in_s),
+            source_out_s=source_out_s,
+        )
         _atomic_replace(tmp, dest)
         return dest
 
@@ -635,6 +638,8 @@ def materialize_spatial_managed_media(
         source,
         grade,
         dest,
+        source_in_s=float(source_in_s),
+        source_out_s=source_out_s,
         cancel_event=cancel_event,
         on_progress=on_progress,
     )

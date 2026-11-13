@@ -120,7 +120,7 @@ Legend: **PASS** = runs and passes against merged develop 51d9de3;
 | 4.6 | UNSUPPORTED_INPUT_PROFILE (HDR/log) | `test_unsupported_managed_input_profile_is_typed` | PASS |
 | 4.7 | Transfer/alpha vectors + operator semantics vs oracle | 23 vector/semantic tests | PASS |
 | 5.1 | Managed ACTIVE operator evaluation (primaries-v1 …) | — | GATE → #352 |
-| 5.2 | Animation clock evaluation | `tests/test_studio_grade_animation.py` | PASS (plan/clock unit); packaged preview/export NOT_RUN |
+| 5.2 | Animation clock evaluation | `tests/test_studio_grade_animation.py` | PASS (plan/clock + trim context + story-local bake reject); packaged WebView2 NOT_RUN — deferred by PO |
 | 5.3 | Render adapters consume plans (still/proxy/export) | — | GATE → #359/#360 |
 | 5.4 | Persistence/history/revision publication | — | GATE → #351 |
 | 5.5 | Routes/actions/DOM/MCP binding, error transport | — | GATE → #363 |

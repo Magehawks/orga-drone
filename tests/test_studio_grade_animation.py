@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 import json
+from pathlib import Path
 
 import pytest
 
@@ -325,6 +326,53 @@ def test_repeat_pass_and_trim_mapping() -> None:
         )
     )
     assert context2.repeat_pass == 1
+
+
+def test_story_local_export_path_rejects_before_bake(tmp_path: Path) -> None:
+    from orga_drone.studio_managed_apply import ManagedApplyError
+    from orga_drone.studio_managed_spatial_export import materialize_spatial_managed_media
+
+    media = tmp_path / "clip.mp4"
+    media.write_bytes(b"not-a-real-mp4-but-present")
+    source = _primaries_grade(animation=[_animation(clock="story-local")])
+    with pytest.raises(ManagedApplyError) as excinfo:
+        materialize_spatial_managed_media(
+            media,
+            source["grade"],
+            tmp_path / "work",
+            kind="video",
+        )
+    assert excinfo.value.code == "UNSUPPORTED_GRADE"
+    assert "Story-local" in str(excinfo.value)
+
+
+def test_render_context_honors_trim_for_source_local() -> None:
+    from orga_drone.studio_grade_animation import render_context_for_source_sample
+
+    ctx = render_context_for_source_sample(
+        source_id="c",
+        source_pts_s=3.0,
+        source_in_s=1.0,
+        source_out_s=5.0,
+        story_time_s=12.0,
+        transition_side="incoming",
+        repeat_pass=2,
+    )
+    assert float(ctx.source_local) == pytest.approx(2.0)
+    assert float(ctx.story_time) == pytest.approx(12.0)
+    assert ctx.transition_side == "incoming"
+    assert ctx.repeat_pass == 2
+
+
+def test_transition_side_partner_is_incoming() -> None:
+    from types import SimpleNamespace
+
+    from orga_drone.studio_grade_clock import transition_side_for_hit
+
+    hit = SimpleNamespace(overlap_index=1, crossfade_progress=0.4)
+    assert transition_side_for_hit(hit, role="primary") == "outgoing"
+    assert transition_side_for_hit(hit, role="partner") == "incoming"
+    assert transition_side_for_hit(SimpleNamespace(overlap_index=None, crossfade_progress=None)) == "single"
 
 
 def test_speed_ramp_mapping_uses_existing_ramp() -> None:
