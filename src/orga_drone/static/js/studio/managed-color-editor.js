@@ -1,6 +1,11 @@
 /** Managed Color Workspace primaries editor (#361). */
 
 import {
+  beginRequestToken,
+  isCurrentRequestToken,
+  shouldRefreshColorInspector,
+} from "./color-workspace.js";
+import {
   convertManagedGrade,
   fetchGrade,
   findStep,
@@ -29,6 +34,7 @@ export function createManagedColorEditor({
   getSelectedStudioId,
   onChanged,
   confirmConvert,
+  messages = {},
 }) {
   if (!panel) {
     return { fill() {}, reset() {} };
@@ -63,8 +69,10 @@ export function createManagedColorEditor({
   };
 
   let current = null;
+  let currentId = null;
   let saveTimer = 0;
   let busy = false;
+  const tokens = new Map();
 
   bindValueLabel(fields.exposure, labels.exposure, (v) => `${v.toFixed(2)} EV`);
   bindValueLabel(fields.kelvin, labels.kelvin, (v) => `${Math.round(v)} K`);
@@ -82,7 +90,6 @@ export function createManagedColorEditor({
   }
 
   function setEnabled(enabled) {
-    panel.hidden = !enabled ? panel.hidden : false;
     Object.values(fields).forEach((input) => {
       if (input) input.disabled = !enabled || busy;
     });
@@ -113,19 +120,38 @@ export function createManagedColorEditor({
     };
   }
 
+  function selectedStillCurrent(studioId) {
+    return shouldRefreshColorInspector({
+      clipId: studioId,
+      selectedId: getSelectedStudioId?.(),
+      requestCurrent: true,
+    });
+  }
+
   async function fill() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
     const studioId = getSelectedStudioId?.();
     if (!studioId) {
       current = null;
+      currentId = null;
       setEnabled(false);
       setStatus("");
       return;
     }
+    const token = beginRequestToken(tokens, studioId);
     try {
-      current = await fetchGrade(studioId);
+      const payload = await fetchGrade(studioId);
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!selectedStillCurrent(studioId)) return;
+      current = payload;
+      currentId = String(studioId);
       const managed = current.evaluator === "managed-sdr-v1";
       setEnabled(managed);
-      if (wrapBtn) wrapBtn.hidden = current.authority === "canonical";
+      if (wrapBtn) {
+        wrapBtn.hidden = current.authority === "canonical";
+        wrapBtn.disabled = busy;
+      }
       if (convertBtn) {
         convertBtn.hidden = managed;
         convertBtn.disabled = busy;
@@ -133,14 +159,23 @@ export function createManagedColorEditor({
       if (managed) {
         const step = findStep(current.grade, "primaries-v1");
         paintParams(step?.params || neutralPrimariesParams());
-        setStatus(`managed-sdr · rev ${current.revision}`);
+        setStatus(
+          messages.managedStatus?.replace("{rev}", String(current.revision)) ||
+            `managed-sdr · rev ${current.revision} · preview/export bake`
+        );
       } else if (current.authority === "canonical") {
-        setStatus(`legacy wrapper · rev ${current.revision}`);
+        setStatus(
+          messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
+            `legacy wrapper · rev ${current.revision} · Look & color locked`
+        );
       } else {
-        setStatus("legacy color");
+        setStatus(messages.legacyStatus || "legacy color");
       }
     } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!selectedStillCurrent(studioId)) return;
       current = null;
+      currentId = null;
       setEnabled(false);
       setStatus(String(error.message || error));
     }
@@ -148,18 +183,37 @@ export function createManagedColorEditor({
 
   async function savePrimaries() {
     const studioId = getSelectedStudioId?.();
-    if (!studioId || !current?.grade || current.evaluator !== "managed-sdr-v1") return;
+    if (
+      !studioId ||
+      !current?.grade ||
+      current.evaluator !== "managed-sdr-v1" ||
+      String(currentId) !== String(studioId)
+    ) {
+      return;
+    }
+    const token = beginRequestToken(tokens, studioId);
+    const expectedId = String(studioId);
+    const expectedRevision = current.revision;
+    const grade = upsertPrimariesStep(current.grade, readParams());
     busy = true;
     setEnabled(true);
     try {
-      const grade = upsertPrimariesStep(current.grade, readParams());
-      current = await putGrade(studioId, {
+      const payload = await putGrade(studioId, {
         grade,
-        expectedRevision: current.revision,
+        expectedRevision,
       });
-      setStatus(`managed-sdr · rev ${current.revision}`);
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (String(getSelectedStudioId?.()) !== expectedId) return;
+      current = payload;
+      currentId = expectedId;
+      setStatus(
+        messages.managedStatus?.replace("{rev}", String(current.revision)) ||
+          `managed-sdr · rev ${current.revision} · preview/export bake`
+      );
       onChanged?.(current);
     } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (String(getSelectedStudioId?.()) !== expectedId) return;
       setStatus(String(error.message || error));
       await fill();
     } finally {
@@ -183,13 +237,22 @@ export function createManagedColorEditor({
   wrapBtn?.addEventListener("click", async () => {
     const studioId = getSelectedStudioId?.();
     if (!studioId) return;
+    const token = beginRequestToken(tokens, studioId);
     busy = true;
     try {
-      current = await wrapGrade(studioId);
-      setStatus(`wrapped · rev ${current.revision}`);
+      const payload = await wrapGrade(studioId);
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!selectedStillCurrent(studioId)) return;
+      current = payload;
+      currentId = String(studioId);
+      setStatus(
+        messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
+          `legacy wrapper · rev ${current.revision} · Look & color locked`
+      );
       onChanged?.(current);
       await fill();
     } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
       setStatus(String(error.message || error));
     } finally {
       busy = false;
@@ -199,18 +262,25 @@ export function createManagedColorEditor({
   convertBtn?.addEventListener("click", async () => {
     const studioId = getSelectedStudioId?.();
     if (!studioId) return;
+    const confirmText =
+      messages.convertConfirm ||
+      "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math.";
     const ok = confirmConvert
       ? await confirmConvert()
-      : (globalThis.confirm || (() => false))(
-          "Convert to managed Color Workspace? Appearance can change. This cannot keep exact legacy math."
-        );
+      : (globalThis.confirm || (() => false))(confirmText);
     if (!ok) return;
+    const token = beginRequestToken(tokens, studioId);
     busy = true;
     try {
-      current = await convertManagedGrade(studioId, { acknowledge: true });
+      const payload = await convertManagedGrade(studioId, { acknowledge: true });
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!selectedStillCurrent(studioId)) return;
+      current = payload;
+      currentId = String(studioId);
       onChanged?.(current);
       await fill();
     } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
       setStatus(String(error.message || error));
     } finally {
       busy = false;

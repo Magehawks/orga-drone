@@ -125,6 +125,72 @@ test("managed editor enables primaries only for managed-sdr grades", async () =>
   assert.deepEqual(calls, [["GET", "/api/studio/42/grade"]]);
 });
 
+test("stale fill after clip switch does not paint the previous clip", async () => {
+  const fixture = buildPanel();
+  let resolveFirst;
+  const firstBody = new Promise((resolve) => {
+    resolveFirst = resolve;
+  });
+  let selected = "1";
+  let call = 0;
+  globalThis.fetch = async () => {
+    call += 1;
+    if (call === 1) {
+      return {
+        ok: true,
+        async json() {
+          return firstBody;
+        },
+      };
+    }
+    return {
+      ok: true,
+      async json() {
+        return {
+          evaluator: "managed-sdr-v1",
+          authority: "canonical",
+          revision: 2,
+          grade: {
+            steps: [
+              {
+                type: "primaries-v1",
+                id: "p2",
+                enabled: true,
+                params: { exposure: -0.5, kelvin: 6500 },
+              },
+            ],
+          },
+        };
+      },
+    };
+  };
+  const editor = createManagedColorEditor({
+    panel: fixture.panel,
+    getSelectedStudioId: () => selected,
+  });
+  const first = editor.fill();
+  selected = "2";
+  await editor.fill();
+  resolveFirst({
+    evaluator: "managed-sdr-v1",
+    authority: "canonical",
+    revision: 1,
+    grade: {
+      steps: [
+        {
+          type: "primaries-v1",
+          id: "p1",
+          enabled: true,
+          params: { exposure: 1.5, kelvin: 4000 },
+        },
+      ],
+    },
+  });
+  await first;
+  assert.equal(fixture.fields.exposure.value, "-0.5");
+  assert.equal(fixture.fields.kelvin.value, "6500");
+});
+
 test("managed editor paints primaries and PUT-saves after reset", async () => {
   const fixture = buildPanel();
   const puts = [];

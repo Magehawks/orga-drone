@@ -14074,9 +14074,16 @@ import {
     },
     save: saveSpeedRamp,
   });
+  const managedColorPanel = document.getElementById("inspector-managed-color");
   managedColorEditor = createManagedColorEditor({
-    panel: document.getElementById("inspector-managed-color"),
+    panel: managedColorPanel,
     getSelectedStudioId: () => selectedAdjustableClip()?.dataset?.studioId || null,
+    messages: {
+      convertConfirm: managedColorPanel?.dataset.msgConvertConfirm,
+      managedStatus: managedColorPanel?.dataset.msgManagedStatus,
+      wrappedStatus: managedColorPanel?.dataset.msgWrappedStatus,
+      legacyStatus: managedColorPanel?.dataset.msgLegacyStatus,
+    },
     onChanged: () => {
       const clip = selectedAdjustableClip();
       if (clip) {

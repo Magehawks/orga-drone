@@ -144,10 +144,13 @@ def _read_stored_slider(value: object) -> int:
 
 def image_adjust_from_effect_settings(raw: str | None) -> ImageAdjust:
     """Missing, empty, or invalid JSON is the neutral grade."""
-    if raw is None or not str(raw).strip():
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
+    if view is None or not str(view).strip():
         return ImageAdjust()
     try:
-        data = json.loads(raw)
+        data = json.loads(view)
     except json.JSONDecodeError:
         return ImageAdjust()
     if not isinstance(data, dict):
@@ -463,10 +466,13 @@ def _read_ramp_time(value: object) -> float:
 
 def saturation_ramp_from_effect_settings(raw: str | None) -> SaturationRamp:
     """Missing or invalid JSON is an off ramp. The grade stays as stored."""
-    if raw is None or not str(raw).strip():
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
+    if view is None or not str(view).strip():
         return SaturationRamp()
     try:
-        data = json.loads(raw)
+        data = json.loads(view)
     except json.JSONDecodeError:
         return SaturationRamp()
     if not isinstance(data, dict):

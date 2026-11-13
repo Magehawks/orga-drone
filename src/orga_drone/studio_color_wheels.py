@@ -137,10 +137,13 @@ def _point_from_mapping(value: object) -> ColorWheelPoint:
 
 def color_wheels_from_effect_settings(raw: str | None) -> ColorWheels:
     """Missing, empty, or invalid JSON is the neutral wheels."""
-    if raw is None or not str(raw).strip():
+    from orga_drone.studio_grade_compat import color_effect_settings_view
+
+    view = color_effect_settings_view(raw)
+    if view is None or not str(view).strip():
         return ColorWheels()
     try:
-        data = json.loads(raw)
+        data = json.loads(view)
     except json.JSONDecodeError:
         return ColorWheels()
     if not isinstance(data, dict):
