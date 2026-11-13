@@ -4065,6 +4065,55 @@ class Database:
         items = {i.id: i for i in self.list_studio_items(project_id)}
         return items[studio_item_id]
 
+    def convert_studio_grade_managed(
+        self,
+        studio_item_id: int,
+        *,
+        acknowledge_appearance_change: bool,
+    ) -> StudioClip:
+        """Convert legacy or wrapped-legacy clips to a neutral managed-sdr grade."""
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_grade_persistence import (
+            convert_legacy_to_managed,
+            publish_grade_document,
+            require_writes_enabled,
+        )
+
+        require_writes_enabled(self.path.parent)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id, project_id, effect_settings FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            current_raw = str(row["effect_settings"] or "")
+            current = read_grade(current_raw)
+            document = convert_legacy_to_managed(
+                current_raw,
+                revision=1,
+                acknowledge_appearance_change=acknowledge_appearance_change,
+            )
+            if current.authority == "canonical":
+                blob = publish_grade_document(
+                    current, document, expected_revision=current.revision
+                )
+            else:
+                blob = json.dumps(document, separators=(",", ":"), sort_keys=True)
+                read_grade(blob)  # validate before publish
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
     def set_studio_speed_ramp(self, studio_item_id: int, value: object) -> StudioClip:
         """Persist one source-anchored ramp without changing media or other effects."""
         from orga_drone.studio_speed_ramp import KEY, parse_ramp

@@ -2231,17 +2231,160 @@ def create_app() -> FastAPI:
         try:
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
                 item = db.set_studio_image_adjust(studio_item_id, payload)
-        except ValueError as exc:
-            msg = str(exc)
-            if "not found" in msg:
-                raise HTTPException(status_code=404, detail=msg) from exc
-            raise HTTPException(status_code=400, detail=msg) from exc
+        except Exception as exc:  # noqa: BLE001 - map GradeError / ValueError
+            raise _grade_http_error(exc) from exc
         image = image_adjust_from_effect_settings(item.effect_settings)
         return JSONResponse(
             {
                 "ok": True,
                 "id": item.id,
                 "image": image.as_dict(),
+            }
+        )
+
+    def _grade_http_error(exc: Exception) -> HTTPException:
+        from orga_drone.studio_grade_contract import GradeError
+
+        if isinstance(exc, GradeError):
+            status = 409 if exc.code in {"CANONICAL_GUARD", "STALE_REVISION"} else 400
+            return HTTPException(
+                status_code=status,
+                detail={"code": exc.code, "path": exc.path, "message": exc.message},
+            )
+        msg = str(exc)
+        if "not found" in msg:
+            return HTTPException(status_code=404, detail=msg)
+        return HTTPException(status_code=400, detail=msg)
+
+    @app.get("/api/studio/{studio_item_id}/grade")
+    async def api_studio_grade_get(studio_item_id: int) -> JSONResponse:
+        from orga_drone.studio_grade_model import read_grade
+
+        try:
+            project_id = _clip_project_id(studio_item_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        items = {item.id: item for item in db.list_studio_items(project_id)}
+        item = items.get(studio_item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="studio item not found")
+        model = read_grade(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "authority": model.authority,
+                "evaluator": model.evaluator,
+                "revision": model.revision,
+                "grade": model.grade,
+                "descriptors": model.descriptors,
+            }
+        )
+
+    @app.post("/api/studio/{studio_item_id}/grade/wrap")
+    async def api_studio_grade_wrap(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        from orga_drone.studio_grade_model import read_grade
+
+        try:
+            with story_edit(
+                db, _clip_project_id(studio_item_id), group=_history_group(request)
+            ):
+                item = db.wrap_studio_grade(studio_item_id)
+        except Exception as exc:  # noqa: BLE001 - map typed grade errors
+            raise _grade_http_error(exc) from exc
+        model = read_grade(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "authority": model.authority,
+                "evaluator": model.evaluator,
+                "revision": model.revision,
+                "grade": model.grade,
+            }
+        )
+
+    @app.put("/api/studio/{studio_item_id}/grade")
+    async def api_studio_grade_put(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        from orga_drone.studio_grade_model import read_grade
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or "grade" not in payload:
+            raise HTTPException(
+                status_code=400, detail="JSON body must include grade and expected_revision"
+            )
+        if "expected_revision" not in payload:
+            raise HTTPException(status_code=400, detail="expected_revision is required")
+        try:
+            expected = int(payload["expected_revision"])
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400, detail="expected_revision must be an integer"
+            ) from exc
+        document = {"grade": payload["grade"]}
+        for key, value in payload.items():
+            if key not in {"grade", "expected_revision"}:
+                document[key] = value
+        try:
+            with story_edit(
+                db, _clip_project_id(studio_item_id), group=_history_group(request)
+            ):
+                item = db.set_studio_canonical_grade(
+                    studio_item_id, document, expected_revision=expected
+                )
+        except Exception as exc:  # noqa: BLE001 - map typed grade errors
+            raise _grade_http_error(exc) from exc
+        model = read_grade(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "authority": model.authority,
+                "evaluator": model.evaluator,
+                "revision": model.revision,
+                "grade": model.grade,
+            }
+        )
+
+    @app.post("/api/studio/{studio_item_id}/grade/convert-managed")
+    async def api_studio_grade_convert_managed(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        from orga_drone.studio_grade_model import read_grade
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        acknowledged = bool(payload.get("acknowledge_appearance_change"))
+        try:
+            with story_edit(
+                db, _clip_project_id(studio_item_id), group=_history_group(request)
+            ):
+                item = db.convert_studio_grade_managed(
+                    studio_item_id,
+                    acknowledge_appearance_change=acknowledged,
+                )
+        except Exception as exc:  # noqa: BLE001 - map typed grade errors
+            raise _grade_http_error(exc) from exc
+        model = read_grade(item.effect_settings)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": item.id,
+                "authority": model.authority,
+                "evaluator": model.evaluator,
+                "revision": model.revision,
+                "grade": model.grade,
             }
         )
 
