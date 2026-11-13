@@ -377,14 +377,16 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run_export(cdp: CDP, project_id: int, output_path: Path) -> dict[str, Any]:
+def run_export(
+    cdp: CDP, project_id: int, output_path: Path, *, height: int = 720
+) -> dict[str, Any]:
     result = fetch_json(
         cdp,
         "/api/studio/export",
         method="POST",
         json_body={
             "project_id": project_id,
-            "height": 720,
+            "height": height,
             "output_path": str(output_path),
         },
     )
@@ -443,6 +445,20 @@ def validate_export(ffmpeg: Path, output_path: Path) -> dict[str, Any]:
         "red_frames": red,
         "blue_frames": blue,
     }
+
+
+def probe_video_size(ffmpeg: Path, output_path: Path) -> tuple[int, int]:
+    """Return (width, height) from ffmpeg -i stderr (no ffprobe required)."""
+    completed = subprocess.run(
+        [str(ffmpeg), "-i", str(output_path)],
+        capture_output=True,
+        timeout=60,
+    )
+    text = (completed.stderr or b"").decode("utf-8", errors="replace")
+    match = re.search(r"Video:.*?\s(\d{2,5})x(\d{2,5})", text)
+    if match is None:
+        raise E2EError(f"Could not probe video size: {text[-500:]!r}")
+    return int(match.group(1)), int(match.group(2))
 
 
 def audio_peak(ffmpeg: Path, output_path: Path) -> float:
@@ -783,6 +799,210 @@ def main() -> int:
             return {"exposure": adjust.get("exposure")}
 
         journey("edit_persistence", edit_persistence)
+
+        def timeline_transitions() -> dict[str, Any]:
+            """Crossfade, Blur Dissolve, and Soft Wipe on the outgoing video clip."""
+            video_clip_id = cdp.evaluate(
+                "(() => { const clip = Array.from(document.querySelectorAll('.studio-clip'))"
+                f".find(el => el.getAttribute('data-filename') === {json.dumps(expected_video)});"
+                " return clip ? Number(clip.getAttribute('data-studio-id')) : null; })()"
+            )
+            if not video_clip_id:
+                raise E2EError("Video Studio clip id is missing for transitions")
+            applied: dict[str, Any] = {}
+            for transition_type in (
+                "crossfade",
+                "blur_dissolve",
+                "soft_wipe_left",
+            ):
+                body = expect_ok(
+                    fetch_json(
+                        cdp,
+                        f"/api/studio/{int(video_clip_id)}/transition",
+                        method="PATCH",
+                        json_body={"type": transition_type, "duration_s": 0.5},
+                    ),
+                    f"Transition {transition_type}",
+                )
+                if body.get("type") != transition_type:
+                    raise E2EError(f"Transition type not stored: {body!r}")
+                if body.get("applied_type") != transition_type:
+                    raise E2EError(f"Transition not applied: {body!r}")
+                applied[transition_type] = {
+                    "duration_s": body.get("duration_s"),
+                    "applied_duration_s": body.get("applied_duration_s"),
+                    "fallback_cut": body.get("fallback_cut"),
+                }
+            # Leave Soft Wipe active for later exports (overlap shortens story).
+            shot = cdp.call("Page.captureScreenshot", {"format": "png"})
+            (output_dir / "studio-transitions.png").write_bytes(
+                base64.b64decode(str(shot.get("data", "")))
+            )
+            state["video_clip_id"] = int(video_clip_id)
+            return applied
+
+        journey("timeline_transitions", timeline_transitions)
+
+        def speed_and_timelapse() -> dict[str, Any]:
+            """Speed Ramp region + Timelapse flat ramp via the same speed-ramp API."""
+            clip_id = int(state["video_clip_id"])
+            ramp = {
+                "v": 1,
+                "interp": "reciprocal_smoothstep",
+                "points": [
+                    {"source_s": 0.0, "speed": 1.0},
+                    {"source_s": 2.0, "speed": 4.0},
+                ],
+                "region": {"start_s": 0.0, "end_s": 2.0},
+            }
+            ramped = expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{clip_id}/speed-ramp",
+                    method="PATCH",
+                    json_body={"speed_ramp": ramp},
+                ),
+                "Speed ramp apply",
+            )
+            if not isinstance(ramped.get("speed_ramp"), dict):
+                raise E2EError(f"Speed ramp did not persist: {ramped!r}")
+            if float(ramped.get("effective_duration_s") or 0) <= 0:
+                raise E2EError(f"Speed ramp has no effective duration: {ramped!r}")
+            # Timelapse Inspector writes a flat ADR-0034 ramp after confirm.
+            flat = {
+                "v": 1,
+                "interp": "reciprocal_smoothstep",
+                "points": [
+                    {"source_s": 0.0, "speed": 2.0},
+                    {"source_s": 2.0, "speed": 2.0},
+                ],
+            }
+            timed = expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{clip_id}/speed-ramp",
+                    method="PATCH",
+                    json_body={"speed_ramp": flat},
+                ),
+                "Timelapse flat ramp apply",
+            )
+            points = (timed.get("speed_ramp") or {}).get("points") or []
+            if len(points) != 2 or abs(float(points[0].get("speed") or 0) - 2.0) > 1e-6:
+                raise E2EError(f"Timelapse flat ramp missing: {timed!r}")
+            # Clear before the long SFX/export journeys so frame-count gates stay stable.
+            cleared = expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{clip_id}/speed-ramp",
+                    method="PATCH",
+                    json_body={"speed_ramp": None},
+                ),
+                "Speed ramp clear",
+            )
+            if cleared.get("speed_ramp") is not None:
+                raise E2EError(f"Speed ramp did not clear: {cleared!r}")
+            navigate(cdp, app.app_port, "/studio")
+            wait_until(
+                cdp,
+                "!!document.getElementById('inspector-timelapse')",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="Timelapse inspector panel",
+            )
+            shot = cdp.call("Page.captureScreenshot", {"format": "png"})
+            (output_dir / "studio-timelapse-inspector.png").write_bytes(
+                base64.b64decode(str(shot.get("data", "")))
+            )
+            return {
+                "ramp_effective_duration_s": ramped.get("effective_duration_s"),
+                "timelapse_effective_duration_s": timed.get("effective_duration_s"),
+                "cleared": True,
+            }
+
+        journey("speed_and_timelapse", speed_and_timelapse)
+
+        def undo_redo_timeline() -> dict[str, Any]:
+            studio_id = cdp.evaluate(
+                "(() => { const clip = Array.from(document.querySelectorAll('.studio-clip'))"
+                f".find(el => el.getAttribute('data-filename') === {json.dumps(expected_photo)});"
+                " return clip ? clip.getAttribute('data-studio-id') : null; })()"
+            )
+            if not studio_id:
+                raise E2EError("Photo Studio clip id is missing for undo/redo")
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{studio_id}/image",
+                    method="PATCH",
+                    json_body={"exposure": 35},
+                ),
+                "Undo/redo exposure edit",
+            )
+            undone = expect_ok(
+                fetch_json(cdp, "/api/studio/history/undo", method="POST"),
+                "Timeline undo",
+            )
+            if undone.get("ok") is False:
+                raise E2EError(f"Undo rejected: {undone!r}")
+            adjust = read_photo_adjust(cdp, expected_photo)
+            # DOM may be stale until reload; verify via reopen.
+            navigate(cdp, app.app_port, "/studio")
+            wait_until(
+                cdp,
+                f"document.body.innerText.includes({json.dumps(expected_photo)})",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="Studio after undo",
+            )
+            adjust = read_photo_adjust(cdp, expected_photo)
+            if int(adjust.get("exposure") or 0) != 20:
+                raise E2EError(f"Undo did not restore exposure 20: {adjust!r}")
+            expect_ok(
+                fetch_json(cdp, "/api/studio/history/redo", method="POST"),
+                "Timeline redo",
+            )
+            navigate(cdp, app.app_port, "/studio")
+            wait_until(
+                cdp,
+                f"document.body.innerText.includes({json.dumps(expected_photo)})",
+                timeout_s=JOURNEY_TIMEOUT_S,
+                description="Studio after redo",
+            )
+            adjust = read_photo_adjust(cdp, expected_photo)
+            if int(adjust.get("exposure") or 0) != 35:
+                raise E2EError(f"Redo did not restore exposure 35: {adjust!r}")
+            # Restore the baseline exposure used by relaunch_persistence.
+            expect_ok(
+                fetch_json(
+                    cdp,
+                    f"/api/studio/{studio_id}/image",
+                    method="PATCH",
+                    json_body={"exposure": 20},
+                ),
+                "Restore baseline exposure",
+            )
+            return {"after_undo": 20, "after_redo": 35, "restored": 20}
+
+        journey("undo_redo_timeline", undo_redo_timeline)
+
+        def export_1080p() -> dict[str, Any]:
+            output_path = output_dir / "e2e-export-1080p.mp4"
+            job = run_export(
+                cdp, int(state["project_id"]), output_path, height=1080
+            )
+            if not output_path.is_file() or output_path.stat().st_size <= 0:
+                raise E2EError(f"1080p export missing: {output_path}")
+            width, height = probe_video_size(args.ffmpeg, output_path)
+            if height != 1080:
+                raise E2EError(f"1080p export height mismatch: {width}x{height}")
+            if str(job.get("output_path") or "") == "":
+                raise E2EError(f"1080p export job has no output path: {job!r}")
+            return {
+                "bytes": output_path.stat().st_size,
+                "sha256": sha256_file(output_path),
+                "width": width,
+                "height": height,
+            }
+
+        journey("export_1080p", export_1080p)
 
         def sfx_lane() -> dict[str, Any]:
             music = library / "e2e-bed.wav"
@@ -1262,6 +1482,24 @@ def main() -> int:
             return {"exposure": adjust.get("exposure")}
 
         journey("relaunch_persistence", relaunch_persistence)
+
+        def shutdown() -> dict[str, Any]:
+            """Ensure no packaged app process remains after journeys complete."""
+            stopped: list[int] = []
+            for process in list(background):
+                if process.process is not None:
+                    stopped.append(int(process.process.pid))
+                process.stop()
+                background.remove(process)
+            if app is not None and app.process is not None:
+                stopped.append(int(app.process.pid))
+                app.stop()
+            crash = data_dir / "startup-crash.log"
+            if crash.exists():
+                raise E2EError(f"startup-crash.log after shutdown: {crash.read_text()}")
+            return {"stopped_pids": stopped, "clean": True}
+
+        journey("shutdown", shutdown)
 
         evidence["result"] = "pass"
         evidence["elapsed_ms"] = int((time.monotonic() - started) * 1000)
