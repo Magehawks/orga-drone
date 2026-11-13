@@ -34,6 +34,7 @@ const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy
     fetchGrade: async () => null,
     probeManagedGpuCapabilities: () => ({ supported: false, mode: "cpu" }),
     managedBakeUrl: () => "",
+    managedColorEditor: null,
     window: {},
     String, Math, Array,
   };
