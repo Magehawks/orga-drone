@@ -191,10 +191,20 @@ test("stale fill after clip switch does not paint the previous clip", async () =
   assert.equal(fixture.fields.kelvin.value, "6500");
 });
 
-test("managed editor paints primaries and PUT-saves after reset", async () => {
+test("managed editor paints primaries and command-saves after reset", async () => {
   const fixture = buildPanel();
-  const puts = [];
+  const commands = [];
   let revision = 7;
+  let gradeSteps = [
+    {
+      type: "primaries-v1",
+      id: "p1",
+      enabled: true,
+      mix: 1,
+      selection_id: null,
+      params: { exposure: 0.4, kelvin: 5200 },
+    },
+  ];
   globalThis.fetch = async (url, init = {}) => {
     if (!init.method || init.method === "GET") {
       return {
@@ -204,22 +214,32 @@ test("managed editor paints primaries and PUT-saves after reset", async () => {
             evaluator: "managed-sdr-v1",
             authority: "canonical",
             revision,
-            grade: {
-              steps: [
-                {
-                  type: "primaries-v1",
-                  id: "p1",
-                  enabled: true,
-                  params: { exposure: 0.4, kelvin: 5200 },
-                },
-              ],
-            },
+            grade: { steps: gradeSteps },
           };
         },
       };
     }
-    puts.push({ url, body: JSON.parse(init.body) });
+    const body = JSON.parse(init.body);
+    commands.push({ url: String(url), body, headers: init.headers || {} });
     revision += 1;
+    if (body.type === "upsert_step_params") {
+      const existing = gradeSteps.find((step) => step.id === body.params.step_id);
+      if (existing) {
+        existing.params = { ...existing.params, ...body.params.params };
+      } else {
+        gradeSteps = [
+          ...gradeSteps,
+          {
+            id: body.params.step_id,
+            type: body.params.type,
+            enabled: true,
+            mix: 1,
+            selection_id: null,
+            params: body.params.params,
+          },
+        ];
+      }
+    }
     return {
       ok: true,
       async json() {
@@ -227,7 +247,7 @@ test("managed editor paints primaries and PUT-saves after reset", async () => {
           evaluator: "managed-sdr-v1",
           authority: "canonical",
           revision,
-          grade: JSON.parse(init.body).grade,
+          grade: { steps: gradeSteps },
         };
       },
     };
@@ -248,11 +268,12 @@ test("managed editor paints primaries and PUT-saves after reset", async () => {
   fixture.resetBtn.click();
   await tick();
   await new Promise((resolve) => setTimeout(resolve, 220));
-  assert.equal(puts.length, 1);
-  assert.equal(puts[0].body.expected_revision, 7);
-  assert.equal(
-    puts[0].body.grade.steps.find((step) => step.type === "primaries-v1").params.exposure,
-    0
-  );
+  assert.ok(commands.length >= 1);
+  assert.match(commands[0].url, /\/grade\/command$/);
+  assert.equal(commands[0].body.type, "upsert_step_params");
+  assert.equal(commands[0].body.expected_revision, 7);
+  assert.equal(commands[0].body.params.type, "primaries-v1");
+  assert.equal(commands[0].body.params.params.exposure, 0);
+  assert.ok(commands[0].headers["X-Studio-History-Group"]);
   assert.deepEqual(changed, [8]);
 });

@@ -71,14 +71,21 @@ export async function putGrade(studioId, { grade, expectedRevision, extras = {} 
   return data;
 }
 
-/** Shared bounded grade command (#363). Prefer over full PUT for enable/mix/reorder/animation. */
-export async function postGradeCommand(studioId, { type, expectedRevision, params = {} }) {
+/** Shared bounded grade command (#363). Prefer over full PUT for enable/mix/reorder/params. */
+export async function postGradeCommand(
+  studioId,
+  { type, expectedRevision, params = {}, historyGroup = null }
+) {
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  if (historyGroup) {
+    headers["X-Studio-History-Group"] = String(historyGroup);
+  }
   const response = await fetch(`/api/studio/${studioId}/grade/command`, {
     method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
       type,
       expected_revision: expectedRevision,

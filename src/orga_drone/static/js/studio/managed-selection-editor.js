@@ -193,36 +193,39 @@ export function createManagedSelectionEditor({
     try {
       let payload = gradeDoc;
       let step = findStep(gradeDoc.grade, bindType);
-      if (!step) {
-        const neutrals =
-          bindType === "wheels-v1"
-            ? neutralWheelsParams()
-            : bindType === "managed-hsl-v1"
-              ? neutralManagedHslParams()
-              : neutralPrimariesParams();
-        payload = await postGradeCommand(studioId, {
-          type: "upsert_step_params",
-          expectedRevision,
-          params: {
-            step_id: `${bindType}-${Date.now().toString(36)}`,
-            type: bindType,
-            params: neutrals,
-            enabled: true,
-          },
-        });
-        expectedRevision = payload.revision;
-        step = findStep(payload.grade, bindType);
-      }
-      if (!step?.id) throw new Error("step not found");
-
       if (clear) {
         showSample(null);
+        if (!step?.id) {
+          setStatus(messages.selectionCleared || "Selection cleared");
+          return;
+        }
         payload = await postGradeCommand(studioId, {
           type: "bind_step_selection",
           expectedRevision,
           params: { step_id: step.id, selection_id: null },
         });
       } else {
+        if (!step) {
+          const neutrals =
+            bindType === "wheels-v1"
+              ? neutralWheelsParams()
+              : bindType === "managed-hsl-v1"
+                ? neutralManagedHslParams()
+                : neutralPrimariesParams();
+          payload = await postGradeCommand(studioId, {
+            type: "upsert_step_params",
+            expectedRevision,
+            params: {
+              step_id: `${bindType}-${Date.now().toString(36)}`,
+              type: bindType,
+              params: neutrals,
+              enabled: true,
+            },
+          });
+          expectedRevision = payload.revision;
+          step = findStep(payload.grade, bindType);
+        }
+        if (!step?.id) throw new Error("step not found");
         const reuseId = step.selection_id || null;
         const previous = (payload.grade.selections || []).find((entry) => entry.id === reuseId);
         const selection = previous

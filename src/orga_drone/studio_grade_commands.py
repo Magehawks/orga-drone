@@ -144,12 +144,18 @@ def validate_patch(
                 "Unsupported step type for upsert_step_params",
                 "UNSUPPORTED_GRADE",
             )
-        allowed_params = set(descriptor["parameters"])
+        raw_params = descriptor["parameters"]
+        allowed_params = {
+            str(item) for item in (raw_params if isinstance(raw_params, list) else [])
+        }
         unknown = set(body) - allowed_params
         if unknown:
             fail(
                 "command.params.params",
-                "Unknown parameter keys for " + step_type + ": " + ", ".join(sorted(unknown)),
+                "Unknown parameter keys for "
+                + step_type
+                + ": "
+                + ", ".join(sorted(unknown)),
             )
         if "enabled" in params and type(params["enabled"]) is not bool:
             fail("command.params.enabled", "Expected a boolean")

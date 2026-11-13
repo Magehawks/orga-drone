@@ -390,13 +390,16 @@ export function createManagedColorEditor({
     const hsl = readHsl();
     const grade = current.grade;
     const commands = [];
-    const hasPrimaries = Boolean(findStep(grade, "primaries-v1"));
-    const hasWheels = Boolean(findStep(grade, "wheels-v1"));
-    const hasHsl = Boolean(findStep(grade, "managed-hsl-v1"));
-    const primariesChanged = JSON.stringify(primaries) !== JSON.stringify(neutralPrimariesParams());
-    const wheelsChanged = JSON.stringify(wheels) !== JSON.stringify(neutralWheelsParams());
-    const hslChanged = JSON.stringify(hsl) !== JSON.stringify(neutralManagedHslParams());
-    if (hasPrimaries || primariesChanged) {
+    function familyDirty(type, nextParams, neutrals) {
+      const step = findStep(grade, type);
+      const baseline = { ...neutrals, ...(step?.params || {}) };
+      const candidate = { ...neutrals, ...nextParams };
+      return JSON.stringify(baseline) !== JSON.stringify(candidate);
+    }
+    const primariesDirty = familyDirty("primaries-v1", primaries, neutralPrimariesParams());
+    const wheelsDirty = familyDirty("wheels-v1", wheels, neutralWheelsParams());
+    const hslDirty = familyDirty("managed-hsl-v1", hsl, neutralManagedHslParams());
+    if (primariesDirty) {
       commands.push({
         type: "upsert_step_params",
         params: {
@@ -407,7 +410,7 @@ export function createManagedColorEditor({
         },
       });
     }
-    if (hasWheels || wheelsChanged) {
+    if (wheelsDirty) {
       commands.push({
         type: "upsert_step_params",
         params: {
@@ -418,7 +421,7 @@ export function createManagedColorEditor({
         },
       });
     }
-    if (hasHsl || hslChanged) {
+    if (hslDirty) {
       commands.push({
         type: "upsert_step_params",
         params: {
@@ -430,6 +433,7 @@ export function createManagedColorEditor({
       });
     }
     if (!commands.length) return;
+    const historyGroup = `grade-save-${expectedId}-${Date.now().toString(36)}`;
     busy = true;
     setEnabled(true);
     try {
@@ -439,6 +443,7 @@ export function createManagedColorEditor({
           type: command.type,
           expectedRevision,
           params: command.params,
+          historyGroup,
         });
         expectedRevision = payload.revision;
       }

@@ -34,7 +34,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Animation clocks (#358) | Available now (partial) | Client `story_s`; story-local export with Story anchor (constant-speed single play); ramps/repeats/loop fail-closed |
 | GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
-| Shared Control API grade actions (#363) | Available now | Commands for enable/mix/reorder/params/selection; preview tokens; PUT escape hatch |
+| Shared Control API grade actions (#363) | Available now (unit) | Commands for enable/mix/reorder/params/selection; preview tokens; PUT escape hatch; packaged E2E NOT_RUN |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
 | Full #365 acceptance matrix | OPEN | Remaining AC + packaged deferred by PO |
 
