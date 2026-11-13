@@ -1,6 +1,12 @@
 /** Managed-sdr GPU capability probe for the existing WebGL LUT adapter (#360). */
 
-export const MANAGED_GPU_ADAPTER_VERSION = "managed-sdr-webgl-bake-v2-tetrahedral";
+import {
+  LUT_PRECISION_RGBA16F,
+  LUT_PRECISION_RGBA32F,
+  LUT_PRECISION_RGBA8,
+} from "./lut-webgl-precision.js";
+
+export const MANAGED_GPU_ADAPTER_VERSION = "managed-sdr-webgl-bake-v3-precision-gated";
 
 const LUT_BAKEABLE = new Set([
   "primaries-v1",
@@ -16,11 +22,20 @@ const LUT_BAKEABLE = new Set([
   "creative-lut-v1",
 ]);
 
+const FLOAT_PRECISIONS = new Set([LUT_PRECISION_RGBA16F, LUT_PRECISION_RGBA32F]);
+
 /**
  * Inspect a managed grade document and report WebGL coverage.
  * Spatial selections and unknown ops are never silently approximated.
+ *
+ * @param {object} gradeDoc
+ * @param {{ lutPrecision?: string }=} [options]
+ *   Runtime WebGL LUT storage precision from the renderer probe. When omitted,
+ *   assume RGBA8 (conservative exact:false). Float precision is required before
+ *   claiming operator-exact GPU parity (≤1e-5 vs CPU tetrahedral).
  */
-export function probeManagedGpuCapabilities(gradeDoc) {
+export function probeManagedGpuCapabilities(gradeDoc, options = {}) {
+  const lutPrecision = String(options.lutPrecision || LUT_PRECISION_RGBA8);
   const grade = gradeDoc?.grade || gradeDoc;
   if (!grade || gradeDoc?.evaluator !== "managed-sdr-v1") {
     return {
@@ -29,6 +44,7 @@ export function probeManagedGpuCapabilities(gradeDoc) {
       mode: "none",
       reasons: ["not-managed-sdr"],
       unsupported: [],
+      lutPrecision,
     };
   }
   const unsupported = [];
@@ -57,6 +73,8 @@ export function probeManagedGpuCapabilities(gradeDoc) {
       mode: "identity",
       reasons: [],
       unsupported: [],
+      lutPrecision,
+      exact: true,
     };
   }
   if (hasSpatial || unsupported.length) {
@@ -66,16 +84,32 @@ export function probeManagedGpuCapabilities(gradeDoc) {
       mode: "cpu-fallback",
       reasons: hasSpatial ? ["spatial-selection"] : ["unsupported-op"],
       unsupported: [...new Set(unsupported)],
+      lutPrecision,
+      exact: true,
+    };
+  }
+  const floatOk = FLOAT_PRECISIONS.has(lutPrecision);
+  if (floatOk) {
+    return {
+      adapter: MANAGED_GPU_ADAPTER_VERSION,
+      supported: true,
+      mode: "webgl-bake-tetrahedral",
+      exact: true,
+      interpolation: "tetrahedral",
+      lutPrecision,
+      reasons: [],
+      unsupported: [],
     };
   }
   return {
     adapter: MANAGED_GPU_ADAPTER_VERSION,
     supported: true,
-    // Preview samples tetrahedrally (#360) but RGBA8 3D textures still
-    // quantize table values. Export/CPU float remain the exact reference.
+    // Tetrahedral sampling is exact; RGBA8 table storage is not. Export/CPU
+    // float remain the reference when the runtime cannot upload float LUTs.
     mode: "webgl-bake-tetrahedral",
     exact: false,
     interpolation: "tetrahedral",
+    lutPrecision: LUT_PRECISION_RGBA8,
     reasons: ["rgba8-quantization"],
     unsupported: [],
   };

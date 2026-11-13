@@ -20,7 +20,7 @@ function grade(steps) {
   };
 }
 
-test("pointwise primaries are webgl-bake-tetrahedral supported", () => {
+test("pointwise primaries default to rgba8 exact:false", () => {
   const probe = probeManagedGpuCapabilities(
     grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }])
   );
@@ -29,6 +29,17 @@ test("pointwise primaries are webgl-bake-tetrahedral supported", () => {
   assert.equal(probe.interpolation, "tetrahedral");
   assert.equal(probe.exact, false);
   assert.ok(probe.reasons.includes("rgba8-quantization"));
+  assert.match(probe.adapter, /v3-precision-gated/);
+});
+
+test("float LUT precision enables exact:true", () => {
+  const probe = probeManagedGpuCapabilities(
+    grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }]),
+    { lutPrecision: "rgba32f" }
+  );
+  assert.equal(probe.exact, true);
+  assert.equal(probe.lutPrecision, "rgba32f");
+  assert.deepEqual(probe.reasons, []);
 });
 
 test("spatial selection forces cpu fallback", () => {
