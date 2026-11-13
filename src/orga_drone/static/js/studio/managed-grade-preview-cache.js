@@ -14,7 +14,7 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
     try {
       const parsed = JSON.parse(raw);
       if (parsed?.evaluator === "managed-sdr-v1") return parsed;
-    } catch (_) {
+    } catch {
       /* corrupt cache */
     }
     return null;
@@ -69,7 +69,7 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
         }
         markMiss(clip);
         return null;
-      } catch (_) {
+      } catch {
         if (String(clip.dataset.studioId) === studioId) {
           markMiss(clip);
         }
@@ -88,7 +88,8 @@ export function createManagedGradePreviewCache({ fetchGrade }) {
    * the clip that requested it and the editor's current studio id.
    */
   function cacheFillResult({ clip, requestedStudioId, editorStudioId, grade }) {
-    if (!clip || requestedStudioId == null || editorStudioId == null) return false;
+    if (!clip || requestedStudioId === null || requestedStudioId === undefined) return false;
+    if (editorStudioId === null || editorStudioId === undefined) return false;
     if (String(clip.dataset?.studioId) !== String(requestedStudioId)) return false;
     if (String(editorStudioId) !== String(requestedStudioId)) return false;
     writeManagedGrade(clip, grade);
