@@ -203,6 +203,65 @@ def test_prepare_action_blocks_canonical_color() -> None:
     assert exc.value.args[0] == "CANONICAL_GUARD"
 
 
+def test_grade_put_route_preserves_opaque_and_undo_remints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from orga_drone.config import Settings
+    from orga_drone.studio_history import redo_story, undo_story
+
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    from orga_drone.app import create_app
+
+    app = create_app()
+    client = TestClient(app)
+    db = app.state.db
+    startup_backup_if_needed(tmp_path / "data", app_version="t")
+    media_id = _seed_photo(db, tmp_path / "library")
+    item = db.get_media(media_id)
+    assert item is not None
+    project = db.create_studio_project("persist")
+    clip_id, _ = db.add_studio_item(
+        item.path,
+        identity_key=make_identity_key(item.filename, item.size_bytes, item.recorded_at),
+        filename=item.filename,
+        recorded_at=item.recorded_at,
+        kind=item.kind,
+        project_id=project.id,
+        source_media_id=media_id,
+    )
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+            (_legacy_blob(), clip_id),
+        )
+    assert client.post(f"/api/studio/{clip_id}/grade/wrap").status_code == 200
+    before = client.get(f"/api/studio/{clip_id}/grade").json()
+    rev = int(before["revision"])
+    put = client.put(
+        f"/api/studio/{clip_id}/grade",
+        json={"grade": before["grade"], "expected_revision": rev},
+    )
+    assert put.status_code == 200, put.text
+    after = client.get(f"/api/studio/{clip_id}/grade").json()
+    assert after["revision"] == rev + 1
+    stored = json.loads(db.list_studio_items(project.id)[0].effect_settings)
+    assert stored["mystery"] == {"keep": True}
+    assert stored["overlays"] == []
+    assert undo_story(db, project.id) is True
+    undone = read_grade(db.list_studio_items(project.id)[0].effect_settings)
+    assert undone.revision > after["revision"]
+    stale = client.put(
+        f"/api/studio/{clip_id}/grade",
+        json={"grade": undone.grade, "expected_revision": after["revision"]},
+    )
+    assert stale.status_code == 409
+    assert redo_story(db, project.id) is True
+    redone = read_grade(db.list_studio_items(project.id)[0].effect_settings)
+    assert redone.revision > undone.revision
+
+
 def test_convert_legacy_to_managed_requires_ack() -> None:
     from orga_drone.studio_grade_persistence import convert_legacy_to_managed
 

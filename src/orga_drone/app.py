@@ -2334,8 +2334,10 @@ def create_app() -> FastAPI:
         for key, value in payload.items():
             if key not in {"grade", "expected_revision"}:
                 document[key] = value
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="studio item not found")
         try:
-            project_id = _clip_project_id(studio_item_id)
             with transactional_story_edit(
                 db, project_id, group=_history_group(request)
             ) as conn:
