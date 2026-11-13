@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -65,6 +64,7 @@ def _grade(spatial: bool = False) -> dict:
                             }
                         ],
                     },
+                    "qualifier": {"type": "luma", "inner": 0.5, "outer": 0.1},
                     "invert": False,
                 }
             ]
