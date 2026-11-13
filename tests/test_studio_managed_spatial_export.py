@@ -406,3 +406,71 @@ def test_story_time_for_source_pts_maps_constant_speed() -> None:
         )
         is None
     )
+
+
+def test_story_time_for_source_pts_maps_speed_ramp() -> None:
+    from orga_drone.studio_managed_spatial_export import _story_time_for_source_pts
+    from orga_drone.studio_speed_ramp import Point, SpeedRamp
+
+    ramp = SpeedRamp(points=(Point(0.0, 1.0), Point(2.0, 2.0)))
+    # Story offset is the ramp primitive delta from in-point.
+    expected = 10.0 + (ramp.time_at(1.0) - ramp.time_at(0.0))
+    assert _story_time_for_source_pts(
+        source_pts_s=1.0,
+        source_in_s=0.0,
+        story_anchor_s=10.0,
+        playback_speed=1.0,
+        speed_ramp=ramp,
+    ) == pytest.approx(expected)
+
+
+def test_story_local_repeat_passes_evaluate_distinct_exposure() -> None:
+    """Pass 0 vs pass 1 at the same source PTS must see different Story keys."""
+    from orga_drone.studio_grade_animation import materialize_grade_at, render_context_for_source_sample
+    from orga_drone.studio_managed_spatial_export import _story_time_for_source_pts
+
+    grade = _story_local_grade()
+    # Keys at story 0 → exposure 0, story 2 → exposure 1.
+    pts = 0.5
+    story_pass0 = _story_time_for_source_pts(
+        source_pts_s=pts,
+        source_in_s=0.0,
+        story_anchor_s=0.0,
+        playback_speed=1.0,
+    )
+    story_pass1 = _story_time_for_source_pts(
+        source_pts_s=pts,
+        source_in_s=0.0,
+        story_anchor_s=2.0,
+        playback_speed=1.0,
+    )
+    assert story_pass0 == pytest.approx(0.5)
+    assert story_pass1 == pytest.approx(2.5)
+    g0 = materialize_grade_at(
+        grade,
+        render_context_for_source_sample(
+            source_id="p0",
+            source_pts_s=pts,
+            source_in_s=0.0,
+            source_out_s=2.0,
+            story_time_s=story_pass0,
+            speed=1.0,
+        ),
+    )
+    g1 = materialize_grade_at(
+        grade,
+        render_context_for_source_sample(
+            source_id="p1",
+            source_pts_s=pts,
+            source_in_s=0.0,
+            source_out_s=2.0,
+            story_time_s=story_pass1,
+            speed=1.0,
+        ),
+    )
+    exp0 = float(g0["steps"][0]["params"]["exposure"])
+    exp1 = float(g1["steps"][0]["params"]["exposure"])
+    # Keys 0→0 and 2→1: pass0 at story 0.5 → 0.25; pass1 at 2.5 holds 1.0.
+    assert exp0 == pytest.approx(0.25, abs=0.02)
+    assert exp1 == pytest.approx(1.0, abs=0.02)
+    assert exp1 > exp0

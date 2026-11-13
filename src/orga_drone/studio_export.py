@@ -817,14 +817,16 @@ def _snapshot_export_destination(
 
 
 def _story_local_spatial_export_eligible(clip: StudioExportClip) -> bool:
-    """Constant-speed single play can map source PTS → Story for a full bake."""
-    if int(clip.section_repeats or 1) != 1:
-        return False
-    if bool(clip.forward_loop):
-        return False
-    if clip.speed_ramp is not None:
-        return False
+    """Whether Source→Story bake mapping can be established for this clip.
+
+    Supported: constant speed, trim, speed ramp (single play), section repeats
+    and forward-loop (expanded to one bake pass each). Fail closed on slow-bar
+    and on forward-loop combined with a speed ramp (join/ramp interaction is
+    not injective without a dedicated renderer).
+    """
     if clip.slow_span is not None:
+        return False
+    if bool(clip.forward_loop) and clip.speed_ramp is not None:
         return False
     return True
 
@@ -838,6 +840,57 @@ def spatial_cpu_materialize_plan(*, kind: str, story_local: bool) -> str:
     if kind == "video" or story_local:
         return "defer"
     return "eager"
+
+
+def _expand_story_local_spatial_passes(
+    clips: list[StudioExportClip],
+) -> list[StudioExportClip]:
+    """Expand repeats / forward-loop into one bake pass per play (#358).
+
+    Reuses ``section_repeat_slices`` so encoder timing stays aligned. Each
+    expanded slice keeps an injective Source→Story map via its own anchor.
+    """
+    from dataclasses import replace
+
+    from orga_drone.export.studio_encoder import section_repeat_slices
+    from orga_drone.studio_grade_animation import grade_uses_story_local_animation
+
+    out: list[StudioExportClip] = []
+    for clip in clips:
+        if not clip.managed_spatial_grade_json:
+            out.append(clip)
+            continue
+        if clip.managed_spatial_story_anchor_s is None:
+            out.append(clip)
+            continue
+        try:
+            grade = json.loads(clip.managed_spatial_grade_json)
+        except json.JSONDecodeError:
+            out.append(clip)
+            continue
+        if not grade_uses_story_local_animation(grade):
+            out.append(clip)
+            continue
+        needs_expand = int(clip.section_repeats or 1) > 1 or bool(clip.forward_loop)
+        if not needs_expand:
+            out.append(clip)
+            continue
+        slices = section_repeat_slices(clip)
+        cursor = float(clip.managed_spatial_story_anchor_s)
+        for slice_clip in slices:
+            out.append(
+                replace(
+                    slice_clip,
+                    managed_spatial_story_anchor_s=cursor,
+                )
+            )
+            cursor += float(slice_clip.duration_s)
+            if (
+                str(slice_clip.transition_type) == "crossfade"
+                and float(slice_clip.transition_s or 0.0) > 0
+            ):
+                cursor -= float(slice_clip.transition_s)
+    return out
 
 
 def _attach_story_local_spatial_anchors(
@@ -869,8 +922,8 @@ def _attach_story_local_spatial_anchors(
             continue
         if not _story_local_spatial_export_eligible(clip):
             raise StudioExportError(
-                "Story-local grade animation export supports constant-speed "
-                "single play only (no repeats, forward loop, slow bar, or ramp)",
+                "Story-local grade animation export does not support this "
+                "timing combination (slow bar, or forward loop with speed ramp)",
                 code="unsupported_grade",
             )
         out.append(
@@ -879,7 +932,7 @@ def _attach_story_local_spatial_anchors(
                 managed_spatial_story_anchor_s=float(starts[index]),
             )
         )
-    return out
+    return _expand_story_local_spatial_passes(out)
 
 
 def prepare_studio_export(
@@ -1130,6 +1183,7 @@ def _materialize_deferred_spatial_clips(
                 ),
                 story_anchor_s=clip.managed_spatial_story_anchor_s,
                 playback_speed=float(clip.playback_speed or 1.0),
+                speed_ramp=clip.speed_ramp,
                 cancel_event=cancel_event,
                 on_progress=_frame_progress,
             )

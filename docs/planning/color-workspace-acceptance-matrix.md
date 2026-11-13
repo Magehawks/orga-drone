@@ -46,10 +46,10 @@ and stopped #320 precision experiments are not weakened.
 | Source-local mapping + trim | PASS | #431; `test_studio_grade_animation.py` |
 | Story-local plan evaluation | PASS | unit |
 | Story-local full-source bake (no anchor) | PASS (fail-closed) | explicit UNSUPPORTED |
-| Story-local constant-speed single-play export | PASS | anchor + `_story_time_for_source_pts`; repeats/ramp/loop remain fail-closed |
+| Story-local constant-speed single-play export | PASS | anchor + `_story_time_for_source_pts` |
 | Speed/repeat/transition helpers | PASS | `studio_grade_clock` unit |
 | Client `story_s` wiring | PASS | `preview-frame-url.js` + lut/scopes/compare |
-| ClipTimingInputs full export wiring | NOT_RUN | remaining complex ramps/repeats |
+| ClipTimingInputs full export wiring | PASS | Ramp via `SpeedRamp.time_at`; repeats/forward-loop expanded to per-pass anchors; slow_span and forward_loop+ramp fail-closed |
 | Packaged preview/export | NOT_RUN — deferred by PO | — |
 
 ## 5. Undo / persistence / migration
@@ -128,7 +128,7 @@ pytest tests/test_studio_grade_animation.py \
 
 | Issue | Matrix implication |
 |---|---|
-| #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
+| #358 | Client story_s + story-local export for constant/ramp/repeats/forward-loop; slow_span and loop+ramp fail-closed; packaged NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
 | #361 | Step editor + Quick Look `apply_preset` compile shipped |
 | #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |

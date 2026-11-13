@@ -72,14 +72,33 @@ def _story_time_for_source_pts(
     source_in_s: float,
     story_anchor_s: float | None,
     playback_speed: float,
+    speed_ramp: object | None = None,
 ) -> float | None:
-    """Map absolute media PTS to Story time for a constant-speed single play.
+    """Map absolute media PTS to Story time for one bake pass.
+
+    Constant speed: ``anchor + (pts - in) / speed``.
+    Speed ramp: ``anchor + (ramp.time_at(pts) - ramp.time_at(in))`` using the
+    canonical ``SpeedRamp`` primitive (same owner as ClipTimingInputs).
 
     ``None`` leaves RenderContext on the source-local default (source-local
     animation only). Story-local animation requires an explicit anchor.
+    Repeats / forward-loop passes are expanded before bake so each pass keeps
+    an injective Source→Story map.
     """
     if story_anchor_s is None:
         return None
+    if speed_ramp is not None:
+        time_at = getattr(speed_ramp, "time_at", None)
+        if not callable(time_at):
+            raise ManagedApplyError(
+                "Story-local grade animation ramp mapping is invalid",
+                code="UNSUPPORTED_GRADE",
+            )
+        local = max(
+            0.0,
+            float(time_at(float(source_pts_s))) - float(time_at(float(source_in_s))),
+        )
+        return float(story_anchor_s) + local
     speed = max(1e-6, float(playback_speed))
     source_local = max(0.0, float(source_pts_s) - float(source_in_s))
     return float(story_anchor_s) + source_local / speed
@@ -96,6 +115,7 @@ def _grade_rgb_image(
     source_out_s: float | None = None,
     story_anchor_s: float | None = None,
     playback_speed: float = 1.0,
+    speed_ramp: object | None = None,
 ) -> Path:
     from PIL import Image
 
@@ -119,6 +139,7 @@ def _grade_rgb_image(
                     source_in_s=float(source_in_s),
                     story_anchor_s=story_anchor_s,
                     playback_speed=playback_speed,
+                    speed_ramp=speed_ramp,
                 ),
                 speed=float(playback_speed),
             ),
@@ -413,6 +434,7 @@ def _grade_rgb_video(
     source_out_s: float | None = None,
     story_anchor_s: float | None = None,
     playback_speed: float = 1.0,
+    speed_ramp: object | None = None,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -492,6 +514,7 @@ def _grade_rgb_video(
                 source_out_s=source_out_s,
                 story_anchor_s=story_anchor_s if animated else None,
                 playback_speed=float(playback_speed),
+                speed_ramp=speed_ramp if animated else None,
             )
             frame_path.unlink(missing_ok=True)
             if on_progress is not None and (index % 5 == 0 or index + 1 == total):
@@ -607,6 +630,7 @@ def materialize_spatial_managed_media(
     source_out_s: float | None = None,
     story_anchor_s: float | None = None,
     playback_speed: float = 1.0,
+    speed_ramp: object | None = None,
     cancel_event: threading.Event | None = None,
     on_progress: ProgressFn | None = None,
 ) -> Path:
@@ -614,9 +638,9 @@ def materialize_spatial_managed_media(
 
     Video grades keep full source timing so callers can preserve trim/speed/
     repeat on the export clip. Partial outputs never become cache hits.
-    Story-local animation requires an explicit ``story_anchor_s`` (clip Story
-    start) and a constant-speed single play; repeats/ramps stay fail-closed at
-    the export owner.
+    Story-local animation requires an explicit ``story_anchor_s``. Repeats and
+    forward-loop plays are expanded to one bake pass each by the export owner;
+    ramps use ``SpeedRamp.time_at`` for Source→Story mapping.
     """
     from orga_drone.studio_grade_animation import grade_uses_story_local_animation
 
@@ -638,7 +662,11 @@ def materialize_spatial_managed_media(
         work_dir = spatial_work_dir(work_dir, grade_digest=grade_digest, source=source)
         if story_anchor_s is not None:
             # Story mapping changes graded frames without changing grade digest.
-            anchor_key = f"{float(story_anchor_s):.3f}_{float(playback_speed):.4f}"
+            if speed_ramp is not None and hasattr(speed_ramp, "as_dict"):
+                ramp_blob = json.dumps(speed_ramp.as_dict(), sort_keys=True)
+            else:
+                ramp_blob = f"speed_{float(playback_speed):.4f}"
+            anchor_key = f"{float(story_anchor_s):.3f}_{ramp_blob}"
             work_dir = work_dir / f"story_{hashlib.sha1(anchor_key.encode()).hexdigest()[:10]}"
     work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -662,6 +690,7 @@ def materialize_spatial_managed_media(
             source_out_s=source_out_s,
             story_anchor_s=story_anchor_s,
             playback_speed=float(playback_speed),
+            speed_ramp=speed_ramp,
         )
         _atomic_replace(tmp, dest)
         return dest
@@ -681,6 +710,7 @@ def materialize_spatial_managed_media(
         source_out_s=source_out_s,
         story_anchor_s=story_anchor_s,
         playback_speed=float(playback_speed),
+        speed_ramp=speed_ramp,
         cancel_event=cancel_event,
         on_progress=on_progress,
     )
