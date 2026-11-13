@@ -49,7 +49,7 @@ and stopped #320 precision experiments are not weakened.
 | Story-local constant-speed single-play export | PASS | anchor + `_story_time_for_source_pts` |
 | Speed/repeat/transition helpers | PASS | `studio_grade_clock` unit |
 | Client `story_s` wiring | PASS | `preview-frame-url.js` + lut/scopes/compare |
-| ClipTimingInputs full export wiring | PASS | Ramp via `SpeedRamp.time_at`; repeats/forward-loop expanded to per-pass anchors; slow_span and forward_loop+ramp fail-closed |
+| ClipTimingInputs full export wiring | PASS (bounded) | Supported: constant/trim, single-play ramp, repeats, forward-loop (per-pass anchors; parent Story transition restored on last slice). Fail-closed: slow_span, forward_loop+ramp, ramp+repeats |
 | Packaged preview/export | NOT_RUN — deferred by PO | — |
 
 ## 5. Undo / persistence / migration
@@ -128,7 +128,7 @@ pytest tests/test_studio_grade_animation.py \
 
 | Issue | Matrix implication |
 |---|---|
-| #358 | Client story_s + story-local export for constant/ramp/repeats/forward-loop; slow_span and loop+ramp fail-closed; packaged NOT_RUN |
+| #358 | Client story_s + bounded complex story-local export; fail-closed slow_span / loop+ramp / ramp+repeats; packaged NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
 | #361 | Step editor + Quick Look `apply_preset` compile shipped |
 | #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |

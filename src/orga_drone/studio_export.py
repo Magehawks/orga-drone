@@ -820,13 +820,15 @@ def _story_local_spatial_export_eligible(clip: StudioExportClip) -> bool:
     """Whether Source→Story bake mapping can be established for this clip.
 
     Supported: constant speed, trim, speed ramp (single play), section repeats
-    and forward-loop (expanded to one bake pass each). Fail closed on slow-bar
-    and on forward-loop combined with a speed ramp (join/ramp interaction is
-    not injective without a dedicated renderer).
+    and forward-loop (expanded to one bake pass each). Fail closed on slow-bar,
+    forward-loop + speed ramp, and speed ramp + section repeats (ramp story
+    spans must use ramp_passes; section_repeat_slices uses source cycle length).
     """
     if clip.slow_span is not None:
         return False
     if bool(clip.forward_loop) and clip.speed_ramp is not None:
+        return False
+    if clip.speed_ramp is not None and int(clip.section_repeats or 1) > 1:
         return False
     return True
 
@@ -849,6 +851,8 @@ def _expand_story_local_spatial_passes(
 
     Reuses ``section_repeat_slices`` so encoder timing stays aligned. Each
     expanded slice keeps an injective Source→Story map via its own anchor.
+    The parent Story transition / fade-out is restored on the last slice so
+    the outer stitch still matches the unexpanded timeline.
     """
     from dataclasses import replace
 
@@ -865,9 +869,11 @@ def _expand_story_local_spatial_passes(
             continue
         try:
             grade = json.loads(clip.managed_spatial_grade_json)
-        except json.JSONDecodeError:
-            out.append(clip)
-            continue
+        except json.JSONDecodeError as exc:
+            raise StudioExportError(
+                "Managed spatial grade payload is invalid",
+                code="unsupported_grade",
+            ) from exc
         if not grade_uses_story_local_animation(grade):
             out.append(clip)
             continue
@@ -875,15 +881,28 @@ def _expand_story_local_spatial_passes(
         if not needs_expand:
             out.append(clip)
             continue
-        slices = section_repeat_slices(clip)
+        slices = list(section_repeat_slices(clip))
+        if not slices:
+            out.append(clip)
+            continue
         cursor = float(clip.managed_spatial_story_anchor_s)
-        for slice_clip in slices:
-            out.append(
-                replace(
-                    slice_clip,
-                    managed_spatial_story_anchor_s=cursor,
-                )
+        last = len(slices) - 1
+        for index, slice_clip in enumerate(slices):
+            anchored = replace(
+                slice_clip,
+                managed_spatial_story_anchor_s=cursor,
             )
+            if index == last:
+                # section_repeat_slices clears the parent Story boundary; put
+                # it back so the outer export stitch keeps the same overlap.
+                anchored = replace(
+                    anchored,
+                    transition_type=clip.transition_type,
+                    transition_s=float(clip.transition_s or 0.0),
+                    transition_curve=clip.transition_curve,
+                    fade_out_s=float(clip.fade_out_s or 0.0),
+                )
+            out.append(anchored)
             cursor += float(slice_clip.duration_s)
             if (
                 str(slice_clip.transition_type) == "crossfade"
@@ -923,7 +942,8 @@ def _attach_story_local_spatial_anchors(
         if not _story_local_spatial_export_eligible(clip):
             raise StudioExportError(
                 "Story-local grade animation export does not support this "
-                "timing combination (slow bar, or forward loop with speed ramp)",
+                "timing combination (slow bar, forward loop with speed ramp, "
+                "or speed ramp with section repeats)",
                 code="unsupported_grade",
             )
         out.append(
