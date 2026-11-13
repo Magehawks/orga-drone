@@ -1,7 +1,6 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` at `88c79e9`
-(`feat(studio): add blur dissolve and soft directional wipes (#301) (#401)`).
+Updated: 2026-11-13. Integration branch `develop` includes `#401` and `#402`.
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -24,7 +23,7 @@ is not acceptance.
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Phase B loop playback parity is not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | VERIFY | #411 | Discovery recommends Concept C: keep shipped hybrid ramp, declutter Speed panel. Packaged WebView2 NOT_RUN. | PO selection of Concept C | Do not rebuild the speed engine. |
 | #297 | Local object removal | DONE | #398 merged `e397c26` | PO accepted the NO-GO. No removal UI. OpenCV is not packaged for this purpose. | — | Do not reopen as a feature. |
-| #298 | Local motion tracking | VERIFY | #402 | Synthetic optical-flow spike. Recommendation NO-GO for a 2.4.0 tracker. Real footage NOT_RUN. | PO acceptance of the NO-GO | Do not ship a tracker or package OpenCV. |
+| #298 | Local motion tracking | VERIFY | #402 merged | Synthetic optical-flow spike. Recommendation NO-GO for a 2.4.0 tracker. Real footage NOT_RUN. | PO acceptance of the NO-GO | Do not ship a tracker or package OpenCV. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Automatic detection is forbidden. Subject following waits on #298. | #298 evidence | Do not add a second crop model. |
 | #301 | Drone-friendly transitions | VERIFY | #401 merged `88c79e9` | Blur dissolve and four soft wipes landed. Packaged WebView2 for these transitions is NOT_RUN. | PO acceptance | Do not reimplement. Do not add more transition types. |
