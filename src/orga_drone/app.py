@@ -347,6 +347,15 @@ def create_app() -> FastAPI:
     settings.ensure_dirs()
     clear_studio_history()
     db = Database(settings.db_path)
+    try:
+        from orga_drone.grade_backup import GradeBackupError
+        from orga_drone.studio_grade_persistence import startup_backup_if_needed
+
+        startup_backup_if_needed(settings.data_dir, app_version=__version__)
+    except (GradeBackupError, OSError):
+        # Backup failure must not block library browsing; canonical writes stay
+        # disabled until a verified backup exists.
+        pass
 
     app = FastAPI(title="orga-drone", version=__version__)
     app.add_middleware(LoopbackOriginMiddleware)

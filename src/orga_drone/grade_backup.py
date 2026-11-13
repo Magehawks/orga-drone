@@ -1,9 +1,9 @@
-"""Pre-upgrade backup and restore for a future canonical grade database.
+"""Pre-upgrade backup and restore for the canonical grade database.
 
-This module does not migrate grades, does not select a database at startup,
-and does not enable canonical grade writes. Callers may take a verified
-SQLite backup and restore it. A failed check leaves the destination file
-untouched.
+Callers take a verified SQLite backup and restore it. ``studio_grade_persistence``
+enables canonical writes only after a verified backup exists. This module does
+not migrate grades and does not select a database at startup. A failed check
+leaves the destination file untouched.
 
 Publication copies through a sibling file and ``os.replace``. The live
 database is never overwritten in place. Restore requires a closed database:

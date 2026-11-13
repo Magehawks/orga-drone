@@ -3448,6 +3448,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("image adjustment only applies to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             current = image_adjust_from_effect_settings(str(row["effect_settings"] or ""))
             updated = parse_image_adjust_patch(patch, current)
             blob = dump_effect_settings(str(row["effect_settings"] or ""), updated)
@@ -3503,6 +3505,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("HSL color mixer only applies to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             current = hsl_adjust_from_effect_settings(str(row["effect_settings"] or ""))
             updated = parse_hsl_payload(payload, current)
             blob = dump_hsl_adjust(str(row["effect_settings"] or ""), updated)
@@ -3558,6 +3562,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("colour wheels only apply to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             current = color_wheels_from_effect_settings(
                 str(row["effect_settings"] or "")
             )
@@ -3615,6 +3621,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("detail controls only apply to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             current = detail_from_effect_settings(str(row["effect_settings"] or ""))
             updated = parse_detail_patch(payload, current)
             blob = dump_detail(str(row["effect_settings"] or ""), updated)
@@ -3675,6 +3683,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("quick looks only apply to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             look_id = parse_look_payload(payload)
             blob = str(row["effect_settings"] or "")
             if look_id:
@@ -3734,6 +3744,8 @@ class Database:
             )
             if kind not in {"photo", "video"}:
                 raise ValueError("color look only applies to photos and videos")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             look = parse_color_look_payload(payload)
             blob = dump_color_look(str(row["effect_settings"] or ""), look)
             conn.execute(
@@ -3909,6 +3921,8 @@ class Database:
             )
             if kind != "video":
                 raise ValueError("saturation ramp only applies to video")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             ramp = parse_saturation_ramp_payload(payload)
             blob = dump_saturation_ramp(str(row["effect_settings"] or ""), ramp)
             conn.execute(
@@ -3962,8 +3976,83 @@ class Database:
             )
             if kind != "video":
                 raise ValueError("color animation only applies to video")
+            from orga_drone.studio_grade_persistence import grade_write_guard
+            grade_write_guard(str(row["effect_settings"] or ""))
             anim = parse_color_animation_payload(payload)
             blob = dump_color_animation(str(row["effect_settings"] or ""), anim)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
+    def wrap_studio_grade(self, studio_item_id: int) -> StudioClip:
+        """Wrap legacy color keys into a canonical ``legacy-v1`` grade envelope.
+
+        Requires a verified pre-upgrade backup (``canonical-writes-enabled``).
+        Non-color effect keys stay at the root. Source media is never modified.
+        """
+        from orga_drone.studio_grade_persistence import (
+            require_writes_enabled,
+            wrap_legacy_to_canonical,
+        )
+
+        require_writes_enabled(self.path.parent)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id, project_id, effect_settings FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            document = wrap_legacy_to_canonical(str(row["effect_settings"] or ""))
+            blob = json.dumps(document, separators=(",", ":"), sort_keys=True)
+            conn.execute(
+                "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
+                (blob, studio_item_id),
+            )
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        return items[studio_item_id]
+
+    def set_studio_canonical_grade(
+        self,
+        studio_item_id: int,
+        proposed: dict[str, object],
+        *,
+        expected_revision: int,
+    ) -> StudioClip:
+        """Publish one validated canonical grade document with a new revision."""
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_grade_persistence import (
+            publish_grade_document,
+            require_writes_enabled,
+        )
+
+        require_writes_enabled(self.path.parent)
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id, project_id, effect_settings FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("studio item not found")
+            project_id = int(row["project_id"])
+            current = read_grade(str(row["effect_settings"] or ""))
+            blob = publish_grade_document(
+                current, proposed, expected_revision=expected_revision
+            )
             conn.execute(
                 "UPDATE studio_clips SET effect_settings = ? WHERE id = ?",
                 (blob, studio_item_id),
@@ -4202,7 +4291,9 @@ class Database:
                 ColorAnimation,
                 dump_color_animation,
             )
+            from orga_drone.studio_grade_persistence import grade_write_guard
 
+            grade_write_guard(settings)
             blob = dump_color_animation(settings, ColorAnimation())
         elif kind == "color":
             from orga_drone.studio_color_animation import (
@@ -4210,7 +4301,9 @@ class Database:
                 color_animation_from_effect_settings,
                 dump_color_animation,
             )
+            from orga_drone.studio_grade_persistence import grade_write_guard
 
+            grade_write_guard(settings)
             start_s, end_s = span()
             anim = color_animation_from_effect_settings(settings)
             if not anim.is_active:
@@ -5184,14 +5277,20 @@ class Database:
                 left_s=ramp.duration(left.source_in_s, left.source_out_s) if ramp else timeline_offset_s(left_len, speed),
                 right_s=ramp.duration(right.source_in_s, right.source_out_s) if ramp else timeline_offset_s(right_len, speed),
             )
-            right_settings = shift_saturation_ramp_settings(
-                right_base,
-                float(local_cut_s),
-            )
-            right_settings = shift_color_animation_settings(
-                right_settings,
-                float(local_cut_s),
-            )
+            from orga_drone.studio_grade_persistence import is_canonical_effect_settings
+
+            if is_canonical_effect_settings(original_settings):
+                # Color keys live inside the grade envelope; preserve them opaque.
+                right_settings = right_base
+            else:
+                right_settings = shift_saturation_ramp_settings(
+                    right_base,
+                    float(local_cut_s),
+                )
+                right_settings = shift_color_animation_settings(
+                    right_settings,
+                    float(local_cut_s),
+                )
             from orga_drone.studio_forward_loop import without_loop_to_soundtrack
 
             # A cut makes two sections. The soundtrack loop stays a single
