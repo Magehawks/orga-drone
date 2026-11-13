@@ -2,11 +2,39 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+_LOG = logging.getLogger(__name__)
+# imageio-ffmpeg 0.6.0 ships ffmpeg v7.1 which crashes on odd scaled heights
+# (#369). requirements.txt pins >=0.8.0; warn when a stale user install wins.
+_MIN_IMAGEIO_FFMPEG = (0, 8, 0)
+_stale_imageio_warned = False
+
+
+def _warn_if_stale_imageio_ffmpeg() -> None:
+    global _stale_imageio_warned
+    if _stale_imageio_warned:
+        return
+    try:
+        import importlib.metadata as metadata
+
+        version = metadata.version("imageio-ffmpeg")
+        parts = tuple(int(part) for part in version.split(".")[:3])
+    except Exception:
+        return
+    if parts < _MIN_IMAGEIO_FFMPEG:
+        _stale_imageio_warned = True
+        _LOG.warning(
+            "imageio-ffmpeg %s is below the required >=0.8.0 floor; "
+            "odd preview-still heights can crash ffmpeg (#369). "
+            "Run: pip install 'imageio-ffmpeg>=0.8.0'",
+            version,
+        )
 
 
 def find_ffmpeg() -> str | None:
@@ -16,6 +44,7 @@ def find_ffmpeg() -> str | None:
     try:
         import imageio_ffmpeg
 
+        _warn_if_stale_imageio_ffmpeg()
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return None

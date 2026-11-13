@@ -86,3 +86,31 @@ def test_requirements_pin_imageio_ffmpeg_above_broken_release() -> None:
     line = next(line for line in text.splitlines() if line.startswith("imageio-ffmpeg"))
     floor = line.split(">=")[1].strip()
     assert tuple(int(part) for part in floor.split(".")) >= (0, 8, 0), line
+
+
+def test_stale_imageio_ffmpeg_warns_once(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A below-floor imageio-ffmpeg install must warn when resolved via the wheel."""
+    import importlib.metadata as metadata
+    import logging
+    import sys
+
+    import orga_drone.ffmpeg_bin as ffmpeg_bin
+
+    monkeypatch.setattr(ffmpeg_bin.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(metadata, "version", lambda _name: "0.6.0")
+    monkeypatch.setattr(ffmpeg_bin, "_stale_imageio_warned", False)
+
+    class _FakeImageio:
+        @staticmethod
+        def get_ffmpeg_exe() -> str:
+            return "C:/fake/ffmpeg.exe"
+
+    monkeypatch.setitem(sys.modules, "imageio_ffmpeg", _FakeImageio())
+    with caplog.at_level(logging.WARNING, logger="orga_drone.ffmpeg_bin"):
+        assert ffmpeg_bin.find_ffmpeg() == "C:/fake/ffmpeg.exe"
+        assert ffmpeg_bin.find_ffmpeg() == "C:/fake/ffmpeg.exe"
+    messages = [record.getMessage() for record in caplog.records]
+    assert sum("#369" in message for message in messages) == 1
+
