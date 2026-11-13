@@ -24,7 +24,7 @@ from orga_drone.studio_grade_contract import (
 )
 
 EVALUATORS = ("legacy-v1", "managed-sdr-v1")
-# Metadata registry, not a renderer or an implementation of future operators.
+# Metadata registry for plan construction. Pixel adapters remain separate.
 OPERATION_DESCRIPTORS = {
     "legacy-stack-v1": {
         "evaluator": "legacy-v1",
@@ -33,6 +33,107 @@ OPERATION_DESCRIPTORS = {
         "lut_bakeable": False,
         "parameters": list(LEGACY_KEYS),
         "animation": "legacy-source-local",
+    },
+    "primaries-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "linear-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": [
+            "exposure",
+            "gains",
+            "kelvin",
+            "tint",
+            "contrast",
+            "pivot",
+            "tone",
+            "blacks",
+            "shadows",
+            "highlights",
+            "whites",
+            "saturation",
+        ],
+        "animation": "none",
+    },
+    "rgb-curves-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "declared",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["domain", "master", "red", "green", "blue"],
+        "animation": "none",
+    },
+    "luma-curve-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "linear-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "hue-vs-hue-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "hue-vs-saturation-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "hue-vs-luma-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "luma-vs-saturation-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "saturation-vs-saturation-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["curve"],
+        "animation": "none",
+    },
+    "wheels-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "linear-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["lift", "gamma", "gain", "offset"],
+        "animation": "none",
+    },
+    "managed-hsl-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "encoded-bt709",
+        "pointwise": True,
+        "lut_bakeable": True,
+        "parameters": ["hue", "saturation", "lightness"],
+        "animation": "none",
+    },
+    "creative-lut-v1": {
+        "evaluator": "managed-sdr-v1",
+        "domain": "declared",
+        "pointwise": True,
+        "lut_bakeable": False,
+        "parameters": ["asset_id", "strength", "sha256", "interpolation"],
+        "animation": "none",
     },
 }
 
@@ -200,7 +301,7 @@ def _validate_grade(grade: dict[str, Any]) -> None:
                 fail(
                     path + ".type", "Unsupported active operation", "UNSUPPORTED_GRADE"
                 )
-            if mix != 1 or selection is not None:
+            if op == "legacy-stack-v1" and (mix != 1 or selection is not None):
                 fail(
                     path,
                     "Legacy stack cannot be mixed or spatially selected",
