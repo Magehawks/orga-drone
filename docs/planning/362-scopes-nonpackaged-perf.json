@@ -12,30 +12,46 @@
     "packaged_webview2": false
   },
   "samples_per_phase": 7,
-  "measured_at": "2026-11-13T20:24:24.743Z",
+  "measured_at": "2026-11-13T20:31:14.779Z",
   "cases": [
     {
       "label": "preview-960x540",
       "width": 960,
       "height": 540,
       "sampleFactor": 2,
+      "effective_pixels": 129600,
+      "sample_step": 2,
       "buffer_bytes": 8294400,
       "buffer_mib": 7.91,
       "cold": {
         "n": 7,
-        "min_ms": 16.391500000000008,
-        "max_ms": 27.771600000000007,
-        "mean_ms": 19.622228571428575,
-        "p50_ms": 16.410900000000012,
-        "p95_ms": 27.771600000000007
+        "min_ms": 16.214799999999997,
+        "max_ms": 27.681000000000004,
+        "mean_ms": 19.048,
+        "p50_ms": 16.290899999999993,
+        "p95_ms": 27.681000000000004
       },
       "warm": {
         "n": 7,
-        "min_ms": 16.377100000000013,
-        "max_ms": 16.64519999999999,
-        "mean_ms": 16.51447142857143,
-        "p50_ms": 16.512100000000004,
-        "p95_ms": 16.64519999999999
+        "min_ms": 16.22969999999998,
+        "max_ms": 16.4589,
+        "mean_ms": 16.32039999999999,
+        "p50_ms": 16.28309999999999,
+        "p95_ms": 16.4589
+      },
+      "memory": {
+        "input_buffer_bytes": 8294400,
+        "heap_before_bytes": 5529720,
+        "heap_after_bytes": 5669592,
+        "heap_delta_bytes": 139872,
+        "rss_after_bytes": 89149440,
+        "per_accumulate_heap_delta_bytes": {
+          "n": 7,
+          "min": -798880,
+          "max": 267064,
+          "p50": 216648,
+          "p95": 267064
+        }
       }
     },
     {
@@ -43,23 +59,39 @@
       "width": 1920,
       "height": 1080,
       "sampleFactor": 4,
+      "effective_pixels": 129600,
+      "sample_step": 4,
       "buffer_bytes": 33177600,
       "buffer_mib": 31.641,
       "cold": {
         "n": 7,
-        "min_ms": 16.408299999999997,
-        "max_ms": 25.314300000000003,
-        "mean_ms": 17.87745714285716,
-        "p50_ms": 16.631200000000035,
-        "p95_ms": 25.314300000000003
+        "min_ms": 15.845500000000015,
+        "max_ms": 24.198999999999955,
+        "mean_ms": 17.51538571428571,
+        "p50_ms": 16.54509999999999,
+        "p95_ms": 24.198999999999955
       },
       "warm": {
         "n": 7,
-        "min_ms": 15.564399999999978,
-        "max_ms": 16.76679999999999,
-        "mean_ms": 15.977657142857131,
-        "p50_ms": 15.71859999999998,
-        "p95_ms": 16.76679999999999
+        "min_ms": 15.424399999999935,
+        "max_ms": 15.514299999999992,
+        "mean_ms": 15.450571428571427,
+        "p50_ms": 15.432200000000023,
+        "p95_ms": 15.514299999999992
+      },
+      "memory": {
+        "input_buffer_bytes": 33177600,
+        "heap_before_bytes": 4948416,
+        "heap_after_bytes": 6377544,
+        "heap_delta_bytes": 1429128,
+        "rss_after_bytes": 149499904,
+        "per_accumulate_heap_delta_bytes": {
+          "n": 7,
+          "min": -766120,
+          "max": 870664,
+          "p50": 282664,
+          "p95": 870664
+        }
       }
     },
     {
@@ -67,29 +99,48 @@
       "width": 280,
       "height": 160,
       "sampleFactor": 1,
+      "effective_pixels": 44800,
+      "sample_step": 1,
       "buffer_bytes": 716800,
       "buffer_mib": 0.684,
       "cold": {
         "n": 7,
-        "min_ms": 5.532800000000066,
-        "max_ms": 6.172800000000052,
-        "mean_ms": 5.713242857142875,
-        "p50_ms": 5.6375000000000455,
-        "p95_ms": 6.172800000000052
+        "min_ms": 5.460800000000063,
+        "max_ms": 5.967800000000011,
+        "mean_ms": 5.580928571428607,
+        "p50_ms": 5.527300000000082,
+        "p95_ms": 5.967800000000011
       },
       "warm": {
         "n": 7,
-        "min_ms": 5.516799999999989,
-        "max_ms": 14.528299999999945,
-        "mean_ms": 7.175357142857138,
-        "p50_ms": 5.688299999999913,
-        "p95_ms": 14.528299999999945
+        "min_ms": 5.427900000000022,
+        "max_ms": 15.529800000000023,
+        "mean_ms": 7.157942857142871,
+        "p50_ms": 5.6077999999999975,
+        "p95_ms": 15.529800000000023
+      },
+      "memory": {
+        "input_buffer_bytes": 716800,
+        "heap_before_bytes": 6522616,
+        "heap_after_bytes": 5788312,
+        "heap_delta_bytes": -734304,
+        "rss_after_bytes": 59871232,
+        "per_accumulate_heap_delta_bytes": {
+          "n": 7,
+          "min": -1148448,
+          "max": 1047856,
+          "p50": -1035288,
+          "p95": 1047856
+        }
       }
     }
   ],
   "limitations": [
     "Node synthetic ScopeFrameV1 only — not packaged WebView2 / Chromium GPU path",
     "Does not include JPEG decode, preview-frame fetch, or panel canvas paint",
+    "Memory = process.memoryUsage() heapUsed/RSS deltas around accumulate; not WebView2 process budgets",
+    "sampleFactor steps x/y once — preview-960x540@2 and preview-1920x1080@4 visit ~same effective pixels",
+    "Cold/warm are sequential halves of the same loop (not isolated JIT/GC warmup); warm p95 may exceed cold",
     "Packaged latency/memory remain NOT_RUN until EXE verification phase"
   ]
 }

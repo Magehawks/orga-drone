@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Non-packaged ScopeFrameV1 accumulate latency/memory harness (#362/#366).
+ * Non-packaged ScopeFrameV1 accumulate latency + Node heap delta harness (#362/#366).
  *
- * Measures cold/warm accumulateAllScopes on synthetic fixtures in Node.
+ * Measures cold/warm accumulateAllScopes on synthetic fixtures in Node, discloses
+ * input buffer size, effective subsampled visit count, and heapUsed deltas.
  * Does NOT claim packaged WebView2 budgets — those remain NOT_RUN until EXE.
  *
  * Usage:
@@ -46,6 +47,15 @@ function stats(samplesMs) {
   };
 }
 
+function effectiveVisitCount(width, height, sampleFactor) {
+  const step = Math.max(1, Math.round(Number(sampleFactor) || 1));
+  let visited = 0;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) visited += 1;
+  }
+  return { step, visited };
+}
+
 function buildRectGrayFrame(spec) {
   if (spec.fixture === "color-bars") {
     return createScopeFixture("color-bars", { width: spec.width, height: spec.height });
@@ -85,11 +95,24 @@ function buildRectGrayFrame(spec) {
   });
 }
 
+function heapSnapshot() {
+  const usage = process.memoryUsage();
+  return {
+    heap_used_bytes: usage.heapUsed,
+    heap_total_bytes: usage.heapTotal,
+    rss_bytes: usage.rss,
+    external_bytes: usage.external,
+  };
+}
+
 function measureCase(spec, sampleCount) {
   const frame = buildRectGrayFrame(spec);
   const bufferBytes = frame.rgb.byteLength;
+  const sampleFactor = spec.sampleFactor || 1;
+  const visits = effectiveVisitCount(spec.width, spec.height, sampleFactor);
   const cold = [];
   const warm = [];
+  const heapDeltas = [];
   const options = {
     waveform: { columns: 256, rows: 256 },
     parade: { columns: 256, rows: 256 },
@@ -97,11 +120,16 @@ function measureCase(spec, sampleCount) {
   };
 
   if (typeof globalThis.gc === "function") globalThis.gc();
+  const heapBeforeCase = heapSnapshot();
+
   for (let i = 0; i < sampleCount; i += 1) {
+    const before = process.memoryUsage().heapUsed;
     const t0 = performance.now();
     const result = accumulateAllScopes(frame, options);
     const t1 = performance.now();
+    const after = process.memoryUsage().heapUsed;
     cold.push(t1 - t0);
+    heapDeltas.push(after - before);
     if (!result.histogram) throw new Error("missing histogram");
   }
 
@@ -112,15 +140,34 @@ function measureCase(spec, sampleCount) {
     warm.push(t1 - t0);
   }
 
+  const heapAfterCase = heapSnapshot();
+  const sortedDeltas = heapDeltas.slice().sort((a, b) => a - b);
+
   return {
     label: spec.label,
     width: spec.width,
     height: spec.height,
-    sampleFactor: spec.sampleFactor || 1,
+    sampleFactor,
+    effective_pixels: visits.visited,
+    sample_step: visits.step,
     buffer_bytes: bufferBytes,
     buffer_mib: Number((bufferBytes / (1024 * 1024)).toFixed(3)),
     cold: stats(cold),
     warm: stats(warm),
+    memory: {
+      input_buffer_bytes: bufferBytes,
+      heap_before_bytes: heapBeforeCase.heap_used_bytes,
+      heap_after_bytes: heapAfterCase.heap_used_bytes,
+      heap_delta_bytes: heapAfterCase.heap_used_bytes - heapBeforeCase.heap_used_bytes,
+      rss_after_bytes: heapAfterCase.rss_bytes,
+      per_accumulate_heap_delta_bytes: {
+        n: sortedDeltas.length,
+        min: sortedDeltas[0],
+        max: sortedDeltas[sortedDeltas.length - 1],
+        p50: percentile(sortedDeltas, 50),
+        p95: percentile(sortedDeltas, 95),
+      },
+    },
   };
 }
 
@@ -142,6 +189,9 @@ export function runScopesNonpackagedPerf({ samples = DEFAULT_SAMPLES, sizes = SI
     limitations: [
       "Node synthetic ScopeFrameV1 only — not packaged WebView2 / Chromium GPU path",
       "Does not include JPEG decode, preview-frame fetch, or panel canvas paint",
+      "Memory = process.memoryUsage() heapUsed/RSS deltas around accumulate; not WebView2 process budgets",
+      "sampleFactor steps x/y once — preview-960x540@2 and preview-1920x1080@4 visit ~same effective pixels",
+      "Cold/warm are sequential halves of the same loop (not isolated JIT/GC warmup); warm p95 may exceed cold",
       "Packaged latency/memory remain NOT_RUN until EXE verification phase",
     ],
   };

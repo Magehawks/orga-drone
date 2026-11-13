@@ -79,7 +79,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Histogram / waveform / parade / vectorscope | PASS (source) | #428 |
 | ScopeFrameV1 + stale reject | PASS | unit/JS |
-| Non-packaged accumulate latency/memory | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; Node synthetic) |
+| Non-packaged accumulate latency + Node heap delta | PASS | `scripts/scopes_nonpackaged_perf.mjs` → `docs/planning/362-scopes-nonpackaged-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
 | Packaged latency/memory | NOT_RUN — deferred by PO | — |
 
 ## 8. Performance / memory
@@ -87,7 +87,7 @@ and stopped #320 precision experiments are not weakened.
 | Row | Verdict | Evidence |
 |---|---|---|
 | Source-level export/spatial budgets | PASS (where tested) | spatial export limits |
-| Non-packaged scopes cold/warm p50/p95 | PASS | #362 harness (Node); not WebView2 |
+| Non-packaged scopes cold/warm p50/p95 + heap | PASS | #362 Node harness; not WebView2 |
 | ≥5 cold/warm p50/p95 packaged samples | NOT_RUN — deferred by PO | #364 AC |
 | WebView2 GPU budgets | NOT_RUN — deferred by PO | #360 |
 
