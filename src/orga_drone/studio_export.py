@@ -673,12 +673,20 @@ def _clip_to_export_clip(
         detached = detached_audio_from_effect_settings(clip.effect_settings)
         if detached is not None and not detached.is_heard:
             detached = None
+    # Photos are a single graded still → start at 0. Graded video keeps the
+    # full source timeline so trim/speed/repeat/transition map correctly.
+    if managed_grade_media is not None and kind == "photo":
+        export_start = 0.0
+        export_end = None
+    else:
+        export_start = start
+        export_end = end
     return StudioExportClip(
         source_path=export_source,
         kind=kind or "video",
         duration_s=float(seconds),
-        source_start_s=start if managed_grade_media is None else 0.0,
-        source_end_s=end if managed_grade_media is None else None,
+        source_start_s=export_start,
+        source_end_s=export_end,
         playback_speed=speed,
         zoom_span=zoom_span,
         slow_span=slow_span,

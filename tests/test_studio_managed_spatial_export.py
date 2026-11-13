@@ -1,12 +1,14 @@
-"""Spatial materialization: photo OK, video fail-closed, cache isolation."""
+"""Spatial materialization: photo + video, cache isolation, outside-mask parity."""
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.studio_managed_apply import ManagedApplyError
 from orga_drone.studio_managed_spatial_export import (
     materialize_spatial_managed_media,
@@ -52,7 +54,7 @@ def _grade() -> dict:
                         {
                             "type": "radial",
                             "center": [0.5, 0.5],
-                            "axes": [0.4, 0.4],
+                            "axes": [0.25, 0.25],
                             "feather": 0.0,
                         }
                     ],
@@ -70,6 +72,60 @@ def _grade() -> dict:
 def _write_photo(path: Path, color: tuple[int, int, int]) -> Path:
     Image.new("RGB", (32, 32), color).save(path, format="JPEG", quality=95)
     return path
+
+
+def _run_ffmpeg(*args: str) -> None:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg unavailable")
+    subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error", *args],
+        check=True,
+        capture_output=True,
+        timeout=120,
+        **subprocess_no_window_kwargs(),
+    )
+
+
+def _write_video(path: Path, *, with_audio: bool = True) -> Path:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("ffmpeg unavailable")
+    # Solid red field; center will be desaturated by the radial grade.
+    args = [
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=0xc82828:s=64x48:r=10:d=0.3",
+    ]
+    if with_audio:
+        args.extend(
+            [
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:sample_rate=8000:duration=0.3",
+                "-shortest",
+                "-c:a",
+                "aac",
+            ]
+        )
+    args.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)])
+    _run_ffmpeg(*args)
+    return path
+
+
+def _extract_frame(video: Path, dest: Path, *, time_s: float = 0.05) -> Path:
+    _run_ffmpeg(
+        "-ss",
+        f"{time_s:.3f}",
+        "-i",
+        str(video),
+        "-frames:v",
+        "1",
+        str(dest),
+    )
+    return dest
 
 
 def test_source_identity_differs_for_distinct_files(tmp_path: Path) -> None:
@@ -101,11 +157,87 @@ def test_photo_materialize_and_cache_isolation(tmp_path: Path) -> None:
     assert again == out_a
 
 
-def test_video_spatial_export_is_fail_closed(tmp_path: Path) -> None:
-    video = tmp_path / "clip.mp4"
-    video.write_bytes(b"not-a-real-video")
+def test_video_spatial_export_grades_and_preserves_audio(tmp_path: Path) -> None:
+    video = _write_video(tmp_path / "clip.mp4", with_audio=True)
+    grade = _grade()
+    digest = "a" * 40
+    out = materialize_spatial_managed_media(
+        video, grade, tmp_path / "work", kind="video", grade_digest=digest
+    )
+    assert out.is_file() and out.suffix == ".mp4"
+    # Cache hit.
+    again = materialize_spatial_managed_media(
+        video, grade, tmp_path / "work", kind="video", grade_digest=digest
+    )
+    assert again == out
+
+    # Audio stream still present.
+    ffmpeg = find_ffmpeg()
+    assert ffmpeg is not None
+    probe = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(out)],
+        check=False,
+        capture_output=True,
+        timeout=30,
+        **subprocess_no_window_kwargs(),
+    )
+    text = (probe.stderr or b"").decode("utf-8", errors="replace").lower()
+    assert " audio:" in text or "\naudio:" in text
+
+
+def test_video_spatial_matches_cpu_reference_within_encoding_tolerance(
+    tmp_path: Path,
+) -> None:
+    """Decoded graded frames match the CPU applicator within yuv420p CRF18 drift.
+
+    Outside-mask pixels are not bit-identical to the source: managed input/output
+    transforms still run. The gate compares against the same CPU reference used
+    for photo spatial grades.
+    """
+    from orga_drone.studio_managed_apply import apply_managed_grade_image
+
+    video = _write_video(tmp_path / "clip.mp4", with_audio=False)
+    grade = _grade()
+    out = materialize_spatial_managed_media(
+        video, grade, tmp_path / "work", kind="video", grade_digest="b" * 40
+    )
+    src_frame = _extract_frame(video, tmp_path / "src.png")
+    graded_frame = _extract_frame(out, tmp_path / "graded.png")
+    with Image.open(src_frame) as src_img, Image.open(graded_frame) as graded_img:
+        src = src_img.convert("RGB")
+        graded = graded_img.convert("RGB")
+        assert src.size == graded.size
+        width, height = src.size
+        px = src.load()
+        rows = [
+            [
+                (px[x, y][0] / 255.0, px[x, y][1] / 255.0, px[x, y][2] / 255.0)
+                for x in range(width)
+            ]
+            for y in range(height)
+        ]
+        ref = apply_managed_grade_image(rows, grade, lattice_domain="srgb")
+
+        def _err(x: int, y: int) -> int:
+            rr, rg, rb = ref[y][x]
+            er = int(min(255, max(0, round(rr * 255))))
+            eg = int(min(255, max(0, round(rg * 255))))
+            eb = int(min(255, max(0, round(rb * 255))))
+            gr, gg, gb = graded.getpixel((x, y))
+            return max(abs(er - gr), abs(eg - gg), abs(eb - gb))
+
+        # Corner (outside mask) and center (inside mask).
+        assert _err(2, 2) <= 12
+        assert _err(width // 2, height // 2) <= 12
+        # Center must be near-neutral after saturation=0 inside the radial.
+        cr, cg, cb = graded.getpixel((width // 2, height // 2))
+        assert max(cr, cg, cb) - min(cr, cg, cb) <= 16
+
+
+def test_unknown_kind_fail_closed(tmp_path: Path) -> None:
+    photo = _write_photo(tmp_path / "a.jpg", (10, 10, 10))
     with pytest.raises(ManagedApplyError) as exc:
         materialize_spatial_managed_media(
-            video, _grade(), tmp_path / "work", kind="video", grade_digest="a" * 40
+            photo, _grade(), tmp_path / "work", kind="audio", grade_digest="c" * 40
         )
     assert exc.value.code == "UNSUPPORTED_GRADE"

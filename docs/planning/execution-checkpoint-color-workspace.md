@@ -36,7 +36,7 @@ Final `develop` SHA for this checkpoint: `71936cebac9db4dab850c053bc82aeecfbd640
 | Creative .cube LUT strength enable/clear | Available now | #422; confined assets + digest cache |
 | Preview/export pointwise bake | Available now | lut3d bake |
 | Spatial photo preview/export | Available now | CPU path; JPEG-boundary preview limitation |
-| Spatial video export | Fail-closed | Needs timing/audio-accurate adapter |
+| Spatial video export | Available now (CPU materialize) | Full-timeline graded MP4 + audio copy; export keeps trim/speed |
 | Playback proxy spatial/managed LUT | Gap | Proxy path not fully wired for all managed cases |
 | GPU WebGL managed adapter (#360) | Later | Not shipped |
 | Scopes tap (#362/#366) | Partial fixtures | Live tap depends on #359 plane |
@@ -56,10 +56,10 @@ Do not close foundations as complete user-facing features without AC evidence.
 | #353 | Primaries UI+bake | PO acceptance; packaged evidence |
 | #354 | Curves UI+bake | PO acceptance |
 | #355 | Wheels/HSL UI+bake | PO acceptance |
-| #356 | Mask apply+UI | Video spatial; orientation/DPR fixtures; viewer handles |
+| #356 | Mask apply+UI + video spatial materialize | Viewer brush/handles; orientation/DPR fixtures |
 | #357 | Qualifier apply+UI | Eyedropper accept-to-range |
 | #358 | Animation clocks | Still unsupported (fail-closed) |
-| #359 | FFmpeg/CPU adapters | Bake shipped; spatial video + proxy gaps |
+| #359 | FFmpeg/CPU adapters | Bake + spatial photo/video; playback-proxy gaps remain |
 | #360 | GPU adapter | Open |
 | #361 | Creative/Pro workspace | Large UI slice landed; serial step editor incomplete |
 | #362/#366 | Scopes | Open |
@@ -70,6 +70,21 @@ Do not close foundations as complete user-facing features without AC evidence.
 
 1. Packaged Windows WebView2 retest on tip `8f4cbc8` covering convert→primaries→curves→wheels→selection (photo)→creative LUT→720p/1080p export.
 2. Issue cleanup comments with evidence; close only when AC fully met.
-3. Video spatial adapter or keep documented fail-closed.
-4. Eyedropper accept path (#357 remainder).
+3. Eyedropper + interactive viewer mask/brush editing (#356/#357).
+4. GPU managed adapter (#360), live scopes (#362/#366), remaining #358/#361/#363–#365.
 5. Do not merge to `main` or publish a release.
+
+## Finishing-sprint acceptance matrix (from `9f6ad52`)
+
+| Area | State |
+|---|---|
+| #417–#422 UI/bake/masks/LUT | Implemented + merged; packaged regression PASS; managed CDP NOT_RUN |
+| #423/#424 checkpoint/E2E docs | Merged |
+| Spatial photo | Implemented + verified |
+| Spatial video export | Implemented this slice (CPU frame grade + audio) |
+| Eyedropper / viewer brush | Missing |
+| GPU #360 | Missing |
+| Live scopes #362/#366 | Partial fixtures only |
+| Persistence #351 | Writes enabled; full recovery evidence pending |
+| Animation #358 | Fail-closed |
+| Packaged managed-SDR journey | NOT_RUN |
