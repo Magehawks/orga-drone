@@ -20,7 +20,8 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #421 | `c3eabdc…` | Mask/qualifier apply + UI; photo spatial; video fail-closed |
 | #422 | `8f4cbc8…` | Creative LUT resolve/bake/UI |
 
-Final `develop` SHA for this checkpoint: `8f4cbc8edab5740b40f80032587f10cd25037231`.
+Final `develop` SHA for this checkpoint: `71936cebac9db4dab850c053bc82aeecfbd640fa`
+(includes Color Workspace feature merges through `#422` plus checkpoint docs `#423`).
 
 ## Feature matrix (honest)
 
@@ -39,8 +40,10 @@ Final `develop` SHA for this checkpoint: `8f4cbc8edab5740b40f80032587f10cd250372
 | Playback proxy spatial/managed LUT | Gap | Proxy path not fully wired for all managed cases |
 | GPU WebGL managed adapter (#360) | Later | Not shipped |
 | Scopes tap (#362/#366) | Partial fixtures | Live tap depends on #359 plane |
-| Packaged Color Workspace E2E retest | NOT_RUN after #417–#422 | Phase 1 predated Color UI merges |
-| Full #365 acceptance matrix | OPEN | Synthetic harness + packaged evidence pending |
+| Packaged regression E2E (tip `71936ceb`) | PASS (local) | All journeys in `windows_e2e.py` ok incl. transitions, 1080p, lut_parity; evidence `tmp-packaged-e2e-color/run-71936ceb/` |
+| Source-app Creative/Pro workspace journey | PASS | `packaging/e2e/studio_color_workspace.py` |
+| Managed convert→curves→masks→LUT packaged journey | NOT_RUN | Needs dedicated CDP steps beyond Creative/Pro smoke |
+| Full #365 acceptance matrix | OPEN | Synthetic harness + managed-grade packaged evidence pending |
 
 ## Open Color Workspace issues
 
