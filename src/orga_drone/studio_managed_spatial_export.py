@@ -4,30 +4,45 @@ Pointwise grades stay on the lut3d bake path. Spatial selections cannot fold
 into a global cube, so this module writes a temporary graded copy. Source
 media is never overwritten.
 
-Photo and video spatial materialization share the CPU reference applicator.
-Graded video preserves source duration/fps so Studio export can keep trims,
-speed ramps, repeats, transitions, and soundtrack mixing on the existing
-FFmpeg pipeline. Audio is copied from the source when present.
+Photo materialization is eager. Video materialization is intended for the
+export job phase (cancel + progress). Graded video keeps source duration/fps
+so trim/speed/repeat/transition stay on the canonical FFmpeg encoder path.
+Audio is remuxed (copy when MP4-compatible, otherwise AAC).
+
+Limits: CFR sources up to ``MAX_SPATIAL_VIDEO_*``. VFR and oversized clips
+fail closed with ``UNSUPPORTED_GRADE``. Intermediate encode is a documented
+second lossy pass (CRF 18 yuv420p) before the final export encode.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
 import shutil
 import subprocess
-from collections.abc import Mapping
+import threading
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+from orga_drone.ffmpeg_bin import find_ffmpeg, find_ffprobe, subprocess_no_window_kwargs
 from orga_drone.studio_managed_apply import (
     ManagedApplyError,
     apply_managed_grade_image,
 )
 
+ProgressFn = Callable[[float], None]
+
+# Soft product limits for the CPU reference video path (not a performance claim).
+MAX_SPATIAL_VIDEO_PIXELS = 3840 * 2160
+MAX_SPATIAL_VIDEO_DURATION_S = 600.0
+MAX_SPATIAL_VIDEO_FRAMES = 18_000
+
 _FPS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*fps", re.IGNORECASE)
 _SIZE_RE = re.compile(r",\s*(\d{2,5})x(\d{2,5})\b")
+_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 
 
 def source_identity(path: Path) -> str:
@@ -74,34 +89,153 @@ def _grade_rgb_image(path: Path, grade: Mapping[str, Any], dest: Path) -> Path:
     return dest
 
 
-def _run_ffmpeg(args: list[str], *, timeout: int = 600) -> subprocess.CompletedProcess[bytes]:
+def _check_cancel(cancel_event: threading.Event | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise ManagedApplyError(
+            "Spatial managed video grading was cancelled",
+            code="CANCELLED",
+        )
+
+
+def _run_ffmpeg(
+    args: list[str],
+    *,
+    timeout: int = 600,
+    cancel_event: threading.Event | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         raise ManagedApplyError(
-            "ffmpeg is required for spatial managed video grades",
+            "Spatial managed video grades need ffmpeg",
             code="UNSUPPORTED_GRADE",
         )
+    _check_cancel(cancel_event)
     try:
-        return subprocess.run(
+        proc = subprocess.Popen(
             [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", *args],
-            check=False,
-            capture_output=True,
-            timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             **subprocess_no_window_kwargs(),
         )
-    except subprocess.TimeoutExpired as exc:
+    except OSError as exc:
         raise ManagedApplyError(
-            "Spatial managed video grading timed out",
+            "Could not start ffmpeg for spatial managed video",
             code="UNSUPPORTED_GRADE",
         ) from exc
+    try:
+        elapsed = 0.0
+        step = 0.25
+        while True:
+            _check_cancel(cancel_event)
+            try:
+                stdout, stderr = proc.communicate(timeout=step)
+                return subprocess.CompletedProcess(
+                    proc.args, proc.returncode, stdout, stderr
+                )
+            except subprocess.TimeoutExpired:
+                elapsed += step
+                if elapsed >= timeout:
+                    proc.kill()
+                    proc.wait(timeout=10)
+                    raise ManagedApplyError(
+                        "Spatial managed video grading timed out",
+                        code="UNSUPPORTED_GRADE",
+                    ) from None
+    except ManagedApplyError:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=10)
+        raise
 
 
-def _probe_video_meta(path: Path) -> tuple[int, int, float]:
-    """Return width, height, fps from ffmpeg -i stderr (works without ffprobe)."""
+def _parse_fps_fraction(value: str) -> float | None:
+    text = value.strip()
+    if not text or text in {"0/0", "N/A"}:
+        return None
+    if "/" in text:
+        num_s, den_s = text.split("/", 1)
+        try:
+            num = float(num_s)
+            den = float(den_s)
+        except ValueError:
+            return None
+        if den == 0:
+            return None
+        return num / den
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
+    """Return width, height, fps, duration_s (prefer ffprobe; ffmpeg -i fallback)."""
+    ffprobe = find_ffprobe()
+    if ffprobe:
+        try:
+            proc = subprocess.run(
+                [
+                    ffprobe,
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_streams",
+                    "-show_format",
+                    "-select_streams",
+                    "v:0",
+                    str(path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                **subprocess_no_window_kwargs(),
+            )
+        except (OSError, subprocess.SubprocessError):
+            proc = None
+        if proc is not None and proc.returncode == 0 and proc.stdout:
+            try:
+                data = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                data = None
+            if data is not None:
+                streams = data.get("streams") or []
+                stream = streams[0] if streams else None
+                if isinstance(stream, dict):
+                    try:
+                        width = int(stream.get("width") or 0)
+                        height = int(stream.get("height") or 0)
+                    except (TypeError, ValueError):
+                        width = height = 0
+                    avg = _parse_fps_fraction(str(stream.get("avg_frame_rate") or ""))
+                    r_fps = _parse_fps_fraction(str(stream.get("r_frame_rate") or ""))
+                    fps = avg or r_fps
+                    duration = 0.0
+                    if stream.get("duration") is not None:
+                        try:
+                            duration = float(stream["duration"])
+                        except (TypeError, ValueError):
+                            duration = 0.0
+                    if duration <= 0:
+                        fmt = data.get("format") or {}
+                        try:
+                            duration = float(fmt.get("duration") or 0)
+                        except (TypeError, ValueError):
+                            duration = 0.0
+                    if width >= 2 and height >= 2 and fps and fps > 0:
+                        # Treat large avg/r mismatch as VFR → fail closed.
+                        if avg and r_fps and abs(avg - r_fps) / max(avg, r_fps) > 0.05:
+                            raise ManagedApplyError(
+                                "Spatial managed video needs constant frame rate",
+                                code="UNSUPPORTED_GRADE",
+                            )
+                        return width, height, float(fps), float(duration)
+
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         raise ManagedApplyError(
-            "ffmpeg is required for spatial managed video grades",
+            "Spatial managed video grades need ffmpeg",
             code="UNSUPPORTED_GRADE",
         )
     proc = subprocess.run(
@@ -114,20 +248,27 @@ def _probe_video_meta(path: Path) -> tuple[int, int, float]:
     text = (proc.stderr or b"").decode("utf-8", errors="replace")
     size = _SIZE_RE.search(text)
     fps_m = _FPS_RE.search(text)
+    dur_m = _DURATION_RE.search(text)
     if size is None or fps_m is None:
         raise ManagedApplyError(
-            "Could not probe spatial video dimensions/fps",
+            "Could not probe spatial video dimensions or frame rate",
             code="UNSUPPORTED_GRADE",
         )
     width = int(size.group(1))
     height = int(size.group(2))
     fps = float(fps_m.group(1))
+    duration = 0.0
+    if dur_m is not None:
+        hours = int(dur_m.group(1))
+        minutes = int(dur_m.group(2))
+        seconds = float(dur_m.group(3))
+        duration = hours * 3600 + minutes * 60 + seconds
     if width < 2 or height < 2 or fps <= 0:
         raise ManagedApplyError(
-            "Spatial video has invalid dimensions or fps",
+            "Spatial video has invalid dimensions or frame rate",
             code="UNSUPPORTED_GRADE",
         )
-    return width, height, fps
+    return width, height, fps, duration
 
 
 def _source_has_audio(path: Path) -> bool:
@@ -145,92 +286,194 @@ def _source_has_audio(path: Path) -> bool:
     return " audio:" in text or "\naudio:" in text
 
 
-def _grade_rgb_video(path: Path, grade: Mapping[str, Any], dest: Path) -> Path:
-    """Grade every decoded frame and remux with source audio when present.
+def validate_spatial_video_limits(path: Path) -> tuple[int, int, float, float]:
+    """Probe and enforce CPU-path limits without grading."""
+    width, height, fps, duration = _probe_video_meta(path)
+    pixels = width * height
+    if pixels > MAX_SPATIAL_VIDEO_PIXELS:
+        raise ManagedApplyError(
+            "Spatial managed video is larger than the CPU grade limit",
+            code="UNSUPPORTED_GRADE",
+        )
+    if duration > MAX_SPATIAL_VIDEO_DURATION_S:
+        raise ManagedApplyError(
+            "Spatial managed video is longer than the CPU grade limit",
+            code="UNSUPPORTED_GRADE",
+        )
+    estimated = int(duration * fps + 0.5) if duration > 0 else 0
+    if estimated > MAX_SPATIAL_VIDEO_FRAMES:
+        raise ManagedApplyError(
+            "Spatial managed video has more frames than the CPU grade limit",
+            code="UNSUPPORTED_GRADE",
+        )
+    return width, height, fps, duration
 
-    The graded MP4 keeps the source frame rate and frame count so export can
-    retain source_start/source_end, speed ramps, repeats, and transitions on
-    the canonical encoder path.
-    """
-    _width, _height, fps = _probe_video_meta(path)
-    frames_dir = dest.parent / "frames_src"
-    graded_dir = dest.parent / "frames_graded"
-    if frames_dir.exists():
-        shutil.rmtree(frames_dir, ignore_errors=True)
-    if graded_dir.exists():
-        shutil.rmtree(graded_dir, ignore_errors=True)
+
+def _atomic_replace(tmp: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(tmp, dest)
+
+
+def _grade_rgb_video(
+    path: Path,
+    grade: Mapping[str, Any],
+    dest: Path,
+    *,
+    cancel_event: threading.Event | None = None,
+    on_progress: ProgressFn | None = None,
+) -> Path:
+    """Grade every decoded frame and remux with source audio when present."""
+    width, height, fps, duration = validate_spatial_video_limits(path)
+    run_id = hashlib.sha1(f"{os.getpid()}|{dest}|{path}".encode()).hexdigest()[:10]
+    frames_dir = dest.parent / f"frames_src_{run_id}"
+    graded_dir = dest.parent / f"frames_graded_{run_id}"
+    tmp_out = dest.parent / f"graded_{run_id}.tmp.mp4"
+    for orphan in (frames_dir, graded_dir, tmp_out):
+        if orphan.is_dir():
+            shutil.rmtree(orphan, ignore_errors=True)
+        elif orphan.is_file():
+            orphan.unlink(missing_ok=True)
     frames_dir.mkdir(parents=True, exist_ok=True)
     graded_dir.mkdir(parents=True, exist_ok=True)
 
-    extract = _run_ffmpeg(
-        [
-            "-i",
-            str(path),
-            "-vsync",
-            "0",
+    try:
+        _check_cancel(cancel_event)
+        extract = _run_ffmpeg(
+            [
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-fps_mode",
+                "passthrough",
+                "-start_number",
+                "0",
+                str(frames_dir / "frame_%06d.png"),
+            ],
+            timeout=900,
+            cancel_event=cancel_event,
+        )
+        if extract.returncode != 0:
+            raise ManagedApplyError(
+                "Could not decode frames for spatial managed video",
+                code="UNSUPPORTED_GRADE",
+            )
+
+        sources = sorted(frames_dir.glob("frame_*.png"))
+        if not sources:
+            raise ManagedApplyError(
+                "Spatial managed video produced no frames",
+                code="UNSUPPORTED_GRADE",
+            )
+        if len(sources) > MAX_SPATIAL_VIDEO_FRAMES:
+            raise ManagedApplyError(
+                "Spatial managed video has more frames than the CPU grade limit",
+                code="UNSUPPORTED_GRADE",
+            )
+        total = len(sources)
+        for index, frame_path in enumerate(sources):
+            _check_cancel(cancel_event)
+            _grade_rgb_image(frame_path, grade, graded_dir / f"frame_{index:06d}.png")
+            if on_progress is not None and (index % 5 == 0 or index + 1 == total):
+                on_progress((index + 1) / float(total))
+
+        fps_arg = f"{fps:.6f}".rstrip("0").rstrip(".")
+        encode_args = [
+            "-framerate",
+            fps_arg,
             "-start_number",
             "0",
-            str(frames_dir / "frame_%06d.png"),
-        ],
-        timeout=900,
-    )
-    if extract.returncode != 0:
-        detail = (extract.stderr or b"").decode("utf-8", errors="replace").strip()
-        raise ManagedApplyError(
-            detail or "Could not decode frames for spatial managed video",
-            code="UNSUPPORTED_GRADE",
-        )
-
-    sources = sorted(frames_dir.glob("frame_*.png"))
-    if not sources:
-        raise ManagedApplyError(
-            "Spatial managed video produced no frames",
-            code="UNSUPPORTED_GRADE",
-        )
-    for index, frame_path in enumerate(sources):
-        _grade_rgb_image(frame_path, grade, graded_dir / f"frame_{index:06d}.png")
-
-    fps_arg = f"{fps:.6f}".rstrip("0").rstrip(".")
-    encode_args = [
-        "-framerate",
-        fps_arg,
-        "-start_number",
-        "0",
-        "-i",
-        str(graded_dir / "frame_%06d.png"),
-        "-i",
-        str(path),
-        "-map",
-        "0:v:0",
-    ]
-    if _source_has_audio(path):
-        encode_args.extend(["-map", "1:a:0?", "-c:a", "copy"])
-    else:
-        encode_args.append("-an")
-    encode_args.extend(
-        [
+            "-i",
+            str(graded_dir / "frame_%06d.png"),
+            "-i",
+            str(path),
+            "-map",
+            "0:v:0",
             "-c:v",
             "libx264",
             "-pix_fmt",
             "yuv420p",
             "-crf",
             "18",
+            "-colorspace",
+            "bt709",
+            "-color_primaries",
+            "bt709",
+            "-color_trc",
+            "bt709",
             "-movflags",
             "+faststart",
-            str(dest),
         ]
-    )
-    encode = _run_ffmpeg(encode_args, timeout=900)
-    if encode.returncode != 0 or not dest.is_file() or dest.stat().st_size <= 0:
-        detail = (encode.stderr or b"").decode("utf-8", errors="replace").strip()
-        raise ManagedApplyError(
-            detail or "Could not encode spatial managed video",
-            code="UNSUPPORTED_GRADE",
-        )
-    # Drop intermediate frames after a successful encode to bound disk use.
-    shutil.rmtree(frames_dir, ignore_errors=True)
-    shutil.rmtree(graded_dir, ignore_errors=True)
-    return dest
+        has_audio = _source_has_audio(path)
+        if has_audio:
+            encode_args.extend(["-map", "1:a:0?", "-c:a", "copy", "-shortest"])
+        else:
+            encode_args.append("-an")
+        encode_args.append(str(tmp_out))
+
+        encode = _run_ffmpeg(encode_args, timeout=900, cancel_event=cancel_event)
+        if encode.returncode != 0 or not tmp_out.is_file() or tmp_out.stat().st_size <= 0:
+            if has_audio:
+                # Retry with AAC when stream copy cannot mux into MP4.
+                if tmp_out.is_file():
+                    tmp_out.unlink(missing_ok=True)
+                encode_args = [
+                    "-framerate",
+                    fps_arg,
+                    "-start_number",
+                    "0",
+                    "-i",
+                    str(graded_dir / "frame_%06d.png"),
+                    "-i",
+                    str(path),
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0?",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-crf",
+                    "18",
+                    "-colorspace",
+                    "bt709",
+                    "-color_primaries",
+                    "bt709",
+                    "-color_trc",
+                    "bt709",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
+                    "-shortest",
+                    "-movflags",
+                    "+faststart",
+                    str(tmp_out),
+                ]
+                encode = _run_ffmpeg(
+                    encode_args, timeout=900, cancel_event=cancel_event
+                )
+            if (
+                encode.returncode != 0
+                or not tmp_out.is_file()
+                or tmp_out.stat().st_size <= 0
+            ):
+                raise ManagedApplyError(
+                    "Could not encode spatial managed video",
+                    code="UNSUPPORTED_GRADE",
+                )
+        _atomic_replace(tmp_out, dest)
+        if on_progress is not None:
+            on_progress(1.0)
+        return dest
+    finally:
+        shutil.rmtree(frames_dir, ignore_errors=True)
+        shutil.rmtree(graded_dir, ignore_errors=True)
+        if tmp_out.is_file():
+            tmp_out.unlink(missing_ok=True)
+        # Silence unused meta when probe succeeded but encode failed early.
+        _ = (width, height, duration)
 
 
 def materialize_spatial_managed_media(
@@ -240,19 +483,22 @@ def materialize_spatial_managed_media(
     *,
     kind: str,
     grade_digest: str | None = None,
+    cancel_event: threading.Event | None = None,
+    on_progress: ProgressFn | None = None,
 ) -> Path:
     """Return a temporary graded media path under ``work_dir``.
 
-    ``work_dir`` should already incorporate source identity (see
-    ``spatial_work_dir``). Video grades keep full source timing so callers can
-    preserve trim/speed/repeat on the export clip.
+    Video grades keep full source timing so callers can preserve trim/speed/
+    repeat on the export clip. Partial outputs never become cache hits.
     """
     if not source.is_file():
         raise ManagedApplyError("source media is missing", code="MEDIA_MISSING")
     if kind not in {"photo", "video"}:
-        raise ManagedApplyError(f"unsupported spatial kind: {kind}", code="UNSUPPORTED_GRADE")
+        raise ManagedApplyError(
+            "Unsupported spatial media kind",
+            code="UNSUPPORTED_GRADE",
+        )
 
-    # Prefer an isolated work dir when the caller passes a shared base + digest.
     if grade_digest:
         work_dir = spatial_work_dir(work_dir, grade_digest=grade_digest, source=source)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -265,9 +511,24 @@ def materialize_spatial_managed_media(
 
         still = work_dir / "source.jpg"
         _materialize_photo_still(source, still)
-        return _grade_rgb_image(still, grade, dest)
+        tmp = work_dir / "graded.tmp.png"
+        if tmp.is_file():
+            tmp.unlink(missing_ok=True)
+        _grade_rgb_image(still, grade, tmp)
+        _atomic_replace(tmp, dest)
+        return dest
 
     dest = work_dir / "graded.mp4"
     if dest.is_file() and dest.stat().st_size > 0:
-        return dest
-    return _grade_rgb_video(source, grade, dest)
+        try:
+            validate_spatial_video_limits(dest)
+            return dest
+        except ManagedApplyError:
+            dest.unlink(missing_ok=True)
+    return _grade_rgb_video(
+        source,
+        grade,
+        dest,
+        cancel_event=cancel_event,
+        on_progress=on_progress,
+    )

@@ -36,7 +36,7 @@ Final `develop` SHA for this checkpoint: `71936cebac9db4dab850c053bc82aeecfbd640
 | Creative .cube LUT strength enable/clear | Available now | #422; confined assets + digest cache |
 | Preview/export pointwise bake | Available now | lut3d bake |
 | Spatial photo preview/export | Available now | CPU path; JPEG-boundary preview limitation |
-| Spatial video export | Available now (CPU materialize) | Full-timeline graded MP4 + audio copy; export keeps trim/speed |
+| Spatial video export | Implemented (CPU CFR path) | Deferred job materialize + audio remux; packaged evidence pending |
 | Playback proxy spatial/managed LUT | Gap | Proxy path not fully wired for all managed cases |
 | GPU WebGL managed adapter (#360) | Later | Not shipped |
 | Scopes tap (#362/#366) | Partial fixtures | Live tap depends on #359 plane |
@@ -81,7 +81,7 @@ Do not close foundations as complete user-facing features without AC evidence.
 | #417–#422 UI/bake/masks/LUT | Implemented + merged; packaged regression PASS; managed CDP NOT_RUN |
 | #423/#424 checkpoint/E2E docs | Merged |
 | Spatial photo | Implemented + verified |
-| Spatial video export | Implemented this slice (CPU frame grade + audio) |
+| Spatial video export | Implemented (CFR CPU path; job-deferred; limits) |
 | Eyedropper / viewer brush | Missing |
 | GPU #360 | Missing |
 | Live scopes #362/#366 | Partial fixtures only |

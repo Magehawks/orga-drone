@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -483,6 +484,10 @@ def _clip_to_export_clip(
             seconds = float(seconds) - loop_join * (repeats - 1)
     managed_grade_lut = None
     managed_grade_media = None
+    managed_spatial_source = None
+    managed_spatial_grade_json = None
+    managed_spatial_digest = None
+    managed_spatial_work = None
     if kind in {"photo", "video"}:
         from orga_drone.studio_grade_model import read_grade
         from orga_drone.studio_managed_apply import (
@@ -497,6 +502,7 @@ def _clip_to_export_clip(
         )
         from orga_drone.studio_managed_spatial_export import (
             materialize_spatial_managed_media,
+            validate_spatial_video_limits,
         )
 
         if grade_is_managed_sdr(clip.effect_settings):
@@ -527,22 +533,44 @@ def _clip_to_export_clip(
                 except ManagedApplyError as exc:
                     raise StudioExportError(str(exc), code=exc.code.lower()) from exc
             elif grade_has_spatial_selections(clip.effect_settings):
-                try:
-                    managed_grade_media = materialize_spatial_managed_media(
-                        path,
-                        model.grade,
-                        work,
-                        kind=kind,
-                        grade_digest=digest,
+                if kind == "photo":
+                    try:
+                        managed_grade_media = materialize_spatial_managed_media(
+                            path,
+                            model.grade,
+                            work,
+                            kind=kind,
+                            grade_digest=digest,
+                        )
+                    except ManagedApplyError as exc:
+                        raise StudioExportError(
+                            str(exc), code=exc.code.lower()
+                        ) from exc
+                else:
+                    # Validate cheaply in preflight; grade frames in the job.
+                    try:
+                        validate_spatial_video_limits(path)
+                    except ManagedApplyError as exc:
+                        raise StudioExportError(
+                            str(exc), code=exc.code.lower()
+                        ) from exc
+                    managed_spatial_source = path
+                    managed_spatial_grade_json = json.dumps(
+                        model.grade, separators=(",", ":"), sort_keys=True
                     )
-                except ManagedApplyError as exc:
-                    raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+                    managed_spatial_digest = digest
+                    managed_spatial_work = work
             else:
                 raise StudioExportError(
                     "This managed grade needs a creative LUT resolver before export",
                     code="unsupported_grade",
                 )
-    managed_color = managed_grade_lut is not None or managed_grade_media is not None
+    managed_spatial_pending = managed_spatial_grade_json is not None
+    managed_color = (
+        managed_grade_lut is not None
+        or managed_grade_media is not None
+        or managed_spatial_pending
+    )
     export_source = managed_grade_media if managed_grade_media is not None else path
     image = (
         ImageAdjust()
@@ -709,6 +737,10 @@ def _clip_to_export_clip(
         color_animation=color_anim,
         managed_grade_lut=managed_grade_lut,
         managed_grade_media=managed_grade_media,
+        managed_spatial_source=managed_spatial_source,
+        managed_spatial_grade_json=managed_spatial_grade_json,
+        managed_spatial_digest=managed_spatial_digest,
+        managed_spatial_work=managed_spatial_work,
         color_look=color_look,
         hsl=hsl,
         color_wheels=color_wheels,
@@ -951,6 +983,83 @@ def run_studio_export(
     )
 
 
+def _materialize_deferred_spatial_clips(
+    config: StudioExportConfig,
+    *,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+) -> StudioExportConfig:
+    """Grade deferred spatial video clips inside the export job (cancelable)."""
+    from orga_drone.studio_managed_apply import ManagedApplyError
+    from orga_drone.studio_managed_spatial_export import materialize_spatial_managed_media
+
+    pending = [
+        clip
+        for clip in config.clips
+        if clip.managed_spatial_grade_json and clip.managed_spatial_source is not None
+    ]
+    if not pending:
+        return config
+
+    built: list[StudioExportClip] = []
+    total = len(pending)
+    done = 0
+    for clip in config.clips:
+        if not (
+            clip.managed_spatial_grade_json and clip.managed_spatial_source is not None
+        ):
+            built.append(clip)
+            continue
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportCancelled()
+        grade = json.loads(clip.managed_spatial_grade_json)
+        work = clip.managed_spatial_work or (
+            settings.data_dir / "export-work" / "managed-grades"
+        )
+
+        def _frame_progress(fraction: float, clip_done: int = done) -> None:
+            if on_progress is None:
+                return
+            base = (clip_done / total) * 100.0
+            span = (1.0 / total) * 100.0
+            on_progress(
+                {
+                    "phase": "spatial_grade",
+                    "clip_index": clip_done,
+                    "clip_total": total,
+                    "percent": int(min(99, max(0, base + span * fraction))),
+                }
+            )
+
+        try:
+            media = materialize_spatial_managed_media(
+                clip.managed_spatial_source,
+                grade,
+                work,
+                kind="video",
+                grade_digest=clip.managed_spatial_digest,
+                cancel_event=cancel_event,
+                on_progress=_frame_progress,
+            )
+        except ManagedApplyError as exc:
+            if exc.code == "CANCELLED":
+                raise ExportCancelled() from exc
+            raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+        built.append(
+            replace(
+                clip,
+                source_path=media,
+                managed_grade_media=media,
+                managed_spatial_source=None,
+                managed_spatial_grade_json=None,
+                managed_spatial_digest=None,
+                managed_spatial_work=None,
+            )
+        )
+        done += 1
+    return replace(config, clips=tuple(built))
+
+
 def _execute_export_config(
     config: StudioExportConfig,
     *,
@@ -967,6 +1076,9 @@ def _execute_export_config(
                 "percent": 0,
             }
         )
+    config = _materialize_deferred_spatial_clips(
+        config, on_progress=on_progress, cancel_event=cancel_event
+    )
     enc = encoder or get_default_encoder()
     try:
         result = enc.render(

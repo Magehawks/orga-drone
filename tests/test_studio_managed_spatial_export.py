@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from orga_drone.studio_managed_spatial_export import (
     materialize_spatial_managed_media,
     source_identity,
     spatial_work_dir,
+    validate_spatial_video_limits,
 )
 
 
@@ -87,16 +90,15 @@ def _run_ffmpeg(*args: str) -> None:
     )
 
 
-def _write_video(path: Path, *, with_audio: bool = True) -> Path:
+def _write_video(path: Path, *, with_audio: bool = True, duration_s: float = 0.3) -> Path:
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         pytest.skip("ffmpeg unavailable")
-    # Solid red field; center will be desaturated by the radial grade.
     args = [
         "-f",
         "lavfi",
         "-i",
-        "color=c=0xc82828:s=64x48:r=10:d=0.3",
+        f"color=c=0xc82828:s=64x48:r=10:d={duration_s}",
     ]
     if with_audio:
         args.extend(
@@ -104,7 +106,7 @@ def _write_video(path: Path, *, with_audio: bool = True) -> Path:
                 "-f",
                 "lavfi",
                 "-i",
-                "sine=frequency=440:sample_rate=8000:duration=0.3",
+                f"sine=frequency=440:sample_rate=8000:duration={duration_s}",
                 "-shortest",
                 "-c:a",
                 "aac",
@@ -126,6 +128,27 @@ def _extract_frame(video: Path, dest: Path, *, time_s: float = 0.05) -> Path:
         str(dest),
     )
     return dest
+
+
+def _frame_count(video: Path) -> int:
+    work = video.parent / f"_count_{video.stem}"
+    work.mkdir(exist_ok=True)
+    for old in work.glob("*.png"):
+        old.unlink()
+    _run_ffmpeg(
+        "-i",
+        str(video),
+        "-map",
+        "0:v:0",
+        "-start_number",
+        "0",
+        str(work / "f_%06d.png"),
+    )
+    return len(list(work.glob("f_*.png")))
+
+
+def _file_sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_source_identity_differs_for_distinct_files(tmp_path: Path) -> None:
@@ -150,28 +173,33 @@ def test_photo_materialize_and_cache_isolation(tmp_path: Path) -> None:
     )
     assert out_a != out_b
     assert out_a.is_file() and out_b.is_file()
-    # Cache hit returns the same path for the same source.
     again = materialize_spatial_managed_media(
         a, grade, tmp_path / "work", kind="photo", grade_digest=digest
     )
     assert again == out_a
 
 
-def test_video_spatial_export_grades_and_preserves_audio(tmp_path: Path) -> None:
+def test_video_spatial_export_grades_preserves_audio_and_timing(tmp_path: Path) -> None:
     video = _write_video(tmp_path / "clip.mp4", with_audio=True)
+    before = _file_sha(video)
+    src_frames = _frame_count(video)
     grade = _grade()
     digest = "a" * 40
     out = materialize_spatial_managed_media(
         video, grade, tmp_path / "work", kind="video", grade_digest=digest
     )
     assert out.is_file() and out.suffix == ".mp4"
-    # Cache hit.
+    assert _file_sha(video) == before
+    assert _frame_count(out) == src_frames
+    width, height, fps, _duration = validate_spatial_video_limits(out)
+    assert (width, height) == (64, 48)
+    assert abs(fps - 10.0) < 0.05
+
     again = materialize_spatial_managed_media(
         video, grade, tmp_path / "work", kind="video", grade_digest=digest
     )
     assert again == out
 
-    # Audio stream still present.
     ffmpeg = find_ffmpeg()
     assert ffmpeg is not None
     probe = subprocess.run(
@@ -188,12 +216,7 @@ def test_video_spatial_export_grades_and_preserves_audio(tmp_path: Path) -> None
 def test_video_spatial_matches_cpu_reference_within_encoding_tolerance(
     tmp_path: Path,
 ) -> None:
-    """Decoded graded frames match the CPU applicator within yuv420p CRF18 drift.
-
-    Outside-mask pixels are not bit-identical to the source: managed input/output
-    transforms still run. The gate compares against the same CPU reference used
-    for photo spatial grades.
-    """
+    """Decoded graded frames match the CPU applicator within yuv420p CRF18 drift."""
     from orga_drone.studio_managed_apply import apply_managed_grade_image
 
     video = _write_video(tmp_path / "clip.mp4", with_audio=False)
@@ -226,12 +249,43 @@ def test_video_spatial_matches_cpu_reference_within_encoding_tolerance(
             gr, gg, gb = graded.getpixel((x, y))
             return max(abs(er - gr), abs(eg - gg), abs(eb - gb))
 
-        # Corner (outside mask) and center (inside mask).
         assert _err(2, 2) <= 12
         assert _err(width // 2, height // 2) <= 12
-        # Center must be near-neutral after saturation=0 inside the radial.
         cr, cg, cb = graded.getpixel((width // 2, height // 2))
         assert max(cr, cg, cb) - min(cr, cg, cb) <= 16
+
+
+def test_partial_mp4_is_not_cache_hit(tmp_path: Path) -> None:
+    video = _write_video(tmp_path / "clip.mp4", with_audio=False)
+    grade = _grade()
+    digest = "d" * 40
+    work = spatial_work_dir(tmp_path / "work", grade_digest=digest, source=video)
+    work.mkdir(parents=True, exist_ok=True)
+    poison = work / "graded.mp4"
+    poison.write_bytes(b"not-a-complete-mp4-but-nonempty")
+    out = materialize_spatial_managed_media(
+        video, grade, tmp_path / "work", kind="video", grade_digest=digest
+    )
+    assert out.is_file() and out.stat().st_size > 1000
+    assert out.read_bytes()[:4] != b"not-"
+
+
+def test_cancel_during_spatial_video(tmp_path: Path) -> None:
+    video = _write_video(tmp_path / "clip.mp4", with_audio=False, duration_s=1.0)
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(ManagedApplyError) as exc:
+        materialize_spatial_managed_media(
+            video,
+            _grade(),
+            tmp_path / "work",
+            kind="video",
+            grade_digest="e" * 40,
+            cancel_event=cancel,
+        )
+    assert exc.value.code == "CANCELLED"
+    dest = spatial_work_dir(tmp_path / "work", grade_digest="e" * 40, source=video) / "graded.mp4"
+    assert not dest.is_file()
 
 
 def test_unknown_kind_fail_closed(tmp_path: Path) -> None:

@@ -63,6 +63,12 @@ class StudioExportClip:
     # Pre-graded media for spatial managed grades (masks/qualifiers). Replaces
     # source for color; framing/masks/overlays still run afterward.
     managed_grade_media: Path | None = None
+    # Deferred spatial video grade (materialized in the export job, not preflight).
+    # ``managed_spatial_grade_json`` is the validated managed-sdr grade object.
+    managed_spatial_source: Path | None = None
+    managed_spatial_grade_json: str | None = None
+    managed_spatial_digest: str | None = None
+    managed_spatial_work: Path | None = None
     color_look: ColorLook = field(default_factory=ColorLook)
     hsl: HslAdjust = field(default_factory=HslAdjust)
     color_wheels: ColorWheels = field(default_factory=ColorWheels)
