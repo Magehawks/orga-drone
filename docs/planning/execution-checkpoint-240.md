@@ -1,8 +1,7 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-12. Integration branch `develop` at `f4e688a`
-(`feat(control): place Studio sound effects through shared actions (#281) (#397)`).
-#396 and #397 are merged.
+Updated: 2026-11-13. Integration branch `develop` at `88c79e9`
+(`feat(studio): add blur dissolve and soft directional wipes (#301) (#401)`).
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -12,55 +11,67 @@ is not acceptance.
 
 | Issue | Feature | State | PR | Acceptance | Blocker | Next action |
 |---|---|---|---|---|---|---|
-| #184 | Independent SFX timeline | VERIFY | #391, #395, #396 merged (`1c929bd`) | Local onefolder WebView2 run PASS: two SFX clips, music, painted waveforms, drag to 1.97 s, keyboard trim, undo/redo, reopen, export audio peak 0.412. Evidence `docs/planning/184-local-packaged-e2e.json`. GitHub ZIP admission NOT_RUN (that workflow runs on PRs to `main`). | PO acceptance | Do not close #184 on the local run alone. |
-| #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets, manual keys, LUT strength fade, undo/persistence exist. WebView2 start/mid/end vs MP4 with a user `.cube`, ease-in-out, and highlights/shadows/blacks are not evidenced. | Full frame-parity E2E | Do not claim #211 done. Next slice needs a bounded parity gap, not a second engine. |
-| #267 | Packaged Windows E2E | VERIFY | local onefolder from `f4e688a` | Same run as #184. Isolated data dir. Not the GitHub admission artifact. | ZIP admission on a PR to `main` | Do not publish. |
-| #273 | Secure pairing | READY | — | Bounded security spike approved. Preferred design: per-connection credentials, DPAPI, user approval, revocation. Production pairing still needs a reviewed contract. | Production implementation | Write the threat-model spike. Do not ship pairing. |
+| #184 | Independent SFX timeline | VERIFY | #395, #396, #400 merged `2c1108a` | Local onefolder WebView2 E2E PASS. Evidence `docs/planning/184-local-packaged-e2e.json`. GitHub release-ZIP admission NOT_RUN. | PO acceptance | Leave #184 open. |
+| #211 | Animated color grading | VERIFY | existing color-animation modules on develop | Presets exist. WebView2 start/mid/end vs MP4 frame-parity is not evidenced. | Full frame-parity E2E | Do not claim #211 done. |
+| #267 | Packaged Windows E2E | VERIFY | local onefolder run recorded in #400 | Local WebView2 journey PASS. GitHub release-ZIP admission NOT_RUN. | PR to `main` admission | Do not call the local run a release admission. |
+| #273 | Secure pairing | VERIFY | #403 | Threat model only. No production pairing, no stored key. Same-user process risk remains. | Reviewed security contract | Do not ship pairing. |
 | #274 | Connect assistant settings UX | BLOCKED | — | — | Depends on #273 approval | Wait. |
-| #275 | Shared action contract and E2E | VERIFY | matrix exists | A documentation matrix does not complete the issue. Color/library/project/timeline/music contracts have tests. Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions (SFX in this checkpoint's PR). |
-| #281 | Shared audio/overlay actions | VERIFY | #397 merged `f4e688a` | Packaged WebView2 journey set one SFX volume to 0.35 through `sfx.update` and the export still decoded. Clip audio and overlay artifact checks beyond that command are not in this run. | PO acceptance | Do not close #281 yet. |
+| #275 | Shared action contract and E2E | VERIFY | matrix exists | Packaged assistant journey NOT_RUN. | Packaged E2E | Keep extending contracts with real actions. |
+| #281 | Shared audio/overlay actions | VERIFY | #397 merged | Packaged journey set one SFX volume to 0.35 through `sfx.update`. Full artifact audit NOT_RUN. | PO acceptance | Do not close #281. |
 | #283 | Real drone footage fixtures | READY | — | Opt-in local media only; nothing committed | — | Privacy-safe manifest, no source media in git. |
 | #284 | Parallel development and release gates | READY | — | — | — | After packaged E2E evidence. |
 | #293 | Open Media Journey acceptance | VERIFY | #387 merged | API + synthetic evidence. Packaged EXE journey NOT_RUN. | Packaged dispatch | Do not close on unit tests. |
-| #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Backend refuses proxies for repeats and forward loop. Playing loop names HSL/wheels/LUT omission. Phase B loop playback parity is explicitly not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
+| #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Phase B loop playback parity is not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | READY | — | Discovery/audit, not a new editor | — | Read the issue and deliver the approved audit outcome. |
-| #297 | Local object removal | VERIFY | #398 updated `9a8d136` | Moving-camera before/after PNGs, shadow kept, synthetic flicker 0, align 2.238 s. Real footage NOT_RUN. NO-GO for a tool. | PO re-review | Do not add a removal UI or package OpenCV. |
-| #298 | Local motion tracking | VERIFY | spike approved | Bounded OpenCV feasibility only. Not a shipping tracker. | — | Deliver spike evidence, do not ship a tracker. |
+| #297 | Local object removal | DONE | #398 merged `e397c26` | PO accepted the NO-GO. No removal UI. OpenCV is not packaged for this purpose. | — | Do not reopen as a feature. |
+| #298 | Local motion tracking | VERIFY | #402 | Synthetic optical-flow spike. Recommendation NO-GO for a 2.4.0 tracker. Real footage NOT_RUN. | PO acceptance of the NO-GO | Do not ship a tracker or package OpenCV. |
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
-| #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Issue says a later milestone and forbids automatic detection. Manual crop/pan exists. Subject following waits on the #298 spike. | #298 evidence, then an explicit follow implementation | Do not add a second crop model. |
-| #301 | Drone-friendly transitions | READY | #390 discovery merged | PO GO for blur dissolve and one soft directional wipe. ADR 0010 must be amended in the same implementation. Luma wipe and zoom/spin stay out. | Amend ADR 0010 before the new type ids ship | Implement those two types with preview and export. |
+| #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Automatic detection is forbidden. Subject following waits on #298. | #298 evidence | Do not add a second crop model. |
+| #301 | Drone-friendly transitions | VERIFY | #401 merged `88c79e9` | Blur dissolve and four soft wipes landed. Packaged WebView2 for these transitions is NOT_RUN. | PO acceptance | Do not reimplement. Do not add more transition types. |
 | #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
-| #325 | Timelapse target duration | VERIFY | inspector and `studio_timelapse.py` already on develop | PO GO for the bounded MVP. Target-duration math, trim, limits, preview, and ramp confirmation already exist. Packaged Windows and exported MP4 evidence for this control are NOT_RUN. | Do not build a second speed engine | Compare the inspector with the acceptance list before adding code. |
+| #325 | Timelapse target duration | VERIFY | #404 | Target-duration draft drives decoded MP4 evidence (trimmed+music, 1080p). Journey smoke now adds clips in a fixed red-then-blue order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |
 | #331 | Source/Story clocks | VERIFY | #392 ADR 0037 merged `0cb3d35` | ADR accepted | — | Region work landed in #332. |
-| #332 | Bounded speed-ramp region | VERIFY | #394 merged `9f927d4` | Focused Python/JS tests passed before merge. Packaged E2E NOT_RUN. PO has not accepted the issue. | PO acceptance | Do not reimplement. |
+| #332 | Bounded speed-ramp region | VERIFY | #394 merged `9f927d4` | Packaged E2E NOT_RUN. PO has not accepted the issue. | PO acceptance | Do not reimplement. |
 | #333 | Timelapse/ramp conflict | VERIFY | #389 merged | Confirm UI merged. Issue may still be open if acceptance is wider. | — | Re-read before more code. |
-| #351 | Color persistence/recovery | IN_PROGRESS | #399 open (`e5c830e`) | ADR 0035 accepted. Backup/restore helper verified. Canonical writes and startup refusal are not enabled. | PO merge, then wire startup only with the canonical file | Do not migrate existing grades. |
-| #352–#366 | Color Workspace | READY | — | Architecture accepted. Read-only contracts may proceed. Production writes wait on verified #351 safeguards. | No canonical write | Do not add a second grade model. |
+| #351 | Color persistence/recovery | VERIFY | #399 | Staged copy and atomic replace. Canonical writes and startup refusal stay disabled. | PO re-review / merge | Do not enable canonical writes. |
+| #352 | Managed SDR LUT contract | VERIFY | #405 | Read-only transfers and tetrahedral 3D LUT sampling. Legacy import/export unchanged. Managed parity gate NOT_RUN. | PO review; #351 before canonical writes | Do not wire into export yet. |
+| #353 | Managed primaries | VERIFY | #406 | Read-only exposure/balance/contrast/tone/saturation. Kelvin/tint and tonal-slider mapping unpublished. | PO review; Kelvin/tint vectors | Do not write canonical grades. |
+| #354–#366 | Color Workspace remainder | READY | — | Continue after #351/#352/#353 gates. | #351 verification | No silent legacy conversion. |
 
 ## Open pull requests
 
-- #398 `feat/297-removal-spike` at `9a8d136`. Moving-camera evidence added. NO-GO for a Studio tool. Awaiting PO re-review.
-- #399 `feat/351-grade-backup` at `e5c830e`. Backup/restore helper and ADR 0035 acceptance. Canonical writes stay off.
+- #399 grade backup. Canonical writes stay disabled.
+- #402 tracking spike. NO-GO for a production tracker.
+- #403 pairing spike. No production pairing.
+- #404 target-duration export evidence. Journey clip order fixed. Packaged Timelapse Inspector NOT_RUN.
+- #405 managed LUT sampling. Not wired to export.
+- #406 managed primaries. Kelvin/tint unpublished.
 
 ## Worktrees
 
-- `issue-184-packaged-e2e` — harness and local onefolder at `dist/orga-drone/orga-drone.exe`. Isolated run data is outside the repo.
-- `issue-297-removal-spike` — PR #398.
+- `issue-325-timelapse` — PR #404.
 - `issue-351-grade-backup` — PR #399.
+- `issue-298-tracking` — PR #402.
+- `issue-273-pairing-spike` — PR #403.
+- `issue-352-managed-lut` — PR #405.
+- `issue-353-primaries` — PR #406.
+- `issue-301-transitions` / `issue-184-packaged-e2e` — merged. Do not keep editing them.
 
 ## PO decisions already received
 
-- ADR 0035 accepted. No canonical production writes until #351 safeguards are verified.
-- #351 backup, checksum, user-only permissions, and tested restore are the approved strategy.
+- ADR 0035 accepted. Canonical writes stay disabled until #351 safeguards are verified.
+- ADR 0037 approved and merged.
+- #297 NO-GO accepted. No removal UI and no packaged OpenCV for that purpose.
+- #301 GO for blur dissolve and one soft directional wipe family; merged via #401.
+- #325 target-duration MVP is GO. Do not build a second speed engine.
+- #351 backup strategy approved. Production canonical writes stay off until backup and restore are verified.
 - #273 bounded security spike approved. Production pairing stays gated.
-- #325 target-duration MVP is GO. Do not duplicate the inspector that is already on develop.
-- #301 GO for blur dissolve and one soft directional wipe, after amending ADR 0010.
-- #298 remains a feasibility spike, not a product tracker.
+- #298 bounded OpenCV spike approved. Not a product tracker.
 - #302 FFmpeg-only dehaze is NO-GO.
 - Do not merge or release without explicit authorization.
 
 ## Exact next task
 
-#353 adds read-only primaries-v1 arithmetic: exposure, luma-normalized balance, contrast, a monotone tone curve, and saturation. Kelvin/tint and blacks/shadows/highlights/whites are not implemented. Canonical writes stay disabled. Do not merge without PO approval.
+Open PRs are updated onto `88c79e9`. #404 journey clip order is deterministic. Request re-review after green CI. Continue Color Workspace read-only work (#354+) without canonical writes. Packaged Timelapse Inspector and GitHub release-ZIP admission remain NOT_RUN. Do not merge without PO approval.
