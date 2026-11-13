@@ -9,9 +9,12 @@ export job phase (cancel + progress). Graded video keeps source duration/fps
 so trim/speed/repeat/transition stay on the canonical FFmpeg encoder path.
 Audio is remuxed (copy when MP4-compatible, otherwise AAC).
 
-Limits: CFR sources up to ``MAX_SPATIAL_VIDEO_*``. VFR and oversized clips
-fail closed with ``UNSUPPORTED_GRADE``. Intermediate encode is a documented
-second lossy pass (CRF 18 yuv420p) before the final export encode.
+Limits: sources up to ``MAX_SPATIAL_VIDEO_*``. Oversized clips fail closed.
+When ffprobe is present, avg/r_frame_rate mismatches fail closed as VFR.
+Without ffprobe (bundled imageio-ffmpeg), extract forces ``-vf fps=`` at the
+probed rate so audio/video stay aligned (VFR is resampled, not silently
+passthrough). Intermediate encode is a documented second lossy pass
+(CRF 18 yuv420p) before the final export encode.
 """
 
 from __future__ import annotations
@@ -37,10 +40,11 @@ ProgressFn = Callable[[float], None]
 
 # Soft product limits for the CPU reference video path (not a performance claim).
 MAX_SPATIAL_VIDEO_PIXELS = 1920 * 1080
-MAX_SPATIAL_VIDEO_DURATION_S = 120.0
-MAX_SPATIAL_VIDEO_FRAMES = 3600
+MAX_SPATIAL_VIDEO_DURATION_S = 60.0
+MAX_SPATIAL_VIDEO_FRAMES = 900
 # Combined decode+grade scratch budget (~uncompressed RGB8 frame equivalents).
-MAX_SPATIAL_VIDEO_PIXEL_FRAMES = MAX_SPATIAL_VIDEO_PIXELS * 900
+# Source frames are deleted after each grade to keep only one PNG set on disk.
+MAX_SPATIAL_VIDEO_PIXEL_FRAMES = MAX_SPATIAL_VIDEO_PIXELS * 300
 
 _FPS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*fps", re.IGNORECASE)
 _SIZE_RE = re.compile(r",\s*(\d{2,5})x(\d{2,5})\b")
@@ -271,14 +275,14 @@ def _probe_video_meta(path: Path) -> tuple[int, int, float, float]:
         **subprocess_no_window_kwargs(),
     )
     text = (proc.stderr or b"").decode("utf-8", errors="replace")
-    # Prefer the largest WxH so attached pics do not win over the main stream.
-    sizes = [(int(w), int(h)) for w, h in _SIZE_RE.findall(text)]
-    if not sizes:
+    # Match extract mapping ``0:v:0``: use the first video stream's WxH/fps.
+    size = _SIZE_RE.search(text)
+    if size is None:
         raise ManagedApplyError(
             "Could not probe spatial video dimensions or frame rate",
             code="UNSUPPORTED_GRADE",
         )
-    width, height = max(sizes, key=lambda wh: wh[0] * wh[1])
+    width, height = int(size.group(1)), int(size.group(2))
     fps_m = _FPS_RE.search(text)
     dur_m = _DURATION_RE.search(text)
     if fps_m is None or dur_m is None:
@@ -419,6 +423,7 @@ def _grade_rgb_video(
                 graded_dir / f"frame_{index:06d}.png",
                 lattice_domain="encoded-bt709",
             )
+            frame_path.unlink(missing_ok=True)
             if on_progress is not None and (index % 5 == 0 or index + 1 == total):
                 on_progress((index + 1) / float(total))
 

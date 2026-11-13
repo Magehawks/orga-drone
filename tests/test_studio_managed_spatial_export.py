@@ -288,6 +288,16 @@ def test_cancel_during_spatial_video(tmp_path: Path) -> None:
     assert not dest.is_file()
 
 
+def test_spatial_video_limits_reject_oversized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import orga_drone.studio_managed_spatial_export as spatial
+
+    video = _write_video(tmp_path / "clip.mp4", with_audio=False)
+    monkeypatch.setattr(spatial, "MAX_SPATIAL_VIDEO_PIXELS", 16)
+    with pytest.raises(ManagedApplyError) as exc:
+        spatial.validate_spatial_video_limits(video)
+    assert exc.value.code == "UNSUPPORTED_GRADE"
+
+
 def test_unknown_kind_fail_closed(tmp_path: Path) -> None:
     photo = _write_photo(tmp_path / "a.jpg", (10, 10, 10))
     with pytest.raises(ManagedApplyError) as exc:
