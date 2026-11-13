@@ -118,3 +118,31 @@ def test_bake_cube_and_ffmpeg_chain(tmp_path: Path) -> None:
 def test_legacy_effect_settings_skip_managed_chain() -> None:
     assert grade_is_managed_pointwise('{"image":{"exposure":10}}') is False
     assert ffmpeg_managed_grade_chain('{"image":{"exposure":10}}', work_dir=Path(".")) == ""
+
+
+def test_creative_lut_managed_grade_is_rejected_before_bake() -> None:
+    from orga_drone.studio_managed_apply import require_managed_pointwise
+
+    grade = _managed_grade(
+        steps=[
+            {
+                "id": "lut1",
+                "type": "creative-lut-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {
+                    "asset_id": "abc.cube",
+                    "strength": 1,
+                    "sha256": "a" * 64,
+                    "interpolation": "tetrahedral",
+                },
+            }
+        ]
+    )
+    effect = json.dumps({"grade": grade})
+    with pytest.raises(ManagedApplyError) as exc:
+        require_managed_pointwise(effect)
+    assert exc.value.code == "UNSUPPORTED_GRADE"
+    assert grade_is_managed_pointwise(effect) is False
+    assert ffmpeg_managed_grade_chain(effect, work_dir=Path(".")) == ""

@@ -307,6 +307,14 @@ def apply_managed_grade_rgb(
     return _encode_profile(output_profile if output_profile != "bt709" else "bt709-sdr", working)
 
 
+def grade_is_managed_sdr(
+    effect_settings: str | Mapping[str, Any] | None,
+) -> bool:
+    """True when the clip authority is managed-sdr-v1."""
+    model = read_grade(effect_settings)
+    return model.evaluator == "managed-sdr-v1" and model.grade is not None
+
+
 def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) -> bool:
     """True when preview/export should use the managed applicator instead of legacy."""
     model = read_grade(effect_settings)
@@ -324,6 +332,20 @@ def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) 
         if kind == "creative-lut-v1":
             return False
     return True
+
+
+def require_managed_pointwise(
+    effect_settings: str | Mapping[str, Any] | None,
+) -> None:
+    """Reject managed grades that cannot be executed by the bake adapter."""
+    if not grade_is_managed_sdr(effect_settings):
+        return
+    if grade_is_managed_pointwise(effect_settings):
+        return
+    raise ManagedApplyError(
+        "This managed grade needs masks, a creative LUT, or another adapter before preview/export",
+        code="UNSUPPORTED_GRADE",
+    )
 
 
 def bake_managed_grade_cube(
@@ -352,7 +374,9 @@ def bake_managed_grade_cube(
                 )
                 lines.append(f"{out[0]:.8f} {out[1]:.8f} {out[2]:.8f}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary = path.with_suffix(path.suffix + ".partial")
+    temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary.replace(path)
     return path
 
 

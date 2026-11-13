@@ -296,7 +296,13 @@ def evaluate_grade(
                     asset(asset_id, "creative")
         requirements = ["managed-sdr-adapter"]
     resolved = all(entry["sha256"] is not None for entry in assets)
-    managed_pixels = model.evaluator == "managed-sdr-v1"
+    managed_bake = False
+    if model.evaluator == "managed-sdr-v1" and model.grade is not None:
+        from orga_drone.studio_managed_apply import grade_is_managed_pointwise
+
+        managed_bake = grade_is_managed_pointwise(model.to_dict())
+        if not managed_bake:
+            requirements = list(requirements) + ["spatial-or-lut-adapter"]
     content = {
         "plan_version": 1,
         "schema_version": 1,
@@ -308,12 +314,12 @@ def evaluate_grade(
         "assets": assets,
         "capabilities": {
             "planning": True,
-            "pixel_execution": managed_pixels,
-            "ffmpeg": "managed-lut-bake-v1" if managed_pixels else "not-integrated",
+            "pixel_execution": managed_bake,
+            "ffmpeg": "managed-lut-bake-v1" if managed_bake else "not-integrated",
             "gpu": "not-integrated",
             "requirements": requirements,
             "assets_resolved": resolved,
-            "adapter": "managed-sdr-cpu-v1" if managed_pixels else None,
+            "adapter": "managed-sdr-cpu-v1" if managed_bake else None,
         },
     }
     encoded = snapshot(content)

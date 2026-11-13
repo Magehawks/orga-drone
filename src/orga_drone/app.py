@@ -2635,9 +2635,23 @@ def create_app() -> FastAPI:
         else:
             image = image_adjust_from_effect_settings(clip.effect_settings)
             look = base_look
-        from orga_drone.studio_managed_apply import grade_is_managed_pointwise
+        from orga_drone.studio_managed_apply import (
+            ManagedApplyError,
+            grade_is_managed_pointwise,
+            grade_is_managed_sdr,
+            require_managed_pointwise,
+        )
 
-        managed_preview = grade_is_managed_pointwise(clip.effect_settings)
+        managed_preview = False
+        if grade_is_managed_sdr(clip.effect_settings):
+            try:
+                require_managed_pointwise(clip.effect_settings)
+            except ManagedApplyError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": str(exc), "code": exc.code},
+                ) from exc
+            managed_preview = True
         if (
             not before
             and not managed_preview

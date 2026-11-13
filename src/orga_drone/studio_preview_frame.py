@@ -72,15 +72,24 @@ def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
     """Temporary comparison inputs; preserve only configured technical conversion.
 
     Reuse the existing effective-input cache identity. Never write clip settings
-    or change the normal still/proxy/export builders.
+    or change the normal still/proxy/export builders. Clear managed
+    ``effect_settings`` so before-compare does not keep the managed bake.
     """
     look = ColorLook(
         input_profile=req.look.input_profile,
         conversion_lut=req.look.conversion_lut if req.look.conversion_confirmed else "",
         conversion_confirmed=req.look.conversion_confirmed,
     )
-    return replace(req, image=ImageAdjust(), look=look, hsl=HslAdjust(),
-                   color_wheels=ColorWheels(), saturation=1.0, detail=False)
+    return replace(
+        req,
+        image=ImageAdjust(),
+        look=look,
+        hsl=HslAdjust(),
+        color_wheels=ColorWheels(),
+        saturation=1.0,
+        detail=False,
+        effect_settings=None,
+    )
 
 
 class PreviewFrameError(Exception):

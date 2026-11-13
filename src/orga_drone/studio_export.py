@@ -488,13 +488,20 @@ def _clip_to_export_clip(
             ManagedApplyError,
             bake_managed_grade_cube,
             grade_is_managed_pointwise,
+            grade_is_managed_sdr,
             managed_grade_digest,
+            require_managed_pointwise,
         )
 
-        if grade_is_managed_pointwise(clip.effect_settings):
+        if grade_is_managed_sdr(clip.effect_settings):
+            try:
+                require_managed_pointwise(clip.effect_settings)
+            except ManagedApplyError as exc:
+                raise StudioExportError(str(exc), code=exc.code.lower()) from exc
             digest = managed_grade_digest(clip.effect_settings)
             model = read_grade(clip.effect_settings)
             assert digest is not None and model.grade is not None
+            assert grade_is_managed_pointwise(clip.effect_settings)
             work = settings.data_dir / "export-work" / "managed-grades"
             work.mkdir(parents=True, exist_ok=True)
             managed_grade_lut = work / f"managed_{digest[:16]}.cube"
