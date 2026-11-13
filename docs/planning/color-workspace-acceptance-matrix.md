@@ -19,7 +19,7 @@ and stopped #320 precision experiments are not weakened.
 | Creative LUT resolve/bake | PASS | #422 |
 | Technical LUT metadata | PASS / reject | #352; non-null technical LUT typed reject until resolved asset |
 | Serial step enable/mix/reorder | PASS | #433 `clip.grade.command` |
-| Full serial step editor UX | PASS (slice) | enable/mix/reorder via `managed-step-editor.js` + grade commands; param PUT remains |
+| Full serial step editor UX | PASS (slice) | enable/mix/reorder via `managed-step-editor.js` + grade commands; params via upsert commands |
 
 ## 2. LUTs, photo/video export
 
