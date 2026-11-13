@@ -71,8 +71,11 @@ export function probeManagedGpuCapabilities(gradeDoc) {
   return {
     adapter: MANAGED_GPU_ADAPTER_VERSION,
     supported: true,
-    mode: "webgl-bake",
-    reasons: [],
+    // Preview uses the existing RGBA8 + trilinear 3D LUT path (not exact
+    // tetrahedral float parity). Export/CPU remain the reference.
+    mode: "webgl-bake-approx",
+    exact: false,
+    reasons: ["rgba8-trilinear-approx"],
     unsupported: [],
   };
 }

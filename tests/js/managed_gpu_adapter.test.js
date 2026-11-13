@@ -19,12 +19,13 @@ function grade(steps) {
   };
 }
 
-test("pointwise primaries are webgl-bake supported", () => {
+test("pointwise primaries are webgl-bake-approx supported", () => {
   const probe = probeManagedGpuCapabilities(
     grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }])
   );
   assert.equal(probe.supported, true);
-  assert.equal(probe.mode, "webgl-bake");
+  assert.equal(probe.mode, "webgl-bake-approx");
+  assert.equal(probe.exact, false);
 });
 
 test("spatial selection forces cpu fallback", () => {

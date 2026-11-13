@@ -2783,11 +2783,30 @@ import {
   }
 
   function managedGradeForClip(clip) {
-    if (!clip || !managedColorEditor) return null;
+    if (!clip) return null;
+    const raw = clip.dataset.managedGradeJson;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.evaluator === "managed-sdr-v1") return parsed;
+      } catch (_) {
+        /* ignore corrupt cache */
+      }
+    }
+    if (!managedColorEditor) return null;
     const grade = managedColorEditor.currentGrade?.();
     const gradeId = managedColorEditor.currentStudioId?.();
     if (!grade || String(gradeId) !== String(clip.dataset.studioId)) return null;
     return grade;
+  }
+
+  function cacheManagedGradeOnClip(clip, grade) {
+    if (!clip) return;
+    if (grade?.evaluator === "managed-sdr-v1") {
+      clip.dataset.managedGradeJson = JSON.stringify(grade);
+    } else if (clip.dataset.managedGradeJson) {
+      delete clip.dataset.managedGradeJson;
+    }
   }
 
   function managedGpuProbeFor(clip) {
@@ -2802,7 +2821,11 @@ import {
     const managedProbe = managedGpuProbeFor(clip);
     if (managedProbe) {
       // Spatial / unsupported managed ops stay on the CPU still path.
-      return managedProbe.supported && managedProbe.mode === "webgl-bake";
+      // Approx bake is allowed for live preview; export stays on CPU/FFmpeg.
+      return (
+        managedProbe.supported &&
+        (managedProbe.mode === "webgl-bake" || managedProbe.mode === "webgl-bake-approx")
+      );
     }
     return evaluateLutWebglHandling({
       kind: clip.dataset.kind,
@@ -2818,14 +2841,19 @@ import {
     const grade = managedGradeForClip(clip);
     if (!grade) return null;
     const probe = probeManagedGpuCapabilities(grade);
-    if (!probe.supported || probe.mode !== "webgl-bake") return null;
+    if (
+      !probe.supported ||
+      (probe.mode !== "webgl-bake" && probe.mode !== "webgl-bake-approx")
+    ) {
+      return null;
+    }
     const studioId = clip?.dataset?.studioId;
     if (!studioId) return null;
     return {
       conversion_lut: "",
       conversion_confirmed: false,
       creative_lut: managedBakeUrl(studioId, grade.revision),
-      creative_strength: 1,
+      creative_strength: 100,
     };
   }
 
@@ -14160,6 +14188,7 @@ import {
     onChanged: () => {
       const clip = selectedAdjustableClip();
       if (clip) {
+        cacheManagedGradeOnClip(clip, managedColorEditor?.currentGrade?.());
         scheduleLutProxyPrepare(clip);
         syncPreviewMedia({ seek: true });
       }
