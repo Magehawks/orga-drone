@@ -37,11 +37,19 @@ def test_acceptance_matrix_document_exists_and_is_honest() -> None:
 
 def test_matrix_does_not_claim_packaged_webview2_pass() -> None:
     text = MATRIX.read_text(encoding="utf-8")
-    # Guard against accidental PASS wording for packaged WebView2.
-    banned = [
-        "Packaged WebView2 parity | PASS",
-        "Packaged latency/memory | PASS",
-        "Windows EXE | PASS",
-    ]
-    for line in banned:
-        assert line not in text
+    # Any table row that mentions packaged/WebView2/EXE must not verdict PASS.
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        lower = line.lower()
+        if not any(
+            token in lower
+            for token in ("packaged", "webview2", "windows exe", "installer")
+        ):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        verdict = cells[1]
+        assert verdict.startswith(("NOT_RUN", "FAIL", "BLOCKED")), line
+
