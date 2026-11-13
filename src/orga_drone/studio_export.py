@@ -482,37 +482,64 @@ def _clip_to_export_clip(
         if loop_join > 0 and seconds is not None:
             seconds = float(seconds) - loop_join * (repeats - 1)
     managed_grade_lut = None
+    managed_grade_media = None
     if kind in {"photo", "video"}:
         from orga_drone.studio_grade_model import read_grade
         from orga_drone.studio_managed_apply import (
             ManagedApplyError,
             bake_managed_grade_cube,
+            grade_has_spatial_selections,
             grade_is_managed_pointwise,
             grade_is_managed_sdr,
             managed_grade_digest,
+            require_managed_executable,
             require_managed_pointwise,
+        )
+        from orga_drone.studio_managed_spatial_export import (
+            materialize_spatial_managed_media,
         )
 
         if grade_is_managed_sdr(clip.effect_settings):
             try:
-                require_managed_pointwise(clip.effect_settings)
+                require_managed_executable(clip.effect_settings)
             except ManagedApplyError as exc:
                 raise StudioExportError(str(exc), code=exc.code.lower()) from exc
             digest = managed_grade_digest(clip.effect_settings)
             model = read_grade(clip.effect_settings)
             assert digest is not None and model.grade is not None
-            assert grade_is_managed_pointwise(clip.effect_settings)
             work = settings.data_dir / "export-work" / "managed-grades"
             work.mkdir(parents=True, exist_ok=True)
-            managed_grade_lut = work / f"managed_{digest[:16]}.cube"
-            try:
-                if not managed_grade_lut.is_file():
-                    bake_managed_grade_cube(model.grade, managed_grade_lut)
-            except ManagedApplyError as exc:
-                raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+            if grade_is_managed_pointwise(clip.effect_settings):
+                try:
+                    require_managed_pointwise(clip.effect_settings)
+                except ManagedApplyError as exc:
+                    raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+                managed_grade_lut = work / f"managed_{digest[:16]}.cube"
+                try:
+                    if not managed_grade_lut.is_file():
+                        bake_managed_grade_cube(model.grade, managed_grade_lut)
+                except ManagedApplyError as exc:
+                    raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+            elif grade_has_spatial_selections(clip.effect_settings):
+                try:
+                    managed_grade_media = materialize_spatial_managed_media(
+                        path,
+                        model.grade,
+                        work / f"spatial_{digest[:16]}",
+                        kind=kind,
+                    )
+                except ManagedApplyError as exc:
+                    raise StudioExportError(str(exc), code=exc.code.lower()) from exc
+            else:
+                raise StudioExportError(
+                    "This managed grade needs a creative LUT resolver before export",
+                    code="unsupported_grade",
+                )
+    managed_color = managed_grade_lut is not None or managed_grade_media is not None
+    export_source = managed_grade_media if managed_grade_media is not None else path
     image = (
         ImageAdjust()
-        if managed_grade_lut is not None
+        if managed_color
         else image_adjust_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else ImageAdjust()
@@ -521,7 +548,7 @@ def _clip_to_export_clip(
 
     color_anim = (
         None
-        if managed_grade_lut is not None
+        if managed_color
         else color_animation_from_effect_settings(clip.effect_settings)
         if kind == "video"
         else None
@@ -530,21 +557,21 @@ def _clip_to_export_clip(
         color_anim = None
     color_look = (
         ColorLook()
-        if managed_grade_lut is not None
+        if managed_color
         else color_look_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else color_look_from_effect_settings(None)
     )
     hsl = (
         HslAdjust()
-        if managed_grade_lut is not None
+        if managed_color
         else hsl_adjust_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else hsl_adjust_from_effect_settings(None)
     )
     color_wheels = (
         ColorWheels()
-        if managed_grade_lut is not None
+        if managed_color
         else color_wheels_from_effect_settings(clip.effect_settings)
         if kind in {"photo", "video"}
         else color_wheels_from_effect_settings(None)
@@ -640,11 +667,11 @@ def _clip_to_export_clip(
         if detached is not None and not detached.is_heard:
             detached = None
     return StudioExportClip(
-        source_path=path,
+        source_path=export_source,
         kind=kind or "video",
         duration_s=float(seconds),
-        source_start_s=start,
-        source_end_s=end,
+        source_start_s=start if managed_grade_media is None else 0.0,
+        source_end_s=end if managed_grade_media is None else None,
         playback_speed=speed,
         zoom_span=zoom_span,
         slow_span=slow_span,
@@ -666,6 +693,7 @@ def _clip_to_export_clip(
         image=image,
         color_animation=color_anim,
         managed_grade_lut=managed_grade_lut,
+        managed_grade_media=managed_grade_media,
         color_look=color_look,
         hsl=hsl,
         color_wheels=color_wheels,

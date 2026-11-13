@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  bindStepSelection,
+  emptySelection,
   findStep,
+  linearLeaf,
   neutralCurveParams,
   neutralPrimariesParams,
+  radialLeaf,
   upsertCurveStep,
   upsertManagedHslStep,
   upsertPrimariesStep,
+  upsertSelection,
   upsertWheelsStep,
 } from "../../src/orga_drone/static/js/studio/grade-api.js";
 
@@ -78,4 +83,15 @@ test("upsertCurveStep inserts rgb and hue curve families", () => {
   const hue = upsertCurveStep(rgb, "hue-vs-hue-v1", neutralCurveParams("hue-vs-hue-v1"));
   assert.equal(hue.steps.length, 2);
   assert.deepEqual(findStep(hue, "hue-vs-hue-v1").params.curve[0], [0, 0]);
+});
+
+test("upsertSelection and bindStepSelection share the grade document", () => {
+  let grade = upsertPrimariesStep({ steps: [], selections: [] }, { exposure: 0.2 });
+  const selection = emptySelection("sel-1");
+  selection.mask = { combine: "union", leaves: [radialLeaf(), linearLeaf()] };
+  grade = upsertSelection(grade, selection);
+  grade = bindStepSelection(grade, "primaries-v1", "sel-1");
+  assert.equal(grade.selections.length, 1);
+  assert.equal(findStep(grade, "primaries-v1").selection_id, "sel-1");
+  assert.equal(grade.selections[0].mask.leaves[0].type, "radial");
 });

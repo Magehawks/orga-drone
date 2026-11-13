@@ -205,3 +205,56 @@ export function upsertCurveStep(grade, type, params) {
   }
   return upsertTypedStep(grade, type, params, neutralCurveParams(type));
 }
+
+export function emptySelection(id) {
+  return {
+    id: id || `sel-${Date.now().toString(36)}`,
+    mask: { combine: "union", leaves: [] },
+    qualifier: null,
+    invert: false,
+  };
+}
+
+export function linearLeaf({ start = [0.5, 0], end = [0.5, 1], feather = 0.05 } = {}) {
+  return { type: "linear", start, end, feather };
+}
+
+export function radialLeaf({ center = [0.5, 0.5], axes = [0.25, 0.25], feather = 0.05 } = {}) {
+  return { type: "radial", center, axes, feather };
+}
+
+export function brushLeaf({
+  points = [
+    [0.4, 0.5],
+    [0.6, 0.5],
+  ],
+  radius = 0.08,
+  hardness = 0.5,
+  pressure = 1,
+} = {}) {
+  return {
+    type: "brush",
+    combine: "union",
+    strokes: [{ points, radius, hardness, pressure }],
+  };
+}
+
+export function upsertSelection(grade, selection) {
+  const next = structuredClone(grade || {});
+  if (!Array.isArray(next.selections)) next.selections = [];
+  const index = next.selections.findIndex((entry) => entry.id === selection.id);
+  if (index >= 0) next.selections[index] = selection;
+  else next.selections.push(selection);
+  return next;
+}
+
+export function bindStepSelection(grade, stepType, selectionId) {
+  const next = structuredClone(grade || {});
+  if (!Array.isArray(next.steps)) next.steps = [];
+  const step = next.steps.find((entry) => entry.type === stepType);
+  if (!step) {
+    throw new Error(`step not found: ${stepType}`);
+  }
+  step.selection_id = selectionId;
+  return next;
+}

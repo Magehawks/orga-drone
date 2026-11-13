@@ -19,6 +19,7 @@ import {
   wrapGrade,
 } from "./grade-api.js";
 import { createManagedCurveEditor } from "./managed-curve-editor.js";
+import { createManagedSelectionEditor } from "./managed-selection-editor.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -105,6 +106,16 @@ export function createManagedColorEditor({
     getGrade: () => current,
     onChanged: (payload) => {
       current = payload;
+      onChanged?.(payload);
+    },
+  });
+  const selectionEditor = createManagedSelectionEditor({
+    panel: panel.querySelector("[data-managed-selection-panel]"),
+    getSelectedStudioId,
+    getGrade: () => current,
+    onChanged: (payload) => {
+      current = payload;
+      curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
       onChanged?.(payload);
     },
   });
@@ -244,15 +255,18 @@ export function createManagedColorEditor({
             `managed-sdr · rev ${current.revision} · preview/export bake`
         );
         curveEditor.syncFromGrade(current, studioId);
+        selectionEditor.syncFromGrade(current, studioId);
       } else if (current.authority === "canonical") {
         setStatus(
           messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
             `legacy wrapper · rev ${current.revision} · Look & color locked`
         );
         curveEditor.syncFromGrade(null, null);
+        selectionEditor.syncFromGrade(null, null);
       } else {
         setStatus(messages.legacyStatus || "legacy color");
         curveEditor.syncFromGrade(null, null);
+        selectionEditor.syncFromGrade(null, null);
       }
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
@@ -308,6 +322,7 @@ export function createManagedColorEditor({
       current = payload;
       currentId = expectedId;
       curveEditor.syncFromGrade(current, expectedId);
+      selectionEditor.syncFromGrade(current, expectedId);
       setStatus(
         messages.managedStatus?.replace("{rev}", String(current.revision)) ||
           `managed-sdr · rev ${current.revision} · preview/export bake`
