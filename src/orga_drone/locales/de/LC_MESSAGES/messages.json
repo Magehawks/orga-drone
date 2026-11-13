@@ -1078,5 +1078,8 @@
   "Brush drawing…": "Pinselzeichnung…",
   "Brush cancelled": "Pinsel abgebrochen",
   "Selection saved": "Auswahl gespeichert",
-  "Selection cleared": "Auswahl gelöscht"
+  "Selection cleared": "Auswahl gelöscht",
+  "Sample · rev {rev} · {domain} · frame {frame}": "Probe · Rev {rev} · {domain} · Frame {frame}",
+  "Selection · {id} · rev {rev}": "Auswahl · {id} · Rev {rev}",
+  "No selection · rev {rev}": "Keine Auswahl · Rev {rev}"
 }

@@ -88,8 +88,9 @@ export function createManagedSelectionEditor({
     if (brushBtn) {
       brushBtn.setAttribute("aria-pressed", viewerMode === "brush" ? "true" : "false");
     }
-    const media = getPreviewMediaEl?.();
-    if (media) {
+    const provided = getPreviewMediaEl?.();
+    const media = Array.isArray(provided) ? resolveActivePreviewMedia(provided) : provided || null;
+    if (media && media.style) {
       media.style.cursor =
         viewerMode === "eyedropper" ? "crosshair" : viewerMode === "brush" ? "cell" : "";
     }
@@ -109,7 +110,11 @@ export function createManagedSelectionEditor({
     const b = Math.round(Math.min(255, Math.max(0, rgb[2] * 255)));
     if (sampleSwatch) sampleSwatch.style.background = `rgb(${r}, ${g}, ${b})`;
     if (sampleMeta) {
-      sampleMeta.textContent = `sample · rev ${sample.revision} · ${sample.domain} · frame ${sample.frame}`;
+      const template = messages.sampleMeta || "Sample · rev {rev} · {domain} · frame {frame}";
+      sampleMeta.textContent = template
+        .replace("{rev}", String(sample.revision))
+        .replace("{domain}", String(sample.domain || ""))
+        .replace("{frame}", String(sample.frame));
     }
   }
 
@@ -321,8 +326,13 @@ export function createManagedSelectionEditor({
     }
     setStatus(
       selection
-        ? `selection · ${selection.id} · rev ${payload.revision}`
-        : `no selection · rev ${payload.revision}`
+        ? (messages.selectionStatus || "Selection · {id} · rev {rev}")
+            .replace("{id}", String(selection.id))
+            .replace("{rev}", String(payload.revision))
+        : (messages.noSelectionStatus || "No selection · rev {rev}").replace(
+            "{rev}",
+            String(payload.revision)
+          )
     );
   }
 
