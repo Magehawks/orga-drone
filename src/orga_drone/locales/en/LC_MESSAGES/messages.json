@@ -1069,5 +1069,14 @@
   "Draw brush": "Draw brush",
   "Accept sample": "Accept sample",
   "Brush radius": "Brush radius",
-  "Brush hardness": "Brush hardness"
+  "Brush hardness": "Brush hardness",
+  "Sampling…": "Sampling…",
+  "Sampled — accept to apply qualifier": "Sampled — accept to apply qualifier",
+  "Sample is stale. Sample again.": "Sample is stale. Sample again.",
+  "Eyedropper: click the preview": "Eyedropper: click the preview",
+  "Brush: draw on the preview": "Brush: draw on the preview",
+  "Brush drawing…": "Brush drawing…",
+  "Brush cancelled": "Brush cancelled",
+  "Selection saved": "Selection saved",
+  "Selection cleared": "Selection cleared"
 }

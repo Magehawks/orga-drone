@@ -14078,10 +14078,12 @@ import {
   managedColorEditor = createManagedColorEditor({
     panel: managedColorPanel,
     getSelectedStudioId: () => selectedAdjustableClip()?.dataset?.studioId || null,
-    getPreviewMediaEl: () =>
-      document.getElementById("studio-preview-video") ||
-      document.getElementById("studio-preview-image") ||
+    getPreviewMediaEl: () => [
+      document.getElementById("studio-preview-video"),
+      document.getElementById("studio-preview-image"),
+      document.getElementById("studio-preview-lut-still"),
       previewFrame,
+    ],
     getPreviewSourceTimeS: () => {
       const clip = selectedAdjustableClip();
       if (!clip) return 0;

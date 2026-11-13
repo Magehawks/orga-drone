@@ -1119,7 +1119,16 @@
               <input type="range" data-managed-hsl-light min="-0.5" max="0.5" step="0.01" value="0" disabled>
             </label>
             <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
-            <div class="studio-managed-selection" data-managed-selection-panel hidden>
+            <div class="studio-managed-selection" data-managed-selection-panel hidden
+                 data-msg-sampling="{{ _('Sampling…') }}"
+                 data-msg-sampled="{{ _('Sampled — accept to apply qualifier') }}"
+                 data-msg-sample-stale="{{ _('Sample is stale. Sample again.') }}"
+                 data-msg-eyedropper="{{ _('Eyedropper: click the preview') }}"
+                 data-msg-brush="{{ _('Brush: draw on the preview') }}"
+                 data-msg-brush-drawing="{{ _('Brush drawing…') }}"
+                 data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
+                 data-msg-saved="{{ _('Selection saved') }}"
+                 data-msg-cleared="{{ _('Selection cleared') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
               <label class="studio-inspector-field">

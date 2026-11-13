@@ -120,6 +120,18 @@ export function createManagedColorEditor({
     getGrade: () => current,
     getPreviewMediaEl,
     getPreviewSourceTimeS,
+    messages: {
+      sampling: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampling,
+      sampledHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampled,
+      sampleStale: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleStale,
+      eyedropperHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgEyedropper,
+      brushHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrush,
+      brushDrawing: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrushDrawing,
+      brushCancelled: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgBrushCancelled,
+      selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
+      selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
+    },
     onChanged: (payload) => {
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());

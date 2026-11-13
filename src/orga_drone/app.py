@@ -2417,14 +2417,26 @@ def create_app() -> FastAPI:
             payload = None
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_u = payload.get("u")
+        raw_v = payload.get("v")
+        if raw_u is None or raw_v is None:
+            raise HTTPException(status_code=400, detail="u and v are required")
         try:
-            u = float(payload.get("u"))
-            v = float(payload.get("v"))
+            u = float(raw_u)
+            v = float(raw_v)
+            t_s = float(payload["t_s"]) if payload.get("t_s") is not None else 0.0
+            neighborhood = (
+                float(payload["neighborhood"])
+                if payload.get("neighborhood") is not None
+                else 0.01
+            )
         except (TypeError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail="u and v are required") from exc
-        t_s = float(payload.get("t_s") or 0.0)
-        neighborhood = float(payload.get("neighborhood") or 0.01)
-        domain = str(payload.get("domain") or "srgb")
+            raise HTTPException(
+                status_code=400, detail="u, v, t_s and neighborhood must be numbers"
+            ) from exc
+        if u != u or v != v or t_s != t_s or neighborhood != neighborhood:
+            raise HTTPException(status_code=400, detail="u, v, t_s and neighborhood must be finite")
+        domain = "srgb"
         expected_revision = payload.get("expected_revision")
         try:
             project_id = _clip_project_id(studio_item_id)
@@ -2443,12 +2455,16 @@ def create_app() -> FastAPI:
                 status_code=422,
                 detail="Eyedropper works on photo and video clips only.",
             )
-        if not clip.media_path or not clip.available:
+        media_row = (
+            db.get_media(int(clip.source_media_id))
+            if clip.source_media_id is not None
+            else None
+        )
+        media_path = resolve_media_file(db, media_row) if media_row is not None else None
+        if media_path is None:
             raise HTTPException(status_code=409, detail="This media file is offline.")
-        media_path = Path(clip.media_path)
-        if not media_path.is_file():
-            raise HTTPException(status_code=409, detail="This media file is missing.")
         model = read_grade(clip.effect_settings)
+        expected: int | None = None
         if expected_revision is not None:
             try:
                 expected = int(expected_revision)
@@ -2473,7 +2489,7 @@ def create_app() -> FastAPI:
                     status_code=422,
                     detail={"message": str(exc), "code": exc.code},
                 ) from exc
-        local = quantize_preview_time(t_s if t_s == t_s else 0.0)
+        local = quantize_preview_time(t_s)
         origin = float(clip.source_start or 0.0)
         abs_t = origin + local
         if clip.source_end is not None:
@@ -2495,6 +2511,27 @@ def create_app() -> FastAPI:
                 frame_request,
                 data_dir=settings.data_dir,
             )
+            # Re-read grade after the potentially slow render.
+            fresh = next(
+                (
+                    item
+                    for item in db.list_studio_items(project_id)
+                    if item.id == studio_item_id
+                ),
+                None,
+            )
+            if fresh is None:
+                raise HTTPException(status_code=404, detail="Studio item not found")
+            model = read_grade(fresh.effect_settings)
+            if expected is not None and int(model.revision) != expected:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": "Grade changed since this sample started",
+                        "code": "STALE_REVISION",
+                        "revision": model.revision,
+                    },
+                )
             rgb, box, size = sample_preview_jpeg(
                 jpeg, u=u, v=v, neighborhood=neighborhood
             )
@@ -2502,7 +2539,7 @@ def create_app() -> FastAPI:
                 rgb=rgb,
                 frame=int(round(abs_t * 30.0)),
                 revision=int(model.revision),
-                domain=domain if domain in {"bt709", "srgb", "legacy-native"} else "srgb",
+                domain=domain,
                 neighborhood=box,
                 source_time_s=local,
                 size=size,

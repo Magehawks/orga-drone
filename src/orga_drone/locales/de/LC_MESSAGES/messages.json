@@ -1069,5 +1069,14 @@
   "Draw brush": "Pinsel zeichnen",
   "Accept sample": "Probe übernehmen",
   "Brush radius": "Pinselradius",
-  "Brush hardness": "Pinselhärte"
+  "Brush hardness": "Pinselhärte",
+  "Sampling…": "Abproben…",
+  "Sampled — accept to apply qualifier": "Abgetastet — Probe übernehmen, um den Qualifier anzuwenden",
+  "Sample is stale. Sample again.": "Probe ist veraltet. Bitte erneut abtasten.",
+  "Eyedropper: click the preview": "Pipette: Vorschau anklicken",
+  "Brush: draw on the preview": "Pinsel: auf der Vorschau zeichnen",
+  "Brush drawing…": "Pinselzeichnung…",
+  "Brush cancelled": "Pinsel abgebrochen",
+  "Selection saved": "Auswahl gespeichert",
+  "Selection cleared": "Auswahl gelöscht"
 }

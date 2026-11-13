@@ -12,7 +12,7 @@ import {
   sampleEyedropper,
   upsertSelection,
 } from "./grade-api.js";
-import { createManagedViewerTools } from "./managed-viewer-tools.js";
+import { createManagedViewerTools, resolveActivePreviewMedia } from "./managed-viewer-tools.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -26,6 +26,7 @@ export function createManagedSelectionEditor({
   onChanged,
   getPreviewMediaEl,
   getPreviewSourceTimeS,
+  messages = {},
 }) {
   if (!panel) {
     return { fill() {}, syncFromGrade() {}, setViewerMode() {} };
@@ -50,6 +51,7 @@ export function createManagedSelectionEditor({
   let currentId = null;
   let pendingSample = null;
   let viewerMode = "none";
+  let tools = { rebind() {}, destroy() {} };
   const tokens = new Map();
 
   function setStatus(text) {
@@ -158,7 +160,7 @@ export function createManagedSelectionEditor({
     return radialLeaf({ feather });
   }
 
-  async function saveSelection({ clear = false, stroke = null } = {}) {
+  async function saveSelection({ clear = false, stroke = null, acceptSample = false } = {}) {
     const studioId = getSelectedStudioId?.();
     const gradeDoc = getGrade?.() || current;
     if (
@@ -168,6 +170,14 @@ export function createManagedSelectionEditor({
       String(currentId) !== String(studioId)
     ) {
       return;
+    }
+    if (acceptSample) {
+      if (!pendingSample) return;
+      if (Number(pendingSample.revision) !== Number(gradeDoc.revision)) {
+        showSample(null);
+        setStatus(messages.sampleStale || "Sample is stale. Sample again.");
+        return;
+      }
     }
     const token = beginRequestToken(tokens, studioId);
     const expectedId = String(studioId);
@@ -184,9 +194,32 @@ export function createManagedSelectionEditor({
     } else {
       const existing = (grade.steps || []).find((entry) => entry.type === bindType);
       const reuseId = existing?.selection_id || null;
-      const selection = emptySelection(reuseId || undefined);
-      selection.mask = { combine: "union", leaves: [buildLeaf(stroke)] };
-      selection.qualifier = buildQualifier();
+      const previous = (grade.selections || []).find((entry) => entry.id === reuseId);
+      const selection = previous ? structuredClone(previous) : emptySelection(reuseId || undefined);
+      if (!selection.mask || typeof selection.mask !== "object") {
+        selection.mask = { combine: "union", leaves: [] };
+      }
+      if (!Array.isArray(selection.mask.leaves)) selection.mask.leaves = [];
+      if (stroke) {
+        const leaf = buildLeaf(stroke);
+        const brushIndex = selection.mask.leaves.findIndex((entry) => entry?.type === "brush");
+        if (brushIndex >= 0) {
+          const brush = selection.mask.leaves[brushIndex];
+          const strokes = Array.isArray(brush.strokes) ? brush.strokes.slice() : [];
+          strokes.push(...(leaf.strokes || []));
+          selection.mask.leaves[brushIndex] = { ...brush, strokes };
+        } else if (selection.mask.leaves.length === 0) {
+          selection.mask.leaves = [leaf];
+        } else {
+          selection.mask.leaves.push(leaf);
+        }
+        if (shapeSelect) shapeSelect.value = "brush";
+      } else if (!acceptSample) {
+        selection.mask = { combine: "union", leaves: [buildLeaf(null)] };
+      }
+      if (acceptSample || !stroke) {
+        selection.qualifier = buildQualifier();
+      }
       selection.invert = Boolean(invertInput?.checked);
       grade = upsertSelection(grade, selection);
       grade = bindStepSelection(grade, bindType, selection.id);
@@ -202,10 +235,11 @@ export function createManagedSelectionEditor({
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;
       currentId = expectedId;
+      if (acceptSample) showSample(null);
       setStatus(
         clear
-          ? `selection cleared · rev ${payload.revision}`
-          : `selection saved · rev ${payload.revision}`
+          ? `${messages.selectionCleared || "Selection cleared"} · rev ${payload.revision}`
+          : `${messages.selectionSaved || "Selection saved"} · rev ${payload.revision}`
       );
       onChanged?.(payload);
     } catch (error) {
@@ -221,7 +255,7 @@ export function createManagedSelectionEditor({
     const gradeDoc = getGrade?.() || current;
     if (!studioId || !gradeDoc || gradeDoc.evaluator !== "managed-sdr-v1") return;
     const token = beginRequestToken(tokens, `eye-${studioId}`);
-    setStatus("sampling…");
+    setStatus(messages.sampling || "Sampling…");
     try {
       const data = await sampleEyedropper(studioId, {
         u: uv.u,
@@ -230,11 +264,20 @@ export function createManagedSelectionEditor({
         expectedRevision: gradeDoc.revision,
       });
       if (!isCurrentRequestToken(tokens, `eye-${studioId}`, token)) return;
+      if (String(getSelectedStudioId?.()) !== String(studioId)) return;
+      const live = getGrade?.() || current;
+      if (!live || Number(live.revision) !== Number(data.sample.revision)) {
+        showSample(null);
+        setStatus(messages.sampleStale || "Sample is stale. Sample again.");
+        return;
+      }
       showSample(data.sample);
       if (qualifierSelect && qualifierSelect.value === "none") {
         qualifierSelect.value = "rgb";
       }
-      setStatus(`sampled · accept to apply qualifier · rev ${data.sample.revision}`);
+      setStatus(
+        `${messages.sampledHint || "Sampled — accept to apply qualifier"} · rev ${data.sample.revision}`
+      );
       setViewerMode("none");
     } catch (error) {
       if (!isCurrentRequestToken(tokens, `eye-${studioId}`, token)) return;
@@ -244,10 +287,19 @@ export function createManagedSelectionEditor({
   }
 
   function syncFromGrade(payload, studioId) {
+    const previousId = currentId;
+    const previousRevision = current?.revision;
     current = payload || null;
     currentId = studioId ? String(studioId) : null;
+    if (
+      String(previousId || "") !== String(currentId || "") ||
+      Number(previousRevision) !== Number(payload?.revision)
+    ) {
+      showSample(null);
+    }
     const managed = payload?.evaluator === "managed-sdr-v1";
     setEnabled(managed);
+    tools.rebind?.();
     if (!managed) {
       setStatus("");
       showSample(null);
@@ -292,21 +344,28 @@ export function createManagedSelectionEditor({
   });
   eyedropperBtn?.addEventListener("click", () => {
     setViewerMode(viewerMode === "eyedropper" ? "none" : "eyedropper");
-    setStatus(viewerMode === "eyedropper" ? "eyedropper: click the preview" : "");
+    setStatus(
+      viewerMode === "eyedropper" ? messages.eyedropperHint || "Eyedropper: click the preview" : ""
+    );
+    tools.rebind?.();
   });
   brushBtn?.addEventListener("click", () => {
     if (shapeSelect) shapeSelect.value = "brush";
     setViewerMode(viewerMode === "brush" ? "none" : "brush");
-    setStatus(viewerMode === "brush" ? "brush: draw on the preview" : "");
+    setStatus(viewerMode === "brush" ? messages.brushHint || "Brush: draw on the preview" : "");
+    tools.rebind?.();
   });
   acceptBtn?.addEventListener("click", () => {
     if (!pendingSample) return;
-    void saveSelection();
+    void saveSelection({ acceptSample: true });
   });
 
-  const media = getPreviewMediaEl?.();
-  const tools = createManagedViewerTools({
-    mediaEl: media,
+  tools = createManagedViewerTools({
+    getMediaEl: () => {
+      const provided = getPreviewMediaEl?.();
+      if (Array.isArray(provided)) return resolveActivePreviewMedia(provided);
+      return provided || null;
+    },
     getMode: () => viewerMode,
     getBrushSettings: () => ({
       radius: numberFromInput(brushRadius, 0.08),
@@ -319,6 +378,7 @@ export function createManagedSelectionEditor({
       setViewerMode("none");
     },
     onStatus: setStatus,
+    messages,
   });
 
   return {

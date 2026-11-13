@@ -280,9 +280,7 @@ export async function sampleEyedropper(
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(
-      data?.detail?.message || data?.detail || "eyedropper sample failed"
-    );
+    const error = new Error(data?.detail?.message || data?.detail || "eyedropper sample failed");
     error.status = response.status;
     error.code = data?.detail?.code;
     throw error;
