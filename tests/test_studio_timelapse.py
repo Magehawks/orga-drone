@@ -8,7 +8,11 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageDraw
 
-from orga_drone.export.studio_config import StudioExportClip, StudioExportConfig
+from orga_drone.export.studio_config import (
+    StudioExportClip,
+    StudioExportConfig,
+    StudioExportMusic,
+)
 from orga_drone.export.studio_encoder import FfmpegStudioEncoder
 from orga_drone.export.studio_frame_plan import frame_index, plan_story_frames
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
@@ -246,3 +250,135 @@ def test_mixed_story_with_flat_timelapse_keeps_shared_grid(tmp_path: Path) -> No
         **subprocess_no_window_kwargs(),
     ).stdout
     assert len(raw) // (320 * 180 * 3) == expected
+
+
+def _video_frame_count(ffmpeg: str, path: Path, width: int, height: int) -> int:
+    raw = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-map",
+            "0:v:0",
+            "-fps_mode",
+            "passthrough",
+            "-pix_fmt",
+            "rgb24",
+            "-f",
+            "rawvideo",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=180,
+        **subprocess_no_window_kwargs(),
+    ).stdout
+    return len(raw) // (width * height * 3)
+
+
+def _audio_seconds(ffmpeg: str, path: Path) -> float:
+    raw = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-map",
+            "0:a:0",
+            "-ac",
+            "1",
+            "-ar",
+            "48000",
+            "-f",
+            "s16le",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+        **subprocess_no_window_kwargs(),
+    ).stdout
+    return (len(raw) // 2) / 48000
+
+
+def test_target_duration_export_keeps_draft_frames_and_music(tmp_path: Path) -> None:
+    """A trimmed target duration uses the existing flat ramp and story mix."""
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("FFmpeg unavailable")
+    source_in, source_out = 0.5, 2.5
+    draft = draft_from_target(source_out - source_in, 0.5)
+    assert draft.speed == pytest.approx(4.0)
+    source = _synthetic_source(tmp_path, ffmpeg, seconds=3.0, width=320, height=180)
+    original = source.read_bytes()
+    ramp = parse_ramp(
+        flat_timelapse_payload(source_in, source_out, draft.speed),
+        media_duration_s=3.0,
+    )
+    duration = ramp.duration(source_in, source_out)
+    clip = StudioExportClip(
+        source,
+        "video",
+        duration,
+        source_start_s=source_in,
+        source_end_s=source_out,
+        speed_ramp=ramp,
+    )
+    song = tmp_path / "music.wav"
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=3",
+            str(song),
+        ],
+        check=True,
+        timeout=30,
+        **subprocess_no_window_kwargs(),
+    )
+    out = tmp_path / "target.mp4"
+    FfmpegStudioEncoder().render(
+        StudioExportConfig(
+            out,
+            320,
+            180,
+            clips=(clip,),
+            music_tracks=(StudioExportMusic(song, duration_s=3.0),),
+        )
+    )
+    assert _video_frame_count(ffmpeg, out, 320, 180) == draft.output_frames
+    assert _audio_seconds(ffmpeg, out) == pytest.approx(draft.output_duration_s, abs=1 / 30)
+    assert source.read_bytes() == original
+
+
+def test_target_duration_exports_1080p(tmp_path: Path) -> None:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("FFmpeg unavailable")
+    span, target = 2.0, 0.5
+    draft = draft_from_target(span, target)
+    source = _synthetic_source(tmp_path, ffmpeg, seconds=span, width=1920, height=1080)
+    original = source.read_bytes()
+    ramp = parse_ramp(
+        flat_timelapse_payload(0.0, span, draft.speed),
+        media_duration_s=span,
+    )
+    clip = StudioExportClip(
+        source,
+        "video",
+        ramp.duration(0.0, span),
+        source_end_s=span,
+        speed_ramp=ramp,
+    )
+    out = tmp_path / "hd.mp4"
+    FfmpegStudioEncoder().render(StudioExportConfig(out, 1920, 1080, clips=(clip,)))
+    assert _video_frame_count(ffmpeg, out, 1920, 1080) == draft.output_frames
+    assert source.read_bytes() == original

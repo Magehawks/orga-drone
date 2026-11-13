@@ -187,21 +187,28 @@ def test_scan_story_export_real_mp4(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     client.get("/lang/en")
     lib = tmp_path / "library"
     lib.mkdir()
-    for name, color in (("first.jpg", "red"), ("second.png", "blue")):
+    # Explicit story order. Do not iterate Path.iterdir() — Linux directory
+    # order is not sorted, and a blue-first add would still decode six frames
+    # while failing the red-then-blue colour check below.
+    story = (("first.jpg", "red"), ("second.png", "blue"))
+    for name, color in story:
         Image.new("RGB", (160, 120), color).save(lib / name)
-    originals = {p.name: p.read_bytes() for p in lib.iterdir()}
+    originals = {name: (lib / name).read_bytes() for name, _color in story}
     response = client.post("/library/add", data={"path": str(lib), "label": "Export journey"}, follow_redirects=False)
     job_id = response.headers["location"].split("scan_job=", 1)[1].split("&", 1)[0]
     assert _wait_scan(client, job_id)["state"] == "completed"
     project_id = client.post("/api/studio/projects", json={"title": "Export journey"}).json()["id"]
     assert client.post(f"/api/studio/projects/{project_id}/open").status_code == 200
-    for name in originals:
+    for name, _color in story:
         media = client.post("/api/search", json={"q": name}).json()["items"][0]
         assert client.post(f"/media/{media['id']}/studio/add", follow_redirects=False).status_code == 303
     studio = client.get("/studio")
     assert studio.status_code == 200
     assert 'data-filename="first.jpg"' in studio.text
     assert 'data-filename="second.png"' in studio.text
+    first_pos = studio.text.index('data-filename="first.jpg"')
+    second_pos = studio.text.index('data-filename="second.png"')
+    assert first_pos < second_pos
     options = client.get("/api/studio/export/options", params={"project_id": project_id}).json()
     assert options["readiness"] == "ready"
     assert [o["height"] for o in options["options"]] == [720, 1080]
