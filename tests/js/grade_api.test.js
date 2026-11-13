@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   findStep,
+  neutralCurveParams,
   neutralPrimariesParams,
+  upsertCurveStep,
   upsertManagedHslStep,
   upsertPrimariesStep,
   upsertWheelsStep,
@@ -61,4 +63,19 @@ test("upsertWheelsStep and upsertManagedHslStep share the grade steps array", ()
   assert.equal(findStep(grade, "wheels-v1").params.lift, 0.1);
   assert.equal(findStep(grade, "managed-hsl-v1").params.hue, 12);
   assert.equal(grade.steps.length, 2);
+});
+
+test("upsertCurveStep inserts rgb and hue curve families", () => {
+  const grade = { steps: [] };
+  const rgb = upsertCurveStep(grade, "rgb-curves-v1", {
+    master: [
+      [0, 0],
+      [0.5, 0.6],
+      [1, 1],
+    ],
+  });
+  assert.equal(findStep(rgb, "rgb-curves-v1").params.master[1][1], 0.6);
+  const hue = upsertCurveStep(rgb, "hue-vs-hue-v1", neutralCurveParams("hue-vs-hue-v1"));
+  assert.equal(hue.steps.length, 2);
+  assert.deepEqual(findStep(hue, "hue-vs-hue-v1").params.curve[0], [0, 0]);
 });

@@ -1119,6 +1119,32 @@
               <input type="range" data-managed-hsl-light min="-0.5" max="0.5" step="0.01" value="0" disabled>
             </label>
             <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
+            <div class="studio-managed-curves" data-managed-curve-panel hidden>
+              <p class="hint">{{ _('Curves edit the same managed grade. Double-click to add a point.') }}</p>
+              <p class="meta-line" data-managed-curve-status role="status" aria-live="polite"></p>
+              <label class="studio-inspector-field">
+                <span>{{ _('Curve family') }}</span>
+                <select data-managed-curve-family aria-label="{{ _('Curve family') }}">
+                  <option value="rgb-curves-v1">{{ _('RGB') }}</option>
+                  <option value="luma-curve-v1">{{ _('Luma') }}</option>
+                  <option value="hue-vs-hue-v1">{{ _('Hue vs Hue') }}</option>
+                  <option value="hue-vs-saturation-v1">{{ _('Hue vs Saturation') }}</option>
+                  <option value="hue-vs-luma-v1">{{ _('Hue vs Luma') }}</option>
+                  <option value="luma-vs-saturation-v1">{{ _('Luma vs Saturation') }}</option>
+                  <option value="saturation-vs-saturation-v1">{{ _('Saturation vs Saturation') }}</option>
+                </select>
+              </label>
+              <label class="studio-inspector-field">
+                <span>{{ _('Channel') }}</span>
+                <select data-managed-curve-channel aria-label="{{ _('Channel') }}"></select>
+              </label>
+              <svg class="studio-managed-curve-svg" data-managed-curve-svg viewBox="0 0 220 160" width="220" height="160" role="img" aria-label="{{ _('Curve editor') }}">
+                <rect x="8" y="8" width="204" height="144" class="studio-managed-curve-frame"></rect>
+                <path data-managed-curve-path class="studio-managed-curve-path" d="M8,152 L212,8"></path>
+                <g data-managed-curve-points></g>
+              </svg>
+              <button type="button" class="button ghost" data-managed-curve-reset>{{ _('Reset curve') }}</button>
+            </div>
           </details>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Look & color') }}</summary>

@@ -18,6 +18,7 @@ import {
   upsertWheelsStep,
   wrapGrade,
 } from "./grade-api.js";
+import { createManagedCurveEditor } from "./managed-curve-editor.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -98,6 +99,15 @@ export function createManagedColorEditor({
   let saveTimer = 0;
   let busy = false;
   const tokens = new Map();
+  const curveEditor = createManagedCurveEditor({
+    panel: panel.querySelector("[data-managed-curve-panel]"),
+    getSelectedStudioId,
+    getGrade: () => current,
+    onChanged: (payload) => {
+      current = payload;
+      onChanged?.(payload);
+    },
+  });
 
   bindValueLabel(fields.exposure, labels.exposure, (v) => `${v.toFixed(2)} EV`);
   bindValueLabel(fields.kelvin, labels.kelvin, (v) => `${Math.round(v)} K`);
@@ -233,13 +243,16 @@ export function createManagedColorEditor({
           messages.managedStatus?.replace("{rev}", String(current.revision)) ||
             `managed-sdr · rev ${current.revision} · preview/export bake`
         );
+        curveEditor.syncFromGrade(current, studioId);
       } else if (current.authority === "canonical") {
         setStatus(
           messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
             `legacy wrapper · rev ${current.revision} · Look & color locked`
         );
+        curveEditor.syncFromGrade(null, null);
       } else {
         setStatus(messages.legacyStatus || "legacy color");
+        curveEditor.syncFromGrade(null, null);
       }
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
@@ -294,6 +307,7 @@ export function createManagedColorEditor({
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;
       currentId = expectedId;
+      curveEditor.syncFromGrade(current, expectedId);
       setStatus(
         messages.managedStatus?.replace("{rev}", String(current.revision)) ||
           `managed-sdr · rev ${current.revision} · preview/export bake`

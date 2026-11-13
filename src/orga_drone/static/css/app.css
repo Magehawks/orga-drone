@@ -5117,3 +5117,28 @@ footer {
 .studio-ramp-reference { stroke: currentColor; opacity: .3; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .studio-ramp-point { fill: currentColor; stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: grab; }
 .studio-ramp-point.is-selected { stroke: currentColor; fill: var(--bg); }
+
+.studio-managed-curves {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.studio-managed-curve-svg {
+  width: 100%;
+  max-width: 220px;
+  background: var(--panel, #1b1f24);
+  border: 1px solid var(--border, #333);
+}
+.studio-managed-curve-frame {
+  fill: transparent;
+  stroke: var(--border, #444);
+}
+.studio-managed-curve-path {
+  fill: none;
+  stroke: var(--accent, #7db7ff);
+  stroke-width: 2;
+}
+.studio-managed-curve-handle {
+  fill: var(--accent, #7db7ff);
+  cursor: grab;
+}
