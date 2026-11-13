@@ -170,3 +170,46 @@ def test_bake_cube_spatial_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert detail["code"] == "UNSUPPORTED_GRADE"
+
+
+def _put_managed(client: TestClient, clip_id: int, grade: dict) -> int:
+    put = client.put(
+        f"/api/studio/{clip_id}/grade",
+        json={"grade": grade, "expected_revision": 0},
+    )
+    if put.status_code >= 400:
+        client.post(f"/api/studio/{clip_id}/grade/wrap")
+        client.post(
+            f"/api/studio/{clip_id}/grade/convert-managed",
+            json={"acknowledge_appearance_change": True},
+        )
+        get = client.get(f"/api/studio/{clip_id}/grade")
+        rev = get.json()["revision"]
+        put = client.put(
+            f"/api/studio/{clip_id}/grade",
+            json={"grade": grade, "expected_revision": rev},
+        )
+    assert put.status_code < 400, put.text
+    return int(put.json()["revision"])
+
+
+def test_preview_frame_exposes_revision_and_rejects_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    clip_id = _seed_photo(db, tmp_path / "lib")
+    rev = _put_managed(client, clip_id, _grade(spatial=False))
+    ok = client.get(
+        f"/api/studio/{clip_id}/preview-frame",
+        params={"t_s": 0.04, "expected_revision": rev},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.headers.get("X-Orga-Grade-Revision") == str(rev)
+    assert ok.headers.get("X-Orga-Preview-Time-S") == "0.000"
+    assert ok.headers.get("X-Orga-Preview-Still") == "1"
+    stale = client.get(
+        f"/api/studio/{clip_id}/preview-frame",
+        params={"t_s": 0.0, "expected_revision": rev + 99},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "stale_grade_revision"

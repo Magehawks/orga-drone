@@ -2850,6 +2850,7 @@ def create_app() -> FastAPI:
         t_s: float = Query(0.0),
         detail: int = Query(0),
         before: bool = Query(False),
+        expected_revision: str | None = Query(None),
     ) -> Response:
         """JPEG still using the same grade+LUT builders as export (ADR 0028).
 
@@ -2957,12 +2958,37 @@ def create_app() -> FastAPI:
             if exc.code == "unsupported":
                 status = 422
             raise HTTPException(status_code=status, detail=str(exc)) from exc
+        grade_revision = ""
+        if managed_preview:
+            try:
+                from orga_drone.studio_grade_model import read_grade
+
+                grade_revision = str(read_grade(clip.effect_settings).revision)
+            except Exception:
+                grade_revision = ""
+        if (
+            expected_revision is not None
+            and str(expected_revision).strip() != ""
+            and grade_revision
+            and str(expected_revision) != grade_revision
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Preview frame grade revision is stale.",
+                    "code": "stale_grade_revision",
+                    "expected": str(expected_revision),
+                    "actual": grade_revision,
+                },
+            )
         return FileResponse(
             jpeg,
             media_type="image/jpeg",
             headers={
                 "Cache-Control": "no-store",
                 "X-Orga-Preview-Still": "1",
+                "X-Orga-Preview-Time-S": f"{local:.3f}",
+                "X-Orga-Grade-Revision": grade_revision,
             },
         )
 
