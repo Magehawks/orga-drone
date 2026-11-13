@@ -21,6 +21,8 @@ import {
 import { createManagedCurveEditor } from "./managed-curve-editor.js";
 import { createManagedLutEditor } from "./managed-lut-editor.js";
 import { createManagedSelectionEditor } from "./managed-selection-editor.js";
+import { createManagedStepEditor } from "./managed-step-editor.js";
+import { createPreviewTokenStore, contextDigestFromParts } from "./preview-token.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -104,16 +106,19 @@ export function createManagedColorEditor({
   let saveTimer = 0;
   let busy = false;
   const tokens = new Map();
+  const previewTokens = createPreviewTokenStore();
   const curveEditor = createManagedCurveEditor({
     panel: panel.querySelector("[data-managed-curve-panel]"),
     getSelectedStudioId,
     getGrade: () => current,
     onChanged: (payload) => {
       current = payload;
+      stepEditor.syncFromGrade(payload, getSelectedStudioId?.());
       onChanged?.(payload);
     },
   });
   let lutEditor = { syncFromGrade() {} };
+  let stepEditor = { syncFromGrade() {}, reset() {} };
   const selectionEditor = createManagedSelectionEditor({
     panel: panel.querySelector("[data-managed-selection-panel]"),
     getSelectedStudioId,
@@ -140,6 +145,7 @@ export function createManagedColorEditor({
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
       lutEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      stepEditor.syncFromGrade(payload, getSelectedStudioId?.());
       onChanged?.(payload);
     },
   });
@@ -152,6 +158,30 @@ export function createManagedColorEditor({
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
       selectionEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      stepEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      onChanged?.(payload);
+    },
+  });
+  stepEditor = createManagedStepEditor({
+    panel: panel.querySelector("[data-managed-step-panel]"),
+    getSelectedStudioId,
+    getGrade: () => current,
+    messages: {
+      enable: panel.querySelector("[data-managed-step-panel]")?.dataset.msgEnable,
+      enableAria: panel.querySelector("[data-managed-step-panel]")?.dataset.msgEnableAria,
+      mixAria: panel.querySelector("[data-managed-step-panel]")?.dataset.msgMixAria,
+      moveUp: panel.querySelector("[data-managed-step-panel]")?.dataset.msgMoveUp,
+      moveDown: panel.querySelector("[data-managed-step-panel]")?.dataset.msgMoveDown,
+      empty: panel.querySelector("[data-managed-step-panel]")?.dataset.msgEmpty,
+      ready: panel.querySelector("[data-managed-step-panel]")?.dataset.msgReady,
+      saved: panel.querySelector("[data-managed-step-panel]")?.dataset.msgSaved,
+      unavailable: panel.querySelector("[data-managed-step-panel]")?.dataset.msgUnavailable,
+    },
+    onChanged: (payload) => {
+      current = payload;
+      curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      selectionEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      lutEditor.syncFromGrade(payload, getSelectedStudioId?.());
       onChanged?.(payload);
     },
   });
@@ -252,15 +282,36 @@ export function createManagedColorEditor({
     if (!studioId) {
       current = null;
       currentId = null;
+      previewTokens.invalidate();
       setEnabled(false);
       setStatus("");
+      stepEditor.reset();
       return;
     }
     const token = beginRequestToken(tokens, studioId);
+    const previewToken = previewTokens.begin({
+      key: String(studioId),
+      clipId: studioId,
+      revision: "",
+      contextDigest: contextDigestFromParts(["managed-fill", studioId]),
+    });
     try {
       const payload = await fetchGrade(studioId);
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!previewTokens.isCurrent(previewToken)) return;
       if (!selectedStillCurrent(studioId)) return;
+      // Re-bind revision after the fetch so later paints match this response.
+      const paintToken = previewTokens.begin({
+        key: String(studioId),
+        clipId: studioId,
+        revision: payload?.revision,
+        contextDigest: contextDigestFromParts([
+          "managed-fill",
+          studioId,
+          payload?.revision,
+          payload?.evaluator,
+        ]),
+      });
       current = payload;
       currentId = String(studioId);
       const managed = current.evaluator === "managed-sdr-v1";
@@ -273,6 +324,7 @@ export function createManagedColorEditor({
         convertBtn.hidden = managed;
         convertBtn.disabled = busy;
       }
+      if (!previewTokens.isCurrent(paintToken) || !selectedStillCurrent(studioId)) return;
       if (managed) {
         paintGroup(fields, {
           ...neutralPrimariesParams(),
@@ -293,6 +345,7 @@ export function createManagedColorEditor({
         curveEditor.syncFromGrade(current, studioId);
         selectionEditor.syncFromGrade(current, studioId);
         lutEditor.syncFromGrade(current, studioId);
+        stepEditor.syncFromGrade(current, studioId);
       } else if (current.authority === "canonical") {
         setStatus(
           messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
@@ -301,19 +354,24 @@ export function createManagedColorEditor({
         curveEditor.syncFromGrade(null, null);
         selectionEditor.syncFromGrade(null, null);
         lutEditor.syncFromGrade(null, null);
+        stepEditor.syncFromGrade(null, null);
       } else {
         setStatus(messages.legacyStatus || "legacy color");
         curveEditor.syncFromGrade(null, null);
         selectionEditor.syncFromGrade(null, null);
         lutEditor.syncFromGrade(null, null);
+        stepEditor.syncFromGrade(null, null);
       }
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (!previewTokens.isCurrent(previewToken)) return;
       if (!selectedStillCurrent(studioId)) return;
       current = null;
       currentId = null;
+      previewTokens.invalidate(String(studioId));
       setEnabled(false);
       setStatus(String(error.message || error));
+      stepEditor.reset();
     }
   }
 
@@ -360,9 +418,15 @@ export function createManagedColorEditor({
       if (String(getSelectedStudioId?.()) !== expectedId) return;
       current = payload;
       currentId = expectedId;
+      previewTokens.begin({
+        clipId: expectedId,
+        revision: current.revision,
+        contextDigest: contextDigestFromParts(["managed-save", expectedId, current.revision]),
+      });
       curveEditor.syncFromGrade(current, expectedId);
       selectionEditor.syncFromGrade(current, expectedId);
       lutEditor.syncFromGrade(current, expectedId);
+      stepEditor.syncFromGrade(current, expectedId);
       setStatus(
         messages.managedStatus?.replace("{rev}", String(current.revision)) ||
           `managed-sdr · rev ${current.revision} · preview/export bake`
@@ -467,10 +531,19 @@ export function createManagedColorEditor({
     currentStudioId() {
       return currentId;
     },
+    previewTokens,
+    beginPreviewToken(identity) {
+      return previewTokens.begin(identity || {});
+    },
+    isPreviewTokenCurrent(token) {
+      return previewTokens.isCurrent(token);
+    },
     reset() {
       paintGroup(fields, neutralPrimariesParams());
       paintGroup(wheelFields, neutralWheelsParams());
       paintGroup(hslFields, neutralManagedHslParams());
+      stepEditor.reset();
+      previewTokens.invalidate();
     },
   };
 }

@@ -5163,3 +5163,39 @@ footer {
   gap: 0.35rem;
   margin: 0.35rem 0;
 }
+.studio-managed-steps {
+  margin: 0.75rem 0 0.5rem;
+}
+.studio-managed-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.studio-managed-step-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1.2fr) auto minmax(6rem, 1fr) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+.studio-managed-step-title {
+  font-size: 0.9rem;
+}
+.studio-managed-step-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.studio-managed-step-mix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.studio-managed-step-mix input[type="range"] {
+  width: 100%;
+  min-width: 4rem;
+}
+.studio-managed-step-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+}

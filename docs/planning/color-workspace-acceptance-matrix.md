@@ -19,7 +19,7 @@ and stopped #320 precision experiments are not weakened.
 | Creative LUT resolve/bake | PASS | #422 |
 | Technical LUT metadata | PASS / reject | #352; non-null technical LUT typed reject until resolved asset |
 | Serial step enable/mix/reorder | PASS | #433 `clip.grade.command` |
-| Full serial step editor UX | NOT_RUN | #361 remaining (PR #437) |
+| Full serial step editor UX | PASS (slice) | enable/mix/reorder via `managed-step-editor.js` + grade commands; param PUT remains |
 
 ## 2. LUTs, photo/video export
 
@@ -60,8 +60,9 @@ and stopped #320 precision experiments are not weakened.
 | Undo remint | PASS | #429 |
 | Shared grade commands | PASS | #433 |
 | Save/reopen / clip switch | PASS (API) | grade route tests |
-| Editor full-PUT migration | NOT_RUN | remaining #363 (PR #437) |
-| Async preview tokens | NOT_RUN | remaining #363 (PR #437) |
+| Editor command migration (enable/mix/reorder) | PASS | `postGradeCommand` in step editor |
+| Editor param body PUT | PASS (retained) | primaries/curves/LUT/selection still PUT until params command |
+| Async preview tokens | PASS (partial) | keyed store + fill/cache gating |
 
 ## 6. Preview / export numerical parity
 
@@ -129,7 +130,7 @@ pytest tests/test_studio_grade_animation.py \
 |---|---|
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
-| #361 | Open: serial editor UX (PR #437) |
+| #361 | Serial step enable/mix/reorder shipped; packaged E2E NOT_RUN |
 | #362/#366 | Non-packaged accumulate harness PASS; packaged latency/memory NOT_RUN |
-| #363 | Open: preview tokens + editor PUT migration (PR #437) |
+| #363 | Preview tokens + command path for step ops; param PUT retained |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

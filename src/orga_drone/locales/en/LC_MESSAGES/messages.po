@@ -969,3 +969,45 @@ msgstr "Soft wipe down"
 
 msgid "Drone pack"
 msgstr "Drone pack"
+
+msgid "On"
+msgstr "On"
+
+msgid "Enable step"
+msgstr "Enable step"
+
+msgid "Step mix"
+msgstr "Step mix"
+
+msgid "Up"
+msgstr "Up"
+
+msgid "Down"
+msgstr "Down"
+
+msgid "No steps yet"
+msgstr "No steps yet"
+
+msgid "{count} steps · serial"
+msgstr "{count} steps · serial"
+
+msgid "steps · rev {rev}"
+msgstr "steps · rev {rev}"
+
+msgid "Serial steps need a managed grade"
+msgstr "Serial steps need a managed grade"
+
+msgid "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document."
+msgstr "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document."
+
+msgid "Serial grade steps"
+msgstr "Serial grade steps"
+
+msgid "Move up"
+msgstr "Move up"
+
+msgid "Move down"
+msgstr "Move down"
+
+msgid "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
+msgstr "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."

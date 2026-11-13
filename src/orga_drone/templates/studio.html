@@ -1047,6 +1047,20 @@
               <button type="button" class="button" data-managed-color-convert>{{ _('Convert to managed') }}</button>
               <button type="button" class="button ghost" data-managed-color-reset>{{ _('Reset primaries') }}</button>
             </div>
+            <div class="studio-managed-steps" data-managed-step-panel
+                 data-msg-enable="{{ _('On')|e }}"
+                 data-msg-enable-aria="{{ _('Enable step')|e }}"
+                 data-msg-mix-aria="{{ _('Step mix')|e }}"
+                 data-msg-move-up="{{ _('Move up')|e }}"
+                 data-msg-move-down="{{ _('Move down')|e }}"
+                 data-msg-empty="{{ _('No steps yet')|e }}"
+                 data-msg-ready="{{ _('{count} steps · serial')|e }}"
+                 data-msg-saved="{{ _('steps · rev {rev}')|e }}"
+                 data-msg-unavailable="{{ _('Serial steps need a managed grade')|e }}">
+              <p class="hint">{{ _('Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save.') }}</p>
+              <p class="meta-line" data-managed-step-status role="status" aria-live="polite"></p>
+              <div class="studio-managed-step-list" data-managed-step-list role="list" aria-label="{{ _('Serial grade steps') }}"></div>
+            </div>
             <label class="studio-inspector-field">
               <span>{{ _('Exposure (stops)') }} <span data-managed-exposure-value>0.00 EV</span></span>
               <input type="range" data-managed-exposure min="-4" max="4" step="0.05" value="0" disabled>
