@@ -110,3 +110,39 @@ export function neutralPrimariesParams() {
     whites: 0,
   };
 }
+
+export function neutralWheelsParams() {
+  return { lift: 0, gamma: 1, gain: 1, offset: 0 };
+}
+
+export function neutralManagedHslParams() {
+  return { hue: 0, saturation: 1, lightness: 0 };
+}
+
+export function upsertTypedStep(grade, type, params, neutrals = {}) {
+  const next = structuredClone(grade || {});
+  if (!Array.isArray(next.steps)) next.steps = [];
+  let step = next.steps.find((entry) => entry.type === type);
+  if (!step) {
+    step = {
+      id: `${type}-${Date.now().toString(36)}`,
+      type,
+      enabled: true,
+      mix: 1,
+      selection_id: null,
+      params: {},
+    };
+    next.steps.push(step);
+  }
+  step.enabled = true;
+  step.params = { ...neutrals, ...step.params, ...params };
+  return next;
+}
+
+export function upsertWheelsStep(grade, params) {
+  return upsertTypedStep(grade, "wheels-v1", params, neutralWheelsParams());
+}
+
+export function upsertManagedHslStep(grade, params) {
+  return upsertTypedStep(grade, "managed-hsl-v1", params, neutralManagedHslParams());
+}

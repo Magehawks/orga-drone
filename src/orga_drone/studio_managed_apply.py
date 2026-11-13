@@ -48,6 +48,25 @@ class ManagedApplyError(ValueError):
         self.code = code
 
 
+def _param_float(params: Mapping[str, Any], key: str, default: float) -> float:
+    """Read a float param. Explicit ``0`` stays ``0`` (never coerced via ``or``)."""
+    if key not in params or params[key] is None:
+        return float(default)
+    value = float(params[key])
+    if not math.isfinite(value):
+        raise ManagedApplyError(f"{key} must be finite", code="RANGE")
+    return value
+
+
+def _param_float_any(
+    params: Mapping[str, Any], keys: Sequence[str], default: float
+) -> float:
+    for key in keys:
+        if key in params and params[key] is not None:
+            return _param_float(params, key, default)
+    return float(default)
+
+
 def _as_curve(value: Any, *, default: Curve = IDENTITY_CURVE) -> Curve:
     if value is None:
         return tuple((float(x), float(y)) for x, y in default)
@@ -118,8 +137,10 @@ def _to_domain(rgb: Rgb, *, current: str, target: str) -> Rgb:
 
 
 def _normalize_domain(name: str) -> str:
-    if name in {"linear-bt709", "encoded-bt709", "srgb", "bt709-sdr", "bt709"}:
-        return "bt709-sdr" if name in {"bt709", "bt709-sdr"} else name
+    if name in {"linear-bt709", "srgb"}:
+        return name
+    if name in {"encoded-bt709", "bt709-sdr", "bt709"}:
+        return "bt709-sdr"
     if name == "declared":
         return "linear-bt709"
     raise ManagedApplyError(f"unsupported domain: {name}", code="UNSUPPORTED_GRADE")
@@ -153,16 +174,16 @@ def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
     if kind == "primaries-v1":
         processed = apply_primaries(
             rgb,
-            exposure=float(params.get("exposure", 0) or 0),
-            kelvin=float(params.get("kelvin", 6500) or 6500),
-            tint=float(params.get("tint", 0) or 0),
-            contrast=float(params.get("contrast", 1) or 1),
-            pivot=float(params.get("pivot", 0.18) or 0.18),
-            saturation=float(params.get("saturation", 1) or 1),
-            blacks=float(params.get("blacks", 0) or 0),
-            shadows=float(params.get("shadows", 0) or 0),
-            highlights=float(params.get("highlights", 0) or 0),
-            whites=float(params.get("whites", 0) or 0),
+            exposure=_param_float(params, "exposure", 0.0),
+            kelvin=_param_float(params, "kelvin", 6500.0),
+            tint=_param_float(params, "tint", 0.0),
+            contrast=_param_float(params, "contrast", 1.0),
+            pivot=_param_float(params, "pivot", 0.18),
+            saturation=_param_float(params, "saturation", 1.0),
+            blacks=_param_float(params, "blacks", 0.0),
+            shadows=_param_float(params, "shadows", 0.0),
+            highlights=_param_float(params, "highlights", 0.0),
+            whites=_param_float(params, "whites", 0.0),
         )
     elif kind == "rgb-curves-v1":
         processed = rgb_curves_v1(
@@ -197,20 +218,22 @@ def apply_managed_step(rgb: Rgb, step: Mapping[str, Any]) -> Rgb:
     elif kind == "wheels-v1":
         processed = wheels_v1(
             rgb,
-            lift=float(params.get("lift", 0) or 0),
-            gamma=float(params.get("gamma", 1) or 1),
-            gain=float(params.get("gain", 1) or 1),
-            offset=float(params.get("offset", 0) or 0),
+            lift=_param_float(params, "lift", 0.0),
+            gamma=_param_float(params, "gamma", 1.0),
+            gain=_param_float(params, "gain", 1.0),
+            offset=_param_float(params, "offset", 0.0),
         )
     elif kind == "managed-hsl-v1":
         processed = managed_hsl(
             rgb,
-            hue_offset_deg=float(params.get("hue", params.get("hue_offset_deg", 0)) or 0),
-            saturation_mult=float(
-                params.get("saturation", params.get("saturation_mult", 1)) or 1
+            hue_offset_deg=_param_float_any(
+                params, ("hue", "hue_offset_deg"), 0.0
             ),
-            lightness_offset=float(
-                params.get("lightness", params.get("lightness_offset", 0)) or 0
+            saturation_mult=_param_float_any(
+                params, ("saturation", "saturation_mult"), 1.0
+            ),
+            lightness_offset=_param_float_any(
+                params, ("lightness", "lightness_offset"), 0.0
             ),
         )
     elif kind == "creative-lut-v1":

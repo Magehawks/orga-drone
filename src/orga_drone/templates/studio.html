@@ -1087,6 +1087,38 @@
               <span>{{ _('Whites') }} <span data-managed-whites-value>0</span></span>
               <input type="range" data-managed-whites min="-100" max="100" step="1" value="0" disabled>
             </label>
+            <p class="hint">{{ _('Lift / Gamma / Gain / Offset are managed wheels on the same grade.') }}</p>
+            <label class="studio-inspector-field">
+              <span>{{ _('Lift') }} <span data-managed-lift-value>0.00</span></span>
+              <input type="range" data-managed-lift min="-0.5" max="0.5" step="0.01" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Gamma') }} <span data-managed-gamma-value>1.00</span></span>
+              <input type="range" data-managed-gamma min="0.2" max="3" step="0.01" value="1" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Gain') }} <span data-managed-gain-value>1.00</span></span>
+              <input type="range" data-managed-gain min="0" max="4" step="0.01" value="1" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Offset') }} <span data-managed-offset-value>0.00</span></span>
+              <input type="range" data-managed-offset min="-0.5" max="0.5" step="0.01" value="0" disabled>
+            </label>
+            <button type="button" class="button ghost" data-managed-wheels-reset>{{ _('Reset wheels') }}</button>
+            <p class="hint">{{ _('Managed HSL is an encoded-domain step, separate from legacy HSL.') }}</p>
+            <label class="studio-inspector-field">
+              <span>{{ _('Hue offset') }} <span data-managed-hue-value>0°</span></span>
+              <input type="range" data-managed-hue min="-180" max="180" step="1" value="0" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('HSL saturation') }} <span data-managed-hsl-sat-value>1.00</span></span>
+              <input type="range" data-managed-hsl-sat min="0" max="2" step="0.01" value="1" disabled>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('HSL lightness') }} <span data-managed-hsl-light-value>0.00</span></span>
+              <input type="range" data-managed-hsl-light min="-0.5" max="0.5" step="0.01" value="0" disabled>
+            </label>
+            <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
           </details>
           <details id="inspector-image-section-basic" class="studio-image-section" open>
             <summary>{{ _('Look & color') }}</summary>
