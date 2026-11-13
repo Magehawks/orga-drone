@@ -581,8 +581,8 @@
   "Animation (s)": "Animation (s)",
   "Left": "Links",
   "Right": "Rechts",
-  "Up": "Oben",
-  "Down": "Unten",
+  "Up": "Hoch",
+  "Down": "Runter",
   "Privacy": "Datenschutz",
   "Blur": "Weichzeichnen",
   "Pixelate": "Verpixeln",
@@ -1081,5 +1081,14 @@
   "Selection cleared": "Auswahl gelöscht",
   "Sample · rev {rev} · {domain} · frame {frame}": "Probe · Rev {rev} · {domain} · Frame {frame}",
   "Selection · {id} · rev {rev}": "Auswahl · {id} · Rev {rev}",
-  "No selection · rev {rev}": "Keine Auswahl · Rev {rev}"
+  "No selection · rev {rev}": "Keine Auswahl · Rev {rev}",
+  "On": "An",
+  "Enable step": "Schritt aktivieren",
+  "Step mix": "Schritt-Mix",
+  "No steps yet": "Noch keine Schritte",
+  "{count} steps · serial": "{count} Schritte · seriell",
+  "steps · rev {rev}": "Schritte · Rev. {rev}",
+  "Serial steps need a managed grade": "Serielle Schritte brauchen einen Managed Grade",
+  "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.": "Serielle Schritte laufen einmal in Reihenfolge. Bypass und Mix nutzen den gemeinsamen Grade-Befehlsweg; Parameteränderungen speichern weiterhin über das Grade-Dokument.",
+  "Serial grade steps": "Serielle Grade-Schritte"
 }

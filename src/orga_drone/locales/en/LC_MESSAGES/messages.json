@@ -1081,5 +1081,14 @@
   "Selection cleared": "Selection cleared",
   "Sample · rev {rev} · {domain} · frame {frame}": "Sample · rev {rev} · {domain} · frame {frame}",
   "Selection · {id} · rev {rev}": "Selection · {id} · rev {rev}",
-  "No selection · rev {rev}": "No selection · rev {rev}"
+  "No selection · rev {rev}": "No selection · rev {rev}",
+  "On": "On",
+  "Enable step": "Enable step",
+  "Step mix": "Step mix",
+  "No steps yet": "No steps yet",
+  "{count} steps · serial": "{count} steps · serial",
+  "steps · rev {rev}": "steps · rev {rev}",
+  "Serial steps need a managed grade": "Serial steps need a managed grade",
+  "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.": "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.",
+  "Serial grade steps": "Serial grade steps"
 }

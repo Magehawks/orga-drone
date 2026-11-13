@@ -34,7 +34,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Animation clocks (#358) | Available now (partial) | Source-local preview/export; story-local plan + fail-closed full-source bake; client `story_s` pending |
 | GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
-| Shared Control API grade actions (#363) | Available now (slice) | `clip.grade.command` + HTTP `/grade/command`; editor PUT migration partial |
+| Shared Control API grade actions (#363) | Available now (slice) | Commands for enable/mix/reorder; preview tokens; param body PUT retained |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
 | Full #365 acceptance matrix | OPEN | Remaining AC + packaged deferred by PO |
 
@@ -53,9 +53,9 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
 | #358 | #431 merged | Client `story_s`; story-local export beyond fail-closed; full ClipTimingInputs wiring |
 | #360 | Bake-approx shipped | Exact tetrahedral / Windows budgets NOT_RUN |
-| #361 | Serial workspace incomplete | Step editor UX |
+| #361 | Step editor shipped | Packaged keyboard/E2E NOT_RUN; Creative preset compile depth |
 | #362/#366 | Live tap shipped | Packaged latency/memory NOT_RUN |
-| #363 | #433 merged | Preview tokens; migrate managed editors from full PUT to `postGradeCommand` where applicable |
+| #363 | Tokens + step commands | Param body PUT retained (no upsert_step_params yet) |
 | #364/#365 | OPEN | Strict matrix + packaged deferred |
 
 ## Explicitly deferred by PO (this sprint)

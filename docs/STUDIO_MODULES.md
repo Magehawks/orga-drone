@@ -49,19 +49,21 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/color-workspace.js` owns pure Creative/Pro helpers: per-clip Quick Look
   request tokens, inspector-refresh gating when selection changes mid-flight, and
   grade-summary part formatting. The entry still owns DOM fills and saves.
-- `studio/grade-api.js` owns Grade HTTP helpers (GET/PUT/wrap/convert-managed)
-  and primaries step upsert helpers for ADR 0035 managed grades. `studio/
-  managed-color-editor.js` owns the Managed Color Workspace inspector panel
-  (wrap/convert/reset and primaries sliders). The entry mounts the panel and
-  refreshes it from image-inspector fill; preview invalidation stays in the
-  entry. `studio/managed-curve-editor.js` owns the seven managed curve families
-  (RGB/luma/hue-sat maps) against the same grade PUT path.
+- `studio/grade-api.js` owns Grade HTTP helpers (GET/PUT/wrap/convert-managed/
+  `postGradeCommand`) and primaries step upsert helpers for ADR 0035 managed
+  grades. `studio/managed-color-editor.js` owns the Managed Color Workspace
+  inspector panel (wrap/convert/reset and primaries sliders). The entry mounts
+  the panel and refreshes it from image-inspector fill; preview invalidation
+  stays in the entry. `studio/managed-curve-editor.js` owns the seven managed
+  curve families (RGB/luma/hue-sat maps) against the same grade PUT path.
   `studio/managed-selection-editor.js` owns linear/radial/brush masks and
   RGB/HSL/luma qualifiers bound to a managed step. See
   `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
   `studio/managed-lut-editor.js` owns the managed creative-lut-v1 step against
-  confined local `.cube` assets. See `tests/js/grade_api.test.js` and
-  `tests/js/managed_color_editor.test.js`.
+  confined local `.cube` assets. `studio/managed-step-editor.js` owns the
+  serial step list (enable/mix/reorder) via `postGradeCommand`.
+  `studio/preview-token.js` owns async preview identity tokens (#363).
+  Parameter body edits still use full grade PUT until a params command exists.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
   histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro
