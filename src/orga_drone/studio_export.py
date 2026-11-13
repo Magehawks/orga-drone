@@ -504,7 +504,9 @@ def _clip_to_export_clip(
                 require_managed_executable(clip.effect_settings)
             except ManagedApplyError as exc:
                 raise StudioExportError(str(exc), code=exc.code.lower()) from exc
-            digest = managed_grade_digest(clip.effect_settings)
+            digest = managed_grade_digest(
+                clip.effect_settings, data_dir=settings.data_dir
+            )
             model = read_grade(clip.effect_settings)
             assert digest is not None and model.grade is not None
             work = settings.data_dir / "export-work" / "managed-grades"
@@ -517,7 +519,11 @@ def _clip_to_export_clip(
                 managed_grade_lut = work / f"managed_{digest[:16]}.cube"
                 try:
                     if not managed_grade_lut.is_file():
-                        bake_managed_grade_cube(model.grade, managed_grade_lut)
+                        bake_managed_grade_cube(
+                            model.grade,
+                            managed_grade_lut,
+                            data_dir=settings.data_dir,
+                        )
                 except ManagedApplyError as exc:
                     raise StudioExportError(str(exc), code=exc.code.lower()) from exc
             elif grade_has_spatial_selections(clip.effect_settings):

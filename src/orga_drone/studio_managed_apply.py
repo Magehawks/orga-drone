@@ -25,10 +25,12 @@ from orga_drone.studio_managed_curves import (
 )
 from orga_drone.studio_managed_lut import (
     ManagedCube,
+    ManagedLutError,
     decode_bt709,
     decode_srgb,
     encode_bt709,
     encode_srgb,
+    make_lut_resolver,
     sample_creative_lut,
 )
 from orga_drone.studio_managed_masks import no_selection_coverage, step_blend
@@ -182,7 +184,10 @@ def apply_managed_step(
         raise ManagedApplyError("coverage must be from 0 to 1", code="RANGE")
     raw_params = step.get("params")
     params: dict[str, Any] = dict(raw_params) if isinstance(raw_params, Mapping) else {}
-    mix = float(step.get("mix", 1) if step.get("mix") is not None else 0)
+    if "mix" not in step or step.get("mix") is None:
+        mix = 1.0
+    else:
+        mix = float(step["mix"])
     if not 0.0 <= mix <= 1.0:
         raise ManagedApplyError("mix must be from 0 to 1", code="RANGE")
 
@@ -258,9 +263,12 @@ def apply_managed_step(
                 "creative LUT assets require the managed LUT adapter",
                 code="UNSUPPORTED_GRADE",
             )
-        cube = lut_resolver(params)
-        strength = _param_float(params, "strength", 1.0)
-        processed = sample_creative_lut(cube, rgb, strength)
+        try:
+            cube = lut_resolver(params)
+            strength = _param_float(params, "strength", 1.0)
+            processed = sample_creative_lut(cube, rgb, strength)
+        except ManagedLutError as exc:
+            raise ManagedApplyError(str(exc), code=exc.code) from exc
     elif kind == "legacy-stack-v1":
         raise ManagedApplyError(
             "legacy-stack must use the legacy builders",
@@ -368,7 +376,6 @@ def apply_managed_grade_rgb(
         target = _normalize_domain(str(target))
         working = _to_domain(working, current=domain, target=target)
         domain = target
-
         coverage = no_selection_coverage()
         selection_id = step.get("selection_id")
         if selection_id:
@@ -434,7 +441,10 @@ def grade_is_managed_pointwise(effect_settings: str | Mapping[str, Any] | None) 
         if descriptor is None or not descriptor.get("lut_bakeable", False):
             return False
         if kind == "creative-lut-v1":
-            return False
+            params = step.get("params") if isinstance(step.get("params"), Mapping) else {}
+            asset = params.get("asset_id") or params.get("creative_lut")
+            if not isinstance(asset, str) or not asset.strip():
+                return False
     return True
 
 
@@ -536,10 +546,15 @@ def bake_managed_grade_cube(
     *,
     size: int = BAKE_SIZE,
     lattice_domain: str = "encoded-bt709",
+    lut_resolver: LutResolver | None = None,
+    data_dir: Path | None = None,
 ) -> Path:
     """Write a red-fastest .cube that approximates the managed grade in lattice space."""
     if size < 2 or size > 65:
         raise ManagedApplyError("bake size must be from 2 to 65", code="RANGE")
+    resolver = lut_resolver
+    if resolver is None and data_dir is not None:
+        resolver = make_lut_resolver(data_dir)
     denom = float(size - 1)
     lines = [
         f'TITLE "Orga managed-sdr {ADAPTER_VERSION}"',
@@ -552,7 +567,10 @@ def bake_managed_grade_cube(
             for red in range(size):
                 sample = (red / denom, green / denom, blue / denom)
                 out = apply_managed_grade_rgb(
-                    sample, grade, lattice_domain=lattice_domain
+                    sample,
+                    grade,
+                    lattice_domain=lattice_domain,
+                    lut_resolver=resolver,
                 )
                 lines.append(f"{out[0]:.8f} {out[1]:.8f} {out[2]:.8f}")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -562,19 +580,55 @@ def bake_managed_grade_cube(
     return path
 
 
-def managed_grade_digest(effect_settings: str | Mapping[str, Any] | None) -> str | None:
-    """Stable content digest for cache keys, or None when not managed-sdr."""
+def _creative_lut_asset_digests(
+    grade: Mapping[str, Any],
+    *,
+    data_dir: Path | None,
+) -> list[str]:
+    """Resolve creative LUT file digests for cache identity. Fail closed if missing."""
+    digests: list[str] = []
+    for step in grade.get("steps") or []:
+        if not isinstance(step, Mapping) or not step.get("enabled", True):
+            continue
+        if step.get("type") != "creative-lut-v1":
+            continue
+        params = step.get("params") if isinstance(step.get("params"), Mapping) else {}
+        if data_dir is None:
+            raise ManagedApplyError(
+                "creative LUT bake requires data_dir for asset identity",
+                code="UNSUPPORTED_GRADE",
+            )
+        try:
+            cube = make_lut_resolver(data_dir)(params)
+        except ManagedLutError as exc:
+            raise ManagedApplyError(str(exc), code=exc.code) from exc
+        digests.append(cube.digest)
+    return digests
+
+
+def managed_grade_digest(
+    effect_settings: str | Mapping[str, Any] | None,
+    *,
+    data_dir: Path | None = None,
+) -> str | None:
+    """Stable content digest for cache keys, or None when not managed-sdr.
+
+    When creative LUT steps are present, ``data_dir`` is required so asset
+    bytes enter the digest (missing/replaced cubes fail closed).
+    """
     import hashlib
     import json
 
     model = read_grade(effect_settings)
     if model.evaluator != "managed-sdr-v1" or model.grade is None:
         return None
+    asset_digests = _creative_lut_asset_digests(model.grade, data_dir=data_dir)
     payload = {
         "adapter": ADAPTER_VERSION,
         "evaluator": model.evaluator,
         "revision": model.revision,
         "grade": model.grade,
+        "assets": asset_digests,
         "mode": (
             "lut-bake"
             if grade_is_managed_pointwise(effect_settings)
@@ -589,18 +643,21 @@ def ffmpeg_managed_grade_chain(
     effect_settings: str | Mapping[str, Any] | None,
     *,
     work_dir: Path,
+    data_dir: Path | None = None,
 ) -> str:
     """Bake a managed grade to ``lut3d`` for FFmpeg preview/export, or empty."""
     if not grade_is_managed_pointwise(effect_settings):
         return ""
     model = read_grade(effect_settings)
     assert model.grade is not None
-    digest = managed_grade_digest(effect_settings)
+    digest = managed_grade_digest(effect_settings, data_dir=data_dir)
     assert digest is not None
     work_dir.mkdir(parents=True, exist_ok=True)
     cube = work_dir / f"managed_{digest[:16]}.cube"
+    # Always re-validate creative assets before reusing a bake.
+    _creative_lut_asset_digests(model.grade, data_dir=data_dir)
     if not cube.is_file():
-        bake_managed_grade_cube(model.grade, cube)
+        bake_managed_grade_cube(model.grade, cube, data_dir=data_dir)
     from orga_drone.studio_lut import escape_ffmpeg_lut_path
 
     return f"lut3d=file={escape_ffmpeg_lut_path(cube)}:interp=tetrahedral"

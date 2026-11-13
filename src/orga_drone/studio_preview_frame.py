@@ -203,6 +203,7 @@ def preview_filter_chain(
     managed = ffmpeg_managed_grade_chain(
         effect_settings,
         work_dir=work_dir / "managed-grades",
+        data_dir=data_dir,
     )
     if managed:
         parts.append(managed)
@@ -242,6 +243,7 @@ def cache_key_for(
     *,
     media_mtime_ns: int,
     media_size: int,
+    data_dir: Path | None = None,
 ) -> str:
     payload = {
         "path": str(req.media_path.resolve()),
@@ -256,7 +258,7 @@ def cache_key_for(
         "detail": bool(req.detail),
         "edge": int(req.max_edge),
         "saturation": req.saturation,
-        "managed": managed_grade_digest(req.effect_settings),
+        "managed": managed_grade_digest(req.effect_settings, data_dir=data_dir),
         "v": 8,
     }
     if req.kind == "photo":
@@ -314,7 +316,12 @@ def render_preview_frame(
         require_lut_asset(data_dir, req.look.conversion_lut)
     if req.look.creative_lut and req.look.creative_strength > 0:
         require_lut_asset(data_dir, req.look.creative_lut)
-    key = cache_key_for(req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size)
+    key = cache_key_for(
+        req,
+        media_mtime_ns=st.st_mtime_ns,
+        media_size=st.st_size,
+        data_dir=data_dir,
+    )
     dest = folder / f"{key}.jpg"
     if dest.is_file() and dest.stat().st_size > 0:
         return dest

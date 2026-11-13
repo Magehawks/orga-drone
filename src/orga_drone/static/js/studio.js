@@ -14078,6 +14078,18 @@ import {
   managedColorEditor = createManagedColorEditor({
     panel: managedColorPanel,
     getSelectedStudioId: () => selectedAdjustableClip()?.dataset?.studioId || null,
+    listLuts: async () => {
+      try {
+        const res = await fetch("/api/luts", { headers: { Accept: "application/json" } });
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (Array.isArray(data?.luts)) return data.luts;
+        if (Array.isArray(data?.items)) return data.items;
+        return Array.isArray(data) ? data : [];
+      } catch (_) {
+        return [];
+      }
+    },
     messages: {
       convertConfirm: managedColorPanel?.dataset.msgConvertConfirm,
       managedStatus: managedColorPanel?.dataset.msgManagedStatus,

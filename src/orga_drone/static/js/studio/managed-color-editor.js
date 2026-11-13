@@ -19,6 +19,7 @@ import {
   wrapGrade,
 } from "./grade-api.js";
 import { createManagedCurveEditor } from "./managed-curve-editor.js";
+import { createManagedLutEditor } from "./managed-lut-editor.js";
 import { createManagedSelectionEditor } from "./managed-selection-editor.js";
 
 function numberFromInput(input, fallback) {
@@ -48,6 +49,7 @@ export function createManagedColorEditor({
   getSelectedStudioId,
   onChanged,
   confirmConvert,
+  listLuts,
   messages = {},
 }) {
   if (!panel) {
@@ -109,6 +111,7 @@ export function createManagedColorEditor({
       onChanged?.(payload);
     },
   });
+  let lutEditor = { syncFromGrade() {} };
   const selectionEditor = createManagedSelectionEditor({
     panel: panel.querySelector("[data-managed-selection-panel]"),
     getSelectedStudioId,
@@ -116,6 +119,19 @@ export function createManagedColorEditor({
     onChanged: (payload) => {
       current = payload;
       curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      lutEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      onChanged?.(payload);
+    },
+  });
+  lutEditor = createManagedLutEditor({
+    panel: panel.querySelector("[data-managed-lut-panel]"),
+    getSelectedStudioId,
+    getGrade: () => current,
+    listLuts,
+    onChanged: (payload) => {
+      current = payload;
+      curveEditor.syncFromGrade(payload, getSelectedStudioId?.());
+      selectionEditor.syncFromGrade(payload, getSelectedStudioId?.());
       onChanged?.(payload);
     },
   });
@@ -256,6 +272,7 @@ export function createManagedColorEditor({
         );
         curveEditor.syncFromGrade(current, studioId);
         selectionEditor.syncFromGrade(current, studioId);
+        lutEditor.syncFromGrade(current, studioId);
       } else if (current.authority === "canonical") {
         setStatus(
           messages.wrappedStatus?.replace("{rev}", String(current.revision)) ||
@@ -263,10 +280,12 @@ export function createManagedColorEditor({
         );
         curveEditor.syncFromGrade(null, null);
         selectionEditor.syncFromGrade(null, null);
+        lutEditor.syncFromGrade(null, null);
       } else {
         setStatus(messages.legacyStatus || "legacy color");
         curveEditor.syncFromGrade(null, null);
         selectionEditor.syncFromGrade(null, null);
+        lutEditor.syncFromGrade(null, null);
       }
     } catch (error) {
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
@@ -323,6 +342,7 @@ export function createManagedColorEditor({
       currentId = expectedId;
       curveEditor.syncFromGrade(current, expectedId);
       selectionEditor.syncFromGrade(current, expectedId);
+      lutEditor.syncFromGrade(current, expectedId);
       setStatus(
         messages.managedStatus?.replace("{rev}", String(current.revision)) ||
           `managed-sdr · rev ${current.revision} · preview/export bake`
