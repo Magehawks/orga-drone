@@ -49,7 +49,8 @@ def color_effect_settings_view(raw: str | None) -> str | None:
         return "{}"
     if step.get("type") != "legacy-stack-v1":
         return raw
-    params = step.get("params") if isinstance(step.get("params"), dict) else {}
+    raw_params = step.get("params")
+    params: dict[str, Any] = dict(raw_params) if isinstance(raw_params, dict) else {}
     payload: dict[str, Any] = {
         key: params[key] for key in LEGACY_KEYS if key in params
     }
