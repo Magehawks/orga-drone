@@ -294,6 +294,7 @@ test("studio entry wires probe and refuses blit as live source", async () => {
   assert.match(entry, /createScopeTapController/);
   assert.match(entry, /probeScopeTapCapability/);
   assert.match(entry, /display-blit/);
-  assert.match(entry, /awaiting-render-adapter|renderAdapterReady:\s*false/);
+  assert.match(entry, /managedPreviewTaggedCapturePlane|createManagedPreviewScopeProducer/);
+  assert.match(entry, /kind:\s*"display-blit"|kind:\s*'display-blit'/);
   assert.equal(entry.includes("getImageData("), false);
 });

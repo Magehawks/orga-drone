@@ -75,8 +75,12 @@ import {
 } from "./studio/color-workspace.js";
 import {
   createColorScopesPanel,
+  createManagedPreviewScopeProducer,
   createScopeTapController,
+  decodeJpegBytesToRgba,
+  managedPreviewTaggedCapturePlane,
   probeScopeTapCapability,
+  SCOPE_TAP_IDS,
 } from "./studio/scopes/index.js";
 import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
@@ -413,6 +417,7 @@ import {
   let colorComparison = null;
   let colorScopes = null;
   let colorScopeTap = null;
+  let colorScopePreviewProducer = null;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
   const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
@@ -4098,15 +4103,62 @@ import {
     return (option && option.textContent) || key;
   }
 
+  function currentScopeView() {
+    const clip = selectedAdjustableClip();
+    const grade = managedGradeForClip(clip);
+    const gradeRevision = grade?.revision != null
+      ? String(grade.revision)
+      : clip
+        ? String(clip.dataset.gradeRevision || "0")
+        : "";
+    const managedDigest = grade
+      ? `managed:${gradeRevision}:${grade.evaluator || ""}`
+      : "";
+    return {
+      projectId: String(projectId || ""),
+      clipId: clip ? String(clip.dataset.studioId || "") : "",
+      gradeRevision,
+      contextDigest: clip
+        ? [
+            managedDigest,
+            clip.dataset.colorLook || "",
+            clip.dataset.imageAdjust || "",
+            clip.dataset.hsl || "",
+            clip.dataset.colorWheels || "",
+            clip.dataset.detail || "",
+            clip.dataset.saturationRamp || "",
+            clip.dataset.quickLook || "",
+          ].join("|")
+        : "",
+      tapId: SCOPE_TAP_IDS.CLIP_POST_GRADE,
+    };
+  }
+
   function syncColorScopesView() {
     colorScopes?.syncView();
     colorScopeTap?.sync();
+    const capability = colorScopeTap?.probe?.() || currentScopeTapCapability();
+    if (capability?.available) {
+      void colorScopePreviewProducer?.refresh?.("view-sync");
+    } else {
+      colorScopePreviewProducer?.invalidate?.();
+    }
   }
 
   function currentScopeTapCapability() {
-    // Refuse today's display/CSS/JPEG candidates; #359 must supply a tagged plane.
+    const clip = selectedAdjustableClip();
+    const grade = managedGradeForClip(clip);
+    const managedReady = !!(
+      grade &&
+      grade.evaluator === "managed-sdr-v1" &&
+      clip &&
+      clip.dataset.available === "1"
+    );
+    // Display blit / CSS / raw JPEG / untagged WebGL stay refused.
+    // Managed preview-frame (#359) is eligible only via taggedCapturePlane.
     return probeScopeTapCapability({
-      renderAdapterReady: false,
+      renderAdapterReady: managedReady,
+      taggedCapturePlane: managedPreviewTaggedCapturePlane(managedReady),
       candidates: [
         { id: "preview-blit", kind: "display-blit", hasFraming: true, hasComposite: true },
         { id: "css-grade", kind: "css-filter" },
@@ -11729,30 +11781,42 @@ import {
       sourceDownsampled: scopesRoot?.dataset.scopeSourceDownsampled,
     },
   });
-  // #366 orchestration: capability stays unavailable until #359 provides a
-  // tagged post-grade capture plane. Never sample blit/CSS/JPEG as live media.
+  // #366/#362: managed-sdr preview-frame (#359) publishes tagged ScopeFrameV1.
+  // Display blit / CSS / untagged WebGL remain refused.
   colorScopeTap = createScopeTapController({
     panel: colorScopes,
-    getView: () => {
-      const clip = selectedAdjustableClip();
-      return {
-        projectId: String(projectId || ""),
-        clipId: clip ? String(clip.dataset.studioId || "") : "",
-        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
-        contextDigest: clip
-          ? [
-              clip.dataset.colorLook || "",
-              clip.dataset.imageAdjust || "",
-              clip.dataset.hsl || "",
-              clip.dataset.colorWheels || "",
-              clip.dataset.detail || "",
-              clip.dataset.saturationRamp || "",
-              clip.dataset.quickLook || "",
-            ].join("|")
-          : "",
-      };
-    },
+    getView: currentScopeView,
     getCapability: currentScopeTapCapability,
+  });
+  colorScopePreviewProducer = createManagedPreviewScopeProducer({
+    getView: currentScopeView,
+    getSourceTimeS: () => {
+      const clip = selectedAdjustableClip();
+      if (!clip) return 0;
+      try {
+        const hit = resolveAt(state.projectTimeS);
+        if (hit && String(hit.clip?.dataset?.studioId) === String(clip.dataset.studioId)) {
+          return Number(playSourceOffset(clip, hit.localS) || 0);
+        }
+        return 0;
+      } catch (_) {
+        return 0;
+      }
+    },
+    isPlaying: () => Boolean(state.playing),
+    tryPublish: (frame) => colorScopeTap?.tryPublish(frame),
+    decodeJpegToRgba: decodeJpegBytesToRgba,
+    fetchPreviewJpeg: async (studioId, sourceTimeS) => {
+      const quant = Math.round(Number(sourceTimeS || 0) * 30) / 30;
+      const url =
+        `/api/studio/${encodeURIComponent(studioId)}/preview-frame` +
+        `?t_s=${encodeURIComponent(String(quant))}&detail=0`;
+      const res = await fetch(url, { headers: { Accept: "image/jpeg" } });
+      if (!res.ok) {
+        throw new Error(`preview-frame ${res.status}`);
+      }
+      return res.arrayBuffer();
+    },
   });
   syncColorScopesView();
   void colorScopeTap.probe();

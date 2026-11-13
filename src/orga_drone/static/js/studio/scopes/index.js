@@ -58,3 +58,13 @@ export {
   probeScopeTapCapability,
   refusePreviewCandidate,
 } from "./engine-tap.js";
+
+export {
+  MANAGED_PREVIEW_SCOPE_PRODUCER,
+  buildManagedPreviewScopeDescriptor,
+  buildManagedPreviewScopeFrame,
+  createManagedPreviewScopeProducer,
+  decodeJpegBytesToRgba,
+  downsampleRgba,
+  managedPreviewTaggedCapturePlane,
+} from "./preview-tap.js";

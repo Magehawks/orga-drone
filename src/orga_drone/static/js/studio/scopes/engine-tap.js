@@ -98,10 +98,11 @@ function requireNonEmptyString(descriptor, key) {
 }
 
 /**
- * Classify today's Studio preview candidates. None are eligible for a contract
- * live tap until #359 provides a tagged post-grade/pre-frame plane.
+ * Classify Studio preview candidates and optional tagged capture planes.
  *
  * `renderAdapterReady` alone never makes capability available.
+ * A producer must supply an explicit taggedCapturePlane matching the
+ * managed-preview-frame-v1 contract (BT.709 post-grade/pre-frame).
  */
 export function probeScopeTapCapability(snapshot = {}) {
   const notes = [];
@@ -121,7 +122,26 @@ export function probeScopeTapCapability(snapshot = {}) {
     notes.push("no-preview-candidates-declared");
   }
 
-  // Live publishing stays off until #359 supplies tagged frames through tryPublish.
+  const plane = snapshot.taggedCapturePlane;
+  if (plane && typeof plane === "object") {
+    const producer = String(plane.producer || "");
+    const profileOk = plane.profile === "bt709";
+    const transferOk = plane.transfer === "bt709";
+    const stageOk = plane.captureStage === SCOPE_CAPTURE_STAGES.CLIP_POST_GRADE_PRE_FRAME;
+    const planeOk = plane.capturePlane === SCOPE_CAPTURE_PLANES.BT709_ENCODED_RGBA;
+    if (producer === "managed-preview-frame-v1" && profileOk && transferOk && stageOk && planeOk) {
+      notes.push("managed-preview-frame-v1-tagged; jpeg-transport-disclosed; not-display-blit");
+      return Object.freeze({
+        available: true,
+        reason: "",
+        tapId: SCOPE_TAP_IDS.CLIP_POST_GRADE,
+        notes: Object.freeze(notes.slice()),
+      });
+    }
+    notes.push(`tagged-capture-plane-rejected:${producer || "missing-producer"}`);
+  }
+
+  // Live publishing stays off until a tagged managed preview plane is declared.
   return Object.freeze({
     available: false,
     reason: SCOPE_TAP_REASONS.AWAITING_RENDER_ADAPTER,
