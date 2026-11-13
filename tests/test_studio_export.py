@@ -1560,7 +1560,7 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
                 section_repeats=2,
             )
         )
-        is False
+        is True
     )
     applied = [
         AppliedTransition(
@@ -1587,7 +1587,7 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
                 speed_ramp=SpeedRamp(points=(Point(0.0, 1.0), Point(1.0, 2.0))),
             )
         )
-        is False
+        is True
     )
     assert (
         _story_local_spatial_export_eligible(
@@ -1598,7 +1598,7 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
                 forward_loop=True,
             )
         )
-        is False
+        is True
     )
     assert (
         _story_local_spatial_export_eligible(
@@ -1611,6 +1611,171 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
         )
         is False
     )
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("loop-ramp.mp4"),
+                kind="video",
+                duration_s=2.0,
+                forward_loop=True,
+                speed_ramp=SpeedRamp(points=(Point(0.0, 1.0), Point(1.0, 2.0))),
+            )
+        )
+        is False
+    )
+    assert (
+        _story_local_spatial_export_eligible(
+            StudioExportClip(
+                source_path=Path("ramp-rep.mp4"),
+                kind="video",
+                duration_s=4.0,
+                section_repeats=2,
+                speed_ramp=SpeedRamp(points=(Point(0.0, 1.0), Point(1.0, 2.0))),
+            )
+        )
+        is False
+    )
+
+
+def test_story_local_repeat_expansion_assigns_per_pass_anchors() -> None:
+    grade = {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": 1,
+        "input": {"profile": "srgb", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [
+            {
+                "id": "p1",
+                "type": "primaries-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"exposure": 0.0},
+            }
+        ],
+        "selections": [],
+        "animation": [
+            {
+                "id": "a1",
+                "step_id": "p1",
+                "clock": "story-local",
+                "parameter": "exposure",
+                "interpolation": "linear",
+                "outside": "hold",
+                "keys": [{"t": [0, 1], "value": 0.0}, {"t": [4, 1], "value": 2.0}],
+            }
+        ],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {},
+    }
+    payload = json.dumps(grade)
+    # duration_s is total Story length (2×2s); encoder expands to one-play slices.
+    clip = StudioExportClip(
+        source_path=Path("rep.mp4"),
+        kind="video",
+        duration_s=4.0,
+        source_start_s=0.0,
+        source_end_s=2.0,
+        managed_spatial_grade_json=payload,
+        section_repeats=2,
+    )
+    applied = [
+        AppliedTransition(
+            type="cut",
+            duration_s=0.0,
+            stored_type="cut",
+            stored_duration_s=None,
+            fallback_cut=False,
+            clamped=False,
+        )
+    ]
+    bound = _attach_story_local_spatial_anchors([clip], applied)
+    assert len(bound) == 2
+    assert bound[0].section_repeats == 1
+    assert bound[1].section_repeats == 1
+    assert bound[0].managed_spatial_story_anchor_s == pytest.approx(0.0)
+    assert bound[1].managed_spatial_story_anchor_s == pytest.approx(2.0)
+    assert bound[0].forward_loop is False
+    assert bound[1].forward_loop is False
+
+
+def test_story_local_repeat_expansion_keeps_parent_story_transition() -> None:
+    grade = {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": 1,
+        "input": {"profile": "srgb", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [
+            {
+                "id": "p1",
+                "type": "primaries-v1",
+                "enabled": True,
+                "mix": 1,
+                "selection_id": None,
+                "params": {"exposure": 0.0},
+            }
+        ],
+        "selections": [],
+        "animation": [
+            {
+                "id": "a1",
+                "step_id": "p1",
+                "clock": "story-local",
+                "parameter": "exposure",
+                "interpolation": "linear",
+                "outside": "hold",
+                "keys": [{"t": [0, 1], "value": 0.0}, {"t": [4, 1], "value": 2.0}],
+            }
+        ],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {},
+    }
+    payload = json.dumps(grade)
+    first = StudioExportClip(
+        source_path=Path("rep.mp4"),
+        kind="video",
+        duration_s=4.0,
+        source_start_s=0.0,
+        source_end_s=2.0,
+        managed_spatial_grade_json=payload,
+        section_repeats=2,
+        transition_type="crossfade",
+        transition_s=0.5,
+        fade_out_s=0.5,
+    )
+    second = StudioExportClip(
+        source_path=Path("next.mp4"),
+        kind="video",
+        duration_s=3.0,
+        section_repeats=1,
+    )
+    applied = [
+        AppliedTransition(
+            type="crossfade",
+            duration_s=0.5,
+            stored_type="crossfade",
+            stored_duration_s=0.5,
+            fallback_cut=False,
+            clamped=False,
+        ),
+        AppliedTransition(
+            type="cut",
+            duration_s=0.0,
+            stored_type="cut",
+            stored_duration_s=None,
+            fallback_cut=False,
+            clamped=False,
+        ),
+    ]
+    bound = _attach_story_local_spatial_anchors([first, second], applied)
+    assert len(bound) == 3  # two repeat slices + second clip
+    assert bound[1].transition_type == "crossfade"
+    assert bound[1].transition_s == pytest.approx(0.5)
+    assert bound[1].fade_out_s == pytest.approx(0.5)
+    # Internal join must not steal the parent Story boundary.
+    assert bound[0].transition_s == pytest.approx(0.0)
 
 
 def test_spatial_cpu_materialize_plan_owner_paths() -> None:
