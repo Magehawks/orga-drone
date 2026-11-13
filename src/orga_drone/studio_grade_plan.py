@@ -265,8 +265,35 @@ def evaluate_grade(
             "export_format": "yuv420p",
             "alpha": "straight-before-composite",
         }
-        # Only empty/disabled unknown managed operations are supported in #350.
-        # read_grade already rejects every unsupported active operation/animation.
+        # Emit enabled managed steps in serial order. Pixel adapters remain
+        # not-integrated until #359/#360 consume the plan.
+        from orga_drone.studio_grade_model import OPERATION_DESCRIPTORS
+
+        for step in grade["steps"]:
+            if not step["enabled"]:
+                continue
+            descriptor = OPERATION_DESCRIPTORS.get(step["type"])
+            assert descriptor is not None  # Validated by read_grade for enabled steps.
+            domain = descriptor["domain"]
+            if domain == "declared":
+                domain = str(step["params"].get("domain") or "linear-bt709")
+            operations.append(
+                {
+                    "type": step["type"],
+                    "input_domain": domain,
+                    "output_domain": domain,
+                    "params": dict(step["params"]),
+                    "pointwise": bool(descriptor["pointwise"]),
+                    "selection_id": step.get("selection_id"),
+                    "mix": step.get("mix", 1),
+                    "capability": "managed-reference-plan",
+                    "lut_bakeable": bool(descriptor["lut_bakeable"]),
+                }
+            )
+            if step["type"] == "creative-lut-v1":
+                asset_id = step["params"].get("asset_id")
+                if isinstance(asset_id, str) and asset_id:
+                    asset(asset_id, "creative")
         requirements = ["managed-sdr-adapter"]
     resolved = all(entry["sha256"] is not None for entry in assets)
     content = {

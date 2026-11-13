@@ -365,6 +365,35 @@ def test_neutral_identity_is_distinct_from_transfer_identity() -> None:
     assert legacy.semantic_digest != canonical.semantic_digest
 
 
+def test_managed_serial_primaries_emit_plan_operations() -> None:
+    source = managed()
+    source["grade"]["steps"] = [
+        {
+            "id": "p1",
+            "type": "primaries-v1",
+            "enabled": True,
+            "mix": 1,
+            "selection_id": None,
+            "params": {"exposure": 0.5, "contrast": 1.1, "pivot": 0.18},
+        },
+        {
+            "id": "c1",
+            "type": "rgb-curves-v1",
+            "enabled": True,
+            "mix": 0.5,
+            "selection_id": None,
+            "params": {"domain": "linear-bt709", "master": [[0, 0], [1, 1]]},
+        },
+    ]
+    plan = evaluate_grade(read_grade(source), RenderContext("photo"))
+    ops = plan.to_dict()["operations"]
+    assert [item["type"] for item in ops] == ["primaries-v1", "rgb-curves-v1"]
+    assert ops[0]["input_domain"] == "linear-bt709"
+    assert ops[1]["mix"] == 0.5
+    assert plan.grade_identity is False
+    assert plan.to_dict()["capabilities"]["pixel_execution"] is False
+
+
 def test_revision_opaque_fields_and_disabled_ops_do_not_change_semantic_digest() -> (
     None
 ):
