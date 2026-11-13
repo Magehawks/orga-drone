@@ -20,6 +20,15 @@ const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy
     colorWheelsIsNeutral: () => wheelsNeutral,
     readColorLook: () => ({ conversion_lut: '', creative_lut: 'a', creative_strength: 100 }),
     evaluateLutWebglHandling: policy.evaluateLutWebglHandling,
+    createManagedGradePreviewCache: () => ({
+      readManagedGrade: () => null,
+      writeManagedGrade: () => {},
+      ensureCached: async () => null,
+      cacheFillResult: () => false,
+    }),
+    fetchGrade: async () => null,
+    probeManagedGpuCapabilities: () => ({ supported: false, mode: "cpu" }),
+    managedBakeUrl: () => "",
     Boolean, Array,
   };
   vm.createContext(context);
