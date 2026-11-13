@@ -133,5 +133,6 @@ test("probe exact:true only when float LUT precision is available", () => {
   const f16 = probeManagedGpuCapabilities(grade, {
     lutPrecision: LUT_PRECISION_RGBA16F,
   });
-  assert.equal(f16.exact, true);
+  assert.equal(f16.exact, false);
+  assert.ok(f16.reasons.includes("rgba16f-quantization"));
 });

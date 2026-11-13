@@ -32,14 +32,21 @@ test("pointwise primaries default to rgba8 exact:false", () => {
   assert.match(probe.adapter, /v3-precision-gated/);
 });
 
-test("float LUT precision enables exact:true", () => {
-  const probe = probeManagedGpuCapabilities(
+test("RGBA32F enables exact:true; RGBA16F stays labeled approx", () => {
+  const f32 = probeManagedGpuCapabilities(
     grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }]),
     { lutPrecision: "rgba32f" }
   );
-  assert.equal(probe.exact, true);
-  assert.equal(probe.lutPrecision, "rgba32f");
-  assert.deepEqual(probe.reasons, []);
+  assert.equal(f32.exact, true);
+  assert.equal(f32.lutPrecision, "rgba32f");
+  assert.deepEqual(f32.reasons, []);
+
+  const f16 = probeManagedGpuCapabilities(
+    grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }]),
+    { lutPrecision: "rgba16f" }
+  );
+  assert.equal(f16.exact, false);
+  assert.ok(f16.reasons.includes("rgba16f-quantization"));
 });
 
 test("spatial selection forces cpu fallback", () => {

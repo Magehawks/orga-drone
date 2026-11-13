@@ -22,7 +22,9 @@ const LUT_BAKEABLE = new Set([
   "creative-lut-v1",
 ]);
 
-const FLOAT_PRECISIONS = new Set([LUT_PRECISION_RGBA16F, LUT_PRECISION_RGBA32F]);
+/** Only RGBA32F meets the float operator gate (≤1e-5). RGBA16F is higher
+ * precision than RGBA8 but half-float lattice error exceeds that gate. */
+const EXACT_FLOAT_PRECISIONS = new Set([LUT_PRECISION_RGBA32F]);
 
 /**
  * Inspect a managed grade document and report WebGL coverage.
@@ -88,16 +90,27 @@ export function probeManagedGpuCapabilities(gradeDoc, options = {}) {
       exact: true,
     };
   }
-  const floatOk = FLOAT_PRECISIONS.has(lutPrecision);
-  if (floatOk) {
+  if (EXACT_FLOAT_PRECISIONS.has(lutPrecision)) {
     return {
       adapter: MANAGED_GPU_ADAPTER_VERSION,
       supported: true,
       mode: "webgl-bake-tetrahedral",
       exact: true,
       interpolation: "tetrahedral",
-      lutPrecision,
+      lutPrecision: LUT_PRECISION_RGBA32F,
       reasons: [],
+      unsupported: [],
+    };
+  }
+  if (lutPrecision === LUT_PRECISION_RGBA16F) {
+    return {
+      adapter: MANAGED_GPU_ADAPTER_VERSION,
+      supported: true,
+      mode: "webgl-bake-tetrahedral",
+      exact: false,
+      interpolation: "tetrahedral",
+      lutPrecision: LUT_PRECISION_RGBA16F,
+      reasons: ["rgba16f-quantization"],
       unsupported: [],
     };
   }
