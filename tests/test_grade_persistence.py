@@ -177,3 +177,17 @@ def test_prepare_action_blocks_canonical_color() -> None:
     with pytest.raises(ActionValidationError) as exc:
         prepare_action(spec, raw, {"exposure": 1}, set(), Path("."))
     assert exc.value.args[0] == "CANONICAL_GUARD"
+
+
+def test_convert_legacy_to_managed_requires_ack() -> None:
+    from orga_drone.studio_grade_persistence import convert_legacy_to_managed
+
+    with pytest.raises(GradeError):
+        convert_legacy_to_managed(_legacy_blob(), acknowledge_appearance_change=False)
+    document = convert_legacy_to_managed(
+        _legacy_blob(), acknowledge_appearance_change=True
+    )
+    model = read_grade(document)
+    assert model.evaluator == "managed-sdr-v1"
+    assert model.steps == ()
+    assert document["grade"]["extensions"]["legacy_recovery"]["image"]["exposure"] == 12

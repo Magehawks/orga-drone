@@ -199,3 +199,58 @@ def require_writes_enabled(data_dir: Path) -> None:
             "Canonical grade writes require a verified pre-upgrade backup",
             "UNSUPPORTED_GRADE",
         )
+
+
+def convert_legacy_to_managed(
+    raw: str | None,
+    *,
+    revision: int = 1,
+    acknowledge_appearance_change: bool = False,
+) -> dict[str, Any]:
+    """Create a neutral managed-sdr grade. Appearance may change vs legacy.
+
+    This does not invent a pixel-identical translation of YUV eq. Callers must
+    pass ``acknowledge_appearance_change=True``. Legacy color keys are retained
+    only inside ``extensions.legacy_recovery`` for rollback evidence.
+    """
+    if not acknowledge_appearance_change:
+        fail(
+            "grade",
+            "Managed conversion requires explicit appearance-change acknowledgement",
+            "UNSUPPORTED_GRADE",
+        )
+    model = read_grade(raw)
+    recovery: dict[str, Any] = {}
+    if model.authority == "canonical":
+        if model.evaluator == "managed-sdr-v1":
+            fail("grade", "Clip is already managed-sdr", "UNSUPPORTED_GRADE")
+        grade = model.grade
+        assert grade is not None
+        step = grade["steps"][0] if grade.get("steps") else None
+        if isinstance(step, dict):
+            recovery = dict(step.get("params") or {})
+        document = model.to_dict()
+    else:
+        try:
+            data = json.loads(raw or "{}")
+        except (ValueError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        for key in LEGACY_KEYS:
+            if key in data:
+                recovery[key] = data.pop(key)
+        document = data
+    document["grade"] = {
+        "schema_version": 1,
+        "evaluator": "managed-sdr-v1",
+        "revision": int(revision),
+        "input": {"profile": "srgb", "technical_lut": None},
+        "working": "linear-bt709",
+        "steps": [],
+        "selections": [],
+        "animation": [],
+        "output": {"profile": "bt709-sdr", "gamut": "clip"},
+        "extensions": {"legacy_recovery": recovery},
+    }
+    return read_grade(document).to_dict()
