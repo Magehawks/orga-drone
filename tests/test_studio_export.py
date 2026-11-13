@@ -29,6 +29,7 @@ from orga_drone.studio_export import (
     prepare_studio_export,
     probe_video_dimensions,
     run_studio_export,
+    spatial_cpu_materialize_plan,
 )
 from orga_drone.studio_transition import AppliedTransition
 
@@ -1610,6 +1611,13 @@ def test_story_local_spatial_anchor_attach_and_eligibility() -> None:
         )
         is False
     )
+
+
+def test_spatial_cpu_materialize_plan_owner_paths() -> None:
+    assert spatial_cpu_materialize_plan(kind="photo", story_local=False) == "eager"
+    assert spatial_cpu_materialize_plan(kind="photo", story_local=True) == "defer"
+    assert spatial_cpu_materialize_plan(kind="video", story_local=False) == "defer"
+    assert spatial_cpu_materialize_plan(kind="video", story_local=True) == "defer"
 
 
 def test_story_local_photo_is_deferred_not_eager_materialized() -> None:

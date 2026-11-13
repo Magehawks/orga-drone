@@ -542,10 +542,11 @@ def _clip_to_export_clip(
                     float(clip.source_end) if clip.source_end is not None else None
                 )
                 story_local = grade_uses_story_local_animation(model.grade)
-                # Source-local photos keep eager preflight bake.
-                # Video always defers. Story-local photos also defer so
-                # `_attach_story_local_spatial_anchors` can bind Story starts.
-                if kind == "video" or story_local:
+                plan = spatial_cpu_materialize_plan(
+                    kind=str(kind), story_local=bool(story_local)
+                )
+                if plan == "defer":
+                    # Video + story-local photo: set deferred fields (anchors later).
                     if kind == "video":
                         try:
                             validate_spatial_video_limits(path)
@@ -560,7 +561,7 @@ def _clip_to_export_clip(
                     managed_spatial_digest = digest
                     managed_spatial_work = work
                 else:
-                    # Source-local photo CPU materialize (unchanged owner path).
+                    # Source-local photo only: eager preflight bake.
                     try:
                         managed_grade_media = materialize_spatial_managed_media(
                             path,
@@ -826,6 +827,17 @@ def _story_local_spatial_export_eligible(clip: StudioExportClip) -> bool:
     if clip.slow_span is not None:
         return False
     return True
+
+
+def spatial_cpu_materialize_plan(*, kind: str, story_local: bool) -> str:
+    """Decide eager vs deferred spatial CPU materialize for one clip.
+
+    Returns ``\"defer\"`` when Story anchors must be attached first (all video,
+    and story-local photos) or ``\"eager\"`` for source-local photo preflight.
+    """
+    if kind == "video" or story_local:
+        return "defer"
+    return "eager"
 
 
 def _attach_story_local_spatial_anchors(
