@@ -54,8 +54,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   managed-color-editor.js` owns the Managed Color Workspace inspector panel
   (wrap/convert/reset and primaries sliders). The entry mounts the panel and
   refreshes it from image-inspector fill; preview invalidation stays in the
-  entry. See `tests/js/grade_api.test.js` and
-  `tests/js/managed_color_editor.test.js`.
+  entry. `studio/managed-curve-editor.js` owns the seven managed curve families
+  (RGB/luma/hue-sat maps) against the same grade PUT path. See
+  `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
 
 - `studio/scopes/` owns ScopeFrameV1 validation, fixture frames, reference
   histogram/waveform/parade/vectorscope accumulation, canvas paint, the Pro

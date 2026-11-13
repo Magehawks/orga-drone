@@ -119,6 +119,58 @@ export function neutralManagedHslParams() {
   return { hue: 0, saturation: 1, lightness: 0 };
 }
 
+export const IDENTITY_CURVE = [
+  [0, 0],
+  [1, 1],
+];
+
+export const IDENTITY_HUE_OFFSET_CURVE = [
+  [0, 0],
+  [360, 0],
+];
+
+export const IDENTITY_HUE_MULT_CURVE = [
+  [0, 1],
+  [360, 1],
+];
+
+export const CURVE_STEP_TYPES = [
+  "rgb-curves-v1",
+  "luma-curve-v1",
+  "hue-vs-hue-v1",
+  "hue-vs-saturation-v1",
+  "hue-vs-luma-v1",
+  "luma-vs-saturation-v1",
+  "saturation-vs-saturation-v1",
+];
+
+export function neutralCurveParams(type) {
+  if (type === "rgb-curves-v1") {
+    return {
+      domain: "linear-bt709",
+      master: IDENTITY_CURVE.map((point) => [...point]),
+      red: IDENTITY_CURVE.map((point) => [...point]),
+      green: IDENTITY_CURVE.map((point) => [...point]),
+      blue: IDENTITY_CURVE.map((point) => [...point]),
+    };
+  }
+  if (type === "luma-curve-v1" || type === "saturation-vs-saturation-v1") {
+    return { curve: IDENTITY_CURVE.map((point) => [...point]) };
+  }
+  if (type === "luma-vs-saturation-v1") {
+    return {
+      curve: [
+        [0, 1],
+        [1, 1],
+      ],
+    };
+  }
+  if (type === "hue-vs-saturation-v1") {
+    return { curve: IDENTITY_HUE_MULT_CURVE.map((point) => [...point]) };
+  }
+  return { curve: IDENTITY_HUE_OFFSET_CURVE.map((point) => [...point]) };
+}
+
 export function upsertTypedStep(grade, type, params, neutrals = {}) {
   const next = structuredClone(grade || {});
   if (!Array.isArray(next.steps)) next.steps = [];
@@ -145,4 +197,11 @@ export function upsertWheelsStep(grade, params) {
 
 export function upsertManagedHslStep(grade, params) {
   return upsertTypedStep(grade, "managed-hsl-v1", params, neutralManagedHslParams());
+}
+
+export function upsertCurveStep(grade, type, params) {
+  if (!CURVE_STEP_TYPES.includes(type)) {
+    throw new Error(`unsupported curve type: ${type}`);
+  }
+  return upsertTypedStep(grade, type, params, neutralCurveParams(type));
 }
