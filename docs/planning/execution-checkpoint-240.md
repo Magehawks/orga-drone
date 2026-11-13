@@ -74,4 +74,4 @@ is not acceptance.
 
 ## Exact next task
 
-Rebase open PRs onto `88c79e9`. Keep #404 journey clip order deterministic. Request re-review after green CI. Continue Color Workspace read-only work (#354+) without canonical writes. Packaged Timelapse Inspector and GitHub release-ZIP admission remain NOT_RUN. Do not merge without PO approval.
+Open PRs are updated onto `88c79e9`. #404 journey clip order is deterministic. Request re-review after green CI. Continue Color Workspace read-only work (#354+) without canonical writes. Packaged Timelapse Inspector and GitHub release-ZIP admission remain NOT_RUN. Do not merge without PO approval.
