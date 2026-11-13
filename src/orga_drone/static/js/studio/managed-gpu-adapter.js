@@ -1,6 +1,6 @@
 /** Managed-sdr GPU capability probe for the existing WebGL LUT adapter (#360). */
 
-export const MANAGED_GPU_ADAPTER_VERSION = "managed-sdr-webgl-bake-v1";
+export const MANAGED_GPU_ADAPTER_VERSION = "managed-sdr-webgl-bake-v2-tetrahedral";
 
 const LUT_BAKEABLE = new Set([
   "primaries-v1",
@@ -71,17 +71,26 @@ export function probeManagedGpuCapabilities(gradeDoc) {
   return {
     adapter: MANAGED_GPU_ADAPTER_VERSION,
     supported: true,
-    // Preview uses the existing RGBA8 + trilinear 3D LUT path (not exact
-    // tetrahedral float parity). Export/CPU remain the reference.
-    mode: "webgl-bake-approx",
+    // Preview samples tetrahedrally (#360) but RGBA8 3D textures still
+    // quantize table values. Export/CPU float remain the exact reference.
+    mode: "webgl-bake-tetrahedral",
     exact: false,
-    reasons: ["rgba8-trilinear-approx"],
+    interpolation: "tetrahedral",
+    reasons: ["rgba8-quantization"],
     unsupported: [],
   };
 }
 
+/** Modes that may drive the existing WebGL LUT bake preview path. */
+export function isManagedWebglBakeMode(mode) {
+  return mode === "webgl-bake" || mode === "webgl-bake-approx" || mode === "webgl-bake-tetrahedral";
+}
+
 export function managedBakeUrl(studioId, revision) {
   if (!studioId) return "";
-  const rev = revision == null ? "" : `?rev=${encodeURIComponent(String(revision))}`;
+  const rev =
+    revision === null || revision === undefined
+      ? ""
+      : `?rev=${encodeURIComponent(String(revision))}`;
   return `/api/studio/${encodeURIComponent(String(studioId))}/grade/bake.cube${rev}`;
 }

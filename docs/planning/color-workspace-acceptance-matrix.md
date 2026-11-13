@@ -19,7 +19,7 @@ and stopped #320 precision experiments are not weakened.
 | Creative LUT resolve/bake | PASS | #422 |
 | Technical LUT metadata | PASS / reject | #352; non-null technical LUT typed reject until resolved asset |
 | Serial step enable/mix/reorder | PASS | #433 `clip.grade.command` |
-| Full serial step editor UX | NOT_RUN | #361 remaining |
+| Full serial step editor UX | NOT_RUN | #361 remaining (PR #437) |
 
 ## 2. LUTs, photo/video export
 
@@ -60,8 +60,8 @@ and stopped #320 precision experiments are not weakened.
 | Undo remint | PASS | #429 |
 | Shared grade commands | PASS | #433 |
 | Save/reopen / clip switch | PASS (API) | grade route tests |
-| Editor full-PUT migration | NOT_RUN | remaining #363 |
-| Async preview tokens | NOT_RUN | remaining #363 |
+| Editor full-PUT migration | NOT_RUN | remaining #363 (PR #437) |
+| Async preview tokens | NOT_RUN | remaining #363 (PR #437) |
 
 ## 6. Preview / export numerical parity
 
@@ -69,7 +69,8 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Managed-SDR API journey + CPU delta | PASS | #430 `test_managed_sdr_parity_journey.py` |
 | GPU bake-approx vs CPU | PASS (approx labeled) | #427 `exact:false` |
-| Exact GPU tetrahedral | NOT_RUN | #360 remaining |
+| GPU tetrahedral interpolation | PASS | #360 / #438 `lut-tetrahedral.js` + WebGL texelFetch |
+| Exact GPU float parity | NOT_RUN | RGBA8 table storage; labeled `exact:false` / `rgba8-quantization` |
 | Packaged WebView2 parity | NOT_RUN — deferred by PO | — |
 
 ## 7. Scopes (#362 / #366)
@@ -125,8 +126,8 @@ pytest tests/test_studio_grade_animation.py \
 | Issue | Matrix implication |
 |---|---|
 | #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
-| #360 | Open: exact GPU / packaged budgets |
-| #361 | Open: serial editor UX |
+| #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
+| #361 | Open: serial editor UX (PR #437) |
 | #362/#366 | Open only for packaged latency/memory if AC require it |
-| #363 | Open: preview tokens + editor PUT migration |
+| #363 | Open: preview tokens + editor PUT migration (PR #437) |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

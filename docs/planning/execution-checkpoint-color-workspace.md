@@ -1,8 +1,7 @@
 # Color Workspace execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` tip
-`c47b9b3` (after #431 animation clocks, #432 imageio-ffmpeg guard,
-#433 shared grade commands).
+Updated: 2026-11-13. Integration branch `develop` tip after #438
+tetrahedral GPU sampling.
 
 A merged PR is not full issue acceptance. This file records shipped slices vs
 remaining gaps after the PO complete-Color-Workspace directive.
@@ -22,6 +21,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #431 | `2d788a1…` | #358 canonical animation clocks |
 | #432 | `f7bfb13…` | Warn on stale imageio-ffmpeg <0.8.0 |
 | #433 | `c47b9b3…` | #363 shared grade command bridge |
+| #438 | `f8382be…` | #360 tetrahedral WebGL LUT sampling |
 
 ## Feature matrix (honest)
 
@@ -32,7 +32,7 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | Spatial masks/qualifiers | Available now | Photo + video CPU export |
 | Eyedropper / brush | Available now | #426 |
 | Animation clocks (#358) | Available now (partial) | Client `story_s`; story-local export with Story anchor (constant-speed single play); ramps/repeats/loop fail-closed |
-| GPU WebGL managed adapter (#360) | Available now (approx) | `webgl-bake-approx`, `exact:false`; packaged budgets NOT_RUN |
+| GPU WebGL managed adapter (#360) | Available now (tetrahedral) | `webgl-bake-tetrahedral`, `exact:false` (RGBA8); packaged budgets NOT_RUN |
 | Live scopes (#362/#366) | Available now (managed) | Tagged preview-frame; packaged latency NOT_RUN |
 | Shared Control API grade actions (#363) | Available now (slice) | `clip.grade.command` + HTTP `/grade/command`; editor PUT migration partial |
 | Managed-SDR API journey | PASS (unit) | #430; packaged WebView2 NOT_RUN |
@@ -52,10 +52,10 @@ remaining gaps after the PO complete-Color-Workspace directive.
 | #351 | CLOSED | — |
 | #352–#357 | Feature slices merged | Packaged AC / PO close comments where AC require it |
 | #358 | #431 + story_s/export PR | Complex ClipTimingInputs export (ramp/repeat/loop) NOT_RUN |
-| #360 | Bake-approx shipped | Exact tetrahedral / Windows budgets NOT_RUN |
-| #361 | Serial workspace incomplete | Step editor UX |
+| #360 | Tetrahedral sampling shipped | Float exact parity blocked by RGBA8; Windows budgets NOT_RUN |
+| #361 | Serial workspace incomplete | Step editor UX (PR #437) |
 | #362/#366 | Live tap shipped | Packaged latency/memory NOT_RUN |
-| #363 | #433 merged | Preview tokens; migrate managed editors from full PUT to `postGradeCommand` where applicable |
+| #363 | #433 merged | Preview tokens; migrate managed editors from full PUT to `postGradeCommand` where applicable (PR #437) |
 | #364/#365 | OPEN | Strict matrix + packaged deferred |
 
 ## Explicitly deferred by PO (this sprint)
@@ -67,6 +67,6 @@ Record packaged-only evidence as `NOT_RUN — deferred by PO`.
 
 ## Exact next tasks
 
-1. Continue #363 editor migration + preview tokens; #364/#365 matrix.
+1. Merge #436 story_s/export and #437 step editor + tokens.
 2. Issue evidence comments; close only when AC fully met.
 3. Do not build packaged Windows EXE in this sprint.
