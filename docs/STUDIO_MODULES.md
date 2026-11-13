@@ -49,6 +49,9 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - `studio/color-workspace.js` owns pure Creative/Pro helpers: per-clip Quick Look
   request tokens, inspector-refresh gating when selection changes mid-flight, and
   grade-summary part formatting. The entry still owns DOM fills and saves.
+- `studio/preview-frame-url.js` builds preview-frame query strings including
+  optional `story_s` (#358). The entry passes Story playhead time into LUT
+  stills, live scopes, and color-compare fetches.
 - `studio/grade-api.js` owns Grade HTTP helpers (GET/PUT/wrap/convert-managed)
   and primaries step upsert helpers for ADR 0035 managed grades. `studio/
   managed-color-editor.js` owns the Managed Color Workspace inspector panel

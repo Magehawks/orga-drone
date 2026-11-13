@@ -19,6 +19,20 @@ const context = {
     clearTimeout: id => timers.delete(id),
   },
   state: { playing: false }, colorComparison: null, reuseDraft: null,
+  quantizePreviewTime: (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+  },
+  buildPreviewFrameUrl: (studioId, opts = {}) => {
+    const params = new URLSearchParams();
+    if (opts.t_s != null && opts.t_s !== '') params.set('t_s', String(opts.t_s));
+    if (opts.story_s != null && Number.isFinite(Number(opts.story_s))) {
+      params.set('story_s', String(Number(opts.story_s)));
+    }
+    if (opts.detail != null && opts.detail !== '') params.set('detail', String(opts.detail));
+    if (opts.before) params.set('before', '1');
+    return `/api/studio/${encodeURIComponent(String(studioId))}/preview-frame?${params}`;
+  },
   readColorAnimation: () => null,
   forwardLoopActive: () => false, sectionRepeats: () => 1,
   readImageAdjust: clip => JSON.parse(clip.dataset.imageAdjust || '{}'),
@@ -39,7 +53,7 @@ const context = {
   resolveAt: () => null,
   URL: { createObjectURL: blob => blob.id, revokeObjectURL() {} },
   Image: class { removeAttribute() {} decode() { return new Promise(resolve => decodes.push({ resolve })); } },
-  AbortController, Number, JSON, Math,
+  AbortController, Number, JSON, Math, URLSearchParams,
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
 };
 vm.createContext(context);

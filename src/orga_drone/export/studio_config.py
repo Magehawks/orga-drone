@@ -69,6 +69,8 @@ class StudioExportClip:
     managed_spatial_grade_json: str | None = None
     managed_spatial_digest: str | None = None
     managed_spatial_work: Path | None = None
+    # Absolute Story start for #358 story-local animation during deferred bake.
+    managed_spatial_story_anchor_s: float | None = None
     color_look: ColorLook = field(default_factory=ColorLook)
     hsl: HslAdjust = field(default_factory=HslAdjust)
     color_wheels: ColorWheels = field(default_factory=ColorWheels)

@@ -19,7 +19,7 @@ and stopped #320 precision experiments are not weakened.
 | Creative LUT resolve/bake | PASS | #422 |
 | Technical LUT metadata | PASS / reject | #352; non-null technical LUT typed reject until resolved asset |
 | Serial step enable/mix/reorder | PASS | #433 `clip.grade.command` |
-| Full serial step editor UX | NOT_RUN | #361 remaining |
+| Full serial step editor UX | NOT_RUN | #361 remaining (PR #437) |
 
 ## 2. LUTs, photo/video export
 
@@ -45,9 +45,11 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Source-local mapping + trim | PASS | #431; `test_studio_grade_animation.py` |
 | Story-local plan evaluation | PASS | unit |
-| Story-local full-source bake | PASS (fail-closed) | explicit UNSUPPORTED |
+| Story-local full-source bake (no anchor) | PASS (fail-closed) | explicit UNSUPPORTED |
+| Story-local constant-speed single-play export | PASS | anchor + `_story_time_for_source_pts`; repeats/ramp/loop remain fail-closed |
 | Speed/repeat/transition helpers | PASS | `studio_grade_clock` unit |
-| Client `story_s` wiring | NOT_RUN | server ready; UI pending |
+| Client `story_s` wiring | PASS | `preview-frame-url.js` + lut/scopes/compare |
+| ClipTimingInputs full export wiring | NOT_RUN | remaining complex ramps/repeats |
 | Packaged preview/export | NOT_RUN — deferred by PO | — |
 
 ## 5. Undo / persistence / migration
@@ -58,8 +60,8 @@ and stopped #320 precision experiments are not weakened.
 | Undo remint | PASS | #429 |
 | Shared grade commands | PASS | #433 |
 | Save/reopen / clip switch | PASS (API) | grade route tests |
-| Editor full-PUT migration | NOT_RUN | remaining #363 |
-| Async preview tokens | NOT_RUN | remaining #363 |
+| Editor full-PUT migration | NOT_RUN | remaining #363 (PR #437) |
+| Async preview tokens | NOT_RUN | remaining #363 (PR #437) |
 
 ## 6. Preview / export numerical parity
 
@@ -67,7 +69,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Managed-SDR API journey + CPU delta | PASS | #430 `test_managed_sdr_parity_journey.py` |
 | GPU bake-approx vs CPU | PASS (approx labeled) | #427 `exact:false` |
-| GPU tetrahedral interpolation | PASS | #360 `lut-tetrahedral.js` + WebGL texelFetch; float CPU reference |
+| GPU tetrahedral interpolation | PASS | #360 / #438 `lut-tetrahedral.js` + WebGL texelFetch |
 | Exact GPU float parity | NOT_RUN | RGBA8 table storage; labeled `exact:false` / `rgba8-quantization` |
 | Packaged WebView2 parity | NOT_RUN — deferred by PO | — |
 
@@ -123,9 +125,9 @@ pytest tests/test_studio_grade_animation.py \
 
 | Issue | Matrix implication |
 |---|---|
-| #358 | Open: client story_s + story-local export path |
+| #358 | Client story_s + constant-speed story-local export shipped; complex timing NOT_RUN |
 | #360 | Tetrahedral GPU sampling shipped; exact:false (RGBA8); packaged budgets NOT_RUN |
-| #361 | Open: serial editor UX |
+| #361 | Open: serial editor UX (PR #437) |
 | #362/#366 | Open only for packaged latency/memory if AC require it |
-| #363 | Open: preview tokens + editor PUT migration |
+| #363 | Open: preview tokens + editor PUT migration (PR #437) |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |
