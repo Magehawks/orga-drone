@@ -1,13 +1,17 @@
 import {
+  MAX_REGIONS,
   MAX_SPEED,
   MIN_SPEED,
+  addRampRegion,
   parseRamp,
   placeRampRegion,
   rampPreset,
   rampRegion,
+  rampRegions,
   rampSource,
   rampSpeed,
   rampTime,
+  removeRampRegion,
 } from "./speed-ramp.js";
 
 const LOG_SPAN = Math.log2(MAX_SPEED / MIN_SPEED);
@@ -30,6 +34,7 @@ export function createSpeedRampEditor({
   if (!panel) return { fill() {}, layout() {} };
   const field = (name) => panel.querySelector(`[data-ramp-${name}]`);
   let selected = 0;
+  let selectedRegionId = "";
   let draft = null;
   let pending = false;
   let idle = Promise.resolve();
@@ -39,6 +44,15 @@ export function createSpeedRampEditor({
   const copy = (value) => JSON.parse(JSON.stringify(value));
   function current() {
     return draft || readRamp(getSelection());
+  }
+  function active(ramp) {
+    const regions = rampRegions(ramp);
+    if (!regions.length) return null;
+    const found = regions.findIndex((region) => region.id === selectedRegionId);
+    return regions[found >= 0 ? found : 0];
+  }
+  function regionIdOf(ramp, region) {
+    return ramp && ramp.v === 2 ? region.id : null;
   }
   function hideCurve() {
     if (!curve) return;
@@ -52,6 +66,7 @@ export function createSpeedRampEditor({
       draft = null;
       drag = null;
       selected = 0;
+      selectedRegionId = "";
       selectedClip = clip;
     }
     panel.hidden = !clip;
@@ -62,8 +77,9 @@ export function createSpeedRampEditor({
       hideCurve();
       return;
     }
-    selected = Math.min(selected, ramp.points.length - 1);
-    const region = rampRegion(ramp);
+    const region = active(ramp);
+    selectedRegionId = region.id;
+    selected = Math.min(selected, region.points.length - 1);
     const range = bounds(clip);
     const regionStart = field("region-start");
     const regionEnd = field("region-end");
@@ -73,9 +89,40 @@ export function createSpeedRampEditor({
       regionStart.disabled = pending;
       regionEnd.disabled = pending;
     }
+    const regions = rampRegions(ramp);
+    const regionPick = field("region");
+    if (regionPick) {
+      regionPick.replaceChildren(
+        ...regions.map((item, index) => {
+          const option = document.createElement("option");
+          option.value = item.id;
+          option.textContent = String(index + 1);
+          return option;
+        })
+      );
+      regionPick.value = region.id;
+      regionPick.disabled = pending || regions.length < 2;
+    }
+    const addRegion = field("add-region");
+    const removeRegion = field("remove-region");
+    const bounded = ramp.v === 2 || Boolean(ramp.region);
+    if (addRegion) {
+      const preset = field("preset");
+      const canAdd =
+        bounded &&
+        regions.length < MAX_REGIONS &&
+        preset &&
+        addRampRegion(ramp, {
+          playStart: range.start,
+          playEnd: range.end,
+          preset: preset.value,
+        });
+      addRegion.disabled = pending || !canAdd;
+    }
+    if (removeRegion) removeRegion.disabled = pending || !bounded;
     const pick = field("point");
     pick.replaceChildren(
-      ...ramp.points.map((_, i) => {
+      ...region.points.map((_, i) => {
         const option = document.createElement("option");
         option.value = i;
         option.textContent = String(i + 1);
@@ -83,13 +130,13 @@ export function createSpeedRampEditor({
       })
     );
     pick.value = String(selected);
-    const point = ramp.points[selected];
+    const point = region.points[selected];
     field("time").value = (point.source_s - range.start).toFixed(2);
     field("speed").value = point.speed;
     field("time").disabled = pending;
     field("remove-point").disabled =
-      selected === 0 || selected === ramp.points.length - 1 || pending;
-    field("add").disabled = ramp.points.length >= 5 || pending;
+      selected === 0 || selected === region.points.length - 1 || pending;
+    field("add").disabled = region.points.length >= 5 || pending;
     draw();
   }
   async function commit(value) {
@@ -147,18 +194,19 @@ export function createSpeedRampEditor({
     if (!value) return;
     const clip = getSelection();
     const range = bounds(clip);
-    const point = value.points[selected];
+    const region = active(value);
+    const point = region.points[selected];
     const nextTime = Number(field("time").value) + range.start;
     const nextSpeed = Number(field("speed").value);
-    const isEnd = selected === 0 || selected === value.points.length - 1;
+    const isEnd = selected === 0 || selected === region.points.length - 1;
     const timeChanged = Number.isFinite(nextTime) && Math.abs(nextTime - point.source_s) > 1e-6;
     if (isEnd && timeChanged) {
-      const region = rampRegion(value);
       const newStart = selected === 0 ? nextTime : region.start;
-      const newEnd = selected === value.points.length - 1 ? nextTime : region.end;
+      const newEnd = selected === region.points.length - 1 ? nextTime : region.end;
       const placed = placeRampRegion(value, newStart, newEnd, {
         playStart: range.start,
         playEnd: range.end,
+        regionId: regionIdOf(value, region),
       });
       if (!placed) {
         onError();
@@ -184,12 +232,18 @@ export function createSpeedRampEditor({
     const startField = field("region-start");
     const endField = field("region-end");
     if (!value || !clip || !startField || !endField) return;
+    const region = active(value);
+    if (!region) return;
     const range = bounds(clip);
     const placed = placeRampRegion(
       value,
       Number(startField.value) + range.start,
       Number(endField.value) + range.start,
-      { playStart: range.start, playEnd: range.end }
+      {
+        playStart: range.start,
+        playEnd: range.end,
+        regionId: regionIdOf(value, region),
+      }
     );
     if (!placed) {
       onError();
@@ -204,27 +258,87 @@ export function createSpeedRampEditor({
   if (regionEndField) regionEndField.addEventListener("change", editRegion);
   field("add").addEventListener("click", () => {
     const value = copy(current());
-    if (!value || value.points.length >= 5) return;
-    const index = Math.min(selected, value.points.length - 2);
-    const source = (value.points[index].source_s + value.points[index + 1].source_s) / 2;
-    value.points.splice(index + 1, 0, { source_s: source, speed: rampSpeed(value, source) });
+    const region = value && active(value);
+    if (!value || !region || region.points.length >= 5) return;
+    const index = Math.min(selected, region.points.length - 2);
+    const source = (region.points[index].source_s + region.points[index + 1].source_s) / 2;
+    region.points.splice(index + 1, 0, { source_s: source, speed: rampSpeed(value, source) });
     selected = index + 1;
     commit(value);
   });
   field("remove-point").addEventListener("click", () => {
     const value = copy(current());
-    if (!value || selected === 0 || selected === value.points.length - 1) return;
-    value.points.splice(selected, 1);
+    const region = value && active(value);
+    if (!value || !region || selected === 0 || selected === region.points.length - 1) return;
+    region.points.splice(selected, 1);
     selected -= 1;
     commit(value);
   });
+  const regionPick = field("region");
+  if (regionPick) {
+    regionPick.addEventListener("change", () => {
+      selectedRegionId = regionPick.value;
+      selected = 0;
+      const clip = getSelection();
+      if (clip)
+        onSelect?.(clip, { focusInspector: false, source: "region", regionId: selectedRegionId });
+      fill();
+    });
+  }
+  const addRegion = field("add-region");
+  if (addRegion) {
+    addRegion.addEventListener("click", () => {
+      const value = current();
+      const clip = getSelection();
+      if (!value || !clip) return;
+      const range = bounds(clip);
+      const previousSpans = new Set(
+        rampRegions(value).map((region) => `${region.start}:${region.end}`)
+      );
+      const next = addRampRegion(value, {
+        playStart: range.start,
+        playEnd: range.end,
+        preset: field("preset").value,
+      });
+      if (!next) {
+        onError();
+        fill();
+        return;
+      }
+      const created = next.regions.find(
+        (region) => !previousSpans.has(`${region.start_s}:${region.end_s}`)
+      );
+      draft = next;
+      selectedRegionId = created ? created.id : next.regions[0].id;
+      onSelect?.(clip, { focusInspector: false, source: "region", regionId: selectedRegionId });
+      commit(next);
+    });
+  }
+  const removeRegion = field("remove-region");
+  if (removeRegion) {
+    removeRegion.addEventListener("click", () => {
+      const value = current();
+      if (!value) return;
+      const region = active(value);
+      const next = removeRampRegion(value, region ? region.id : "");
+      if (next === undefined) {
+        onError();
+        fill();
+        return;
+      }
+      selectedRegionId = next && next.regions ? next.regions[0].id : "";
+      selected = 0;
+      commit(next);
+    });
+  }
   function svgNode(name, attrs) {
     const node = document.createElementNS("http://www.w3.org/2000/svg", name);
     Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, String(value)));
     return node;
   }
   function displayRange(ramp) {
-    return rampRegion(ramp);
+    const region = active(ramp);
+    return region ? { start: region.start, end: region.end } : rampRegion(ramp);
   }
   function curvePathD(ramp, range) {
     const start = rampTime(ramp, range.start);
@@ -255,7 +369,7 @@ export function createSpeedRampEditor({
     }
     curve.querySelectorAll(".studio-ramp-point").forEach((handle) => {
       const index = Number(handle.getAttribute("data-index"));
-      const point = draft.points[index];
+      const point = active(draft).points[index];
       if (!point) return;
       handle.setAttribute("cx", String(x(point.source_s)));
       handle.setAttribute("cy", String(curveY(point.speed)));
@@ -270,7 +384,7 @@ export function createSpeedRampEditor({
     });
     const clip = getSelection();
     const play = clip ? bounds(clip) : range;
-    const point = draft.points[selected];
+    const point = active(draft).points[selected];
     if (point) {
       field("speed").value = point.speed;
       field("time").value = (point.source_s - play.start).toFixed(2);
@@ -294,7 +408,8 @@ export function createSpeedRampEditor({
       svgNode("line", { x1: 0, x2: 1000, y1: y(1), y2: y(1), class: "studio-ramp-reference" }),
       svgNode("path", { d: curvePathD(ramp, range), class: "studio-ramp-line" })
     );
-    ramp.points.forEach((point, index) => {
+    const focused = active(ramp);
+    focused.points.forEach((point, index) => {
       const handle = svgNode("ellipse", {
         cx: x(point.source_s),
         cy: y(point.speed),
@@ -346,32 +461,33 @@ export function createSpeedRampEditor({
         event.preventDefault();
         event.stopPropagation();
         const clip = getSelection();
-        if (clip) onSelect?.(clip, { focusInspector: false, source: "curve" });
+        if (clip)
+          onSelect?.(clip, { focusInspector: false, source: "curve", regionId: selectedRegionId });
       });
       curve.addEventListener("contextmenu", (event) => {
         if (pending) return;
         event.preventDefault();
         event.stopPropagation();
         const clip = getSelection();
-        if (clip) onContextMenu?.(event, clip, { source: "curve" });
+        if (clip) onContextMenu?.(event, clip, { source: "curve", regionId: selectedRegionId });
       });
       curve.addEventListener("pointermove", (event) => {
         if (!drag || !draft) return;
         const { rect, index } = drag;
-        const point = draft.points[index];
+        const point = active(draft).points[index];
         const range = displayRange(draft);
         point.speed = Math.max(
           MIN_SPEED,
           Math.min(MAX_SPEED, speedFromCurveY(58 - ((event.clientY - rect.top) * 64) / rect.height))
         );
         point.speed = Number((Math.round(point.speed / 0.05) * 0.05).toFixed(2));
-        if (index > 0 && index < draft.points.length - 1) {
+        if (index > 0 && index < active(draft).points.length - 1) {
           const span = rampTime(draft, range.end) - rampTime(draft, range.start);
           const time = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * span;
           point.source_s = Math.max(
-            draft.points[index - 1].source_s + 0.05,
+            active(draft).points[index - 1].source_s + 0.05,
             Math.min(
-              draft.points[index + 1].source_s - 0.05,
+              active(draft).points[index + 1].source_s - 0.05,
               rampSource(draft, time, range.start, range.end)
             )
           );
@@ -424,10 +540,19 @@ export function createSpeedRampEditor({
     draft = null;
     fill();
   }
+  function selectRegion(id) {
+    const next = id || "";
+    if (next === selectedRegionId) return;
+    selectedRegionId = next;
+    selected = 0;
+    fill();
+  }
   return {
     fill,
     layout,
     cancel,
+    selectRegion,
+    selectedRegionId: () => selectedRegionId,
     whenIdle: () => idle,
     isBusy: () => pending || Boolean(drag),
   };

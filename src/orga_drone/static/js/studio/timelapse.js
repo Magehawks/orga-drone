@@ -118,9 +118,16 @@ export function clampPreviewPlaybackRate(speed) {
 }
 
 export function rampNeedsSeekPreview(ramp) {
-  if (!ramp || !Array.isArray(ramp.points)) return false;
-  return ramp.points.some(
-    (point) => finite(point.speed) && point.speed > MAX_HTML_PLAYBACK_RATE + 1e-9
+  if (!ramp) return false;
+  const groups = [];
+  if (Array.isArray(ramp.points)) groups.push(ramp.points);
+  if (Array.isArray(ramp.regions)) {
+    for (const region of ramp.regions) {
+      if (region && Array.isArray(region.points)) groups.push(region.points);
+    }
+  }
+  return groups.some((points) =>
+    points.some((point) => finite(point.speed) && point.speed > MAX_HTML_PLAYBACK_RATE + 1e-9)
   );
 }
 

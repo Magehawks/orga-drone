@@ -4,10 +4,11 @@ import {
   parseRamp,
   rampAfterRegionDrag,
   rampMediaTime,
-  rampRegion,
+  rampRegions,
   rampSource,
   rampSpeed,
   rampTime,
+  removeRampRegion,
 } from "./studio/speed-ramp.js";
 import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.js";
@@ -1236,17 +1237,20 @@ import {
       const bars = [];
       const rampBar = speedRampOf(clip);
       if (rampBar) {
-        const region = rampRegion(rampBar);
+        const regions = rampRegions(rampBar);
         const sourceIn = sourceInS(clip);
         const dur = Math.max(0.05, sourceDurationS(clip));
-        const start = Math.max(0, Math.min(dur, region.start - sourceIn));
-        const end = Math.max(start, Math.min(dur, region.end - sourceIn));
-        bars.push({
-          kind: "ramp",
-          id: "",
-          start,
-          end: Math.max(start + 0.05, end),
-          label: effectLabel("ramp"),
+        const rampLabel = effectLabel("ramp");
+        regions.forEach((region, regionIndex) => {
+          const start = Math.max(0, Math.min(dur, region.start - sourceIn));
+          const end = Math.max(start, Math.min(dur, region.end - sourceIn));
+          bars.push({
+            kind: "ramp",
+            id: region.id,
+            start,
+            end: Math.max(start + 0.05, end),
+            label: regions.length > 1 ? `${rampLabel} ${regionIndex + 1}` : rampLabel,
+          });
         });
       }
       const zoom = zoomBarOf(clip);
@@ -1291,7 +1295,10 @@ import {
           label: overlayBarLabel(overlay),
         });
       });
-      bars.forEach((bar, index) => {
+      let nextRow = 0;
+      let rampRow = null;
+      bars.forEach((bar) => {
+        const row = bar.kind === "ramp" ? (rampRow ?? (rampRow = nextRow++)) : nextRow++;
         const storyStart = bar.coord === "story" ? bar.start : sourceToStory(clip, bar.start);
         const storyEnd = bar.coord === "story" ? bar.end : sourceToStory(clip, bar.end);
         const el = document.createElement("button");
@@ -1300,7 +1307,7 @@ import {
         const step = effectBarPx + effectBarGapPx;
         el.style.left = `${left + storyStart * pps}px`;
         el.style.width = `${Math.max(12, (storyEnd - storyStart) * pps)}px`;
-        el.style.top = `${effectBarGapPx + index * step}px`;
+        el.style.top = `${effectBarGapPx + row * step}px`;
         el.style.height = `${effectBarPx}px`;
         el.dataset.kind = bar.kind === "blur" || bar.kind === "pixelate" ? "mask" : bar.kind;
         el.dataset.effect = bar.effect || bar.kind;
@@ -1335,11 +1342,11 @@ import {
             el.setAttribute("aria-label", `${bar.label}. ${keys}`);
           }
           el.addEventListener("pointerdown", (event) => onRampPointerDown(event, el, clip));
-          el.addEventListener("keydown", (event) => onRampKeyDown(event, clip));
+          el.addEventListener("keydown", (event) => onRampKeyDown(event, clip, el));
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            showTimedEffectMenu(event, clip, "ramp", "", el);
+            showTimedEffectMenu(event, clip, "ramp", el.dataset.maskId || "", el);
           });
         } else if (bar.kind === "overlay") {
           el.addEventListener("pointerdown", (event) => onOverlayBarPointerDown(event, el, clip));
@@ -1369,7 +1376,7 @@ import {
           });
         }
         lane.appendChild(el);
-        stack = Math.max(stack, index + 1);
+        stack = Math.max(stack, row + 1);
       });
     });
     const step = effectBarPx + effectBarGapPx;
@@ -1668,7 +1675,12 @@ import {
 
   function timedEffectStillPresent(clip, selection) {
     if (!clip || !selection) return false;
-    if (selection.kind === "ramp") return Boolean(speedRampOf(clip));
+    if (selection.kind === "ramp") {
+      const ramp = speedRampOf(clip);
+      if (!ramp) return false;
+      if (!selection.id) return true;
+      return rampRegions(ramp).some((region) => region.id === selection.id);
+    }
     if (selection.kind === "zoom") return Boolean(zoomBarOf(clip));
     if (selection.kind === "slow") return Boolean(slowBarOf(clip));
     if (selection.kind === "color") {
@@ -1925,14 +1937,16 @@ import {
       : edge && edge.classList.contains("studio-effect-edge-out")
         ? "end"
         : "move";
-    selectTimedRamp(clip, { focusInspector: false, source: "bar" });
-    const fresh = document.querySelector(effectBarSelector("ramp", clipId(clip), ""));
+    const regionId = el.dataset.maskId || "";
+    selectTimedRamp(clip, { focusInspector: false, source: "bar", regionId });
+    const fresh = document.querySelector(effectBarSelector("ramp", clipId(clip), regionId));
     if (fresh) el = fresh;
     else el.classList.add("is-selected");
     const playStart = loopPlayInS(clip);
     const playEnd = loopPlayOutS(clip);
-    const origin = rampRegion(ramp);
-    if (!(origin.end - origin.start >= 0.05)) return;
+    const regions = rampRegions(ramp);
+    const origin = regions.find((region) => region.id === regionId) || regions[0];
+    if (!origin || !(origin.end - origin.start >= 0.05)) return;
     const startX = event.clientX;
     const pps = timelinePxPerSecond() || 1;
     const clipLeft = Number.parseFloat(clip.style.left) || 0;
@@ -1944,11 +1958,12 @@ import {
         deltaStory,
         playStart,
         playEnd,
+        regionId: regionId || null,
       });
       if (!draft) return;
-      const region = rampRegion(draft);
-      const storyLeft = rampTime(draft, region.start) - rampTime(draft, playStart);
-      const storyRight = rampTime(draft, region.end) - rampTime(draft, playStart);
+      const moved = rampRegions(draft).find((region) => region.id === regionId) || rampRegions(draft)[0];
+      const storyLeft = rampTime(draft, moved.start) - rampTime(draft, playStart);
+      const storyRight = rampTime(draft, moved.end) - rampTime(draft, playStart);
       el.style.left = `${clipLeft + Math.max(0, storyLeft) * pps}px`;
       el.style.width = `${Math.max(12, (storyRight - storyLeft) * pps)}px`;
       el.dataset.draftRamp = JSON.stringify(draft);
@@ -1980,28 +1995,28 @@ import {
     window.addEventListener("pointercancel", up);
   }
 
-  function onRampKeyDown(event, clip) {
+  function onRampKeyDown(event, clip, el) {
     if (event.ctrlKey || event.metaKey || (event.altKey && event.shiftKey)) return;
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     const ramp = speedRampOf(clip);
     if (!ramp) return;
     event.preventDefault();
     event.stopPropagation();
+    const regionId = el?.dataset.maskId || "";
     const mode = event.altKey ? "start" : event.shiftKey ? "end" : "move";
     const next = rampAfterRegionDrag(ramp, {
       mode,
       deltaStory: (event.key === "ArrowRight" ? 1 : -1) * 0.1,
       playStart: loopPlayInS(clip),
       playEnd: loopPlayOutS(clip),
+      regionId: regionId || null,
     });
     if (!next || JSON.stringify(next) === JSON.stringify(ramp)) return;
-    if (
-      !timedSelectionMatches(timedSelection, "ramp", clipId(clip), "")
-    ) {
-      selectTimedRamp(clip, { focusInspector: false, source: "keys" });
+    if (!timedSelectionMatches(timedSelection, "ramp", clipId(clip), regionId)) {
+      selectTimedRamp(clip, { focusInspector: false, source: "keys", regionId });
     }
     void saveSpeedRamp(clip, next).then(() => {
-      document.querySelector(effectBarSelector("ramp", clipId(clip), ""))?.focus();
+      document.querySelector(effectBarSelector("ramp", clipId(clip), regionId))?.focus();
     });
   }
 
@@ -2275,7 +2290,15 @@ import {
   function seekPlayheadIntoRamp(clip) {
     const ramp = speedRampOf(clip);
     if (!ramp || !clip) return;
-    const region = rampRegion(ramp);
+    const regions = rampRegions(ramp);
+    const wanted =
+      timedSelection &&
+      timedSelection.kind === "ramp" &&
+      String(timedSelection.clipId) === String(clipId(clip))
+        ? timedSelection.id
+        : "";
+    const region = regions.find((item) => item.id === wanted) || regions[0];
+    if (!region) return;
     const start = region.start;
     const end = region.end;
     if (!(end - start >= 0.05)) return;
@@ -2287,7 +2310,7 @@ import {
     // Land on the strongest non-1× point so Play immediately shows the ramp.
     let target = (start + end) / 2;
     let best = -1;
-    ramp.points.forEach((point) => {
+    (region.points || []).forEach((point) => {
       const score = Math.abs(Math.log2(Math.max(Number(point.speed) || 1, 1e-6)));
       if (score > best) {
         best = score;
@@ -2299,7 +2322,7 @@ import {
     applyClipPlayback(previewVideo, clip);
   }
 
-  function selectTimedRamp(clip, { focusInspector = false, source = "bar" } = {}) {
+  function selectTimedRamp(clip, { focusInspector = false, source = "bar", regionId = "" } = {}) {
     if (!clip || !speedRampOf(clip)) return;
     suppressTimelineClick = true;
     window.setTimeout(() => {
@@ -2310,14 +2333,15 @@ import {
     timedSelection = createTimedSelection({
       kind: "ramp",
       clipId: clipId(clip),
-      id: "",
+      id: regionId || "",
     });
+    rampEditor?.selectRegion?.(regionId || "");
     openTimedEffectInspector(clip, "ramp", { focusInspector });
     layoutEffectBars();
     if (source === "bar" || source === "curve") seekPlayheadIntoRamp(clip);
   }
 
-  async function removeTimedRampSelection() {
+  async function removeTimedRampSelection(scope = "region") {
     if (!timedSelection || timedSelection.kind !== "ramp") return false;
     const selection = timedSelection;
     const clip = clips().find(
@@ -2328,10 +2352,21 @@ import {
       layoutEffectBars();
       return false;
     }
+    const ramp = speedRampOf(clip);
+    const regionId = selection.id || "";
+    let next = null;
+    if (scope !== "all" && ramp && ramp.v === 2) {
+      next = removeRampRegion(ramp, regionId);
+      if (next === undefined) {
+        showFlash(msgSpeedFailed);
+        layoutEffectBars();
+        return false;
+      }
+    }
     hideClipMenu();
     // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
     const result = await persistTimedSelectionRemoval(selection, () =>
-      saveSpeedRamp(clip, null)
+      saveSpeedRamp(clip, next)
     );
     if (!result.ok) {
       // Leave a newer selection alone; only flash when this removal still owns focus.
@@ -2347,7 +2382,7 @@ import {
   }
 
   function showTimedEffectMenu(event, clip, kind, id = "", returnTarget) {
-    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: false, source: "menu" });
+    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: false, source: "menu", regionId: id });
     else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: false, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: false, relayout: true });
     const removeItem = document.getElementById("studio-clip-menu-remove");
@@ -11269,13 +11304,13 @@ import {
     );
     if (!clip) return;
     if (kind === "audio") selectTimedClipAudio(clip, { focusInspector: true, relayout: true });
-    else if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit" });
+    else if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit", regionId: id });
     else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: true, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: true, relayout: true });
   });
   document.getElementById("studio-clip-menu-remove-ramp")?.addEventListener("click", () => {
     hideClipMenu();
-    void removeTimedRampSelection();
+    void removeTimedRampSelection("all");
   });
   document.getElementById("studio-clip-menu-remove-effect")?.addEventListener("click", () => {
     hideClipMenu();
@@ -14280,7 +14315,12 @@ import {
       const ramp = speedRampOf(clip);
       if (!ramp) return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
       const playStart = loopPlayInS(clip);
-      const region = rampRegion(ramp);
+      const regions = rampRegions(ramp);
+      const selectedId = rampEditor?.selectedRegionId?.() || "";
+      const region = regions.find((item) => item.id === selectedId) || regions[0];
+      if (!region) {
+        return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
+      }
       const storyLeft = Math.max(0, rampTime(ramp, region.start) - rampTime(ramp, playStart));
       const storyRight = Math.max(storyLeft, rampTime(ramp, region.end) - rampTime(ramp, playStart));
       const pps = timelinePxPerSecond();
@@ -14292,8 +14332,8 @@ import {
     onError: () => showFlash(msgSpeedFailed),
     save: saveSpeedRamp,
     onSelect: (clip, options) => selectTimedRamp(clip, options),
-    onContextMenu: (event, clip) =>
-      showTimedEffectMenu(event, clip, "ramp", "", event.currentTarget),
+    onContextMenu: (event, clip, options) =>
+      showTimedEffectMenu(event, clip, "ramp", options?.regionId || "", event.currentTarget),
     isTimedSelected: () =>
       timedSelectionMatches(timedSelection, "ramp", selectedVideoClip()?.dataset?.studioId || ""),
   });

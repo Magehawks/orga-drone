@@ -126,7 +126,9 @@ Outside the region, preview and export play at 1×; inside, the reciprocal
 smoothstep curve is unchanged. A ramp with no region keeps the ADR 0034
 endpoint hold. Older builds ignore `region` and hold the endpoint speed outside
 the points. The timeline bar moves and resizes that one region; the inspector
-numbers and arrow keys edit the same Source bounds.
+numbers and arrow keys edit the same Source bounds. ADR 0038 adds `v: 2`
+documents with up to three non-overlapping regions, each with its own curve.
+Version-1 documents, including Timelapse flat ramps, stay on the path above.
 
 `export/studio_ramp_encoder.py` is a timing adapter around the existing renderer
 and stitcher. It expands loop passes before unchanged color subdivision, assigns
