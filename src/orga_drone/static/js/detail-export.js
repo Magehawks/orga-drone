@@ -35,7 +35,21 @@
     whatsapp: root.dataset.presetWhatsapp || "WhatsApp",
     instagram: root.dataset.presetInstagram || "Instagram",
     tiktok: root.dataset.presetTiktok || "TikTok",
+    custom: root.dataset.profileCustom || "Custom",
   };
+  const profileNames = {
+    original: root.dataset.profileOriginal || "Original quality",
+    print: root.dataset.profilePrint || "High quality / Print",
+    social: root.dataset.profileSocial || "Social media",
+    custom: root.dataset.profileCustom || "Custom",
+  };
+  const msgDimsLabel = root.dataset.dimsLabel || "Output size";
+  const msgPpiLabel = root.dataset.ppiLabel || "About {ppi} PPI at this print size";
+  const msgPpiAspect = root.dataset.ppiAspect || "";
+  const msgPpiGuidance = root.dataset.ppiGuidance || "";
+  const msgPhotoPrintHint = root.dataset.photoPrintHint || "";
+  const msgPhotoBestGps = root.dataset.photoBestGps || "";
+  const msgPhotoCustom = root.dataset.photoCustom || "";
 
   const gradePreview = document.getElementById("detail-export-grade-preview");
   const pagePreview = document.querySelector(".photo-preview");
@@ -61,6 +75,20 @@
   let compareOriginal = false;
 
   const presetSelect = document.getElementById("detail-export-preset");
+  const profileSelect = document.getElementById("detail-export-profile");
+  const socialSelect = document.getElementById("detail-export-social");
+  const formatSelect = document.getElementById("detail-export-format");
+  const widthInput = document.getElementById("detail-export-width");
+  const heightInput = document.getElementById("detail-export-height");
+  const lockAspectInput = document.getElementById("detail-export-lock-aspect");
+  const jpegQualityInput = document.getElementById("detail-export-jpeg-quality");
+  const dimsEl = document.getElementById("detail-export-dims");
+  const printWrap = document.getElementById("detail-export-print-wrap");
+  const printSizeSelect = document.getElementById("detail-export-print-size");
+  const ppiEl = document.getElementById("detail-export-ppi");
+  const ppiAspectEl = document.getElementById("detail-export-ppi-aspect");
+  const ppiGuidanceEl = document.getElementById("detail-export-ppi-guidance");
+  const destinationEl = document.getElementById("detail-export-destination");
   const exportFilename = document.getElementById("detail-export-filename");
   const exportStatus = document.getElementById("detail-export-status");
   const exportHint = document.getElementById("detail-export-hint");
@@ -80,6 +108,7 @@
   let lastJob = null;
   let activeJobId = null;
   let cancelRequested = false;
+  let customSyncFrom = null;
 
   function readImageAdjustModel() {
     const fallback = {
@@ -251,31 +280,226 @@
     return presets.find((row) => row.id === id) || null;
   }
 
+  function selectedProfile() {
+    if (kind !== "photo" || !profileSelect) return "";
+    return profileSelect.value || "original";
+  }
+
+  function selectedWirePresetId() {
+    if (kind !== "photo") {
+      return presetSelect ? presetSelect.value : "";
+    }
+    const profile = selectedProfile();
+    if (profile === "social") return socialSelect ? socialSelect.value || "whatsapp" : "whatsapp";
+    if (profile === "custom") return "custom";
+    return "best";
+  }
+
   function selectedPreset() {
-    const id = presetSelect ? presetSelect.value : "";
-    return presetById(id);
+    return presetById(selectedWirePresetId());
   }
 
   function selectedStillFormat() {
-    const select = document.getElementById("detail-export-format");
     const preset = selectedPreset();
-    if (!select || kind !== "photo" || !preset || preset.id !== "best") return null;
-    return select.value === "png" ? "png" : "jpeg";
+    if (!formatSelect || kind !== "photo" || !preset) return null;
+    if (preset.id !== "best" && preset.id !== "custom") return null;
+    return formatSelect.value === "png" ? "png" : "jpeg";
+  }
+
+  function sourceSize() {
+    const w = Number(optionsCache && optionsCache.source_width);
+    const h = Number(optionsCache && optionsCache.source_height);
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) return { width: w, height: h };
+    const best = presetById("best");
+    if (best && best.width && best.height) return { width: Number(best.width), height: Number(best.height) };
+    return { width: 0, height: 0 };
+  }
+
+  function resolveCustomPreviewSize() {
+    const src = sourceSize();
+    const lock = !(lockAspectInput && !lockAspectInput.checked);
+    let reqW = widthInput && widthInput.value !== "" ? Number(widthInput.value) : null;
+    let reqH = heightInput && heightInput.value !== "" ? Number(heightInput.value) : null;
+    if (!Number.isFinite(reqW) || reqW <= 0) reqW = null;
+    if (!Number.isFinite(reqH) || reqH <= 0) reqH = null;
+    if (!src.width || !src.height) return { width: reqW || 0, height: reqH || 0 };
+    if (reqW == null && reqH == null) return src;
+    if (lock) {
+      if (reqW != null && reqH != null) {
+        const scale = Math.min(reqW / src.width, reqH / src.height, 1);
+        return {
+          width: Math.max(1, Math.min(src.width, Math.round(src.width * scale))),
+          height: Math.max(1, Math.min(src.height, Math.round(src.height * scale))),
+        };
+      }
+      if (reqW != null) {
+        const outW = Math.min(reqW, src.width);
+        return {
+          width: outW,
+          height: Math.max(1, Math.min(src.height, Math.round(src.height * (outW / src.width)))),
+        };
+      }
+      const outH = Math.min(reqH, src.height);
+      return {
+        width: Math.max(1, Math.min(src.width, Math.round(src.width * (outH / src.height)))),
+        height: outH,
+      };
+    }
+    return {
+      width: Math.max(1, Math.min(reqW != null ? reqW : src.width, src.width)),
+      height: Math.max(1, Math.min(reqH != null ? reqH : src.height, src.height)),
+    };
+  }
+
+  function currentOutputSize() {
+    const preset = selectedPreset();
+    if (kind === "photo" && selectedProfile() === "custom") return resolveCustomPreviewSize();
+    if (preset && preset.width != null && preset.height != null) {
+      return { width: Number(preset.width), height: Number(preset.height) };
+    }
+    return sourceSize();
   }
 
   function syncFormatVisibility() {
-    const wrap = document.getElementById("detail-export-format-wrap");
-    if (!wrap) return;
-    const preset = selectedPreset();
-    wrap.hidden = !(kind === "photo" && preset && preset.id === "best");
+    const formatWrap = document.getElementById("detail-export-format-wrap");
+    const socialWrap = document.getElementById("detail-export-social-wrap");
+    const customWrap = document.getElementById("detail-export-custom-wrap");
+    const lockWrap = document.getElementById("detail-export-lock-wrap");
+    const qualityWrap = document.getElementById("detail-export-quality-wrap");
+    if (kind !== "photo") {
+      if (formatWrap) formatWrap.hidden = true;
+      if (socialWrap) socialWrap.hidden = true;
+      if (customWrap) customWrap.hidden = true;
+      if (lockWrap) lockWrap.hidden = true;
+      if (qualityWrap) qualityWrap.hidden = true;
+      if (printWrap) printWrap.hidden = true;
+      return;
+    }
+    const profile = selectedProfile();
+    const fmt = selectedStillFormat();
+    if (formatWrap) formatWrap.hidden = !(profile === "original" || profile === "print" || profile === "custom");
+    if (socialWrap) socialWrap.hidden = profile !== "social";
+    if (customWrap) customWrap.hidden = profile !== "custom";
+    if (lockWrap) lockWrap.hidden = profile !== "custom";
+    if (qualityWrap) qualityWrap.hidden = !(profile === "custom" && fmt !== "png");
+    if (printWrap) printWrap.hidden = profile !== "print";
+  }
+
+  function refreshDimensions() {
+    if (!dimsEl || kind !== "photo") return;
+    const size = currentOutputSize();
+    if (size.width > 0 && size.height > 0) {
+      dimsEl.textContent = `${msgDimsLabel}: ${size.width}×${size.height}`;
+      dimsEl.hidden = false;
+    } else {
+      dimsEl.textContent = "";
+      dimsEl.hidden = true;
+    }
+    refreshPpi();
+  }
+
+  function effectivePpi(exportW, exportH, widthMm, heightMm) {
+    const imageLandscape = exportW >= exportH;
+    const paperLandscape = widthMm >= heightMm;
+    let wMm = widthMm;
+    let hMm = heightMm;
+    if (imageLandscape !== paperLandscape) {
+      wMm = heightMm;
+      hMm = widthMm;
+    }
+    const widthIn = wMm / 25.4;
+    const heightIn = hMm / 25.4;
+    return Math.min(exportW / widthIn, exportH / heightIn);
+  }
+
+  function aspectMismatch(exportW, exportH, widthMm, heightMm) {
+    const imageLandscape = exportW >= exportH;
+    const paperLandscape = widthMm >= heightMm;
+    let wMm = widthMm;
+    let hMm = heightMm;
+    if (imageLandscape !== paperLandscape) {
+      wMm = heightMm;
+      hMm = widthMm;
+    }
+    const imageAr = exportW / exportH;
+    const paperAr = wMm / hMm;
+    return Math.abs(imageAr - paperAr) / Math.max(imageAr, paperAr) > 0.02;
+  }
+
+  function refreshPpi() {
+    if (!printWrap || printWrap.hidden || !printSizeSelect || !ppiEl) return;
+    const chosen = printSizeSelect.value;
+    const size = currentOutputSize();
+    if (!chosen || !(size.width > 0 && size.height > 0)) {
+      ppiEl.hidden = true;
+      ppiEl.textContent = "";
+      if (ppiAspectEl) {
+        ppiAspectEl.hidden = true;
+        ppiAspectEl.textContent = "";
+      }
+      if (ppiGuidanceEl) {
+        ppiGuidanceEl.hidden = true;
+        ppiGuidanceEl.textContent = "";
+      }
+      return;
+    }
+    const option = printSizeSelect.selectedOptions[0];
+    const widthMm = Number(option && option.dataset.widthMm);
+    const heightMm = Number(option && option.dataset.heightMm);
+    if (!(widthMm > 0 && heightMm > 0)) return;
+    const ppi = effectivePpi(size.width, size.height, widthMm, heightMm);
+    ppiEl.hidden = false;
+    ppiEl.textContent = msgPpiLabel.replace("{ppi}", String(Math.round(ppi)));
+    if (ppiAspectEl) {
+      const mismatch = aspectMismatch(size.width, size.height, widthMm, heightMm);
+      ppiAspectEl.hidden = !mismatch;
+      ppiAspectEl.textContent = mismatch ? msgPpiAspect : "";
+    }
+    if (ppiGuidanceEl) {
+      ppiGuidanceEl.hidden = false;
+      ppiGuidanceEl.textContent = msgPpiGuidance;
+    }
+  }
+
+  function fillPrintSizes() {
+    if (!printSizeSelect || !optionsCache) return;
+    const sizes = Array.isArray(optionsCache.print_sizes) ? optionsCache.print_sizes : [];
+    const previous = printSizeSelect.value;
+    printSizeSelect.innerHTML = "";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = root.dataset.printChoose || "Choose a print size";
+    printSizeSelect.appendChild(empty);
+    sizes.forEach((row) => {
+      const option = document.createElement("option");
+      option.value = String(row.id);
+      option.dataset.widthMm = String(row.width_mm);
+      option.dataset.heightMm = String(row.height_mm);
+      const wCm = Math.round(Number(row.width_mm) / 10);
+      const hCm = Math.round(Number(row.height_mm) / 10);
+      option.textContent = `${wCm}×${hCm} cm`;
+      printSizeSelect.appendChild(option);
+    });
+    if (previous && sizes.some((row) => String(row.id) === previous)) {
+      printSizeSelect.value = previous;
+    }
   }
 
   function suggestionFor(preset) {
     const base = preset && preset.suggested_filename
       ? String(preset.suggested_filename)
       : (kind === "video" ? "export.mp4" : "export.jpg");
-    if (kind === "photo" && preset && preset.id === "best" && selectedStillFormat() === "png") {
+    if (kind === "photo" && preset && (preset.id === "best" || preset.id === "custom") && selectedStillFormat() === "png") {
       return base.replace(/\.[^.]+$/, ".png");
+    }
+    if (kind === "photo" && preset && preset.id === "custom") {
+      const size = resolveCustomPreviewSize();
+      if (size.width > 0 && size.height > 0) {
+        const stem = base.replace(/\.[^.]+$/, "");
+        const cleaned = stem.replace(/_custom(?:_\d+x\d+)?$/i, "_custom");
+        const ext = selectedStillFormat() === "png" ? ".png" : ".jpg";
+        return `${cleaned}_${size.width}x${size.height}${ext}`;
+      }
     }
     return base;
   }
@@ -289,10 +513,22 @@
   function presetDetail(preset) {
     if (!preset) return "";
     if (kind === "photo" && preset.id === "best") {
-      if (selectedStillFormat() === "png") return root.dataset.gradePng || "";
+      if (selectedStillFormat() === "png") {
+        if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
+        if (preset.copied_png) return root.dataset.photoBest || "";
+        return root.dataset.gradePng || "";
+      }
       if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
-      return preset.copied ? root.dataset.photoBest || "" : root.dataset.photoBestJpeg || "";
+      const jpegCopy = preset.copied_jpeg != null ? preset.copied_jpeg : preset.copied;
+      if (jpegCopy) return root.dataset.photoBest || "";
+      // GPS wording only when location_risk is known; otherwise neutral JPEG text
+      // (format mismatch / unsupported container must not read as a GPS strip).
+      if (preset.location_risk === true) {
+        return msgPhotoBestGps || root.dataset.photoBestJpeg || "";
+      }
+      return root.dataset.photoBestJpeg || msgPhotoBestGps || "";
     }
+    if (kind === "photo" && preset.id === "custom") return msgPhotoCustom;
     if (kind === "photo" && preset.id === "whatsapp") return root.dataset.photoWhatsapp || "";
     if (kind === "photo" && preset.id === "instagram") return root.dataset.photoInstagram || "";
     if (kind === "photo" && preset.id === "tiktok") return root.dataset.photoTiktok || "";
@@ -307,6 +543,38 @@
       return `${name} — ${preset.width}×${preset.height}`;
     }
     return name;
+  }
+
+  function initCustomInputs() {
+    const src = sourceSize();
+    if (widthInput && src.width) widthInput.value = String(src.width);
+    if (heightInput && src.height) heightInput.value = String(src.height);
+    if (widthInput && src.width) widthInput.max = String(src.width);
+    if (heightInput && src.height) heightInput.max = String(src.height);
+    const custom = presetById("custom");
+    if (jpegQualityInput) {
+      const def = custom && custom.jpeg_quality_default != null ? custom.jpeg_quality_default : 95;
+      jpegQualityInput.value = String(def);
+      if (custom && custom.jpeg_quality_min != null) jpegQualityInput.min = String(custom.jpeg_quality_min);
+      if (custom && custom.jpeg_quality_max != null) jpegQualityInput.max = String(custom.jpeg_quality_max);
+    }
+    if (lockAspectInput) lockAspectInput.checked = true;
+  }
+
+  function syncCustomAspect(changed) {
+    if (!(lockAspectInput && lockAspectInput.checked)) return;
+    const src = sourceSize();
+    if (!(src.width > 0 && src.height > 0)) return;
+    if (changed === "width" && widthInput && heightInput) {
+      const w = Number(widthInput.value);
+      if (!(w > 0)) return;
+      heightInput.value = String(Math.max(1, Math.min(src.height, Math.round(src.height * (Math.min(w, src.width) / src.width)))));
+    }
+    if (changed === "height" && widthInput && heightInput) {
+      const h = Number(heightInput.value);
+      if (!(h > 0)) return;
+      widthInput.value = String(Math.max(1, Math.min(src.width, Math.round(src.width * (Math.min(h, src.height) / src.height)))));
+    }
   }
 
   function setStatus(message, { error = false } = {}) {
@@ -374,11 +642,17 @@
   function setRunningUi(running) {
     if (exportRunBtn) exportRunBtn.disabled = running;
     if (presetSelect) presetSelect.disabled = running;
+    if (profileSelect) profileSelect.disabled = running;
+    if (socialSelect) socialSelect.disabled = running;
     if (exportFilename) exportFilename.disabled = running;
+    if (widthInput) widthInput.disabled = running;
+    if (heightInput) heightInput.disabled = running;
+    if (lockAspectInput) lockAspectInput.disabled = running;
+    if (jpegQualityInput) jpegQualityInput.disabled = running;
+    if (printSizeSelect) printSizeSelect.disabled = running;
     adjustInputs.forEach((row) => {
       if (row.input) row.input.disabled = running;
     });
-    const formatSelect = document.getElementById("detail-export-format");
     const resetBtn = document.getElementById("detail-adjust-reset");
     if (formatSelect) formatSelect.disabled = running;
     if (resetBtn) resetBtn.disabled = running;
@@ -389,8 +663,16 @@
     if (!exportHint || !optionsCache) return;
     const preset = selectedPreset();
     const name = (exportFilename && exportFilename.value.trim()) || suggestionFor(preset);
-    const detail = presetDetail(preset);
-    const dest = `${name} → ${optionsCache.default_directory || ""}`;
+    let detail = presetDetail(preset);
+    if (kind === "photo" && selectedProfile() === "print" && msgPhotoPrintHint) {
+      detail = detail ? `${detail} ${msgPhotoPrintHint}` : msgPhotoPrintHint;
+    }
+    const destDir = optionsCache.default_directory || "";
+    if (destinationEl) {
+      destinationEl.hidden = !destDir;
+      destinationEl.textContent = destDir ? destDir : "";
+    }
+    const dest = destDir ? `${name} → ${destDir}` : name;
     exportHint.textContent = detail ? `${detail} ${dest}` : dest;
   }
 
@@ -606,7 +888,7 @@
         if (exportHint) exportHint.textContent = msgNoPreset;
         return;
       }
-      if (presetSelect) {
+      if (kind === "video" && presetSelect) {
         presets.forEach((preset) => {
           const option = document.createElement("option");
           option.value = String(preset.id);
@@ -615,8 +897,17 @@
           presetSelect.appendChild(option);
         });
       }
-      syncFilename(selectedPreset(), { reset: true });
+      if (kind === "photo") {
+        if (profileSelect) {
+          profileSelect.value = data.default_profile || "original";
+        }
+        if (socialSelect) socialSelect.value = "whatsapp";
+        initCustomInputs();
+        fillPrintSizes();
+      }
       syncFormatVisibility();
+      refreshDimensions();
+      syncFilename(selectedPreset(), { reset: true });
       if (exportRunBtn) exportRunBtn.disabled = false;
     } catch (_) {
       setStatus(msgFailed, { error: true });
@@ -733,6 +1024,16 @@
     if (activeLookId) body.look_id = activeLookId;
     const fmt = selectedStillFormat();
     if (fmt) body.still_format = fmt;
+    body.profile = selectedProfile() || "original";
+    if (preset.id === "custom") {
+      const size = resolveCustomPreviewSize();
+      body.width = size.width;
+      body.height = size.height;
+      body.lock_aspect = !(lockAspectInput && !lockAspectInput.checked);
+      if (fmt !== "png" && jpegQualityInput && jpegQualityInput.value !== "") {
+        body.jpeg_quality = Number(jpegQualityInput.value);
+      }
+    }
     return body;
   }
 
@@ -804,14 +1105,31 @@
     saveAdjust({ keepLook: false });
   }
 
-  presetSelect?.addEventListener("change", () => {
+  function onExportControlsChanged({ resetName = false } = {}) {
     syncFormatVisibility();
-    syncFilename(selectedPreset());
-  });
-  document.getElementById("detail-export-format")?.addEventListener("change", () => {
-    syncFilename(selectedPreset());
+    refreshDimensions();
+    syncFilename(selectedPreset(), { reset: resetName });
     refreshHint();
+  }
+
+  presetSelect?.addEventListener("change", () => onExportControlsChanged({ resetName: true }));
+  profileSelect?.addEventListener("change", () => onExportControlsChanged({ resetName: true }));
+  socialSelect?.addEventListener("change", () => onExportControlsChanged({ resetName: true }));
+  formatSelect?.addEventListener("change", () => onExportControlsChanged({ resetName: true }));
+  printSizeSelect?.addEventListener("change", () => refreshPpi());
+  lockAspectInput?.addEventListener("change", () => {
+    if (lockAspectInput.checked) syncCustomAspect("width");
+    onExportControlsChanged({ resetName: true });
   });
+  widthInput?.addEventListener("input", () => {
+    syncCustomAspect("width");
+    onExportControlsChanged({ resetName: true });
+  });
+  heightInput?.addEventListener("input", () => {
+    syncCustomAspect("height");
+    onExportControlsChanged({ resetName: true });
+  });
+  jpegQualityInput?.addEventListener("change", () => refreshHint());
   document.getElementById("detail-adjust-reset")?.addEventListener("click", (event) => {
     event.preventDefault();
     resetAdjust();

@@ -201,13 +201,18 @@ Detail page: Info holds date, drone, the other file facts, rating, tags, notes,
 albums, rename, and flow merge. Studio is Share; photo adjustment is Image; the
 file export is Export; map and GPS are Location when coordinates exist. A video
 has no Image tab. On a desktop window the picture stays left and the tabs stay
-right. A photo is a local still (best quality, or a local WhatsApp / Instagram /
-TikTok JPEG preset; nothing is uploaded). Neutral best quality copies readable
-original bytes; a moved slider uses the Studio grade before the preset. The
-grade and optional look id are stored on `media_meta` (`image_adjust_json`), so
-a matching rescan can attach them again. Best quality accepts JPEG or PNG; PNG
-is a re-encode. A video stays an MP4 from the Studio encoder and does not get
-the photo sliders. The library file is never modified.
+right. A photo is a local still with Original / Print / Social / Custom profiles
+over `export/still_export.py` (wire presets `best`, `whatsapp`, `instagram`,
+`tiktok`, `custom`; nothing is uploaded). Options expose source WxH, print-size
+presets for an effective-PPI helper (`export/print_ppi.py`), and Custom limits.
+Neutral Original/Print may byte-copy only when the chosen JPEG/PNG matches the
+source container and location checks pass (EXIF GPS, XMP/GPS-like markers, and
+a bounded raw scan; unknown/unreadable metadata fails closed). Graded or
+location-bearing stills re-encode as 8-bit RGB without location tags. An
+explicit JPEG/PNG choice always yields that format. The grade and optional look
+id are stored on `media_meta` (`image_adjust_json`), so a matching rescan can
+attach them again. A video stays an MP4 from the Studio encoder and does not get
+the photo profiles. The library file is never modified.
 
 Typical user flow:
 
