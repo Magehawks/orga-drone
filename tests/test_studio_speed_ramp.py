@@ -28,6 +28,8 @@ from orga_drone.studio_speed_ramp import (
     place_ramp_region,
     ramp_after_region_drag,
     ramp_from_settings,
+    remove_ramp_region,
+    add_ramp_region,
 )
 from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_map import MapPlacement
@@ -998,3 +1000,149 @@ def test_bounded_region_reopens_and_shares_preview_duration(
             source_out_s=clip.source_end,
             effect_settings=clip.effect_settings,
         ) == pytest.approx(kept.duration(rang.source_in_s, rang.source_out_s))
+
+
+def _region(region_id: str, start: float, end: float, speeds: tuple[float, ...]) -> dict[str, object]:
+    count = len(speeds)
+    return {
+        "id": region_id,
+        "start_s": start,
+        "end_s": end,
+        "points": [
+            {
+                "source_s": start + (end - start) * index / (count - 1),
+                "speed": speed,
+            }
+            for index, speed in enumerate(speeds)
+        ],
+    }
+
+
+def test_three_regions_share_one_source_story_map() -> None:
+    ramp = parse_ramp(
+        {
+            "v": 2,
+            "interp": "reciprocal_smoothstep",
+            "regions": [
+                _region("r3", 22, 27, (0.5, 4, 0.5)),
+                _region("r1", 3, 7, (0.5, 4, 0.5)),
+                _region("r2", 12, 16, (4, 0.5, 4)),
+            ],
+        },
+        media_duration_s=30,
+    )
+    assert [region.id for region in ramp.regions] == ["r1", "r2", "r3"]
+    assert ramp.speed_at(2.9) == 1
+    assert ramp.speed_at(3) == pytest.approx(0.5)
+    assert ramp.speed_at(7) == pytest.approx(0.5)
+    assert ramp.speed_at(7.1) == 1
+    assert ramp.speed_at(14) == pytest.approx(0.5)
+    assert ramp.speed_at(24.5) == pytest.approx(4)
+    assert ramp.speed_at(29) == 1
+    # 1× covers 17 s. The 4 s curves contribute 4.5 s each; the 5 s curve contributes 5.625 s.
+    assert ramp.duration(0, 30) == pytest.approx(31.625)
+    assert ramp.duration(10, 20) == pytest.approx(1 * 2 + 4.5 + 1 * 4)
+    for source in (0, 3, 5, 7, 12, 16, 22, 27, 30):
+        story = ramp.time_at(source)
+        assert ramp.source_at(story, 0, 30) == pytest.approx(source)
+        assert _eval_ffmpeg_time(ramp.ffmpeg_time(), source) == pytest.approx(story)
+    single = parse_ramp(
+        {
+            "v": 1,
+            "interp": "reciprocal_smoothstep",
+            "region": {"start_s": 3, "end_s": 7},
+            "points": [point.as_dict() for point in ramp.regions[0].points],
+        }
+    )
+    for source in (0, 3, 5, 7, 10):
+        assert ramp.time_at(source) == pytest.approx(single.time_at(source))
+    moved = ramp_after_region_drag(
+        ramp, mode="move", delta_story_s=1, play_start=0, play_end=30, region_id="r2"
+    )
+    assert moved.regions[0] == ramp.regions[0]
+    assert moved.regions[2] == ramp.regions[2]
+    assert moved.regions[1].start_s == pytest.approx(13)
+    removed = remove_ramp_region(moved, "r2")
+    assert removed is not None
+    assert removed.regions[0] == moved.regions[0]
+    assert removed.regions[1] == moved.regions[2]
+    assert remove_ramp_region(removed, "r1") is not None
+    assert remove_ramp_region(remove_ramp_region(removed, "r3"), "r1") is None
+    with pytest.raises(ValueError, match="overlap"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [
+                    _region("r1", 3, 8, (0.5, 4, 0.5)),
+                    _region("r2", 7, 12, (4, 0.5, 4)),
+                ],
+            }
+        )
+    with pytest.raises(ValueError, match="at most 3"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [
+                    _region("r1", 0, 1, (1, 1)),
+                    _region("r2", 2, 3, (1, 1)),
+                    _region("r3", 4, 5, (1, 1)),
+                    _region("r4", 6, 7, (1, 1)),
+                ],
+            }
+        )
+    with pytest.raises(ValueError, match="at least 0.05"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [_region("r1", 3, 3, (1, 1))],
+            }
+        )
+    with pytest.raises(ValueError, match="inside the source"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [_region("r1", 28, 32, (0.5, 4, 0.5))],
+            },
+            media_duration_s=30,
+        )
+    base = parse_ramp(
+        {
+            "v": 1,
+            "interp": "reciprocal_smoothstep",
+            "region": {"start_s": 0, "end_s": 4},
+            "points": [
+                {"source_s": 0, "speed": 0.5},
+                {"source_s": 2, "speed": 4},
+                {"source_s": 4, "speed": 0.5},
+            ],
+        }
+    )
+    added = add_ramp_region(
+        base, play_start=0, play_end=30, preset="fast_slow_fast", region_id="r2", span_s=4
+    )
+    assert added.version == 2
+    assert added.regions[0].points == base.points
+    assert added.regions[0].start_s == 0 and added.regions[0].end_s == 4
+    assert added.regions[1].id == "r2"
+    assert [point.speed for point in added.regions[1].points] == [4, 0.5, 4]
+    assert added.as_dict()["v"] == 2
+    assert "region" not in base.as_dict() or base.as_dict()["v"] == 1
+    raw = json.dumps({"speed_ramp": added.as_dict()})
+    assert effective_seconds(
+        kind="video",
+        available=True,
+        photo_duration_s=None,
+        duration_s=30,
+        source_in_s=0,
+        source_out_s=30,
+        effect_settings=raw,
+    ) == pytest.approx(added.duration(0, 30))
+    from orga_drone.studio_timelapse import flat_timelapse_payload
+
+    timelapse = parse_ramp(flat_timelapse_payload(1, 9, 8))
+    assert timelapse.version == 1 and timelapse.region is None
+    assert [point.speed for point in timelapse.points] == [8, 8]
