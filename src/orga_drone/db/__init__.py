@@ -431,6 +431,15 @@ class StudioProject:
     clip_count: int = 0
 
 
+@dataclass(frozen=True)
+class StudioProjectUsage:
+    """One saved Studio project that references a library media row."""
+
+    id: int
+    title: str
+    clip_count: int
+
+
 @dataclass
 class StudioClip:
     """One Story clip: media reference or generated Title Card (never copies files)."""
@@ -3157,6 +3166,41 @@ class Database:
                     (media_path, project_id),
                 ).fetchone()
         return row is not None
+
+    def studio_projects_for_media(self, media_id: int) -> list[StudioProjectUsage]:
+        """List saved Studio projects that reference this library media row.
+
+        Matches by ``source_media_id`` and/or canonical ``media_path`` (never
+        filename alone). Projects are deduplicated; ``clip_count`` is the number
+        of media clips in that project that match. Deleted projects are omitted
+        via the join. Missing/moved files still appear when the stored reference
+        points at this media id or path.
+        """
+        media = self.get_media(media_id)
+        if media is None:
+            return []
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT p.id, p.title, COUNT(c.id) AS clip_count
+                   FROM studio_clips c
+                   JOIN studio_projects p ON p.id = c.project_id
+                   WHERE c.item_kind = 'media'
+                     AND (
+                       c.source_media_id = ?
+                       OR c.media_path = ?
+                     )
+                   GROUP BY p.id, p.title
+                   ORDER BY p.title COLLATE NOCASE, p.id""",
+                (media.id, media.path),
+            ).fetchall()
+        return [
+            StudioProjectUsage(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                clip_count=int(r["clip_count"]),
+            )
+            for r in rows
+        ]
 
     def studio_paths_among(
         self, paths: list[str], project_id: int | None = None
