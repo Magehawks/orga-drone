@@ -1,12 +1,22 @@
 """Local still-image export for one library photo.
 
-Best quality copies a readable still (JPEG, PNG, and similar). Share presets
-write a new JPEG. Nothing is uploaded.
+Best quality copies a readable still (JPEG, PNG, and similar) when that is
+safe. Share presets write a new JPEG. Custom writes a resized still inside the
+source bounds. Nothing is uploaded.
+
+Byte-copy policy (Original / Print ``best``):
+
+- Allowed only when the grade is neutral, the selected output format matches
+  the source container (or the format was left unspecified), and the source is
+  confidently free of location metadata.
+- Location checks cover EXIF GPS and XMP / embedded GPS-like markers. Unknown,
+  malformed, or unreadable metadata fails closed (no byte-copy).
+- An explicit JPEG or PNG choice always produces that format; a mismatched
+  source is re-encoded (8-bit RGB) without source location tags.
 
 A non-neutral grade uses the Studio ffmpeg filter chain
-(``ffmpeg_grade_chain``) and then the same preset. Neutral leaves that chain
-out, so a best-quality copy stays the original bytes. The library file is
-never written.
+(``ffmpeg_grade_chain``) and then the same preset. The library file is never
+written. Re-encodes do not claim EXIF or ICC preservation.
 """
 
 from __future__ import annotations
@@ -30,7 +40,15 @@ PRESET_BEST = "best"
 PRESET_WHATSAPP = "whatsapp"
 PRESET_INSTAGRAM = "instagram"
 PRESET_TIKTOK = "tiktok"
+PRESET_CUSTOM = "custom"
 SHARE_PRESETS: tuple[str, ...] = (
+    PRESET_BEST,
+    PRESET_WHATSAPP,
+    PRESET_INSTAGRAM,
+    PRESET_TIKTOK,
+    PRESET_CUSTOM,
+)
+VIDEO_SHARE_PRESETS: tuple[str, ...] = (
     PRESET_BEST,
     PRESET_WHATSAPP,
     PRESET_INSTAGRAM,
@@ -43,6 +61,9 @@ INSTAGRAM_SIZE = (1080, 1350)
 TIKTOK_SIZE = (1080, 1920)
 SOCIAL_JPEG_QUALITY = 90
 BEST_JPEG_QUALITY = 95
+CUSTOM_JPEG_QUALITY_DEFAULT = 95
+CUSTOM_JPEG_QUALITY_MIN = 60
+CUSTOM_JPEG_QUALITY_MAX = 100
 
 # The Studio encoder scales and pads to an explicit frame. These presets use
 # that frame. The picture is fitted inside it, not cropped.
@@ -61,11 +82,16 @@ class PhotoPresetSpec:
     width: int | None
     height: int | None
     copied: bool
+    jpeg_quality: int | None = None
+    geometry: str | None = None
 
 
-def normalize_share_preset(preset: str) -> str:
+def normalize_share_preset(preset: str, *, allow_custom: bool = True) -> str:
     key = str(preset or "").strip().lower()
-    if key not in SHARE_PRESETS:
+    allowed = SHARE_PRESETS if allow_custom else VIDEO_SHARE_PRESETS
+    if key not in allowed:
+        if key == PRESET_CUSTOM and not allow_custom:
+            raise StudioExportError("Custom export is only for photos.")
         raise StudioExportError("Choose a share preset.")
     return key
 
@@ -89,17 +115,318 @@ def normalize_still_format(value: object) -> str | None:
     raise StudioExportError("Choose JPEG or PNG.")
 
 
+def normalize_jpeg_quality(value: object | None, *, default: int = CUSTOM_JPEG_QUALITY_DEFAULT) -> int:
+    """Clamp a JPEG quality to the supported Custom range."""
+    if value is None:
+        return int(default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise StudioExportError(
+            f"JPEG quality must be from {CUSTOM_JPEG_QUALITY_MIN} to {CUSTOM_JPEG_QUALITY_MAX}."
+        )
+    number = float(value)
+    if not number == number:  # NaN
+        raise StudioExportError(
+            f"JPEG quality must be from {CUSTOM_JPEG_QUALITY_MIN} to {CUSTOM_JPEG_QUALITY_MAX}."
+        )
+    quality = int(round(number))
+    if quality < CUSTOM_JPEG_QUALITY_MIN or quality > CUSTOM_JPEG_QUALITY_MAX:
+        raise StudioExportError(
+            f"JPEG quality must be from {CUSTOM_JPEG_QUALITY_MIN} to {CUSTOM_JPEG_QUALITY_MAX}."
+        )
+    return quality
+
+
+def resolve_custom_dimensions(
+    source_w: int,
+    source_h: int,
+    *,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+) -> tuple[int, int]:
+    """Return export WxH inside the oriented source box. Never upscales."""
+    src_w = int(source_w)
+    src_h = int(source_h)
+    if src_w < 1 or src_h < 1:
+        raise StudioExportError("Could not read this photo.")
+
+    def _parse_side(value: object | None, label: str) -> int | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise StudioExportError(f"{label} must be a positive pixel size.")
+        number = float(value)
+        if not number == number or number <= 0:
+            raise StudioExportError(f"{label} must be a positive pixel size.")
+        return max(1, int(round(number)))
+
+    req_w = _parse_side(width, "Width")
+    req_h = _parse_side(height, "Height")
+    if req_w is None and req_h is None:
+        return src_w, src_h
+
+    if lock_aspect:
+        if req_w is not None and req_h is not None:
+            scale = min(req_w / src_w, req_h / src_h, 1.0)
+            out_w = max(1, int(round(src_w * scale)))
+            out_h = max(1, int(round(src_h * scale)))
+            return min(out_w, src_w), min(out_h, src_h)
+        if req_w is not None:
+            out_w = min(req_w, src_w)
+            out_h = max(1, int(round(src_h * (out_w / src_w))))
+            return out_w, min(out_h, src_h)
+        assert req_h is not None
+        out_h = min(req_h, src_h)
+        out_w = max(1, int(round(src_w * (out_h / src_h))))
+        return min(out_w, src_w), out_h
+
+    out_w = min(req_w if req_w is not None else src_w, src_w)
+    out_h = min(req_h if req_h is not None else src_h, src_h)
+    return max(1, out_w), max(1, out_h)
+
+
 def _is_graded(image: ImageAdjust | None) -> bool:
     return image is not None and not image.is_neutral
 
 
+# Markers that suggest location may be embedded (EXIF GPS packet, XMP, ISO6709).
+# Absence of these is not a privacy proof for exotic containers; unknown read
+# failures still fail closed.
+_LOCATION_BYTE_MARKERS: tuple[bytes, ...] = (
+    b"GPSLatitude",
+    b"GPSLongitude",
+    b"GPSAltitude",
+    b"GPSLatitudeRef",
+    b"GPSLongitudeRef",
+    b"GPSInfo",
+    b"exif/1.0/gps",
+    b"LocationShown",
+    b"LocationCreated",
+    b"iso:6709",
+    b"ISO6709",
+    b"Composite:GPS",
+)
+
+_LOCATION_SCAN_BYTES = 1_048_576
+
+
+def _exif_has_gps(img) -> bool:
+    from PIL.ExifTags import Base
+
+    exif = img.getexif()
+    if not exif:
+        return False
+    if exif.get(Base.GPSInfo):
+        return True
+    try:
+        gps_ifd = exif.get_ifd(Base.GPSInfo)
+    except Exception:
+        raise
+    return bool(gps_ifd)
+
+
+def _warnings_suggest_uncertain_exif(caught: list) -> bool:
+    """Pillow may warn on corrupt Exif without raising — treat as uncertain."""
+    for warning in caught:
+        message = str(warning.message).lower()
+        if "corrupt exif" in message or "truncated" in message:
+            return True
+    return False
+
+
+def _xmp_blob_has_location(blob: object) -> bool:
+    if blob is None:
+        return False
+    if isinstance(blob, (bytes, bytearray)):
+        text = bytes(blob)
+    elif isinstance(blob, str):
+        text = blob.encode("utf-8", errors="ignore")
+    elif isinstance(blob, dict):
+        # Pillow may return a nested dict; flatten string values.
+        parts: list[bytes] = []
+
+        def _walk(node: object) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    parts.append(str(key).encode("utf-8", errors="ignore"))
+                    _walk(value)
+            elif isinstance(node, (list, tuple)):
+                for item in node:
+                    _walk(item)
+            elif node is not None:
+                parts.append(str(node).encode("utf-8", errors="ignore"))
+
+        _walk(blob)
+        text = b"\n".join(parts)
+    else:
+        text = str(blob).encode("utf-8", errors="ignore")
+    lowered = text.lower()
+    for marker in _LOCATION_BYTE_MARKERS:
+        if marker.lower() in lowered:
+            return True
+    return False
+
+
+def _file_bytes_suggest_location(source: Path) -> bool:
+    with source.open("rb") as handle:
+        chunk = handle.read(_LOCATION_SCAN_BYTES)
+    lowered = chunk.lower()
+    return any(marker.lower() in lowered for marker in _LOCATION_BYTE_MARKERS)
+
+
+def still_may_contain_location(source: Path, img=None) -> bool:
+    """True when location metadata may be present, or detection is uncertain.
+
+    Fail closed: any read/parse error refuses byte-copy. EXIF GPS alone is not
+    treated as the only channel — XMP, all decoded Pillow ``info`` text (including
+    PNG zTXt/iTXt), and a bounded raw scan are included. Corrupt Exif that only
+    warns (no exception) also fails closed.
+
+    ``img`` is accepted for call-site compatibility but ignored for loading: a
+    fresh open is required so Pillow ``Corrupt EXIF`` warnings during decode are
+    observed (they are not re-emitted on a pre-loaded handle).
+    """
+    import warnings
+
+    del img  # API compat; see docstring.
+    opened = None
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            opened = _load_still(source)
+            try:
+                if _exif_has_gps(opened):
+                    return True
+            except Exception:
+                return True
+            if _warnings_suggest_uncertain_exif(caught):
+                return True
+            try:
+                getxmp = getattr(opened, "getxmp", None)
+                if callable(getxmp):
+                    xmp = getxmp()
+                    if _xmp_blob_has_location(xmp):
+                        return True
+                if _decoded_info_suggests_location(opened):
+                    return True
+            except Exception:
+                return True
+            try:
+                if _file_bytes_suggest_location(source):
+                    return True
+            except Exception:
+                return True
+            if _warnings_suggest_uncertain_exif(caught):
+                return True
+            return False
+    except Exception:
+        return True
+    finally:
+        if opened is not None:
+            try:
+                opened.close()
+            except Exception:
+                pass
+
+
+def _decoded_info_suggests_location(img) -> bool:
+    """Scan Pillow ``info`` for location markers, including PNG zTXt/iTXt text.
+
+    Compressed PNG text chunks are decompressed into ``info`` (Comment,
+    Description, …). A raw-byte scan of the file cannot see those markers, so
+    every decoded key and value must be inspected. Unknown value types fail
+    closed.
+    """
+    info = getattr(img, "info", None)
+    if info is None:
+        return False
+    if not isinstance(info, dict):
+        return True
+    for key, value in info.items():
+        if _xmp_blob_has_location(key):
+            return True
+        if value is None:
+            continue
+        if isinstance(value, (str, bytes, bytearray, dict, list, tuple, int, float)):
+            if _xmp_blob_has_location(value):
+                return True
+            continue
+        # Exotic Pillow info payloads: refuse byte-copy rather than skip.
+        return True
+    return False
+
+
+def _still_has_gps(img) -> bool:
+    """Backward-compatible name: EXIF/XMP/raw location risk for an open image.
+
+    Callers that also have a path should prefer ``still_may_contain_location``.
+    Without a path, EXIF + decoded info/XMP on the open handle are checked
+    (fail closed).
+    """
+    try:
+        if _exif_has_gps(img):
+            return True
+    except Exception:
+        return True
+    try:
+        getxmp = getattr(img, "getxmp", None)
+        if callable(getxmp) and _xmp_blob_has_location(getxmp()):
+            return True
+        if _decoded_info_suggests_location(img):
+            return True
+    except Exception:
+        return True
+    return False
+
+
+def _format_matches_source(still_format: str | None, copy_suffix: str | None) -> bool:
+    """True when an explicit JPEG/PNG choice matches the source container."""
+    fmt = normalize_still_format(still_format)
+    if fmt is None:
+        return copy_suffix is not None
+    if fmt == "jpeg":
+        return copy_suffix == ".jpg"
+    if fmt == "png":
+        return copy_suffix == ".png"
+    return False
+
+
+def _best_output_suffix(
+    copy_suffix: str | None,
+    *,
+    graded: bool,
+    still_format: str | None,
+) -> str:
+    """Suffix for a best/custom full-frame export after format resolution."""
+    fmt = normalize_still_format(still_format)
+    if fmt == "png":
+        return ".png"
+    if fmt == "jpeg":
+        return ".jpg"
+    if copy_suffix is not None and (not graded or copy_suffix in _REENCODE_SUFFIXES):
+        return copy_suffix
+    return ".jpg"
+
+
 def _best_suffix(copy_suffix: str | None, *, graded: bool) -> tuple[str, bool]:
-    """Return ``(suffix, copied)`` for best quality."""
+    """Return ``(suffix, copied)`` for legacy best quality (ignores location)."""
     if copy_suffix is not None and not graded:
         return copy_suffix, True
     if graded and copy_suffix in _REENCODE_SUFFIXES:
         return copy_suffix, False
     return ".jpg", False
+
+
+def _can_byte_copy_best(
+    *,
+    graded: bool,
+    still_format: str | None,
+    copy_suffix: str | None,
+    location_risk: bool,
+) -> bool:
+    if graded or location_risk or copy_suffix is None:
+        return False
+    return _format_matches_source(still_format, copy_suffix)
 
 
 def inspect_photo_preset(
@@ -108,36 +435,91 @@ def inspect_photo_preset(
     *,
     image: ImageAdjust | None = None,
     still_format: str | None = None,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+    jpeg_quality: object | None = None,
 ) -> PhotoPresetSpec:
     """Pixel size and suffix for one photo preset. Does not write a file."""
-    key = normalize_share_preset(preset)
+    key = normalize_share_preset(preset, allow_custom=True)
     graded = _is_graded(image)
-    as_png = key == PRESET_BEST and normalize_still_format(still_format) == "png"
+    fmt = (
+        normalize_still_format(still_format)
+        if key in {PRESET_BEST, PRESET_CUSTOM}
+        else None
+    )
+    as_png = fmt == "png"
     img = _load_still(source)
     try:
-        if key == PRESET_BEST and as_png:
-            rgb = _oriented_rgb(img)
-            width, height = rgb.size
-            return PhotoPresetSpec(suffix=".png", width=width, height=height, copied=False)
-        if key == PRESET_BEST:
-            suffix, copied = _best_suffix(
-                _copy_suffix(source, img.format or ""),
-                graded=graded,
+        rgb = _oriented_rgb(img)
+        src_w, src_h = rgb.size
+        if key == PRESET_CUSTOM:
+            out_w, out_h = resolve_custom_dimensions(
+                src_w,
+                src_h,
+                width=width,
+                height=height,
+                lock_aspect=lock_aspect,
             )
-            if copied:
-                return PhotoPresetSpec(suffix=suffix, width=None, height=None, copied=True)
-            rgb = _oriented_rgb(img)
-            width, height = rgb.size
-            return PhotoPresetSpec(suffix=suffix, width=width, height=height, copied=False)
+            quality = normalize_jpeg_quality(jpeg_quality)
+            suffix = ".png" if as_png else ".jpg"
+            return PhotoPresetSpec(
+                suffix=suffix,
+                width=out_w,
+                height=out_h,
+                copied=False,
+                jpeg_quality=None if as_png else quality,
+                geometry="custom",
+            )
+        if key == PRESET_BEST:
+            copy_suffix = _copy_suffix(source, img.format or "")
+            location_risk = still_may_contain_location(source, img)
+            can_copy = _can_byte_copy_best(
+                graded=graded,
+                still_format=still_format,
+                copy_suffix=copy_suffix,
+                location_risk=location_risk,
+            )
+            suffix = (
+                copy_suffix
+                if can_copy and copy_suffix is not None
+                else _best_output_suffix(
+                    copy_suffix, graded=graded, still_format=still_format
+                )
+            )
+            return PhotoPresetSpec(
+                suffix=suffix,
+                width=src_w,
+                height=src_h,
+                copied=can_copy,
+                jpeg_quality=None if suffix == ".png" or can_copy else BEST_JPEG_QUALITY,
+                geometry="source",
+            )
         if key == PRESET_WHATSAPP:
-            fitted = _fit_longest(_oriented_rgb(img), WHATSAPP_LONGEST)
-            width, height = fitted.size
-            return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+            fitted = _fit_longest(rgb, WHATSAPP_LONGEST)
+            width_out, height_out = fitted.size
+            return PhotoPresetSpec(
+                suffix=".jpg",
+                width=width_out,
+                height=height_out,
+                copied=False,
+                jpeg_quality=WHATSAPP_QUALITY,
+                geometry="fit",
+            )
         if key == PRESET_INSTAGRAM:
-            width, height = INSTAGRAM_SIZE
+            width_out, height_out = INSTAGRAM_SIZE
+            geometry = "cover_crop"
         else:
-            width, height = TIKTOK_SIZE
-        return PhotoPresetSpec(suffix=".jpg", width=width, height=height, copied=False)
+            width_out, height_out = TIKTOK_SIZE
+            geometry = "cover_crop"
+        return PhotoPresetSpec(
+            suffix=".jpg",
+            width=width_out,
+            height=height_out,
+            copied=False,
+            jpeg_quality=SOCIAL_JPEG_QUALITY,
+            geometry=geometry,
+        )
     finally:
         img.close()
 
@@ -152,11 +534,15 @@ def export_photo_file(
     cancel_event: threading.Event | None = None,
     image: ImageAdjust | None = None,
     still_format: str | None = None,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+    jpeg_quality: object | None = None,
 ) -> Path:
     """Write one photo preset and publish it without replacing an existing file."""
     if cancel_event is not None and cancel_event.is_set():
         raise ExportCancelled()
-    key = normalize_share_preset(preset)
+    key = normalize_share_preset(preset, allow_custom=True)
     if not source.is_file():
         raise StudioExportError("The source file is not available.")
     tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-export-"))
@@ -169,6 +555,10 @@ def export_photo_file(
             image=image,
             cancel_event=cancel_event,
             still_format=still_format,
+            width=width,
+            height=height,
+            lock_aspect=lock_aspect,
+            jpeg_quality=jpeg_quality,
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportCancelled()
@@ -192,27 +582,66 @@ def _write_preset(
     image: ImageAdjust | None = None,
     cancel_event: threading.Event | None = None,
     still_format: str | None = None,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+    jpeg_quality: object | None = None,
 ) -> None:
     graded = _is_graded(image)
-    as_png = preset == PRESET_BEST and normalize_still_format(still_format) == "png"
+    fmt = (
+        normalize_still_format(still_format)
+        if preset in {PRESET_BEST, PRESET_CUSTOM}
+        else None
+    )
+    as_png = fmt == "png"
     img = _load_still(source)
     try:
         copy_suffix = _copy_suffix(source, img.format or "")
-        if as_png:
-            rgb = _oriented_rgb(img)
-            if graded:
-                rgb = _grade_rgb(rgb, image, cancel_event=cancel_event)
-            _save_image(rgb, dest, "PNG")
-            return
-        if preset == PRESET_BEST and not graded and copy_suffix is not None:
+        location_risk = still_may_contain_location(source, img)
+        if preset == PRESET_BEST and _can_byte_copy_best(
+            graded=graded,
+            still_format=still_format,
+            copy_suffix=copy_suffix,
+            location_risk=location_risk,
+        ):
             shutil.copyfile(source, dest)
             return
+
         rgb = _oriented_rgb(img)
         if graded:
             rgb = _grade_rgb(rgb, image, cancel_event=cancel_event)
-        if preset == PRESET_BEST:
-            _save_best(rgb, dest, copy_suffix if graded else None)
+
+        if preset == PRESET_CUSTOM:
+            out_w, out_h = resolve_custom_dimensions(
+                rgb.size[0],
+                rgb.size[1],
+                width=width,
+                height=height,
+                lock_aspect=lock_aspect,
+            )
+            if (out_w, out_h) != rgb.size:
+                rgb = rgb.resize((out_w, out_h), _lanczos())
+            if as_png:
+                _save_image(rgb, dest, "PNG")
+            else:
+                _save_jpeg(rgb, dest, normalize_jpeg_quality(jpeg_quality))
             return
+
+        if preset == PRESET_BEST:
+            if as_png or fmt == "png":
+                _save_image(rgb, dest, "PNG")
+                return
+            if fmt == "jpeg":
+                _save_jpeg(rgb, dest, BEST_JPEG_QUALITY)
+                return
+            # Legacy: no explicit format — preserve readable suffix when possible.
+            _save_best(
+                rgb,
+                dest,
+                copy_suffix if copy_suffix in _REENCODE_SUFFIXES else None,
+            )
+            return
+
         if preset == PRESET_WHATSAPP:
             fitted = _fit_longest(rgb, WHATSAPP_LONGEST)
             _save_jpeg(fitted, dest, WHATSAPP_QUALITY)
@@ -391,6 +820,7 @@ def _lanczos():
 
 def _save_jpeg(img, dest: Path, quality: int) -> None:
     try:
+        # Explicitly omit exif= so GPS/location never rides along on re-encode.
         img.save(dest, format="JPEG", quality=int(quality), optimize=True)
     except OSError as exc:
         raise StudioExportError("Could not read this photo.") from exc

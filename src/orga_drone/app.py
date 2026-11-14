@@ -4380,6 +4380,10 @@ def create_app() -> FastAPI:
         row = db.get_media(media_id)
         image = None
         still_format = None
+        export_width = None
+        export_height = None
+        lock_aspect = True
+        jpeg_quality = None
         if row is not None and row.kind == "photo":
             from orga_drone.export.still_export import normalize_still_format
 
@@ -4387,6 +4391,14 @@ def create_app() -> FastAPI:
                 if export_payload_sets_adjust(payload):
                     image = image_adjust_from_export_payload(payload)
                 still_format = normalize_still_format(payload.get("still_format"))
+                if "width" in payload:
+                    export_width = payload.get("width")
+                if "height" in payload:
+                    export_height = payload.get("height")
+                if "lock_aspect" in payload:
+                    lock_aspect = bool(payload.get("lock_aspect"))
+                if "jpeg_quality" in payload:
+                    jpeg_quality = payload.get("jpeg_quality")
             except ValueError as exc:
                 raise HTTPException(
                     status_code=400,
@@ -4406,6 +4418,10 @@ def create_app() -> FastAPI:
                 overwrite=overwrite,
                 image=image,
                 still_format=still_format,
+                width=export_width,
+                height=export_height,
+                lock_aspect=lock_aspect,
+                jpeg_quality=jpeg_quality,
             )
         except StudioExportError as exc:
             raise _media_export_error(exc, translate) from exc
@@ -4424,6 +4440,10 @@ def create_app() -> FastAPI:
                 cancel_event=cancel_event,
                 image=image,
                 still_format=still_format,
+                width=export_width,
+                height=export_height,
+                lock_aspect=lock_aspect,
+                jpeg_quality=jpeg_quality,
             )
 
         return _begin_export_job(_work, translate)

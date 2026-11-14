@@ -554,3 +554,227 @@ def test_video_presets_use_encoder_frame_without_rendering(
     assert by_id["instagram"]["height"] == 1920
     assert "1080x1920" in str(by_id["whatsapp"]["suggested_filename"])
     assert db.list_studio_projects() == []
+
+
+def test_photo_options_include_profiles_dimensions_and_print_sizes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "coast.jpg", size=(3840, 2160))
+    options = build_media_export_options_payload(db, mid)
+    assert options["kind"] == "photo"
+    assert options["default_profile"] == "original"
+    assert options["source_width"] == 3840
+    assert options["source_height"] == 2160
+    assert options["bit_depth"] == 8
+    assert any(row["id"] == "a4" for row in options["print_sizes"])
+    by_id = {row["id"]: row for row in options["presets"]}
+    assert by_id["best"]["width"] == 3840
+    assert by_id["best"]["height"] == 2160
+    assert by_id["best"]["copied"] is True
+    assert by_id["best"]["modes"] == ["original", "print"]
+    assert by_id["custom"]["max_width"] == 3840
+    assert by_id["custom"]["jpeg_quality_min"] == 60
+    assert "custom" in by_id
+
+
+def test_full_resolution_and_hires_exports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid4k = _add_photo(db, tmp_path / "lib", "uhd.jpg", size=(3840, 2160))
+    mid_hi = _add_photo(db, tmp_path / "lib2", "drone.jpg", size=(5472, 3648))
+    out = tmp_path / "out"
+    out.mkdir()
+    for mid, expected in ((mid4k, (3840, 2160)), (mid_hi, (5472, 3648))):
+        jpeg = run_media_export(db, mid, preset="best", output_path=out / f"{mid}.jpg")
+        png = run_media_export(
+            db,
+            mid,
+            preset="best",
+            output_path=out / f"{mid}.png",
+            still_format="png",
+        )
+        graded = run_media_export(
+            db,
+            mid,
+            preset="best",
+            output_path=out / f"{mid}_g.jpg",
+            image=ImageAdjust(exposure=10),
+        )
+        with Image.open(jpeg) as img:
+            assert img.size == expected
+        with Image.open(png) as img:
+            assert img.size == expected
+            assert img.format == "PNG"
+        with Image.open(graded) as img:
+            assert img.size == expected
+        source = Path(db.get_media(mid).path)
+        assert graded.read_bytes() != source.read_bytes()
+
+
+def test_custom_dimensions_no_upscale_and_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.export.still_export import resolve_custom_dimensions
+
+    assert resolve_custom_dimensions(3840, 2160, width=1920, height=1080) == (1920, 1080)
+    assert resolve_custom_dimensions(800, 600, width=1600, height=1200) == (800, 600)
+    assert resolve_custom_dimensions(800, 600, width=400, lock_aspect=True) == (400, 300)
+    with pytest.raises(StudioExportError):
+        resolve_custom_dimensions(800, 600, width=0)
+
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "wide.jpg", size=(2000, 1000))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(
+        db,
+        mid,
+        preset="custom",
+        output_path=out / "wide_custom.jpg",
+        width=1000,
+        height=500,
+        jpeg_quality=90,
+    )
+    assert source.read_bytes() == original
+    with Image.open(result) as img:
+        assert img.size == (1000, 500)
+        assert img.format == "JPEG"
+    with pytest.raises(StudioExportError, match="JPEG quality"):
+        run_media_export(
+            db,
+            mid,
+            preset="custom",
+            output_path=out / "bad.jpg",
+            jpeg_quality=12,
+        )
+    with pytest.raises(StudioExportError, match="only for photos"):
+        prepare_media_export(
+            db,
+            _add_video(db, tmp_path / "vid", "v.mp4", height=1080, duration_s=1.0),
+            preset="custom",
+            output_path=out / "no.mp4",
+        )
+
+
+def test_gps_detector_failure_refuses_byte_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.export import still_export
+
+    class _Boom:
+        def getexif(self) -> object:
+            raise RuntimeError("exif unavailable")
+
+    assert still_export._still_has_gps(_Boom()) is True
+
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "opaque.jpg", size=(320, 240))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    monkeypatch.setattr(
+        still_export, "still_may_contain_location", lambda *_a, **_k: True
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "opaque_best.jpg",
+        still_format="jpeg",
+    )
+    assert source.read_bytes() == original
+    assert result.read_bytes() != original
+
+
+def test_gps_blocks_byte_copy_and_strips_location(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PIL.ExifTags import Base
+
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "geo.jpg", size=(640, 480))
+    source = Path(db.get_media(mid).path)
+    # Minimal GPS IFD: enough for Pillow to report GPSInfo.
+    exif = Image.Exif()
+    exif[Base.GPSInfo] = {0: b"\x02\x02\x00\x00", 1: "N", 2: (1, 1, 1), 3: "E", 4: (1, 1, 1)}
+    Image.new("RGB", (640, 480), (10, 20, 30)).save(
+        source, format="JPEG", quality=90, exif=exif
+    )
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    options = build_media_export_options_payload(db, mid)
+    best = next(row for row in options["presets"] if row["id"] == "best")
+    assert best["copied"] is False
+    assert best["width"] == 640
+    assert best["height"] == 480
+    result = run_media_export(db, mid, preset="best", output_path=out / "geo_best.jpg")
+    assert source.read_bytes() == original
+    assert result.read_bytes() != original
+    with Image.open(result) as img:
+        assert img.size == (640, 480)
+        exported_exif = img.getexif()
+        gps = None
+        try:
+            gps = exported_exif.get_ifd(Base.GPSInfo) if exported_exif else None
+        except Exception:
+            gps = exported_exif.get(Base.GPSInfo) if exported_exif else None
+        assert not gps
+
+
+def test_social_and_custom_profiles_keep_source_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "scene.jpg", size=(3840, 2160))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    out = tmp_path / "out"
+    out.mkdir()
+    for preset, expected in (
+        ("whatsapp", (1600, 900)),
+        ("instagram", (1080, 1350)),
+        ("tiktok", (1080, 1920)),
+    ):
+        path = run_media_export(db, mid, preset=preset, output_path=out / f"{preset}.jpg")
+        with Image.open(path) as img:
+            assert img.size == expected
+    assert source.read_bytes() == original
+
+
+def test_detail_page_exposes_photo_export_profiles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from orga_drone.app import create_app
+    from orga_drone.config import Settings
+    from orga_drone.i18n import clear_catalog_cache
+
+    clear_catalog_cache()
+    monkeypatch.setattr("orga_drone.app.settings", Settings(data_dir=tmp_path / "data"))
+    app = create_app()
+    db = app.state.db
+    mid = _add_photo(db, tmp_path / "lib", "page.jpg", size=(120, 80))
+    client = TestClient(app)
+    page = client.get(f"/media/{mid}", cookies={"lang": "en"})
+    assert page.status_code == 200
+    assert 'id="detail-export-profile"' in page.text
+    assert "Original quality" in page.text
+    assert "High quality / Print" in page.text
+    assert 'id="detail-export-print-size"' in page.text
+    assert 'id="detail-export-width"' in page.text
+    de = client.get(f"/media/{mid}", cookies={"lang": "de"})
+    assert de.status_code == 200
+    assert "Originalqualität" in de.text or "Exportprofil" in de.text

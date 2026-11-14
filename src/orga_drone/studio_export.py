@@ -65,12 +65,18 @@ from orga_drone.studio_export_resolution import (
     resolve_export_directory,
     suggested_export_filename,
 )
+from orga_drone.export.print_ppi import print_size_presets_payload
 from orga_drone.export.still_export import (
+    BEST_JPEG_QUALITY,
+    CUSTOM_JPEG_QUALITY_DEFAULT,
+    CUSTOM_JPEG_QUALITY_MAX,
+    CUSTOM_JPEG_QUALITY_MIN,
     SOCIAL_VIDEO_HEIGHT,
     SOCIAL_VIDEO_WIDTH,
     export_photo_file,
     inspect_photo_preset,
     normalize_share_preset,
+    still_may_contain_location,
 )
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 
@@ -1358,26 +1364,70 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
     last_dir = get_last_export_directory()
     directory = resolve_export_directory(last_dir)
     presets: list[dict[str, object]] = []
+    source_width: int | None = None
+    source_height: int | None = None
     if media.kind == "photo":
-        for preset in ("best", "whatsapp", "instagram", "tiktok"):
-            spec = inspect_photo_preset(path, preset)
+        adjust = db.get_image_adjust(path)
+        for preset in ("best", "whatsapp", "instagram", "tiktok", "custom"):
+            # Default UI still format is JPEG; also expose PNG copy eligibility
+            # so the client does not claim a byte-copy for a mismatched format.
+            if preset == "best":
+                spec = inspect_photo_preset(
+                    path, preset, image=adjust, still_format="jpeg"
+                )
+                spec_png = inspect_photo_preset(
+                    path, preset, image=adjust, still_format="png"
+                )
+            else:
+                spec = inspect_photo_preset(path, preset, image=adjust)
+                spec_png = None
+            if source_width is None and spec.width is not None and spec.height is not None:
+                # Oriented source size from the best/custom inspect path.
+                if preset in {"best", "custom"}:
+                    source_width = int(spec.width)
+                    source_height = int(spec.height)
             size_tag = None
+            label = preset
             if preset == "instagram":
                 size_tag = "1080x1350"
             elif preset == "tiktok":
                 size_tag = "1080x1920"
-            presets.append(
-                {
-                    "id": preset,
-                    "suggested_filename": _preset_filename(
-                        stem, preset, suffix=spec.suffix, size_tag=size_tag
-                    ),
-                    "width": spec.width,
-                    "height": spec.height,
-                    "copied": spec.copied,
-                }
-            )
+            elif preset == "custom":
+                label = "custom"
+                if spec.width is not None and spec.height is not None:
+                    size_tag = f"{spec.width}x{spec.height}"
+            row: dict[str, object] = {
+                "id": preset,
+                "suggested_filename": _preset_filename(
+                    stem, label, suffix=spec.suffix, size_tag=size_tag
+                ),
+                "width": spec.width,
+                "height": spec.height,
+                "copied": spec.copied,
+            }
+            if spec.jpeg_quality is not None:
+                row["jpeg_quality"] = spec.jpeg_quality
+            if spec.geometry is not None:
+                row["geometry"] = spec.geometry
+            if preset == "best":
+                row["modes"] = ["original", "print"]
+                row["jpeg_quality_default"] = BEST_JPEG_QUALITY
+                row["copied_jpeg"] = bool(spec.copied)
+                row["copied_png"] = bool(spec_png.copied) if spec_png is not None else False
+                # True when EXIF/XMP/raw checks say location may be present
+                # (or detection failed closed). UI uses this so format-mismatch
+                # re-encodes do not claim a GPS strip as the reason.
+                row["location_risk"] = bool(still_may_contain_location(path))
+            if preset == "custom":
+                row["max_width"] = source_width or spec.width
+                row["max_height"] = source_height or spec.height
+                row["aspect_lock_default"] = True
+                row["jpeg_quality_default"] = CUSTOM_JPEG_QUALITY_DEFAULT
+                row["jpeg_quality_min"] = CUSTOM_JPEG_QUALITY_MIN
+                row["jpeg_quality_max"] = CUSTOM_JPEG_QUALITY_MAX
+            presets.append(row)
         default_preset = "best"
+        default_profile = "original"
     else:
         heights = [media_frame_height(db, media)]
         try:
@@ -1410,9 +1460,10 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
                 }
             )
         default_preset = "best" if best is not None else "whatsapp"
+        default_profile = None
     if not presets:
         raise StudioExportError("No exportable resolution for this file.")
-    return {
+    payload: dict[str, object] = {
         "media_id": media.id,
         "filename": media.filename,
         "kind": media.kind,
@@ -1421,6 +1472,14 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
         "default_preset": default_preset,
         "presets": presets,
     }
+    if media.kind == "photo":
+        payload["default_profile"] = default_profile
+        payload["source_width"] = source_width
+        payload["source_height"] = source_height
+        payload["print_sizes"] = print_size_presets_payload()
+        payload["bit_depth"] = 8
+        payload["color_pipeline"] = "rgb8"
+    return payload
 
 
 def _video_export_config(
@@ -1483,17 +1542,30 @@ def prepare_media_export(
     overwrite: bool = False,
     image: ImageAdjust | None = None,
     still_format: str | None = None,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+    jpeg_quality: object | None = None,
 ) -> MediaExportPlan:
     """Validate one photo or video export. Does not render.
 
     ``image`` grades a photo before the preset. None uses the saved grade.
-    A video ignores both the grade and ``still_format``.
+    A video ignores the grade, ``still_format``, and custom still options.
     """
-    key = normalize_share_preset(preset)
     media, path = _require_export_media(db, media_id)
+    key = normalize_share_preset(preset, allow_custom=(media.kind == "photo"))
     if media.kind == "photo":
         adjust = image if image is not None else db.get_image_adjust(path)
-        spec = inspect_photo_preset(path, key, image=adjust, still_format=still_format)
+        spec = inspect_photo_preset(
+            path,
+            key,
+            image=adjust,
+            still_format=still_format,
+            width=width,
+            height=height,
+            lock_aspect=lock_aspect,
+            jpeg_quality=jpeg_quality,
+        )
         dest, identities, protected = _snapshot_export_destination(
             db,
             output_path,
@@ -1537,19 +1609,31 @@ def run_media_export(
     cancel_event: threading.Event | None = None,
     image: ImageAdjust | None = None,
     still_format: str | None = None,
+    width: object | None = None,
+    height: object | None = None,
+    lock_aspect: bool = True,
+    jpeg_quality: object | None = None,
 ) -> Path:
     """Export one library photo as a still, or one video through the Studio encoder.
 
     ``image`` grades a photo before the preset. None uses the saved grade.
-    A video ignores both the grade and ``still_format``.
+    A video ignores the grade, ``still_format``, and custom still options.
     """
     media, path = _require_export_media(db, media_id)
     adjust = image
     fmt = None
+    custom_w = None
+    custom_h = None
+    custom_lock = True
+    custom_q = None
     if media.kind == "photo":
         if adjust is None:
             adjust = db.get_image_adjust(path)
         fmt = still_format
+        custom_w = width
+        custom_h = height
+        custom_lock = lock_aspect
+        custom_q = jpeg_quality
     plan = prepare_media_export(
         db,
         media_id,
@@ -1558,6 +1642,10 @@ def run_media_export(
         overwrite=overwrite,
         image=adjust,
         still_format=fmt,
+        width=custom_w,
+        height=custom_h,
+        lock_aspect=custom_lock,
+        jpeg_quality=custom_q,
     )
     if plan.kind == "photo":
         if on_progress is not None:
@@ -1580,6 +1668,10 @@ def run_media_export(
                 cancel_event=cancel_event,
                 image=adjust,
                 still_format=fmt,
+                width=custom_w,
+                height=custom_h,
+                lock_aspect=custom_lock,
+                jpeg_quality=custom_q,
             )
         except ExportCancelled:
             append_export_log(

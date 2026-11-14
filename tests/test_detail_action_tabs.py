@@ -137,10 +137,16 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     assert 'id="detail-export-run"' not in image
     assert 'id="detail-export-format"' not in image
     assert 'id="detail-export-preset"' not in image
+    assert 'id="detail-export-profile"' not in image
     assert 'id="detail-export"' in export
-    assert 'id="detail-export-preset"' in export
+    assert 'id="detail-export-profile"' in export
     assert 'id="detail-export-format"' in export
+    assert 'id="detail-export-preset"' not in export
     assert 'id="detail-export-run"' in export
+    assert "Original quality" in export or "Originalqualität" in export
+    assert 'id="detail-export-dims"' in export
+    assert 'id="detail-export-print-size"' in export
+
     assert "detail-adjust-exposure" not in export
     assert "detail-adjust-reset" not in export
     assert 'id="map"' in location
@@ -229,6 +235,8 @@ def test_flow_video_keeps_flight_switch_outside_tabs_and_merge_in_file(
     assert 'name="stars"' not in share
     assert 'id="detail-export"' in export
     assert 'id="detail-export-run"' in export
+    assert 'id="detail-export-preset"' in export
+    assert 'id="detail-export-profile"' not in export
     assert 'id="detail-export-format"' not in export
     assert 'id="map"' in location
     assert "detail-adjust-exposure" not in location
