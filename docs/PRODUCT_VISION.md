@@ -281,13 +281,15 @@ See `README.md` for the detailed feature status table. In short:
   optional JPEG quality. Studio Quick Looks and the Image-tab grade (brightness,
   contrast, saturation, warmth, fine-tune tonals; −100…100, neutral 0) use the
   Studio adjustment math and are applied by the Export tab. Neutral Original /
-  Print may copy the original bytes when the file has no location EXIF; graded
-  exports and files with GPS re-encode without copying location tags (8-bit
-  RGB). The library file is not modified. Preview approximates the exported
-  picture the same way Studio preview does (show-original is preview-only). The
-  grade is saved on that photo and stays after leaving the page, restarting, and
-  a rescan that can match the same file. Reset returns it to neutral. Original /
-  Print / Custom can save JPEG or PNG. A video stays an MP4 from the Studio
+  Print may byte-copy only when the chosen JPEG or PNG matches the source
+  container and location checks pass (EXIF GPS, common XMP/GPS markers, and a
+  bounded file scan; unreadable metadata fails closed). Graded exports and
+  location-bearing files re-encode as 8-bit RGB without source location tags.
+  An explicit JPEG or PNG choice always produces that format. The library file
+  is not modified. Preview approximates the exported picture the same way Studio
+  preview does (show-original is preview-only). The grade is saved on that photo
+  and stays after leaving the page, restarting, and a rescan that can match the
+  same file. Reset returns it to neutral. A video stays an MP4 from the Studio
   encoder and does not get these photo profiles or sliders.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
