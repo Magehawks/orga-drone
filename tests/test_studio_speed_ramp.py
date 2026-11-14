@@ -28,6 +28,8 @@ from orga_drone.studio_speed_ramp import (
     place_ramp_region,
     ramp_after_region_drag,
     ramp_from_settings,
+    remove_ramp_region,
+    add_ramp_region,
 )
 from orga_drone.studio_frame import FrameTransform
 from orga_drone.studio_map import MapPlacement
@@ -998,3 +1000,374 @@ def test_bounded_region_reopens_and_shares_preview_duration(
             source_out_s=clip.source_end,
             effect_settings=clip.effect_settings,
         ) == pytest.approx(kept.duration(rang.source_in_s, rang.source_out_s))
+
+
+def _smoothstep_segment(length: float, speed_a: float, speed_b: float) -> float:
+    """Story seconds for one reciprocal-smoothstep segment integrated to u=1."""
+    return length * (0.5 / speed_a + 0.5 / speed_b)
+
+
+def _region(region_id: str, start: float, end: float, speeds: tuple[float, ...]) -> dict[str, object]:
+    count = len(speeds)
+    return {
+        "id": region_id,
+        "start_s": start,
+        "end_s": end,
+        "points": [
+            {
+                "source_s": start + (end - start) * index / (count - 1),
+                "speed": speed,
+            }
+            for index, speed in enumerate(speeds)
+        ],
+    }
+
+
+def test_three_regions_share_one_source_story_map() -> None:
+    ramp = parse_ramp(
+        {
+            "v": 2,
+            "interp": "reciprocal_smoothstep",
+            "regions": [
+                _region("r3", 22, 27, (0.5, 4, 0.5)),
+                _region("r1", 3, 7, (0.5, 4, 0.5)),
+                _region("r2", 12, 16, (4, 0.5, 4)),
+            ],
+        },
+        media_duration_s=30,
+    )
+    assert [region.id for region in ramp.regions] == ["r1", "r2", "r3"]
+    assert ramp.speed_at(2.9) == 1
+    assert ramp.speed_at(3) == pytest.approx(0.5)
+    assert ramp.speed_at(7) == pytest.approx(0.5)
+    assert ramp.speed_at(7.1) == 1
+    assert ramp.speed_at(14) == pytest.approx(0.5)
+    assert ramp.speed_at(24.5) == pytest.approx(4)
+    assert ramp.speed_at(29) == 1
+    # Closed form of the reciprocal-smoothstep integral at u=1:
+    # length * (1/(2*speed_a) + 1/(2*speed_b)).
+    # 0.5↔4 over 2 s is 2.25; over 2.5 s it is 2.8125. Two segments each.
+    # 1× gaps are 3 + 5 + 6 + 3 = 17. Total 17 + 4.5 + 4.5 + 5.625 = 31.625.
+    slow_fast = _smoothstep_segment(2, 0.5, 4) + _smoothstep_segment(2, 4, 0.5)
+    long_curve = _smoothstep_segment(2.5, 0.5, 4) + _smoothstep_segment(2.5, 4, 0.5)
+    assert slow_fast == pytest.approx(4.5)
+    assert long_curve == pytest.approx(5.625)
+    assert ramp.duration(0, 30) == pytest.approx(17 + slow_fast + slow_fast + long_curve)
+    assert 17 + slow_fast + slow_fast + long_curve == pytest.approx(31.625)
+    assert ramp.duration(10, 20) == pytest.approx(1 * 2 + 4.5 + 1 * 4)
+    for source in (0, 3, 5, 7, 12, 16, 22, 27, 30):
+        story = ramp.time_at(source)
+        assert ramp.source_at(story, 0, 30) == pytest.approx(source)
+        assert _eval_ffmpeg_time(ramp.ffmpeg_time(), source) == pytest.approx(story)
+    single = parse_ramp(
+        {
+            "v": 1,
+            "interp": "reciprocal_smoothstep",
+            "region": {"start_s": 3, "end_s": 7},
+            "points": [point.as_dict() for point in ramp.regions[0].points],
+        }
+    )
+    for source in (0, 3, 5, 7, 10):
+        assert ramp.time_at(source) == pytest.approx(single.time_at(source))
+    moved = ramp_after_region_drag(
+        ramp, mode="move", delta_story_s=1, play_start=0, play_end=30, region_id="r2"
+    )
+    assert moved.regions[0] == ramp.regions[0]
+    assert moved.regions[2] == ramp.regions[2]
+    assert moved.regions[1].start_s == pytest.approx(13)
+    removed = remove_ramp_region(moved, "r2")
+    assert removed is not None
+    assert removed.regions[0] == moved.regions[0]
+    assert removed.regions[1] == moved.regions[2]
+    assert remove_ramp_region(removed, "r1") is not None
+    assert remove_ramp_region(remove_ramp_region(removed, "r3"), "r1") is None
+    with pytest.raises(ValueError, match="overlap"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [
+                    _region("r1", 3, 8, (0.5, 4, 0.5)),
+                    _region("r2", 7, 12, (4, 0.5, 4)),
+                ],
+            }
+        )
+    with pytest.raises(ValueError, match="at most 3"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [
+                    _region("r1", 0, 1, (1, 1)),
+                    _region("r2", 2, 3, (1, 1)),
+                    _region("r3", 4, 5, (1, 1)),
+                    _region("r4", 6, 7, (1, 1)),
+                ],
+            }
+        )
+    with pytest.raises(ValueError, match="at least 0.05"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [_region("r1", 3, 3, (1, 1))],
+            }
+        )
+    with pytest.raises(ValueError, match="inside the source"):
+        parse_ramp(
+            {
+                "v": 2,
+                "interp": "reciprocal_smoothstep",
+                "regions": [_region("r1", 28, 32, (0.5, 4, 0.5))],
+            },
+            media_duration_s=30,
+        )
+    base = parse_ramp(
+        {
+            "v": 1,
+            "interp": "reciprocal_smoothstep",
+            "region": {"start_s": 0, "end_s": 4},
+            "points": [
+                {"source_s": 0, "speed": 0.5},
+                {"source_s": 2, "speed": 4},
+                {"source_s": 4, "speed": 0.5},
+            ],
+        }
+    )
+    added = add_ramp_region(
+        base, play_start=0, play_end=30, preset="fast_slow_fast", region_id="r2", span_s=4
+    )
+    assert added.version == 2
+    assert added.regions[0].points == base.points
+    assert added.regions[0].start_s == 0 and added.regions[0].end_s == 4
+    assert added.regions[1].id == "r2"
+    assert [point.speed for point in added.regions[1].points] == [4, 0.5, 4]
+    assert added.as_dict()["v"] == 2
+    assert "region" not in base.as_dict() or base.as_dict()["v"] == 1
+    raw = json.dumps({"speed_ramp": added.as_dict()})
+    assert effective_seconds(
+        kind="video",
+        available=True,
+        photo_duration_s=None,
+        duration_s=30,
+        source_in_s=0,
+        source_out_s=30,
+        effect_settings=raw,
+    ) == pytest.approx(added.duration(0, 30))
+    from orga_drone.studio_timelapse import flat_timelapse_payload
+
+    timelapse = parse_ramp(flat_timelapse_payload(1, 9, 8))
+    assert timelapse.version == 1 and timelapse.region is None
+    assert [point.speed for point in timelapse.points] == [8, 8]
+    assert ramp_from_settings(
+        json.dumps(
+            {
+                "speed_ramp": {
+                    "v": 99,
+                    "interp": "reciprocal_smoothstep",
+                    "regions": [_region("r1", 0, 1, (1, 1))],
+                }
+            }
+        )
+    ) is None
+
+
+def test_added_region_avoids_the_short_hole_before_the_first_region() -> None:
+    first = parse_ramp(
+        {
+            "v": 2,
+            "interp": "reciprocal_smoothstep",
+            "regions": [_region("r1", 3, 7, (0.5, 4, 0.5))],
+        },
+        media_duration_s=30,
+    )
+    second = add_ramp_region(
+        first, play_start=0, play_end=30, preset="fast_slow_fast", span_s=4
+    )
+    assert second.regions[-1].start_s == pytest.approx(7)
+    assert second.regions[-1].end_s == pytest.approx(11)
+    moved = ramp_after_region_drag(
+        second,
+        mode="move",
+        delta_story_s=5,
+        play_start=0,
+        play_end=30,
+        region_id=second.regions[-1].id,
+    )
+    assert moved.regions[0] == first.regions[0]
+    assert moved.regions[-1].start_s == pytest.approx(12)
+    assert moved.regions[-1].end_s == pytest.approx(16)
+    third = add_ramp_region(
+        moved, play_start=0, play_end=30, preset="slow_fast_slow", span_s=4
+    )
+    assert third.regions[-1].start_s == pytest.approx(16)
+    late = parse_ramp(
+        {
+            "v": 2,
+            "interp": "reciprocal_smoothstep",
+            "regions": [_region("r3", 22, 27, (0.5, 4, 0.5))],
+        },
+        media_duration_s=30,
+    )
+    opened = add_ramp_region(
+        late, play_start=0, play_end=30, preset="fast_slow_fast", span_s=4
+    )
+    assert opened.regions[0].start_s == pytest.approx(0)
+    assert opened.regions[0].end_s == pytest.approx(4)
+    assert opened.regions[1] == late.regions[0]
+
+
+def _bit_luma_expression(bits: int = 10, bar: int = 16) -> str:
+    expression = "0"
+    for bit in reversed(range(bits)):
+        expression = (
+            f"if(lt(X\\,{bar * (bit + 1)})\\,"
+            f"gt(mod(floor(N/{1 << bit})\\,2)\\,0)*255\\,{expression})"
+        )
+    return expression
+
+
+def _frame_index_from_bars(pixels: bytes, width: int, *, bits: int = 10, bar: int = 16) -> int:
+    value = 0
+    y = 24
+    for bit in range(bits):
+        x = bit * bar + bar // 2
+        if pixels[(y * width + x) * 3] > 128:
+            value |= 1 << bit
+    return value
+
+
+def test_three_region_export_decodes_the_source_frames(tmp_path: Path) -> None:
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        pytest.skip("FFmpeg unavailable")
+    source = tmp_path / "marked.mp4"
+    subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=176x48:r=60:d=30",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=1000:duration=30",
+            "-filter_complex",
+            f"[0:v]format=yuv444p,geq=lum='{_bit_luma_expression(11)}'[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "0",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(source),
+        ],
+        check=True,
+        timeout=120,
+        **subprocess_no_window_kwargs(),
+    )
+    original = source.read_bytes()
+    ramp = parse_ramp(
+        {
+            "v": 2,
+            "interp": "reciprocal_smoothstep",
+            "regions": [
+                _region("r1", 3, 7, (0.5, 4, 0.5)),
+                _region("r2", 12, 16, (4, 0.5, 4)),
+                _region("r3", 22, 27, (0.5, 4, 0.5)),
+            ],
+        },
+        media_duration_s=30,
+    )
+    expected = (
+        17
+        + _smoothstep_segment(2, 0.5, 4)
+        + _smoothstep_segment(2, 4, 0.5)
+        + _smoothstep_segment(2, 4, 0.5)
+        + _smoothstep_segment(2, 0.5, 4)
+        + _smoothstep_segment(2.5, 0.5, 4)
+        + _smoothstep_segment(2.5, 4, 0.5)
+    )
+    assert expected == pytest.approx(31.625)
+    assert ramp.duration(0, 30) == pytest.approx(expected)
+    output = tmp_path / "export.mp4"
+    clip = StudioExportClip(
+        source,
+        "video",
+        ramp.duration(0, 30),
+        source_end_s=30,
+        speed_ramp=ramp,
+    )
+    FfmpegStudioEncoder().render(StudioExportConfig(output, 176, 48, clips=(clip,)))
+    decoded = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(output),
+            "-map",
+            "0:v:0",
+            "-fps_mode",
+            "passthrough",
+            "-pix_fmt",
+            "rgb24",
+            "-f",
+            "rawvideo",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=120,
+        **subprocess_no_window_kwargs(),
+    ).stdout
+    width = 176
+    size = width * 48 * 3
+    frame_count = len(decoded) // size
+    assert frame_count == int(expected * 30 + 0.5)
+    previous_source = -1
+    for frame in range(frame_count):
+        story = frame / 30
+        pixels = decoded[frame * size : (frame + 1) * size]
+        source_frame = _frame_index_from_bars(pixels, width, bits=11)
+        source_s = source_frame / 60
+        assert 0 <= source_s <= 30
+        assert source_frame >= previous_source
+        previous_source = source_frame
+        assert abs(ramp.time_at(source_s) - story) <= (1 / 30) + 0.001
+    assert source.read_bytes() == original
+    audio = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(output),
+            "-map",
+            "0:a:0",
+            "-ac",
+            "1",
+            "-f",
+            "s16le",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+        **subprocess_no_window_kwargs(),
+    ).stdout
+    import array
+
+    samples = array.array("h", audio)
+    assert samples and max(abs(value) for value in samples) <= 1

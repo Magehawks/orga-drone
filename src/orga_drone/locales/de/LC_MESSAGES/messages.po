@@ -766,14 +766,23 @@ msgstr "Rampe entfernen"
 msgid "Drag points on the timeline or edit their values here. Removing the ramp returns to 1×."
 msgstr "Ziehe Punkte auf der Zeitleiste oder ändere ihre Werte hier. Ohne Rampe gilt wieder 1×."
 
+msgid "Region"
+msgstr "Bereich"
+
+msgid "Add region"
+msgstr "Bereich hinzufügen"
+
+msgid "Remove region"
+msgstr "Bereich entfernen"
+
 msgid "Region start (s)"
 msgstr "Bereichsanfang (s)"
 
 msgid "Region end (s)"
 msgstr "Bereichsende (s)"
 
-msgid "Drag the bar to move the ramp and its edges to resize it. Playback outside the bar is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing the ramp returns to 1×."
-msgstr "Ziehe die Leiste, um die Rampe zu verschieben, und die Kanten, um sie zu ändern. Außerhalb der Leiste gilt 1×. Pfeiltasten verschieben die Leiste; Umschalt+Pfeile ändern das Ende; Alt+Pfeile ändern den Anfang. Ohne Rampe gilt wieder 1×."
+msgid "Drag a bar to move that region and its edges to resize it. A clip can have up to three regions. Playback outside every region is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing a region leaves the others unchanged. Removing the ramp returns to 1×."
+msgstr "Ziehe eine Leiste, um diesen Bereich zu verschieben, und die Kanten, um ihn zu ändern. Ein Clip kann bis zu drei Bereiche haben. Außerhalb aller Bereiche gilt 1×. Pfeiltasten verschieben die gewählte Leiste; Umschalt+Pfeile ändern das Ende; Alt+Pfeile ändern den Anfang. Einen Bereich zu entfernen lässt die anderen unverändert. Ohne Rampe gilt wieder 1×."
 
 msgid "Arrow keys move. Shift+arrows resize the end. Alt+arrows resize the start."
 msgstr "Pfeiltasten verschieben. Umschalt+Pfeile ändern das Ende. Alt+Pfeile ändern den Anfang."

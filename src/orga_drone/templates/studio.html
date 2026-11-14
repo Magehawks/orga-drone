@@ -983,6 +983,9 @@
             <button type="button" class="button ghost" data-ramp-apply>{{ _('Apply ramp') }}</button>
             <p class="hint">{{ _('Applying a ramp replaces slow motion. Source audio is muted; music keeps playing.') }}</p>
             <div data-ramp-controls hidden>
+              <label class="studio-inspector-field"><span>{{ _('Region') }}</span><select data-ramp-region aria-label="{{ _('Region') }}"></select></label>
+              <button type="button" class="button ghost" data-ramp-add-region>{{ _('Add region') }}</button>
+              <button type="button" class="button ghost" data-ramp-remove-region>{{ _('Remove region') }}</button>
               <label class="studio-inspector-field"><span>{{ _('Region start (s)') }}</span><input data-ramp-region-start type="number" min="0" step="0.05" inputmode="decimal" aria-label="{{ _('Region start (s)') }}"></label>
               <label class="studio-inspector-field"><span>{{ _('Region end (s)') }}</span><input data-ramp-region-end type="number" min="0" step="0.05" inputmode="decimal" aria-label="{{ _('Region end (s)') }}"></label>
               <label class="studio-inspector-field"><span>{{ _('Point') }}</span><select data-ramp-point aria-label="{{ _('Point') }}"></select></label>
@@ -991,7 +994,7 @@
               <button type="button" class="button ghost" data-ramp-add>{{ _('Add point') }}</button>
               <button type="button" class="button ghost" data-ramp-remove-point>{{ _('Remove point') }}</button>
               <button type="button" class="button ghost" data-ramp-remove>{{ _('Remove ramp') }}</button>
-              <p class="hint">{{ _('Drag the bar to move the ramp and its edges to resize it. Playback outside the bar is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing the ramp returns to 1×.') }}</p>
+              <p class="hint">{{ _('Drag a bar to move that region and its edges to resize it. A clip can have up to three regions. Playback outside every region is 1×. Arrow keys move the selected bar; Shift+arrows resize the end; Alt+arrows resize the start. Removing a region leaves the others unchanged. Removing the ramp returns to 1×.') }}</p>
             </div>
           </div>
           <div class="studio-speed-choices" role="group" aria-label="{{ _('Speed') }}">

@@ -65,3 +65,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0035](0035-color-workspace-contract.md) | Canonical Color Workspace grade and render contracts | Proposed (architecture approval required) |
 | [0036](0036-studio-sfx-lane.md) | Separate Studio sound-effects (SFX) lane | Accepted |
 | [0037](0037-studio-source-story-clocks.md) | Shared Studio Source and Story clocks | Accepted |
+| [0038](0038-studio-multi-speed-ramp-regions.md) | Up to three speed-ramp regions per clip | Accepted for this branch |

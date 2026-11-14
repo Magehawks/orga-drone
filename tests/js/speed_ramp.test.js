@@ -12,6 +12,9 @@ import {
   edgeSourceAfterRampDrag,
   placeRampRegion,
   rampAfterRegionDrag,
+  rampRegions,
+  addRampRegion,
+  removeRampRegion,
   remapRampSpan,
 } from "../../src/orga_drone/static/js/studio/speed-ramp.js";
 
@@ -242,4 +245,135 @@ test("placing and dragging a region preserves curve speeds", () => {
   assert.equal(started.region.start_s, 8);
   assert.equal(started.region.end_s, 40);
   assert.equal(started.points[0].speed, 0.5);
+});
+
+function region(id, start, end, speeds) {
+  return {
+    id,
+    start_s: start,
+    end_s: end,
+    points: speeds.map((speed, index) => ({
+      source_s: start + ((end - start) * index) / (speeds.length - 1),
+      speed,
+    })),
+  };
+}
+
+test("three regions map source to story and keep siblings on delete", () => {
+  const ramp = parseRamp({
+    v: 2,
+    interp: "reciprocal_smoothstep",
+    regions: [
+      region("r3", 22, 27, [0.5, 4, 0.5]),
+      region("r1", 3, 7, [0.5, 4, 0.5]),
+      region("r2", 12, 16, [4, 0.5, 4]),
+    ],
+  });
+  assert.deepEqual(
+    rampRegions(ramp).map((item) => item.id),
+    ["r1", "r2", "r3"]
+  );
+  close(rampTime(ramp, 30) - rampTime(ramp, 0), 31.625);
+  assert.equal(rampSpeed(ramp, 2.9), 1);
+  assert.equal(rampSpeed(ramp, 3), 0.5);
+  assert.equal(rampSpeed(ramp, 7.1), 1);
+  assert.equal(rampSpeed(ramp, 14), 0.5);
+  close(rampSource(ramp, rampTime(ramp, 16), 0, 30), 16);
+  const first = rampRegions(ramp)[0];
+  const single = parseRamp({
+    v: 1,
+    interp: "reciprocal_smoothstep",
+    region: { start_s: first.start, end_s: first.end },
+    points: first.points,
+  });
+  close(rampTime(ramp, 5), rampTime(single, 5));
+  const moved = rampAfterRegionDrag(ramp, {
+    mode: "move",
+    deltaStory: 1,
+    playStart: 0,
+    playEnd: 30,
+    regionId: "r2",
+  });
+  const byId = (value, id) => value.regions.find((item) => item.id === id);
+  assert.deepEqual(byId(moved, "r1"), byId(ramp, "r1"));
+  assert.deepEqual(byId(moved, "r3"), byId(ramp, "r3"));
+  assert.equal(byId(moved, "r2").start_s, 13);
+  const removed = removeRampRegion(moved, "r2");
+  assert.deepEqual(byId(removed, "r1"), byId(moved, "r1"));
+  assert.deepEqual(byId(removed, "r3"), byId(moved, "r3"));
+  assert.equal(removeRampRegion(removeRampRegion(removed, "r3"), "r1"), null);
+  assert.equal(
+    parseRamp({
+      v: 2,
+      interp: "reciprocal_smoothstep",
+      regions: [region("r1", 3, 8, [0.5, 4, 0.5]), region("r2", 7, 12, [4, 0.5, 4])],
+    }),
+    null
+  );
+  assert.equal(
+    parseRamp({
+      v: 2,
+      interp: "reciprocal_smoothstep",
+      regions: [
+        region("a", 0, 1, [1, 1]),
+        region("b", 2, 3, [1, 1]),
+        region("c", 4, 5, [1, 1]),
+        region("d", 6, 7, [1, 1]),
+      ],
+    }),
+    null
+  );
+  const added = addRampRegion(
+    parseRamp({
+      v: 1,
+      interp: "reciprocal_smoothstep",
+      region: { start_s: 0, end_s: 4 },
+      points: [
+        { source_s: 0, speed: 0.5 },
+        { source_s: 2, speed: 4 },
+        { source_s: 4, speed: 0.5 },
+      ],
+    }),
+    { playStart: 0, playEnd: 30, preset: "fast_slow_fast", regionId: "r2", span: 4 }
+  );
+  assert.equal(added.v, 2);
+  assert.deepEqual(added.regions[0].points, [
+    { source_s: 0, speed: 0.5 },
+    { source_s: 2, speed: 4 },
+    { source_s: 4, speed: 0.5 },
+  ]);
+  assert.deepEqual(
+    added.regions[1].points.map((point) => point.speed),
+    [4, 0.5, 4]
+  );
+  assert.equal(added.regions[1].start_s, 4);
+  assert.equal(added.regions[1].end_s, 8);
+});
+test("a new region uses the tail instead of the short hole before the first region", () => {
+  const first = parseRamp({
+    v: 2,
+    interp: "reciprocal_smoothstep",
+    regions: [region("r1", 3, 7, [0.5, 4, 0.5])],
+  });
+  const second = addRampRegion(first, {
+    playStart: 0,
+    playEnd: 30,
+    preset: "fast_slow_fast",
+    span: 4,
+  });
+  assert.equal(second.regions.at(-1).start_s, 7);
+  assert.equal(second.regions.at(-1).end_s, 11);
+  const late = parseRamp({
+    v: 2,
+    interp: "reciprocal_smoothstep",
+    regions: [region("r3", 22, 27, [0.5, 4, 0.5])],
+  });
+  const opened = addRampRegion(late, {
+    playStart: 0,
+    playEnd: 30,
+    preset: "fast_slow_fast",
+    span: 4,
+  });
+  assert.equal(opened.regions[0].start_s, 0);
+  assert.equal(opened.regions[0].end_s, 4);
 });
