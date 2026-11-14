@@ -349,8 +349,13 @@ def _estimate_peak_bytes(
 
 
 def _total_ram_bytes() -> int | None:
+    """Best-effort physical RAM size (Windows). Other platforms return None."""
     try:
         import ctypes
+        import sys
+
+        if sys.platform != "win32":
+            return None
 
         class MEMORYSTATUSEX(ctypes.Structure):
             _fields_ = [
@@ -365,9 +370,12 @@ def _total_ram_bytes() -> int | None:
                 ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
             ]
 
+        kernel32 = getattr(ctypes, "windll", None)
+        if kernel32 is None:
+            return None
         stat = MEMORYSTATUSEX()
         stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+        if kernel32.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
             return int(stat.ullTotalPhys)
     except Exception:
         pass
