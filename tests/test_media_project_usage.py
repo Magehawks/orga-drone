@@ -218,6 +218,34 @@ def test_studio_projects_for_media_includes_original_without_clips(
     assert usage[0].has_original is True
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+def test_original_membership_id_precedes_conflicting_path(
+    tmp_path: Path, legacy: bool
+) -> None:
+    db = Database(tmp_path / "t.sqlite3")
+    media_a = _seed_media(db, tmp_path / "a", filename="A.MP4")
+    media_b = _seed_media(db, tmp_path / "b", filename="B.MP4")
+    item_b = db.get_media(media_b)
+    assert item_b is not None
+    project = db.create_studio_project("Original identity")
+    with db.connect() as conn:
+        remember_studio_original(
+            conn,
+            project_id=project.id,
+            media_path=item_b.path,
+            source_media_id=None if legacy else media_a,
+            filename=item_b.filename,
+            now="2024-01-02T10:00:00",
+        )
+    owner = media_b if legacy else media_a
+    other = media_a if legacy else media_b
+    usage = db.studio_projects_for_media(owner)
+    assert [(u.id, u.clip_count, u.has_original) for u in usage] == [
+        (project.id, 0, True)
+    ]
+    assert db.studio_projects_for_media(other) == []
+
+
 def test_studio_projects_for_media_renamed_project_title(tmp_path: Path) -> None:
     db = Database(tmp_path / "t.sqlite3")
     mid = _seed_media(db, tmp_path / "lib", filename="rename.MP4")
