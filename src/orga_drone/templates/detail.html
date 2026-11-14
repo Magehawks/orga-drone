@@ -422,6 +422,32 @@
           <button type="submit">{{ _('Add to Studio') }}</button>
         </form>
       {% endif %}
+      <div class="studio-project-usage" id="detail-project-usage">
+        <h3>{{ _('Used in Projects') }}</h3>
+        {% if media_project_usage %}
+          <p class="hint" id="detail-project-usage-summary">
+            {% if media_project_usage|length == 1 %}
+              {{ _('Used in 1 project') }}
+            {% else %}
+              {{ _('Used in %(count)s projects')|format(count=media_project_usage|length) }}
+            {% endif %}
+          </p>
+          <ul class="album-membership project-usage-list">
+            {% for usage in media_project_usage %}
+            <li>
+              <a href="/studio?project_id={{ usage.id }}">{{ usage.title }}</a>
+              {% if usage.clip_count > 1 %}
+              <span class="muted">{{ _('×%(count)s')|format(count=usage.clip_count) }}</span>
+              {% elif usage.clip_count == 0 and usage.has_original %}
+              <span class="muted">{{ _('Full recording') }}</span>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="hint">{{ _('Not used in any project.') }}</p>
+        {% endif %}
+      </div>
     </div>
     </div>
 

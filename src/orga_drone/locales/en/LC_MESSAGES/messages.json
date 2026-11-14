@@ -1091,5 +1091,10 @@
   "Serial steps need a managed grade": "Serial steps need a managed grade",
   "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.": "Serial steps run once in order. Bypass and mix use the shared grade command path; parameter edits still save through the grade document.",
   "Serial grade steps": "Serial grade steps",
-  "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save.": "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
+  "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save.": "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save.",
+  "Used in Projects": "Used in Projects",
+  "Used in 1 project": "Used in 1 project",
+  "Used in %(count)s projects": "Used in %(count)s projects",
+  "Not used in any project.": "Not used in any project.",
+  "×%(count)s": "×%(count)s"
 }
