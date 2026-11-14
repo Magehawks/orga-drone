@@ -278,8 +278,9 @@ def still_may_contain_location(source: Path, img=None) -> bool:
     """True when location metadata may be present, or detection is uncertain.
 
     Fail closed: any read/parse error refuses byte-copy. EXIF GPS alone is not
-    treated as the only channel — XMP and a bounded raw scan are included.
-    Corrupt Exif that only warns (no exception) also fails closed.
+    treated as the only channel — XMP, all decoded Pillow ``info`` text (including
+    PNG zTXt/iTXt), and a bounded raw scan are included. Corrupt Exif that only
+    warns (no exception) also fails closed.
 
     ``img`` is accepted for call-site compatibility but ignored for loading: a
     fresh open is required so Pillow ``Corrupt EXIF`` warnings during decode are
@@ -306,11 +307,8 @@ def still_may_contain_location(source: Path, img=None) -> bool:
                     xmp = getxmp()
                     if _xmp_blob_has_location(xmp):
                         return True
-                info = getattr(opened, "info", None)
-                if isinstance(info, dict):
-                    for key in ("xmp", "XML:com.adobe.xmp"):
-                        if key in info and _xmp_blob_has_location(info.get(key)):
-                            return True
+                if _decoded_info_suggests_location(opened):
+                    return True
             except Exception:
                 return True
             try:
@@ -331,11 +329,39 @@ def still_may_contain_location(source: Path, img=None) -> bool:
                 pass
 
 
+def _decoded_info_suggests_location(img) -> bool:
+    """Scan Pillow ``info`` for location markers, including PNG zTXt/iTXt text.
+
+    Compressed PNG text chunks are decompressed into ``info`` (Comment,
+    Description, …). A raw-byte scan of the file cannot see those markers, so
+    every decoded key and value must be inspected. Unknown value types fail
+    closed.
+    """
+    info = getattr(img, "info", None)
+    if info is None:
+        return False
+    if not isinstance(info, dict):
+        return True
+    for key, value in info.items():
+        if _xmp_blob_has_location(key):
+            return True
+        if value is None:
+            continue
+        if isinstance(value, (str, bytes, bytearray, dict, list, tuple, int, float)):
+            if _xmp_blob_has_location(value):
+                return True
+            continue
+        # Exotic Pillow info payloads: refuse byte-copy rather than skip.
+        return True
+    return False
+
+
 def _still_has_gps(img) -> bool:
     """Backward-compatible name: EXIF/XMP/raw location risk for an open image.
 
     Callers that also have a path should prefer ``still_may_contain_location``.
-    Without a path, only EXIF + XMP on the open handle are checked (fail closed).
+    Without a path, EXIF + decoded info/XMP on the open handle are checked
+    (fail closed).
     """
     try:
         if _exif_has_gps(img):
@@ -346,11 +372,8 @@ def _still_has_gps(img) -> bool:
         getxmp = getattr(img, "getxmp", None)
         if callable(getxmp) and _xmp_blob_has_location(getxmp()):
             return True
-        info = getattr(img, "info", None)
-        if isinstance(info, dict):
-            for key in ("xmp", "XML:com.adobe.xmp"):
-                if key in info and _xmp_blob_has_location(info.get(key)):
-                    return True
+        if _decoded_info_suggests_location(img):
+            return True
     except Exception:
         return True
     return False

@@ -6,7 +6,7 @@ import io
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, PngImagePlugin
 from PIL.ExifTags import Base
 
 from orga_drone.config import Settings
@@ -241,6 +241,36 @@ def test_png_source_png_choice_may_byte_copy(tmp_path: Path) -> None:
     result = export_photo_file(src, dest, "best", still_format="png")
     assert result.read_bytes() == src.read_bytes()
     _assert_png(result)
+
+
+def _png_with_compressed_location_comment(path: Path) -> None:
+    """PNG whose GPS markers live only in a compressed zTXt Comment chunk."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (64, 48), (9, 18, 27))
+    meta = PngImagePlugin.PngInfo()
+    meta.add_text("Comment", "GPSLatitude=1; GPSLongitude=1", zip=True)
+    img.save(path, format="PNG", pnginfo=meta)
+    raw = path.read_bytes()
+    assert b"zTXt" in raw
+    assert b"GPSLatitude" not in raw  # compressed; raw scan must not be enough
+
+
+def test_png_compressed_comment_gps_blocks_byte_copy(tmp_path: Path) -> None:
+    src = tmp_path / "ztxt.png"
+    _png_with_compressed_location_comment(src)
+    original = src.read_bytes()
+    assert still_may_contain_location(src) is True
+    assert inspect_photo_preset(src, "best", still_format="png").copied is False
+    dest = tmp_path / "out.png"
+    result = export_photo_file(src, dest, "best", still_format="png")
+    assert src.read_bytes() == original
+    assert result.read_bytes() != original
+    out = result.read_bytes()
+    assert b"GPSLatitude" not in out
+    assert b"zTXt" not in out
+    with _assert_png(result) as img:
+        assert img.size == (64, 48)
+        assert "Comment" not in (img.info or {})
 
 
 def test_graded_print_png_keeps_full_resolution(tmp_path: Path) -> None:
