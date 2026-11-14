@@ -3850,6 +3850,152 @@ html.is-edge-drag * {
 }
 .studio-export-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 .studio-export-dialog .meta-line.is-error { color: var(--danger, #b00020); }
+
+/* Photo Workspace Image Composer (#453) */
+.photo-combine-entry {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.photo-combine-dialog {
+  max-width: 36rem;
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+.photo-combine-list-wrap {
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg, transparent);
+}
+.photo-combine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.photo-combine-item {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  background: var(--panel);
+  cursor: grab;
+}
+.photo-combine-item.photo-combine-drop-target {
+  border-color: var(--accent);
+}
+.photo-combine-thumb {
+  width: 3rem;
+  height: 3rem;
+  object-fit: cover;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+}
+.photo-combine-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.photo-combine-item-pos {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.photo-combine-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+.photo-combine-item-actions {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.photo-combine-move {
+  min-width: 2rem;
+  padding-inline: 0.4rem;
+}
+.photo-combine-add-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.photo-combine-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  max-height: 10rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.photo-combine-search-hit {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.35rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.photo-combine-search-hit:hover,
+.photo-combine-search-hit:focus-visible {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.photo-combine-search-hit img {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.photo-combine-search-empty {
+  padding: 0.5rem 0.65rem;
+  opacity: 0.8;
+}
+.photo-combine-preview-wrap {
+  min-height: 6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  background:
+    linear-gradient(45deg, #ccc 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, #ccc 25%, transparent 25%) 0 8px / 16px 16px,
+    linear-gradient(45deg, transparent 75%, #ccc 75%) 8px -8px / 16px 16px,
+    linear-gradient(-45deg, transparent 75%, #ccc 75%) -8px 0 / 16px 16px,
+    #eee;
+}
+.photo-combine-preview {
+  max-width: 100%;
+  max-height: 16rem;
+  object-fit: contain;
+}
+.photo-combine-dialog .hint.err {
+  color: var(--danger, #b00020);
+}
+.photo-combine-dialog .studio-export-progress-bar {
+  height: 0.4rem;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
 .studio-export-progress {
   display: grid;
   gap: 0.35rem;

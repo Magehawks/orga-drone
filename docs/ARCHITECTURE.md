@@ -216,6 +216,15 @@ id are stored on `media_meta` (`image_adjust_json`), so a matching rescan can
 attach them again. A video stays an MP4 from the Studio encoder and does not get
 the photo profiles. The library file is never modified.
 
+Image Composer (Photo Workspace): the Image tab offers **Combine images**. A
+compact dialog builds an ordered list of library photos (duplicates allowed per
+entry id), horizontal/vertical native-size layout with cross-axis centering and
+optional spacing, then preview/export via `photo_combine.py` and thin routes
+`POST /api/photo-combine/{inspect,preview,export}`. Composition always re-encodes
+with Pillow (no grades/thumbs as inputs); publish reuses the still-export job
+store and protected-path publisher. Resource admission follows Pillow area,
+edge, and working-set limits from discovery #452. Source files are never written.
+
 Typical user flow:
 
 ```text
