@@ -80,16 +80,6 @@ class PhotoPresetSpec:
     geometry: str | None = None
 
 
-@dataclass(frozen=True)
-class CustomStillOptions:
-    """Validated custom still geometry and JPEG quality."""
-
-    width: int
-    height: int
-    jpeg_quality: int
-    lock_aspect: bool
-
-
 def normalize_share_preset(preset: str, *, allow_custom: bool = True) -> str:
     key = str(preset or "").strip().lower()
     allowed = SHARE_PRESETS if allow_custom else VIDEO_SHARE_PRESETS
@@ -194,7 +184,11 @@ def _is_graded(image: ImageAdjust | None) -> bool:
 
 
 def _still_has_gps(img) -> bool:
-    """True when the open still carries a GPS/location IFD."""
+    """True when the open still may carry GPS/location metadata.
+
+    Fail closed: any read error refuses byte-copy so location tags cannot
+    leave via an exact file copy.
+    """
     try:
         from PIL.ExifTags import Base
 
@@ -206,10 +200,10 @@ def _still_has_gps(img) -> bool:
         try:
             gps_ifd = exif.get_ifd(Base.GPSInfo)
         except Exception:
-            gps_ifd = None
+            return True
         return bool(gps_ifd)
     except Exception:
-        return False
+        return True
 
 
 def _best_suffix(copy_suffix: str | None, *, graded: bool) -> tuple[str, bool]:

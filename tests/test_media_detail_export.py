@@ -663,6 +663,30 @@ def test_custom_dimensions_no_upscale_and_validation(
         )
 
 
+def test_gps_detector_failure_refuses_byte_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from orga_drone.export import still_export
+
+    class _Boom:
+        def getexif(self) -> object:
+            raise RuntimeError("exif unavailable")
+
+    assert still_export._still_has_gps(_Boom()) is True
+
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _add_photo(db, tmp_path / "lib", "opaque.jpg", size=(320, 240))
+    source = Path(db.get_media(mid).path)
+    original = source.read_bytes()
+    monkeypatch.setattr(still_export, "_still_has_gps", lambda _img: True)
+    out = tmp_path / "out"
+    out.mkdir()
+    result = run_media_export(db, mid, preset="best", output_path=out / "opaque_best.jpg")
+    assert source.read_bytes() == original
+    assert result.read_bytes() != original
+
+
 def test_gps_blocks_byte_copy_and_strips_location(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
