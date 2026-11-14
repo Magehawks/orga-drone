@@ -4,13 +4,19 @@ Best quality copies a readable still (JPEG, PNG, and similar) when that is
 safe. Share presets write a new JPEG. Custom writes a resized still inside the
 source bounds. Nothing is uploaded.
 
-A non-neutral grade uses the Studio ffmpeg filter chain
-(``ffmpeg_grade_chain``) and then the same preset. Neutral leaves that chain
-out, so a best-quality copy can stay the original bytes when the file has no
-GPS/location EXIF. The library file is never written.
+Byte-copy policy (Original / Print ``best``):
 
-Processing after decode is 8-bit RGB. Re-encodes do not claim EXIF or ICC
-preservation. GPS/location tags are never left in an export.
+- Allowed only when the grade is neutral, the selected output format matches
+  the source container (or the format was left unspecified), and the source is
+  confidently free of location metadata.
+- Location checks cover EXIF GPS and XMP / embedded GPS-like markers. Unknown,
+  malformed, or unreadable metadata fails closed (no byte-copy).
+- An explicit JPEG or PNG choice always produces that format; a mismatched
+  source is re-encoded (8-bit RGB) without source location tags.
+
+A non-neutral grade uses the Studio ffmpeg filter chain
+(``ffmpeg_grade_chain``) and then the same preset. The library file is never
+written. Re-encodes do not claim EXIF or ICC preservation.
 """
 
 from __future__ import annotations
@@ -183,36 +189,201 @@ def _is_graded(image: ImageAdjust | None) -> bool:
     return image is not None and not image.is_neutral
 
 
-def _still_has_gps(img) -> bool:
-    """True when the open still may carry GPS/location metadata.
+# Markers that suggest location may be embedded (EXIF GPS packet, XMP, ISO6709).
+# Absence of these is not a privacy proof for exotic containers; unknown read
+# failures still fail closed.
+_LOCATION_BYTE_MARKERS: tuple[bytes, ...] = (
+    b"GPSLatitude",
+    b"GPSLongitude",
+    b"GPSAltitude",
+    b"GPSLatitudeRef",
+    b"GPSLongitudeRef",
+    b"GPSInfo",
+    b"exif/1.0/gps",
+    b"LocationShown",
+    b"LocationCreated",
+    b"iso:6709",
+    b"ISO6709",
+    b"Composite:GPS",
+)
 
-    Fail closed: any read error refuses byte-copy so location tags cannot
-    leave via an exact file copy.
-    """
+_LOCATION_SCAN_BYTES = 1_048_576
+
+
+def _exif_has_gps(img) -> bool:
+    from PIL.ExifTags import Base
+
+    exif = img.getexif()
+    if not exif:
+        return False
+    if exif.get(Base.GPSInfo):
+        return True
     try:
-        from PIL.ExifTags import Base
+        gps_ifd = exif.get_ifd(Base.GPSInfo)
+    except Exception:
+        raise
+    return bool(gps_ifd)
 
-        exif = img.getexif()
-        if not exif:
-            return False
-        if exif.get(Base.GPSInfo):
+
+def _xmp_blob_has_location(blob: object) -> bool:
+    if blob is None:
+        return False
+    if isinstance(blob, (bytes, bytearray)):
+        text = bytes(blob)
+    elif isinstance(blob, str):
+        text = blob.encode("utf-8", errors="ignore")
+    elif isinstance(blob, dict):
+        # Pillow may return a nested dict; flatten string values.
+        parts: list[bytes] = []
+
+        def _walk(node: object) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    parts.append(str(key).encode("utf-8", errors="ignore"))
+                    _walk(value)
+            elif isinstance(node, (list, tuple)):
+                for item in node:
+                    _walk(item)
+            elif node is not None:
+                parts.append(str(node).encode("utf-8", errors="ignore"))
+
+        _walk(blob)
+        text = b"\n".join(parts)
+    else:
+        text = str(blob).encode("utf-8", errors="ignore")
+    lowered = text.lower()
+    for marker in _LOCATION_BYTE_MARKERS:
+        if marker.lower() in lowered:
             return True
+    return False
+
+
+def _file_bytes_suggest_location(source: Path) -> bool:
+    with source.open("rb") as handle:
+        chunk = handle.read(_LOCATION_SCAN_BYTES)
+    lowered = chunk.lower()
+    return any(marker.lower() in lowered for marker in _LOCATION_BYTE_MARKERS)
+
+
+def still_may_contain_location(source: Path, img=None) -> bool:
+    """True when location metadata may be present, or detection is uncertain.
+
+    Fail closed: any read/parse error refuses byte-copy. EXIF GPS alone is not
+    treated as the only channel — XMP and a bounded raw scan are included.
+    """
+    opened = img
+    close_opened = False
+    try:
+        if opened is None:
+            opened = _load_still(source)
+            close_opened = True
         try:
-            gps_ifd = exif.get_ifd(Base.GPSInfo)
+            if _exif_has_gps(opened):
+                return True
         except Exception:
             return True
-        return bool(gps_ifd)
+        try:
+            getxmp = getattr(opened, "getxmp", None)
+            if callable(getxmp):
+                xmp = getxmp()
+                if _xmp_blob_has_location(xmp):
+                    return True
+            info = getattr(opened, "info", None)
+            if isinstance(info, dict):
+                for key in ("xmp", "XML:com.adobe.xmp"):
+                    if key in info and _xmp_blob_has_location(info.get(key)):
+                        return True
+        except Exception:
+            return True
+        try:
+            if _file_bytes_suggest_location(source):
+                return True
+        except Exception:
+            return True
+        return False
     except Exception:
         return True
+    finally:
+        if close_opened and opened is not None:
+            try:
+                opened.close()
+            except Exception:
+                pass
+
+
+def _still_has_gps(img) -> bool:
+    """Backward-compatible name: EXIF/XMP/raw location risk for an open image.
+
+    Callers that also have a path should prefer ``still_may_contain_location``.
+    Without a path, only EXIF + XMP on the open handle are checked (fail closed).
+    """
+    try:
+        if _exif_has_gps(img):
+            return True
+    except Exception:
+        return True
+    try:
+        getxmp = getattr(img, "getxmp", None)
+        if callable(getxmp) and _xmp_blob_has_location(getxmp()):
+            return True
+        info = getattr(img, "info", None)
+        if isinstance(info, dict):
+            for key in ("xmp", "XML:com.adobe.xmp"):
+                if key in info and _xmp_blob_has_location(info.get(key)):
+                    return True
+    except Exception:
+        return True
+    return False
+
+
+def _format_matches_source(still_format: str | None, copy_suffix: str | None) -> bool:
+    """True when an explicit JPEG/PNG choice matches the source container."""
+    fmt = normalize_still_format(still_format)
+    if fmt is None:
+        return copy_suffix is not None
+    if fmt == "jpeg":
+        return copy_suffix == ".jpg"
+    if fmt == "png":
+        return copy_suffix == ".png"
+    return False
+
+
+def _best_output_suffix(
+    copy_suffix: str | None,
+    *,
+    graded: bool,
+    still_format: str | None,
+) -> str:
+    """Suffix for a best/custom full-frame export after format resolution."""
+    fmt = normalize_still_format(still_format)
+    if fmt == "png":
+        return ".png"
+    if fmt == "jpeg":
+        return ".jpg"
+    if copy_suffix is not None and (not graded or copy_suffix in _REENCODE_SUFFIXES):
+        return copy_suffix
+    return ".jpg"
 
 
 def _best_suffix(copy_suffix: str | None, *, graded: bool) -> tuple[str, bool]:
-    """Return ``(suffix, copied)`` for best quality (ignores GPS; caller gates copy)."""
+    """Return ``(suffix, copied)`` for legacy best quality (ignores location)."""
     if copy_suffix is not None and not graded:
         return copy_suffix, True
     if graded and copy_suffix in _REENCODE_SUFFIXES:
         return copy_suffix, False
     return ".jpg", False
+
+
+def _can_byte_copy_best(
+    *,
+    graded: bool,
+    still_format: str | None,
+    copy_suffix: str | None,
+    location_risk: bool,
+) -> bool:
+    if graded or location_risk or copy_suffix is None:
+        return False
+    return _format_matches_source(still_format, copy_suffix)
 
 
 def inspect_photo_preset(
@@ -229,10 +400,12 @@ def inspect_photo_preset(
     """Pixel size and suffix for one photo preset. Does not write a file."""
     key = normalize_share_preset(preset, allow_custom=True)
     graded = _is_graded(image)
-    as_png = (
-        key in {PRESET_BEST, PRESET_CUSTOM}
-        and normalize_still_format(still_format) == "png"
+    fmt = (
+        normalize_still_format(still_format)
+        if key in {PRESET_BEST, PRESET_CUSTOM}
+        else None
     )
+    as_png = fmt == "png"
     img = _load_still(source)
     try:
         rgb = _oriented_rgb(img)
@@ -255,30 +428,22 @@ def inspect_photo_preset(
                 jpeg_quality=None if as_png else quality,
                 geometry="custom",
             )
-        if key == PRESET_BEST and as_png:
-            return PhotoPresetSpec(
-                suffix=".png",
-                width=src_w,
-                height=src_h,
-                copied=False,
-                geometry="source",
-            )
         if key == PRESET_BEST:
             copy_suffix = _copy_suffix(source, img.format or "")
-            suffix, would_copy = _best_suffix(copy_suffix, graded=graded)
-            can_copy = (
-                would_copy
-                and not graded
-                and not as_png
-                and copy_suffix is not None
-                and not _still_has_gps(img)
+            location_risk = still_may_contain_location(source, img)
+            can_copy = _can_byte_copy_best(
+                graded=graded,
+                still_format=still_format,
+                copy_suffix=copy_suffix,
+                location_risk=location_risk,
             )
-            if not can_copy and would_copy and _still_has_gps(img):
-                # GPS-safe re-encode keeps the readable suffix when possible.
-                if copy_suffix in _REENCODE_SUFFIXES:
-                    suffix = copy_suffix
-                else:
-                    suffix = ".jpg"
+            suffix = (
+                copy_suffix
+                if can_copy and copy_suffix is not None
+                else _best_output_suffix(
+                    copy_suffix, graded=graded, still_format=still_format
+                )
+            )
             return PhotoPresetSpec(
                 suffix=suffix,
                 width=src_w,
@@ -380,20 +545,21 @@ def _write_preset(
     jpeg_quality: object | None = None,
 ) -> None:
     graded = _is_graded(image)
-    as_png = (
-        preset in {PRESET_BEST, PRESET_CUSTOM}
-        and normalize_still_format(still_format) == "png"
+    fmt = (
+        normalize_still_format(still_format)
+        if preset in {PRESET_BEST, PRESET_CUSTOM}
+        else None
     )
+    as_png = fmt == "png"
     img = _load_still(source)
     try:
         copy_suffix = _copy_suffix(source, img.format or "")
-        has_gps = _still_has_gps(img)
-        if (
-            preset == PRESET_BEST
-            and not graded
-            and not as_png
-            and copy_suffix is not None
-            and not has_gps
+        location_risk = still_may_contain_location(source, img)
+        if preset == PRESET_BEST and _can_byte_copy_best(
+            graded=graded,
+            still_format=still_format,
+            copy_suffix=copy_suffix,
+            location_risk=location_risk,
         ):
             shutil.copyfile(source, dest)
             return
@@ -418,12 +584,19 @@ def _write_preset(
                 _save_jpeg(rgb, dest, normalize_jpeg_quality(jpeg_quality))
             return
 
-        if as_png or preset == PRESET_BEST:
-            if as_png:
+        if preset == PRESET_BEST:
+            if as_png or fmt == "png":
                 _save_image(rgb, dest, "PNG")
                 return
-            # Graded or GPS-stripped best path.
-            _save_best(rgb, dest, copy_suffix if graded or has_gps else None)
+            if fmt == "jpeg":
+                _save_jpeg(rgb, dest, BEST_JPEG_QUALITY)
+                return
+            # Legacy: no explicit format — preserve readable suffix when possible.
+            _save_best(
+                rgb,
+                dest,
+                copy_suffix if copy_suffix in _REENCODE_SUFFIXES else None,
+            )
             return
 
         if preset == PRESET_WHATSAPP:

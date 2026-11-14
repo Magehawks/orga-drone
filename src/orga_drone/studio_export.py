@@ -1368,7 +1368,18 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
     if media.kind == "photo":
         adjust = db.get_image_adjust(path)
         for preset in ("best", "whatsapp", "instagram", "tiktok", "custom"):
-            spec = inspect_photo_preset(path, preset, image=adjust)
+            # Default UI still format is JPEG; also expose PNG copy eligibility
+            # so the client does not claim a byte-copy for a mismatched format.
+            if preset == "best":
+                spec = inspect_photo_preset(
+                    path, preset, image=adjust, still_format="jpeg"
+                )
+                spec_png = inspect_photo_preset(
+                    path, preset, image=adjust, still_format="png"
+                )
+            else:
+                spec = inspect_photo_preset(path, preset, image=adjust)
+                spec_png = None
             if source_width is None and spec.width is not None and spec.height is not None:
                 # Oriented source size from the best/custom inspect path.
                 if preset in {"best", "custom"}:
@@ -1400,6 +1411,8 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
             if preset == "best":
                 row["modes"] = ["original", "print"]
                 row["jpeg_quality_default"] = BEST_JPEG_QUALITY
+                row["copied_jpeg"] = bool(spec.copied)
+                row["copied_png"] = bool(spec_png.copied) if spec_png is not None else False
             if preset == "custom":
                 row["max_width"] = source_width or spec.width
                 row["max_height"] = source_height or spec.height

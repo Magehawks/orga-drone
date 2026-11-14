@@ -679,10 +679,18 @@ def test_gps_detector_failure_refuses_byte_copy(
     mid = _add_photo(db, tmp_path / "lib", "opaque.jpg", size=(320, 240))
     source = Path(db.get_media(mid).path)
     original = source.read_bytes()
-    monkeypatch.setattr(still_export, "_still_has_gps", lambda _img: True)
+    monkeypatch.setattr(
+        still_export, "still_may_contain_location", lambda *_a, **_k: True
+    )
     out = tmp_path / "out"
     out.mkdir()
-    result = run_media_export(db, mid, preset="best", output_path=out / "opaque_best.jpg")
+    result = run_media_export(
+        db,
+        mid,
+        preset="best",
+        output_path=out / "opaque_best.jpg",
+        still_format="jpeg",
+    )
     assert source.read_bytes() == original
     assert result.read_bytes() != original
 

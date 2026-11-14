@@ -513,9 +513,14 @@
   function presetDetail(preset) {
     if (!preset) return "";
     if (kind === "photo" && preset.id === "best") {
-      if (selectedStillFormat() === "png") return root.dataset.gradePng || "";
+      if (selectedStillFormat() === "png") {
+        if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
+        if (preset.copied_png) return root.dataset.photoBest || "";
+        return root.dataset.gradePng || "";
+      }
       if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
-      if (preset.copied) return root.dataset.photoBest || "";
+      const jpegCopy = preset.copied_jpeg != null ? preset.copied_jpeg : preset.copied;
+      if (jpegCopy) return root.dataset.photoBest || "";
       return msgPhotoBestGps || root.dataset.photoBestJpeg || "";
     }
     if (kind === "photo" && preset.id === "custom") return msgPhotoCustom;

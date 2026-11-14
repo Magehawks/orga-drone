@@ -22,4 +22,8 @@ Photo-only Stories export as video (up to 1080p). For a full-resolution still fo
    - **Custom** — format, size inside the original pixels (never enlarges), JPEG quality when applicable.
 3. **Videos** — local MP4 presets only (no Image sliders or photo profiles on video detail).
 
-Nothing is uploaded. The library file is never modified. Graded stills are 8-bit re-encodes; location tags are not copied into exports.
+Nothing is uploaded. The library file is never modified. Graded stills are 8-bit
+re-encodes. An exact byte-copy happens only when the file looks free of location
+metadata (EXIF GPS and common XMP/GPS markers) and the chosen JPEG/PNG format
+matches the source. Unreadable metadata is treated as unsafe for copying.
+Re-encoded exports do not carry source location tags.
