@@ -1011,3 +1011,18 @@ msgstr "Move down"
 
 msgid "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
 msgstr "Steps run once from top to bottom. Turn a step off or change its mix here. Slider values still save with the usual grade save."
+
+msgid "Used in Projects"
+msgstr "Used in Projects"
+
+msgid "Used in 1 project"
+msgstr "Used in 1 project"
+
+msgid "Used in %(count)s projects"
+msgstr "Used in %(count)s projects"
+
+msgid "Not used in any project."
+msgstr "Not used in any project."
+
+msgid "×%(count)s"
+msgstr "×%(count)s"
