@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
-from orga_drone.db import Database, make_identity_key
+from orga_drone.db import Database, make_identity_key, remember_studio_original
 from orga_drone.i18n import clear_catalog_cache
 
 
@@ -163,6 +163,61 @@ def test_studio_projects_for_media_source_id_when_path_stale(
     assert usage[0].id == project.id
 
 
+def test_studio_projects_for_media_prefers_id_over_conflicting_path(
+    tmp_path: Path,
+) -> None:
+    """Explicit source_media_id wins; a path that matches another file must not."""
+    db = Database(tmp_path / "t.sqlite3")
+    media_a = _seed_media(db, tmp_path / "a", filename="A.MP4", content=b"aaaa")
+    media_b = _seed_media(db, tmp_path / "b", filename="B.MP4", content=b"bbbb")
+    item_b = db.get_media(media_b)
+    assert item_b is not None
+    project = db.create_studio_project("Owned by A")
+    clip_id = _add_clip(db, media_a, project.id)
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE studio_clips SET media_path = ? WHERE id = ?",
+            (item_b.path, clip_id),
+        )
+
+    usage_a = db.studio_projects_for_media(media_a)
+    assert [u.id for u in usage_a] == [project.id]
+    assert usage_a[0].clip_count == 1
+
+    # Path equals B, but source_media_id still points at A → B is unused.
+    assert db.studio_projects_for_media(media_b) == []
+
+
+def test_studio_projects_for_media_includes_original_without_clips(
+    tmp_path: Path,
+) -> None:
+    """studio_originals can keep membership after Story clips are removed."""
+    db = Database(tmp_path / "t.sqlite3")
+    mid = _seed_media(db, tmp_path / "lib", filename="kept.MP4", content=b"keep")
+    item = db.get_media(mid)
+    assert item is not None
+    project = db.create_studio_project("Original only")
+    clip_id = _add_clip(db, mid, project.id)
+    with db.connect() as conn:
+        remember_studio_original(
+            conn,
+            project_id=project.id,
+            media_path=item.path,
+            source_media_id=mid,
+            filename=item.filename,
+            now="2024-01-02T10:00:00",
+        )
+        conn.execute("DELETE FROM studio_clips WHERE id = ?", (clip_id,))
+
+    assert db.list_studio_items(project.id) == []
+    assert db.list_studio_originals(project.id)[0]["media_id"] == mid
+    usage = db.studio_projects_for_media(mid)
+    assert len(usage) == 1
+    assert usage[0].id == project.id
+    assert usage[0].clip_count == 0
+    assert usage[0].has_original is True
+
+
 def test_studio_projects_for_media_renamed_project_title(tmp_path: Path) -> None:
     db = Database(tmp_path / "t.sqlite3")
     mid = _seed_media(db, tmp_path / "lib", filename="rename.MP4")
@@ -208,6 +263,40 @@ def test_detail_page_shows_project_usage(
     assert de_page.status_code == 200
     assert "Verwendet in Projekten" in de_page.text
     assert "Verwendet in 2 Projekten" in de_page.text
+
+    de_empty = client.get(f"/media/{empty}", cookies={"lang": "de"})
+    assert de_empty.status_code == 200
+    assert "In keinem Projekt verwendet." in de_empty.text
+
+
+def test_detail_page_shows_original_only_membership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_catalog_cache()
+    client, db = _client(tmp_path, monkeypatch)
+    mid = _seed_media(db, tmp_path / "lib", filename="orig.MP4", content=b"oooo")
+    item = db.get_media(mid)
+    assert item is not None
+    project = db.create_studio_project("Kept original")
+    with db.connect() as conn:
+        remember_studio_original(
+            conn,
+            project_id=project.id,
+            media_path=item.path,
+            source_media_id=mid,
+            filename=item.filename,
+            now="2024-01-02T10:00:00",
+        )
+
+    page = client.get(f"/media/{mid}", cookies={"lang": "en"})
+    assert page.status_code == 200
+    assert "Used in 1 project" in page.text
+    assert ">Kept original<" in page.text
+    assert "Full recording" in page.text
+    assert f'href="/studio?project_id={project.id}"' in page.text
+    usage = db.studio_projects_for_media(mid)
+    assert usage[0].clip_count == 0
+    assert usage[0].has_original is True
 
 
 def test_studio_project_open_from_detail_link(
