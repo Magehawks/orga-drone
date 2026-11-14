@@ -564,17 +564,29 @@
          data-preset-whatsapp="{{ _('WhatsApp')|e }}"
          data-preset-instagram="{{ _('Instagram')|e }}"
          data-preset-tiktok="{{ _('TikTok')|e }}"
-         data-photo-best="{{ _('Copies this still unchanged.')|e }}"
-         data-photo-best-jpeg="{{ _('JPEG at the original pixel size.')|e }}"
-         data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching.')|e }}"
+         data-profile-original="{{ _('Original quality')|e }}"
+         data-profile-print="{{ _('High quality / Print')|e }}"
+         data-profile-social="{{ _('Social media')|e }}"
+         data-profile-custom="{{ _('Custom')|e }}"
+         data-photo-best="{{ _('Exact copy of the library file when there are no adjustments and no location data in the file.')|e }}"
+         data-photo-best-jpeg="{{ _('Full-resolution JPEG (8-bit). The library file stays unchanged.')|e }}"
+         data-photo-best-gps="{{ _('Full-resolution re-encode without location data. The library file stays unchanged.')|e }}"
+         data-photo-whatsapp="{{ _('JPEG, longest side 1600, fitted without stretching or cropping.')|e }}"
          data-photo-instagram="{{ _('JPEG 1080×1350, cropped from the center.')|e }}"
          data-photo-tiktok="{{ _('JPEG 1080×1920, cropped from the center.')|e }}"
+         data-photo-custom="{{ _('Resize inside the original pixel size. Never enlarges the picture.')|e }}"
+         data-photo-print-hint="{{ _('Print suitability depends on these pixels and the physical print size — not on a DPI label.')|e }}"
+         data-ppi-label="{{ _('About {ppi} PPI at this print size')|e }}"
+         data-ppi-aspect="{{ _('Paper and photo aspect ratios differ; the print shop may crop or add borders.')|e }}"
+         data-ppi-guidance="{{ _('Higher PPI helps for close viewing. Large wall prints are often viewed from farther away.')|e }}"
+         data-dims-label="{{ _('Output size')|e }}"
+         data-print-choose="{{ _('Choose a print size')|e }}"
          {% if item.kind == 'photo' %}
          data-image-adjust-model='{{ image_adjust_model|tojson }}'
          data-image-adjust='{{ photo_adjust|tojson }}'
          data-photo-look="{{ photo_look|e }}"
-         data-grade-reencode="{{ _('Re-encodes this still with the adjustments.')|e }}"
-         data-grade-png="{{ _('Saves a PNG of this still. The library file stays unchanged.')|e }}"
+         data-grade-reencode="{{ _('Re-encodes this still with the adjustments (8-bit). The library file stays unchanged.')|e }}"
+         data-grade-png="{{ _('Saves a PNG of this still (8-bit). The library file stays unchanged.')|e }}"
          {% endif %}
          data-video-best="{{ _('MP4 {width}×{height}. The picture is not enlarged past the source.')|e }}"
          data-video-fit="{{ _('MP4 {width}×{height}. The picture is fitted inside the frame. It is not cropped, and nothing is posted.')|e }}"
@@ -582,8 +594,25 @@
          {% endif %}>
       <h2>{{ _('Export file') }}</h2>
       {% if item_exportable %}
-        <p class="hint">{{ _('Saves a local file for this photo or video. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
         {% if item.kind == 'photo' %}
+        <p class="hint">{{ _('Saves a local photo file. The library original stays unchanged. Nothing is uploaded or posted.') }}</p>
+        <label class="studio-inspector-field" for="detail-export-profile">
+          <span>{{ _('Export profile') }}</span>
+          <select id="detail-export-profile" aria-label="{{ _('Export profile') }}">
+            <option value="original">{{ _('Original quality') }}</option>
+            <option value="print">{{ _('High quality / Print') }}</option>
+            <option value="social">{{ _('Social media') }}</option>
+            <option value="custom">{{ _('Custom') }}</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field" id="detail-export-social-wrap" for="detail-export-social" hidden>
+          <span>{{ _('Social size') }}</span>
+          <select id="detail-export-social" aria-label="{{ _('Social size') }}">
+            <option value="whatsapp">{{ _('WhatsApp') }}</option>
+            <option value="instagram">{{ _('Instagram') }}</option>
+            <option value="tiktok">{{ _('TikTok') }}</option>
+          </select>
+        </label>
         <label class="studio-inspector-field" id="detail-export-format-wrap" for="detail-export-format" hidden>
           <span>{{ _('Still format') }}</span>
           <select id="detail-export-format" aria-label="{{ _('Still format') }}">
@@ -591,16 +620,54 @@
             <option value="png">PNG</option>
           </select>
         </label>
-        {% endif %}
+        <div class="studio-export-pair" id="detail-export-custom-wrap" hidden>
+          <label class="studio-inspector-field" for="detail-export-width">
+            <span>{{ _('Width (px)') }}</span>
+            <input id="detail-export-width" type="number" min="1" step="1" inputmode="numeric"
+                   aria-label="{{ _('Width (px)') }}">
+          </label>
+          <label class="studio-inspector-field" for="detail-export-height">
+            <span>{{ _('Height (px)') }}</span>
+            <input id="detail-export-height" type="number" min="1" step="1" inputmode="numeric"
+                   aria-label="{{ _('Height (px)') }}">
+          </label>
+        </div>
+        <label class="studio-inspector-field" id="detail-export-lock-wrap" hidden>
+          <span class="detail-export-check">
+            <input id="detail-export-lock-aspect" type="checkbox" checked>
+            {{ _('Keep aspect ratio') }}
+          </span>
+        </label>
+        <label class="studio-inspector-field" id="detail-export-quality-wrap" for="detail-export-jpeg-quality" hidden>
+          <span>{{ _('JPEG quality') }}</span>
+          <input id="detail-export-jpeg-quality" type="number" min="60" max="100" step="1" value="95"
+                 inputmode="numeric" aria-label="{{ _('JPEG quality') }}">
+        </label>
+        <p class="meta-line detail-export-dims" id="detail-export-dims" aria-live="polite"></p>
+        <div id="detail-export-print-wrap" hidden>
+          <label class="studio-inspector-field" for="detail-export-print-size">
+            <span>{{ _('Print size (optional)') }}</span>
+            <select id="detail-export-print-size" aria-label="{{ _('Print size (optional)') }}">
+              <option value="">{{ _('Choose a print size') }}</option>
+            </select>
+          </label>
+          <p class="meta-line" id="detail-export-ppi" hidden></p>
+          <p class="hint" id="detail-export-ppi-aspect" hidden></p>
+          <p class="hint" id="detail-export-ppi-guidance" hidden></p>
+        </div>
+        {% else %}
+        <p class="hint">{{ _('Saves a local video file. Best quality, WhatsApp, Instagram, and TikTok are files on this computer. Nothing is uploaded or posted.') }}</p>
         <label class="studio-inspector-field" for="detail-export-preset">
           <span>{{ _('Output') }}</span>
           <select id="detail-export-preset" aria-label="{{ _('Output') }}"></select>
         </label>
+        {% endif %}
         <label class="studio-inspector-field" for="detail-export-filename">
           <span>{{ _('Filename') }}</span>
           <input id="detail-export-filename" type="text" autocomplete="off" spellcheck="false"
                  aria-label="{{ _('Filename') }}">
         </label>
+        <p class="meta-line" id="detail-export-destination" hidden></p>
         <p class="meta-line" id="detail-export-status" hidden></p>
         <div class="studio-export-progress" id="detail-export-progress" hidden>
           <div class="busy-progress is-determinate studio-export-progress-track" role="progressbar"

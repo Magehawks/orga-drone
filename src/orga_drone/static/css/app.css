@@ -4450,6 +4450,16 @@ html.is-edge-drag * {
   gap: 1rem;
 }
 .detail-actions-panel[hidden] { display: none; }
+.detail-export-dims {
+  font-variant-numeric: tabular-nums;
+  margin: 0.35rem 0 0;
+}
+.detail-export-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 500;
+}
 .detail-export-grade-preview {
   display: block;
   width: 100%;

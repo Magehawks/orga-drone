@@ -271,21 +271,23 @@ See `README.md` for the detailed feature status table. In short:
   sits in its own tab (preset, JPEG or PNG, and the export action). The map, coordinates, and spot download sit in Location when
   GPS exists; without GPS that tab stays hidden. One panel at a time. A video
   has no Image tab. Tab order is Info, Location, Share, Image, Export.
-- **Detail-page export:** one photo or one video as a local file (best quality, or a
-  WhatsApp, Instagram, or TikTok preset). Nothing is uploaded or posted. A photo
-  stays an image. Studio Quick Looks and the Image-tab grade (brightness,
+- **Detail-page export:** one photo or one video as a local file. Nothing is
+  uploaded or posted. A photo stays an image with clear profiles: Original
+  quality, High quality / Print, Social media (WhatsApp / Instagram / TikTok),
+  and Custom. Final width × height is shown before export. Print can show an
+  optional effective-PPI helper for a chosen paper size (guidance only; no
+  upscaling). Custom resizes inside the source pixel box (no upscale) with
+  optional JPEG quality. Studio Quick Looks and the Image-tab grade (brightness,
   contrast, saturation, warmth, fine-tune tonals; −100…100, neutral 0) use the
-  Studio adjustment math and are applied by the Export tab. Neutral keeps today's
-  file, including a best-quality copy of the original bytes when that is the
-  current result. A moved slider or look grades the pixels and then applies the
-  preset. The library file is not modified. Preview approximates the exported
+  Studio adjustment math and are applied by the Export tab. Neutral Original /
+  Print may copy the original bytes when the file has no location EXIF; graded
+  exports and files with GPS re-encode without copying location tags (8-bit
+  RGB). The library file is not modified. Preview approximates the exported
   picture the same way Studio preview does (show-original is preview-only). The
   grade is saved on that photo and stays after leaving the page, restarting, and
-  a rescan that can match the same file. Reset returns it to neutral. Best
-  quality can be saved as JPEG or PNG. A neutral JPEG best-quality export still
-  copies the original bytes when that is today's result. PNG and a moved slider
-  re-encode. A video stays an MP4 from the Studio encoder and does not get these
-  sliders.
+  a rescan that can match the same file. Reset returns it to neutral. Original /
+  Print / Custom can save JPEG or PNG. A video stays an MP4 from the Studio
+  encoder and does not get these photo profiles or sliders.
 - **Studio:** local project browser and switcher over `studio_projects` /
   `studio_clips` (create, open, rename, delete; last-opened restored). Creator
   Studio UI (browser, preview, transport, Story track, soundtrack playlist, inspector,
