@@ -76,6 +76,7 @@ from orga_drone.export.still_export import (
     export_photo_file,
     inspect_photo_preset,
     normalize_share_preset,
+    still_may_contain_location,
 )
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 
@@ -1413,6 +1414,10 @@ def build_media_export_options_payload(db: Database, media_id: int) -> dict:
                 row["jpeg_quality_default"] = BEST_JPEG_QUALITY
                 row["copied_jpeg"] = bool(spec.copied)
                 row["copied_png"] = bool(spec_png.copied) if spec_png is not None else False
+                # True when EXIF/XMP/raw checks say location may be present
+                # (or detection failed closed). UI uses this so format-mismatch
+                # re-encodes do not claim a GPS strip as the reason.
+                row["location_risk"] = bool(still_may_contain_location(path))
             if preset == "custom":
                 row["max_width"] = source_width or spec.width
                 row["max_height"] = source_height or spec.height

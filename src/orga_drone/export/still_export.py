@@ -225,6 +225,15 @@ def _exif_has_gps(img) -> bool:
     return bool(gps_ifd)
 
 
+def _warnings_suggest_uncertain_exif(caught: list) -> bool:
+    """Pillow may warn on corrupt Exif without raising — treat as uncertain."""
+    for warning in caught:
+        message = str(warning.message).lower()
+        if "corrupt exif" in message or "truncated" in message:
+            return True
+    return False
+
+
 def _xmp_blob_has_location(blob: object) -> bool:
     if blob is None:
         return False
@@ -270,41 +279,52 @@ def still_may_contain_location(source: Path, img=None) -> bool:
 
     Fail closed: any read/parse error refuses byte-copy. EXIF GPS alone is not
     treated as the only channel — XMP and a bounded raw scan are included.
+    Corrupt Exif that only warns (no exception) also fails closed.
+
+    ``img`` is accepted for call-site compatibility but ignored for loading: a
+    fresh open is required so Pillow ``Corrupt EXIF`` warnings during decode are
+    observed (they are not re-emitted on a pre-loaded handle).
     """
-    opened = img
-    close_opened = False
+    import warnings
+
+    del img  # API compat; see docstring.
+    opened = None
     try:
-        if opened is None:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             opened = _load_still(source)
-            close_opened = True
-        try:
-            if _exif_has_gps(opened):
-                return True
-        except Exception:
-            return True
-        try:
-            getxmp = getattr(opened, "getxmp", None)
-            if callable(getxmp):
-                xmp = getxmp()
-                if _xmp_blob_has_location(xmp):
+            try:
+                if _exif_has_gps(opened):
                     return True
-            info = getattr(opened, "info", None)
-            if isinstance(info, dict):
-                for key in ("xmp", "XML:com.adobe.xmp"):
-                    if key in info and _xmp_blob_has_location(info.get(key)):
-                        return True
-        except Exception:
-            return True
-        try:
-            if _file_bytes_suggest_location(source):
+            except Exception:
                 return True
-        except Exception:
-            return True
-        return False
+            if _warnings_suggest_uncertain_exif(caught):
+                return True
+            try:
+                getxmp = getattr(opened, "getxmp", None)
+                if callable(getxmp):
+                    xmp = getxmp()
+                    if _xmp_blob_has_location(xmp):
+                        return True
+                info = getattr(opened, "info", None)
+                if isinstance(info, dict):
+                    for key in ("xmp", "XML:com.adobe.xmp"):
+                        if key in info and _xmp_blob_has_location(info.get(key)):
+                            return True
+            except Exception:
+                return True
+            try:
+                if _file_bytes_suggest_location(source):
+                    return True
+            except Exception:
+                return True
+            if _warnings_suggest_uncertain_exif(caught):
+                return True
+            return False
     except Exception:
         return True
     finally:
-        if close_opened and opened is not None:
+        if opened is not None:
             try:
                 opened.close()
             except Exception:

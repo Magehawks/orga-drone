@@ -521,7 +521,12 @@
       if (!imageAdjustIsNeutral(readAdjust())) return root.dataset.gradeReencode || "";
       const jpegCopy = preset.copied_jpeg != null ? preset.copied_jpeg : preset.copied;
       if (jpegCopy) return root.dataset.photoBest || "";
-      return msgPhotoBestGps || root.dataset.photoBestJpeg || "";
+      // GPS wording only when location_risk is known; otherwise neutral JPEG text
+      // (format mismatch / unsupported container must not read as a GPS strip).
+      if (preset.location_risk === true) {
+        return msgPhotoBestGps || root.dataset.photoBestJpeg || "";
+      }
+      return root.dataset.photoBestJpeg || msgPhotoBestGps || "";
     }
     if (kind === "photo" && preset.id === "custom") return msgPhotoCustom;
     if (kind === "photo" && preset.id === "whatsapp") return root.dataset.photoWhatsapp || "";

@@ -183,6 +183,38 @@ def test_unreadable_location_detection_fails_closed(
     assert result.read_bytes() != original
 
 
+def _jpeg_with_corrupt_exif(path: Path) -> None:
+    """Readable JPEG whose APP1 Exif IFD is truncated (Pillow warns / fails).
+
+    APP1 length matches the payload so pixel data stays decodable; only the
+    Exif directory is incomplete.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    buf = io.BytesIO()
+    Image.new("RGB", (240, 180), (11, 22, 33)).save(buf, format="JPEG", quality=90)
+    data = buf.getvalue()
+    assert data[:2] == b"\xff\xd8"
+    # Incomplete TIFF IFD after Exif header (entry count claims data that is absent).
+    payload = b"Exif\x00\x00II*\x00\x08\x00\x00\x00\xff\x00"
+    app1 = b"\xff\xe1" + (2 + len(payload)).to_bytes(2, "big") + payload
+    path.write_bytes(data[:2] + app1 + data[2:])
+
+
+def test_corrupt_exif_fails_closed_for_byte_copy(tmp_path: Path) -> None:
+    src = tmp_path / "broken_exif.jpg"
+    _jpeg_with_corrupt_exif(src)
+    original = src.read_bytes()
+    # Malformed Exif must not qualify for an exact byte-copy.
+    assert still_may_contain_location(src) is True
+    assert inspect_photo_preset(src, "best", still_format="jpeg").copied is False
+    dest = tmp_path / "out.jpg"
+    result = export_photo_file(src, dest, "best", still_format="jpeg")
+    assert src.read_bytes() == original
+    assert result.read_bytes() != original
+    with _assert_jpeg(result) as img:
+        assert img.size[0] > 0
+
+
 def test_png_source_jpeg_choice_reencodes_as_jpeg(tmp_path: Path) -> None:
     src = tmp_path / "still.png"
     _write_png(src, (800, 600))
@@ -283,10 +315,22 @@ def test_options_expose_format_specific_copy_flags(
     best_j = next(row for row in opt_j["presets"] if row["id"] == "best")
     assert best_j["copied_jpeg"] is True
     assert best_j["copied_png"] is False
+    assert best_j["location_risk"] is False
+    gps = tmp_path / "lib3" / "g.jpg"
+    _jpeg_with_exif_gps(gps)
+    mid_g = _add_photo(db, tmp_path / "lib3", "g.jpg", gps)
+    best_g = next(
+        row
+        for row in build_media_export_options_payload(db, mid_g)["presets"]
+        if row["id"] == "best"
+    )
+    assert best_g["copied_jpeg"] is False
+    assert best_g["location_risk"] is True
     opt_p = build_media_export_options_payload(db, mid_p)
     best_p = next(row for row in opt_p["presets"] if row["id"] == "best")
     assert best_p["copied_jpeg"] is False
     assert best_p["copied_png"] is True
+    assert best_p["location_risk"] is False
 
 
 def test_matrix_via_run_media_export(
