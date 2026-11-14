@@ -1,5 +1,6 @@
 # Discovery: Photo export quality and print workflow
 
+- **Issue:** [#447](https://github.com/Magehawks/orga-drone/issues/447)
 - **Tree:** `origin/develop` @ `8532a3d635d456ee46977477c438171d91cbaf38`
 - **Date:** 2026-11-14
 - **Status:** Analysis only. No production code in this note.
