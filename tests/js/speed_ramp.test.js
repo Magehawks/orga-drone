@@ -346,4 +346,34 @@ test("three regions map source to story and keep siblings on delete", () => {
     added.regions[1].points.map((point) => point.speed),
     [4, 0.5, 4]
   );
+  assert.equal(added.regions[1].start_s, 4);
+  assert.equal(added.regions[1].end_s, 8);
+});
+test("a new region uses the tail instead of the short hole before the first region", () => {
+  const first = parseRamp({
+    v: 2,
+    interp: "reciprocal_smoothstep",
+    regions: [region("r1", 3, 7, [0.5, 4, 0.5])],
+  });
+  const second = addRampRegion(first, {
+    playStart: 0,
+    playEnd: 30,
+    preset: "fast_slow_fast",
+    span: 4,
+  });
+  assert.equal(second.regions.at(-1).start_s, 7);
+  assert.equal(second.regions.at(-1).end_s, 11);
+  const late = parseRamp({
+    v: 2,
+    interp: "reciprocal_smoothstep",
+    regions: [region("r3", 22, 27, [0.5, 4, 0.5])],
+  });
+  const opened = addRampRegion(late, {
+    playStart: 0,
+    playEnd: 30,
+    preset: "fast_slow_fast",
+    span: 4,
+  });
+  assert.equal(opened.regions[0].start_s, 0);
+  assert.equal(opened.regions[0].end_s, 4);
 });

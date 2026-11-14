@@ -622,7 +622,20 @@ function dragCurveRegion(ramp, { mode, deltaStory, playStart, playEnd, regionId 
   });
 }
 
-function firstGap(regions, playStart, playEnd, need) {
+function freeGaps(regions, playStart, playEnd) {
+  const gaps = [];
+  let cursor = playStart;
+  for (const region of [...regions].sort((a, b) => a.start_s - b.start_s)) {
+    const right = Math.min(region.start_s, playEnd);
+    if (right - cursor > 1e-9) gaps.push({ start: cursor, end: right });
+    cursor = Math.max(cursor, region.end_s);
+    if (cursor >= playEnd - 1e-9) return gaps;
+  }
+  if (playEnd - cursor > 1e-9) gaps.push({ start: cursor, end: playEnd });
+  return gaps;
+}
+
+function placementGap(regions, playStart, playEnd, need, span) {
   if (
     !Number.isFinite(playStart) ||
     !Number.isFinite(playEnd) ||
@@ -630,22 +643,32 @@ function firstGap(regions, playStart, playEnd, need) {
   ) {
     return null;
   }
-  let cursor = playStart;
-  for (const region of [...regions].sort((a, b) => a.start_s - b.start_s)) {
-    const right = Math.min(region.start_s, playEnd);
-    if (right - cursor >= need - 1e-9) return { start: cursor, end: right };
-    cursor = Math.max(cursor, region.end_s);
-  }
-  if (playEnd - cursor >= need - 1e-9) return { start: cursor, end: playEnd };
-  return null;
+  const gaps = freeGaps(regions, playStart, playEnd).filter(
+    (gap) => gap.end - gap.start >= need - 1e-9
+  );
+  if (!gaps.length) return null;
+  const lastEnd = regions.reduce((end, region) => Math.max(end, region.end_s), playStart);
+  const tail = gaps.find(
+    (gap) => Math.abs(gap.start - lastEnd) <= 1e-6 && gap.end - gap.start >= span - 1e-9
+  );
+  if (tail) return tail;
+  const wide = gaps.filter((gap) => gap.end - gap.start >= span - 1e-9);
+  const pool = wide.length ? wide : gaps;
+  return pool.reduce((best, gap) =>
+    gap.end - gap.start > best.end - best.start + 1e-9 ||
+    (Math.abs(gap.end - gap.start - (best.end - best.start)) <= 1e-9 && gap.start < best.start)
+      ? gap
+      : best
+  );
 }
 
 function roundUp(value) {
-  return Math.ceil(value * 100 - 1e-9) / 100;
+  // ceil of a tiny negative epsilon is -0; JSON would hide it, strict checks would not.
+  return Math.ceil(value * 100 - 1e-9) / 100 || 0;
 }
 
 function roundDown(value) {
-  return Math.floor(value * 100 + 1e-9) / 100;
+  return Math.floor(value * 100 + 1e-9) / 100 || 0;
 }
 
 function presetPoints(start, end, speeds) {
@@ -705,7 +728,8 @@ export function addRampRegion(
   const existing = boundedCurves(ramp);
   if (!existing || existing.length >= MAX_REGIONS) return null;
   const need = Math.max(0.1, (speeds.length - 1) * 0.05);
-  const gap = firstGap(existing, Number(playStart), Number(playEnd), need);
+  const requested = Math.max(need, Number(span));
+  const gap = placementGap(existing, Number(playStart), Number(playEnd), need, requested);
   if (!gap) return null;
   const length = Math.min(Number(span), gap.end - gap.start);
   let start = roundUp(gap.start);

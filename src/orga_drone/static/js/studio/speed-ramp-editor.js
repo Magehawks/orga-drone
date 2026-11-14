@@ -106,7 +106,19 @@ export function createSpeedRampEditor({
     const addRegion = field("add-region");
     const removeRegion = field("remove-region");
     const bounded = ramp.v === 2 || Boolean(ramp.region);
-    if (addRegion) addRegion.disabled = pending || !bounded || regions.length >= MAX_REGIONS;
+    if (addRegion) {
+      const preset = field("preset");
+      const canAdd =
+        bounded &&
+        regions.length < MAX_REGIONS &&
+        preset &&
+        addRampRegion(ramp, {
+          playStart: range.start,
+          playEnd: range.end,
+          preset: preset.value,
+        });
+      addRegion.disabled = pending || !canAdd;
+    }
     if (removeRegion) removeRegion.disabled = pending || !bounded;
     const pick = field("point");
     pick.replaceChildren(
@@ -280,7 +292,9 @@ export function createSpeedRampEditor({
       const clip = getSelection();
       if (!value || !clip) return;
       const range = bounds(clip);
-      const previous = new Set(rampRegions(value).map((region) => region.id));
+      const previousSpans = new Set(
+        rampRegions(value).map((region) => `${region.start}:${region.end}`)
+      );
       const next = addRampRegion(value, {
         playStart: range.start,
         playEnd: range.end,
@@ -291,7 +305,10 @@ export function createSpeedRampEditor({
         fill();
         return;
       }
-      const created = next.regions.find((region) => !previous.has(region.id));
+      const created = next.regions.find(
+        (region) => !previousSpans.has(`${region.start_s}:${region.end_s}`)
+      );
+      draft = next;
       selectedRegionId = created ? created.id : next.regions[0].id;
       onSelect?.(clip, { focusInspector: false, source: "region", regionId: selectedRegionId });
       commit(next);

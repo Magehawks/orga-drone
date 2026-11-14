@@ -85,6 +85,9 @@ Story overlays and fades stay on the Story clock. Section repeats and forward
 loops still expand passes from `duration` and `source_at`. Source audio stays
 muted for the whole ramped clip. The export order does not change.
 
-The inspector can add, select, and remove a region. The effect lane draws one
-bar per region on the same row. Arrow keys and edge drags edit the selected
-region and stop at the neighboring region so the saved document cannot overlap.
+The inspector can add, select, and remove a region. A new region is placed in
+the open tail after the last region when that tail can hold the preset span.
+Otherwise it uses the widest gap that can hold the span, so a short hole before
+the first region does not trap it. The effect lane draws one bar per region on
+the same row. Arrow keys and edge drags edit the selected region and stop at
+the neighboring region so the saved document cannot overlap.

@@ -534,27 +534,57 @@ def _neighbor_limits(
     return lo, hi
 
 
-def _first_gap(
+def _free_gaps(
+    regions: list[CurveRegion],
+    play_start: float,
+    play_end: float,
+) -> list[tuple[float, float]]:
+    gaps: list[tuple[float, float]] = []
+    cursor = play_start
+    for region in sorted(regions, key=lambda item: item.start_s):
+        right = min(region.start_s, play_end)
+        if right - cursor > 1e-9:
+            gaps.append((cursor, right))
+        cursor = max(cursor, region.end_s)
+        if cursor >= play_end - 1e-9:
+            return gaps
+    if play_end - cursor > 1e-9:
+        gaps.append((cursor, play_end))
+    return gaps
+
+
+def _placement_gap(
     regions: list[CurveRegion],
     play_start: float,
     play_end: float,
     need: float,
+    span: float,
 ) -> tuple[float, float] | None:
+    """Prefer the open tail after the last region, then the widest usable gap.
+
+    A short hole before the first region must not trap the new region there:
+    a later region cannot be dragged through an earlier one.
+    """
     if (
         not math.isfinite(play_start)
         or not math.isfinite(play_end)
         or play_end - play_start < need - 1e-9
     ):
         return None
-    cursor = play_start
-    for region in sorted(regions, key=lambda item: item.start_s):
-        right = min(region.start_s, play_end)
-        if right - cursor >= need - 1e-9:
-            return cursor, right
-        cursor = max(cursor, region.end_s)
-    if play_end - cursor >= need - 1e-9:
-        return cursor, play_end
-    return None
+    gaps = [
+        gap
+        for gap in _free_gaps(regions, play_start, play_end)
+        if gap[1] - gap[0] >= need - 1e-9
+    ]
+    if not gaps:
+        return None
+    last_end = max((region.end_s for region in regions), default=play_start)
+    for gap in gaps:
+        if abs(gap[0] - last_end) <= 1e-6 and gap[1] - gap[0] >= span - 1e-9:
+            return gap
+    wide = [gap for gap in gaps if gap[1] - gap[0] >= span - 1e-9]
+    pool = wide or gaps
+    return max(pool, key=lambda gap: (gap[1] - gap[0], -gap[0]))
 
 
 def _round_up(value: float) -> float:
@@ -838,7 +868,7 @@ def add_ramp_region(
     region_id: str | None = None,
     span_s: float = 4.0,
 ) -> SpeedRamp:
-    """Append one bounded region in the first gap that can hold it."""
+    """Append one bounded region after the last region when that tail can hold it."""
     speeds = _PRESETS.get(preset)
     if speeds is None:
         raise ValueError("unknown speed ramp preset")
@@ -846,7 +876,10 @@ def add_ramp_region(
     if len(existing) >= MAX_REGIONS:
         raise ValueError("a clip can have at most 3 speed ramp regions")
     need = max(0.1, (len(speeds) - 1) * MIN_REGION_S)
-    gap = _first_gap(existing, float(play_start), float(play_end), need)
+    requested = max(need, float(span_s))
+    gap = _placement_gap(
+        existing, float(play_start), float(play_end), need, requested
+    )
     if gap is None:
         raise ValueError("speed ramp region does not fit")
     length = min(float(span_s), gap[1] - gap[0])
