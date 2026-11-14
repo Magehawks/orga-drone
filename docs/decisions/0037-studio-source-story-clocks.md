@@ -103,7 +103,8 @@ Rules:
    tests and timeline handles. An optional nested `region` object inside
    `speed_ramp` is allowed only if #332 cannot express bounds safely with
    points alone; any such field needs its own write validation and downgrade
-   note, still without a SQLite migration.
+   note, still without a SQLite migration. ADR 0038 later allows up to three
+   version-2 regions in the same key.
 3. **Phase 2 (later issues):** Extract shared helper modules incrementally;
    point new readers at them. Leave legacy keys in place. Migrate or rename
    keys only under a dedicated ADR.
@@ -119,8 +120,8 @@ this ADR, under these constraints:
    consistent with ADR 0034 points.
 2. **Semantics:** Outside the region playback is **1×**. Inside the region,
    use the existing `reciprocal_smoothstep` curve (2–5 points, validated
-   speeds). Exactly **one** region per clip in MVP; multiple regions stay
-   out of scope.
+   speeds). Exactly **one** region per clip in the #332 MVP. ADR 0038 raises
+   that limit to three non-overlapping version-2 regions.
 3. **Duration:** Story length uses the shared Source→Story map (flanking 1×
    Source spans + mapped interior). Preview and export must share that map.
 4. **Persistence:** Keep writing `effect_settings.speed_ramp`. No new top-level

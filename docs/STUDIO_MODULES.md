@@ -30,7 +30,8 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   cancellation and numeric controls. The entry injects selection, bounds,
   persistence, timeline positioning and playback callbacks. The editor never
   writes another feature's dataset. `placeRampRegion` stores one Source region
-  on the same payload: 1× outside, the existing curve inside. See ADR 0034,
+  on the same payload: 1× outside, the existing curve inside. ADR 0038 stores
+  up to three of those regions as `v: 2` on the same key. See ADR 0034,
   ADR 0037 and `tests/js/speed_ramp.test.js`.
 - `studio/timelapse.js` is the pure target-duration / speed-multiplier draft
   helper (1×–20×) that builds flat ADR 0034 payloads. `studio/timelapse-editor.js`

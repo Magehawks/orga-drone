@@ -1302,6 +1302,7 @@ def create_app() -> FastAPI:
         albums_available = [
             album for album in db.list_albums() if album.id not in member_ids
         ]
+        media_project_usage = db.studio_projects_for_media(item.id)
         return render(
             request,
             "detail.html",
@@ -1349,6 +1350,7 @@ def create_app() -> FastAPI:
             ),
             media_albums=media_albums,
             albums_available=albums_available,
+            media_project_usage=media_project_usage,
         )
 
     def studio_gallery_cards() -> list[dict[str, Any]]:

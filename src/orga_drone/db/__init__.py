@@ -431,6 +431,21 @@ class StudioProject:
     clip_count: int = 0
 
 
+@dataclass(frozen=True)
+class StudioProjectUsage:
+    """One saved Studio project that references a library media row.
+
+    ``clip_count`` is Story-clip occurrences only. ``has_original`` is true when
+    a ``studio_originals`` row still references the media (including after all
+    Story clips for that file were removed).
+    """
+
+    id: int
+    title: str
+    clip_count: int
+    has_original: bool = False
+
+
 @dataclass
 class StudioClip:
     """One Story clip: media reference or generated Title Card (never copies files)."""
@@ -3157,6 +3172,63 @@ class Database:
                     (media_path, project_id),
                 ).fetchone()
         return row is not None
+
+    def studio_projects_for_media(self, media_id: int) -> list[StudioProjectUsage]:
+        """List saved Studio projects that reference this library media row.
+
+        Membership comes from Story clips and/or kept ``studio_originals`` rows
+        (Originals can outlive every Story clip of that file). Matching prefers
+        an explicit ``source_media_id``; path is only a legacy fallback when the
+        stored id is NULL. Filename alone never counts. ``clip_count`` is Story
+        occurrences only; ``has_original`` is separate. Deleted projects are
+        omitted via the project join.
+        """
+        media = self.get_media(media_id)
+        if media is None:
+            return []
+        # Explicit id wins. Path matches only orphan/legacy rows without an id,
+        # so a stale path for another file cannot claim this media (or vice versa).
+        clip_match = (
+            "(c.source_media_id = ? OR "
+            "(c.source_media_id IS NULL AND c.media_path = ?))"
+        )
+        original_match = (
+            "(o.source_media_id = ? OR "
+            "(o.source_media_id IS NULL AND o.media_path = ?))"
+        )
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""SELECT p.id, p.title,
+                          COALESCE(clips.clip_count, 0) AS clip_count,
+                          CASE WHEN originals.project_id IS NULL THEN 0 ELSE 1 END
+                            AS has_original
+                   FROM studio_projects p
+                   LEFT JOIN (
+                     SELECT c.project_id, COUNT(c.id) AS clip_count
+                     FROM studio_clips c
+                     WHERE c.item_kind = 'media'
+                       AND {clip_match}
+                     GROUP BY c.project_id
+                   ) clips ON clips.project_id = p.id
+                   LEFT JOIN (
+                     SELECT DISTINCT o.project_id
+                     FROM studio_originals o
+                     WHERE {original_match}
+                   ) originals ON originals.project_id = p.id
+                   WHERE clips.clip_count IS NOT NULL
+                      OR originals.project_id IS NOT NULL
+                   ORDER BY p.title COLLATE NOCASE, p.id""",
+                (media.id, media.path, media.id, media.path),
+            ).fetchall()
+        return [
+            StudioProjectUsage(
+                id=int(r["id"]),
+                title=str(r["title"]),
+                clip_count=int(r["clip_count"]),
+                has_original=bool(r["has_original"]),
+            )
+            for r in rows
+        ]
 
     def studio_paths_among(
         self, paths: list[str], project_id: int | None = None
