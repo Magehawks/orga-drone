@@ -228,6 +228,11 @@ export function createCollageEditor(opts) {
 
   function fillInspector(clip) {
     if (!isCollage(clip)) return;
+    const ownerId = String(clip.dataset.studioId || "");
+    if (selectedLeafOwnerId && selectedLeafOwnerId !== ownerId) {
+      selectedLeafId = null;
+      selectedLeafOwnerId = null;
+    }
     opts.showInspector("inspector-collage");
     const spec = parseSpec(clip) || {};
     if (durationEl) {
