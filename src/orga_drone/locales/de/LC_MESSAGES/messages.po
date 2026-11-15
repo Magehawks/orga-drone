@@ -1143,3 +1143,24 @@ msgstr "Der Dateidialog braucht die Desktop-App."
 
 msgid "Select at least one photo or video."
 msgstr "Mindestens ein Foto oder Video auswählen."
+
+msgid "Still export"
+msgstr "Standbild-Export"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Collage still export format"
+msgstr "Exportformat der Collage"
+
+msgid "Export still"
+msgstr "Standbild exportieren"
+
+msgid "Could not export collage."
+msgstr "Collage konnte nicht exportiert werden."
+
+msgid "Collage export cancelled."
+msgstr "Collage-Export abgebrochen."
+
+msgid "collage"
+msgstr "collage"

@@ -1204,5 +1204,11 @@
   "Filter library media": "Filter library media",
   "Missing media": "Missing media",
   "Native file picker needs the desktop app.": "Native file picker needs the desktop app.",
-  "Select at least one photo or video.": "Select at least one photo or video."
+  "Select at least one photo or video.": "Select at least one photo or video.",
+  "Still export": "Still export",
+  "Collage still export format": "Collage still export format",
+  "Export still": "Export still",
+  "Could not export collage.": "Could not export collage.",
+  "Collage export cancelled.": "Collage export cancelled.",
+  "collage": "collage"
 }

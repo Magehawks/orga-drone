@@ -2401,6 +2401,139 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Collage media missing")
         return file_response(path)
 
+    from orga_drone.studio_collage_still import CollageStillPreviewCoordinator
+
+    collage_still_preview_gate = CollageStillPreviewCoordinator()
+
+    def _load_collage_spec_for_still(studio_item_id: int) -> tuple[Any, dict[str, Any]]:
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        if clip.item_kind != "collage":
+            raise HTTPException(status_code=400, detail="not a collage")
+        if not clip.collage_spec:
+            raise HTTPException(status_code=400, detail="collage has no layout")
+        return clip, collage_spec_from_raw(clip.collage_spec)
+
+    @app.post("/api/studio/{studio_item_id}/collage/preview")
+    async def api_studio_collage_preview(
+        studio_item_id: int,
+        request: Request,
+    ) -> Response:
+        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+        from orga_drone.studio_collage_still import (
+            PREVIEW_LONG_EDGE,
+            render_collage_preview_png,
+        )
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        t_s = 0.0
+        long_edge = PREVIEW_LONG_EDGE
+        if isinstance(payload, dict):
+            raw_t = payload.get("t_s", 0.0)
+            if isinstance(raw_t, (int, float)) and not isinstance(raw_t, bool):
+                t_s = float(raw_t)
+            raw_edge = payload.get("long_edge")
+            if isinstance(raw_edge, (int, float)) and not isinstance(raw_edge, bool):
+                long_edge = max(64, min(PREVIEW_LONG_EDGE, int(raw_edge)))
+        translate = get_translator(lang_from_request(request))
+        _clip, spec = _load_collage_spec_for_still(studio_item_id)
+        my_seq, cancel_event = collage_still_preview_gate.claim()
+        async with collage_still_preview_gate.lock:
+            if not collage_still_preview_gate.is_current(my_seq):
+                collage_still_preview_gate.release(cancel_event)
+                return Response(status_code=409)
+            try:
+                data = await asyncio.to_thread(
+                    render_collage_preview_png,
+                    db,
+                    spec,
+                    long_edge=long_edge,
+                    t_s=t_s,
+                    cancel_event=cancel_event,
+                )
+            except ExportCancelled:
+                return Response(status_code=409)
+            except StudioExportError as exc:
+                raise _media_export_error(exc, translate) from exc
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=400, detail=translate(str(exc) or "Could not build collage preview.")
+                ) from exc
+            finally:
+                collage_still_preview_gate.release(cancel_event)
+        return Response(content=data, media_type="image/png")
+
+    @app.post("/api/studio/{studio_item_id}/collage/export")
+    async def api_studio_collage_export(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_collage_still import (
+            EXPORT_LONG_EDGE,
+            MAX_EDGE,
+            export_collage_still,
+            inspect_collage_still,
+            normalize_still_format,
+        )
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        output_path = payload.get("output_path")
+        if not isinstance(output_path, str) or not output_path.strip():
+            raise HTTPException(status_code=400, detail="output_path is required")
+        translate = get_translator(lang_from_request(request))
+        _clip, spec = _load_collage_spec_for_still(studio_item_id)
+        try:
+            fmt = normalize_still_format(payload.get("format", "png"))
+            t_s = 0.0
+            raw_t = payload.get("t_s", 0.0)
+            if isinstance(raw_t, (int, float)) and not isinstance(raw_t, bool):
+                t_s = float(raw_t)
+            long_edge = EXPORT_LONG_EDGE
+            raw_edge = payload.get("long_edge")
+            if isinstance(raw_edge, (int, float)) and not isinstance(raw_edge, bool):
+                long_edge = max(64, min(MAX_EDGE, int(raw_edge)))
+            inspect = await asyncio.to_thread(
+                inspect_collage_still, db, spec, long_edge=long_edge, fmt=fmt
+            )
+            if not inspect.get("ok"):
+                raise StudioExportError(str(inspect.get("error") or "Could not export collage."))
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+
+        def _work(
+            on_progress: Callable[..., None],
+            cancel_event: threading.Event | None,
+        ) -> Path:
+            return export_collage_still(
+                db,
+                spec,
+                Path(output_path),
+                fmt=fmt,
+                long_edge=long_edge,
+                t_s=t_s,
+                cancel_event=cancel_event,
+                on_progress=on_progress,
+            )
+
+        return _begin_export_job(_work, translate)
+
+
     @app.patch("/api/studio/{studio_item_id}/title-card")
     async def api_studio_patch_title_card(
         studio_item_id: int,
@@ -5499,8 +5632,20 @@ def create_app() -> FastAPI:
             if isinstance(payload.get("filename"), str)
             else "export.mp4"
         )
+        file_types_raw = payload.get("file_types")
+        file_types: tuple[str, ...] | None = None
+        if isinstance(file_types_raw, list) and file_types_raw:
+            cleaned = tuple(
+                str(item) for item in file_types_raw if isinstance(item, str) and item.strip()
+            )
+            if cleaned:
+                file_types = cleaned
         try:
-            path = pick_save_file(directory=directory or "", save_filename=filename or "export.mp4")
+            path = pick_save_file(
+                directory=directory or "",
+                save_filename=filename or "export.mp4",
+                file_types=file_types or ("MP4 Files (*.mp4)",),
+            )
         except SaveFilePickerError:
             return JSONResponse(
                 {
