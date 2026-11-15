@@ -1,21 +1,20 @@
 # Discovery: Studio Creator Workflow
 
-Status: **discovery complete for planning** (not shipped).  
+Status: **implemented on develop** (Collage #456–#463 + Creator #466–#469; journey gate #470).  
 Tracking issue: [#465](https://github.com/Magehawks/orga-drone/issues/465).  
-Baseline: `origin/develop` @ `27c7e87` (includes Collage WP1 #457 / PR #471).  
+Journey evidence: [`docs/discovery/470-creator-journey-evidence.md`](470-creator-journey-evidence.md).  
 Collage Composer baseline: epic [#456](https://github.com/Magehawks/orga-drone/issues/456), ADR 0038
-(Accepted) + `docs/architecture/STUDIO_COLLAGE_COMPOSER.md`. WP1 persistence is on develop;
-WP2+ UI/media/export remain in flight (PRs #472 / #473 and later WPs).
+(Accepted) + `docs/architecture/STUDIO_COLLAGE_COMPOSER.md`.
 
-Implementation ideas (`status:idea`, not `ready-for-dev`):
+Implementation issues:
 
-| # | Issue |
-|---|--------|
-| [#466](https://github.com/Magehawks/orga-drone/issues/466) | Browse Edit in Studio + new/existing project chooser |
-| [#467](https://github.com/Magehawks/orga-drone/issues/467) | Skippable empty-project start (Normal vs Collage) |
-| [#468](https://github.com/Magehawks/orga-drone/issues/468) | Library selection seeds collage leaves |
-| [#469](https://github.com/Magehawks/orga-drone/issues/469) | Per-leaf grading via Color Workspace |
-| [#470](https://github.com/Magehawks/orga-drone/issues/470) | Creator journey tests Library → Export |
+| # | Issue | Status |
+|---|--------|--------|
+| [#466](https://github.com/Magehawks/orga-drone/issues/466) | Browse Edit in Studio + new/existing project chooser | shipped |
+| [#467](https://github.com/Magehawks/orga-drone/issues/467) | Skippable empty-project start (Normal vs Collage) | shipped |
+| [#468](https://github.com/Magehawks/orga-drone/issues/468) | Library selection seeds collage leaves | shipped |
+| [#469](https://github.com/Magehawks/orga-drone/issues/469) | Per-leaf grading via Color Workspace | shipped |
+| [#470](https://github.com/Magehawks/orga-drone/issues/470) | Creator journey tests Library → Export | this PR |
 
 This document specifies the end-to-end journey
 
@@ -212,16 +211,17 @@ document the conflict on both issues and wait for PO direction.
 
 | Desired | Gap |
 |---------|-----|
-| Multi-select photos+videos | Exists |
-| Action “Edit in Studio” | Copy/flow gap; bulk is “Add selected to Studio” |
-| New or existing project | Missing chooser; open-only target |
-| Preserve selection | Lost on need-project redirect; cancel path undefined |
-| No re-pick in Studio | Partial (clips appended) but not collage-seeded |
-| Empty project Normal/Collage skippable | Missing |
-| No start dialog on existing projects | Already true; keep it |
-| Collage anytime later | Planned WP2; keep |
-| Collage one timeline element + hold last frame | Specified in #456; not on develop yet |
-| Per-cell color via existing engine | Specified optionally in ADR; needs explicit WP/issue after still/export path |
+| Multi-select photos+videos | Shipped |
+| Action “Edit in Studio” | Shipped (chooser + open Studio) |
+| New or existing project | Shipped (#466) |
+| Preserve selection | Shipped (`selected=` retry) |
+| No re-pick in Studio | Shipped (collage seed #468) |
+| Empty project Normal/Collage skippable | Shipped (#467) |
+| No start dialog on existing projects | Shipped |
+| Collage anytime later | Shipped (Studio collage create) |
+| Collage one timeline element + hold last frame | Shipped (ADR 0038 / #456) |
+| Per-cell color via existing engine | Shipped (#469) |
+| WebView2 / packaged creator E2E | **NOT_RUN** (see #470 evidence) |
 
 ## 8. Non-goals
 

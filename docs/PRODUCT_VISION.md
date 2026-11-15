@@ -146,6 +146,7 @@ professional video-editing knowledge.
 | Responsibility | Status |
 |----------------|--------|
 | Select media / add to Studio | **Available now** |
+| Browse Edit in Studio (multi-select → new or existing project; optional collage seed; selection preserved on chooser retry) | **Available now** (current Browse page only; empty projects offer a skippable Normal / Collage start; collage cells reuse Color Workspace grades; synthetic journey gate in `tests/test_creator_journey.py`; WebView2/packaged E2E NOT_RUN) |
 | Arrange order | **Available now** |
 | Estimated runtime (photo duration planning) | **Available now** |
 | Persisted Studio project title (non-destructive project/clip model) | **Available now** |
@@ -181,7 +182,7 @@ professional video-editing knowledge.
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the inspector, the media browser, and the Story tracks can be dragged and the size is kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
-| Studio Collage Composer | **Available now** (one Story item with a recursive split layout; library + desktop photos/videos; fit/fill/zoom/pan; composed preview stills and multi-video play with a 4-video cap then still fallback; hold last frame; muted collage audio; PNG/JPEG still export and MP4 Story export via the existing encoder; does not modify Image Composer / `photo_combine`; no motion slide-in/out collages) |
+| Studio Collage Composer | **Available now** (one Story item with a recursive split layout; library + desktop photos/videos; fit/fill/zoom/pan; per-leaf Color Workspace grades; composed preview stills and multi-video play with a 4-video cap then still fallback; hold last frame; muted collage audio; PNG/JPEG still export and MP4 Story export via the existing encoder; does not modify Image Composer / `photo_combine`; no motion slide-in/out collages) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; project-level lead-in; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; the whole bed can start later with silence before it; coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; Standard / High / Best quality next to resolution, High by default; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
