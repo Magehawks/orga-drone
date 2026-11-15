@@ -5165,6 +5165,25 @@ def create_app() -> FastAPI:
             if target is None:
                 return choose_project_redirect()
 
+        seed = str(form.get("seed") or "").strip().lower()
+        if seed == "collage":
+            from orga_drone.studio_collage_seed import seed_collage_from_media_ids
+
+            with story_edit(db, target.id, group=_history_group(request)):
+                collage, assigned_n, leftover_n = seed_collage_from_media_ids(
+                    db, target.id, media_ids
+                )
+            collage_params: dict[str, Any] = {
+                "msg": "studio_bulk_added",
+                "added": assigned_n + leftover_n,
+                "skipped": max(0, len(media_ids) - assigned_n - leftover_n),
+                "select": collage.id,
+            }
+            return RedirectResponse(
+                url=append_query_params("/studio", **collage_params),
+                status_code=303,
+            )
+
         before_ids = {item.id for item in db.list_studio_items(target.id)}
         added_n, skipped_n = db.add_studio_media_ids(
             media_ids, project_id=target.id
