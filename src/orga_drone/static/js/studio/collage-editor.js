@@ -34,8 +34,27 @@ export function createCollageEditor(opts) {
   const removeForm = document.getElementById("inspector-collage-remove-form");
 
   let selectedLeafId = null;
+  let selectedLeafOwnerId = null;
   let drag = null;
   let saveChain = Promise.resolve();
+
+  function clipForLeafAction() {
+    const selected = opts.getSelectedClip?.();
+    if (
+      selectedLeafOwnerId &&
+      selected &&
+      String(selected.dataset?.studioId || "") === String(selectedLeafOwnerId)
+    ) {
+      return selected;
+    }
+    if (selectedLeafOwnerId) {
+      const owner = document.querySelector(
+        `.studio-clip[data-studio-id="${CSS.escape(String(selectedLeafOwnerId))}"]`
+      );
+      if (owner) return owner;
+    }
+    return selected;
+  }
 
   function msg(key, fallback) {
     const value = root?.dataset?.[key];
@@ -168,7 +187,16 @@ export function createCollageEditor(opts) {
       cell.appendChild(label);
       cell.addEventListener("click", () => {
         selectedLeafId = String(leaf.id);
+        selectedLeafOwnerId = String(clip.dataset.studioId || "");
         if (cellActions) cellActions.hidden = false;
+        const selected = opts.getSelectedClip?.();
+        if (
+          selectedLeafOwnerId &&
+          selected &&
+          String(selected.dataset?.studioId || "") !== selectedLeafOwnerId
+        ) {
+          opts.onSelectClip?.(selectedLeafOwnerId);
+        }
         renderPreview(clip);
       });
       stage.appendChild(cell);
@@ -269,7 +297,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-split-h")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     queueSave(
       clip,
@@ -280,7 +308,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-split-v")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     queueSave(
       clip,
@@ -291,7 +319,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-remove-cell")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     const leafId = selectedLeafId;
     selectedLeafId = null;
