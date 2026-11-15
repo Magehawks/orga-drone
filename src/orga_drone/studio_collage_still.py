@@ -234,9 +234,12 @@ def _render_graded_or_video_rgba(
     source_time_s: float,
     effect_settings: str | None,
     max_edge: int,
+    exact_time: bool = False,
+    cancel_event: threading.Event | None = None,
 ):
     from PIL import Image
 
+    _check_cancel(cancel_event)
     image = (
         image_adjust_from_effect_settings(effect_settings)
         if effect_settings
@@ -270,11 +273,14 @@ def _render_graded_or_video_rgba(
         color_wheels=wheels,
         max_edge=max(64, int(max_edge)),
         effect_settings=effect_settings if managed else None,
+        exact_time=bool(exact_time),
     )
     try:
         jpeg = render_preview_frame(req, data_dir=settings.data_dir)
     except PreviewFrameError as exc:
+        _check_cancel(cancel_event)
         raise StudioExportError(str(exc) or "Could not build a collage leaf still.") from exc
+    _check_cancel(cancel_event)
     try:
         img = Image.open(jpeg)
         img.load()
@@ -444,9 +450,12 @@ def _leaf_rgba(
     *,
     t_s: float,
     long_edge: int,
+    exact_time: bool = False,
+    cancel_event: threading.Event | None = None,
 ):
     from PIL import Image
 
+    _check_cancel(cancel_event)
     media = leaf.get("media")
     path = resolve_leaf_source(db, media if isinstance(media, dict) else None)
     if path is None or not isinstance(media, dict):
@@ -471,8 +480,11 @@ def _leaf_rgba(
                 source_time_s=source_time,
                 effect_settings=effect_settings,
                 max_edge=max(long_edge, max(rect_w, rect_h)),
+                exact_time=exact_time,
+                cancel_event=cancel_event,
             )
         except StudioExportError:
+            _check_cancel(cancel_event)
             if kind != "video" or source_time <= 0:
                 return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
             # Last-resort hold: retry near the start rather than aborting the collage.
@@ -483,8 +495,11 @@ def _leaf_rgba(
                     source_time_s=0.0,
                     effect_settings=effect_settings,
                     max_edge=max(long_edge, max(rect_w, rect_h)),
+                    exact_time=exact_time,
+                    cancel_event=cancel_event,
                 )
             except StudioExportError:
+                _check_cancel(cancel_event)
                 return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
         # Preview-frame grades through JPEG and loses photo alpha. Restore the
         # source alpha channel so transparent PNGs stay transparent after grade.
@@ -518,6 +533,7 @@ def compose_collage_rgba(
     long_edge: int = EXPORT_LONG_EDGE,
     t_s: float = 0.0,
     cancel_event: threading.Event | None = None,
+    exact_time: bool = False,
 ):
     """Compose one RGBA collage canvas from the layout SoT."""
     from PIL import Image
@@ -541,6 +557,8 @@ def compose_collage_rgba(
                 rect.h,
                 t_s=t_s,
                 long_edge=long_edge,
+                exact_time=exact_time,
+                cancel_event=cancel_event,
             )
             try:
                 box = (rect.x, rect.y, rect.x + rect.w, rect.y + rect.h)

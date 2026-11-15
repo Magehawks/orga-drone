@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
+import time
 from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
@@ -403,10 +405,29 @@ def _clip_to_export_clip(
             label=primary or secondary or "Title card",
         )
     if clip.item_kind == ITEM_KIND_COLLAGE or clip.kind == COLLAGE_KIND:
-        # MP4 collage segment lands in WP6 (#462). Persist/preview work must not
-        # silently drop the item or invent a second encoder path here.
-        raise StudioExportError(
-            "Collage MP4 export is not available yet; finish the collage export work package first."
+        from orga_drone.studio_collage import collage_spec_from_raw, normalize_spec
+
+        if not clip.collage_spec:
+            raise StudioExportError("This collage has no layout to export.")
+        try:
+            spec = normalize_spec(collage_spec_from_raw(clip.collage_spec))
+        except Exception as exc:  # noqa: BLE001 — surface as export error
+            raise StudioExportError("This collage layout is invalid.") from exc
+        seconds = effective_seconds(
+            kind=COLLAGE_KIND,
+            photo_duration_s=None,
+            duration_s=clip.collage_duration_s or clip.duration_s,
+            available=True,
+            card_duration_s=clip.collage_duration_s,
+        )
+        if seconds is None or seconds <= 0:
+            return None
+        return StudioExportClip(
+            source_path=None,
+            kind=COLLAGE_KIND,
+            duration_s=float(seconds),
+            collage_spec=spec,
+            label="Collage",
         )
     media, path = _require_clip_source(db, clip)
     kind = clip.kind if clip.kind in {"photo", "video"} else media.kind
@@ -994,9 +1015,9 @@ def prepare_studio_export(
         )
     for clip in source_rows:
         if clip.item_kind == ITEM_KIND_COLLAGE or clip.kind == COLLAGE_KIND:
-            raise StudioExportError(
-                "Collage MP4 export is not available yet; finish the collage export work package first."
-            )
+            if not clip.collage_spec:
+                raise StudioExportError("This collage has no layout to export.")
+            continue
         if clip.item_kind != TITLE_CARD_KIND:
             _require_clip_source(db, clip)
     heights = collect_project_video_heights(db, project.id)
@@ -1136,6 +1157,70 @@ def append_export_log(message: str) -> None:
         return
 
 
+def _materialize_collage_clips(
+    db: Database,
+    config: StudioExportConfig,
+    *,
+    on_progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+    owned_segments: list[Path] | None = None,
+) -> StudioExportConfig:
+    """Render collage Story items to temporary muted MP4 segments before encode."""
+    from orga_drone.studio_collage_export import render_collage_mp4_segment
+
+    pending = [clip for clip in config.clips if clip.kind == COLLAGE_KIND]
+    if not pending:
+        return config
+    work_root = settings.data_dir / "tmp" / "collage-export"
+    work_root.mkdir(parents=True, exist_ok=True)
+    built: list[StudioExportClip] = []
+    total = max(1, len(pending))
+    done = 0
+    for clip in config.clips:
+        if clip.kind != COLLAGE_KIND:
+            built.append(clip)
+            continue
+        if not clip.collage_spec:
+            raise StudioExportError("This collage has no layout to export.")
+        done += 1
+        if on_progress is not None:
+            on_progress(
+                {
+                    "phase": "preparing",
+                    "clip_index": done,
+                    "clip_total": total,
+                    "percent": int((done - 1) / total * 20),
+                    "current_label": clip.label or "Collage",
+                }
+            )
+        seg = work_root / f"collage-{os.getpid()}-{done}-{int(time.time() * 1000)}.mp4"
+        if owned_segments is not None:
+            owned_segments.append(seg)
+        render_collage_mp4_segment(
+            db,
+            clip.collage_spec,
+            seg,
+            width=int(config.width),
+            height=int(config.height),
+            duration_s=float(clip.duration_s),
+            cancel_event=cancel_event,
+            on_progress=on_progress,
+        )
+        built.append(
+            replace(
+                clip,
+                source_path=seg,
+                kind="video",
+                collage_spec=None,
+                source_start_s=0.0,
+                source_end_s=None,
+                playback_speed=1.0,
+                section_repeats=1,
+            )
+        )
+    return replace(config, clips=tuple(built))
+
+
 def run_studio_export(
     db: Database,
     *,
@@ -1156,12 +1241,27 @@ def run_studio_export(
         project_id=project_id,
         quality=quality,
     )
-    return _execute_export_config(
-        config,
-        encoder=encoder,
-        on_progress=on_progress,
-        cancel_event=cancel_event,
-    )
+    owned_segments: list[Path] = []
+    try:
+        config = _materialize_collage_clips(
+            db,
+            config,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+            owned_segments=owned_segments,
+        )
+        return _execute_export_config(
+            config,
+            encoder=encoder,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+        )
+    finally:
+        for seg in owned_segments:
+            try:
+                seg.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _materialize_deferred_spatial_clips(
