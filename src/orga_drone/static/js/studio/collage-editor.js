@@ -584,6 +584,17 @@ export function createCollageEditor(opts) {
     return targets.slice(0, count);
   }
 
+  function notifyLeafSelection(clip) {
+    if (!clip || !selectedLeafId || selectedLeafOwnerId !== String(clip.dataset.studioId || "")) {
+      return;
+    }
+    const spec = parseSpec(clip);
+    const leaf = spec
+      ? iterLeaves(spec.root).find((item) => String(item.id) === String(selectedLeafId))
+      : null;
+    opts.onLeafSelected?.(clip, leaf || { id: selectedLeafId }, leaf?.media || null);
+  }
+
   async function assignMediaList(clip, mediaList) {
     if (!isCollage(clip) || !mediaList.length) return;
     const targets = mediaTargets(clip, mediaList.length);
@@ -598,6 +609,8 @@ export function createCollageEditor(opts) {
     }
     if (isStillSelected(clip)) {
       fillInspector(clip);
+      // Rehydrate Color Workspace from the (possibly replaced) selected leaf.
+      notifyLeafSelection(clip);
     }
   }
 
@@ -960,7 +973,10 @@ export function createCollageEditor(opts) {
       { op: "assign_media", leaf_id: selectedLeafId, media: null },
       gestureGroup("collage-clear")
     ).then(() => {
-      if (isStillSelected(clip)) fillInspector(clip);
+      if (isStillSelected(clip)) {
+        fillInspector(clip);
+        notifyLeafSelection(clip);
+      }
     });
   });
   fitEl?.addEventListener("change", () => {
