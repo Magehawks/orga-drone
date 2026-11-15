@@ -445,7 +445,7 @@ export function createCollagePlayback(opts) {
       composedEl.style.width = "100%";
       composedEl.style.height = "100%";
       composedEl.style.objectFit = "fill";
-      composedEl.style.zIndex = "2";
+      composedEl.style.zIndex = "0";
       composedEl.hidden = false;
       composedEl.style.visibility = "visible";
       stage.appendChild(composedEl);

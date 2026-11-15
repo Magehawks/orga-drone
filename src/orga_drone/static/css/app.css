@@ -2502,7 +2502,8 @@ video.studio-preview-media.studio-preview-layer-b {
   z-index: 0;
 }
 .studio-preview-collage.is-paused .studio-collage-composed {
-  z-index: 2;
+  /* Below cell controls (z-index 1+) so labels and selection stay visible. */
+  z-index: 0;
 }
 .studio-collage-play-media {
   position: absolute;
@@ -2513,7 +2514,7 @@ video.studio-preview-media.studio-preview-layer-b {
   background: #000;
 }
 .studio-collage-play-media.studio-collage-play-composed {
-  z-index: 2;
+  z-index: 0;
 }
 .studio-collage-cell {
   position: absolute;

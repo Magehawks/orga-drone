@@ -216,6 +216,7 @@ export function createCollageEditor(opts) {
         composedObjectUrl = URL.createObjectURL(blob);
         composedImg.src = composedObjectUrl;
         composedImg.hidden = false;
+        /* Below cell controls so selection labels stay visible. */
         composedImg.style.zIndex = "0";
         stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
           img.style.opacity = "0";
