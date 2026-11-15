@@ -22,6 +22,7 @@ from orga_drone.studio_collage import (
 from orga_drone.studio_collage_still import (
     EXPORT_LONG_EDGE,
     PREVIEW_LONG_EDGE,
+    _clamp_video_source_time,
     compose_collage_rgba,
     export_collage_still,
     inspect_collage_still,
@@ -275,3 +276,18 @@ def test_fit_mode_letterboxes_without_stretch(
         assert corner[2] > corner[0]  # bluish background, not stretched red
     finally:
         canvas.close()
+
+
+def test_clamp_video_source_time_holds_last_frame(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = Database(tmp_path / "lib.sqlite3")
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"not-a-real-video")
+    monkeypatch.setattr(
+        "orga_drone.studio_collage_still._probe_video_duration_s",
+        lambda _path: 2.0,
+    )
+    media = {"source": "external", "kind": "video", "path": str(path)}
+    assert _clamp_video_source_time(db, media, path, 0.5) == pytest.approx(0.5)
+    assert _clamp_video_source_time(db, media, path, 9.0) == pytest.approx(1.95)
