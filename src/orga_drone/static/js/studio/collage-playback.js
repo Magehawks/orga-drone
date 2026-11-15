@@ -174,7 +174,8 @@ export function createCollagePlayback(opts) {
     if (composedEl) {
       composedEl.hidden = playMediaVisible && !fallback;
       composedEl.style.visibility = !playMediaVisible || fallback ? "visible" : "hidden";
-      composedEl.style.zIndex = !playMediaVisible || fallback ? "2" : "0";
+      /* Stay under .studio-collage-cell (z-index 1+) so labels/selection remain. */
+      composedEl.style.zIndex = "0";
     }
   }
 
