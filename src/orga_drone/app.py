@@ -5173,14 +5173,14 @@ def create_app() -> FastAPI:
                 collage, assigned_n, leftover_n = seed_collage_from_media_ids(
                     db, target.id, media_ids
                 )
-            params = {
+            collage_params: dict[str, Any] = {
                 "msg": "studio_bulk_added",
                 "added": assigned_n + leftover_n,
                 "skipped": max(0, len(media_ids) - assigned_n - leftover_n),
                 "select": collage.id,
             }
             return RedirectResponse(
-                url=append_query_params("/studio", **params),
+                url=append_query_params("/studio", **collage_params),
                 status_code=303,
             )
 
