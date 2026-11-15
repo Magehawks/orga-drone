@@ -75,6 +75,9 @@ class PreviewFrameRequest:
     story_time_s: float | None = None
     transition_side: str = "single"
     repeat_pass: int = 0
+    # Collage MP4 export (#462): keep distinct 30 fps samples instead of the
+    # 0.1 s preview cache bucket.
+    exact_time: bool = False
 
 
 def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
@@ -295,7 +298,11 @@ def cache_key_for(
         "mtime_ns": media_mtime_ns,
         "size": media_size,
         "kind": req.kind,
-        "t": quantize_preview_time(req.source_time_s),
+        "t": (
+            round(float(req.source_time_s), 4)
+            if req.exact_time
+            else quantize_preview_time(req.source_time_s)
+        ),
         # #358 animation clocks: same absolute PTS can sample different
         # source-local / Story values after trim or Story placement changes.
         "source_in": round(float(req.source_in_s), 4),
@@ -307,10 +314,15 @@ def cache_key_for(
         "story_t": (
             None
             if req.story_time_s is None
-            else quantize_preview_time(float(req.story_time_s))
+            else (
+                round(float(req.story_time_s), 4)
+                if req.exact_time
+                else quantize_preview_time(float(req.story_time_s))
+            )
         ),
         "transition_side": str(req.transition_side or "single"),
         "repeat_pass": int(req.repeat_pass or 0),
+        "exact_time": bool(req.exact_time),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),

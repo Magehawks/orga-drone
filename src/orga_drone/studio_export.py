@@ -1163,6 +1163,7 @@ def _materialize_collage_clips(
     *,
     on_progress: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
+    owned_segments: list[Path] | None = None,
 ) -> StudioExportConfig:
     """Render collage Story items to temporary muted MP4 segments before encode."""
     from orga_drone.studio_collage_export import render_collage_mp4_segment
@@ -1193,6 +1194,8 @@ def _materialize_collage_clips(
                 }
             )
         seg = work_root / f"collage-{os.getpid()}-{done}-{int(time.time() * 1000)}.mp4"
+        if owned_segments is not None:
+            owned_segments.append(seg)
         render_collage_mp4_segment(
             db,
             clip.collage_spec,
@@ -1238,18 +1241,27 @@ def run_studio_export(
         project_id=project_id,
         quality=quality,
     )
-    config = _materialize_collage_clips(
-        db,
-        config,
-        on_progress=on_progress,
-        cancel_event=cancel_event,
-    )
-    return _execute_export_config(
-        config,
-        encoder=encoder,
-        on_progress=on_progress,
-        cancel_event=cancel_event,
-    )
+    owned_segments: list[Path] = []
+    try:
+        config = _materialize_collage_clips(
+            db,
+            config,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+            owned_segments=owned_segments,
+        )
+        return _execute_export_config(
+            config,
+            encoder=encoder,
+            on_progress=on_progress,
+            cancel_event=cancel_event,
+        )
+    finally:
+        for seg in owned_segments:
+            try:
+                seg.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _materialize_deferred_spatial_clips(
