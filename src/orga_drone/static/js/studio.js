@@ -4145,9 +4145,21 @@ import {
   function selectedAdjustableClip() {
     if (!state.selected || state.selected.type !== "clip") return null;
     const clip = findClip(grid, state.selected.id);
+    if (!clip) return null;
     const kind = clipKind(clip);
-    if (!clip || (kind !== "video" && kind !== "photo")) return null;
-    return clip;
+    if (kind === "video" || kind === "photo") return clip;
+    // Collage leaf grading reuses the Color Workspace when a cell is selected.
+    if (
+      kind === "collage" &&
+      collageEditor &&
+      typeof collageEditor.getSelectedLeafId === "function" &&
+      collageEditor.getSelectedLeafId() &&
+      String(collageEditor.getSelectedLeafOwnerId?.() || "") ===
+        String(clip.dataset.studioId || "")
+    ) {
+      return clip;
+    }
+    return null;
   }
 
   function syncQuickLookChips(lookId) {
@@ -5156,8 +5168,9 @@ import {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
     const look = readColorLook(clip);
-    const payload = { ...look };
     const leafId = collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
+    const payload = { ...look };
     if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/color`, {
       method: "PATCH",
@@ -5172,12 +5185,16 @@ import {
       }
       throw new Error(detail || msgColorFailed);
     }
+    const stillSameLeaf =
+      !leafId || String(collageLeafGradeTarget(studioId) || "") === String(leafId);
     // A response for an older slider value must not overwrite a newer edit.
-    if (JSON.stringify(readColorLook(clip)) === JSON.stringify(look)) {
+    if (stillSameLeaf && JSON.stringify(readColorLook(clip)) === JSON.stringify(look)) {
       writeColorLook(clip, body.color_look || look);
     }
+    applyLeafGradeCollageSpec(clip, body);
     applyPreviewGrades(resolveAt(state.projectTimeS));
     if (
+      stillSameLeaf &&
       state.selected &&
       state.selected.type === "clip" &&
       String(state.selected.id) === String(studioId)
@@ -5277,6 +5294,7 @@ import {
   }
 
   let imageSaveChain = Promise.resolve();
+  const imageAdjustQueued = new Map();
 
   const imageAdjustSaver = createImageAdjustSaver({
     getClipById: (studioId) =>
@@ -5298,6 +5316,16 @@ import {
     showError: showFlash,
     errorMessage: msgImageFailed,
     leafIdFor: (studioId) => collageLeafGradeTarget(studioId),
+    queuedPayloadFor: (studioId) => imageAdjustQueued.get(String(studioId)) || null,
+    allowWithoutLeaf: (studioId, leafId) => {
+      const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
+      if (clip && clipKind(clip) === "collage") return Boolean(leafId);
+      return true;
+    },
+    onResponse: (clip, body) => {
+      if (clip?.dataset?.studioId) imageAdjustQueued.delete(String(clip.dataset.studioId));
+      applyLeafGradeCollageSpec(clip, body);
+    },
     serialize: (run) => {
       const next = imageSaveChain.then(run);
       imageSaveChain = next.catch(() => {});
@@ -5309,34 +5337,21 @@ import {
   function queueImageAdjustSave(clip) {
     const studioId = clip && clip.dataset.studioId;
     if (!studioId) return;
+    const leafId = collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
+    imageAdjustQueued.set(String(studioId), {
+      leafId,
+      adjust: readImageAdjust(clip),
+    });
     imageAdjustSaver.queue(studioId).catch((err) => {
+      imageAdjustQueued.delete(String(studioId));
       showFlash((err && err.message) || msgImageFailed);
     });
   }
 
   let hslSaveChain = Promise.resolve();
   let hslSaveTimer = 0;
-  const hslPendingStudioIds = new Set();
-
-  function queueHslSave(clip) {
-    const studioId = clip && clip.dataset.studioId;
-    if (!studioId) return;
-    hslPendingStudioIds.add(String(studioId));
-    if (hslSaveTimer) window.clearTimeout(hslSaveTimer);
-    // Rapid slider releases coalesce into the latest per-clip settings.
-    hslSaveTimer = window.setTimeout(() => {
-      hslSaveTimer = 0;
-      const pendingIds = [...hslPendingStudioIds];
-      hslPendingStudioIds.clear();
-      pendingIds.forEach((pendingId) => {
-        hslSaveChain = hslSaveChain
-          .then(() => saveHsl(pendingId))
-          .catch((err) => {
-            showFlash((err && err.message) || msgHslFailed);
-          });
-      });
-    }, 150);
-  }
+  const hslPendingByKey = new Map();
 
   function collageLeafGradeTarget(studioId) {
     if (!collageEditor || typeof collageEditor.getSelectedLeafId !== "function") {
@@ -5349,12 +5364,43 @@ import {
     return String(leafId);
   }
 
-  async function saveHsl(studioId) {
+  function queueHslSave(clip) {
+    const studioId = clip && clip.dataset.studioId;
+    if (!studioId) return;
+    const leafId = collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
+    const key = `${studioId}:${leafId || ""}`;
+    hslPendingByKey.set(key, {
+      studioId: String(studioId),
+      leafId,
+      hsl: readHsl(clip),
+    });
+    if (hslSaveTimer) window.clearTimeout(hslSaveTimer);
+    // Rapid slider releases coalesce into the latest per-clip/leaf settings.
+    hslSaveTimer = window.setTimeout(() => {
+      hslSaveTimer = 0;
+      const pending = [...hslPendingByKey.values()];
+      hslPendingByKey.clear();
+      pending.forEach((entry) => {
+        hslSaveChain = hslSaveChain
+          .then(() => saveHsl(entry.studioId, entry))
+          .catch((err) => {
+            showFlash((err && err.message) || msgHslFailed);
+          });
+      });
+    }, 150);
+  }
+
+  async function saveHsl(studioId, queued = null) {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
-    const hsl = readHsl(clip);
+    const hsl = queued?.hsl || readHsl(clip);
+    const leafId =
+      queued && Object.prototype.hasOwnProperty.call(queued, "leafId")
+        ? queued.leafId
+        : collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
     const payload = { ranges: hsl.ranges };
-    const leafId = collageLeafGradeTarget(studioId);
     if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/hsl`, {
       method: "PATCH",
@@ -5365,39 +5411,47 @@ import {
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgHslFailed);
     }
-    if (JSON.stringify(readHsl(clip)) === JSON.stringify(hsl)) {
+    const stillSameLeaf =
+      !leafId || String(collageLeafGradeTarget(studioId) || "") === String(leafId);
+    if (stillSameLeaf && JSON.stringify(readHsl(clip)) === JSON.stringify(hsl)) {
       writeHsl(clip, body.hsl || hsl, true);
     }
     if (
+      stillSameLeaf &&
       state.selected &&
       state.selected.type === "clip" &&
       String(state.selected.id) === String(studioId)
     ) {
       fillHsl(clip);
     }
+    applyLeafGradeCollageSpec(clip, body);
     applyPreviewGrades(resolveAt(state.projectTimeS));
-    if (leafId && collageEditor?.renderPreview) {
-      collageEditor.renderPreview(clip);
-    }
     setSaveState(true);
   }
 
   let colorWheelsSaveChain = Promise.resolve();
   let colorWheelsSaveTimer = 0;
-  const colorWheelsPendingStudioIds = new Set();
+  const colorWheelsPendingByKey = new Map();
 
   function queueColorWheelsSave(clip) {
     const studioId = clip && clip.dataset.studioId;
     if (!studioId) return;
-    colorWheelsPendingStudioIds.add(String(studioId));
+    const leafId = collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
+    const key = `${studioId}:${leafId || ""}`;
+    colorWheelsPendingByKey.set(key, {
+      studioId: String(studioId),
+      leafId,
+      colorWheels: readColorWheels(clip),
+    });
     if (colorWheelsSaveTimer) window.clearTimeout(colorWheelsSaveTimer);
     colorWheelsSaveTimer = window.setTimeout(() => {
       colorWheelsSaveTimer = 0;
-      const pendingIds = [...colorWheelsPendingStudioIds];
-      colorWheelsPendingStudioIds.clear();
-      pendingIds.forEach((pendingId) => {
+      const pending = [...colorWheelsPendingByKey.values()];
+      colorWheelsPendingByKey.clear();
+      pending.forEach((entry) => {
         colorWheelsSaveChain = colorWheelsSaveChain
-          .then(() => saveColorWheels(pendingId))
+          .then(() => saveColorWheels(entry.studioId, entry))
           .catch((err) => {
             showFlash((err && err.message) || msgColorWheelsFailed);
           });
@@ -5405,12 +5459,16 @@ import {
     }, 150);
   }
 
-  async function saveColorWheels(studioId) {
+  async function saveColorWheels(studioId, queued = null) {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
-    const colorWheels = readColorWheels(clip);
+    const colorWheels = queued?.colorWheels || readColorWheels(clip);
+    const leafId =
+      queued && Object.prototype.hasOwnProperty.call(queued, "leafId")
+        ? queued.leafId
+        : collageLeafGradeTarget(studioId);
+    if (clipKind(clip) === "collage" && !leafId) return;
     const payload = { wheels: colorWheels.wheels };
-    const leafId = collageLeafGradeTarget(studioId);
     if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/color-wheels`, {
       method: "PATCH",
@@ -5421,16 +5479,23 @@ import {
     if (!res.ok || !body || !body.ok) {
       throw new Error((body && body.detail) || msgColorWheelsFailed);
     }
-    if (JSON.stringify(readColorWheels(clip)) === JSON.stringify(colorWheels)) {
+    const stillSameLeaf =
+      !leafId || String(collageLeafGradeTarget(studioId) || "") === String(leafId);
+    if (
+      stillSameLeaf &&
+      JSON.stringify(readColorWheels(clip)) === JSON.stringify(colorWheels)
+    ) {
       writeColorWheels(clip, body.color_wheels || colorWheels, true);
     }
     if (
+      stillSameLeaf &&
       state.selected &&
       state.selected.type === "clip" &&
       String(state.selected.id) === String(studioId)
     ) {
       fillColorWheels(clip);
     }
+    applyLeafGradeCollageSpec(clip, body);
     applyPreviewGrades(resolveAt(state.projectTimeS));
     setSaveState(true);
   }
@@ -9087,7 +9152,9 @@ import {
     }
   }
 
-  function showInspector(kind) {
+  function showInspector(kind, options = {}) {
+    const also = Array.isArray(options.also) ? options.also : [];
+    const visible = new Set([kind, ...also].filter(Boolean));
     [
       "inspector-empty",
       "inspector-clip",
@@ -9098,9 +9165,19 @@ import {
       "inspector-collage",
     ].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.hidden = id !== kind;
+      if (el) el.hidden = !visible.has(id);
     });
     if (kind === "inspector-empty") fillEmptyInspector();
+  }
+
+  function applyLeafGradeCollageSpec(clip, body) {
+    if (!clip || !body || !body.collage_spec) return;
+    try {
+      clip.dataset.collageSpec = JSON.stringify(body.collage_spec);
+    } catch (_) {
+      /* ignore */
+    }
+    if (collageEditor?.renderPreview) collageEditor.renderPreview(clip);
   }
 
   function setClipRemoveAction(form, studioId) {
@@ -11749,6 +11826,15 @@ import {
     onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
     onLeafSelected: (clip, _leaf, media) => {
       if (!clip) return;
+      showInspector("inspector-collage", { also: ["inspector-clip"] });
+      const imageTab = document.querySelector('[data-inspector-tab-button="image"]');
+      if (imageTab && typeof imageTab.click === "function") {
+        try {
+          imageTab.click();
+        } catch (_) {
+          /* ignore */
+        }
+      }
       const grade =
         media && media.grade && typeof media.grade === "object" ? media.grade : {};
       const image =
@@ -11765,22 +11851,18 @@ import {
           : grade.color && typeof grade.color === "object"
             ? grade.color
             : neutralColorLook();
+      const wheels =
+        grade.color_wheels && typeof grade.color_wheels === "object"
+          ? grade.color_wheels
+          : neutralColorWheels();
       writeImageAdjust(clip, image, true);
       writeHsl(clip, hsl.ranges ? hsl : { ranges: hsl }, true);
       writeColorLook(clip, look);
+      writeColorWheels(clip, wheels, true);
       fillImageAdjust(clip);
       fillHsl(clip);
       fillColorLook(clip);
-      if (typeof writeColorWheels === "function" && typeof fillColorWheels === "function") {
-        const wheels =
-          grade.color_wheels && typeof grade.color_wheels === "object"
-            ? grade.color_wheels
-            : null;
-        if (wheels) {
-          writeColorWheels(clip, wheels, true);
-          fillColorWheels(clip);
-        }
-      }
+      fillColorWheels(clip);
     },
     showInspector,
     showFlash: showRootFlash,

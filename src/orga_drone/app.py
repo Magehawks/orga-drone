@@ -2676,14 +2676,22 @@ def create_app() -> FastAPI:
                     image = image_adjust_from_effect_settings(item.effect_settings)
         except Exception as exc:  # noqa: BLE001 - map GradeError / ValueError
             raise _grade_http_error(exc) from exc
-        return JSONResponse(
-            {
-                "ok": True,
-                "id": item.id,
-                "leaf_id": leaf_id,
-                "image": image.as_dict(),
-            }
-        )
+        payload_out: dict[str, Any] = {
+            "ok": True,
+            "id": item.id,
+            "leaf_id": leaf_id,
+            "image": image.as_dict(),
+        }
+        if leaf_id and getattr(item, "collage_spec", None):
+            from orga_drone.studio_collage import (
+                collage_spec_from_raw,
+                public_collage_spec,
+            )
+
+            payload_out["collage_spec"] = public_collage_spec(
+                collage_spec_from_raw(item.collage_spec)
+            )
+        return JSONResponse(payload_out)
 
     def _grade_http_error(exc: Exception) -> HTTPException:
         from orga_drone.studio_grade_contract import GradeError
@@ -3639,14 +3647,22 @@ def create_app() -> FastAPI:
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        return JSONResponse(
-            {
-                "ok": True,
-                "id": item.id,
-                "leaf_id": leaf_id,
-                "hsl": hsl.as_dict(),
-            }
-        )
+        hsl_out: dict[str, Any] = {
+            "ok": True,
+            "id": item.id,
+            "leaf_id": leaf_id,
+            "hsl": hsl.as_dict(),
+        }
+        if leaf_id and getattr(item, "collage_spec", None):
+            from orga_drone.studio_collage import (
+                collage_spec_from_raw,
+                public_collage_spec,
+            )
+
+            hsl_out["collage_spec"] = public_collage_spec(
+                collage_spec_from_raw(item.collage_spec)
+            )
+        return JSONResponse(hsl_out)
 
     @app.patch("/api/studio/{studio_item_id}/color-wheels")
     async def api_studio_color_wheels(
@@ -3683,14 +3699,22 @@ def create_app() -> FastAPI:
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        return JSONResponse(
-            {
-                "ok": True,
-                "id": item.id,
-                "leaf_id": leaf_id,
-                "color_wheels": color_wheels.as_dict(),
-            }
-        )
+        wheels_out: dict[str, Any] = {
+            "ok": True,
+            "id": item.id,
+            "leaf_id": leaf_id,
+            "color_wheels": color_wheels.as_dict(),
+        }
+        if leaf_id and getattr(item, "collage_spec", None):
+            from orga_drone.studio_collage import (
+                collage_spec_from_raw,
+                public_collage_spec,
+            )
+
+            wheels_out["collage_spec"] = public_collage_spec(
+                collage_spec_from_raw(item.collage_spec)
+            )
+        return JSONResponse(wheels_out)
 
     @app.patch("/api/studio/{studio_item_id}/color")
     async def api_studio_color_look(
@@ -3735,14 +3759,22 @@ def create_app() -> FastAPI:
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        return JSONResponse(
-            {
-                "ok": True,
-                "id": item.id,
-                "leaf_id": leaf_id,
-                "color_look": look.as_dict(),
-            }
-        )
+        look_out: dict[str, Any] = {
+            "ok": True,
+            "id": item.id,
+            "leaf_id": leaf_id,
+            "color_look": look.as_dict(),
+        }
+        if leaf_id and getattr(item, "collage_spec", None):
+            from orga_drone.studio_collage import (
+                collage_spec_from_raw,
+                public_collage_spec,
+            )
+
+            look_out["collage_spec"] = public_collage_spec(
+                collage_spec_from_raw(item.collage_spec)
+            )
+        return JSONResponse(look_out)
 
     @app.patch("/api/studio/{studio_item_id}/color-animation")
     async def api_studio_color_animation(
