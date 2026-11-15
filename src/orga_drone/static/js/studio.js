@@ -5156,10 +5156,13 @@ import {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
     const look = readColorLook(clip);
+    const payload = { ...look };
+    const leafId = collageLeafGradeTarget(studioId);
+    if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/color`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(look),
+      body: JSON.stringify(payload),
     });
     const body = await readJson(res);
     if (!res.ok || !body || !body.ok) {
@@ -5294,6 +5297,7 @@ import {
     setSaved: setSaveState,
     showError: showFlash,
     errorMessage: msgImageFailed,
+    leafIdFor: (studioId) => collageLeafGradeTarget(studioId),
     serialize: (run) => {
       const next = imageSaveChain.then(run);
       imageSaveChain = next.catch(() => {});
@@ -5334,14 +5338,28 @@ import {
     }, 150);
   }
 
+  function collageLeafGradeTarget(studioId) {
+    if (!collageEditor || typeof collageEditor.getSelectedLeafId !== "function") {
+      return null;
+    }
+    const leafId = collageEditor.getSelectedLeafId();
+    const ownerId = collageEditor.getSelectedLeafOwnerId?.();
+    if (!leafId || !ownerId) return null;
+    if (String(ownerId) !== String(studioId)) return null;
+    return String(leafId);
+  }
+
   async function saveHsl(studioId) {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
     const hsl = readHsl(clip);
+    const payload = { ranges: hsl.ranges };
+    const leafId = collageLeafGradeTarget(studioId);
+    if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/hsl`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ ranges: hsl.ranges }),
+      body: JSON.stringify(payload),
     });
     const body = await readJson(res);
     if (!res.ok || !body || !body.ok) {
@@ -5358,6 +5376,9 @@ import {
       fillHsl(clip);
     }
     applyPreviewGrades(resolveAt(state.projectTimeS));
+    if (leafId && collageEditor?.renderPreview) {
+      collageEditor.renderPreview(clip);
+    }
     setSaveState(true);
   }
 
@@ -5388,10 +5409,13 @@ import {
     const clip = clips().find((item) => String(item.dataset.studioId) === String(studioId));
     if (!clip) return;
     const colorWheels = readColorWheels(clip);
+    const payload = { wheels: colorWheels.wheels };
+    const leafId = collageLeafGradeTarget(studioId);
+    if (leafId) payload.leaf_id = leafId;
     const res = await fetch(`/api/studio/${studioId}/color-wheels`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ wheels: colorWheels.wheels }),
+      body: JSON.stringify(payload),
     });
     const body = await readJson(res);
     if (!res.ok || !body || !body.ok) {
@@ -11723,6 +11747,41 @@ import {
       return findClip(grid, state.selected.id);
     },
     onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
+    onLeafSelected: (clip, _leaf, media) => {
+      if (!clip) return;
+      const grade =
+        media && media.grade && typeof media.grade === "object" ? media.grade : {};
+      const image =
+        grade.image && typeof grade.image === "object"
+          ? grade.image
+          : neutralImageAdjust();
+      const hsl =
+        grade.hsl && typeof grade.hsl === "object"
+          ? { ranges: grade.hsl.ranges || grade.hsl }
+          : neutralHslAdjust();
+      const look =
+        grade.color_look && typeof grade.color_look === "object"
+          ? grade.color_look
+          : grade.color && typeof grade.color === "object"
+            ? grade.color
+            : neutralColorLook();
+      writeImageAdjust(clip, image, true);
+      writeHsl(clip, hsl.ranges ? hsl : { ranges: hsl }, true);
+      writeColorLook(clip, look);
+      fillImageAdjust(clip);
+      fillHsl(clip);
+      fillColorLook(clip);
+      if (typeof writeColorWheels === "function" && typeof fillColorWheels === "function") {
+        const wheels =
+          grade.color_wheels && typeof grade.color_wheels === "object"
+            ? grade.color_wheels
+            : null;
+        if (wheels) {
+          writeColorWheels(clip, wheels, true);
+          fillColorWheels(clip);
+        }
+      }
+    },
     showInspector,
     showFlash: showRootFlash,
     isPlaying: () => Boolean(state.playing),

@@ -14,6 +14,7 @@ export function createImageAdjustSaver({
   setSaved = noop,
   showError = noop,
   errorMessage = DEFAULT_ERROR,
+  leafIdFor = () => null,
   headers,
   fetchImpl,
   readJson,
@@ -35,14 +36,20 @@ export function createImageAdjustSaver({
     payload: (studioId) => {
       const clip = getClipById(studioId);
       if (!clip) return null;
-      pendingClips.set(keyOf(studioId), { clip, wrote: false });
-      return readAdjust(clip);
+      const adjust = readAdjust(clip);
+      if (!adjust) return null;
+      pendingClips.set(keyOf(studioId), { clip, wrote: false, adjust });
+      const leafId = leafIdFor(studioId);
+      if (leafId) return { ...adjust, leaf_id: leafId };
+      return adjust;
     },
     apply: (studioId, body, requestBody) => {
       const pending = pendingClips.get(keyOf(studioId));
       if (!pending) return false;
-      if (JSON.stringify(readAdjust(pending.clip)) === JSON.stringify(requestBody)) {
-        writeAdjust(pending.clip, body.image || requestBody, true);
+      const sent = { ...(requestBody || {}) };
+      delete sent.leaf_id;
+      if (JSON.stringify(readAdjust(pending.clip)) === JSON.stringify(sent)) {
+        writeAdjust(pending.clip, body.image || sent, true);
         pending.wrote = true;
       }
       return true;

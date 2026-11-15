@@ -2633,6 +2633,20 @@ def create_app() -> FastAPI:
             }
         )
 
+    def _collage_leaf_id(payload: dict[str, Any]) -> str | None:
+        raw = payload.get("leaf_id")
+        if raw is None or raw == "":
+            return None
+        if not isinstance(raw, str):
+            raise HTTPException(status_code=400, detail="leaf_id must be a string")
+        return raw
+
+    def _leaf_grade_blob(item: Any, leaf_id: str) -> str:
+        from orga_drone.studio_collage_grade import grade_blob, leaf_grade_from_clip_raw
+
+        grade = leaf_grade_from_clip_raw(item.collage_spec, leaf_id)
+        return grade_blob({"grade": grade} if grade else None)
+
     @app.patch("/api/studio/{studio_item_id}/image")
     async def api_studio_image(
         studio_item_id: int,
@@ -2647,15 +2661,26 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include an image adjustment"
             )
         try:
+            leaf_id = _collage_leaf_id(payload)
+            body = {k: v for k, v in payload.items() if k != "leaf_id"}
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_image_adjust(studio_item_id, payload)
+                if leaf_id:
+                    item = db.set_studio_collage_leaf_grade(
+                        studio_item_id, leaf_id, section="image", payload=body
+                    )
+                    image = image_adjust_from_effect_settings(
+                        _leaf_grade_blob(item, leaf_id)
+                    )
+                else:
+                    item = db.set_studio_image_adjust(studio_item_id, body)
+                    image = image_adjust_from_effect_settings(item.effect_settings)
         except Exception as exc:  # noqa: BLE001 - map GradeError / ValueError
             raise _grade_http_error(exc) from exc
-        image = image_adjust_from_effect_settings(item.effect_settings)
         return JSONResponse(
             {
                 "ok": True,
                 "id": item.id,
+                "leaf_id": leaf_id,
                 "image": image.as_dict(),
             }
         )
@@ -3598,18 +3623,27 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include HSL settings"
             )
         try:
+            leaf_id = _collage_leaf_id(payload)
+            body = {k: v for k, v in payload.items() if k != "leaf_id"}
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_hsl(studio_item_id, payload)
+                if leaf_id:
+                    item = db.set_studio_collage_leaf_grade(
+                        studio_item_id, leaf_id, section="hsl", payload=body
+                    )
+                    hsl = hsl_adjust_from_effect_settings(_leaf_grade_blob(item, leaf_id))
+                else:
+                    item = db.set_studio_hsl(studio_item_id, body)
+                    hsl = hsl_adjust_from_effect_settings(item.effect_settings)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        hsl = hsl_adjust_from_effect_settings(item.effect_settings)
         return JSONResponse(
             {
                 "ok": True,
                 "id": item.id,
+                "leaf_id": leaf_id,
                 "hsl": hsl.as_dict(),
             }
         )
@@ -3628,18 +3662,32 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include colour wheels"
             )
         try:
+            leaf_id = _collage_leaf_id(payload)
+            body = {k: v for k, v in payload.items() if k != "leaf_id"}
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_color_wheels(studio_item_id, payload)
+                if leaf_id:
+                    item = db.set_studio_collage_leaf_grade(
+                        studio_item_id,
+                        leaf_id,
+                        section="color-wheels",
+                        payload=body,
+                    )
+                    color_wheels = color_wheels_from_effect_settings(
+                        _leaf_grade_blob(item, leaf_id)
+                    )
+                else:
+                    item = db.set_studio_color_wheels(studio_item_id, body)
+                    color_wheels = color_wheels_from_effect_settings(item.effect_settings)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        color_wheels = color_wheels_from_effect_settings(item.effect_settings)
         return JSONResponse(
             {
                 "ok": True,
                 "id": item.id,
+                "leaf_id": leaf_id,
                 "color_wheels": color_wheels.as_dict(),
             }
         )
@@ -3671,18 +3719,27 @@ def create_app() -> FastAPI:
                         detail="A LUT file is missing. Choose the .cube again.",
                     ) from exc
         try:
+            leaf_id = _collage_leaf_id(payload)
+            body = {k: v for k, v in payload.items() if k != "leaf_id"}
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_color_look(studio_item_id, payload)
+                if leaf_id:
+                    item = db.set_studio_collage_leaf_grade(
+                        studio_item_id, leaf_id, section="color", payload=body
+                    )
+                    look = color_look_from_effect_settings(_leaf_grade_blob(item, leaf_id))
+                else:
+                    item = db.set_studio_color_look(studio_item_id, body)
+                    look = color_look_from_effect_settings(item.effect_settings)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:
                 raise HTTPException(status_code=404, detail=msg) from exc
             raise HTTPException(status_code=400, detail=msg) from exc
-        look = color_look_from_effect_settings(item.effect_settings)
         return JSONResponse(
             {
                 "ok": True,
                 "id": item.id,
+                "leaf_id": leaf_id,
                 "color_look": look.as_dict(),
             }
         )

@@ -307,6 +307,7 @@ export function createCollageEditor(opts) {
         ) {
           opts.onSelectClip?.(selectedLeafOwnerId);
         }
+        opts.onLeafSelected?.(clip, leaf, media || null);
         renderPreview(clip);
       });
       stage.appendChild(cell);
@@ -1005,6 +1006,9 @@ export function createCollageEditor(opts) {
     fillInspector,
     hidePreview,
     renderPreview,
+    getSelectedLeafId: () => selectedLeafId,
+    getSelectedLeafOwnerId: () => selectedLeafOwnerId,
+    selectedLeafMedia,
     syncPlayback: (args) => playback.sync(args),
     pausePlayback: () => {
       playback.pause();
