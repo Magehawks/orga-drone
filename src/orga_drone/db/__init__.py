@@ -1077,118 +1077,127 @@ class Database:
             and "'collage'" in sql
         ):
             return
-        conn.executescript(
-            """
-            CREATE TABLE studio_clips__collage_mig (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
-                item_kind TEXT NOT NULL DEFAULT 'media',
-                media_path TEXT,
-                identity_key TEXT,
-                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
-                position INTEGER NOT NULL,
-                filename_snapshot TEXT NOT NULL,
-                recorded_at_snapshot TEXT,
-                kind_snapshot TEXT NOT NULL,
-                photo_duration_s REAL,
-                source_start REAL,
-                source_end REAL,
-                playback_speed REAL NOT NULL DEFAULT 1.0,
-                volume REAL NOT NULL DEFAULT 1.0,
-                transition TEXT,
-                transition_duration_s REAL,
-                effect_settings TEXT NOT NULL DEFAULT '{}',
-                title_text TEXT,
-                subtitle_text TEXT,
-                card_duration_s REAL,
-                background TEXT,
-                collage_spec TEXT,
-                collage_duration_s REAL,
-                added_at TEXT NOT NULL,
-                CHECK (item_kind IN ('media', 'title_card', 'collage')),
-                CHECK (
-                    (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
-                    OR (
-                        item_kind = 'title_card'
-                        AND media_path IS NULL
-                        AND identity_key IS NULL
-                        AND source_media_id IS NULL
-                    )
-                    OR (
-                        item_kind = 'collage'
-                        AND media_path IS NULL
-                        AND identity_key IS NULL
-                        AND source_media_id IS NULL
-                        AND collage_spec IS NOT NULL
-                    )
-                ),
-                CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
-            );
-            """
-        )
-        # Column set varies by prior migrations; copy what exists.
-        src_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
-        }
-        copy_cols = [
-            "id",
-            "project_id",
-            "item_kind",
-            "media_path",
-            "identity_key",
-            "source_media_id",
-            "position",
-            "filename_snapshot",
-            "recorded_at_snapshot",
-            "kind_snapshot",
-            "photo_duration_s",
-            "source_start",
-            "source_end",
-            "playback_speed",
-            "volume",
-            "transition",
-            "transition_duration_s",
-            "effect_settings",
-            "title_text",
-            "subtitle_text",
-            "card_duration_s",
-            "background",
-            "added_at",
-        ]
-        select_parts: list[str] = []
-        insert_parts: list[str] = []
-        for name in copy_cols:
-            if name not in src_cols:
-                continue
-            insert_parts.append(name)
-            select_parts.append(name)
-        insert_parts.extend(["collage_spec", "collage_duration_s"])
-        select_parts.extend(
-            [
-                "collage_spec" if "collage_spec" in src_cols else "NULL",
-                "collage_duration_s" if "collage_duration_s" in src_cols else "NULL",
-            ]
-        )
-        conn.execute(
-            f"""INSERT INTO studio_clips__collage_mig(
-                    {", ".join(insert_parts)}
+        # Restartable rebuild: drop leftover staging from an interrupted attempt.
+        conn.execute("DROP TABLE IF EXISTS studio_clips__collage_mig")
+        try:
+            conn.execute(
+                """
+                CREATE TABLE studio_clips__collage_mig (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                    item_kind TEXT NOT NULL DEFAULT 'media',
+                    media_path TEXT,
+                    identity_key TEXT,
+                    source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                    position INTEGER NOT NULL,
+                    filename_snapshot TEXT NOT NULL,
+                    recorded_at_snapshot TEXT,
+                    kind_snapshot TEXT NOT NULL,
+                    photo_duration_s REAL,
+                    source_start REAL,
+                    source_end REAL,
+                    playback_speed REAL NOT NULL DEFAULT 1.0,
+                    volume REAL NOT NULL DEFAULT 1.0,
+                    transition TEXT,
+                    transition_duration_s REAL,
+                    effect_settings TEXT NOT NULL DEFAULT '{}',
+                    title_text TEXT,
+                    subtitle_text TEXT,
+                    card_duration_s REAL,
+                    background TEXT,
+                    collage_spec TEXT,
+                    collage_duration_s REAL,
+                    added_at TEXT NOT NULL,
+                    CHECK (item_kind IN ('media', 'title_card', 'collage')),
+                    CHECK (
+                        (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
+                        OR (
+                            item_kind = 'title_card'
+                            AND media_path IS NULL
+                            AND identity_key IS NULL
+                            AND source_media_id IS NULL
+                        )
+                        OR (
+                            item_kind = 'collage'
+                            AND media_path IS NULL
+                            AND identity_key IS NULL
+                            AND source_media_id IS NULL
+                            AND collage_spec IS NOT NULL
+                        )
+                    ),
+                    CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
                 )
-                SELECT {", ".join(select_parts)} FROM studio_clips"""
-        )
-        conn.execute("DROP TABLE studio_clips")
-        conn.execute(
-            "ALTER TABLE studio_clips__collage_mig RENAME TO studio_clips"
-        )
-        conn.executescript(
-            """
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position);
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
-            CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind ON studio_clips(project_id, item_kind);
-            """
-        )
+                """
+            )
+            src_cols = {
+                r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+            }
+            copy_cols = [
+                "id",
+                "project_id",
+                "item_kind",
+                "media_path",
+                "identity_key",
+                "source_media_id",
+                "position",
+                "filename_snapshot",
+                "recorded_at_snapshot",
+                "kind_snapshot",
+                "photo_duration_s",
+                "source_start",
+                "source_end",
+                "playback_speed",
+                "volume",
+                "transition",
+                "transition_duration_s",
+                "effect_settings",
+                "title_text",
+                "subtitle_text",
+                "card_duration_s",
+                "background",
+                "added_at",
+            ]
+            select_parts: list[str] = []
+            insert_parts: list[str] = []
+            for name in copy_cols:
+                if name not in src_cols:
+                    continue
+                insert_parts.append(name)
+                select_parts.append(name)
+            insert_parts.extend(["collage_spec", "collage_duration_s"])
+            select_parts.extend(
+                [
+                    "collage_spec" if "collage_spec" in src_cols else "NULL",
+                    (
+                        "collage_duration_s"
+                        if "collage_duration_s" in src_cols
+                        else "NULL"
+                    ),
+                ]
+            )
+            conn.execute(
+                f"""INSERT INTO studio_clips__collage_mig(
+                        {", ".join(insert_parts)}
+                    )
+                    SELECT {", ".join(select_parts)} FROM studio_clips"""
+            )
+            conn.execute("DROP TABLE studio_clips")
+            conn.execute(
+                "ALTER TABLE studio_clips__collage_mig RENAME TO studio_clips"
+            )
+            conn.executescript(
+                """
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position);
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
+                CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind ON studio_clips(project_id, item_kind);
+                """
+            )
+        except Exception:
+            conn.execute("DROP TABLE IF EXISTS studio_clips__collage_mig")
+            raise
 
     @staticmethod
     def _migrate_studio_audio_clips(conn: sqlite3.Connection) -> None:
@@ -3366,14 +3375,24 @@ class Database:
             raise ValueError("studio item not found")
         if str(row["item_kind"] or "") != ITEM_KIND_COLLAGE:
             raise ValueError("not a collage")
+        from orga_drone.studio_collage import merge_public_media_paths
+
+        persisted_raw = (
+            str(row["collage_spec"]) if row["collage_spec"] is not None else None
+        )
+        persisted_spec = collage_spec_from_raw(persisted_raw)
         if collage_spec is None:
-            next_spec = collage_spec_from_raw(
-                str(row["collage_spec"]) if row["collage_spec"] is not None else None
-            )
+            next_spec = persisted_spec
         elif isinstance(collage_spec, str):
-            next_spec = collage_spec_from_raw(collage_spec)
+            try:
+                incoming = json.loads(collage_spec)
+            except json.JSONDecodeError as exc:
+                raise ValueError("collage_spec must be JSON") from exc
+            if not isinstance(incoming, dict):
+                raise ValueError("collage_spec must be an object")
+            next_spec = merge_public_media_paths(incoming, persisted_spec)
         else:
-            next_spec = normalize_spec(collage_spec)
+            next_spec = merge_public_media_paths(collage_spec, persisted_spec)
         if collage_duration_s is not None:
             next_spec["duration_s"] = clamp_collage_duration(float(collage_duration_s))
         elif row["collage_duration_s"] is not None:

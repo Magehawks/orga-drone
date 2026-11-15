@@ -455,14 +455,57 @@ def split_leaf(
     direction = direction.strip().lower()
     if direction not in {"h", "v"}:
         raise CollageSpecError("direction must be h or v")
-    replaced = _replace_leaf(
-        normalized["root"],
-        leaf_id,
-        lambda leaf: _split(direction, ratio, {**leaf, "id": leaf["id"]}, _leaf()),
-    )
+
+    def _factory(leaf: dict[str, Any]) -> dict[str, Any]:
+        return _split(direction, ratio, {**leaf, "id": leaf["id"]}, _leaf())
+
+    root = normalized["root"]
+    if root["type"] == "leaf":
+        if str(root["id"]) != str(leaf_id):
+            raise CollageSpecError(f"leaf not found: {leaf_id}")
+        normalized["root"] = _factory(root)
+        return normalize_spec(normalized)
+    replaced = _replace_leaf(root, leaf_id, _factory)
     if not replaced:
         raise CollageSpecError(f"leaf not found: {leaf_id}")
     return normalize_spec(normalized)
+
+
+def merge_public_media_paths(
+    incoming: dict[str, Any], persisted: dict[str, Any]
+) -> dict[str, Any]:
+    """Restore server-only external paths when a public spec is patched back."""
+    persisted_norm = normalize_spec(persisted)
+    persisted_by_id = {
+        str(leaf["id"]): leaf.get("media")
+        for leaf in iter_leaves(persisted_norm["root"])
+        if isinstance(leaf.get("media"), dict)
+    }
+
+    def _restore(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("type") == "leaf":
+            media = node.get("media")
+            if not isinstance(media, dict) or media.get("source") != "external":
+                return
+            if media.get("path"):
+                return
+            prior = persisted_by_id.get(str(node.get("id")))
+            if isinstance(prior, dict) and prior.get("path"):
+                media["path"] = prior["path"]
+                if prior.get("display_name") and not media.get("display_name"):
+                    media["display_name"] = prior["display_name"]
+            media.pop("has_path", None)
+            return
+        if node.get("type") == "split":
+            _restore(node.get("a"))
+            _restore(node.get("b"))
+
+    draft = json.loads(json.dumps(incoming))
+    if isinstance(draft, dict):
+        _restore(draft.get("root"))
+    return normalize_spec(draft)
 
 
 def remove_leaf(spec: dict[str, Any], leaf_id: str) -> dict[str, Any]:

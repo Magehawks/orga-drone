@@ -993,6 +993,10 @@ def prepare_studio_export(
             "The Story is empty. Add a photo, video, or title card before exporting."
         )
     for clip in source_rows:
+        if clip.item_kind == ITEM_KIND_COLLAGE or clip.kind == COLLAGE_KIND:
+            raise StudioExportError(
+                "Collage MP4 export is not available yet; finish the collage export work package first."
+            )
         if clip.item_kind != TITLE_CARD_KIND:
             _require_clip_source(db, clip)
     heights = collect_project_video_heights(db, project.id)

@@ -233,3 +233,65 @@ def test_clamp_and_dump_roundtrip() -> None:
     again = collage_spec_from_raw(raw)
     assert normalize_spec(again)["duration_s"] == again["duration_s"]
     assert leaf_count(again) == 4
+
+
+def test_remove_to_one_then_split_root_leaf() -> None:
+    spec = preset_spec("1+1")
+    leaves = iter_leaves(spec["root"])
+    one = remove_leaf(spec, leaves[1]["id"])
+    assert leaf_count(one) == 1
+    assert one["root"]["type"] == "leaf"
+    again = split_leaf(one, one["root"]["id"], direction="v")
+    assert leaf_count(again) == 2
+
+
+def test_public_patch_preserves_external_path(tmp_path: Path) -> None:
+    from orga_drone.studio_collage import merge_public_media_paths, public_collage_spec
+
+    db = Database(tmp_path / "ext.sqlite3")
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    clip = db.add_studio_collage(project.id, preset="1+1")
+    leaf_id = iter_leaves(collage_spec_from_raw(clip.collage_spec)["root"])[0]["id"]
+    with_path = assign_leaf_media(
+        collage_spec_from_raw(clip.collage_spec),
+        leaf_id,
+        {
+            "source": "external",
+            "path": str(tmp_path / "clip.mp4"),
+            "kind": "video",
+            "display_name": "clip.mp4",
+        },
+    )
+    saved = db.update_studio_collage(clip.id, collage_spec=with_path)
+    public = public_collage_spec(collage_spec_from_raw(saved.collage_spec))
+    public["gap_px"] = 12
+    merged = merge_public_media_paths(public, collage_spec_from_raw(saved.collage_spec))
+    media = iter_leaves(merged["root"])[0]["media"]
+    assert media["path"] == str(tmp_path / "clip.mp4")
+    updated = db.update_studio_collage(clip.id, collage_spec=public)
+    media2 = iter_leaves(collage_spec_from_raw(updated.collage_spec)["root"])[0]["media"]
+    assert media2["path"] == str(tmp_path / "clip.mp4")
+    assert updated.collage_spec and '"gap_px":12' in updated.collage_spec
+
+
+def test_interrupted_collage_migration_is_restartable(tmp_path: Path) -> None:
+    import sqlite3
+
+    db_path = tmp_path / "mig.sqlite3"
+    # Build a pre-collage DB via an older-shaped table, then reopen.
+    first = Database(db_path)
+    project = first.ensure_default_studio_project()
+    assert project is not None
+    first.add_studio_title_card(project.id, title_text="Hello")
+    with sqlite3.connect(db_path) as conn:
+        # Simulate leftover staging from a crashed migration.
+        conn.execute("DROP TABLE IF EXISTS studio_clips__collage_mig")
+        conn.execute(
+            "CREATE TABLE studio_clips__collage_mig (id INTEGER PRIMARY KEY)"
+        )
+        conn.commit()
+    reopened = Database(db_path)
+    items = reopened.list_studio_items(project.id)
+    assert len(items) == 1
+    assert items[0].kind == "title_card"
