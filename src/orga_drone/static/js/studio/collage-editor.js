@@ -978,7 +978,18 @@ export function createCollageEditor(opts) {
     hidePreview,
     renderPreview,
     syncPlayback: (args) => playback.sync(args),
-    pausePlayback: () => playback.pause(),
+    pausePlayback: () => {
+      playback.pause();
+      const clip = opts.getSelectedClip?.();
+      const spec = clip && isCollage(clip) ? parseSpec(clip) : null;
+      playback.sync({
+        localS: Number(opts.getCollageLocalS?.() || 0),
+        playing: false,
+        seek: true,
+        spec,
+      });
+      preview?.classList.toggle("is-paused", true);
+    },
     teardownPlayback: () => playback.teardown(),
     isPlaybackFallback: () => playback.isFallback(),
     parseSpec,
