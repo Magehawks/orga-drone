@@ -21,10 +21,7 @@ import {
 } from "./studio/managed-gpu-adapter.js";
 import { fetchGrade, postGradeCommand } from "./studio/grade-api.js";
 import { createManagedGradePreviewCache } from "./studio/managed-grade-preview-cache.js";
-import {
-  buildPreviewFrameUrl,
-  quantizePreviewTime,
-} from "./studio/preview-frame-url.js";
+import { buildPreviewFrameUrl, quantizePreviewTime } from "./studio/preview-frame-url.js";
 import {
   bumpOverlayRevision,
   overlayRevisionOf,
@@ -91,7 +88,11 @@ import {
   quantizePreviewScopeTime,
   SCOPE_TAP_IDS,
 } from "./studio/scopes/index.js";
-import { mountControlUi, createCanonicalApplier, hasActiveControlGesture } from "./studio/control-bridge.js";
+import {
+  mountControlUi,
+  createCanonicalApplier,
+  hasActiveControlGesture,
+} from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
@@ -157,21 +158,34 @@ import {
       init = Object.assign({}, init || {}, { headers: headers });
     }
     const controlUrl = String(input);
-    const controlMutation = method !== "GET" && method !== "HEAD" &&
-      controlUrl.startsWith("/api/studio/") && !controlUrl.startsWith("/api/studio/control/") &&
+    const controlMutation =
+      method !== "GET" &&
+      method !== "HEAD" &&
+      controlUrl.startsWith("/api/studio/") &&
+      !controlUrl.startsWith("/api/studio/control/") &&
       !controlUrl.includes("/playback-proxy");
     if (controlMutation) controlPendingWrites += 1;
     const response = nativeFetch(input, init);
-    if (controlMutation) response.then((res) => {
-      controlPendingWrites -= 1;
-      if (!res.ok) controlWriteFailed = true;
-    }, () => { controlPendingWrites -= 1; controlWriteFailed = true; });
+    if (controlMutation)
+      response.then(
+        (res) => {
+          controlPendingWrites -= 1;
+          if (!res.ok) controlWriteFailed = true;
+        },
+        () => {
+          controlPendingWrites -= 1;
+          controlWriteFailed = true;
+        }
+      );
     if (method !== "GET" && method !== "HEAD") {
-      response.then((res) => {
-        const canUndo = res.headers.get("X-Studio-Can-Undo");
-        if (canUndo == null) return;
-        syncHistoryButtons(canUndo === "1", res.headers.get("X-Studio-Can-Redo") === "1");
-      }, () => {});
+      response.then(
+        (res) => {
+          const canUndo = res.headers.get("X-Studio-Can-Undo");
+          if (canUndo == null) return;
+          syncHistoryButtons(canUndo === "1", res.headers.get("X-Studio-Can-Redo") === "1");
+        },
+        () => {}
+      );
     }
     return response;
   };
@@ -213,9 +227,7 @@ import {
     // Drop an unfinished curve drag before history so pointerup cannot race Undo.
     rampEditor?.cancel?.();
     await rampEditor?.whenIdle?.();
-    const button = document.getElementById(
-      direction === "undo" ? "studio-undo" : "studio-redo"
-    );
+    const button = document.getElementById(direction === "undo" ? "studio-undo" : "studio-redo");
     if (!button || button.disabled) return;
     const res = await nativeFetch("/api/studio/history/" + direction, {
       method: "POST",
@@ -298,16 +310,17 @@ import {
   const msgReorderFailed = root.dataset.reorderFailed || "Could not save Studio order.";
   const msgDurationFailed = root.dataset.durationFailed || "Could not save photo duration.";
   const msgMusicFailed = root.dataset.musicFailed || "Could not save music settings.";
-  const msgMusicPickerUnavailable = root.dataset.musicPickerUnavailable || "Choosing music needs the desktop app.";
-  const msgMusicMissing = root.dataset.musicMissing || "The selected music file is no longer available.";
+  const msgMusicPickerUnavailable =
+    root.dataset.musicPickerUnavailable || "Choosing music needs the desktop app.";
+  const msgMusicMissing =
+    root.dataset.musicMissing || "The selected music file is no longer available.";
   const msgMusicLimit = root.dataset.musicLimit || "This story already has 8 soundtrack songs.";
   const msgMusicSongOf = root.dataset.musicSongOf || "Song {current} of {total}";
   const msgFullscreen = root.dataset.fullscreenLabel || "Fullscreen";
   const msgFullscreenLutBlocked =
     root.dataset.fullscreenLutBlocked || "Fullscreen is too heavy with live color preview";
   const msgDragReorder = root.dataset.dragReorder || "Drag to reorder";
-  const msgDragMusicStart =
-    root.dataset.dragMusicStart || "Drag to set when the soundtrack starts";
+  const msgDragMusicStart = root.dataset.dragMusicStart || "Drag to set when the soundtrack starts";
   const labelSaved = root.dataset.savedLabel || "Saved";
   const labelUnsaved = root.dataset.unsavedLabel || "Unsaved changes";
   const labelPlay = root.dataset.labelPlay || "Play";
@@ -333,12 +346,15 @@ import {
     unknown: root.dataset.kindUnknown || "Memory",
   };
   let collageEditor = null;
+  function withCollageEditor(fn) {
+    if (typeof collageEditor === "undefined" || !collageEditor) return undefined;
+    return fn(collageEditor);
+  }
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgTransitionNoRoom =
     root.dataset.transitionNoRoom || "Not enough clip length for this transition";
-  const msgTransitionLimit =
-    root.dataset.transitionLimit || "Up to {max}s with these clips";
+  const msgTransitionLimit = root.dataset.transitionLimit || "Up to {max}s with these clips";
   const msgStorySummary = root.dataset.storySummary || "{count} items · {duration}";
   const msgSectionFailed = root.dataset.sectionFailed || "Could not save the section.";
   const msgForwardLoopHint =
@@ -365,8 +381,7 @@ import {
     root.dataset.forwardLoopFilled ||
     "The rest of the story is already as long as the soundtrack, so this section is not extended.";
   const msgForwardLoopShort =
-    root.dataset.forwardLoopShort ||
-    "This section is too short to repeat through the soundtrack.";
+    root.dataset.forwardLoopShort || "This section is too short to repeat through the soundtrack.";
   const msgForwardLoopOther =
     root.dataset.forwardLoopOther || "Another clip already repeats to the soundtrack.";
   const msgForwardLoopFailed =
@@ -378,8 +393,7 @@ import {
     root.dataset.loopCinematicHint ||
     "Eases the end of each repetition into the start of the next. Both keep moving forward and keep the clip color settings. Roads, trees and other objects can appear doubled when the views differ. This is not an invisible loop. The soundtrack plays once and is not blended.";
   const msgLoopBlendClamped =
-    root.dataset.loopBlendClamped ||
-    "Blend is shortened to {seconds} s so it fits this section.";
+    root.dataset.loopBlendClamped || "Blend is shortened to {seconds} s so it fits this section.";
   const msgLoopTransitionShort =
     root.dataset.loopTransitionShort ||
     "This section is too short for a crossfade, so the joins stay hard cuts.";
@@ -393,23 +407,28 @@ import {
   const labelInspectorStory = root.dataset.inspectorStory || "Story";
   const labelInspectorMusic = root.dataset.inspectorMusic || "Music";
   const labelInStory = root.dataset.inStory || "In story";
-  const msgCutHint = root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
+  const msgCutHint =
+    root.dataset.cutHint || "Cut splits this video at the playhead. Source files stay unchanged.";
   const msgSpeedFailed = root.dataset.speedFailed || "Could not change speed.";
   const msgImageFailed = root.dataset.imageFailed || "Could not save image adjustments.";
   const msgHslFailed = root.dataset.hslFailed || "Could not save HSL color settings.";
   const msgColorWheelsFailed = root.dataset.colorWheelsFailed || "Could not save color grading.";
   const msgColorFailed = root.dataset.colorFailed || "Could not save the color look.";
   const msgColorLutFailed = root.dataset.colorLutFailed || "Could not import that .cube LUT.";
-  const msgColorLutMissing = root.dataset.colorLutMissing || "A LUT file is missing. Choose the .cube again, or clear the look.";
-  const msgColorLutAlready = root.dataset.colorLutAlready || 'This file is already in your library as "{name}".';
-  const msgColorLutRestored = root.dataset.colorLutRestored || 'The color file was restored in your library as "{name}".';
-  const msgColorLutMissingOption = root.dataset.colorLutMissingOption || "Unknown color file (missing)";
+  const msgColorLutMissing =
+    root.dataset.colorLutMissing ||
+    "A LUT file is missing. Choose the .cube again, or clear the look.";
+  const msgColorLutAlready =
+    root.dataset.colorLutAlready || 'This file is already in your library as "{name}".';
+  const msgColorLutRestored =
+    root.dataset.colorLutRestored || 'The color file was restored in your library as "{name}".';
+  const msgColorLutMissingOption =
+    root.dataset.colorLutMissingOption || "Unknown color file (missing)";
   const msgColorProfileNone = root.dataset.colorProfileNone || "No camera profile detected";
   const msgColorLutDuplicate =
     root.dataset.colorLutDuplicate ||
     "This file is already used in the other LUT stage. Choose a different file.";
-  const msgColorLutStageUsed =
-    root.dataset.colorLutStageUsed || "already used in the other stage";
+  const msgColorLutStageUsed = root.dataset.colorLutStageUsed || "already used in the other stage";
   const msgColorFileMissingSuffix = root.dataset.colorFileMissingSuffix || "(file missing)";
   let lutCatalog = [];
   try {
@@ -431,7 +450,8 @@ import {
   let colorScopePreviewProducer = null;
   const msgOverlayFailed = root.dataset.overlayFailed || "Could not save overlays.";
   const msgOverlayMissing = root.dataset.overlayMissing || "Overlay image is missing.";
-  const msgOverlayClamped = root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
+  const msgOverlayClamped =
+    root.dataset.overlayClamped || "Overlay timing was shortened to fit this clip.";
   const msgOverlayLimit = root.dataset.overlayLimit || "This clip already has 8 overlays.";
   const msgMapFailed = root.dataset.mapFailed || "Could not save the flight map.";
   const msgMapEmpty = root.dataset.mapEmpty || "No GPS for this clip.";
@@ -760,7 +780,9 @@ import {
     if (zoom <= 1.001) return null;
     const dur = Math.max(0.05, sourceDurationS(clip));
     const stored = readStoredBar(clip, "zoomBar");
-    return stored ? { start: stored.start, end: Math.min(dur, stored.end), zoom } : { start: 0, end: dur, zoom };
+    return stored
+      ? { start: stored.start, end: Math.min(dur, stored.end), zoom }
+      : { start: 0, end: dur, zoom };
   }
 
   function slowBarOf(clip) {
@@ -786,7 +808,11 @@ import {
 
   function sourceToStory(clip, offset) {
     const ramp = speedRampOf(clip);
-    if (ramp) return Math.max(0, rampTime(ramp, sourceInS(clip) + Math.max(0, offset)) - rampTime(ramp, loopPlayInS(clip)));
+    if (ramp)
+      return Math.max(
+        0,
+        rampTime(ramp, sourceInS(clip) + Math.max(0, offset)) - rampTime(ramp, loopPlayInS(clip))
+      );
     const bar = slowBarOf(clip);
     const off = Math.max(0, offset);
     if (!bar || playbackSpeed(clip) < 0.999) return off / playbackSpeed(clip);
@@ -797,7 +823,8 @@ import {
 
   function storyToSource(clip, localS) {
     const ramp = speedRampOf(clip);
-    if (ramp) return rampSource(ramp, localS, loopPlayInS(clip), loopPlayOutS(clip)) - sourceInS(clip);
+    if (ramp)
+      return rampSource(ramp, localS, loopPlayInS(clip), loopPlayOutS(clip)) - sourceInS(clip);
     const bar = slowBarOf(clip);
     const local = Math.max(0, localS);
     if (!bar || playbackSpeed(clip) < 0.999) return local * playbackSpeed(clip);
@@ -809,8 +836,11 @@ import {
 
   let clipAudio = null;
   function speedRampOf(clip) {
-    try { return parseRamp(JSON.parse(clip?.dataset.speedRamp || "null")); }
-    catch (_) { return null; }
+    try {
+      return parseRamp(JSON.parse(clip?.dataset.speedRamp || "null"));
+    } catch (_) {
+      return null;
+    }
   }
   function clipAudioEl() {
     if (clipAudio) return clipAudio;
@@ -846,9 +876,10 @@ import {
     if (range.custom) {
       video.muted = true;
       const speed = playbackSpeed(clip) || 1;
-      const story = slowBarOf(clip) && playbackSpeed(clip) >= 0.999
-        ? sourceToStory(clip, offset)
-        : offset / speed;
+      const story =
+        slowBarOf(clip) && playbackSpeed(clip) >= 0.999
+          ? sourceToStory(clip, offset)
+          : offset / speed;
       const into = story - range.place;
       if (!stream || into < -0.03 || into > range.story + 0.03) {
         audio.pause();
@@ -860,7 +891,11 @@ import {
       }
       const target = range.sourceIn + Math.max(0, into) * speed;
       if (Math.abs((audio.currentTime || 0) - target) > 0.35) {
-        try { audio.currentTime = target; } catch (_) { /* seek while loading */ }
+        try {
+          audio.currentTime = target;
+        } catch (_) {
+          /* seek while loading */
+        }
       }
       audio.volume = state.volume;
       if (video.paused) audio.pause();
@@ -881,7 +916,11 @@ import {
       }
       const target = sourceInS(clip) + offset;
       if (Math.abs((audio.currentTime || 0) - target) > 0.35) {
-        try { audio.currentTime = target; } catch (_) { /* seek while loading */ }
+        try {
+          audio.currentTime = target;
+        } catch (_) {
+          /* seek while loading */
+        }
       }
       audio.volume = state.volume;
       if (video.paused) audio.pause();
@@ -1042,7 +1081,14 @@ import {
       const story = clipDuration(clip);
       const local = Math.max(0, Number(localS) || 0);
       if (!spans.length || !(story > 0)) {
-        return { index: 0, offset: local, atEnd: false, blending: false, progress: 0, incomingOffset: 0 };
+        return {
+          index: 0,
+          offset: local,
+          atEnd: false,
+          blending: false,
+          progress: 0,
+          incomingOffset: 0,
+        };
       }
       const starts = forwardLoopStarts(spans, overlap);
       if (local >= story - 0.001) {
@@ -1118,8 +1164,14 @@ import {
 
   function secondaryVideoTarget(clip, localS, src) {
     const ramp = speedRampOf(clip);
-    if (ramp) return rampMediaTime(ramp, localS, loopPlayInS(clip), loopPlayOutS(clip),
-      src === lutProxySrcFor(clip) ? sourceInS(clip) : 0);
+    if (ramp)
+      return rampMediaTime(
+        ramp,
+        localS,
+        loopPlayInS(clip),
+        loopPlayOutS(clip),
+        src === lutProxySrcFor(clip) ? sourceInS(clip) : 0
+      );
     return loopPlayInS(clip) + playSourceOffset(clip, localS);
   }
 
@@ -1142,10 +1194,7 @@ import {
   function clipOccupancyS(clip, index, listLength) {
     // Same last-clip rule as totalDuration(): only a non-last Crossfade shrinks occupancy.
     let duration = clipDuration(clip);
-    if (
-      index < listLength - 1 &&
-      isOverlapType(clip.dataset.appliedType || "cut")
-    ) {
+    if (index < listLength - 1 && isOverlapType(clip.dataset.appliedType || "cut")) {
       duration -= Number(clip.dataset.appliedDuration) || 0;
     }
     return Math.max(0, duration);
@@ -1263,7 +1312,14 @@ import {
         });
       }
       const zoom = zoomBarOf(clip);
-      if (zoom) bars.push({ kind: "zoom", id: "", start: zoom.start, end: zoom.end, label: `${effectLabel("zoom")} ${zoom.zoom.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}×` });
+      if (zoom)
+        bars.push({
+          kind: "zoom",
+          id: "",
+          start: zoom.start,
+          end: zoom.end,
+          label: `${effectLabel("zoom")} ${zoom.zoom.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}×`,
+        });
       readMasks(clip).forEach((mask) => {
         const dur = Math.max(0.05, sourceDurationS(clip));
         const start = mask.start_s == null ? 0 : Number(mask.start_s);
@@ -1271,7 +1327,15 @@ import {
         bars.push({ kind: mask.effect, id: mask.id, start, end, label: effectLabel(mask.effect) });
       });
       const slow = slowBarOf(clip);
-      if (slow) bars.push({ kind: "slow", id: "", start: slow.start, end: slow.end, speed: slow.speed, label: `${effectLabel("slow")} ${slow.speed}×` });
+      if (slow)
+        bars.push({
+          kind: "slow",
+          id: "",
+          start: slow.start,
+          end: slow.end,
+          speed: slow.speed,
+          label: `${effectLabel("slow")} ${slow.speed}×`,
+        });
       const colorAnim = readColorAnimation(clip);
       if (colorAnim && colorAnim.keys && colorAnim.keys.length >= 2) {
         const start = Number(colorAnim.bar && colorAnim.bar.start_s);
@@ -1279,7 +1343,7 @@ import {
         if (Number.isFinite(start) && Number.isFinite(end) && end - start >= 0.05) {
           const presetName = colorAnim.preset_id
             ? colorAnimPresetLabel(colorAnim.preset_id)
-            : (root.dataset.colorAnimCustom || "Custom points");
+            : root.dataset.colorAnimCustom || "Custom points";
           bars.push({
             kind: "color",
             id: "",
@@ -1347,7 +1411,10 @@ import {
           const keys = lane.dataset.rampKeys || "";
           if (keys) {
             el.title = keys;
-            el.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight");
+            el.setAttribute(
+              "aria-keyshortcuts",
+              "ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight"
+            );
             el.setAttribute("aria-label", `${bar.label}. ${keys}`);
           }
           el.addEventListener("pointerdown", (event) => onRampPointerDown(event, el, clip));
@@ -1362,26 +1429,14 @@ import {
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            showTimedEffectMenu(
-              event,
-              clip,
-              "overlay",
-              el.dataset.maskId || "",
-              el
-            );
+            showTimedEffectMenu(event, clip, "overlay", el.dataset.maskId || "", el);
           });
         } else {
           el.addEventListener("pointerdown", (event) => onEffectPointerDown(event, el, clip));
           el.addEventListener("contextmenu", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            showTimedEffectMenu(
-              event,
-              clip,
-              el.dataset.kind,
-              el.dataset.maskId || "",
-              el
-            );
+            showTimedEffectMenu(event, clip, el.dataset.kind, el.dataset.maskId || "", el);
           });
         }
         lane.appendChild(el);
@@ -1405,7 +1460,8 @@ import {
       const sourceIn = Number(parsed.source_in_s);
       const sourceOut = Number(parsed.source_out_s);
       const place = Number(parsed.place_s);
-      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut - sourceIn < 0.05) return null;
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || sourceOut - sourceIn < 0.05)
+        return null;
       return { sourceIn, sourceOut, place: Number.isFinite(place) ? place : 0 };
     } catch (_) {
       return null;
@@ -1444,9 +1500,7 @@ import {
     bar.dataset.studioId = clip.dataset.studioId || "";
     bar.setAttribute("aria-label", clip.dataset.filename || "Audio");
     bar.textContent = clip.dataset.filename || "";
-    if (
-      timedSelectionMatches(timedSelection, "audio", clip.dataset.studioId || "", "")
-    ) {
+    if (timedSelectionMatches(timedSelection, "audio", clip.dataset.studioId || "", "")) {
       bar.classList.add("is-selected");
     }
     const edgeIn = document.createElement("span");
@@ -1492,8 +1546,9 @@ import {
     if (focusInspector) {
       window.setTimeout(() => {
         const focus =
-          panel?.querySelector("#inspector-source-in, #inspector-section-repeats, #studio-volume") ||
-          document.getElementById("studio-volume");
+          panel?.querySelector(
+            "#inspector-source-in, #inspector-section-repeats, #studio-volume"
+          ) || document.getElementById("studio-volume");
         if (focus && typeof focus.focus === "function") focus.focus();
       }, 0);
     }
@@ -1572,11 +1627,12 @@ import {
     event.stopPropagation();
     suppressTimelineClick = true;
     const edge = event.target.closest ? event.target.closest(".studio-clip-audio-edge") : null;
-    const mode = edge && edge.classList.contains("studio-clip-audio-edge-in")
-      ? "start"
-      : edge && edge.classList.contains("studio-clip-audio-edge-out")
-        ? "end"
-        : "move";
+    const mode =
+      edge && edge.classList.contains("studio-clip-audio-edge-in")
+        ? "start"
+        : edge && edge.classList.contains("studio-clip-audio-edge-out")
+          ? "end"
+          : "move";
     const origin = audioPlacement(clip);
     const originLeft = Number.parseFloat(el.style.left) || 0;
     const startX = event.clientX;
@@ -1609,11 +1665,17 @@ import {
         place = origin.place + deltaStory;
         place = Math.max(Math.min(0, 0.05 - span), Math.min(Math.max(0, limit - 0.05), place));
       } else if (mode === "start") {
-        const next = Math.max(origin.sourceIn, Math.min(origin.sourceOut - 0.05, origin.sourceIn + deltaStory * speed));
+        const next = Math.max(
+          origin.sourceIn,
+          Math.min(origin.sourceOut - 0.05, origin.sourceIn + deltaStory * speed)
+        );
         place = origin.place + (next - origin.sourceIn) / speed;
         sourceIn = next;
       } else {
-        sourceOut = Math.max(origin.sourceIn + 0.05, Math.min(origin.sourceOut, origin.sourceOut + deltaStory * speed));
+        sourceOut = Math.max(
+          origin.sourceIn + 0.05,
+          Math.min(origin.sourceOut, origin.sourceOut + deltaStory * speed)
+        );
       }
       const story = Math.max(0.05, (sourceOut - sourceIn) / speed);
       el.style.left = `${originLeft + (place - origin.place) * pps}px`;
@@ -1632,7 +1694,8 @@ import {
       const sourceIn = Number(el.dataset.draftIn);
       const sourceOut = Number(el.dataset.draftOut);
       const place = Number(el.dataset.draftPlace);
-      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || !Number.isFinite(place)) return;
+      if (!Number.isFinite(sourceIn) || !Number.isFinite(sourceOut) || !Number.isFinite(place))
+        return;
       if (
         Math.abs(sourceIn - origin.sourceIn) < 0.001 &&
         Math.abs(sourceOut - origin.sourceOut) < 0.001 &&
@@ -1732,8 +1795,7 @@ import {
       fillColorAnimationInspector(clip);
     } else if (kind === "ramp") {
       panel = document.getElementById("inspector-speed-ramp");
-      focusQuery =
-        "[data-ramp-speed]:not([disabled]), [data-ramp-preset], [data-ramp-apply]";
+      focusQuery = "[data-ramp-speed]:not([disabled]), [data-ramp-preset], [data-ramp-apply]";
     } else if (kind === "overlay") {
       panel = document.getElementById("inspector-overlays");
       focusQuery = "#overlay-text, #overlay-start, #overlay-end, #overlay-remove";
@@ -1787,11 +1849,7 @@ import {
     return selection;
   }
 
-  function selectTimedOverlay(
-    clip,
-    id,
-    { focusInspector = false, relayout = true } = {}
-  ) {
+  function selectTimedOverlay(clip, id, { focusInspector = false, relayout = true } = {}) {
     if (!clip || !id || clip.dataset.kind !== "video") return null;
     const selection = createTimedSelection({
       kind: "overlay",
@@ -1826,10 +1884,7 @@ import {
   }
 
   function overlayStoryDuration(clip) {
-    return Math.max(
-      0.05,
-      sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip)
-    );
+    return Math.max(0.05, sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip));
   }
 
   function overlayRangeForBar(clip, id) {
@@ -1860,11 +1915,12 @@ import {
       el.classList.add("is-selected");
     }
     const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
-    const mode = edge && edge.classList.contains("studio-effect-edge-in")
-      ? "start"
-      : edge && edge.classList.contains("studio-effect-edge-out")
-        ? "end"
-        : "move";
+    const mode =
+      edge && edge.classList.contains("studio-effect-edge-in")
+        ? "start"
+        : edge && edge.classList.contains("studio-effect-edge-out")
+          ? "end"
+          : "move";
     const dur = overlayStoryDuration(clip);
     const origin = overlayRangeForBar(clip, id);
     const startX = event.clientX;
@@ -1898,10 +1954,7 @@ import {
       const start = Number(el.dataset.draftStart);
       const end = Number(el.dataset.draftEnd);
       if (!Number.isFinite(start) || !Number.isFinite(end)) return;
-      if (
-        Math.abs(start - origin.start) < 0.001 &&
-        Math.abs(end - origin.end) < 0.001
-      ) {
+      if (Math.abs(start - origin.start) < 0.001 && Math.abs(end - origin.end) < 0.001) {
         return;
       }
       const previous = readOverlays(clip);
@@ -1941,11 +1994,12 @@ import {
     const ramp = speedRampOf(clip);
     if (!ramp) return;
     const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
-    const mode = edge && edge.classList.contains("studio-effect-edge-in")
-      ? "start"
-      : edge && edge.classList.contains("studio-effect-edge-out")
-        ? "end"
-        : "move";
+    const mode =
+      edge && edge.classList.contains("studio-effect-edge-in")
+        ? "start"
+        : edge && edge.classList.contains("studio-effect-edge-out")
+          ? "end"
+          : "move";
     const regionId = el.dataset.maskId || "";
     selectTimedRamp(clip, { focusInspector: false, source: "bar", regionId });
     const fresh = document.querySelector(effectBarSelector("ramp", clipId(clip), regionId));
@@ -1970,7 +2024,8 @@ import {
         regionId: regionId || null,
       });
       if (!draft) return;
-      const moved = rampRegions(draft).find((region) => region.id === regionId) || rampRegions(draft)[0];
+      const moved =
+        rampRegions(draft).find((region) => region.id === regionId) || rampRegions(draft)[0];
       const storyLeft = rampTime(draft, moved.start) - rampTime(draft, playStart);
       const storyRight = rampTime(draft, moved.end) - rampTime(draft, playStart);
       el.style.left = `${clipLeft + Math.max(0, storyLeft) * pps}px`;
@@ -2049,11 +2104,12 @@ import {
       el.classList.add("is-selected");
     }
     const edge = event.target.closest ? event.target.closest(".studio-effect-edge") : null;
-    const mode = edge && edge.classList.contains("studio-effect-edge-in")
-      ? "start"
-      : edge && edge.classList.contains("studio-effect-edge-out")
-        ? "end"
-        : "move";
+    const mode =
+      edge && edge.classList.contains("studio-effect-edge-in")
+        ? "start"
+        : edge && edge.classList.contains("studio-effect-edge-out")
+          ? "end"
+          : "move";
     const dur = Math.max(0.05, sourceDurationS(clip));
     const origin = sourceRangeForBar(clip, el);
     const startX = event.clientX;
@@ -2090,7 +2146,10 @@ import {
         id: el.dataset.maskId || "",
         start_s: start,
         end_s: end,
-        speed: el.dataset.effect === "slow" ? Number(el.dataset.speed) || slowBarOf(clip)?.speed || 0.5 : undefined,
+        speed:
+          el.dataset.effect === "slow"
+            ? Number(el.dataset.speed) || slowBarOf(clip)?.speed || 0.5
+            : undefined,
       });
     };
     window.addEventListener("pointermove", move);
@@ -2115,7 +2174,8 @@ import {
       return { start: 0, end: dur };
     }
     const mask = readMasks(clip).find((item) => item.id === el.dataset.maskId);
-    if (mask && mask.start_s != null) return { start: Number(mask.start_s), end: Number(mask.end_s) };
+    if (mask && mask.start_s != null)
+      return { start: Number(mask.start_s), end: Number(mask.end_s) };
     return { start: 0, end: dur };
   }
 
@@ -2135,11 +2195,15 @@ import {
     clip.dataset.masks = JSON.stringify(data.masks || []);
     clip.dataset.zoomBar = JSON.stringify(data.zoom_bar);
     clip.dataset.slowBar = JSON.stringify(data.slow_bar);
-    if (data.effect_lane && Object.prototype.hasOwnProperty.call(data.effect_lane, "color_animation")) {
+    if (
+      data.effect_lane &&
+      Object.prototype.hasOwnProperty.call(data.effect_lane, "color_animation")
+    ) {
       writeColorAnimation(clip, data.effect_lane.color_animation || null);
     }
     if (data.playback_speed != null) clip.dataset.playbackSpeed = String(data.playback_speed);
-    if (data.effective_duration_s != null) clip.dataset.effectiveDuration = String(data.effective_duration_s);
+    if (data.effective_duration_s != null)
+      clip.dataset.effectiveDuration = String(data.effective_duration_s);
     layoutTimeline();
     applyFramePreview(resolveAt(state.projectTimeS));
     drawPrivacyMasks();
@@ -2153,9 +2217,7 @@ import {
     // selectedEffectBar after an ordinary clip switch cleared it.
     if (!timedSelection || !isEffectBarKind(timedSelection.kind)) return false;
     const selection = timedSelection;
-    const clip = clips().find(
-      (item) => String(item.dataset.studioId) === String(selection.clipId)
-    );
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(selection.clipId));
     if (!clip || !timedEffectStillPresent(clip, selection)) {
       clearTimedSelection();
       if (selection.kind === "mask") selectedMaskId = null;
@@ -2208,9 +2270,7 @@ import {
   async function removeTimedOverlaySelection() {
     if (!timedSelection || !isOverlayTimedKind(timedSelection.kind)) return false;
     const selection = timedSelection;
-    const clip = clips().find(
-      (item) => String(item.dataset.studioId) === String(selection.clipId)
-    );
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(selection.clipId));
     if (!clip || !timedEffectStillPresent(clip, selection)) {
       clearTimedSelection();
       layoutEffectBars();
@@ -2353,9 +2413,7 @@ import {
   async function removeTimedRampSelection(scope = "region") {
     if (!timedSelection || timedSelection.kind !== "ramp") return false;
     const selection = timedSelection;
-    const clip = clips().find(
-      (item) => String(item.dataset.studioId) === String(selection.clipId)
-    );
+    const clip = clips().find((item) => String(item.dataset.studioId) === String(selection.clipId));
     if (!clip || !speedRampOf(clip)) {
       clearTimedSelection();
       layoutEffectBars();
@@ -2374,9 +2432,7 @@ import {
     }
     hideClipMenu();
     // Keep timedSelection until PATCH succeeds so failed saves remain retryable.
-    const result = await persistTimedSelectionRemoval(selection, () =>
-      saveSpeedRamp(clip, next)
-    );
+    const result = await persistTimedSelectionRemoval(selection, () => saveSpeedRamp(clip, next));
     if (!result.ok) {
       // Leave a newer selection alone; only flash when this removal still owns focus.
       showFlash(msgSpeedFailed);
@@ -2391,8 +2447,10 @@ import {
   }
 
   function showTimedEffectMenu(event, clip, kind, id = "", returnTarget) {
-    if (kind === "ramp") selectTimedRamp(clip, { focusInspector: false, source: "menu", regionId: id });
-    else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: false, relayout: true });
+    if (kind === "ramp")
+      selectTimedRamp(clip, { focusInspector: false, source: "menu", regionId: id });
+    else if (kind === "overlay")
+      selectTimedOverlay(clip, id, { focusInspector: false, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: false, relayout: true });
     const removeItem = document.getElementById("studio-clip-menu-remove");
     const mergeItem = document.getElementById("studio-clip-menu-merge");
@@ -2482,15 +2540,10 @@ import {
     const pps = timelinePxPerSecond();
     const view = timelineViewportPx();
     const width =
-      state.timelineMode === "fit" || total <= 0
-        ? Math.max(view, 1)
-        : Math.max(view, total * pps);
+      state.timelineMode === "fit" || total <= 0 ? Math.max(view, 1) : Math.max(view, total * pps);
     timelineCanvasEl.style.width = `${width}px`;
     if (timelineScrollEl) {
-      timelineScrollEl.classList.toggle(
-        "is-fit",
-        state.timelineMode === "fit" || total <= 0
-      );
+      timelineScrollEl.classList.toggle("is-fit", state.timelineMode === "fit" || total <= 0);
     }
     let x = 0;
     const list = clips();
@@ -2508,13 +2561,12 @@ import {
       const afterId = el.dataset.transitionAfter;
       const prev = clips().find((c) => String(c.dataset.studioId) === String(afterId));
       if (!prev) return;
-      const boundary = (Number.parseFloat(prev.style.left) || 0) + (Number.parseFloat(prev.style.width) || 0);
+      const boundary =
+        (Number.parseFloat(prev.style.left) || 0) + (Number.parseFloat(prev.style.width) || 0);
       const type = el.dataset.appliedType || el.dataset.transitionType || "cut";
       const dur = Number(el.dataset.appliedDuration) || 0;
       const regionW =
-        type === "cut" || dur <= 0
-          ? Math.max(14, TIMELINE_HIT_MIN_PX)
-          : Math.max(24, dur * pps);
+        type === "cut" || dur <= 0 ? Math.max(14, TIMELINE_HIT_MIN_PX) : Math.max(24, dur * pps);
       el.style.width = `${regionW}px`;
       el.style.left = `${Math.max(0, boundary - regionW / 2)}px`;
       el.classList.toggle("is-cut", type === "cut" || dur <= 0);
@@ -2609,8 +2661,7 @@ import {
     if (win1) win1.disabled = empty;
     if (inBtn) {
       const atMaxZoom =
-        state.timelineMode === "zoom" &&
-        state.zoomIndex >= TIMELINE_ZOOM_PX_S.length - 1;
+        state.timelineMode === "zoom" && state.zoomIndex >= TIMELINE_ZOOM_PX_S.length - 1;
       inBtn.disabled = empty || atMaxZoom || (state.timelineMode === "fit" && denser < 0);
     }
   }
@@ -2721,7 +2772,8 @@ import {
     if (outgoingType === "fade_black" && outgoingD > 0) {
       const half = outgoingD / 2;
       const fadeStart = dur - half;
-      if (localS >= fadeStart) fadeBlackOpacity = half <= 0 ? 0 : Math.min(1, (localS - fadeStart) / half);
+      if (localS >= fadeStart)
+        fadeBlackOpacity = half <= 0 ? 0 : Math.min(1, (localS - fadeStart) / half);
     }
     if (incoming && (incoming.dataset.appliedType || "cut") === "fade_black") {
       const half = (Number(incoming.dataset.appliedDuration) || 0) / 2;
@@ -2822,10 +2874,12 @@ import {
     if (lutWebglCanHandle(clip)) return "";
     const clipId = String(clip.dataset.studioId);
     const selected = state.selected;
-    const selectedMatch = !!(selected && selected.type === "clip" &&
-      String(selected.id) === clipId);
-    const activeMatch = state.activeStudioId != null &&
-      String(state.activeStudioId) === clipId;
+    const selectedMatch = !!(
+      selected &&
+      selected.type === "clip" &&
+      String(selected.id) === clipId
+    );
+    const activeMatch = state.activeStudioId != null && String(state.activeStudioId) === clipId;
     if (!selectedMatch && !activeMatch) return "";
     return clip.dataset.lutProxyUrl || "";
   }
@@ -2834,9 +2888,7 @@ import {
   let lutRendererB = null;
 
   function lookHasLut(look) {
-    return !!look && !!(
-      (look.conversion_lut && look.conversion_confirmed) || look.creative_lut
-    );
+    return !!look && !!((look.conversion_lut && look.conversion_confirmed) || look.creative_lut);
   }
 
   const managedGradePreviewCache = createManagedGradePreviewCache({ fetchGrade });
@@ -2948,9 +3000,12 @@ import {
 
   function lutWebglReadyFor(clip) {
     if (!lutWebglCanHandle(clip)) return false;
-    const media = clipForPreviewMedia(previewVideo) === clip
-      ? previewVideo
-      : (clipForPreviewMedia(previewVideoB) === clip ? previewVideoB : null);
+    const media =
+      clipForPreviewMedia(previewVideo) === clip
+        ? previewVideo
+        : clipForPreviewMedia(previewVideoB) === clip
+          ? previewVideoB
+          : null;
     if (!media) return false;
     const renderer = lutRendererFor(media);
     return !!renderer && renderer.isReady(previewLookFor(clip));
@@ -2974,9 +3029,12 @@ import {
     if (!renderer) return null;
     const look = previewLookFor(clip);
     const hit = resolveAt(state.projectTimeS);
-    const localS = hit && hit.overlapClip === clip
-      ? hit.overlapLocalS
-      : (hit && hit.clip === clip ? hit.localS : 0);
+    const localS =
+      hit && hit.overlapClip === clip
+        ? hit.overlapLocalS
+        : hit && hit.clip === clip
+          ? hit.localS
+          : 0;
     const adjust = readImageAdjustAt(clip, localS);
     const ramp = saturationRampMultiplier(readSaturationRamp(clip), localS);
     const fullscreen = previewIsFullscreen();
@@ -3021,7 +3079,10 @@ import {
     if (lutProxyActiveFor(clip)) return false;
     // Any live LUT path (WebGL or would-be WebGL) blocks fullscreen.
     if (lutWebglCanHandle(clip)) return true;
-    return lookHasLut(readColorLook(clip)) && !!(window.OrgaLutPreview && window.OrgaLutPreview.supported);
+    return (
+      lookHasLut(readColorLook(clip)) &&
+      !!(window.OrgaLutPreview && window.OrgaLutPreview.supported)
+    );
   }
 
   function syncFullscreenControl() {
@@ -3041,15 +3102,11 @@ import {
   }
 
   function clipMediaTarget(clip, mapped, inS) {
-    return lutProxyActiveFor(clip)
-      ? Math.max(0, mapped)
-      : Math.max(inS, inS + mapped);
+    return lutProxyActiveFor(clip) ? Math.max(0, mapped) : Math.max(inS, inS + mapped);
   }
 
   function clipOffsetFromMediaTime(clip, mediaTime, inS) {
-    return lutProxyActiveFor(clip)
-      ? Math.max(0, mediaTime)
-      : Math.max(0, mediaTime - inS);
+    return lutProxyActiveFor(clip) ? Math.max(0, mediaTime) : Math.max(0, mediaTime - inS);
   }
 
   function videoSrcFor(clip) {
@@ -3062,12 +3119,7 @@ import {
   }
 
   function imageSrcFor(clip) {
-    return (
-      clip.dataset.previewUrl ||
-      clip.dataset.streamUrl ||
-      clip.dataset.thumb ||
-      ""
-    );
+    return clip.dataset.previewUrl || clip.dataset.streamUrl || clip.dataset.thumb || "";
   }
 
   function clearVideoElement() {
@@ -3171,7 +3223,9 @@ import {
     clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
-    collageEditor?.pausePlayback?.();
+    if (typeof collageEditor !== "undefined" && collageEditor) {
+      collageEditor.pausePlayback?.();
+    }
     // The video paint clock can pass the last transition update before pause.
     // Freeze photo composites at the stopped Story time, including overlap exit.
     if ((previewImage && !previewImage.hidden) || (previewImageB && !previewImageB.hidden)) {
@@ -3378,7 +3432,10 @@ import {
     const y = clampWheelCoordinate(point && point.y);
     const radius = Math.hypot(x, y);
     if (radius > 1) {
-      return { x: Math.round((x / radius) * 10000) / 10000, y: Math.round((y / radius) * 10000) / 10000 };
+      return {
+        x: Math.round((x / radius) * 10000) / 10000,
+        y: Math.round((y / radius) * 10000) / 10000,
+      };
     }
     return { x, y };
   }
@@ -3477,9 +3534,7 @@ import {
     brightness -= ((adjust.highlights || 0) / 100) * 0.05;
     brightness = Math.max(0.5, Math.min(2.2, brightness));
     const ramp = Number.isFinite(rampMultiplier) ? rampMultiplier : 1;
-    const warmthGains = adjust.warmth
-      ? blackbodyGains(kelvinForWarmth(adjust.warmth))
-      : [1, 1, 1];
+    const warmthGains = adjust.warmth ? blackbodyGains(kelvinForWarmth(adjust.warmth)) : [1, 1, 1];
     return { saturation, contrast, brightness, ramp, warmthGains };
   }
 
@@ -3608,14 +3663,15 @@ import {
       primary && !overlap && (forwardLoopActive(primary) || sectionRepeats(primary) > 1)
         ? sectionPoint(primary, localS)
         : null;
-    const primaryLocal =
-      loopPoint && Number.isFinite(loopPoint.offset) ? loopPoint.offset : localS;
+    const primaryLocal = loopPoint && Number.isFinite(loopPoint.offset) ? loopPoint.offset : localS;
     const loopBlend = Boolean(loopPoint && loopPoint.blending && loopOverlapS(primary) > 0);
     // The incoming loop copy is the same clip. Grading only the story neighbor
     // left that layer on the original color while the outgoing layer stayed graded.
     const incomingClip = loopBlend ? primary : overlap;
     const incomingLocal = loopBlend
-      ? (Number.isFinite(loopPoint.incomingOffset) ? loopPoint.incomingOffset : 0)
+      ? Number.isFinite(loopPoint.incomingOffset)
+        ? loopPoint.incomingOffset
+        : 0
       : overlapLocal;
     gradePreviewElement(
       previewVideo,
@@ -3649,9 +3705,10 @@ import {
     scheduleLutPreviewStill(primary, primaryLocal);
     // Prepare the next photo in the otherwise unused owner. It is a single
     // static request, not clock-tick rendering, and can move to primary intact.
-    const nextPhoto = !incomingClip && primary && isOverlapType(primary.dataset.appliedType)
-      ? clips().filter((clip) => clipDuration(clip) > 0)[hit.index + 1]
-      : null;
+    const nextPhoto =
+      !incomingClip && primary && isOverlapType(primary.dataset.appliedType)
+        ? clips().filter((clip) => clipDuration(clip) > 0)[hit.index + 1]
+        : null;
     schedulePhotoOverlapStill(incomingClip || nextPhoto, incomingLocal);
     schedulePreviewBlit();
   }
@@ -3660,16 +3717,26 @@ import {
   const previewLutChip = document.getElementById("studio-preview-lut-chip");
   const msgLutChipUpdating = root.dataset.lutChipUpdating || "Updating picture…";
   const msgLutChipStill = root.dataset.lutChipStill || "Still frame with color file";
-  const msgLutChipProxyPreparing = root.dataset.lutChipProxyPreparing || "LUT video is being prepared...";
+  const msgLutChipProxyPreparing =
+    root.dataset.lutChipProxyPreparing || "LUT video is being prepared...";
   const msgLutChipPlaying = root.dataset.lutChipPlaying || "Playing without color file";
-  const msgLutChipLoopPlaying = root.dataset.lutChipLoopPlaying || "Playing looped; color file preview appears on pause";
+  const msgLutChipLoopPlaying =
+    root.dataset.lutChipLoopPlaying || "Playing looped; color file preview appears on pause";
   const msgLutChipMissing = root.dataset.lutChipMissing || "Color file missing";
-  const msgLutChipFailed = root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
-  const msgLutChipComposite = root.dataset.lutChipComposite || "Color still; transition colors approximate";
-  const msgHslChipPlaying = root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
-  const msgHslChipLoopPlaying = root.dataset.hslChipLoopPlaying || "Playing looped; HSL preview appears on pause";
-  const msgColorWheelsChipPlaying = root.dataset.colorWheelsChipPlaying || "Playing without color grading preview; pause or seek to see it";
-  const msgColorWheelsChipLoopPlaying = root.dataset.colorWheelsChipLoopPlaying || "Playing looped; color grading preview appears on pause";
+  const msgLutChipFailed =
+    root.dataset.lutChipFailed || "Color preview unavailable; try pausing or seeking again";
+  const msgLutChipComposite =
+    root.dataset.lutChipComposite || "Color still; transition colors approximate";
+  const msgHslChipPlaying =
+    root.dataset.hslChipPlaying || "Playing without HSL preview; pause or seek to see it";
+  const msgHslChipLoopPlaying =
+    root.dataset.hslChipLoopPlaying || "Playing looped; HSL preview appears on pause";
+  const msgColorWheelsChipPlaying =
+    root.dataset.colorWheelsChipPlaying ||
+    "Playing without color grading preview; pause or seek to see it";
+  const msgColorWheelsChipLoopPlaying =
+    root.dataset.colorWheelsChipLoopPlaying ||
+    "Playing looped; color grading preview appears on pause";
   const msgWheelNeutral = root.dataset.wheelNeutral || "Neutral";
   function colorLookNeedsStill(look, clip) {
     if (!look) return false;
@@ -3685,7 +3752,8 @@ import {
     if (!clip || clip.dataset.kind !== "video") return 0;
     const offset = Math.max(0, Number(localS) || 0);
     const speed = playbackSpeed(clip);
-    if (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999)) return storyToSource(clip, offset);
+    if (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999))
+      return storyToSource(clip, offset);
     return offset * speed;
   }
 
@@ -3701,9 +3769,15 @@ import {
   }
 
   function lutStillSourceIdentity(clip) {
-    return JSON.stringify([clip.dataset.studioId, clip.dataset.mediaId,
-      clip.dataset.streamUrl, clip.dataset.previewUrl, clip.dataset.thumb,
-      clip.dataset.sourceIn, clip.dataset.sourceOut]);
+    return JSON.stringify([
+      clip.dataset.studioId,
+      clip.dataset.mediaId,
+      clip.dataset.streamUrl,
+      clip.dataset.previewUrl,
+      clip.dataset.thumb,
+      clip.dataset.sourceIn,
+      clip.dataset.sourceOut,
+    ]);
   }
 
   // Both layers use the same preview-frame path. Only photo owners survive
@@ -3784,8 +3858,12 @@ import {
         clearLutPreviewStill();
         return;
       }
-      if (clip.dataset.imagePreviewDirty === "1" || clip.dataset.rampPreviewDirty === "1" ||
-          clip.dataset.hslPreviewDirty === "1" || clip.dataset.colorWheelsPreviewDirty === "1") {
+      if (
+        clip.dataset.imagePreviewDirty === "1" ||
+        clip.dataset.rampPreviewDirty === "1" ||
+        clip.dataset.hslPreviewDirty === "1" ||
+        clip.dataset.colorWheelsPreviewDirty === "1"
+      ) {
         clearLutPreviewStill();
         setChip(msgLutChipUpdating);
         return;
@@ -3823,10 +3901,22 @@ import {
       const sourceOff = lutStillSourceOffset(clip, localS);
       const quant = quantizePreviewTime(sourceOff);
       const storyQuant = quantizePreviewTime(state.projectTimeS);
-      const key = JSON.stringify([studioId, clip.dataset.mediaId, clip.dataset.streamUrl,
-        clip.dataset.previewUrl, clip.dataset.thumb, quant, storyQuant, clip.dataset.sourceIn,
-        clip.dataset.sourceOut, look, readImageAdjust(clip), hsl, colorWheels,
-        clip.dataset.saturationRamp]);
+      const key = JSON.stringify([
+        studioId,
+        clip.dataset.mediaId,
+        clip.dataset.streamUrl,
+        clip.dataset.previewUrl,
+        clip.dataset.thumb,
+        quant,
+        storyQuant,
+        clip.dataset.sourceIn,
+        clip.dataset.sourceOut,
+        look,
+        readImageAdjust(clip),
+        hsl,
+        colorWheels,
+        clip.dataset.saturationRamp,
+      ]);
       if (key === lutStillKey) return;
       // Reject old responses now, including during the debounce and image decode.
       clearLutPreviewStill();
@@ -3847,7 +3937,11 @@ import {
           story_s: storyQuant,
           detail: 0,
         });
-        fetch(url, { cache: "no-store", headers: { Accept: "image/jpeg" }, signal: controller.signal })
+        fetch(url, {
+          cache: "no-store",
+          headers: { Accept: "image/jpeg" },
+          signal: controller.signal,
+        })
           .then(async (res) => {
             if (token !== lutStillToken) return null;
             if (res.status === 409) {
@@ -3885,11 +3979,15 @@ import {
             previewLutStill.src = objectUrl;
             previewLutStill.hidden = false;
             const hit = resolveAt(state.projectTimeS);
-            const composite = hit && (hit.overlapClip ||
-              (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
+            const composite =
+              hit &&
+              (hit.overlapClip ||
+                (loopOverlapS(clip) > 0 && sectionPoint(clip, hit.localS).blending));
             const stillLabel = composite ? msgLutChipComposite : msgLutChipStill;
             setChip(
-              lutProxyPreparingFor(clip) ? `${stillLabel} · ${msgLutChipProxyPreparing}` : stillLabel
+              lutProxyPreparingFor(clip)
+                ? `${stillLabel} · ${msgLutChipProxyPreparing}`
+                : stillLabel
             );
             drawPrivacyMasks();
             schedulePreviewBlit();
@@ -3920,8 +4018,10 @@ import {
         return true;
       },
       clip: () => owner,
-      picture: () => owner && ownerSource === lutStillSourceIdentity(owner) &&
-        previewLayerReady(previewLutStill) ? previewLutStill : null,
+      picture: () =>
+        owner && ownerSource === lutStillSourceIdentity(owner) && previewLayerReady(previewLutStill)
+          ? previewLutStill
+          : null,
     };
   }
 
@@ -3933,9 +4033,11 @@ import {
   function alignLutStillOwners(primary, overlap) {
     // The previous primary becomes the outgoing layer at an overlap boundary.
     // Move its decoded resource rather than clearing and rendering it again.
-    if (primary !== primaryLutStill.clip() &&
-        ((overlap && overlap === primaryLutStill.clip()) ||
-         (primary && primary === overlapLutStill.clip()))) {
+    if (
+      primary !== primaryLutStill.clip() &&
+      ((overlap && overlap === primaryLutStill.clip()) ||
+        (primary && primary === overlapLutStill.clip()))
+    ) {
       [primaryLutStill, overlapLutStill] = [overlapLutStill, primaryLutStill];
       primaryLutStill.setPrimary(true);
       overlapLutStill.setPrimary(false);
@@ -4126,7 +4228,10 @@ import {
   }
 
   function canvasFilterFrom(styleFilter) {
-    const text = String(styleFilter || "none").replace(/url\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+    const text = String(styleFilter || "none")
+      .replace(/url\([^)]*\)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return text || "none";
   }
 
@@ -4182,14 +4287,13 @@ import {
   function currentScopeView() {
     const clip = selectedAdjustableClip();
     const grade = managedGradeForClip(clip);
-    const gradeRevision = grade?.revision != null
-      ? String(grade.revision)
-      : clip
-        ? String(clip.dataset.gradeRevision || "0")
-        : "";
-    const managedDigest = grade
-      ? `managed:${gradeRevision}:${grade.evaluator || ""}`
-      : "";
+    const gradeRevision =
+      grade?.revision != null
+        ? String(grade.revision)
+        : clip
+          ? String(clip.dataset.gradeRevision || "0")
+          : "";
+    const managedDigest = grade ? `managed:${gradeRevision}:${grade.evaluator || ""}` : "";
     // While playing, keep the view key stable so 0.1s PTS advances do not
     // clear measurements or reset the producer throttle. Scrub-while-paused
     // still changes the seek token so reverse seeks drop the old frame.
@@ -4443,8 +4547,7 @@ import {
             params: { preset_id: desiredLook },
             historyGroup: `quick-look-${studioId}`,
           });
-          const presetId =
-            payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
+          const presetId = payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
           return { ok: true, quick_look: presetId, grade: payload };
         }
         const res = await fetch(`/api/studio/${studioId}/look`, {
@@ -4496,10 +4599,7 @@ import {
     if (!clip.dataset.quickLook) return;
     clip.dataset.quickLook = "";
     const selected = selectedAdjustableClip();
-    if (
-      selected &&
-      String(selected.dataset.studioId) === String(clip.dataset.studioId)
-    ) {
+    if (selected && String(selected.dataset.studioId) === String(clip.dataset.studioId)) {
       const lookSelect = document.getElementById("inspector-quick-look");
       if (lookSelect) lookSelect.value = "";
       syncQuickLookChips("");
@@ -4540,8 +4640,14 @@ import {
         creative_lut: String(parsed.creative_lut || ""),
         creative_strength: Math.max(
           0,
-          Math.min(100, Math.round(Number.isFinite(Number(parsed.creative_strength)) &&
-            parsed.creative_strength != null ? Number(parsed.creative_strength) : 100))
+          Math.min(
+            100,
+            Math.round(
+              Number.isFinite(Number(parsed.creative_strength)) && parsed.creative_strength != null
+                ? Number(parsed.creative_strength)
+                : 100
+            )
+          )
         ),
         conversion_confirmed: Boolean(parsed.conversion_confirmed),
       };
@@ -4560,7 +4666,8 @@ import {
 
   let colorAnimationModel = { maxKeys: 8, minKeyGapS: 0.1, presets: [] };
   try {
-    colorAnimationModel = JSON.parse(root.dataset.colorAnimationModel || "{}") || colorAnimationModel;
+    colorAnimationModel =
+      JSON.parse(root.dataset.colorAnimationModel || "{}") || colorAnimationModel;
   } catch (_) {
     /* keep defaults */
   }
@@ -4587,7 +4694,7 @@ import {
     const hit = list.find((item) => item && item.id === id);
     if (!hit) return id;
     const lang = (document.documentElement.lang || "en").toLowerCase();
-    return lang.startsWith("de") ? (hit.label_de || hit.label_en || id) : (hit.label_en || id);
+    return lang.startsWith("de") ? hit.label_de || hit.label_en || id : hit.label_en || id;
   }
 
   function keyedColorAt(anim, localS, staticLutStrength) {
@@ -4920,10 +5027,13 @@ import {
           showFlash(root.dataset.colorAnimPlayhead || "Set the playhead inside the color bar.");
           return;
         }
-        const keys = anim && Array.isArray(anim.keys) ? anim.keys.map((key) => ({ ...key })) : [
-          { t: barStart, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
-          { t: barEnd, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
-        ];
+        const keys =
+          anim && Array.isArray(anim.keys)
+            ? anim.keys.map((key) => ({ ...key }))
+            : [
+                { t: barStart, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
+                { t: barEnd, exposure: 0, contrast: 0, saturation: 0, warmth: 0 },
+              ];
         if (keys.length >= 8) {
           showFlash(root.dataset.colorAnimMax || "At most 8 points.");
           return;
@@ -4932,13 +5042,19 @@ import {
           return;
         }
         const look = readColorLook(clip);
-        const staticStrength = look ? Math.max(0, Math.min(100, Math.round(Number(look.creative_strength) || 100))) : 100;
+        const staticStrength = look
+          ? Math.max(0, Math.min(100, Math.round(Number(look.creative_strength) || 100)))
+          : 100;
         const keyed = keyedColorAt(
           { bar: { start_s: barStart, end_s: barEnd }, keys },
           local,
           staticStrength
         ) || {
-          exposure: 0, contrast: 0, saturation: 0, warmth: 0, lut_strength: null,
+          exposure: 0,
+          contrast: 0,
+          saturation: 0,
+          warmth: 0,
+          lut_strength: null,
         };
         const point = {
           t: Math.round(local * 10) / 10,
@@ -4948,8 +5064,7 @@ import {
           warmth: keyed.warmth,
         };
         if (keyed.lut_strength != null || (look && look.creative_lut)) {
-          point.lut_strength =
-            keyed.lut_strength != null ? keyed.lut_strength : staticStrength;
+          point.lut_strength = keyed.lut_strength != null ? keyed.lut_strength : staticStrength;
         }
         keys.push(point);
         keys.sort((a, b) => Number(a.t) - Number(b.t));
@@ -5040,7 +5155,10 @@ import {
     const strengthField = document.getElementById("inspector-color-strength-field");
     const strengthInput = document.getElementById("inspector-color-strength");
     const strengthValue = document.getElementById("inspector-color-strength-value");
-    const hintKey = String(token || "").trim().toLowerCase().replace(/-/g, "_");
+    const hintKey = String(token || "")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
     const isDlogHint = hintKey === "dlog_m";
     const conversionOn = Boolean(look.conversion_lut && look.conversion_confirmed);
     if (profileValue) {
@@ -5075,9 +5193,7 @@ import {
     );
     if (creativeMissing) {
       creativeMissing.hidden = !creativeMissingFile;
-      creativeMissing.textContent = creativeMissingFile
-        ? msgColorLutMissing
-        : "";
+      creativeMissing.textContent = creativeMissingFile ? msgColorLutMissing : "";
     }
     if (strengthField) strengthField.hidden = !look.creative_lut;
     if (strengthInput) strengthInput.value = String(look.creative_strength);
@@ -5127,10 +5243,7 @@ import {
       // Re-hydrate Quick Look chips from grade.extensions.creative_preset once
       // the managed grade cache is warm (SSR look id stays empty for managed).
       const selected = selectedAdjustableClip();
-      if (
-        selected &&
-        String(selected.dataset.studioId) === String(requestedStudioId || "")
-      ) {
+      if (selected && String(selected.dataset.studioId) === String(requestedStudioId || "")) {
         fillImageAdjust(selected);
       }
     })();
@@ -5281,8 +5394,8 @@ import {
     isSelected: (studioId) =>
       Boolean(
         state.selected &&
-          state.selected.type === "clip" &&
-          String(state.selected.id) === String(studioId)
+        state.selected.type === "clip" &&
+        String(state.selected.id) === String(studioId)
       ),
     fill: fillImageAdjust,
     refreshPreview: () => {
@@ -5492,7 +5605,10 @@ import {
   function newMaskId() {
     const bytes = new Uint8Array(5);
     if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
-    else bytes.forEach((_, index) => { bytes[index] = Math.floor(Math.random() * 256); });
+    else
+      bytes.forEach((_, index) => {
+        bytes[index] = Math.floor(Math.random() * 256);
+      });
     const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
     return `m${hex}`;
   }
@@ -5551,10 +5667,14 @@ import {
 
   function sourceWindowForMask(media, srcW, srcH) {
     const laidOut = media.getBoundingClientRect();
-    const frameW = previewFrame && previewFrame.clientWidth > 2 ? previewFrame.clientWidth : laidOut.width;
-    const frameH = previewFrame && previewFrame.clientHeight > 2 ? previewFrame.clientHeight : laidOut.height;
+    const frameW =
+      previewFrame && previewFrame.clientWidth > 2 ? previewFrame.clientWidth : laidOut.width;
+    const frameH =
+      previewFrame && previewFrame.clientHeight > 2 ? previewFrame.clientHeight : laidOut.height;
     const clip = clipForPreviewMedia(media);
-    const frame = clip ? readFrame(clip) : { zoom_start: 1, zoom_end: 1, x_start: 0.5, y_start: 0.5, x_end: 0.5, y_end: 0.5 };
+    const frame = clip
+      ? readFrame(clip)
+      : { zoom_start: 1, zoom_end: 1, x_start: 0.5, y_start: 0.5, x_end: 0.5, y_end: 0.5 };
     const hit = resolveAt(state.projectTimeS);
     const localS =
       clip && hit && hit.overlapClip === clip
@@ -5839,8 +5959,7 @@ import {
           clientX <= right + 12 &&
           clientY >= bottom - 18 &&
           clientY <= bottom + 12;
-        const inside =
-          clientX >= left && clientX <= right && clientY >= top && clientY <= bottom;
+        const inside = clientX >= left && clientX <= right && clientY >= top && clientY <= bottom;
         if (onResize || inside) {
           found = { mask, clip: layer.clip, resizing: onResize, rect };
         }
@@ -5891,9 +6010,7 @@ import {
     if (!layer) return false;
     const maskId = (box && box.dataset.maskId) || (geom && geom.mask && geom.mask.id) || "";
     const studioId =
-      (box && box.dataset.studioId) ||
-      (geom && geom.clip && geom.clip.dataset.studioId) ||
-      "";
+      (box && box.dataset.studioId) || (geom && geom.clip && geom.clip.dataset.studioId) || "";
     const clip =
       (geom && geom.clip) ||
       clips().find((item) => String(item.dataset.studioId) === String(studioId));
@@ -6268,7 +6385,8 @@ import {
     const storyHandle = document.getElementById("studio-story-resize");
     if (workspace) {
       const savedBrowser = readStoredSize("orga-drone.studio.browserWidth", 200, 420);
-      if (savedBrowser != null) workspace.style.setProperty("--studio-browser-width", `${savedBrowser}px`);
+      if (savedBrowser != null)
+        workspace.style.setProperty("--studio-browser-width", `${savedBrowser}px`);
     }
     if (stage) {
       // Floor keeps story + audio + effect + soundtrack lanes visible without drag-up.
@@ -6293,7 +6411,9 @@ import {
           browserHandle.classList.remove("is-dragging");
           window.removeEventListener("pointermove", move);
           window.removeEventListener("pointerup", up);
-          const width = Number.parseFloat(workspace.style.getPropertyValue("--studio-browser-width"));
+          const width = Number.parseFloat(
+            workspace.style.getPropertyValue("--studio-browser-width")
+          );
           if (Number.isFinite(width)) {
             try {
               localStorage.setItem("orga-drone.studio.browserWidth", String(Math.round(width)));
@@ -6358,10 +6478,10 @@ import {
     const active = document.activeElement;
     const inMaskUi = Boolean(
       active &&
-        active.closest &&
-        (active.closest("#studio-preview-mask-handles") ||
-          active.closest("#inspector-masks") ||
-          active.closest("#mask-list"))
+      active.closest &&
+      (active.closest("#studio-preview-mask-handles") ||
+        active.closest("#inspector-masks") ||
+        active.closest("#mask-list"))
     );
     return clipPanel.dataset.tab === "effects" || inMaskUi;
   }
@@ -6542,7 +6662,10 @@ import {
   function framePreviewProgress(clip, localS, sampleOverride) {
     if (speedRampOf(clip)) {
       const sample = sampleOverride ?? sectionSampleS(clip, localS);
-      return Math.max(0, Math.min(1, storyToSource(clip, sample) / Math.max(0.05, sourceDurationS(clip))));
+      return Math.max(
+        0,
+        Math.min(1, storyToSource(clip, sample) / Math.max(0.05, sourceDurationS(clip)))
+      );
     }
     if (sampleOverride != null && Number.isFinite(sampleOverride)) {
       const duration = sectionRepeats(clip) > 1 ? sectionCycleS(clip) : clipDuration(clip);
@@ -6629,9 +6752,7 @@ import {
     }
     const active = selectedAdjustableClip();
     const framing = active ? readFrame(active) : null;
-    const zooming = Boolean(
-      framing && (framing.zoom_start > 1.001 || framing.zoom_end > 1.001)
-    );
+    const zooming = Boolean(framing && (framing.zoom_start > 1.001 || framing.zoom_end > 1.001));
     if (previewFrame) previewFrame.classList.toggle("is-framing", zooming);
   }
 
@@ -6745,7 +6866,7 @@ import {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
-    collageEditor?.hidePreview();
+    withCollageEditor((ce) => ce.hidePreview());
     hideOverlayLayers();
     hideAnnotations();
     hidePrivacyMasks();
@@ -6767,7 +6888,7 @@ import {
     if (!previewImage) return;
     clearVideoElement();
     hideTitlecard();
-    collageEditor?.hidePreview();
+    withCollageEditor((ce) => ce.hidePreview());
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewImage.hidden = false;
     if (!src) {
@@ -6803,9 +6924,10 @@ import {
       : { index: 0, offset: Math.max(0, localS), atEnd: false };
     videoLoopIndex = point.index;
     const speed = clip ? playbackSpeed(clip) : 1;
-    const mapped = clip && (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999))
-      ? playSourceOffset(clip, point.offset)
-      : Math.max(0, point.offset) * speed;
+    const mapped =
+      clip && (speedRampOf(clip) || (slowBarOf(clip) && speed >= 0.999))
+        ? playSourceOffset(clip, point.offset)
+        : Math.max(0, point.offset) * speed;
     const target = clipMediaTarget(clip, mapped, inS);
     const apply = () => {
       if (reuseDraft || token !== syncToken) return;
@@ -6830,24 +6952,28 @@ import {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
     hideTitlecard();
-    collageEditor?.hidePreview();
+    withCollageEditor((ce) => ce.hidePreview());
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
     const lutSrc = clip ? lutProxySrcFor(clip) : "";
     if (lutSrc && src === lutSrc) {
-      previewVideo.addEventListener("error", () => {
-        if (reuseDraft || !clip || loadedVideoSrc !== lutSrc) return;
-        delete clip.dataset.lutProxyUrl;
-        loadedVideoSrc = "";
-        showVideo(videoSrcFor(clip), localS, {
-          play: allowHtmlVideoAutoplay({
-            playing: state.playing,
-            seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
-          }),
-          clip,
-        });
-      }, { once: true });
+      previewVideo.addEventListener(
+        "error",
+        () => {
+          if (reuseDraft || !clip || loadedVideoSrc !== lutSrc) return;
+          delete clip.dataset.lutProxyUrl;
+          loadedVideoSrc = "";
+          showVideo(videoSrcFor(clip), localS, {
+            play: allowHtmlVideoAutoplay({
+              playing: state.playing,
+              seekSample: rampNeedsSeekPreview(speedRampOf(clip)),
+            }),
+            clip,
+          });
+        },
+        { once: true }
+      );
     }
     applyClipPlayback(previewVideo, clip);
     const needLoad = !src || loadedVideoSrc !== src;
@@ -6901,7 +7027,7 @@ import {
     if (!previewTitlecard) return;
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
-    collageEditor?.hidePreview();
+    withCollageEditor((ce) => ce.hidePreview());
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     setPreviewLoading(false);
     const bg = clip.dataset.background || "dark";
@@ -6923,7 +7049,7 @@ import {
     hideTitlecard();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     setPreviewLoading(false);
-    collageEditor?.renderPreview(clip);
+    withCollageEditor((ce) => ce.renderPreview(clip));
   }
 
   function fillTitlecardEl(el, titleEl, subEl, clip) {
@@ -6976,7 +7102,11 @@ import {
     if (remaining <= 0 || remaining > 0.5) return false;
     const id = String(clip.dataset.studioId);
     const inS = loopPlayInS(clip);
-    const target = secondaryVideoTarget(clip, Math.max(0, sectionSampleS(clip, hit.localS)), videoSrcFor(clip));
+    const target = secondaryVideoTarget(
+      clip,
+      Math.max(0, sectionSampleS(clip, hit.localS)),
+      videoSrcFor(clip)
+    );
     const seekSample = rampNeedsSeekPreview(speedRampOf(clip));
     const mayPlay = allowHtmlVideoAutoplay({ playing: state.playing, seekSample });
     const sync = () => {
@@ -7205,8 +7335,7 @@ import {
 
   function paintOverlap(hit, progress) {
     clearOverlapPaint();
-    const type =
-      hit && hit.overlapClip ? hit.overlapClip.dataset.appliedType || "cut" : "cut";
+    const type = hit && hit.overlapClip ? hit.overlapClip.dataset.appliedType || "cut" : "cut";
     if (type === "blur_dissolve") {
       const radius = blurRadiusPx(progress);
       overlapLayers().forEach((el) => {
@@ -7265,7 +7394,8 @@ import {
       const progress = hit.crossfadeProgress;
       if (previewImage && !previewImage.hidden) previewImage.style.opacity = String(progress);
       if (previewVideo && !previewVideo.hidden) previewVideo.style.opacity = String(progress);
-      if (previewTitlecard && !previewTitlecard.hidden) previewTitlecard.style.opacity = String(progress);
+      if (previewTitlecard && !previewTitlecard.hidden)
+        previewTitlecard.style.opacity = String(progress);
       if (typeof paintOverlap === "function") paintOverlap(hit, progress);
     }
     if (hit && hit.fadeBlackOpacity > 0.001 && previewFadeBlack) {
@@ -7366,11 +7496,13 @@ import {
     const alpha = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1;
     if (alpha <= 0.001) return true;
     // WebGL output, server stills and LUT proxies already contain grade + LUT.
-    const proxyRendered = (media === previewVideo || media === previewVideoB) &&
+    const proxyRendered =
+      (media === previewVideo || media === previewVideoB) &&
       lutProxyActiveFor(clipForPreviewMedia(media));
-    const filter = compared || webgl || rendered || proxyRendered
-      ? "none"
-      : canvasFilterFrom(media.style.filter);
+    const filter =
+      compared || webgl || rendered || proxyRendered
+        ? "none"
+        : canvasFilterFrom(media.style.filter);
     ctx.save();
     try {
       ctx.globalAlpha = alpha;
@@ -7460,8 +7592,12 @@ import {
     const primary = visiblePrimaryMedia();
     const renderedSecondary = renderedPreviewStillFor(secondary);
     const rendered = renderedPreviewStillFor(primary);
-    if (!previewLayerReady(secondary) && !previewLayerReady(primary) &&
-        !previewLayerReady(renderedSecondary) && !previewLayerReady(rendered)) {
+    if (
+      !previewLayerReady(secondary) &&
+      !previewLayerReady(primary) &&
+      !previewLayerReady(renderedSecondary) &&
+      !previewLayerReady(rendered)
+    ) {
       canvas.hidden = true;
       return;
     }
@@ -7689,9 +7825,14 @@ import {
     } else {
       applyTransitionPreview(after);
     }
-    if (after.clip && after.clip.dataset.kind === "collage") {
-      const spec = collageEditor?.parseSpec?.(after.clip);
-      collageEditor?.syncPlayback?.({
+    if (
+      after.clip &&
+      after.clip.dataset.kind === "collage" &&
+      typeof collageEditor !== "undefined" &&
+      collageEditor
+    ) {
+      const spec = collageEditor.parseSpec?.(after.clip);
+      collageEditor.syncPlayback?.({
         localS: after.localS || 0,
         playing: true,
         seek: false,
@@ -7768,10 +7909,15 @@ import {
     const speed = playbackSpeed(playing);
     const reps = sectionRepeats(playing);
     const cycle = sectionCycleS(playing);
-    const offset = clipOffsetFromMediaTime(playing, mediaTime, speedRampOf(playing) ? sourceInS(playing) : inS);
-    const within = speedRampOf(playing) || (slowBarOf(playing) && speed >= 0.999)
-      ? sourceToStory(playing, offset)
-      : offset / speed;
+    const offset = clipOffsetFromMediaTime(
+      playing,
+      mediaTime,
+      speedRampOf(playing) ? sourceInS(playing) : inS
+    );
+    const within =
+      speedRampOf(playing) || (slowBarOf(playing) && speed >= 0.999)
+        ? sourceToStory(playing, offset)
+        : offset / speed;
     const loopOverlap = forwardLoopOverlapS(playing);
     const loopSpans = loopOverlap > 0 ? forwardLoopSpans(playing) : [];
     let local = reps > 1 ? videoLoopIndex * cycle + within : within;
@@ -7817,7 +7963,9 @@ import {
     if (!playing || playing.dataset.kind !== "video") return;
     const position = videoStoryPosition(playing, previewVideo.currentTime || 0);
     if (speedRampOf(playing)) applyClipPlayback(previewVideo, playing);
-    const secondary = clipForPreviewMedia(previewVideoB) || (previewVideoB && !previewVideoB.hidden && loopOverlapS(playing) > 0 ? playing : null);
+    const secondary =
+      clipForPreviewMedia(previewVideoB) ||
+      (previewVideoB && !previewVideoB.hidden && loopOverlapS(playing) > 0 ? playing : null);
     if (secondary && speedRampOf(secondary)) applyClipPlayback(previewVideoB, secondary);
     const after = resolveAt(position.next);
     if (!after) return;
@@ -7855,16 +8003,10 @@ import {
     const outS = sourceOutS(playing);
     const mediaTime = previewVideo.currentTime || 0;
     applyClipPlayback(previewVideo, playing);
-    const {
-      inS,
-      speed,
-      reps,
-      cycle,
-      loopOverlap,
-      loopSpans,
-      local,
-      next,
-    } = videoStoryPosition(playing, mediaTime);
+    const { inS, speed, reps, cycle, loopOverlap, loopSpans, local, next } = videoStoryPosition(
+      playing,
+      mediaTime
+    );
     if (Math.abs(next - state.projectTimeS) >= 0.01) {
       state.projectTimeS = next;
     }
@@ -7889,7 +8031,8 @@ import {
     if (loopOverlap > 0 && loopSpans.length) {
       const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
       const span = loopSpans[index] || 0;
-      const endMedia = inS + (speedRampOf(playing) ? playSourceOffset(playing, span) : span * speed);
+      const endMedia =
+        inS + (speedRampOf(playing) ? playSourceOffset(playing, span) : span * speed);
       if (index + 1 < loopSpans.length && mediaTime >= endMedia - 0.02) {
         if (loopSeeking) return;
         loopSeeking = true;
@@ -8034,11 +8177,7 @@ import {
           if (volumeInput) volumeInput.value = String(Math.round(state.volume * 100));
         }
         const timeline = data.timeline;
-        if (
-          timeline &&
-          typeof timeline === "object" &&
-          Number(timeline.projectId) === projectId
-        ) {
+        if (timeline && typeof timeline === "object" && Number(timeline.projectId) === projectId) {
           if (timeline.mode === "fit" || timeline.mode === "zoom") {
             state.timelineMode = timeline.mode;
           }
@@ -8099,8 +8238,7 @@ import {
     if (trackEl) {
       trackEl.classList.toggle("is-selected", state.selected.type === "sfx");
     }
-    const pps =
-      totalDuration() > 0 ? timeToX(1) - timeToX(0) : timelinePxPerSecond();
+    const pps = totalDuration() > 0 ? timeToX(1) - timeToX(0) : timelinePxPerSecond();
     renderSfxClips({
       container: clipsEl,
       clips: sfxState.clips,
@@ -8272,10 +8410,7 @@ import {
     if (startEl) startEl.value = String(Number(clip.start_s) || 0);
     if (inEl) inEl.value = String(Number(clip.source_in_s) || 0);
     const fallbackOut =
-      Number(clip.source_out_s) ||
-      audibleSfxDurationS(clip) ||
-      Number(clip.duration_s) ||
-      0;
+      Number(clip.source_out_s) || audibleSfxDurationS(clip) || Number(clip.duration_s) || 0;
     if (outEl) outEl.value = String(fallbackOut);
     if (volEl) volEl.value = String(Math.round((Number(clip.volume) || 0) * 100));
     if (fadeInEl) fadeInEl.value = String(Number(clip.fade_in_s) || 0);
@@ -8411,9 +8546,7 @@ import {
     const startS = Number(payload && payload.music_start_s);
     if (Number.isFinite(startS)) state.musicStartS = Math.max(0, startS);
     const mapped = list.map(musicFromPayload).filter(Boolean);
-    state.tracks = acceptRemoved
-      ? mapped
-      : filterResurrectedMusicTracks(mapped, musicRemovedIds);
+    state.tracks = acceptRemoved ? mapped : filterResurrectedMusicTracks(mapped, musicRemovedIds);
   }
 
   function beginMusicPlaylistMutation() {
@@ -8748,11 +8881,7 @@ import {
       const duration = audibleSfxDurationS(clip);
       const sourceIn = Math.max(0, Number(clip.source_in_s) || 0);
       const local = storyT - start;
-      const active =
-        !!clip.stream_url &&
-        duration > 0 &&
-        local >= -0.05 &&
-        local < duration;
+      const active = !!clip.stream_url && duration > 0 && local >= -0.05 && local < duration;
       if (!active) {
         try {
           el.pause();
@@ -8771,10 +8900,7 @@ import {
         Number(clip.fade_in_s) || 0,
         Number(clip.fade_out_s) || 0
       );
-      el.volume = Math.max(
-        0,
-        Math.min(1, master * (Number(clip.volume) || 0) * gain)
-      );
+      el.volume = Math.max(0, Math.min(1, master * (Number(clip.volume) || 0) * gain));
       const playPos = sourceIn + Math.max(0, local);
       try {
         if (Math.abs((el.currentTime || 0) - playPos) > 0.35) {
@@ -9038,8 +9164,7 @@ import {
     }
     const pushMark = (s, kind, label) => {
       const mark = document.createElement("span");
-      mark.className =
-        kind === "minor" ? "studio-ruler-mark is-minor" : "studio-ruler-mark";
+      mark.className = kind === "minor" ? "studio-ruler-mark is-minor" : "studio-ruler-mark";
       mark.style.left = `${timeToX(s)}px`;
       if (label) mark.textContent = label;
       rulerEl.appendChild(mark);
@@ -9123,10 +9248,10 @@ import {
       syncColorScopesView();
     } else if (kind === "collage") {
       setInspectorHeading(kindLabels.collage);
-      collageEditor?.fillInspector(clip);
+      withCollageEditor((ce) => ce.fillInspector(clip));
       syncColorScopesView();
     } else {
-      collageEditor?.hidePreview();
+      withCollageEditor((ce) => ce.hidePreview());
       showInspector("inspector-clip");
       setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
       const panel = document.getElementById("inspector-clip");
@@ -9138,8 +9263,7 @@ import {
       const dur = clipDuration(clip);
       const durationLine = panel.querySelector('[data-field="duration-line"]');
       if (durationLine) {
-        durationLine.textContent =
-          dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
+        durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
       }
 
       const photoWrap = document.getElementById("inspector-photo-duration-wrap");
@@ -9172,7 +9296,9 @@ import {
           if (outEl && document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
           if (repeatEl && document.activeElement !== repeatEl) {
             repeatEl.value = String(
-              forwardLoopActive(clip) ? Number(clip.dataset.sectionRepeats) || 1 : sectionRepeats(clip)
+              forwardLoopActive(clip)
+                ? Number(clip.dataset.sectionRepeats) || 1
+                : sectionRepeats(clip)
             );
           }
           fillForwardLoop(clip);
@@ -9542,7 +9668,9 @@ import {
       c.classList.remove("is-selected");
       c.removeAttribute("aria-selected");
     });
-    grid.querySelectorAll(".studio-transition").forEach((t) => t.classList.toggle("is-selected", t === el));
+    grid
+      .querySelectorAll(".studio-transition")
+      .forEach((t) => t.classList.toggle("is-selected", t === el));
     layoutMusicSpans();
     layoutEffectBars();
     layoutClipAudio();
@@ -9560,7 +9688,8 @@ import {
     const select = document.getElementById("inspector-transition-type");
     const stored = el.dataset.storedType || el.dataset.transitionType || "cut";
     if (select) {
-      select.value = stored === "cut" || stored === "fade_black" || isOverlapType(stored) ? stored : "cut";
+      select.value =
+        stored === "cut" || stored === "fade_black" || isOverlapType(stored) ? stored : "cut";
     }
     const durWrap = document.getElementById("inspector-transition-duration-wrap");
     const durInput = document.getElementById("inspector-transition-duration");
@@ -9581,9 +9710,7 @@ import {
       } else if (!isCut) {
         const { after, before } = transitionNeighbors(el);
         const maxD =
-          after && before
-            ? Math.min(clipDuration(after), clipDuration(before)) - 0.1
-            : 0;
+          after && before ? Math.min(clipDuration(after), clipDuration(before)) - 0.1 : 0;
         if (!Number.isFinite(maxD) || maxD < 0.1) {
           hint.hidden = false;
           hint.textContent = msgTransitionNoRoom;
@@ -9713,7 +9840,10 @@ import {
     showClipMenu(
       event.clientX,
       event.clientY,
-      returnTarget || document.querySelector(`.studio-music-select[data-music-id="${CSS.escape(String(trackId))}"]`)
+      returnTarget ||
+        document.querySelector(
+          `.studio-music-select[data-music-id="${CSS.escape(String(trackId))}"]`
+        )
     );
   }
 
@@ -9796,14 +9926,11 @@ import {
       if (!path) return;
       setSaveState(false);
       const mutationRev = beginMusicPlaylistMutation();
-      const saved = await fetch(
-        `/api/studio/projects/${projectId}/music/${trackId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ path }),
-        }
-      );
+      const saved = await fetch(`/api/studio/projects/${projectId}/music/${trackId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ path }),
+      });
       const savedBody = await saved.json().catch(() => null);
       if (!saved.ok || !savedBody || !savedBody.ok) {
         showFlash(musicErrorDetail(savedBody));
@@ -9853,10 +9980,7 @@ import {
         applyTracksPayload(data);
         renderMusic();
         // Keep inspector on this track only when it is still the selection.
-        if (
-          state.selected?.type === "music" &&
-          String(state.selected.id) === String(trackId)
-        ) {
+        if (state.selected?.type === "music" && String(state.selected.id) === String(trackId)) {
           selectMusic(trackId);
         }
       } else {
@@ -10072,10 +10196,7 @@ import {
       if (musicPlaylistMutationIsCurrent(mutationRev)) {
         applyTracksPayload(data);
         renderMusic();
-        if (
-          state.selected?.type === "music" &&
-          String(state.selected.id) === String(trackId)
-        ) {
+        if (state.selected?.type === "music" && String(state.selected.id) === String(trackId)) {
           selectMusic(trackId);
         }
       } else {
@@ -10192,8 +10313,7 @@ import {
       if (resetBtn) resetBtn.disabled = data.photo_duration_s == null;
       const input = document.getElementById("inspector-photo-duration");
       if (input) {
-        const shown =
-          data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
+        const shown = data.photo_duration_s == null ? defaultPhotoDuration : data.photo_duration_s;
         input.value = Number(shown).toFixed(1);
       }
       if (reloadIfForwardLoop()) return;
@@ -10281,7 +10401,12 @@ import {
 
   function forwardLoopError(detail) {
     const known = forwardLoopHint(detail);
-    if (known !== msgForwardLoopHint || detail === "active" || detail === "ready" || detail === "off") {
+    if (
+      known !== msgForwardLoopHint ||
+      detail === "active" ||
+      detail === "ready" ||
+      detail === "off"
+    ) {
       if (
         detail === "unknown_duration" ||
         detail === "unavailable" ||
@@ -10522,9 +10647,7 @@ import {
       if (document.activeElement !== inEl) inEl.value = sourceInS(clip).toFixed(2);
       if (document.activeElement !== outEl) outEl.value = sourceOutS(clip).toFixed(2);
       if (document.activeElement !== repeatEl) repeatEl.value = String(sectionRepeats(clip));
-      const durationLine = document.querySelector(
-        "#inspector-clip [data-field='duration-line']"
-      );
+      const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
       const dur = clipDuration(clip);
       if (durationLine) {
         durationLine.textContent = dur > 0 ? `${labelInStory}: ${dur.toFixed(1)} s` : "—";
@@ -10594,7 +10717,11 @@ import {
     const speed = playbackSpeed(clip);
     const span = Math.max(0, outS - inS);
     const ramp = speedRampOf(clip);
-    const cycle = ramp ? rampTime(ramp, outS) - rampTime(ramp, inS) : (speed > 0 ? span / speed : span);
+    const cycle = ramp
+      ? rampTime(ramp, outS) - rampTime(ramp, inS)
+      : speed > 0
+        ? span / speed
+        : span;
     const reps = storedSectionRepeats(clip);
     let duration = cycle * reps;
     const overlap = loopOverlapS(clip);
@@ -10660,9 +10787,7 @@ import {
 
   function showEdgeReadout(edge, value, clientX, clientY) {
     const name =
-      edge === "in"
-        ? root.dataset.sourceIn || "Source in"
-        : root.dataset.sourceOut || "Source out";
+      edge === "in" ? root.dataset.sourceIn || "Source in" : root.dataset.sourceOut || "Source out";
     edgeReadout.textContent = `${name} ${Number(value).toFixed(2)} s`;
     edgeReadout.hidden = false;
     edgeReadout.style.left = `${clientX + 12}px`;
@@ -10899,7 +11024,8 @@ import {
     });
     setReusePieceHidden("inspector-section-repeats", on);
     const repeats = document.getElementById("inspector-section-repeats");
-    const repeatsHint = repeats && repeats.closest("label") && repeats.closest("label").nextElementSibling;
+    const repeatsHint =
+      repeats && repeats.closest("label") && repeats.closest("label").nextElementSibling;
     if (repeatsHint && repeatsHint.classList.contains("hint")) repeatsHint.hidden = on;
     setReusePieceHidden("inspector-forward-loop", on);
     const loopHint = document.getElementById("inspector-forward-loop-hint");
@@ -10963,8 +11089,7 @@ import {
     if (whole) {
       whole.hidden = !reuseDraft.whole;
       whole.textContent =
-        root.dataset.reuseWhole ||
-        "Add will use the whole recording unless the range is narrowed.";
+        root.dataset.reuseWhole || "Add will use the whole recording unless the range is narrowed.";
     }
     const add = document.getElementById("inspector-reuse-add");
     if (add) add.disabled = reuseDraft.outS - reuseDraft.inS < MIN_CUT_SEGMENT_S;
@@ -11093,7 +11218,10 @@ import {
       );
       if (transition) selectTransition(transition);
       else showInspector("inspector-empty");
-    } else if (previous.type === "music" && state.tracks.some((track) => String(track.id) === previous.id)) {
+    } else if (
+      previous.type === "music" &&
+      state.tracks.some((track) => String(track.id) === previous.id)
+    ) {
       selectMusic(previous.id);
     } else {
       showInspector("inspector-empty");
@@ -11276,9 +11404,7 @@ import {
     const rampRemoveItem = document.getElementById("studio-clip-menu-remove-ramp");
     const effectRemoveItem = document.getElementById("studio-clip-menu-remove-effect");
     const clipEl =
-      mode === "clip"
-        ? (anchor.closest && anchor.closest(".studio-clip")) || anchor
-        : null;
+      mode === "clip" ? (anchor.closest && anchor.closest(".studio-clip")) || anchor : null;
     const reuse = mode === "clip" ? reuseMenuState(clipEl) : { show: false, reason: "" };
     if (editItem) editItem.hidden = true;
     if (rampRemoveItem) rampRemoveItem.hidden = true;
@@ -11301,8 +11427,7 @@ import {
       uncutItem.dataset.studioId = mergeId || "";
     }
     setClipMenuReason(reuse.reason || "");
-    const opener =
-      (anchor.querySelector && anchor.querySelector("[data-select-clip]")) || anchor;
+    const opener = (anchor.querySelector && anchor.querySelector("[data-select-clip]")) || anchor;
     showClipMenu(event.clientX, event.clientY, opener);
     const action = mode === "boundary" ? uncutItem : mergeItem;
     if (action && !action.hidden && mergeId) refreshMergeItem(action, mergeId);
@@ -11315,15 +11440,10 @@ import {
       const previous = clip.previousElementSibling;
       const hasPrevious = Boolean(
         previous &&
-          (previous.classList.contains("studio-clip") ||
-            previous.classList.contains("studio-transition"))
+        (previous.classList.contains("studio-clip") ||
+          previous.classList.contains("studio-transition"))
       );
-      showStoryContextMenu(
-        event,
-        clip,
-        "clip",
-        hasPrevious ? clip.dataset.studioId : ""
-      );
+      showStoryContextMenu(event, clip, "clip", hasPrevious ? clip.dataset.studioId : "");
       return;
     }
     const transition = event.target.closest && event.target.closest(".studio-transition");
@@ -11349,8 +11469,10 @@ import {
     );
     if (!clip) return;
     if (kind === "audio") selectTimedClipAudio(clip, { focusInspector: true, relayout: true });
-    else if (kind === "ramp") selectTimedRamp(clip, { focusInspector: true, source: "edit", regionId: id });
-    else if (kind === "overlay") selectTimedOverlay(clip, id, { focusInspector: true, relayout: true });
+    else if (kind === "ramp")
+      selectTimedRamp(clip, { focusInspector: true, source: "edit", regionId: id });
+    else if (kind === "overlay")
+      selectTimedOverlay(clip, id, { focusInspector: true, relayout: true });
     else selectTimedEffectBar(clip, kind, id, { focusInspector: true, relayout: true });
   });
   document.getElementById("studio-clip-menu-remove-ramp")?.addEventListener("click", () => {
@@ -11616,8 +11738,7 @@ import {
     showTimedMusicMenu(event, card.dataset.musicId, card);
   });
   musicClipsEl?.addEventListener("pointerdown", (event) => {
-    const handle =
-      event.target.closest && event.target.closest(".studio-music-start-handle");
+    const handle = event.target.closest && event.target.closest(".studio-music-start-handle");
     if (handle) beginMusicStartDrag(event, handle);
   });
   musicClipsEl?.addEventListener("dragstart", (event) => {
@@ -11783,7 +11904,8 @@ import {
       }
       if (body.summary && body.summary.estimated_total_s != null) {
         root.dataset.totalS = String(body.summary.estimated_total_s);
-        root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
+        root.dataset.totalLabel =
+          body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
       if (reloadIfForwardLoop()) return;
       syncPreviewMedia();
@@ -11798,7 +11920,9 @@ import {
   ["inspector-titlecard-title", "inspector-titlecard-subtitle"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", persistTitlecard);
   });
-  document.getElementById("inspector-titlecard-duration")?.addEventListener("change", persistTitlecard);
+  document
+    .getElementById("inspector-titlecard-duration")
+    ?.addEventListener("change", persistTitlecard);
   document.querySelectorAll('input[name="inspector-titlecard-bg"]').forEach((el) => {
     el.addEventListener("change", persistTitlecard);
   });
@@ -11833,8 +11957,7 @@ import {
       const clip = clips().find((c) => String(c.dataset.studioId) === String(state.selected.id));
       if (clip) {
         clip.dataset.transitionType = body.type || payload.type;
-        clip.dataset.transitionDuration =
-          body.duration_s == null ? "" : String(body.duration_s);
+        clip.dataset.transitionDuration = body.duration_s == null ? "" : String(body.duration_s);
         clip.dataset.appliedType = body.applied_type || "cut";
         clip.dataset.appliedDuration = String(body.applied_duration_s || 0);
         clip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
@@ -11848,8 +11971,7 @@ import {
       );
       if (chip) {
         chip.dataset.storedType = body.type || payload.type;
-        chip.dataset.storedDuration =
-          body.duration_s == null ? "" : String(body.duration_s);
+        chip.dataset.storedDuration = body.duration_s == null ? "" : String(body.duration_s);
         chip.dataset.appliedType = body.applied_type || "cut";
         chip.dataset.appliedDuration = String(body.applied_duration_s || 0);
         chip.dataset.fallbackCut = body.fallback_cut ? "1" : "0";
@@ -11860,7 +11982,8 @@ import {
       }
       if (body.summary && body.summary.estimated_total_s != null) {
         root.dataset.totalS = String(body.summary.estimated_total_s);
-        root.dataset.totalLabel = body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
+        root.dataset.totalLabel =
+          body.summary.estimated_total_label || formatTime(body.summary.estimated_total_s);
       }
       if (reloadIfForwardLoop()) return;
       layoutTimeline();
@@ -12010,12 +12133,8 @@ import {
       const headerTime = res.headers.get("X-Orga-Preview-Time-S");
       return {
         bytes,
-        gradeRevision: headerRevision != null && headerRevision !== ""
-          ? headerRevision
-          : revision,
-        sourceTimeS: headerTime != null && headerTime !== ""
-          ? Number(headerTime)
-          : quant,
+        gradeRevision: headerRevision != null && headerRevision !== "" ? headerRevision : revision,
+        sourceTimeS: headerTime != null && headerTime !== "" ? Number(headerTime) : quant,
         storyTimeS: storyQuant,
       };
     },
@@ -12029,11 +12148,18 @@ import {
     getTarget: () => {
       const clip = selectedAdjustableClip();
       if (!clip || reuseDraft || state.playing || clip.dataset.available !== "1") return null;
-      if (["imagePreviewDirty", "rampPreviewDirty", "hslPreviewDirty", "colorWheelsPreviewDirty"]
-        .some((key) => clip.dataset[key] === "1")) return null;
+      if (
+        [
+          "imagePreviewDirty",
+          "rampPreviewDirty",
+          "hslPreviewDirty",
+          "colorWheelsPreviewDirty",
+        ].some((key) => clip.dataset[key] === "1")
+      )
+        return null;
       const hit = resolveAt(state.projectTimeS);
-      const local = hit?.clip === clip ? hit.localS
-        : (hit?.overlapClip === clip ? hit.overlapLocalS : null);
+      const local =
+        hit?.clip === clip ? hit.localS : hit?.overlapClip === clip ? hit.overlapLocalS : null;
       if (!Number.isFinite(local)) return null;
       // Repeated/slow video sections use the same source-time mapping as stills.
       const point = sectionPoint(clip, local);
@@ -12053,8 +12179,12 @@ import {
         }),
       };
     },
-    whenIdle: () => Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]),
-    onChange: () => { drawPrivacyMasks(); schedulePreviewBlit(); },
+    whenIdle: () =>
+      Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]),
+    onChange: () => {
+      drawPrivacyMasks();
+      schedulePreviewBlit();
+    },
     messages: {
       loading: root.dataset.compareLoading,
       before: root.dataset.compareBefore,
@@ -12365,7 +12495,10 @@ import {
     const input = document.getElementById("inspector-color-strength");
     const valueEl = document.getElementById("inspector-color-strength-value");
     const look = readColorLook(clip);
-    look.creative_strength = Math.max(0, Math.min(100, Math.round(Number(input && input.value) || 0)));
+    look.creative_strength = Math.max(
+      0,
+      Math.min(100, Math.round(Number(input && input.value) || 0))
+    );
     if (valueEl) valueEl.textContent = String(look.creative_strength);
     writeColorLook(clip, look);
     updateColorGradeSummary(clip);
@@ -12626,20 +12759,32 @@ import {
     if (overlay.kind === "arrow") {
       return (
         '<svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">' +
-        '<line x1="2" y1="20" x2="72" y2="20" stroke="' + stroke + '" stroke-width="6" stroke-linecap="round"></line>' +
-        '<polygon points="68,6 98,20 68,34" fill="' + stroke + '"></polygon></svg>'
+        '<line x1="2" y1="20" x2="72" y2="20" stroke="' +
+        stroke +
+        '" stroke-width="6" stroke-linecap="round"></line>' +
+        '<polygon points="68,6 98,20 68,34" fill="' +
+        stroke +
+        '"></polygon></svg>'
       );
     }
     if (overlay.kind === "circle") {
       return (
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        '<ellipse cx="50" cy="50" rx="46" ry="46" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4"></ellipse></svg>'
+        '<ellipse cx="50" cy="50" rx="46" ry="46" fill="' +
+        fill +
+        '" stroke="' +
+        stroke +
+        '" stroke-width="4"></ellipse></svg>'
       );
     }
     if (overlay.kind === "rectangle") {
       return (
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        '<rect x="3" y="3" width="94" height="94" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4"></rect></svg>'
+        '<rect x="3" y="3" width="94" height="94" fill="' +
+        fill +
+        '" stroke="' +
+        stroke +
+        '" stroke-width="4"></rect></svg>'
       );
     }
     return "";
@@ -12675,11 +12820,13 @@ import {
     const from = overlay.slide_from || "left";
     let shift = "";
     if (from === "right") {
-      shift = "translateX(calc(" + remain + " * (100% + " + (1 - overlay.x - overlay.w) * 100 + "%)))";
+      shift =
+        "translateX(calc(" + remain + " * (100% + " + (1 - overlay.x - overlay.w) * 100 + "%)))";
     } else if (from === "up") {
       shift = "translateY(calc(" + -remain + " * (100% + " + overlay.y * 100 + "%)))";
     } else if (from === "down") {
-      shift = "translateY(calc(" + remain + " * (100% + " + (1 - overlay.y - overlay.h) * 100 + "%)))";
+      shift =
+        "translateY(calc(" + remain + " * (100% + " + (1 - overlay.y - overlay.h) * 100 + "%)))";
     } else {
       shift = "translateX(calc(" + -remain + " * (100% + " + overlay.x * 100 + "%)))";
     }
@@ -12733,7 +12880,9 @@ import {
     const repeated = sectionRepeats(clip) > 1;
     const duration = repeated ? sectionCycleS(clip) : clipDuration(clip);
     const sample = repeated ? sectionSampleS(clip, localS) : localS;
-    const visible = readOverlays(clip).filter((overlay) => overlayActive(overlay, sample, duration));
+    const visible = readOverlays(clip).filter((overlay) =>
+      overlayActive(overlay, sample, duration)
+    );
     if (!visible.length) {
       layer.hidden = true;
       return;
@@ -12745,7 +12894,9 @@ import {
     layer.style.top = box.top + "px";
     layer.style.width = Math.max(1, box.width) + "px";
     layer.style.height = Math.max(1, box.height) + "px";
-    visible.forEach((overlay) => layer.appendChild(buildAnnotation(overlay, layer, interactive, sample)));
+    visible.forEach((overlay) =>
+      layer.appendChild(buildAnnotation(overlay, layer, interactive, sample))
+    );
   }
 
   function syncAnnotations(hit) {
@@ -12768,7 +12919,9 @@ import {
 
   function selectedOverlayClip() {
     if (!state.selected || state.selected.type !== "clip") return null;
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.selected.id));
+    const clip = clips().find(
+      (item) => String(item.dataset.studioId) === String(state.selected.id)
+    );
     if (!clip || (clip.dataset.kind !== "photo" && clip.dataset.kind !== "video")) return null;
     return clip;
   }
@@ -12837,7 +12990,8 @@ import {
     setColor("overlay-stroke", current.stroke);
     setColor("overlay-fill", current.fill);
     const animation = document.getElementById("overlay-animation");
-    if (animation && document.activeElement !== animation) animation.value = current.animation || "none";
+    if (animation && document.activeElement !== animation)
+      animation.value = current.animation || "none";
     setNumber("overlay-animation-s", current.animation_s == null ? 0.4 : current.animation_s);
     const slide = document.getElementById("overlay-slide-from");
     if (slide && document.activeElement !== slide) slide.value = current.slide_from || "left";
@@ -12870,7 +13024,8 @@ import {
     next.w = numberOr(document.getElementById("overlay-w"), next.w * 100) / 100;
     next.h = numberOr(document.getElementById("overlay-h"), next.h * 100) / 100;
     next.rotation = numberOr(document.getElementById("overlay-rotation"), next.rotation || 0);
-    next.font_size = numberOr(document.getElementById("overlay-font"), (next.font_size || 0.06) * 100) / 100;
+    next.font_size =
+      numberOr(document.getElementById("overlay-font"), (next.font_size || 0.06) * 100) / 100;
     const text = document.getElementById("overlay-text");
     if (text && next.kind === "text") next.text = text.value;
     const color = document.getElementById("overlay-color");
@@ -12878,10 +13033,14 @@ import {
     const stroke = document.getElementById("overlay-stroke");
     if (stroke && next.kind !== "text" && next.kind !== "image") next.stroke = stroke.value;
     const fill = document.getElementById("overlay-fill");
-    if (fill && (next.kind === "circle" || next.kind === "rectangle")) next.fill = fill.value + "66";
+    if (fill && (next.kind === "circle" || next.kind === "rectangle"))
+      next.fill = fill.value + "66";
     const animation = document.getElementById("overlay-animation");
     if (animation) next.animation = animation.value || "none";
-    next.animation_s = numberOr(document.getElementById("overlay-animation-s"), next.animation_s || 0.4);
+    next.animation_s = numberOr(
+      document.getElementById("overlay-animation-s"),
+      next.animation_s || 0.4
+    );
     const slide = document.getElementById("overlay-slide-from");
     if (slide) next.slide_from = slide.value || "left";
     if (duration > 0 && next.end_s > duration) next.end_s = duration;
@@ -13010,10 +13169,17 @@ import {
   function startAnnotationDrag(event, overlayId) {
     if (event.button != null && event.button !== 0) return;
     if (maskDragging) return;
-    if (event.target && event.target.closest && event.target.closest(".studio-mask-box, .studio-mask-resize")) return;
+    if (
+      event.target &&
+      event.target.closest &&
+      event.target.closest(".studio-mask-box, .studio-mask-resize")
+    )
+      return;
     if (maskBoxAtPoint(event.clientX, event.clientY)) return;
     if (maskCanvasHit(event.clientX, event.clientY)) return;
-    const clip = clips().find((item) => String(item.dataset.studioId) === String(state.activeStudioId));
+    const clip = clips().find(
+      (item) => String(item.dataset.studioId) === String(state.activeStudioId)
+    );
     if (!clip) return;
     event.preventDefault();
     event.stopPropagation();
@@ -13090,15 +13256,29 @@ import {
       }
     });
   }
-  ["overlay-text", "overlay-start", "overlay-end", "overlay-x", "overlay-y", "overlay-w", "overlay-h", "overlay-rotation", "overlay-font", "overlay-color", "overlay-stroke", "overlay-fill", "overlay-animation", "overlay-animation-s", "overlay-slide-from"].forEach(
-    (id) => {
-      const input = document.getElementById(id);
-      if (!input) return;
-      input.addEventListener("change", () => {
-        replaceSelectedOverlay((overlay) => editorOverlayPatch(overlay));
-      });
-    }
-  );
+  [
+    "overlay-text",
+    "overlay-start",
+    "overlay-end",
+    "overlay-x",
+    "overlay-y",
+    "overlay-w",
+    "overlay-h",
+    "overlay-rotation",
+    "overlay-font",
+    "overlay-color",
+    "overlay-stroke",
+    "overlay-fill",
+    "overlay-animation",
+    "overlay-animation-s",
+    "overlay-slide-from",
+  ].forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", () => {
+      replaceSelectedOverlay((overlay) => editorOverlayPatch(overlay));
+    });
+  });
   document.getElementById("overlay-remove")?.addEventListener("click", () => {
     const clip = selectedOverlayClip();
     if (!clip || !selectedOverlayId) return;
@@ -13241,7 +13421,12 @@ import {
       const end = Number(row.end);
       const last = index === rows.length - 1;
       const beforeEnd = sourceS < end - 1e-9 || (last && sourceS <= end + 1e-3);
-      if (sourceS >= start - 1e-9 && beforeEnd && row.alt != null && Number.isFinite(Number(row.alt))) {
+      if (
+        sourceS >= start - 1e-9 &&
+        beforeEnd &&
+        row.alt != null &&
+        Number.isFinite(Number(row.alt))
+      ) {
         return Number(row.alt).toFixed(1) + " m";
       }
     }
@@ -13273,12 +13458,7 @@ import {
       return;
     }
     const overlap = Boolean(hit.overlapClip && hit.crossfadeProgress != null);
-    paintHud(
-      previewHud,
-      hit.clip,
-      hit.localS || 0,
-      overlap ? hit.crossfadeProgress : null
-    );
+    paintHud(previewHud, hit.clip, hit.localS || 0, overlap ? hit.crossfadeProgress : null);
     if (overlap) paintHud(previewHudB, hit.overlapClip, hit.overlapLocalS || 0, 1);
     else paintHud(previewHudB, null, 0, null);
   }
@@ -13362,7 +13542,9 @@ import {
       if (
         event.target &&
         event.target.closest &&
-        event.target.closest(".studio-mask-box, .studio-mask-hit, .studio-mask-resize, .studio-mask-remove, #studio-preview-mask-handles")
+        event.target.closest(
+          ".studio-mask-box, .studio-mask-hit, .studio-mask-resize, .studio-mask-remove, #studio-preview-mask-handles"
+        )
       ) {
         return;
       }
@@ -13480,7 +13662,8 @@ import {
         throw new Error((data && data.detail) || msgForwardLoopFailed);
       }
       if (data.transition) clip.dataset.forwardLoopTransition = data.transition;
-      if (data.transition_s != null) clip.dataset.forwardLoopTransitionS = String(data.transition_s);
+      if (data.transition_s != null)
+        clip.dataset.forwardLoopTransitionS = String(data.transition_s);
       if (data.overlap_s != null) clip.dataset.forwardLoopOverlap = String(data.overlap_s);
       if (data.effective_duration_s != null) {
         clip.dataset.effectiveDuration = String(data.effective_duration_s);
@@ -13674,8 +13857,7 @@ import {
 
   grid.addEventListener("dragend", () => {
     if (dragCard) dragCard.classList.remove("is-dragging");
-    const changed =
-      dragOrderBefore && dragOrderBefore.join(",") !== orderedIds().join(",");
+    const changed = dragOrderBefore && dragOrderBefore.join(",") !== orderedIds().join(",");
     dragCard = null;
     if (changed) persistOrder();
     else {
@@ -13693,9 +13875,8 @@ import {
       if (clip) {
         const rect = clip.getBoundingClientRect();
         const mark = event.clientX < rect.left + rect.width / 2 ? clip : clip.nextElementSibling;
-        const target = mark && mark.classList && mark.classList.contains("studio-clip")
-          ? mark
-          : null;
+        const target =
+          mark && mark.classList && mark.classList.contains("studio-clip") ? mark : null;
         if (target) target.classList.add("is-drop-before");
       }
       return;
@@ -13724,9 +13905,7 @@ import {
       const beforeId = originalDropBeforeId(event);
       clearOriginalDropMark();
       dragOriginalMediaId = null;
-      const row = document.querySelector(
-        `[data-original-media-id="${CSS.escape(mediaId)}"]`
-      );
+      const row = document.querySelector(`[data-original-media-id="${CSS.escape(mediaId)}"]`);
       if (!row || row.dataset.canPlay !== "1") return;
       if (!reuseDraft || String(reuseDraft.mediaId) !== String(mediaId) || reuseDraft.clip) {
         openOriginalDraft(row);
@@ -13995,7 +14174,9 @@ import {
 
   function sourceClock(clip, localS) {
     const sample = sectionSampleS(clip, Math.max(0, Number(localS) || 0));
-    return speedRampOf(clip) ? sourceInS(clip) + storyToSource(clip, sample) : loopPlayInS(clip) + sample * playbackSpeed(clip);
+    return speedRampOf(clip)
+      ? sourceInS(clip) + storyToSource(clip, sample)
+      : loopPlayInS(clip) + sample * playbackSpeed(clip);
   }
 
   function mapClock(clip, localS) {
@@ -14047,9 +14228,7 @@ import {
     const line = (gps.line || []).map(finitePoint).filter(Boolean);
     const samples = (gps.marker || []).map(finitePoint).filter(Boolean);
     const tiles = Array.isArray(gps.tiles) ? gps.tiles : [];
-    const parts = [
-      '<rect x="0" y="0" width="100" height="100" fill="' + bg + '"></rect>',
-    ];
+    const parts = ['<rect x="0" y="0" width="100" height="100" fill="' + bg + '"></rect>'];
     tiles.forEach((tile) => {
       const z = Number(tile.z);
       const x = Number(tile.x);
@@ -14091,7 +14270,10 @@ import {
     }
     if (line.length >= 2) {
       const d = line
-        .map((point, index) => (index ? "L" : "M") + sx(point.x).toFixed(2) + " " + sy(point.y).toFixed(2))
+        .map(
+          (point, index) =>
+            (index ? "L" : "M") + sx(point.x).toFixed(2) + " " + sy(point.y).toFixed(2)
+        )
         .join(" ");
       parts.push(
         '<path d="' +
@@ -14120,7 +14302,8 @@ import {
   function placeMapElement(el, clip, localS, interactive) {
     if (!el) return;
     const placement = readMap(clip);
-    const show = placement.enabled && clip && (clip.dataset.kind === "photo" || clip.dataset.kind === "video");
+    const show =
+      placement.enabled && clip && (clip.dataset.kind === "photo" || clip.dataset.kind === "video");
     if (!show) {
       el.hidden = true;
       return;
@@ -14347,7 +14530,10 @@ import {
     const body = await readJson(response);
     if (!response.ok || !body?.ok) throw new Error(msgSpeedFailed);
     if (sectionRepeats(clip) > 1 || clips().some((c) => c.dataset.forwardLoop === "1")) {
-      sessionStorage.setItem(CUT_RESTORE_KEY, JSON.stringify({ selectId: clipId(clip), atClipStart: true }));
+      sessionStorage.setItem(
+        CUT_RESTORE_KEY,
+        JSON.stringify({ selectId: clipId(clip), atClipStart: true })
+      );
       window.location.reload();
       return;
     }
@@ -14358,9 +14544,11 @@ import {
     clip.style.setProperty("--clip-flex", Number(body.effective_duration_s).toFixed(4));
     if (!body.speed_ramp) clearTimedSelection();
     const durationLabel = clip.querySelector("[data-clip-duration]");
-    if (durationLabel) durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
+    if (durationLabel)
+      durationLabel.textContent = `${Number(body.effective_duration_s).toFixed(1)}s`;
     const durationLine = document.querySelector("#inspector-clip [data-field='duration-line']");
-    if (durationLine) durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
+    if (durationLine)
+      durationLine.textContent = `${labelInStory}: ${Number(body.effective_duration_s).toFixed(1)} s`;
     applyTransitionsToDom();
     layoutTimeline();
     setProjectTime(clipStartTime(clip) + sourceToStory(clip, source));
@@ -14382,16 +14570,26 @@ import {
     pause: pausePlayback,
     position: (clip) => {
       const ramp = speedRampOf(clip);
-      if (!ramp) return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
+      if (!ramp)
+        return {
+          left: timeToX(clipStartTime(clip)),
+          width: onePlayS(clip) * timelinePxPerSecond(),
+        };
       const playStart = loopPlayInS(clip);
       const regions = rampRegions(ramp);
       const selectedId = rampEditor?.selectedRegionId?.() || "";
       const region = regions.find((item) => item.id === selectedId) || regions[0];
       if (!region) {
-        return { left: timeToX(clipStartTime(clip)), width: onePlayS(clip) * timelinePxPerSecond() };
+        return {
+          left: timeToX(clipStartTime(clip)),
+          width: onePlayS(clip) * timelinePxPerSecond(),
+        };
       }
       const storyLeft = Math.max(0, rampTime(ramp, region.start) - rampTime(ramp, playStart));
-      const storyRight = Math.max(storyLeft, rampTime(ramp, region.end) - rampTime(ramp, playStart));
+      const storyRight = Math.max(
+        storyLeft,
+        rampTime(ramp, region.end) - rampTime(ramp, playStart)
+      );
       const pps = timelinePxPerSecond();
       return {
         left: timeToX(clipStartTime(clip) + storyLeft),
@@ -14507,7 +14705,10 @@ import {
       selectClip(cutRestore.selectId, { movePlayhead: false });
       setProjectTime(Number(cutRestore.projectTimeS) || 0);
     }
-  } else if (root.dataset.selectId && clips().some((c) => String(c.dataset.studioId) === String(root.dataset.selectId))) {
+  } else if (
+    root.dataset.selectId &&
+    clips().some((c) => String(c.dataset.studioId) === String(root.dataset.selectId))
+  ) {
     selectClip(root.dataset.selectId);
     if (root.dataset.focusField === "title") {
       const titleEl = document.getElementById("inspector-titlecard-title");
@@ -14531,82 +14732,114 @@ import {
       clip_id: !reuseDraft && state.selected.type === "clip" ? Number(state.selected.id) : null,
       playhead_s: state.projectTimeS,
       playing: state.playing,
-      busy: controlPendingWrites > 0 || controlWriteFailed || Boolean(historyGesture ||
-        titleSaveTimer || hslSaveTimer || colorWheelsSaveTimer || rampEditor?.isBusy?.()) || saveStateEl?.dataset.state === "dirty" ||
-        hasActiveControlGesture({ dragCard, musicDragCard, dragOriginalMediaId, edgeDrag, maskDragging, playheadDragging }),
-      ready: Boolean(!reuseDraft && clip && clip.dataset.kind === "video" && clip.dataset.available === "1" &&
-        !readColorAnimation(clip) && !readSaturationRamp(clip)?.enabled),
+      busy:
+        controlPendingWrites > 0 ||
+        controlWriteFailed ||
+        Boolean(
+          historyGesture ||
+          titleSaveTimer ||
+          hslSaveTimer ||
+          colorWheelsSaveTimer ||
+          rampEditor?.isBusy?.()
+        ) ||
+        saveStateEl?.dataset.state === "dirty" ||
+        hasActiveControlGesture({
+          dragCard,
+          musicDragCard,
+          dragOriginalMediaId,
+          edgeDrag,
+          maskDragging,
+          playheadDragging,
+        }),
+      ready: Boolean(
+        !reuseDraft &&
+        clip &&
+        clip.dataset.kind === "video" &&
+        clip.dataset.available === "1" &&
+        !readColorAnimation(clip) &&
+        !readSaturationRamp(clip)?.enabled
+      ),
     };
   }
 
   setSaveState(true);
   const controlPanel = document.getElementById("studio-control");
-  if (controlPanel) controlBridge = mountControlUi({
-    panel: controlPanel,
-    fetchImpl: nativeFetch,
-    hasWriteFailure: () => controlWriteFailed,
-    snapshot: controlSnapshot,
-    whenIdle: async () => {
-      await Promise.resolve();
-      await Promise.all([imageAdjustSaver.whenIdle(), detailControls.whenIdle(), colorSaveChain,
-        rampEditor?.whenIdle?.(),
-        imageSaveChain, hslSaveChain, colorWheelsSaveChain, maskSaveChain, frameSaveChain,
-        overlaySaveChain, mapSaveChain]);
-    },
-    resumeSelection: (id) => {
-      if (id !== null) {
-        if (!findClip(grid, id)) throw new Error("Timeline selection unavailable");
-        selectClip(String(id), { movePlayhead: false, controlRestore: true });
-      } else {
-        // Issue #293: a null anchor means "no mandatory selection". Keep a
-        // still-valid current selection (e.g. the ?select= target of an
-        // external timeline.add reload); deselect only when the previously
-        // selected clip is really gone.
-        const current = state.selected.type === "clip" ? findClip(grid, state.selected.id) : null;
-        if (current) return;
-        state.selected = { type: "none", id: null };
-        clips().forEach((clip) => {
-          clip.classList.remove("is-selected");
-          clip.removeAttribute("aria-selected");
-        });
-        showPlaceholder();
-        updateCutEnabled();
-        showInspector("inspector-empty");
-        updateRemoveEnabled();
-      }
-    },
-    applyProject: (result) => {
-      if (result.project_id !== projectId) throw new Error("Project context changed");
-      if (result.navigation_required) {
-        window.location.assign("/studio");
-        return;
-      }
-      const title = result.canonical?.project?.title;
-      if (typeof title !== "string") throw new Error("Project title unavailable");
-      state.title = title;
-      if (titleInput) titleInput.value = title;
-      const emptyTitle = document.getElementById("inspector-empty-title");
-      if (emptyTitle) emptyTitle.textContent = title;
-    },
-    applyCanonical: createCanonicalApplier({
+  if (controlPanel)
+    controlBridge = mountControlUi({
+      panel: controlPanel,
+      fetchImpl: nativeFetch,
+      hasWriteFailure: () => controlWriteFailed,
       snapshot: controlSnapshot,
-      getClip: (id) => findClip(grid, id),
-      writeImage: writeImageAdjust,
-      writeColor: writeColorLook,
-      writeHsl,
-      writeWheels: writeColorWheels,
-      writeDetail,
-      fillInspector: (clip) => {
-        fillImageAdjust(clip);
-        fillColorLook(clip);
-        detailControls.fill(clip);
+      whenIdle: async () => {
+        await Promise.resolve();
+        await Promise.all([
+          imageAdjustSaver.whenIdle(),
+          detailControls.whenIdle(),
+          colorSaveChain,
+          rampEditor?.whenIdle?.(),
+          imageSaveChain,
+          hslSaveChain,
+          colorWheelsSaveChain,
+          maskSaveChain,
+          frameSaveChain,
+          overlaySaveChain,
+          mapSaveChain,
+        ]);
       },
-      syncHistory: syncHistoryButtons,
-      refreshPreview: () => {
-        applyPreviewGrades(resolveAt(state.projectTimeS));
-        applyFramePreview(resolveAt(state.projectTimeS));
+      resumeSelection: (id) => {
+        if (id !== null) {
+          if (!findClip(grid, id)) throw new Error("Timeline selection unavailable");
+          selectClip(String(id), { movePlayhead: false, controlRestore: true });
+        } else {
+          // Issue #293: a null anchor means "no mandatory selection". Keep a
+          // still-valid current selection (e.g. the ?select= target of an
+          // external timeline.add reload); deselect only when the previously
+          // selected clip is really gone.
+          const current = state.selected.type === "clip" ? findClip(grid, state.selected.id) : null;
+          if (current) return;
+          state.selected = { type: "none", id: null };
+          clips().forEach((clip) => {
+            clip.classList.remove("is-selected");
+            clip.removeAttribute("aria-selected");
+          });
+          showPlaceholder();
+          updateCutEnabled();
+          showInspector("inspector-empty");
+          updateRemoveEnabled();
+        }
       },
-      setSaved: setSaveState,
-    }),
-  });
+      applyProject: (result) => {
+        if (result.project_id !== projectId) throw new Error("Project context changed");
+        if (result.navigation_required) {
+          window.location.assign("/studio");
+          return;
+        }
+        const title = result.canonical?.project?.title;
+        if (typeof title !== "string") throw new Error("Project title unavailable");
+        state.title = title;
+        if (titleInput) titleInput.value = title;
+        const emptyTitle = document.getElementById("inspector-empty-title");
+        if (emptyTitle) emptyTitle.textContent = title;
+      },
+      applyCanonical: createCanonicalApplier({
+        snapshot: controlSnapshot,
+        getClip: (id) => findClip(grid, id),
+        writeImage: writeImageAdjust,
+        writeColor: writeColorLook,
+        writeHsl,
+        writeWheels: writeColorWheels,
+        writeDetail,
+        fillInspector: (clip) => {
+          fillImageAdjust(clip);
+          fillColorLook(clip);
+          detailControls.fill(clip);
+        },
+        syncHistory: syncHistoryButtons,
+        refreshPreview: () => {
+          applyPreviewGrades(resolveAt(state.projectTimeS));
+          applyFramePreview(resolveAt(state.projectTimeS));
+        },
+        setSaved: setSaveState,
+      }),
+    });
 })();

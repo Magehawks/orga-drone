@@ -185,8 +185,23 @@ export function createCollagePlayback(opts) {
       if (!rect) continue;
       keep.add(id);
       const media = leaf.media;
+      if (!media) {
+        const stale = mediaEls.get(id);
+        if (stale) {
+          if (stale instanceof HTMLVideoElement) {
+            try {
+              stale.pause();
+            } catch {
+              /* ignore */
+            }
+          }
+          stale.remove();
+          mediaEls.delete(id);
+        }
+        continue;
+      }
       const url = leafMediaUrl(activeStudioId, leaf);
-      const isVideo = media && String(media.kind || "").toLowerCase() === "video" && !fallback;
+      const isVideo = String(media.kind || "").toLowerCase() === "video" && !fallback;
       let el = mediaEls.get(id);
       if (isVideo && videoSlots < MAX_CONCURRENT_COLLAGE_VIDEOS) {
         videoSlots += 1;
