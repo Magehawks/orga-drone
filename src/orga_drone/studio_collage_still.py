@@ -127,10 +127,26 @@ def resolve_leaf_source(db: Database, media: dict[str, Any] | None) -> Path | No
     source = str(media.get("source") or "").strip().lower()
     kind = str(media.get("kind") or "").strip().lower()
     if source == "library":
+        row = None
         media_id = media.get("media_id")
-        if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
-            return None
-        row = db.get_media(media_id)
+        if isinstance(media_id, int) and not isinstance(media_id, bool) and media_id > 0:
+            row = db.get_media(media_id)
+        if row is None:
+            identity = str(media.get("identity_key") or "").strip()
+            if identity:
+                with db.connect() as conn:
+                    found = conn.execute(
+                        """
+                        SELECT m.id
+                        FROM media m
+                        JOIN media_meta mm ON mm.media_path = m.path
+                        WHERE mm.identity_key = ?
+                        LIMIT 1
+                        """,
+                        (identity,),
+                    ).fetchone()
+                if found is not None:
+                    row = db.get_media(int(found["id"]))
         if row is None:
             return None
         try:
