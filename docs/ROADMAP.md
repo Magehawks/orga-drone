@@ -40,7 +40,9 @@ Highlights:
   configurable resolution (suggested filename includes that resolution), including photo-only stories at 720/1080; after success, Open video / Show in folder on
   Windows; optional sequential soundtrack playlist (up to 8 local songs; one
   project-level lead-in; loop when there is one song) in preview and export; Title Cards
-  as generated Story items; basic rendered visual transitions; basic per-clip
+  as generated Story items; Studio Collage Composer (`item_kind='collage'`, recursive
+  split layout, library/desktop media, composed still preview, capped multi-video play,
+  PNG/JPEG still export, MP4 Story segment; Image Composer unchanged); basic rendered visual transitions; basic per-clip
   image adjustment for photos and videos (brightness, contrast, saturation, warmth); a linear video saturation ramp from that grade toward black and white; timed text, shape, and image overlays with Fade in, Fade out, and Slide in;
   rectangular blur and pixelate privacy masks (up to 8 per photo or video clip, fixed
   for the whole clip); per-clip zoom and pan (1×–3×, optional start/end motion); source-anchored

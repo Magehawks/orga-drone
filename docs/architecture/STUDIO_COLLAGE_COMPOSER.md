@@ -57,7 +57,7 @@ preview placement (same math, tested).
 | 4 | Still preview + image export | Composed preview-frame; PNG/JPEG export (`studio_collage_still.py`, `/api/studio/{id}/collage/preview|export`) | 1, 3 |
 | 5 | Video play sync | Multi muted video/image cells on Story clock; last-frame hold; cap 4 concurrent videos + still fallback (`collage-playback.js`) | 2, 3 |
 | 6 | MP4 export | Encoder collage segment via existing pipeline (`studio_collage_export.py` + materialize before encode) | 1, 4 |
-| 7 | Integration + polish | DE/EN, limits, journey smoke, packaged E2E where feasible | 4–6 |
+| 7 | Integration + polish | DE/EN, limits, journey smoke, packaged E2E where feasible; PRODUCT_VISION / ROADMAP / ARCHITECTURE honesty | 4–6 |
 
 ## Explicit non-goals (first complete slice)
 
@@ -67,6 +67,25 @@ preview placement (same math, tested).
 - Unguided simultaneous multi-leaf audio mix.
 - Full realtime graded LUT on every playing cell (ADR 0028).
 - Merge to `main` / public EXE / release.
+
+## Limits (shipping)
+
+| Limit | Value |
+|-------|-------|
+| Max leaves | 16 |
+| Max split depth | 8 |
+| Concurrent live videos | 4 (then composed-still fallback) |
+| Collage duration | 0.5–120 s |
+| Zoom | 1.0–3.0 |
+| Still preview long edge | 1280 |
+| Still / MP4 working long edge | up to 1920 (export profiles drive MP4 canvas) |
+
+## Performance notes
+
+- Photo-only MP4 segments compose one still and loop it (cheap).
+- Video collages sample exact-time composed frames at 30 fps; cost scales with leaf count × duration × grade work.
+- Live play prefers muted HTML media under the video cap; custom zoom/pan or undecodable photos force still fallback.
+- Packaged WebView2 collage journeys remain **NOT_RUN** until a PO session records them.
 
 ## Risks
 
