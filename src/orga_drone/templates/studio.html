@@ -152,6 +152,12 @@
          data-kind-photo="{{ _('Photo')|e }}"
          data-kind-video="{{ _('Video')|e }}"
          data-kind-title-card="{{ _('Title card')|e }}"
+         data-kind-collage="{{ _('Collage')|e }}"
+         data-collage-failed="{{ _('Could not save collage.')|e }}"
+         data-collage-empty-cell="{{ _('Empty cell')|e }}"
+         data-collage-split-h="{{ _('Split horizontally')|e }}"
+         data-collage-split-v="{{ _('Split vertically')|e }}"
+         data-collage-remove-cell="{{ _('Remove cell')|e }}"
          data-kind-unknown="{{ _('Memory')|e }}"
          data-inspector-story="{{ _('Story')|e }}"
          data-inspector-music="{{ _('Music')|e }}"
@@ -408,7 +414,7 @@
         <ul class="studio-browser-list" id="studio-browser-story">
           {% for row in item_display %}
           {% set item = row.item %}
-          <li class="studio-browser-item {% if item.kind != 'title_card' and not item.available %}is-unavailable{% endif %}"
+          <li class="studio-browser-item {% if item.kind not in ['title_card', 'collage'] and not item.available %}is-unavailable{% endif %}"
               data-studio-id="{{ item.id }}"
               draggable="{{ 'true' if item.available else 'false' }}">
             {% if item.kind == 'title_card' %}
@@ -420,6 +426,17 @@
               <span class="studio-browser-meta">
                 <strong>{{ row.display_title }}</strong>
                 <span>{{ _('Title card') }}</span>
+              </span>
+            </button>
+            {% elif item.kind == 'collage' %}
+            <button type="button" class="studio-browser-pick"
+                    data-select-clip="{{ item.id }}">
+              <span class="studio-browser-thumb">
+                <span class="studio-collage-swatch" aria-hidden="true"></span>
+              </span>
+              <span class="studio-browser-meta">
+                <strong>{{ row.display_title or _('Collage') }}</strong>
+                <span>{{ _('Collage') }}</span>
               </span>
             </button>
             {% elif item.available and item.media_id %}
@@ -490,6 +507,10 @@
         {{ lucide('plus') }}
         <span class="studio-btn-label">{{ _('Add title card') }}</span>
       </button>
+      <button type="button" class="button ghost studio-add-collage studio-icon-button" id="studio-add-collage">
+        {{ lucide('layout-grid') }}
+        <span class="studio-btn-label">{{ _('Collage') }}</span>
+      </button>
     </aside>
 
     <div class="studio-stage">
@@ -532,6 +553,9 @@
             <p class="studio-preview-titlecard-title" id="studio-preview-titlecard-b-title"></p>
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
           </div>
+          <div id="studio-preview-collage" class="studio-preview-collage" hidden aria-label="{{ _('Collage') }}">
+            <div class="studio-preview-collage-stage" id="studio-preview-collage-stage"></div>
+          </div>
           <div id="studio-preview-hud-b" class="studio-preview-hud is-layer-b" hidden></div>
           <div id="studio-preview-hud" class="studio-preview-hud" hidden></div>
           <div id="studio-preview-fade-black" class="studio-preview-fade-black" hidden aria-hidden="true"></div>
@@ -558,6 +582,7 @@
           <p>{{ _('Or add a Title Card to start with a heading.') }}</p>
           <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
           <button type="button" class="button ghost" id="studio-add-title-card-empty">{{ _('Add title card') }}</button>
+          <button type="button" class="button ghost" id="studio-add-collage-empty">{{ _('Collage') }}</button>
         </div>
         {% endif %}
       </div>
@@ -710,7 +735,7 @@
                 <span class="studio-transition-chip" data-transition-label>{% if ttype == 'fade_black' %}{{ _('Fade') }}{% elif ttype == 'crossfade' %}{{ _('Crossfade') }}{% elif ttype == 'blur_dissolve' %}{{ _('Blur dissolve') }}{% elif ttype == 'soft_wipe_left' %}{{ _('Soft wipe left') }}{% elif ttype == 'soft_wipe_right' %}{{ _('Soft wipe right') }}{% elif ttype == 'soft_wipe_up' %}{{ _('Soft wipe up') }}{% elif ttype == 'soft_wipe_down' %}{{ _('Soft wipe down') }}{% else %}{{ _('Cut') }}{% endif %}</span>
               </li>
               {% endif %}
-              <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'title_card' %}is-title-card{% elif item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
+              <li class="studio-clip studio-card {% if not item.available %}is-unavailable{% endif %} {% if item.kind == 'title_card' %}is-title-card{% elif item.kind == 'collage' %}is-collage{% elif item.kind == 'photo' %}is-photo{% elif item.kind == 'video' %}is-video{% endif %}"
                   data-studio-id="{{ item.id }}"
                   data-kind="{{ item.kind or 'unknown' }}"
                   data-available="{{ '1' if item.available else '0' }}"
@@ -719,6 +744,8 @@
                   data-recorded-at="{{ (item.recorded_at or '')|e }}"
                   data-photo-duration="{{ item.photo_duration_s if item.photo_duration_s is not none else '' }}"
                   data-media-duration="{{ item.duration_s if item.duration_s is not none else '' }}"
+                  data-collage-duration="{{ item.collage_duration_s if item.collage_duration_s is not none else '' }}"
+                  data-collage-spec='{{ (row.collage_spec or none)|tojson|replace("'", "\\u0027") }}'
                   data-source-in="{{ item.source_start if item.source_start is not none else '' }}"
                   data-source-out="{{ item.source_end if item.source_end is not none else '' }}"
                   data-playback-speed="{{ item.playback_speed }}"
@@ -746,7 +773,7 @@
                   data-display-title="{{ (row.display_title or '')|e }}"
                   data-display-subtitle="{{ (row.display_subtitle or '')|e }}"
                   data-background="{{ (item.background or 'dark')|e }}"
-                  data-thumb="{% if item.kind != 'title_card' and item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
+                  data-thumb="{% if item.kind not in ['title_card', 'collage'] and item.available and item.media_id %}/media/{{ item.media_id }}/thumb{% endif %}"
                   data-stream-url="{{ row.stream_url }}"
                   data-proxy-url="{{ row.proxy_url }}"
                   data-lut-proxy-url="{{ row.lut_proxy_url }}"
@@ -790,6 +817,8 @@
                   <span class="studio-clip-thumb">
                     {% if item.kind == 'title_card' %}
                     <span class="studio-titlecard-swatch" data-bg="{{ item.background or 'dark' }}" aria-hidden="true"></span>
+                    {% elif item.kind == 'collage' %}
+                    <span class="studio-collage-swatch" aria-hidden="true"></span>
                     {% elif item.available and item.media_id %}
                     <img src="/media/{{ item.media_id }}/thumb" alt="" loading="lazy" decoding="async">
                     {% else %}
@@ -797,8 +826,8 @@
                     {% endif %}
                   </span>
                   <span class="studio-clip-caption">
-                    <strong>{% if item.kind == 'title_card' %}{{ row.display_title }}{% else %}{{ item.filename }}{% endif %}</strong>
-                    <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% elif item.kind == 'title_card' %}{{ _('Title card') }}{% else %}{{ _('Memory') }}{% endif %}</span>
+                    <strong>{% if item.kind == 'title_card' %}{{ row.display_title }}{% elif item.kind == 'collage' %}{{ row.display_title or _('Collage') }}{% else %}{{ item.filename }}{% endif %}</strong>
+                    <span class="studio-clip-kind">{% if item.kind == 'video' %}{{ _('Video') }}{% elif item.kind == 'photo' %}{{ _('Photo') }}{% elif item.kind == 'title_card' %}{{ _('Title card') }}{% elif item.kind == 'collage' %}{{ _('Collage') }}{% else %}{{ _('Memory') }}{% endif %}</span>
                     <span class="studio-clip-duration" data-clip-duration>
                       {% if row.effective_duration_s is not none %}{{ '%.1f'|format(row.effective_duration_s) }}s{% if item.kind == 'video' and item.playback_speed < 0.999 %} · {{ '%g'|format(item.playback_speed) }}×{% endif %}{% else %}—{% endif %}
                     </span>
@@ -2030,6 +2059,61 @@
           <label><input type="radio" name="inspector-titlecard-bg" value="accent"> {{ _('Accent') }}</label>
         </fieldset>
         <form method="post" id="inspector-titlecard-remove-form" class="studio-inspector-remove"
+              {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
+          <button type="submit" class="button ghost studio-icon-button"
+                  {% if initial_remove_id %}formaction="/studio/{{ initial_remove_id }}/remove"{% endif %}
+                  title="{{ _('Remove from story') }}" aria-label="{{ _('Remove from story') }}">
+            {{ lucide('trash-2') }}
+            <span class="studio-btn-label">{{ _('Remove from story') }}</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="studio-inspector-panel" id="inspector-collage" hidden>
+        <p class="studio-inspector-kind">{{ _('Collage') }}</p>
+        <p class="hint">{{ _('Choose a layout, drag dividers in the preview, then add media to each cell.') }}</p>
+        <label class="studio-inspector-field">
+          <span>{{ _('Duration (s)') }}</span>
+          <input type="number" id="inspector-collage-duration" min="1" max="120" step="0.1" inputmode="decimal"
+                 aria-label="{{ _('Collage duration in seconds') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Layout preset') }}</span>
+          <select id="inspector-collage-preset" aria-label="{{ _('Layout preset') }}">
+            <option value="1+1">1 + 1</option>
+            <option value="2+1">2 + 1</option>
+            <option value="1+2">1 + 2</option>
+            <option value="2x2">2 × 2</option>
+            <option value="3x2">3 × 2</option>
+            <option value="1+2+1">1 + 2 + 1</option>
+            <option value="3|2">3 | 2</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Aspect') }}</span>
+          <select id="inspector-collage-aspect" aria-label="{{ _('Aspect') }}">
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Gap (px)') }}</span>
+          <input type="number" id="inspector-collage-gap" min="0" max="200" step="1" inputmode="numeric"
+                 aria-label="{{ _('Gap between cells in pixels') }}">
+        </label>
+        <label class="studio-inspector-field">
+          <span>{{ _('Background') }}</span>
+          <input type="color" id="inspector-collage-background" value="#0a0c0e"
+                 aria-label="{{ _('Collage background color') }}">
+        </label>
+        <div class="studio-inspector-actions" id="inspector-collage-cell-actions" hidden>
+          <p class="studio-inspector-kind">{{ _('Selected cell') }}</p>
+          <button type="button" class="button ghost" id="inspector-collage-split-h">{{ _('Split horizontally') }}</button>
+          <button type="button" class="button ghost" id="inspector-collage-split-v">{{ _('Split vertically') }}</button>
+          <button type="button" class="button ghost" id="inspector-collage-remove-cell">{{ _('Remove cell') }}</button>
+        </div>
+        <form method="post" id="inspector-collage-remove-form" class="studio-inspector-remove"
               {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
           <button type="submit" class="button ghost studio-icon-button"
                   {% if initial_remove_id %}formaction="/studio/{{ initial_remove_id }}/remove"{% endif %}

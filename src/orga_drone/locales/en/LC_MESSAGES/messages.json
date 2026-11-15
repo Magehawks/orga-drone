@@ -1174,5 +1174,18 @@
   "combined": "combined",
   "Preview appears when at least two images are ready.": "Preview appears when at least two images are ready.",
   "Export combined image": "Export combined image",
-  "Collage": "Collage"
+  "Collage": "Collage",
+  "Choose a layout, drag dividers in the preview, then add media to each cell.": "Choose a layout, drag dividers in the preview, then add media to each cell.",
+  "Layout preset": "Layout preset",
+  "Aspect": "Aspect",
+  "Gap (px)": "Gap (px)",
+  "Gap between cells in pixels": "Gap between cells in pixels",
+  "Collage background color": "Collage background color",
+  "Collage duration in seconds": "Collage duration in seconds",
+  "Selected cell": "Selected cell",
+  "Split horizontally": "Split horizontally",
+  "Split vertically": "Split vertically",
+  "Remove cell": "Remove cell",
+  "Empty cell": "Empty cell",
+  "Could not save collage.": "Could not save collage."
 }

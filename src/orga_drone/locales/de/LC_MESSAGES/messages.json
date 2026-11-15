@@ -1174,5 +1174,18 @@
   "combined": "kombiniert",
   "Preview appears when at least two images are ready.": "Die Vorschau erscheint, sobald mindestens zwei Bilder bereit sind.",
   "Export combined image": "Zusammengefügtes Bild exportieren",
-  "Collage": "Collage"
+  "Collage": "Collage",
+  "Choose a layout, drag dividers in the preview, then add media to each cell.": "Layout wählen, Trennlinien in der Vorschau ziehen, dann Medien in die Zellen legen.",
+  "Layout preset": "Layout-Vorlage",
+  "Aspect": "Seitenverhältnis",
+  "Gap (px)": "Abstand (px)",
+  "Gap between cells in pixels": "Abstand zwischen Zellen in Pixeln",
+  "Collage background color": "Hintergrundfarbe der Collage",
+  "Collage duration in seconds": "Collage-Dauer in Sekunden",
+  "Selected cell": "Ausgewählter Bereich",
+  "Split horizontally": "Horizontal teilen",
+  "Split vertically": "Vertikal teilen",
+  "Remove cell": "Bereich entfernen",
+  "Empty cell": "Leerer Bereich",
+  "Could not save collage.": "Collage konnte nicht gespeichert werden."
 }
