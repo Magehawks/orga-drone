@@ -141,9 +141,10 @@ CREATE TABLE IF NOT EXISTS studio_projects (
     updated_at TEXT NOT NULL
 );
 
--- Clips: media references OR generated Title Cards (Issue #26 / ADR 0009).
--- Multiple media clips may share media_path / source_media_id.
--- Title Cards have NULL media_path/identity_key and never pretend to be files.
+-- Clips: media references OR generated Title Cards / Collages
+-- (Issue #26 / ADR 0009; ADR 0038). Multiple media clips may share
+-- media_path / source_media_id. Generated items have NULL media identity
+-- and never pretend to be files.
 CREATE TABLE IF NOT EXISTS studio_clips (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
@@ -167,8 +168,10 @@ CREATE TABLE IF NOT EXISTS studio_clips (
     subtitle_text TEXT,
     card_duration_s REAL,
     background TEXT,
+    collage_spec TEXT,
+    collage_duration_s REAL,
     added_at TEXT NOT NULL,
-    CHECK (item_kind IN ('media', 'title_card')),
+    CHECK (item_kind IN ('media', 'title_card', 'collage')),
     CHECK (
         (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
         OR (
@@ -176,6 +179,13 @@ CREATE TABLE IF NOT EXISTS studio_clips (
             AND media_path IS NULL
             AND identity_key IS NULL
             AND source_media_id IS NULL
+        )
+        OR (
+            item_kind = 'collage'
+            AND media_path IS NULL
+            AND identity_key IS NULL
+            AND source_media_id IS NULL
+            AND collage_spec IS NOT NULL
         )
     ),
     CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
@@ -448,7 +458,7 @@ class StudioProjectUsage:
 
 @dataclass
 class StudioClip:
-    """One Story clip: media reference or generated Title Card (never copies files)."""
+    """One Story clip: media reference or generated Title Card/Collage."""
 
     id: int
     project_id: int
@@ -478,6 +488,8 @@ class StudioClip:
     subtitle_text: str | None = None
     card_duration_s: float | None = None
     background: str | None = None
+    collage_spec: str | None = None
+    collage_duration_s: float | None = None
 
     @property
     def media_id(self) -> int | None:
@@ -733,6 +745,7 @@ class Database:
         Database._migrate_studio_projects_and_clips(conn)
         Database._migrate_studio_clips_title_cards(conn)
         Database._migrate_studio_clips_transition_duration(conn)
+        Database._migrate_studio_clips_collage(conn)
         Database._migrate_studio_audio_clips(conn)
         Database._migrate_albums(conn)
         Database._migrate_studio_originals(conn)
@@ -1042,6 +1055,140 @@ class Database:
             conn.execute(
                 "ALTER TABLE studio_clips ADD COLUMN transition_duration_s REAL"
             )
+
+    @staticmethod
+    def _migrate_studio_clips_collage(conn: sqlite3.Connection) -> None:
+        """Allow generated Collages (ADR 0038): collage_spec + widened item_kind CHECK."""
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_clips'"
+        ).fetchone()
+        if not exists:
+            return
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='studio_clips'"
+        ).fetchone()
+        sql = str(row[0] or "") if row is not None else ""
+        cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+        }
+        if (
+            "collage_spec" in cols
+            and "collage_duration_s" in cols
+            and "'collage'" in sql
+        ):
+            return
+        conn.executescript(
+            """
+            CREATE TABLE studio_clips__collage_mig (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+                item_kind TEXT NOT NULL DEFAULT 'media',
+                media_path TEXT,
+                identity_key TEXT,
+                source_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+                position INTEGER NOT NULL,
+                filename_snapshot TEXT NOT NULL,
+                recorded_at_snapshot TEXT,
+                kind_snapshot TEXT NOT NULL,
+                photo_duration_s REAL,
+                source_start REAL,
+                source_end REAL,
+                playback_speed REAL NOT NULL DEFAULT 1.0,
+                volume REAL NOT NULL DEFAULT 1.0,
+                transition TEXT,
+                transition_duration_s REAL,
+                effect_settings TEXT NOT NULL DEFAULT '{}',
+                title_text TEXT,
+                subtitle_text TEXT,
+                card_duration_s REAL,
+                background TEXT,
+                collage_spec TEXT,
+                collage_duration_s REAL,
+                added_at TEXT NOT NULL,
+                CHECK (item_kind IN ('media', 'title_card', 'collage')),
+                CHECK (
+                    (item_kind = 'media' AND media_path IS NOT NULL AND identity_key IS NOT NULL)
+                    OR (
+                        item_kind = 'title_card'
+                        AND media_path IS NULL
+                        AND identity_key IS NULL
+                        AND source_media_id IS NULL
+                    )
+                    OR (
+                        item_kind = 'collage'
+                        AND media_path IS NULL
+                        AND identity_key IS NULL
+                        AND source_media_id IS NULL
+                        AND collage_spec IS NOT NULL
+                    )
+                ),
+                CHECK (background IS NULL OR background IN ('dark', 'light', 'accent'))
+            );
+            """
+        )
+        # Column set varies by prior migrations; copy what exists.
+        src_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(studio_clips)").fetchall()
+        }
+        copy_cols = [
+            "id",
+            "project_id",
+            "item_kind",
+            "media_path",
+            "identity_key",
+            "source_media_id",
+            "position",
+            "filename_snapshot",
+            "recorded_at_snapshot",
+            "kind_snapshot",
+            "photo_duration_s",
+            "source_start",
+            "source_end",
+            "playback_speed",
+            "volume",
+            "transition",
+            "transition_duration_s",
+            "effect_settings",
+            "title_text",
+            "subtitle_text",
+            "card_duration_s",
+            "background",
+            "added_at",
+        ]
+        select_parts: list[str] = []
+        insert_parts: list[str] = []
+        for name in copy_cols:
+            if name not in src_cols:
+                continue
+            insert_parts.append(name)
+            select_parts.append(name)
+        insert_parts.extend(["collage_spec", "collage_duration_s"])
+        select_parts.extend(
+            [
+                "collage_spec" if "collage_spec" in src_cols else "NULL",
+                "collage_duration_s" if "collage_duration_s" in src_cols else "NULL",
+            ]
+        )
+        conn.execute(
+            f"""INSERT INTO studio_clips__collage_mig(
+                    {", ".join(insert_parts)}
+                )
+                SELECT {", ".join(select_parts)} FROM studio_clips"""
+        )
+        conn.execute("DROP TABLE studio_clips")
+        conn.execute(
+            "ALTER TABLE studio_clips__collage_mig RENAME TO studio_clips"
+        )
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_project ON studio_clips(project_id);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_identity ON studio_clips(identity_key);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_position ON studio_clips(project_id, position);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_path ON studio_clips(media_path);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_source_media ON studio_clips(source_media_id);
+            CREATE INDEX IF NOT EXISTS idx_studio_clips_item_kind ON studio_clips(project_id, item_kind);
+            """
+        )
 
     @staticmethod
     def _migrate_studio_audio_clips(conn: sqlite3.Connection) -> None:
@@ -3114,6 +3261,146 @@ class Database:
             raise ValueError("studio item not found")
         return clip
 
+    def add_studio_collage(
+        self,
+        project_id: int,
+        *,
+        collage_spec: dict | str | None = None,
+        collage_duration_s: float | None = None,
+        preset: str | None = None,
+    ) -> StudioClip:
+        """Append a generated Collage Story item (ADR 0038). Never copies media."""
+        from orga_drone.studio_collage import (
+            COLLAGE_KIND,
+            DEFAULT_DURATION_S,
+            ITEM_KIND_COLLAGE,
+            clamp_collage_duration,
+            dump_collage_spec,
+            normalize_spec,
+            preset_spec,
+        )
+
+        project = self.get_studio_project(project_id)
+        if project is None:
+            raise ValueError("studio project not found")
+        if preset is not None:
+            spec = preset_spec(preset)
+        elif collage_spec is None:
+            spec = preset_spec("1+1")
+        elif isinstance(collage_spec, str):
+            from orga_drone.studio_collage import collage_spec_from_raw
+
+            spec = collage_spec_from_raw(collage_spec)
+        else:
+            spec = normalize_spec(collage_spec)
+        if collage_duration_s is not None:
+            spec["duration_s"] = clamp_collage_duration(float(collage_duration_s))
+        else:
+            spec["duration_s"] = clamp_collage_duration(
+                float(spec.get("duration_s") or DEFAULT_DURATION_S)
+            )
+        payload = dump_collage_spec(spec)
+        duration = float(spec["duration_s"])
+        now = datetime.now().isoformat(timespec="seconds")
+        with self.connect() as conn:
+            pos_row = conn.execute(
+                """SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+                   FROM studio_clips WHERE project_id = ?""",
+                (project.id,),
+            ).fetchone()
+            position = int(pos_row["next_pos"])
+            cur = conn.execute(
+                """INSERT INTO studio_clips(
+                     project_id, item_kind, media_path, identity_key, source_media_id,
+                     position, filename_snapshot, recorded_at_snapshot, kind_snapshot,
+                     photo_duration_s, source_start, source_end,
+                     playback_speed, volume, transition, effect_settings,
+                     title_text, subtitle_text, card_duration_s, background,
+                     collage_spec, collage_duration_s, added_at
+                   ) VALUES (?, ?, NULL, NULL, NULL, ?, '', NULL, ?, NULL, NULL, NULL,
+                             1.0, 1.0, NULL, '{}', NULL, NULL, NULL, NULL, ?, ?, ?)""",
+                (
+                    project.id,
+                    ITEM_KIND_COLLAGE,
+                    position,
+                    COLLAGE_KIND,
+                    payload,
+                    duration,
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project.id),
+            )
+            item_id = cur.lastrowid
+            assert item_id is not None
+        items = {i.id: i for i in self.list_studio_items(project.id)}
+        clip = items.get(int(item_id))
+        assert clip is not None
+        return clip
+
+    def update_studio_collage(
+        self,
+        studio_item_id: int,
+        *,
+        collage_spec: dict | str | None = None,
+        collage_duration_s: float | None = None,
+    ) -> StudioClip:
+        """Patch Collage fields. Raises ValueError if the row is not a collage."""
+        from orga_drone.studio_collage import (
+            ITEM_KIND_COLLAGE,
+            clamp_collage_duration,
+            collage_spec_from_raw,
+            dump_collage_spec,
+            normalize_spec,
+        )
+
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT project_id, item_kind, collage_spec, collage_duration_s "
+                "FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("studio item not found")
+        if str(row["item_kind"] or "") != ITEM_KIND_COLLAGE:
+            raise ValueError("not a collage")
+        if collage_spec is None:
+            next_spec = collage_spec_from_raw(
+                str(row["collage_spec"]) if row["collage_spec"] is not None else None
+            )
+        elif isinstance(collage_spec, str):
+            next_spec = collage_spec_from_raw(collage_spec)
+        else:
+            next_spec = normalize_spec(collage_spec)
+        if collage_duration_s is not None:
+            next_spec["duration_s"] = clamp_collage_duration(float(collage_duration_s))
+        elif row["collage_duration_s"] is not None:
+            next_spec["duration_s"] = clamp_collage_duration(
+                float(row["collage_duration_s"])
+            )
+        payload = dump_collage_spec(next_spec)
+        duration = float(next_spec["duration_s"])
+        now = datetime.now().isoformat(timespec="seconds")
+        project_id = int(row["project_id"])
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE studio_clips
+                   SET collage_spec = ?, collage_duration_s = ?
+                   WHERE id = ? AND item_kind = ?""",
+                (payload, duration, studio_item_id, ITEM_KIND_COLLAGE),
+            )
+            conn.execute(
+                "UPDATE studio_projects SET updated_at = ? WHERE id = ?",
+                (now, project_id),
+            )
+        items = {i.id: i for i in self.list_studio_items(project_id)}
+        clip = items.get(studio_item_id)
+        if clip is None:
+            raise ValueError("studio item not found")
+        return clip
+
     def remove_studio_item(self, studio_item_id: int, *, connection: sqlite3.Connection | None = None) -> bool:
         """Remove one Studio clip. Never deletes media assets."""
         now = datetime.now().isoformat(timespec="seconds")
@@ -3268,6 +3555,7 @@ class Database:
                           s.playback_speed, s.volume, s.transition, s.transition_duration_s,
                           s.effect_settings,
                           s.title_text, s.subtitle_text, s.card_duration_s, s.background,
+                          s.collage_spec, s.collage_duration_s,
                           s.source_media_id AS stored_media_id,
                           m.id AS media_id, m.filename AS live_filename,
                           m.recorded_at AS live_recorded_at, m.kind AS live_kind,
@@ -3282,7 +3570,9 @@ class Database:
         for r in rows:
             item_kind = str(r["item_kind"] or "media")
             is_title = item_kind == "title_card"
-            available = True if is_title else r["media_id"] is not None
+            is_collage = item_kind == "collage"
+            is_generated = is_title or is_collage
+            available = True if is_generated else r["media_id"] is not None
             live_kind = (
                 str(r["live_kind"]) if available and r["live_kind"] else None
             )
@@ -3290,10 +3580,14 @@ class Database:
             kind = (
                 "title_card"
                 if is_title
-                else effective_kind(
-                    available=available,
-                    live_kind=live_kind,
-                    kind_snapshot=kind_snapshot,
+                else (
+                    "collage"
+                    if is_collage
+                    else effective_kind(
+                        available=available,
+                        live_kind=live_kind,
+                        kind_snapshot=kind_snapshot,
+                    )
                 )
             )
             photo_raw = r["photo_duration_s"]
@@ -3312,17 +3606,39 @@ class Database:
                 str(r["subtitle_text"]) if r["subtitle_text"] is not None else None
             )
             card_raw = r["card_duration_s"]
+            collage_raw = r["collage_duration_s"]
+            collage_spec = (
+                str(r["collage_spec"]) if r["collage_spec"] is not None else None
+            )
             caption = title_text or ""
+            if is_collage:
+                display_name = "Collage"
+            elif is_title:
+                display_name = caption
+            elif available and r["live_filename"]:
+                display_name = str(r["live_filename"])
+            else:
+                display_name = str(r["filename_snapshot"])
+            if is_title and card_raw is not None:
+                duration_s = float(card_raw)
+            elif is_collage and collage_raw is not None:
+                duration_s = float(collage_raw)
+            elif available and r["live_duration_s"] is not None:
+                duration_s = float(r["live_duration_s"])
+            else:
+                duration_s = None
             out.append(
                 StudioClip(
                     id=int(r["id"]),
                     project_id=int(r["project_id"]),
                     media_path=(
-                        None if is_title or r["media_path"] is None else str(r["media_path"])
+                        None
+                        if is_generated or r["media_path"] is None
+                        else str(r["media_path"])
                     ),
                     identity_key=(
                         None
-                        if is_title or r["identity_key"] is None
+                        if is_generated or r["identity_key"] is None
                         else str(r["identity_key"])
                     ),
                     position=int(r["position"]),
@@ -3334,19 +3650,15 @@ class Database:
                     ),
                     added_at=str(r["added_at"]),
                     available=available,
-                    source_media_id=None if is_title else (live_id if live_id is not None else stored_id),
-                    filename=(
-                        caption
-                        if is_title
-                        else (
-                            str(r["live_filename"])
-                            if available and r["live_filename"]
-                            else str(r["filename_snapshot"])
-                        )
+                    source_media_id=(
+                        None
+                        if is_generated
+                        else (live_id if live_id is not None else stored_id)
                     ),
+                    filename=display_name,
                     recorded_at=(
                         None
-                        if is_title
+                        if is_generated
                         else (
                             r["live_recorded_at"]
                             if available
@@ -3354,15 +3666,7 @@ class Database:
                         )
                     ),
                     kind=kind if kind != "unknown" else None,
-                    duration_s=(
-                        float(card_raw)
-                        if is_title and card_raw is not None
-                        else (
-                            float(r["live_duration_s"])
-                            if available and r["live_duration_s"] is not None
-                            else None
-                        )
-                    ),
+                    duration_s=duration_s,
                     source_start=(
                         float(start_raw) if start_raw is not None else None
                     ),
@@ -3386,6 +3690,12 @@ class Database:
                     ),
                     background=(
                         str(r["background"]) if is_title and r["background"] else None
+                    ),
+                    collage_spec=collage_spec if is_collage else None,
+                    collage_duration_s=(
+                        float(collage_raw)
+                        if is_collage and collage_raw is not None
+                        else None
                     ),
                 )
             )

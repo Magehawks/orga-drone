@@ -1,8 +1,8 @@
 # ADR 0038: Studio Collage Composer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-15
-- **Deciders:** Product Owner task (Studio Collage Composer); parent tracking via GitHub epic
+- **Deciders:** Product Owner task (Studio Collage Composer); parent tracking via GitHub epic #456 / WP1 #457
 
 ## Context
 

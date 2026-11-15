@@ -58,6 +58,8 @@ def effective_kind(
 ) -> str:
     if kind_snapshot == "title_card":
         return "title_card"
+    if kind_snapshot == "collage":
+        return "collage"
     if available and live_kind in {"photo", "video"}:
         return live_kind
     if kind_snapshot in {"photo", "video"}:
@@ -84,6 +86,18 @@ def effective_seconds(
         if card_duration_s is not None:
             return clamp_card_duration(float(card_duration_s))
         return DEFAULT_DURATION_S
+    if kind == "collage":
+        from orga_drone.studio_collage import (
+            DEFAULT_DURATION_S as COLLAGE_DEFAULT_DURATION_S,
+            clamp_collage_duration,
+        )
+
+        # Prefer collage_duration_s via card_duration_s alias from callers, or duration_s.
+        if card_duration_s is not None:
+            return clamp_collage_duration(float(card_duration_s))
+        if duration_s is not None:
+            return clamp_collage_duration(float(duration_s))
+        return COLLAGE_DEFAULT_DURATION_S
     if kind == "photo":
         if photo_duration_s is not None:
             return float(photo_duration_s)
@@ -130,7 +144,11 @@ def summarize_studio_items(
     photo_count = 0
     video_count = 0
     for item in rows:
-        kind = item.kind if item.kind in {"photo", "video", "title_card"} else "unknown"
+        kind = (
+            item.kind
+            if item.kind in {"photo", "video", "title_card", "collage"}
+            else "unknown"
+        )
         if kind == "photo":
             photo_count += 1
         elif kind == "video":

@@ -136,6 +136,9 @@ msgstr "Musik wird in die exportierte MP4 gemischt. Quell-Video-Audio bleibt erh
 msgid "Mixing music…"
 msgstr "Musik wird gemischt…"
 
+msgid "Collage"
+msgstr "Collage"
+
 msgid "Title card"
 msgstr "Titelseite"
 
