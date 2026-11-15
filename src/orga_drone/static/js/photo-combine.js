@@ -726,8 +726,11 @@
     libraryFilter.addEventListener("input", function () {
       if (libraryFilterTimer) clearTimeout(libraryFilterTimer);
       libraryFilterTimer = setTimeout(function () {
-        renderLibraryGrid(libraryFilter.value);
-      }, 160);
+        loadLibraryPhotos(libraryFilter.value).catch(function () {
+          libraryItems = [];
+          renderLibraryGrid(libraryFilter.value);
+        });
+      }, 220);
     });
   }
 
