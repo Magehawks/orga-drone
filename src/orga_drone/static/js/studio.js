@@ -9197,6 +9197,20 @@ import {
     return Boolean(collageLeafGradeTarget(target.dataset.studioId));
   }
 
+  function syncLeafGradeUnsupportedChrome(leafActive) {
+    const active = Boolean(leafActive);
+    document.getElementById("inspector-quick-look")?.toggleAttribute("disabled", active);
+    document.querySelectorAll("[data-quick-look-chip]").forEach((btn) => {
+      btn.toggleAttribute("disabled", active);
+    });
+    document.getElementById("inspector-managed-color")?.toggleAttribute("hidden", active);
+    // Sharpen/denoise live in the advanced image section; hide the whole block
+    // for collage leaves so unsupported clip-only endpoints are not clickable.
+    document
+      .getElementById("inspector-image-section-advanced")
+      ?.toggleAttribute("hidden", active);
+  }
+
   function setClipRemoveAction(form, studioId) {
     if (!form || studioId == null || studioId === "") return;
     const url = `/studio/${studioId}/remove`;
@@ -9249,9 +9263,11 @@ import {
     } else if (kind === "collage") {
       setInspectorHeading(kindLabels.collage);
       (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.fillInspector(clip) : undefined);
+      syncLeafGradeUnsupportedChrome(isCollageLeafGradeActive(clip));
       syncColorScopesView();
     } else {
       (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
+      syncLeafGradeUnsupportedChrome(false);
       showInspector("inspector-clip");
       setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
       const panel = document.getElementById("inspector-clip");
@@ -11880,13 +11896,7 @@ import {
       fillHsl(clip);
       fillColorLook(clip);
       fillColorWheels(clip);
-      const leafOnly = Boolean(media);
-      document.getElementById("inspector-quick-look")?.toggleAttribute("disabled", leafOnly);
-      document.querySelectorAll("[data-quick-look-chip]").forEach((btn) => {
-        btn.toggleAttribute("disabled", leafOnly);
-      });
-      document.getElementById("inspector-detail")?.toggleAttribute("hidden", leafOnly);
-      document.getElementById("inspector-managed-color")?.toggleAttribute("hidden", leafOnly);
+      syncLeafGradeUnsupportedChrome(Boolean(media));
     },
     showInspector,
     showFlash: showRootFlash,
