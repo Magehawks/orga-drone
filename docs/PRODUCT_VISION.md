@@ -181,6 +181,7 @@ professional video-editing knowledge.
 | Transition markers (Cut, Fade through black, Crossfade) | **Available now** (preview + MP4; duration 0.1–2.0 s; labeled boundary overlays) |
 | Inspector object heading, selection vs playhead-active, tabs, resizable width | **Available now** (Clip, Image, Effects, and Overlays group the existing controls; the inspector, the media browser, and the Story tracks can be dragged and the size is kept in this browser; not a professional NLE) |
 | Title Cards | **Available now** (generated Story items: title, optional subtitle, duration, dark/light/accent; preview + MP4) |
+| Studio Collage Composer | **Available now** (one Story item with a recursive split layout; library + desktop photos/videos; fit/fill/zoom/pan; composed preview stills and multi-video play with a 4-video cap then still fallback; hold last frame; muted collage audio; PNG/JPEG still export and MP4 Story export via the existing encoder; does not modify Image Composer / `photo_combine`; no motion slide-in/out collages) |
 | Optional sequential soundtrack playlist (up to 8 local songs; per-song volume/fades; project-level lead-in; loop when N=1) | **Available now** (preview + MP4 export; desktop picker; the whole bed can start later with silence before it; coverage spans on the Story time canvas) |
 | Local MP4 export (configurable resolution up to source max) | **Available now** (desktop save dialog; suggested filename includes the selected resolution, e.g. `_1080p` or `_4k`, and stays put once edited; Standard / High / Best quality next to resolution, High by default; optional music mix; photo-only stories at 720/1080; Cancel export stops the running encode and leaves existing files in place) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
@@ -200,6 +201,7 @@ Sharing is the final step of the journey.
 | Simple Studio MP4 export | **Available now** (local file; resolution and quality choice; optional music) |
 | One photo or video from its detail page | **Available now** (local file only; photos: Original / Print / Social / Custom with output width × height before export and an optional print-size PPI helper; videos: Best or social MP4 presets; nothing is uploaded or posted) |
 | Combine images (detail Image tab) | **Available now** (2…N library photos; horizontal or vertical; native sizes with cross-axis centering; optional spacing; PNG/JPEG; originals unchanged; resource limits refuse oversized compositions) |
+| Studio collage still / MP4 export | **Available now** (PNG/JPEG from the collage compositor; MP4 as a muted Story segment with the same layout/grade path; originals unchanged) |
 | Open video / Show in folder after Studio export | **Available now** (Windows desktop; also after a detail-page export) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 | itch.io Windows convenience build | **Later** (butler process documented for a Draft/Restricted test; no public paid launch; no in-app updater; ZIP copies do not auto-update) |
