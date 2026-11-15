@@ -2501,6 +2501,9 @@ video.studio-preview-media.studio-preview-layer-b {
   pointer-events: none;
   z-index: 0;
 }
+.studio-preview-collage.is-paused .studio-collage-composed {
+  z-index: 2;
+}
 .studio-collage-play-media {
   position: absolute;
   inset: auto;
@@ -2508,6 +2511,9 @@ video.studio-preview-media.studio-preview-layer-b {
   pointer-events: none;
   object-fit: cover;
   background: #000;
+}
+.studio-collage-play-media.studio-collage-play-composed {
+  z-index: 2;
 }
 .studio-collage-cell {
   position: absolute;

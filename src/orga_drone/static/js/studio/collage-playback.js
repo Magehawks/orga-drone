@@ -92,9 +92,29 @@ export function createCollagePlayback(opts) {
   let composedEl = null;
   let composedObjectUrl = null;
   let composedSeq = 0;
+  let composedInFlight = false;
+  /** @type {number | null} */
+  let composedPendingLocalS = null;
+  let playMediaVisible = true;
+
+  function setPlayMediaVisible(visible) {
+    playMediaVisible = Boolean(visible);
+    for (const el of mediaEls.values()) {
+      el.hidden = !playMediaVisible;
+      el.style.visibility = playMediaVisible ? "visible" : "hidden";
+    }
+    if (composedEl) {
+      composedEl.hidden = playMediaVisible && !fallback;
+      composedEl.style.visibility =
+        !playMediaVisible || fallback ? "visible" : "hidden";
+      composedEl.style.zIndex = !playMediaVisible || fallback ? "2" : "0";
+    }
+  }
 
   function teardown() {
     composedSeq += 1;
+    composedInFlight = false;
+    composedPendingLocalS = null;
     for (const el of mediaEls.values()) {
       if (el instanceof HTMLVideoElement) {
         try {
@@ -108,6 +128,8 @@ export function createCollagePlayback(opts) {
         } catch {
           /* ignore */
         }
+      } else {
+        el.removeAttribute("src");
       }
       el.remove();
     }
@@ -122,6 +144,7 @@ export function createCollagePlayback(opts) {
     }
     activeStudioId = null;
     fallback = false;
+    playMediaVisible = true;
   }
 
   function pause() {
@@ -194,6 +217,14 @@ export function createCollagePlayback(opts) {
             } catch {
               /* ignore */
             }
+            stale.removeAttribute("src");
+            try {
+              stale.load();
+            } catch {
+              /* ignore */
+            }
+          } else {
+            stale.removeAttribute("src");
           }
           stale.remove();
           mediaEls.delete(id);
@@ -206,7 +237,10 @@ export function createCollagePlayback(opts) {
       if (isVideo && videoSlots < MAX_CONCURRENT_COLLAGE_VIDEOS) {
         videoSlots += 1;
         if (!(el instanceof HTMLVideoElement)) {
-          if (el) el.remove();
+          if (el) {
+            el.removeAttribute("src");
+            el.remove();
+          }
           el = document.createElement("video");
           el.muted = true;
           el.playsInline = true;
@@ -214,7 +248,6 @@ export function createCollagePlayback(opts) {
           el.setAttribute("playsinline", "");
           el.setAttribute("muted", "");
           mediaEls.set(id, el);
-          stage.appendChild(el);
         }
       } else {
         if (!(el instanceof HTMLImageElement) || el instanceof HTMLVideoElement) {
@@ -225,13 +258,20 @@ export function createCollagePlayback(opts) {
               } catch {
                 /* ignore */
               }
+              el.removeAttribute("src");
+              try {
+                el.load();
+              } catch {
+                /* ignore */
+              }
+            } else {
+              el.removeAttribute("src");
             }
             el.remove();
           }
           el = document.createElement("img");
           el.alt = "";
           mediaEls.set(id, el);
-          stage.appendChild(el);
         }
         if (media && media.source === "library" && media.media_id) {
           el.src = `/media/${media.media_id}/thumb`;
@@ -240,11 +280,17 @@ export function createCollagePlayback(opts) {
           if (media && String(media.kind || "").toLowerCase() === "photo") {
             const key = media.source_key ? String(media.source_key) : "";
             el.src = key ? url + "?v=" + encodeURIComponent(key) : url;
+          } else {
+            el.removeAttribute("src");
           }
+        } else if (!(el instanceof HTMLVideoElement)) {
+          el.removeAttribute("src");
         }
       }
       el.className = "studio-collage-play-media";
       el.dataset.leafId = id;
+      el.hidden = !playMediaVisible;
+      el.style.visibility = playMediaVisible ? "visible" : "hidden";
       el.style.left = `${(rect.x / width) * 100}%`;
       el.style.top = `${(rect.y / height) * 100}%`;
       el.style.width = `${(rect.w / width) * 100}%`;
@@ -265,9 +311,8 @@ export function createCollagePlayback(opts) {
           }
         }
       }
-      if (stage && !el.isConnected) {
-        stage.appendChild(el);
-      }
+      /* Always reattach after stage.replaceChildren() in the editor. */
+      stage.appendChild(el);
     }
     for (const [id, el] of [...mediaEls.entries()]) {
       if (!keep.has(id)) {
@@ -277,6 +322,14 @@ export function createCollagePlayback(opts) {
           } catch {
             /* ignore */
           }
+          el.removeAttribute("src");
+          try {
+            el.load();
+          } catch {
+            /* ignore */
+          }
+        } else {
+          el.removeAttribute("src");
         }
         el.remove();
         mediaEls.delete(id);
@@ -292,13 +345,20 @@ export function createCollagePlayback(opts) {
    * @param {any} [args.spec]
    */
   async function updateComposedStill(localS) {
-    if (!fallback || !stage || !activeStudioId) return;
+    if (!stage || !activeStudioId) return;
+    if (!fallback && playMediaVisible) return;
+    if (composedInFlight) {
+      composedPendingLocalS = Number(localS) || 0;
+      return;
+    }
+    composedInFlight = true;
     const seq = ++composedSeq;
+    const requestLocalS = Number(localS) || 0;
     try {
       const res = await fetch(`/api/studio/${encodeURIComponent(activeStudioId)}/collage/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ t_s: Number(localS) || 0 }),
+        body: JSON.stringify({ t_s: requestLocalS }),
       });
       if (seq !== composedSeq) return;
       if (!res.ok) return;
@@ -317,15 +377,27 @@ export function createCollagePlayback(opts) {
       composedEl.style.width = "100%";
       composedEl.style.height = "100%";
       composedEl.style.objectFit = "fill";
-      composedEl.style.zIndex = "0";
-      if (!composedEl.isConnected) stage.appendChild(composedEl);
+      composedEl.style.zIndex = "2";
+      composedEl.hidden = false;
+      composedEl.style.visibility = "visible";
+      stage.appendChild(composedEl);
     } catch {
       /* preview endpoint may be unavailable until WP4 */
+    } finally {
+      composedInFlight = false;
+      if (composedPendingLocalS != null && seq === composedSeq) {
+        const pending = composedPendingLocalS;
+        composedPendingLocalS = null;
+        void updateComposedStill(pending);
+      }
     }
   }
 
   function sync({ localS, playing, seek = false, spec = null }) {
-    if (fallback) {
+    const isPlaying = Boolean(playing);
+    /* Paused: hide raw leaf media so the WP4 composed still (grades/framing) shows. */
+    setPlayMediaVisible(isPlaying && !fallback);
+    if (fallback || !isPlaying) {
       void updateComposedStill(localS);
     }
     for (const [id, el] of mediaEls.entries()) {
@@ -370,6 +442,7 @@ export function createCollagePlayback(opts) {
     sync,
     pause,
     teardown,
+    setPlayMediaVisible,
     isFallback: () => fallback,
     MAX_CONCURRENT_COLLAGE_VIDEOS,
   };

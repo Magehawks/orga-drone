@@ -213,6 +213,7 @@ export function createCollageEditor(opts) {
         composedObjectUrl = URL.createObjectURL(blob);
         composedImg.src = composedObjectUrl;
         composedImg.hidden = false;
+        composedImg.style.zIndex = opts.isPlaying?.() ? "0" : "2";
         stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
           img.style.opacity = "0";
         });
@@ -329,6 +330,7 @@ export function createCollageEditor(opts) {
       });
       stage.appendChild(handle);
     }
+    const playing = Boolean(opts.isPlaying?.());
     playback.mount({
       spec,
       studioId: clip.dataset.studioId,
@@ -338,9 +340,10 @@ export function createCollageEditor(opts) {
       forceStill: false,
     });
     preview?.classList.toggle("has-play-media", true);
+    preview?.classList.toggle("is-paused", !playing);
     playback.sync({
       localS: Number(opts.getCollageLocalS?.() || 0),
-      playing: Boolean(opts.isPlaying?.()),
+      playing,
       seek: true,
       spec,
     });
