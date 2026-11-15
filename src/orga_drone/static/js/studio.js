@@ -5116,7 +5116,12 @@ import {
   }
 
   const detailControls = createDetailControls({
-    getSelectedClip: selectedAdjustableClip,
+    getSelectedClip: () => {
+      const clip = selectedAdjustableClip();
+      // Sharpen/denoise remain clip-row only; leave grades use HSL/image/LUT.
+      if (clip && isCollageLeafGradeActive(clip)) return null;
+      return clip;
+    },
     getClipById: detailClip,
     setSaved: setSaveState,
     showError: showFlash,
@@ -9177,7 +9182,19 @@ import {
     } catch (_) {
       /* ignore */
     }
-    if (collageEditor?.renderPreview) collageEditor.renderPreview(clip);
+    const ownsPreview =
+      state.selected &&
+      state.selected.type === "clip" &&
+      String(state.selected.id) === String(clip.dataset.studioId || "");
+    if (ownsPreview && collageEditor?.renderPreview) {
+      collageEditor.renderPreview(clip);
+    }
+  }
+
+  function isCollageLeafGradeActive(clip = null) {
+    const target = clip || selectedAdjustableClip();
+    if (!target || clipKind(target) !== "collage") return false;
+    return Boolean(collageLeafGradeTarget(target.dataset.studioId));
   }
 
   function setClipRemoveAction(form, studioId) {
@@ -11863,6 +11880,13 @@ import {
       fillHsl(clip);
       fillColorLook(clip);
       fillColorWheels(clip);
+      const leafOnly = Boolean(media);
+      document.getElementById("inspector-quick-look")?.toggleAttribute("disabled", leafOnly);
+      document.querySelectorAll("[data-quick-look-chip]").forEach((btn) => {
+        btn.toggleAttribute("disabled", leafOnly);
+      });
+      document.getElementById("inspector-detail")?.toggleAttribute("hidden", leafOnly);
+      document.getElementById("inspector-managed-color")?.toggleAttribute("hidden", leafOnly);
     },
     showInspector,
     showFlash: showRootFlash,
@@ -12044,6 +12068,13 @@ import {
   async function applyQuickLookFromUi(lookId) {
     const clip = selectedAdjustableClip();
     if (!clip) return;
+    if (isCollageLeafGradeActive(clip)) {
+      showFlash(
+        root.dataset.collageLeafLookHint ||
+          "Quick Looks are not available for collage cells yet. Use the image and LUT controls."
+      );
+      return;
+    }
     const studioId = String(clip.dataset.studioId);
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = lookId || "";

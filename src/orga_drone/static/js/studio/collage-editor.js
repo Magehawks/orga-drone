@@ -483,7 +483,12 @@ export function createCollageEditor(opts) {
       selectedLeafId = null;
       selectedLeafOwnerId = null;
     }
-    opts.showInspector("inspector-collage");
+    if (selectedLeafId && selectedLeafOwnerId === ownerId) {
+      // Keep Color Workspace usable alongside collage layout controls.
+      opts.showInspector("inspector-collage", { also: ["inspector-clip"] });
+    } else {
+      opts.showInspector("inspector-collage");
+    }
     const spec = parseSpec(clip) || {};
     if (durationEl) {
       durationEl.value = String(clip.dataset.collageDuration || spec.duration_s || "5");
