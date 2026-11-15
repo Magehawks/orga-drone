@@ -161,6 +161,10 @@
          data-collage-split-h="{{ _('Split horizontally')|e }}"
          data-collage-split-v="{{ _('Split vertically')|e }}"
          data-collage-remove-cell="{{ _('Remove cell')|e }}"
+         data-collage-export-failed="{{ _('Could not export collage.')|e }}"
+         data-collage-export-cancelled="{{ _('Collage export cancelled.')|e }}"
+         data-collage-desktop-required="{{ _('Native file picker needs the desktop app.')|e }}"
+         data-collage-export-default="{{ _('collage')|e }}"
          data-kind-unknown="{{ _('Memory')|e }}"
          data-inspector-story="{{ _('Story')|e }}"
          data-inspector-music="{{ _('Music')|e }}"
@@ -557,7 +561,9 @@
             <p class="studio-preview-titlecard-subtitle" id="studio-preview-titlecard-b-subtitle"></p>
           </div>
           <div id="studio-preview-collage" class="studio-preview-collage" hidden aria-label="{{ _('Collage') }}">
-            <div class="studio-preview-collage-stage" id="studio-preview-collage-stage"></div>
+            <div class="studio-preview-collage-stage" id="studio-preview-collage-stage">
+              <img id="studio-preview-collage-composed" class="studio-collage-composed" alt="" hidden>
+            </div>
           </div>
           <div id="studio-preview-hud-b" class="studio-preview-hud is-layer-b" hidden></div>
           <div id="studio-preview-hud" class="studio-preview-hud" hidden></div>
@@ -2143,6 +2149,18 @@
             <input type="range" id="inspector-collage-pan-y" min="0" max="1" step="0.01" value="0.5"
                    aria-label="{{ _('Cell pan vertical') }}">
           </label>
+        </div>
+        <div class="studio-inspector-actions" id="inspector-collage-export-actions">
+          <p class="studio-inspector-kind">{{ _('Still export') }}</p>
+          <label class="studio-inspector-field">
+            <span>{{ _('Format') }}</span>
+            <select id="inspector-collage-export-format" aria-label="{{ _('Collage still export format') }}">
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+            </select>
+          </label>
+          <button type="button" class="button" id="inspector-collage-export">{{ _('Export still') }}</button>
+          <p class="hint" id="inspector-collage-export-status" hidden></p>
         </div>
         <form method="post" id="inspector-collage-remove-form" class="studio-inspector-remove"
               {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>

@@ -239,6 +239,7 @@ that boundary. Do not add a bundler, transpiler, or framework.
 | Clip timing, cut, speed, repeat, transitions | `studio_cut.py`, `studio_speed.py`, `studio_transition.py`, `studio_estimate.py`, `studio_effect_lane.py`, `studio_forward_loop.py` | `/reorder`, `/photo-duration`, `/cut`, `/section`, `/speed`, `/transition`, `/forward-loop`, `/loop-effect` |
 | Color, LUT, HSL, wheels, detail | `studio_image.py`, `studio_hsl.py`, `studio_color_wheels.py`, `studio_lut.py`, `studio_detail.py`, `studio_looks.py`, `studio_color_animation.py` | `/image`, `/look`, `/color`, `/hsl`, `/color-wheels`, `/detail`, `/color-animation`, `/saturation-ramp` |
 | Preview stills and playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` | `/preview-frame`, `/playback-proxy` |
+| Collage layout and still export | `studio_collage.py`, `studio_collage_still.py` | `/api/studio/collages`, `/collage`, `/collage/preview`, `/collage/export` |
 | Masks, overlays, map, HUD, frame, audio | `studio_mask.py`, `studio_overlay.py`, `studio_map.py`, `studio_hud.py`, `studio_frame.py`, `studio_audio.py` | `/masks`, `/overlays`, `/map`, `/hud`, `/frame`, `/clip-audio` |
 | Projects, music, history | `studio_history.py`, `studio_audio.py`, `db/__init__.py` | `/api/studio/projects*`, `/music*`, `/history/*` |
 | Export | `studio_export.py`, `export/` | `/api/studio/export*` |

@@ -1204,5 +1204,11 @@
   "Filter library media": "Mediathek filtern",
   "Missing media": "Medium fehlt",
   "Native file picker needs the desktop app.": "Der Dateidialog braucht die Desktop-App.",
-  "Select at least one photo or video.": "Mindestens ein Foto oder Video auswählen."
+  "Select at least one photo or video.": "Mindestens ein Foto oder Video auswählen.",
+  "Still export": "Standbild-Export",
+  "Collage still export format": "Exportformat der Collage",
+  "Export still": "Standbild exportieren",
+  "Could not export collage.": "Collage konnte nicht exportiert werden.",
+  "Collage export cancelled.": "Collage-Export abgebrochen.",
+  "collage": "collage"
 }

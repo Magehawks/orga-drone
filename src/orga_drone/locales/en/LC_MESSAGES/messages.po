@@ -1143,3 +1143,24 @@ msgstr "Native file picker needs the desktop app."
 
 msgid "Select at least one photo or video."
 msgstr "Select at least one photo or video."
+
+msgid "Still export"
+msgstr "Still export"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Collage still export format"
+msgstr "Collage still export format"
+
+msgid "Export still"
+msgstr "Export still"
+
+msgid "Could not export collage."
+msgstr "Could not export collage."
+
+msgid "Collage export cancelled."
+msgstr "Collage export cancelled."
+
+msgid "collage"
+msgstr "collage"

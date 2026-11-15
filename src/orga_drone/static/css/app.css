@@ -2492,11 +2492,20 @@ video.studio-preview-media.studio-preview-layer-b {
   overflow: hidden;
   flex: 0 0 auto;
 }
+.studio-collage-composed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 0;
+}
 .studio-collage-cell {
   position: absolute;
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--fg, #fff) 25%, transparent);
-  background: color-mix(in srgb, var(--panel, #1a1f26) 80%, #000);
+  background: transparent;
   color: var(--muted, #9aabbc);
   font: inherit;
   font-size: 0.75rem;
@@ -2506,6 +2515,7 @@ video.studio-preview-media.studio-preview-layer-b {
   justify-content: center;
   padding: 0.35rem;
   box-sizing: border-box;
+  z-index: 1;
 }
 .studio-collage-cell.is-selected {
   outline: 2px solid var(--accent, #ff9f0a);
