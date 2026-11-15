@@ -278,6 +278,94 @@ def test_public_patch_preserves_external_path(tmp_path: Path) -> None:
     assert updated.collage_spec and '"gap_px":12' in updated.collage_spec
 
 
+def test_http_assign_clear_and_frame_leaf_media(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    db.set_app_state("studio_last_project_id", str(project.id))
+    created = client.post("/api/studio/collages", json={"preset": "1+1"})
+    clip_id = int(created.json()["id"])
+    leaf_ids = [
+        leaf["id"] for leaf in iter_leaves(created.json()["collage_spec"]["root"])
+    ]
+    leaf_a, leaf_b = leaf_ids[0], leaf_ids[1]
+    assigned = client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={
+            "op": "assign_media",
+            "leaf_id": leaf_a,
+            "media": {
+                "source": "library",
+                "media_id": 42,
+                "kind": "photo",
+                "fit": "fill",
+                "zoom": 1.0,
+                "pan_x": 0.5,
+                "pan_y": 0.5,
+            },
+        },
+    )
+    assert assigned.status_code == 200
+    framed = client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={
+            "op": "assign_media",
+            "leaf_id": leaf_a,
+            "media": {
+                "source": "library",
+                "media_id": 42,
+                "kind": "photo",
+                "fit": "fit",
+                "zoom": 1.5,
+                "pan_x": 0.2,
+                "pan_y": 0.8,
+            },
+        },
+    )
+    assert framed.status_code == 200
+    media = next(
+        leaf["media"]
+        for leaf in iter_leaves(framed.json()["collage_spec"]["root"])
+        if leaf["id"] == leaf_a
+    )
+    assert media["fit"] == "fit"
+    assert media["zoom"] == 1.5
+    ext = client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={
+            "op": "assign_media",
+            "leaf_id": leaf_b,
+            "media": {
+                "source": "external",
+                "path": str(tmp_path / "clip.mp4"),
+                "kind": "video",
+                "display_name": "clip.mp4",
+            },
+        },
+    )
+    assert ext.status_code == 200
+    public_b = next(
+        leaf["media"]
+        for leaf in iter_leaves(ext.json()["collage_spec"]["root"])
+        if leaf["id"] == leaf_b
+    )
+    assert "path" not in public_b
+    assert public_b["has_path"] is True
+    cleared = client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={"op": "assign_media", "leaf_id": leaf_a, "media": None},
+    )
+    assert cleared.status_code == 200
+    leaves = {
+        leaf["id"]: leaf
+        for leaf in iter_leaves(cleared.json()["collage_spec"]["root"])
+    }
+    assert "media" not in leaves[leaf_a]
+    assert "media" in leaves[leaf_b]
+
+
 def test_http_preset_preserves_aspect_gap_background(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1077,3 +1077,69 @@ msgstr "Leerer Bereich"
 
 msgid "Could not save collage."
 msgstr "Collage konnte nicht gespeichert werden."
+
+msgid "From library"
+msgstr "Aus Mediathek"
+
+msgid "From this computer"
+msgstr "Vom Computer"
+
+msgid "Clear media"
+msgstr "Medium entfernen"
+
+msgid "Fit"
+msgstr "Einpassen"
+
+msgid "Fill"
+msgstr "Füllen"
+
+msgid "Zoom"
+msgstr "Zoom"
+
+msgid "Pan X"
+msgstr "Schwenken X"
+
+msgid "Pan Y"
+msgstr "Schwenken Y"
+
+msgid "Choose from library"
+msgstr "Aus Mediathek wählen"
+
+msgid "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
+msgstr "Fotos und Videos auswählen. Sie füllen leere Zellen der Reihe nach oder ersetzen zuerst die gewählte Zelle."
+
+msgid "Filter"
+msgstr "Filter"
+
+msgid "No matching photos or videos."
+msgstr "Keine passenden Fotos oder Videos."
+
+msgid "Add to collage"
+msgstr "Zur Collage hinzufügen"
+
+msgid "Media"
+msgstr "Medien"
+
+msgid "Cell fit mode"
+msgstr "Einpassmodus der Zelle"
+
+msgid "Cell zoom"
+msgstr "Zellen-Zoom"
+
+msgid "Cell pan horizontal"
+msgstr "Zellen-Schwenken horizontal"
+
+msgid "Cell pan vertical"
+msgstr "Zellen-Schwenken vertikal"
+
+msgid "Filter library media"
+msgstr "Mediathek filtern"
+
+msgid "Missing media"
+msgstr "Medium fehlt"
+
+msgid "Native file picker needs the desktop app."
+msgstr "Der Dateidialog braucht die Desktop-App."
+
+msgid "Select at least one photo or video."
+msgstr "Mindestens ein Foto oder Video auswählen."

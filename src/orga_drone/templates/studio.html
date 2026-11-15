@@ -155,6 +155,9 @@
          data-kind-collage="{{ _('Collage')|e }}"
          data-collage-failed="{{ _('Could not save collage.')|e }}"
          data-collage-empty-cell="{{ _('Empty cell')|e }}"
+         data-collage-missing-media="{{ _('Missing media')|e }}"
+         data-collage-picker-unavailable="{{ _('Native file picker needs the desktop app.')|e }}"
+         data-collage-select-library="{{ _('Select at least one photo or video.')|e }}"
          data-collage-split-h="{{ _('Split horizontally')|e }}"
          data-collage-split-v="{{ _('Split vertically')|e }}"
          data-collage-remove-cell="{{ _('Remove cell')|e }}"
@@ -2107,11 +2110,39 @@
           <input type="color" id="inspector-collage-background" value="#0a0c0e"
                  aria-label="{{ _('Collage background color') }}">
         </label>
+        <div class="studio-inspector-actions" id="inspector-collage-media-actions">
+          <p class="studio-inspector-kind">{{ _('Media') }}</p>
+          <button type="button" class="button" id="inspector-collage-from-library">{{ _('From library') }}</button>
+          <button type="button" class="button ghost" id="inspector-collage-from-computer">{{ _('From this computer') }}</button>
+        </div>
         <div class="studio-inspector-actions" id="inspector-collage-cell-actions" hidden>
           <p class="studio-inspector-kind">{{ _('Selected cell') }}</p>
           <button type="button" class="button ghost" id="inspector-collage-split-h">{{ _('Split horizontally') }}</button>
           <button type="button" class="button ghost" id="inspector-collage-split-v">{{ _('Split vertically') }}</button>
+          <button type="button" class="button ghost" id="inspector-collage-clear-cell">{{ _('Clear media') }}</button>
           <button type="button" class="button ghost" id="inspector-collage-remove-cell">{{ _('Remove cell') }}</button>
+          <label class="studio-inspector-field">
+            <span>{{ _('Fit') }}</span>
+            <select id="inspector-collage-fit" aria-label="{{ _('Cell fit mode') }}">
+              <option value="fill">{{ _('Fill') }}</option>
+              <option value="fit">{{ _('Fit') }}</option>
+            </select>
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('Zoom') }}</span>
+            <input type="range" id="inspector-collage-zoom" min="1" max="3" step="0.05" value="1"
+                   aria-label="{{ _('Cell zoom') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('Pan X') }}</span>
+            <input type="range" id="inspector-collage-pan-x" min="0" max="1" step="0.01" value="0.5"
+                   aria-label="{{ _('Cell pan horizontal') }}">
+          </label>
+          <label class="studio-inspector-field">
+            <span>{{ _('Pan Y') }}</span>
+            <input type="range" id="inspector-collage-pan-y" min="0" max="1" step="0.01" value="0.5"
+                   aria-label="{{ _('Cell pan vertical') }}">
+          </label>
         </div>
         <form method="post" id="inspector-collage-remove-form" class="studio-inspector-remove"
               {% if initial_remove_id %}action="/studio/{{ initial_remove_id }}/remove"{% endif %}>
@@ -2125,6 +2156,24 @@
       </div>
     </aside>
   </div>
+  <dialog id="studio-collage-library-dialog" class="photo-combine-dialog studio-collage-library-dialog" aria-labelledby="studio-collage-library-title">
+    <form method="dialog" class="photo-combine-dialog-inner">
+      <header class="photo-combine-dialog-header">
+        <h2 id="studio-collage-library-title">{{ _('Choose from library') }}</h2>
+        <p class="hint">{{ _('Select photos and videos. They fill empty cells in order, or replace the selected cell first.') }}</p>
+      </header>
+      <label class="studio-inspector-field">
+        <span>{{ _('Filter') }}</span>
+        <input type="search" id="studio-collage-library-filter" aria-label="{{ _('Filter library media') }}">
+      </label>
+      <div id="studio-collage-library-grid" class="photo-combine-library-grid" role="listbox" aria-multiselectable="true"></div>
+      <p id="studio-collage-library-empty" class="hint" hidden>{{ _('No matching photos or videos.') }}</p>
+      <footer class="photo-combine-dialog-actions">
+        <button type="button" class="button ghost" id="studio-collage-library-cancel">{{ _('Cancel') }}</button>
+        <button type="button" class="button" id="studio-collage-library-add" disabled>{{ _('Add to collage') }}</button>
+      </footer>
+    </form>
+  </dialog>
   {% else %}
   <div class="studio-project-landing">
     <p class="hint">{{ _('Switch, create, or manage Studio projects. Source media files stay unchanged.') }}</p>

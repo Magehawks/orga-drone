@@ -32,10 +32,27 @@ export function createCollageEditor(opts) {
   const bgEl = document.getElementById("inspector-collage-background");
   const cellActions = document.getElementById("inspector-collage-cell-actions");
   const removeForm = document.getElementById("inspector-collage-remove-form");
+  const fitEl = document.getElementById("inspector-collage-fit");
+  const zoomEl = document.getElementById("inspector-collage-zoom");
+  const panXEl = document.getElementById("inspector-collage-pan-x");
+  const panYEl = document.getElementById("inspector-collage-pan-y");
+  const libraryDialog = document.getElementById("studio-collage-library-dialog");
+  const libraryGrid = document.getElementById("studio-collage-library-grid");
+  const libraryFilter = document.getElementById("studio-collage-library-filter");
+  const libraryEmpty = document.getElementById("studio-collage-library-empty");
+  const libraryAdd = document.getElementById("studio-collage-library-add");
+
+  const MEDIA_FILE_TYPES = [
+    "Media (*.jpg;*.jpeg;*.png;*.webp;*.heic;*.mp4;*.mov;*.m4v;*.webm)",
+    "Images (*.jpg;*.jpeg;*.png;*.webp;*.heic)",
+    "Videos (*.mp4;*.mov;*.m4v;*.webm)",
+  ];
 
   let selectedLeafId = null;
   let drag = null;
   let saveChain = Promise.resolve();
+  let libraryItems = [];
+  let librarySelected = {};
 
   function msg(key, fallback) {
     const value = root?.dataset?.[key];
@@ -146,6 +163,7 @@ export function createCollageEditor(opts) {
     const rects = resolveRects(spec, width, height);
     const leaves = iterLeaves(spec.root);
     const emptyLabel = msg("collageEmptyCell", "Empty cell");
+    const missingLabel = msg("collageMissingMedia", "Missing media");
     stage.replaceChildren();
     for (const leaf of leaves) {
       const rect = rects[String(leaf.id)];
@@ -162,13 +180,32 @@ export function createCollageEditor(opts) {
       cell.style.width = `${(rect.w / width) * 100}%`;
       cell.style.height = `${(rect.h / height) * 100}%`;
       const label = document.createElement("span");
-      label.textContent = leaf.media
-        ? leaf.media.display_name || leaf.media.kind || "Media"
-        : emptyLabel;
+      const media = leaf.media;
+      if (!media) {
+        label.textContent = emptyLabel;
+      } else if (media.source === "library" && media.media_id) {
+        const thumb = document.createElement("img");
+        thumb.alt = "";
+        thumb.loading = "lazy";
+        thumb.src = `/media/${media.media_id}/thumb`;
+        thumb.addEventListener("error", () => {
+          thumb.remove();
+          label.textContent = missingLabel;
+          cell.classList.add("is-missing");
+        });
+        cell.appendChild(thumb);
+        label.textContent = media.display_name || media.kind || "Media";
+      } else if (media.source === "external" && (media.has_path || media.path)) {
+        label.textContent = media.display_name || media.kind || "Media";
+      } else {
+        label.textContent = missingLabel;
+        cell.classList.add("is-missing");
+      }
       cell.appendChild(label);
       cell.addEventListener("click", () => {
         selectedLeafId = String(leaf.id);
         if (cellActions) cellActions.hidden = false;
+        fillLeafFraming(clip);
         renderPreview(clip);
       });
       stage.appendChild(cell);
@@ -225,7 +262,264 @@ export function createCollageEditor(opts) {
       if (btn) btn.setAttribute("formaction", `/studio/${id}/remove`);
     }
     if (cellActions) cellActions.hidden = !selectedLeafId;
+    fillLeafFraming(clip);
     renderPreview(clip);
+  }
+
+  function selectedLeafMedia(clip) {
+    const spec = parseSpec(clip);
+    if (!spec || !selectedLeafId) return null;
+    const leaf = iterLeaves(spec.root).find((item) => String(item.id) === String(selectedLeafId));
+    return leaf?.media || null;
+  }
+
+  function fillLeafFraming(clip) {
+    const media = selectedLeafMedia(clip);
+    const has = !!media;
+    if (fitEl) {
+      fitEl.disabled = !has;
+      fitEl.value = media?.fit === "fit" ? "fit" : "fill";
+    }
+    if (zoomEl) {
+      zoomEl.disabled = !has;
+      zoomEl.value = String(media?.zoom ?? 1);
+    }
+    if (panXEl) {
+      panXEl.disabled = !has;
+      panXEl.value = String(media?.pan_x ?? 0.5);
+    }
+    if (panYEl) {
+      panYEl.disabled = !has;
+      panYEl.value = String(media?.pan_y ?? 0.5);
+    }
+  }
+
+  function basename(path) {
+    const text = String(path || "").replace(/\\/g, "/");
+    const parts = text.split("/");
+    return parts[parts.length - 1] || text;
+  }
+
+  function kindFromPath(path) {
+    const lower = String(path || "").toLowerCase();
+    if (/\.(mp4|mov|m4v|webm)$/.test(lower)) return "video";
+    return "photo";
+  }
+
+  function mediaTargets(clip, count) {
+    const spec = parseSpec(clip);
+    if (!spec || count <= 0) return [];
+    const leaves = iterLeaves(spec.root);
+    const targets = [];
+    if (selectedLeafId) {
+      const selected = leaves.find((leaf) => String(leaf.id) === String(selectedLeafId));
+      if (selected) targets.push(String(selected.id));
+    }
+    for (const leaf of leaves) {
+      if (targets.length >= count) break;
+      const id = String(leaf.id);
+      if (targets.includes(id)) continue;
+      if (!leaf.media) targets.push(id);
+    }
+    for (const leaf of leaves) {
+      if (targets.length >= count) break;
+      const id = String(leaf.id);
+      if (!targets.includes(id)) targets.push(id);
+    }
+    return targets.slice(0, count);
+  }
+
+  async function assignMediaList(clip, mediaList) {
+    if (!isCollage(clip) || !mediaList.length) return;
+    const targets = mediaTargets(clip, mediaList.length);
+    for (let i = 0; i < targets.length; i += 1) {
+      const leafId = targets[i];
+      const media = mediaList[i];
+      await queueSave(
+        clip,
+        { op: "assign_media", leaf_id: leafId, media },
+        gestureGroup("collage-assign")
+      );
+    }
+    if (isStillSelected(clip)) {
+      fillInspector(clip);
+    }
+  }
+
+  function syncLibraryAddButton() {
+    if (!libraryAdd) return;
+    libraryAdd.disabled = Object.keys(librarySelected).length === 0;
+  }
+
+  function renderLibraryGrid(query) {
+    if (!libraryGrid) return;
+    const q = String(query || "")
+      .trim()
+      .toLowerCase();
+    libraryGrid.replaceChildren();
+    const visible = libraryItems.filter((item) => {
+      if (!item) return false;
+      if (!q) return true;
+      return String(item.filename || "")
+        .toLowerCase()
+        .includes(q);
+    });
+    if (libraryEmpty) libraryEmpty.hidden = visible.length > 0 || libraryItems.length === 0;
+    if (!libraryItems.length && libraryEmpty) {
+      libraryEmpty.hidden = false;
+    }
+    visible.forEach((item) => {
+      const id = String(item.id);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "photo-combine-picker-card";
+      btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", librarySelected[id] ? "true" : "false");
+      if (librarySelected[id]) btn.classList.add("is-selected");
+      const img = document.createElement("img");
+      img.src = `/media/${item.id}/thumb`;
+      img.alt = "";
+      img.loading = "lazy";
+      const span = document.createElement("span");
+      span.textContent = `${item.filename || `#${item.id}`} (${item.kind || "?"})`;
+      btn.appendChild(img);
+      btn.appendChild(span);
+      btn.addEventListener("click", () => {
+        if (librarySelected[id]) delete librarySelected[id];
+        else librarySelected[id] = item;
+        btn.classList.toggle("is-selected", !!librarySelected[id]);
+        btn.setAttribute("aria-selected", librarySelected[id] ? "true" : "false");
+        syncLibraryAddButton();
+      });
+      libraryGrid.appendChild(btn);
+    });
+    syncLibraryAddButton();
+  }
+
+  async function loadLibraryMedia(query) {
+    const res = await fetchImpl("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        q: String(query || "").trim(),
+        limit: 120,
+        sort: "recorded_at",
+        order: "desc",
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    libraryItems = ((data && data.items) || []).filter(
+      (item) => item && (item.kind === "photo" || item.kind === "video")
+    );
+    renderLibraryGrid(libraryFilter ? libraryFilter.value : "");
+  }
+
+  async function openLibraryPicker() {
+    const clip = opts.getSelectedClip();
+    if (!isCollage(clip) || !libraryDialog) return;
+    librarySelected = {};
+    if (libraryFilter) libraryFilter.value = "";
+    syncLibraryAddButton();
+    try {
+      await loadLibraryMedia("");
+    } catch {
+      libraryItems = [];
+      renderLibraryGrid("");
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
+    if (typeof libraryDialog.showModal === "function") libraryDialog.showModal();
+    else libraryDialog.setAttribute("open", "");
+  }
+
+  function closeLibraryPicker() {
+    if (!libraryDialog) return;
+    if (typeof libraryDialog.close === "function") libraryDialog.close();
+    else libraryDialog.removeAttribute("open");
+  }
+
+  async function commitLibrarySelection() {
+    const clip = opts.getSelectedClip();
+    if (!isCollage(clip)) return;
+    const selected = Object.keys(librarySelected).map((key) => librarySelected[key]);
+    if (!selected.length) {
+      opts.showFlash(msg("collageSelectLibrary", "Select at least one photo or video."));
+      return;
+    }
+    closeLibraryPicker();
+    await assignMediaList(
+      clip,
+      selected.map((item) => ({
+        source: "library",
+        media_id: Number(item.id),
+        kind: item.kind === "video" ? "video" : "photo",
+        fit: "fill",
+        zoom: 1,
+        pan_x: 0.5,
+        pan_y: 0.5,
+      }))
+    );
+  }
+
+  async function pickComputerFiles() {
+    const clip = opts.getSelectedClip();
+    if (!isCollage(clip)) return;
+    try {
+      const res = await fetchImpl("/api/desktop/pick-open-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          allow_multiple: true,
+          file_types: MEDIA_FILE_TYPES,
+        }),
+      });
+      if (res.status === 503) {
+        opts.showFlash(
+          msg("collagePickerUnavailable", "Native file picker needs the desktop app.")
+        );
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (!data || data.status === "cancelled") return;
+      if (data.status !== "ok") {
+        opts.showFlash(
+          msg("collagePickerUnavailable", "Native file picker needs the desktop app.")
+        );
+        return;
+      }
+      const paths = Array.isArray(data.paths) ? data.paths : data.path ? [data.path] : [];
+      if (!paths.length) return;
+      await assignMediaList(
+        clip,
+        paths.map((path) => ({
+          source: "external",
+          path,
+          kind: kindFromPath(path),
+          fit: "fill",
+          zoom: 1,
+          pan_x: 0.5,
+          pan_y: 0.5,
+          display_name: basename(path),
+        }))
+      );
+    } catch {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+    }
+  }
+
+  function patchSelectedLeafMedia(mutator) {
+    const clip = opts.getSelectedClip();
+    if (!isCollage(clip) || !selectedLeafId) return;
+    const media = selectedLeafMedia(clip);
+    if (!media) return;
+    const next = mutator({ ...media });
+    queueSave(
+      clip,
+      { op: "assign_media", leaf_id: selectedLeafId, media: next },
+      gestureGroup("collage-frame")
+    ).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
   }
 
   function hidePreview() {
@@ -356,6 +650,56 @@ export function createCollageEditor(opts) {
 
   document.getElementById("studio-add-collage")?.addEventListener("click", addCollage);
   document.getElementById("studio-add-collage-empty")?.addEventListener("click", addCollage);
+  document.getElementById("inspector-collage-from-library")?.addEventListener("click", () => {
+    openLibraryPicker();
+  });
+  document.getElementById("inspector-collage-from-computer")?.addEventListener("click", () => {
+    pickComputerFiles();
+  });
+  document.getElementById("inspector-collage-clear-cell")?.addEventListener("click", () => {
+    const clip = opts.getSelectedClip();
+    if (!isCollage(clip) || !selectedLeafId) return;
+    queueSave(
+      clip,
+      { op: "assign_media", leaf_id: selectedLeafId, media: null },
+      gestureGroup("collage-clear")
+    ).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
+  });
+  fitEl?.addEventListener("change", () => {
+    patchSelectedLeafMedia((media) => {
+      media.fit = fitEl.value === "fit" ? "fit" : "fill";
+      return media;
+    });
+  });
+  zoomEl?.addEventListener("change", () => {
+    patchSelectedLeafMedia((media) => {
+      media.zoom = Number(zoomEl.value) || 1;
+      return media;
+    });
+  });
+  panXEl?.addEventListener("change", () => {
+    patchSelectedLeafMedia((media) => {
+      media.pan_x = Number(panXEl.value) || 0.5;
+      return media;
+    });
+  });
+  panYEl?.addEventListener("change", () => {
+    patchSelectedLeafMedia((media) => {
+      media.pan_y = Number(panYEl.value) || 0.5;
+      return media;
+    });
+  });
+  document.getElementById("studio-collage-library-cancel")?.addEventListener("click", () => {
+    closeLibraryPicker();
+  });
+  document.getElementById("studio-collage-library-add")?.addEventListener("click", () => {
+    commitLibrarySelection();
+  });
+  libraryFilter?.addEventListener("input", () => {
+    renderLibraryGrid(libraryFilter.value);
+  });
 
   return {
     isCollage,
