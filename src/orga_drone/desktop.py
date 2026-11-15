@@ -533,17 +533,18 @@ class OpenFilePickerError(Exception):
     """Raised when a native open-file dialog cannot be shown."""
 
 
-def pick_open_file(
+def pick_open_files(
     *,
     directory: str = "",
+    allow_multiple: bool = True,
     file_types: tuple[str, ...] = (
         "Audio Files (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg)",
     ),
-) -> str | None:
-    """Open the OS file-open dialog via the active pywebview window.
+) -> list[str] | None:
+    """Open the OS file-open dialog; optionally allow multi-select.
 
     Returns:
-        Selected file path, or ``None`` if the user cancelled.
+        Selected file paths, or ``None`` if the user cancelled.
 
     Raises:
         OpenFilePickerError: When pywebview is missing or no desktop window is open.
@@ -563,14 +564,44 @@ def pick_open_file(
     result = windows[0].create_file_dialog(
         webview.FileDialog.OPEN,
         directory=directory or "",
+        allow_multiple=bool(allow_multiple),
         file_types=file_types,
     )
     if not result:
         return None
-    chosen = result[0] if isinstance(result, (list, tuple)) else result
-    if isinstance(chosen, bytes):
-        chosen = chosen.decode("utf-8")
-    return str(chosen)
+    raw_items = result if isinstance(result, (list, tuple)) else (result,)
+    paths: list[str] = []
+    for item in raw_items:
+        chosen = item.decode("utf-8") if isinstance(item, bytes) else item
+        text = str(chosen).strip()
+        if text:
+            paths.append(text)
+    return paths or None
+
+
+def pick_open_file(
+    *,
+    directory: str = "",
+    file_types: tuple[str, ...] = (
+        "Audio Files (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg)",
+    ),
+) -> str | None:
+    """Open the OS file-open dialog via the active pywebview window.
+
+    Returns:
+        Selected file path, or ``None`` if the user cancelled.
+
+    Raises:
+        OpenFilePickerError: When pywebview is missing or no desktop window is open.
+    """
+    paths = pick_open_files(
+        directory=directory,
+        allow_multiple=False,
+        file_types=file_types,
+    )
+    if not paths:
+        return None
+    return paths[0]
 
 
 def find_listen_port(host: str, preferred: int) -> int:

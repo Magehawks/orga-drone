@@ -42,10 +42,15 @@ FORMATS = frozenset({"png", "jpeg"})
 
 @dataclass(frozen=True)
 class CombineEntrySpec:
-    """One list row. ``entry_id`` is the UI identity; media_id may repeat."""
+    """One list row. ``entry_id`` is the UI identity.
+
+    Library rows use ``media_id`` (may repeat). Desktop picks use ``source_path``
+    without importing into the library.
+    """
 
     entry_id: str
-    media_id: int
+    media_id: int | None = None
+    source_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,13 +66,14 @@ class CombineSpec:
 @dataclass(frozen=True)
 class InspectedSource:
     entry_id: str
-    media_id: int
+    media_id: int | None
     path: Path
     width: int
     height: int
     size_bytes: int
     mtime_ns: int
     filename: str
+    external: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,14 +108,27 @@ def parse_combine_payload(payload: object) -> CombineSpec:
             raise StudioExportError("Each image entry must be an object.")
         entry_id = str(item.get("entry_id") or "").strip()
         media_id = item.get("media_id")
+        source_path = item.get("source_path")
         if not entry_id:
             raise StudioExportError("Each image needs a stable entry id.")
         if entry_id in seen_ids:
             raise StudioExportError("Duplicate entry id in the list.")
-        if not isinstance(media_id, int) or media_id < 1:
-            raise StudioExportError("Each image needs a valid media id.")
+        has_media = isinstance(media_id, int) and not isinstance(media_id, bool) and media_id >= 1
+        has_path = isinstance(source_path, str) and bool(source_path.strip())
+        if has_media and has_path:
+            raise StudioExportError("Each image must be either a library photo or a computer file.")
+        if not has_media and not has_path:
+            raise StudioExportError("Each image needs a library photo or a computer file.")
         seen_ids.add(entry_id)
-        entries.append(CombineEntrySpec(entry_id=entry_id, media_id=media_id))
+        resolved_media_id = media_id if has_media else None
+        resolved_path = str(source_path).strip() if has_path else None
+        entries.append(
+            CombineEntrySpec(
+                entry_id=entry_id,
+                media_id=resolved_media_id if isinstance(resolved_media_id, int) else None,
+                source_path=resolved_path,
+            )
+        )
     layout = str(payload.get("layout") or "horizontal").strip().lower()
     if layout not in LAYOUTS:
         raise StudioExportError("Choose horizontal or vertical layout.")
@@ -213,27 +232,66 @@ def _header_inspect(path: Path) -> tuple[int, int]:
     return int(w), int(h)
 
 
+def resolve_external_photo(path_str: str) -> Path:
+    """Validate a desktop-picked image path without importing it into the library."""
+    from orga_drone.parse import PHOTO_EXTS
+
+    raw = str(path_str or "").strip().strip('"')
+    if not raw:
+        raise StudioExportError("One of the selected photos is missing.")
+    path = Path(raw).expanduser()
+    try:
+        path = path.resolve(strict=True)
+    except OSError as exc:
+        raise StudioExportError(
+            "One of the selected photos is unavailable. Choose the file again."
+        ) from exc
+    if not path.is_file():
+        raise StudioExportError(
+            "One of the selected photos is unavailable. Choose the file again."
+        )
+    if path.suffix.lower() not in PHOTO_EXTS:
+        raise StudioExportError(
+            "This file type is not supported for combine. Choose a photo file."
+        )
+    return path
+
+
 def inspect_sources(db: Database, spec: CombineSpec) -> tuple[InspectedSource, ...]:
     """Resolve and measure every entry. Fail closed on any bad input."""
     require_combine_ready(spec)
     roots = None
     out: list[InspectedSource] = []
     for entry in spec.entries:
-        row = db.get_media(entry.media_id)
-        if row is None:
-            raise StudioExportError("One of the selected photos is missing.")
-        if row.kind != "photo":
-            raise StudioExportError("Combine works with photos only.")
-        path = resolve_media_file(db, row, roots=roots)
-        if path is None or not path.is_file():
-            raise StudioExportError(
-                "One of the selected photos is unavailable. Reconnect the library folder."
-            )
+        if entry.source_path:
+            path = resolve_external_photo(entry.source_path)
+            filename = path.name
+            media_id: int | None = None
+            external = True
+        else:
+            if entry.media_id is None:
+                raise StudioExportError("Each image needs a library photo or a computer file.")
+            row = db.get_media(entry.media_id)
+            if row is None:
+                raise StudioExportError("One of the selected photos is missing.")
+            if row.kind != "photo":
+                raise StudioExportError("Combine works with photos only.")
+            resolved = resolve_media_file(db, row, roots=roots)
+            if resolved is None or not resolved.is_file():
+                raise StudioExportError(
+                    "One of the selected photos is unavailable. Reconnect the library folder."
+                )
+            path = resolved
+            filename = row.filename
+            media_id = entry.media_id
+            external = False
         try:
             st = path.stat()
         except OSError as exc:
             raise StudioExportError(
                 "One of the selected photos is unavailable. Reconnect the library folder."
+                if not external
+                else "One of the selected photos is unavailable. Choose the file again."
             ) from exc
         width, height = _header_inspect(path)
         area = width * height
@@ -244,13 +302,14 @@ def inspect_sources(db: Database, spec: CombineSpec) -> tuple[InspectedSource, .
         out.append(
             InspectedSource(
                 entry_id=entry.entry_id,
-                media_id=entry.media_id,
+                media_id=media_id,
                 path=path,
                 width=width,
                 height=height,
                 size_bytes=int(st.st_size),
                 mtime_ns=int(getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9))),
-                filename=row.filename,
+                filename=filename,
+                external=external,
             )
         )
     return tuple(out)
@@ -498,6 +557,7 @@ def inspect_combine(db: Database, spec: CombineSpec) -> dict[str, Any]:
                 "filename": s.filename,
                 "width": s.width,
                 "height": s.height,
+                "external": s.external,
             }
             for s in sources
         ],

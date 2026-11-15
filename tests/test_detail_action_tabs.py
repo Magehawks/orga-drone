@@ -136,6 +136,10 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     assert "Fine-tune" in image
     assert 'id="detail-photo-combine-open"' in image
     assert "Combine images" in image
+    assert 'id="detail-photo-combine-from-library"' in text
+    assert 'id="detail-photo-combine-from-computer"' in text
+    assert 'id="detail-photo-combine-library-dialog"' in text
+    assert 'id="detail-photo-combine-search"' not in text
     assert 'id="detail-export-run"' not in image
     assert 'id="detail-export-format"' not in image
     assert 'id="detail-export-preset"' not in image
@@ -175,6 +179,8 @@ def test_photo_detail_tabs_keep_preview_outside_and_hide_merge(
     assert ">Helligkeit<" in german.text
     assert "Fotos zusammenfügen" in german.text
     assert 'id="detail-photo-combine-dialog"' in german.text
+    assert "Aus der Mediathek" in german.text
+    assert "Von diesem Computer" in german.text
 
 
 def test_flow_video_keeps_flight_switch_outside_tabs_and_merge_in_file(

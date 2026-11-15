@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orga_drone.config import Settings
-from orga_drone.desktop import FolderPickerError, pick_folder, pick_open_file
+from orga_drone.desktop import FolderPickerError, pick_folder, pick_open_file, pick_open_files
 
 
 def _make_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -149,6 +149,20 @@ def test_pick_open_file_returns_selected_path(monkeypatch: pytest.MonkeyPatch) -
     window.create_file_dialog.assert_called_once()
     args, kwargs = window.create_file_dialog.call_args
     assert args[0] == sys.modules["webview"].FileDialog.OPEN
+    assert kwargs.get("allow_multiple") is False
+
+
+def test_pick_open_files_multi_select(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _install_fake_webview(
+        monkeypatch,
+        dialog_result=(r"D:\Photos\a.png", r"D:\Photos\b.jpg"),
+    )
+    assert pick_open_files(
+        allow_multiple=True,
+        file_types=("Images (*.png;*.jpg)",),
+    ) == [r"D:\Photos\a.png", r"D:\Photos\b.jpg"]
+    _args, kwargs = window.create_file_dialog.call_args
+    assert kwargs.get("allow_multiple") is True
 
 
 def test_pick_open_file_api_ok(
@@ -163,3 +177,31 @@ def test_pick_open_file_api_ok(
     resp = client.post("/api/desktop/pick-open-file", json={})
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok", "path": r"C:\Music\a.mp3"}
+
+
+def test_pick_open_file_api_multi_and_cancel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "orga_drone.desktop.pick_open_files",
+        lambda **_kwargs: [r"C:\Photos\a.png", r"C:\Photos\b.png"],
+    )
+    app = _make_app(tmp_path, monkeypatch)
+    client = TestClient(app)
+    resp = client.post(
+        "/api/desktop/pick-open-file",
+        json={"allow_multiple": True, "file_types": ["Images (*.png)"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["paths"] == [r"C:\Photos\a.png", r"C:\Photos\b.png"]
+    assert body["path"] == r"C:\Photos\a.png"
+
+    monkeypatch.setattr("orga_drone.desktop.pick_open_files", lambda **_kwargs: None)
+    cancelled = client.post(
+        "/api/desktop/pick-open-file",
+        json={"allow_multiple": True},
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json() == {"status": "cancelled"}

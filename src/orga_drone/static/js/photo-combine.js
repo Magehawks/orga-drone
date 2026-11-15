@@ -1,6 +1,6 @@
 /**
- * Photo Workspace Image Composer (#453).
- * Compact dialog: ordered list, search-add, preview, PNG/JPEG export via shared job store.
+ * Photo Workspace Image Composer (#453 / picker UX).
+ * Library multi-select + desktop multi-file pick, ordered list, preview, export.
  */
 (function () {
   "use strict";
@@ -10,8 +10,14 @@
   if (!dialog || !openBtn) return;
 
   const listEl = document.getElementById("detail-photo-combine-list");
-  const searchInput = document.getElementById("detail-photo-combine-search");
-  const searchResults = document.getElementById("detail-photo-combine-search-results");
+  const fromLibraryBtn = document.getElementById("detail-photo-combine-from-library");
+  const fromComputerBtn = document.getElementById("detail-photo-combine-from-computer");
+  const libraryDialog = document.getElementById("detail-photo-combine-library-dialog");
+  const libraryGrid = document.getElementById("detail-photo-combine-library-grid");
+  const libraryFilter = document.getElementById("detail-photo-combine-library-filter");
+  const libraryEmpty = document.getElementById("detail-photo-combine-library-empty");
+  const libraryCancel = document.getElementById("detail-photo-combine-library-cancel");
+  const libraryAdd = document.getElementById("detail-photo-combine-library-add");
   const layoutEl = document.getElementById("detail-photo-combine-layout");
   const spacingEl = document.getElementById("detail-photo-combine-spacing");
   const backgroundEl = document.getElementById("detail-photo-combine-background");
@@ -29,6 +35,11 @@
   const successTitle = document.getElementById("detail-export-success-title");
   const successPath = document.getElementById("detail-export-success-path");
 
+  const IMAGE_FILE_TYPES = [
+    "Images (*.png;*.jpg;*.jpeg;*.webp;*.heic;*.heif;*.dng)",
+    "All files (*.*)",
+  ];
+
   const ds = dialog.dataset;
   const msg = {
     needMore: ds.msgNeedMore || "Add at least one more image.",
@@ -44,6 +55,10 @@
     moveEarlier: ds.msgMoveEarlier || "Move earlier",
     moveLater: ds.msgMoveLater || "Move later",
     position: ds.msgPosition || "Position {n}",
+    pickerUnavailable: ds.msgPickerUnavailable || "Desktop file picker is unavailable. Start Orga Drone as a desktop app.",
+    unreadable: ds.msgUnreadable || "One selected file could not be read. Choose another photo.",
+    libraryEmpty: ds.msgLibraryEmpty || "No photos in the library yet.",
+    selectLibrary: ds.msgSelectLibrary || "Select at least one photo.",
     defaultFilename: ds.defaultFilename || "combined",
   };
 
@@ -58,6 +73,9 @@
   let pollTimer = null;
   let busy = false;
   let dragEntryId = null;
+  let libraryItems = [];
+  let librarySelected = {};
+  let libraryFilterTimer = null;
 
   function nextEntryId() {
     entrySeq += 1;
@@ -68,14 +86,23 @@
     const mediaId = Number(ds.seedMediaId || 0);
     const filename = ds.seedFilename || ("photo-" + mediaId);
     entries = mediaId > 0
-      ? [{ entryId: nextEntryId(), mediaId: mediaId, filename: filename }]
+      ? [{ entryId: nextEntryId(), mediaId: mediaId, sourcePath: null, filename: filename }]
       : [];
+  }
+
+  function filenameFromPath(path) {
+    const text = String(path || "").replace(/\\/g, "/");
+    const parts = text.split("/");
+    return parts[parts.length - 1] || text || "photo";
   }
 
   function specPayload() {
     const spacing = Math.max(0, Math.floor(Number(spacingEl.value) || 0));
     return {
       entries: entries.map(function (e) {
+        if (e.sourcePath) {
+          return { entry_id: e.entryId, source_path: e.sourcePath };
+        }
         return { entry_id: e.entryId, media_id: e.mediaId };
       }),
       layout: layoutEl.value === "vertical" ? "vertical" : "horizontal",
@@ -106,7 +133,8 @@
     spacingEl.disabled = busy;
     backgroundEl.disabled = busy;
     formatEl.disabled = busy;
-    searchInput.disabled = busy;
+    if (fromLibraryBtn) fromLibraryBtn.disabled = busy;
+    if (fromComputerBtn) fromComputerBtn.disabled = busy;
   }
 
   function revokePreview() {
@@ -130,11 +158,18 @@
       li.dataset.entryId = entry.entryId;
       li.setAttribute("aria-grabbed", "false");
 
-      const thumb = document.createElement("img");
-      thumb.className = "photo-combine-thumb";
-      thumb.alt = "";
-      thumb.loading = "lazy";
-      thumb.src = "/media/" + entry.mediaId + "/thumb";
+      let thumb;
+      if (entry.mediaId) {
+        thumb = document.createElement("img");
+        thumb.className = "photo-combine-thumb";
+        thumb.alt = "";
+        thumb.loading = "lazy";
+        thumb.src = "/media/" + entry.mediaId + "/thumb";
+      } else {
+        thumb = document.createElement("span");
+        thumb.className = "photo-combine-thumb photo-combine-thumb-external";
+        thumb.setAttribute("aria-hidden", "true");
+      }
 
       const meta = document.createElement("div");
       meta.className = "photo-combine-item-meta";
@@ -144,7 +179,7 @@
       const name = document.createElement("span");
       name.className = "photo-combine-item-name";
       name.textContent = entry.filename;
-      name.title = entry.filename;
+      name.title = entry.sourcePath || entry.filename;
       meta.appendChild(pos);
       meta.appendChild(name);
 
@@ -268,14 +303,22 @@
     renderList();
   }
 
-  function addEntry(mediaId, filename) {
+  function addLibraryEntry(mediaId, filename) {
     entries.push({
       entryId: nextEntryId(),
       mediaId: Number(mediaId),
+      sourcePath: null,
       filename: filename || ("photo-" + mediaId),
     });
-    revision += 1;
-    renderList();
+  }
+
+  function addExternalEntry(path) {
+    entries.push({
+      entryId: nextEntryId(),
+      mediaId: null,
+      sourcePath: String(path),
+      filename: filenameFromPath(path),
+    });
   }
 
   function syncFormatBackground() {
@@ -371,53 +414,151 @@
     }
   }
 
-  let searchTimer = null;
-  async function runSearch(q) {
-    const query = String(q || "").trim();
-    if (!query) {
-      searchResults.hidden = true;
-      searchResults.innerHTML = "";
+  function selectedLibraryCount() {
+    return Object.keys(librarySelected).length;
+  }
+
+  function syncLibraryAddButton() {
+    if (libraryAdd) libraryAdd.disabled = busy || selectedLibraryCount() < 1;
+  }
+
+  function renderLibraryGrid(filterText) {
+    if (!libraryGrid) return;
+    const needle = String(filterText || "").trim().toLowerCase();
+    libraryGrid.innerHTML = "";
+    const visible = libraryItems.filter(function (item) {
+      if (!item || item.kind !== "photo") return false;
+      if (!needle) return true;
+      return String(item.filename || "").toLowerCase().indexOf(needle) !== -1;
+    });
+    if (libraryEmpty) {
+      if (!libraryItems.length) {
+        libraryEmpty.textContent = msg.libraryEmpty;
+        libraryEmpty.hidden = false;
+      } else if (!visible.length) {
+        libraryEmpty.textContent = msg.searchEmpty;
+        libraryEmpty.hidden = false;
+      } else {
+        libraryEmpty.hidden = true;
+        libraryEmpty.textContent = "";
+      }
+    }
+    visible.forEach(function (item) {
+      const id = String(item.id);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "photo-combine-picker-card";
+      btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", librarySelected[id] ? "true" : "false");
+      if (librarySelected[id]) btn.classList.add("is-selected");
+      btn.innerHTML =
+        '<img src="/media/' + item.id + '/thumb" alt="" loading="lazy">' +
+        '<span></span>';
+      btn.querySelector("span").textContent = item.filename || ("#" + item.id);
+      btn.addEventListener("click", function () {
+        if (librarySelected[id]) delete librarySelected[id];
+        else librarySelected[id] = item;
+        btn.classList.toggle("is-selected", !!librarySelected[id]);
+        btn.setAttribute("aria-selected", librarySelected[id] ? "true" : "false");
+        syncLibraryAddButton();
+      });
+      libraryGrid.appendChild(btn);
+    });
+    syncLibraryAddButton();
+  }
+
+  async function loadLibraryPhotos(query) {
+    const res = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "photo",
+        q: String(query || "").trim(),
+        limit: 120,
+        sort: "recorded_at",
+        order: "desc",
+      }),
+    });
+    const data = await res.json().catch(function () { return null; });
+    libraryItems = ((data && data.items) || []).filter(function (item) {
+      return item && item.kind === "photo";
+    });
+    renderLibraryGrid(libraryFilter ? libraryFilter.value : "");
+  }
+
+  async function openLibraryPicker() {
+    if (!libraryDialog || busy) return;
+    librarySelected = {};
+    if (libraryFilter) libraryFilter.value = "";
+    syncLibraryAddButton();
+    try {
+      await loadLibraryPhotos("");
+    } catch (_err) {
+      libraryItems = [];
+      renderLibraryGrid("");
+      setError(msg.failed);
       return;
     }
+    if (typeof libraryDialog.showModal === "function") libraryDialog.showModal();
+    else libraryDialog.setAttribute("open", "");
+  }
+
+  function closeLibraryPicker() {
+    if (!libraryDialog) return;
+    if (typeof libraryDialog.close === "function") libraryDialog.close();
+    else libraryDialog.removeAttribute("open");
+  }
+
+  function commitLibrarySelection() {
+    const selected = Object.keys(librarySelected).map(function (key) {
+      return librarySelected[key];
+    });
+    if (!selected.length) {
+      setError(msg.selectLibrary);
+      return;
+    }
+    selected.forEach(function (item) {
+      addLibraryEntry(item.id, item.filename);
+    });
+    revision += 1;
+    closeLibraryPicker();
+    setError("");
+    renderList();
+  }
+
+  async function pickComputerFiles() {
+    if (busy) return;
     try {
-      const res = await fetch("/api/search", {
+      const res = await fetch("/api/desktop/pick-open-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "photo", q: query, limit: 24 }),
+        body: JSON.stringify({
+          allow_multiple: true,
+          file_types: IMAGE_FILE_TYPES,
+        }),
       });
-      const data = await res.json().catch(function () { return null; });
-      const items = (data && data.items) || [];
-      searchResults.innerHTML = "";
-      if (!items.length) {
-        const li = document.createElement("li");
-        li.className = "photo-combine-search-empty";
-        li.textContent = msg.searchEmpty;
-        searchResults.appendChild(li);
-        searchResults.hidden = false;
+      if (res.status === 503) {
+        setError(msg.pickerUnavailable);
         return;
       }
-      items.forEach(function (item) {
-        if (!item || item.kind !== "photo") return;
-        const li = document.createElement("li");
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "photo-combine-search-hit";
-        btn.innerHTML =
-          '<img src="/media/' + item.id + '/thumb" alt="" loading="lazy">' +
-          '<span></span>';
-        btn.querySelector("span").textContent = item.filename || ("#" + item.id);
-        btn.addEventListener("click", function () {
-          addEntry(item.id, item.filename);
-          searchInput.value = "";
-          searchResults.hidden = true;
-          searchResults.innerHTML = "";
-        });
-        li.appendChild(btn);
-        searchResults.appendChild(li);
+      const data = await res.json().catch(function () { return null; });
+      if (!data || data.status === "cancelled") return;
+      if (data.status !== "ok") {
+        setError(msg.pickerUnavailable);
+        return;
+      }
+      const paths = Array.isArray(data.paths)
+        ? data.paths
+        : (data.path ? [data.path] : []);
+      if (!paths.length) return;
+      paths.forEach(function (path) {
+        if (path) addExternalEntry(path);
       });
-      searchResults.hidden = false;
+      revision += 1;
+      setError("");
+      renderList();
     } catch (_err) {
-      searchResults.hidden = true;
+      setError(msg.unreadable);
     }
   }
 
@@ -441,7 +582,7 @@
       throw new Error(msg.desktop);
     }
     const data = await res.json().catch(function () { return null; });
-    if (!data || data.cancelled) return null;
+    if (!data || data.status === "cancelled" || data.cancelled) return null;
     if (!data.path) throw new Error(msg.desktop);
     return data.path;
   }
@@ -552,13 +693,43 @@
     formatEl.value = "png";
     setError("");
     if (progressWrap) progressWrap.hidden = true;
-    searchResults.hidden = true;
-    searchResults.innerHTML = "";
-    searchInput.value = "";
     renderList();
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
   });
+
+  if (fromLibraryBtn) {
+    fromLibraryBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      openLibraryPicker();
+    });
+  }
+  if (fromComputerBtn) {
+    fromComputerBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      pickComputerFiles();
+    });
+  }
+  if (libraryCancel) {
+    libraryCancel.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      closeLibraryPicker();
+    });
+  }
+  if (libraryAdd) {
+    libraryAdd.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      commitLibrarySelection();
+    });
+  }
+  if (libraryFilter) {
+    libraryFilter.addEventListener("input", function () {
+      if (libraryFilterTimer) clearTimeout(libraryFilterTimer);
+      libraryFilterTimer = setTimeout(function () {
+        renderLibraryGrid(libraryFilter.value);
+      }, 160);
+    });
+  }
 
   cancelBtn.addEventListener("click", function (ev) {
     ev.preventDefault();
@@ -577,6 +748,7 @@
     revokePreview();
     setBusy(false);
     jobId = null;
+    closeLibraryPicker();
   });
 
   exportBtn.addEventListener("click", function (ev) {
@@ -594,12 +766,5 @@
   spacingEl.addEventListener("input", function () {
     revision += 1;
     scheduleInspectAndPreview();
-  });
-
-  searchInput.addEventListener("input", function () {
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(function () {
-      runSearch(searchInput.value);
-    }, 220);
   });
 })();
