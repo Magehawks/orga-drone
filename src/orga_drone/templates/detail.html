@@ -557,6 +557,13 @@
         </details>
         <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
       </div>
+      <div class="action-form photo-combine-entry" id="detail-photo-combine-entry">
+        <p class="studio-inspector-kind">{{ _('Combine images') }}</p>
+        <p class="hint">{{ _('Join several library photos into one file. Originals stay unchanged; adjustments on this photo are not applied.') }}</p>
+        <button type="button" class="button" id="detail-photo-combine-open"
+                aria-haspopup="dialog"
+                aria-controls="detail-photo-combine-dialog">{{ _('Combine images') }}</button>
+      </div>
     </div>
     {% endif %}
 
@@ -755,6 +762,89 @@
                      values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
     </filter>
   </svg>
+  <dialog class="studio-export-dialog photo-combine-dialog" id="detail-photo-combine-dialog"
+          aria-labelledby="detail-photo-combine-title"
+          data-seed-media-id="{{ item.id }}"
+          data-seed-filename="{{ item.filename|e }}"
+          data-msg-need-more="{{ _('Add at least one more image.')|e }}"
+          data-msg-running="{{ _('Combining images…')|e }}"
+          data-msg-failed="{{ _('Could not combine these images.')|e }}"
+          data-msg-cancelled="{{ _('Combine cancelled.')|e }}"
+          data-msg-done="{{ _('Combined image saved.')|e }}"
+          data-msg-preparing="{{ _('Preparing combine…')|e }}"
+          data-msg-desktop="{{ _('Desktop save dialog is unavailable.')|e }}"
+          data-msg-search-empty="{{ _('No matching photos.')|e }}"
+          data-msg-transparent-jpeg="{{ _('JPEG cannot use a transparent background. White was selected.')|e }}"
+          data-msg-remove="{{ _('Remove')|e }}"
+          data-msg-move-earlier="{{ _('Move earlier')|e }}"
+          data-msg-move-later="{{ _('Move later')|e }}"
+          data-msg-position="{{ _('Position {n}')|e }}"
+          data-default-filename="{{ _('combined')|e }}">
+    <form method="dialog" class="studio-export-form photo-combine-form" id="detail-photo-combine-form">
+      <h2 id="detail-photo-combine-title">{{ _('Combine images') }}</h2>
+      <p class="hint">{{ _('Uses the original library files without saved adjustments. Source files stay unchanged.') }}</p>
+      <div class="photo-combine-list-wrap">
+        <ol class="photo-combine-list" id="detail-photo-combine-list" aria-label="{{ _('Images to combine') }}"></ol>
+      </div>
+      <div class="photo-combine-add-row">
+        <label class="studio-inspector-field photo-combine-search-field" for="detail-photo-combine-search">
+          <span>{{ _('Add images') }}</span>
+          <input type="search" id="detail-photo-combine-search" autocomplete="off"
+                 placeholder="{{ _('Search library photos') }}"
+                 aria-label="{{ _('Search library photos') }}">
+        </label>
+        <ul class="photo-combine-search-results" id="detail-photo-combine-search-results"
+            aria-label="{{ _('Search results') }}" hidden></ul>
+      </div>
+      <div class="studio-export-pair">
+        <label class="studio-inspector-field" for="detail-photo-combine-layout">
+          <span>{{ _('Layout') }}</span>
+          <select id="detail-photo-combine-layout" aria-label="{{ _('Layout') }}">
+            <option value="horizontal" selected>{{ _('Horizontal') }}</option>
+            <option value="vertical">{{ _('Vertical') }}</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field" for="detail-photo-combine-spacing">
+          <span>{{ _('Spacing (px)') }}</span>
+          <input type="number" id="detail-photo-combine-spacing" min="0" step="1" value="0"
+                 aria-label="{{ _('Spacing (px)') }}">
+        </label>
+      </div>
+      <div class="studio-export-pair">
+        <label class="studio-inspector-field" for="detail-photo-combine-background">
+          <span>{{ _('Background') }}</span>
+          <select id="detail-photo-combine-background" aria-label="{{ _('Background') }}">
+            <option value="white" selected>{{ _('White') }}</option>
+            <option value="black">{{ _('Black') }}</option>
+            <option value="transparent">{{ _('Transparent') }}</option>
+          </select>
+        </label>
+        <label class="studio-inspector-field" for="detail-photo-combine-format">
+          <span>{{ _('Format') }}</span>
+          <select id="detail-photo-combine-format" aria-label="{{ _('Format') }}">
+            <option value="png" selected>PNG</option>
+            <option value="jpeg">JPEG</option>
+          </select>
+        </label>
+      </div>
+      <p class="meta-line" id="detail-photo-combine-dims" aria-live="polite"></p>
+      <p class="hint err" id="detail-photo-combine-error" hidden role="alert"></p>
+      <div class="photo-combine-preview-wrap" id="detail-photo-combine-preview-wrap">
+        <img id="detail-photo-combine-preview" class="photo-combine-preview" alt="" hidden>
+        <p class="hint" id="detail-photo-combine-preview-hint">{{ _('Preview appears when at least two images are ready.') }}</p>
+      </div>
+      <div class="studio-export-progress" id="detail-photo-combine-progress" hidden>
+        <div class="studio-export-progress-bar" id="detail-photo-combine-progress-bar"></div>
+        <p class="meta-line" id="detail-photo-combine-progress-label"></p>
+      </div>
+      <div class="studio-export-actions">
+        <button type="button" class="button ghost" id="detail-photo-combine-cancel"
+                value="cancel">{{ _('Cancel') }}</button>
+        <button type="button" class="button" id="detail-photo-combine-export"
+                disabled>{{ _('Export combined image') }}</button>
+      </div>
+    </form>
+  </dialog>
   {% endif %}
 </section>
 {% endblock %}
@@ -762,6 +852,9 @@
   <script src="/static/js/detail-actions.js"></script>
   {% if item_exportable %}
   <script src="/static/js/detail-export.js"></script>
+  {% endif %}
+  {% if item.kind == 'photo' and item_exportable %}
+  <script src="/static/js/photo-combine.js"></script>
   {% endif %}
   <script src="/static/js/thumbs.js"></script>
   <script src="/static/js/player.js"></script>

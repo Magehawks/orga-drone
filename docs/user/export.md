@@ -27,3 +27,11 @@ re-encodes. An exact byte-copy happens only when the file looks free of location
 metadata (EXIF GPS and common XMP/GPS markers) and the chosen JPEG/PNG format
 matches the source. Unreadable metadata is treated as unsafe for copying.
 Re-encoded exports do not carry source location tags.
+
+## Combine images (detail Image tab)
+
+1. Open a photo → **Image** → **Combine images**.
+2. The current photo starts the list. **Add images** searches the library (photos only). Drag to reorder, or use the move buttons. The same file may appear more than once.
+3. Choose **Horizontal** or **Vertical**, spacing (default 0), background (white / black / transparent), and PNG or JPEG.
+4. Preview shows the layout. Export needs at least two images. Oversized combinations are refused with a clear next step (remove an image or reduce spacing).
+5. Save with the desktop dialog. Source files stay unchanged; saved Image-tab adjustments are **not** applied to the combine (library originals only). JPEG cannot use a transparent background.

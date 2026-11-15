@@ -199,6 +199,7 @@ Sharing is the final step of the journey.
 | Local file / folder | **Available now** (media on disk; spot GeoJSON download) |
 | Simple Studio MP4 export | **Available now** (local file; resolution and quality choice; optional music) |
 | One photo or video from its detail page | **Available now** (local file only; photos: Original / Print / Social / Custom with output width × height before export and an optional print-size PPI helper; videos: Best or social MP4 presets; nothing is uploaded or posted) |
+| Combine images (detail Image tab) | **Available now** (2…N library photos; horizontal or vertical; native sizes with cross-axis centering; optional spacing; PNG/JPEG; originals unchanged; resource limits refuse oversized compositions) |
 | Open video / Show in folder after Studio export | **Available now** (Windows desktop; also after a detail-page export) |
 | WhatsApp, Signal, LinkedIn, Reddit, YouTube, … | **Later** destinations after a local export exists |
 | itch.io Windows convenience build | **Later** (butler process documented for a Draft/Restricted test; no public paid launch; no in-app updater; ZIP copies do not auto-update) |
@@ -267,7 +268,8 @@ See `README.md` for the detailed feature status table. In short:
   picture. Info holds the date, drone, and the other file facts together with
   rating, tags, notes, albums, rename, and flow merge. Studio sits in Share.
   Photo Look & color (Studio Quick Looks, four basic sliders, show-original
-  compare) and Fine-tune tonals sit in Image with the Studio grade math. Export
+  compare) and Fine-tune tonals sit in Image with the Studio grade math, plus
+  **Combine images** for joining several library photos into one file. Export
   sits in its own tab (photo profiles or video presets, JPEG or PNG where
   supported, and the export action). The map, coordinates, and spot download sit in Location when
   GPS exists; without GPS that tab stays hidden. One panel at a time. A video

@@ -4448,6 +4448,100 @@ def create_app() -> FastAPI:
 
         return _begin_export_job(_work, translate)
 
+    @app.post("/api/photo-combine/inspect")
+    async def api_photo_combine_inspect(request: Request) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.photo_combine import inspect_combine, parse_combine_payload
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        translate = get_translator(lang_from_request(request))
+        try:
+            spec = parse_combine_payload(payload)
+            result = await asyncio.to_thread(inspect_combine, db, spec)
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+        return JSONResponse({"ok": True, **result})
+
+    from orga_drone.photo_combine import CombinePreviewCoordinator
+
+    photo_combine_preview_gate = CombinePreviewCoordinator()
+
+    @app.post("/api/photo-combine/preview")
+    async def api_photo_combine_preview(request: Request) -> Response:
+        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+        from orga_drone.photo_combine import parse_combine_payload, render_preview_png
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        translate = get_translator(lang_from_request(request))
+        try:
+            spec = parse_combine_payload(payload)
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+
+        my_seq, cancel_event = photo_combine_preview_gate.claim()
+        async with photo_combine_preview_gate.lock:
+            if not photo_combine_preview_gate.is_current(my_seq):
+                photo_combine_preview_gate.release(cancel_event)
+                return Response(status_code=409)
+            try:
+                data = await asyncio.to_thread(
+                    render_preview_png, db, spec, cancel_event=cancel_event
+                )
+            except ExportCancelled:
+                return Response(status_code=409)
+            except StudioExportError as exc:
+                raise _media_export_error(exc, translate) from exc
+            finally:
+                photo_combine_preview_gate.release(cancel_event)
+        return Response(content=data, media_type="image/png")
+
+    @app.post("/api/photo-combine/export")
+    async def api_photo_combine_export(request: Request) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.photo_combine import export_combine, parse_combine_payload
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        output_path = payload.get("output_path")
+        if not isinstance(output_path, str) or not output_path.strip():
+            raise HTTPException(status_code=400, detail="output_path is required")
+        translate = get_translator(lang_from_request(request))
+        try:
+            spec = parse_combine_payload(payload)
+            # Preflight (geometry + admission) before starting the job.
+            from orga_drone.photo_combine import inspect_combine
+
+            inspect = await asyncio.to_thread(inspect_combine, db, spec)
+            if not inspect.get("ok"):
+                detail = inspect.get("error") or "This combination is too large."
+                raise StudioExportError(str(detail))
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+
+        def _work(
+            on_progress: Callable[..., None],
+            cancel_event: threading.Event | None,
+        ) -> Path:
+            return export_combine(
+                db,
+                spec,
+                Path(output_path),
+                cancel_event=cancel_event,
+                on_progress=on_progress,
+            )
+
+        return _begin_export_job(_work, translate)
+
     def _export_action_flags() -> dict[str, bool]:
         from orga_drone.desktop import can_open_local_file, can_reveal_local_file
 
