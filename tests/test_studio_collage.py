@@ -486,3 +486,66 @@ def test_interrupted_collage_migration_is_restartable(tmp_path: Path) -> None:
     items = reopened.list_studio_items(project.id)
     assert len(items) == 1
     assert items[0].kind == "title_card"
+def test_http_collage_leaf_stream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PIL import Image
+
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    root = tmp_path / "lib"
+    root.mkdir()
+    photo = root / "leaf.png"
+    Image.new("RGB", (32, 24), (10, 20, 30)).save(photo)
+    root_id = db.add_root(root, label="lib")
+    media_id = db.upsert_media(
+        {
+            "root_id": root_id,
+            "primary_asset_id": None,
+            "kind": "photo",
+            "filename": "leaf.png",
+            "path": str(photo.resolve()),
+            "size_bytes": photo.stat().st_size,
+            "duration_s": None,
+            "recorded_at": "2024-06-01T12:00:00",
+            "sequence": None,
+            "mode": None,
+            "drone_model": None,
+            "camera_model": None,
+            "latitude": None,
+            "longitude": None,
+            "abs_alt": None,
+            "has_srt": 0,
+            "has_lrf": 0,
+            "track_json": None,
+        }
+    )
+    clip = db.add_studio_collage(project.id, preset="1+1")
+    leaf_id = iter_leaves(collage_spec_from_raw(clip.collage_spec)["root"])[0]["id"]
+    external = tmp_path / "ext.jpg"
+    Image.new("RGB", (16, 16), (1, 2, 3)).save(external)
+    with_media = assign_leaf_media(
+        collage_spec_from_raw(clip.collage_spec),
+        leaf_id,
+        {
+            "source": "external",
+            "path": str(external.resolve()),
+            "kind": "photo",
+            "display_name": "ext.jpg",
+        },
+    )
+    db.update_studio_collage(clip.id, collage_spec=with_media)
+    ok = client.get(f"/api/studio/{clip.id}/collage/leaves/{leaf_id}/stream")
+    assert ok.status_code == 200
+    assert ok.content[:8]  # bytes present
+    assert "ext.jpg" not in (ok.headers.get("content-disposition") or "")
+    missing = client.get(f"/api/studio/{clip.id}/collage/leaves/no-such/stream")
+    assert missing.status_code == 404
+    # Library path also works after reassignment
+    lib_spec = assign_leaf_media(
+        collage_spec_from_raw(db.list_studio_items(project.id)[0].collage_spec),
+        leaf_id,
+        {"source": "library", "media_id": media_id, "kind": "photo"},
+    )
+    db.update_studio_collage(clip.id, collage_spec=lib_spec)
+    lib = client.get(f"/api/studio/{clip.id}/collage/leaves/{leaf_id}/stream")
+    assert lib.status_code == 200

@@ -10,6 +10,7 @@ import {
   iterLeaves,
   resolveRects,
 } from "./collage-layout.js";
+import { createCollagePlayback } from "./collage-playback.js";
 
 /**
  * @param {object} opts
@@ -54,6 +55,7 @@ export function createCollageEditor(opts) {
   let saveChain = Promise.resolve();
   let libraryItems = [];
   let librarySelected = {};
+  const playback = createCollagePlayback({ stage });
 
   function clipForLeafAction() {
     const selected = opts.getSelectedClip?.();
@@ -261,6 +263,20 @@ export function createCollageEditor(opts) {
       });
       stage.appendChild(handle);
     }
+    playback.mount({
+      spec,
+      studioId: clip.dataset.studioId,
+      rects,
+      width,
+      height,
+      forceStill: false,
+    });
+    playback.sync({
+      localS: Number(opts.getCollageLocalS?.() || 0),
+      playing: Boolean(opts.isPlaying?.()),
+      seek: true,
+      spec,
+    });
   }
 
   function fillInspector(clip) {
@@ -761,6 +777,10 @@ export function createCollageEditor(opts) {
     fillInspector,
     hidePreview,
     renderPreview,
+    syncPlayback: (args) => playback.sync(args),
+    pausePlayback: () => playback.pause(),
+    teardownPlayback: () => playback.teardown(),
+    isPlaybackFallback: () => playback.isFallback(),
     parseSpec,
   };
 }

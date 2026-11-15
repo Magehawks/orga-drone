@@ -2344,6 +2344,63 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.get("/api/studio/{studio_item_id}/collage/leaves/{leaf_id}/stream")
+    async def api_studio_collage_leaf_stream(
+        studio_item_id: int,
+        leaf_id: str,
+    ) -> FileResponse:
+        """Stream one collage leaf file (library or external). Paths stay server-side."""
+        from orga_drone.media_files import resolve_media_file
+        from orga_drone.studio_collage import iter_leaves
+
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None or clip.item_kind != "collage" or not clip.collage_spec:
+            raise HTTPException(status_code=404, detail="Collage not found")
+        spec = collage_spec_from_raw(clip.collage_spec)
+        leaf = next(
+            (node for node in iter_leaves(spec["root"]) if str(node["id"]) == str(leaf_id)),
+            None,
+        )
+        if leaf is None:
+            raise HTTPException(status_code=404, detail="Collage cell not found")
+        media = leaf.get("media")
+        if not isinstance(media, dict):
+            raise HTTPException(status_code=404, detail="Collage cell has no media")
+        path: Path | None = None
+        if media.get("source") == "library":
+            media_id = media.get("media_id")
+            if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
+                raise HTTPException(status_code=404, detail="Collage media missing")
+            row = db.get_media(media_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="Collage media missing")
+            path = resolve_media_file(db, row)
+        elif media.get("source") == "external":
+            raw = str(media.get("path") or "").strip()
+            if not raw:
+                raise HTTPException(status_code=404, detail="Collage media missing")
+            try:
+                path = Path(raw).expanduser().resolve(strict=True)
+            except OSError as exc:
+                raise HTTPException(status_code=404, detail="Collage media missing") from exc
+            suffix = path.suffix.lower()
+            kind = str(media.get("kind") or "").lower()
+            photo_ok = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".dng"}
+            video_ok = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"}
+            if kind == "photo" and suffix not in photo_ok:
+                raise HTTPException(status_code=404, detail="Collage media missing")
+            if kind == "video" and suffix not in video_ok:
+                raise HTTPException(status_code=404, detail="Collage media missing")
+        if path is None or not path.is_file():
+            raise HTTPException(status_code=404, detail="Collage media missing")
+        return file_response(path)
+
     @app.patch("/api/studio/{studio_item_id}/title-card")
     async def api_studio_patch_title_card(
         studio_item_id: int,

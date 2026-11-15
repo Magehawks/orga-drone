@@ -71,6 +71,7 @@ import {
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { createCollageEditor } from "./studio/collage-editor.js";
+import { createCollagePlayback } from "./studio/collage-playback.js";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
@@ -3170,6 +3171,7 @@ import {
     clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
+    collageEditor?.pausePlayback?.();
     // The video paint clock can pass the last transition update before pause.
     // Freeze photo composites at the stopped Story time, including overlap exit.
     if ((previewImage && !previewImage.hidden) || (previewImageB && !previewImageB.hidden)) {
@@ -7687,6 +7689,15 @@ import {
     } else {
       applyTransitionPreview(after);
     }
+    if (after.clip && after.clip.dataset.kind === "collage") {
+      const spec = collageEditor?.parseSpec?.(after.clip);
+      collageEditor?.syncPlayback?.({
+        localS: after.localS || 0,
+        playing: true,
+        seek: false,
+        spec,
+      });
+    }
     syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
   }
@@ -11707,6 +11718,14 @@ import {
     onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
     showInspector,
     showFlash: showRootFlash,
+    isPlaying: () => Boolean(state.playing),
+    getCollageLocalS: () => {
+      const hit = resolveAt(state.projectTimeS);
+      if (hit && hit.clip && hit.clip.dataset.kind === "collage") {
+        return hit.localS || 0;
+      }
+      return 0;
+    },
     onSpecApplied: () => {
       layoutTimeline();
       updatePlayheadChrome();
