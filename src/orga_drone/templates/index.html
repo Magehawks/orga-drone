@@ -170,15 +170,39 @@
     {{ _('Added %(added)s to Studio (%(skipped)s already there).')|format(added=(flash_added or 0), skipped=(flash_skipped or 0)) }}
   </div>
 {% endif %}
+{% if flash_msg == 'studio_choose_project' %}
+  <div class="flash" role="status">
+    {{ _('Choose a Studio project for the selected media.') }}
+  </div>
+{% endif %}
 
 {% if items %}
 <form id="browse-bulk-studio" method="post" action="/studio/add-bulk" class="browse-bulk-bar">
   <input type="hidden" name="return_to" value="/browse?{{ browse_qs }}">
+  <input type="hidden" name="project_mode" id="browse-bulk-project-mode" value="">
+  <input type="hidden" name="project_id" id="browse-bulk-project-id" value="">
+  <input type="hidden" name="project_title" id="browse-bulk-project-title" value="">
+  <input type="hidden" name="open_studio" id="browse-bulk-open-studio" value="">
   <button type="submit" class="button" id="browse-bulk-submit" disabled>
-    {{ _('Add selected to Studio') }}
+    {{ _('Edit in Studio') }}
   </button>
   <span class="browse-bulk-hint muted" id="browse-bulk-count" hidden></span>
 </form>
+<dialog id="browse-studio-project-dialog" class="browse-studio-project-dialog" aria-labelledby="browse-studio-project-title">
+  <form method="dialog" class="browse-studio-project-panel">
+    <h2 id="browse-studio-project-title">{{ _('Edit in Studio') }}</h2>
+    <p class="muted">{{ _('Add the selected media to a new or existing project.') }}</p>
+    <label class="browse-studio-project-label" for="browse-studio-new-title">{{ _('New project name') }}</label>
+    <input type="text" id="browse-studio-new-title" maxlength="120" value="{{ _('Your story') }}">
+    <div class="browse-studio-project-actions">
+      <button type="button" class="button" id="browse-studio-new" value="new">{{ _('New project') }}</button>
+      <button type="button" class="button secondary" id="browse-studio-cancel" value="cancel">{{ _('Cancel') }}</button>
+    </div>
+    <h3>{{ _('Existing project') }}</h3>
+    <ul id="browse-studio-project-list" class="browse-studio-project-list"></ul>
+    <p class="muted" id="browse-studio-project-empty" hidden>{{ _('No Studio projects yet.') }}</p>
+  </form>
+</dialog>
 {% endif %}
 
 {% if not items %}
