@@ -15,7 +15,6 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from orga_drone.config import settings
 from orga_drone.db import Database
 from orga_drone.export.studio_encoder import (
     ExportCancelled,
@@ -242,6 +241,8 @@ def _render_graded_or_video_rgba(
         else ColorWheels()
     )
     from orga_drone.studio_managed_apply import grade_is_managed_sdr
+
+    from orga_drone.config import settings
 
     managed = bool(effect_settings and grade_is_managed_sdr(effect_settings))
     req = PreviewFrameRequest(
