@@ -779,22 +779,23 @@
           data-msg-move-earlier="{{ _('Move earlier')|e }}"
           data-msg-move-later="{{ _('Move later')|e }}"
           data-msg-position="{{ _('Position {n}')|e }}"
+          data-msg-picker-unavailable="{{ _('Desktop file picker is unavailable. Start Orga Drone as a desktop app.')|e }}"
+          data-msg-unreadable="{{ _('One selected file could not be read. Choose another photo.')|e }}"
+          data-msg-library-empty="{{ _('No photos in the library yet.')|e }}"
+          data-msg-select-library="{{ _('Select at least one photo.')|e }}"
           data-default-filename="{{ _('combined')|e }}">
     <form method="dialog" class="studio-export-form photo-combine-form" id="detail-photo-combine-form">
       <h2 id="detail-photo-combine-title">{{ _('Combine images') }}</h2>
-      <p class="hint">{{ _('Uses the original library files without saved adjustments. Source files stay unchanged.') }}</p>
+      <p class="hint">{{ _('Uses the original files without saved adjustments. Source files stay unchanged.') }}</p>
       <div class="photo-combine-list-wrap">
         <ol class="photo-combine-list" id="detail-photo-combine-list" aria-label="{{ _('Images to combine') }}"></ol>
       </div>
       <div class="photo-combine-add-row">
-        <label class="studio-inspector-field photo-combine-search-field" for="detail-photo-combine-search">
-          <span>{{ _('Add images') }}</span>
-          <input type="search" id="detail-photo-combine-search" autocomplete="off"
-                 placeholder="{{ _('Search library photos') }}"
-                 aria-label="{{ _('Search library photos') }}">
-        </label>
-        <ul class="photo-combine-search-results" id="detail-photo-combine-search-results"
-            aria-label="{{ _('Search results') }}" hidden></ul>
+        <span class="photo-combine-add-label">{{ _('Add images') }}</span>
+        <div class="photo-combine-add-actions">
+          <button type="button" class="button" id="detail-photo-combine-from-library">{{ _('From library') }}</button>
+          <button type="button" class="button ghost" id="detail-photo-combine-from-computer">{{ _('From this computer') }}</button>
+        </div>
       </div>
       <div class="studio-export-pair">
         <label class="studio-inspector-field" for="detail-photo-combine-layout">
@@ -842,6 +843,27 @@
                 value="cancel">{{ _('Cancel') }}</button>
         <button type="button" class="button" id="detail-photo-combine-export"
                 disabled>{{ _('Export combined image') }}</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="studio-export-dialog photo-combine-library-dialog" id="detail-photo-combine-library-dialog"
+          aria-labelledby="detail-photo-combine-library-title">
+    <form method="dialog" class="studio-export-form photo-combine-library-form" id="detail-photo-combine-library-form">
+      <h2 id="detail-photo-combine-library-title">{{ _('From library') }}</h2>
+      <p class="hint">{{ _('Select one or more library photos to add.') }}</p>
+      <label class="studio-inspector-field" for="detail-photo-combine-library-filter">
+        <span>{{ _('Filter photos') }}</span>
+        <input type="search" id="detail-photo-combine-library-filter" autocomplete="off"
+               placeholder="{{ _('Filter by filename') }}"
+               aria-label="{{ _('Filter photos') }}">
+      </label>
+      <div class="photo-combine-picker-grid" id="detail-photo-combine-library-grid"
+           role="listbox" aria-multiselectable="true" aria-label="{{ _('Library photos') }}"></div>
+      <p class="hint" id="detail-photo-combine-library-empty" hidden></p>
+      <div class="studio-export-actions">
+        <button type="button" class="button ghost" id="detail-photo-combine-library-cancel">{{ _('Cancel') }}</button>
+        <button type="button" class="button" id="detail-photo-combine-library-add"
+                disabled>{{ _('Add selected') }}</button>
       </div>
     </form>
   </dialog>

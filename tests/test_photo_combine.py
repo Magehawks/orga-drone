@@ -417,6 +417,77 @@ def test_render_preview_respects_cancel(
         render_preview_png(db, _spec(*ids), cancel_event=cancel)
 
 
+def test_external_and_library_sources_combine(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    root = tmp_path / "media"
+    lib = root / "lib.png"
+    outside = tmp_path / "outside" / "desk.jpg"
+    _rgb(lib, (40, 30), (200, 10, 10))
+    _rgb(outside, (20, 30), (10, 200, 10), fmt="JPEG")
+    mid = _add_photo(db, root, "lib.png", lib)
+    with db.connect() as conn:
+        before_count = int(conn.execute("SELECT COUNT(*) AS n FROM media").fetchone()["n"])
+    originals = {lib: lib.read_bytes(), outside: outside.read_bytes()}
+
+    payload = parse_combine_payload(
+        {
+            "entries": [
+                {"entry_id": "e1", "media_id": mid},
+                {"entry_id": "e2", "source_path": str(outside)},
+                {"entry_id": "e3", "source_path": str(outside)},
+            ],
+            "layout": "horizontal",
+            "spacing": 0,
+            "background": "white",
+            "format": "png",
+        }
+    )
+    sources = inspect_sources(db, payload)
+    assert len(sources) == 3
+    assert sources[0].external is False
+    assert sources[1].external is True
+    assert sources[2].path == sources[1].path
+
+    out = export_combine(db, payload, tmp_path / "mixed.png")
+    with Image.open(out) as img:
+        assert img.size == (80, 30)
+    assert lib.read_bytes() == originals[lib]
+    assert outside.read_bytes() == originals[outside]
+    with db.connect() as conn:
+        after_count = int(conn.execute("SELECT COUNT(*) AS n FROM media").fetchone()["n"])
+    assert after_count == before_count
+
+
+def test_reject_unsupported_external_type(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    root = tmp_path / "media"
+    a = root / "a.png"
+    bad = tmp_path / "note.txt"
+    _rgb(a, (20, 20), (1, 2, 3))
+    bad.write_text("nope", encoding="utf-8")
+    mid = _add_photo(db, root, "a.png", a)
+    spec = parse_combine_payload(
+        {
+            "entries": [
+                {"entry_id": "e1", "media_id": mid},
+                {"entry_id": "e2", "source_path": str(bad)},
+            ],
+            "layout": "horizontal",
+            "spacing": 0,
+            "background": "white",
+            "format": "png",
+        }
+    )
+    with pytest.raises(StudioExportError, match="not supported"):
+        inspect_sources(db, spec)
+
+
 def test_detail_page_shows_combine_entry(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -440,6 +511,12 @@ def test_detail_page_shows_combine_entry(
     assert 'id="detail-photo-combine-open"' in text
     assert "Combine images" in text
     assert 'id="detail-photo-combine-dialog"' in text
+    assert 'id="detail-photo-combine-from-library"' in text
+    assert 'id="detail-photo-combine-from-computer"' in text
+    assert 'id="detail-photo-combine-library-dialog"' in text
+    assert 'id="detail-photo-combine-search"' not in text
+    assert "From library" in text
+    assert "From this computer" in text
     assert "/static/js/photo-combine.js" in text
     image = text.split('id="detail-panel-image"', 1)[1].split('id="detail-panel-export"', 1)[0]
     assert 'id="detail-photo-combine-open"' in image
@@ -447,3 +524,5 @@ def test_detail_page_shows_combine_entry(
 
     german = client.get(f"/media/{mid}", cookies={"lang": "de"})
     assert "Fotos zusammenfügen" in german.text
+    assert "Aus der Mediathek" in german.text
+    assert "Von diesem Computer" in german.text

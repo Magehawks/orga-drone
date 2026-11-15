@@ -5225,7 +5225,7 @@ def create_app() -> FastAPI:
     @app.post("/api/desktop/pick-open-file")
     async def pick_open_file_dialog(request: Request) -> JSONResponse:
         """Open a native file-open dialog (pywebview desktop shell only)."""
-        from orga_drone.desktop import OpenFilePickerError, pick_open_file
+        from orga_drone.desktop import OpenFilePickerError, pick_open_file, pick_open_files
 
         try:
             payload = await request.json()
@@ -5234,6 +5234,7 @@ def create_app() -> FastAPI:
         if not isinstance(payload, dict):
             payload = {}
         directory = payload.get("directory") if isinstance(payload.get("directory"), str) else ""
+        allow_multiple = bool(payload.get("allow_multiple"))
         file_types_raw = payload.get("file_types")
         file_types: tuple[str, ...] | None = None
         if isinstance(file_types_raw, list) and file_types_raw:
@@ -5243,10 +5244,14 @@ def create_app() -> FastAPI:
             if cleaned:
                 file_types = cleaned
         try:
-            if file_types is None:
-                path = pick_open_file(directory=directory or "")
+            kwargs: dict[str, Any] = {"directory": directory or ""}
+            if file_types is not None:
+                kwargs["file_types"] = file_types
+            if allow_multiple:
+                paths = pick_open_files(allow_multiple=True, **kwargs)
             else:
-                path = pick_open_file(directory=directory or "", file_types=file_types)
+                path = pick_open_file(**kwargs)
+                paths = [path] if path else None
         except OpenFilePickerError:
             return JSONResponse(
                 {
@@ -5255,9 +5260,11 @@ def create_app() -> FastAPI:
                 },
                 status_code=503,
             )
-        if path is None:
+        if not paths:
             return JSONResponse({"status": "cancelled"})
-        return JSONResponse({"status": "ok", "path": path})
+        if allow_multiple:
+            return JSONResponse({"status": "ok", "paths": paths, "path": paths[0]})
+        return JSONResponse({"status": "ok", "path": paths[0]})
 
     @app.post("/library/add")
     async def library_add(path: str = Form(...), label: str = Form("")) -> RedirectResponse:
