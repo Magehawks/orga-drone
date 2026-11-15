@@ -98,16 +98,30 @@ export function leafNeedsFramedStill(media) {
   return false;
 }
 
+const BROWSER_PHOTO_RE = /\.(jpe?g|png|webp|gif|bmp)$/i;
+const NEEDS_DECODE_PHOTO_RE = /\.(heic|heif|dng|tif|tiff)$/i;
+
 /**
- * Identity-only library photos may be HEIC/HEIF/DNG; browsers cannot decode the
- * raw leaf stream. Prefer composed stills instead of assigning undecodable src.
+ * Photos that WebView2 cannot show from the raw leaf stream (HEIC/HEIF/DNG/TIFF,
+ * identity-only library refs, or external photos without a browser-safe name).
+ * Prefer composed stills instead of assigning undecodable src.
  * @param {any} media
  */
 export function leafNeedsDecodedStill(media) {
-  if (!media || media.source !== "library") return false;
-  if (media.media_id) return false;
-  if (!media.identity_key) return false;
-  return String(media.kind || "").toLowerCase() !== "video";
+  if (!media) return false;
+  if (String(media.kind || "").toLowerCase() === "video") return false;
+  if (media.source === "library") {
+    if (media.media_id) return false;
+    return Boolean(media.identity_key);
+  }
+  if (media.source === "external") {
+    const name = String(media.display_name || "");
+    if (NEEDS_DECODE_PHOTO_RE.test(name)) return true;
+    if (name && BROWSER_PHOTO_RE.test(name)) return false;
+    /* Unknown or missing extension: do not risk an undecodable live <img>. */
+    return true;
+  }
+  return false;
 }
 
 /**

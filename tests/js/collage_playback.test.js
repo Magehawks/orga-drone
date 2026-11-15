@@ -5,6 +5,7 @@ import {
   MAX_CONCURRENT_COLLAGE_VIDEOS,
   countVideoLeaves,
   leafMediaUrl,
+  leafNeedsDecodedStill,
   leafNeedsFramedStill,
   leafSourceTime,
   shouldUseStillFallback,
@@ -64,6 +65,31 @@ describe("collage-playback timing", () => {
           media: { source: "library", media_id: 1, kind: "photo", zoom: 1.2 },
         },
       }),
+      true
+    );
+  });
+
+  it("forces decoded stills for HEIC and identity-only photos", () => {
+    assert.equal(
+      leafNeedsDecodedStill({
+        source: "external",
+        kind: "photo",
+        display_name: "drone.HEIC",
+        has_path: true,
+      }),
+      true
+    );
+    assert.equal(
+      leafNeedsDecodedStill({
+        source: "external",
+        kind: "photo",
+        display_name: "shot.jpg",
+        has_path: true,
+      }),
+      false
+    );
+    assert.equal(
+      leafNeedsDecodedStill({ source: "library", identity_key: "x", kind: "photo" }),
       true
     );
   });
