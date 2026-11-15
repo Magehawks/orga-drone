@@ -9,8 +9,8 @@ Does not replace PO testing on real DJI media (#283).
 | --- | --- | --- |
 | Multi-select → new project → clips present | `test_browse_multiselect_new_project_opens_with_clips` | PASS (local) |
 | Empty start panel + seeded collage leaves | `test_browse_seed_collage_and_empty_start_panel` | PASS (local) |
-| Hold last frame clock contract | `test_hold_last_frame_helper_matches_export_clock` (+ `tests/js/collage_playback.test.js`) | PASS (local) |
-| Per-leaf grade → PNG/JPEG still + MP4 Story with trailing clip | `test_per_leaf_grade_still_and_story_with_following_clip` | PASS (local) |
+| Hold last frame production clamp | `test_hold_last_frame_uses_production_clamp` (`_clamp_video_source_time`) | PASS (local) |
+| Per-leaf grade → PNG/JPEG still + decoded MP4 (duration + trailing green) | `test_per_leaf_grade_still_and_story_with_following_clip` | PASS (local) |
 | Mixed photo/video collage + missing media still render | `test_mixed_photo_video_collage_and_missing_media` | PASS (local) |
 | Incomplete existing-project choice fails closed | `test_bulk_add_cancel_without_project_id_fails_closed` | PASS (local) |
 

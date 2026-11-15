@@ -6,6 +6,7 @@ WebView2 / packaged E2E: NOT_RUN (see docs/discovery/470-creator-journey-evidenc
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -212,24 +213,23 @@ def test_browse_seed_collage_and_empty_start_panel(
     assert 'id="studio-empty-start"' not in studio.text or 'hidden' in studio.text
 
 
-def test_hold_last_frame_helper_matches_export_clock() -> None:
-    """3. Hold-last-frame agreement (mirrors collage-playback.js / WP5)."""
+def test_hold_last_frame_uses_production_clamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """3. Hold-last-frame uses studio_collage_still production clamp."""
+    from orga_drone.studio_collage_still import _clamp_video_source_time
 
-    def leaf_source_time(
-        local_s: float, start_offset_s: float, duration_s: float | None
-    ) -> dict[str, float | bool]:
-        t = float(start_offset_s) + max(0.0, float(local_s))
-        if duration_s is None:
-            return {"t": t, "hold": False}
-        end = float(duration_s)
-        if t >= end:
-            return {"t": end, "hold": True}
-        return {"t": t, "hold": False}
-
-    # Same vectors as tests/js/collage_playback.test.js
-    assert leaf_source_time(1.5, 2.0, 10) == {"t": 3.5, "hold": False}
-    assert leaf_source_time(9, 2.0, 10) == {"t": 10, "hold": True}
-    assert leaf_source_time(0, 0, None) == {"t": 0, "hold": False}
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    root = tmp_path / "media"
+    video = _mp4(root / "short.mp4", duration_s=0.5, color="0xff0000")
+    mid = _add_media(db, root, video, kind="video", duration_s=0.5)
+    media = {"source": "library", "media_id": mid, "kind": "video"}
+    # Past EOF must clamp near the last decodable frame (duration - 0.05).
+    held = _clamp_video_source_time(db, media, video, source_time=5.0)
+    assert held == pytest.approx(0.45, abs=0.02)
+    early = _clamp_video_source_time(db, media, video, source_time=0.1)
+    assert early == pytest.approx(0.1, abs=0.01)
 
 
 def test_per_leaf_grade_still_and_story_with_following_clip(
@@ -329,6 +329,47 @@ def test_per_leaf_grade_still_and_story_with_following_clip(
     )
     assert published_mp4.is_file()
     assert published_mp4.stat().st_size > 1000
+    ffmpeg = find_ffmpeg()
+    assert ffmpeg
+    info = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(published_mp4)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        **subprocess_no_window_kwargs(),
+    )
+    duration = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", info.stderr)
+    assert duration is not None, info.stderr
+    hours, minutes, seconds = map(float, duration.groups())
+    total_s = hours * 3600 + minutes * 60 + seconds
+    # 1s collage + default 3s photo trailing clip.
+    assert total_s == pytest.approx(4.0, abs=0.25)
+    decoded = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            str(published_mp4),
+            "-vf",
+            "fps=1,scale=2:2",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-",
+        ],
+        capture_output=True,
+        timeout=60,
+        **subprocess_no_window_kwargs(),
+    )
+    assert decoded.returncode == 0, decoded.stderr
+    pixels = list(zip(*[iter(decoded.stdout)] * 3))
+    # 2x2 samples per second → 4 samples/sec; expect ~4s.
+    assert len(pixels) >= 12
+    # Trailing green photo occupies the last second; mean of last 4 samples.
+    last = pixels[-4:]
+    assert all(g > r + 40 and g > b + 40 for r, g, b in last)
     assert a.is_file() and b.is_file() and c.is_file()
 
 
