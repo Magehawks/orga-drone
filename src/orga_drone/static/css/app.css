@@ -2501,6 +2501,21 @@ video.studio-preview-media.studio-preview-layer-b {
   pointer-events: none;
   z-index: 0;
 }
+.studio-preview-collage.is-paused .studio-collage-composed {
+  /* Below cell controls (z-index 1+) so labels and selection stay visible. */
+  z-index: 0;
+}
+.studio-collage-play-media {
+  position: absolute;
+  inset: auto;
+  z-index: 0;
+  pointer-events: none;
+  object-fit: cover;
+  background: #000;
+}
+.studio-collage-play-media.studio-collage-play-composed {
+  z-index: 0;
+}
 .studio-collage-cell {
   position: absolute;
   margin: 0;
@@ -2530,6 +2545,12 @@ video.studio-preview-media.studio-preview-layer-b {
   object-fit: cover;
   opacity: 0.55;
   pointer-events: none;
+}
+.studio-preview-collage.has-play-media .studio-collage-cell img {
+  opacity: 0;
+}
+.studio-preview-collage.has-play-media .studio-collage-cell span {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
 .studio-collage-cell span {
   position: relative;

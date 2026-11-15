@@ -71,6 +71,7 @@ import {
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
 import { createCollageEditor } from "./studio/collage-editor.js";
+import { createCollagePlayback } from "./studio/collage-playback.js";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
@@ -3170,6 +3171,9 @@ import {
     clearCrossfadePreload();
     pauseMusicAudio();
     if (clipAudio) clipAudio.pause();
+    if (typeof collageEditor !== "undefined" && collageEditor) {
+      collageEditor.pausePlayback?.();
+    }
     // The video paint clock can pass the last transition update before pause.
     // Freeze photo composites at the stopped Story time, including overlap exit.
     if ((previewImage && !previewImage.hidden) || (previewImageB && !previewImageB.hidden)) {
@@ -6743,7 +6747,7 @@ import {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
-    collageEditor?.hidePreview();
+    (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
     hideOverlayLayers();
     hideAnnotations();
     hidePrivacyMasks();
@@ -6765,7 +6769,7 @@ import {
     if (!previewImage) return;
     clearVideoElement();
     hideTitlecard();
-    collageEditor?.hidePreview();
+    (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewImage.hidden = false;
     if (!src) {
@@ -6828,7 +6832,7 @@ import {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
     hideTitlecard();
-    collageEditor?.hidePreview();
+    (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
@@ -6899,7 +6903,7 @@ import {
     if (!previewTitlecard) return;
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
-    collageEditor?.hidePreview();
+    (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     setPreviewLoading(false);
     const bg = clip.dataset.background || "dark";
@@ -6921,7 +6925,7 @@ import {
     hideTitlecard();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     setPreviewLoading(false);
-    collageEditor?.renderPreview(clip);
+    (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.renderPreview(clip) : undefined);
   }
 
   function fillTitlecardEl(el, titleEl, subEl, clip) {
@@ -7686,6 +7690,20 @@ import {
       reconcileSeekSamplePreview(after, nowMs);
     } else {
       applyTransitionPreview(after);
+    }
+    if (
+      after.clip &&
+      after.clip.dataset.kind === "collage" &&
+      typeof collageEditor !== "undefined" &&
+      collageEditor
+    ) {
+      const spec = collageEditor.parseSpec?.(after.clip);
+      collageEditor.syncPlayback?.({
+        localS: after.localS || 0,
+        playing: true,
+        seek: false,
+        spec,
+      });
     }
     syncMusicAudio();
     wallClockRaf = requestAnimationFrame(wallClockTick);
@@ -9112,10 +9130,10 @@ import {
       syncColorScopesView();
     } else if (kind === "collage") {
       setInspectorHeading(kindLabels.collage);
-      collageEditor?.fillInspector(clip);
+      (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.fillInspector(clip) : undefined);
       syncColorScopesView();
     } else {
-      collageEditor?.hidePreview();
+      (typeof collageEditor !== "undefined" && collageEditor ? collageEditor.hidePreview() : undefined);
       showInspector("inspector-clip");
       setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
       const panel = document.getElementById("inspector-clip");
@@ -11707,6 +11725,14 @@ import {
     onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
     showInspector,
     showFlash: showRootFlash,
+    isPlaying: () => Boolean(state.playing),
+    getCollageLocalS: () => {
+      const hit = resolveAt(state.projectTimeS);
+      if (hit && hit.clip && hit.clip.dataset.kind === "collage") {
+        return hit.localS || 0;
+      }
+      return 0;
+    },
     onSpecApplied: () => {
       layoutTimeline();
       updatePlayheadChrome();

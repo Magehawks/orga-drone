@@ -341,6 +341,101 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
         raise
 
 
+_video_duration_cache: dict[str, float | None] = {}
+
+
+def _probe_video_duration_s(path: Path) -> float | None:
+    """Best-effort media duration for hold-last-frame clamps."""
+    key = str(path)
+    if key in _video_duration_cache:
+        return _video_duration_cache[key]
+    duration: float | None = None
+    try:
+        from orga_drone.ffmpeg_bin import find_ffprobe, subprocess_no_window_kwargs
+        import json as _json
+        import subprocess
+
+        ffprobe = find_ffprobe()
+        if ffprobe:
+            proc = subprocess.run(
+                [
+                    ffprobe,
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "json",
+                    str(path),
+                ],
+                check=False,
+                capture_output=True,
+                timeout=8,
+                **subprocess_no_window_kwargs(),
+            )
+            if proc.returncode == 0 and proc.stdout:
+                data = _json.loads(proc.stdout.decode("utf-8", errors="replace"))
+                raw = (data.get("format") or {}).get("duration")
+                if raw is not None:
+                    duration = max(0.0, float(raw))
+    except Exception:
+        duration = None
+    _video_duration_cache[key] = duration
+    return duration
+
+
+def _library_media_duration_s(db: Database, media: dict[str, Any]) -> float | None:
+    media_id = media.get("media_id")
+    row = None
+    if isinstance(media_id, int) and not isinstance(media_id, bool) and media_id > 0:
+        row = db.get_media(media_id)
+    if row is None:
+        identity = str(media.get("identity_key") or "").strip()
+        if identity:
+            with db.connect() as conn:
+                found = conn.execute(
+                    """
+                    SELECT m.id
+                    FROM media m
+                    JOIN media_meta mm ON mm.media_path = m.path
+                    WHERE mm.identity_key = ?
+                    LIMIT 1
+                    """,
+                    (identity,),
+                ).fetchone()
+            if found is not None:
+                row = db.get_media(int(found["id"]))
+    if row is None:
+        return None
+    raw = getattr(row, "duration_s", None)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _clamp_video_source_time(
+    db: Database,
+    media: dict[str, Any],
+    path: Path,
+    source_time: float,
+) -> float:
+    """Hold the last decodable frame when collage time outruns the leaf video."""
+    duration = None
+    if media.get("source") == "library":
+        duration = _library_media_duration_s(db, media)
+    if duration is None:
+        duration = _probe_video_duration_s(path)
+    if duration is None or duration <= 0:
+        return max(0.0, float(source_time))
+    # Keep a small epsilon before EOF so ffmpeg -ss still returns a frame.
+    hold_at = max(0.0, float(duration) - 0.05)
+    return min(max(0.0, float(source_time)), hold_at)
+
+
 def _leaf_rgba(
     db: Database,
     leaf: dict[str, Any],
@@ -364,16 +459,33 @@ def _leaf_rgba(
     effect_settings = _grade_payload(media)
     start_offset = float(media.get("start_offset_s") or 0.0)
     source_time = start_offset + max(0.0, float(t_s))
+    if kind == "video":
+        source_time = _clamp_video_source_time(db, media, path, source_time)
     needs_preview = kind == "video" or _grade_needs_still(effect_settings)
 
     if needs_preview:
-        tile = _render_graded_or_video_rgba(
-            path,
-            kind=kind,
-            source_time_s=source_time,
-            effect_settings=effect_settings,
-            max_edge=max(long_edge, max(rect_w, rect_h)),
-        )
+        try:
+            tile = _render_graded_or_video_rgba(
+                path,
+                kind=kind,
+                source_time_s=source_time,
+                effect_settings=effect_settings,
+                max_edge=max(long_edge, max(rect_w, rect_h)),
+            )
+        except StudioExportError:
+            if kind != "video" or source_time <= 0:
+                return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
+            # Last-resort hold: retry near the start rather than aborting the collage.
+            try:
+                tile = _render_graded_or_video_rgba(
+                    path,
+                    kind=kind,
+                    source_time_s=0.0,
+                    effect_settings=effect_settings,
+                    max_edge=max(long_edge, max(rect_w, rect_h)),
+                )
+            except StudioExportError:
+                return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
         # Preview-frame grades through JPEG and loses photo alpha. Restore the
         # source alpha channel so transparent PNGs stay transparent after grade.
         if kind == "photo":

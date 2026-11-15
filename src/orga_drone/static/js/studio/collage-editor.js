@@ -10,6 +10,7 @@ import {
   iterLeaves,
   resolveRects,
 } from "./collage-layout.js";
+import { createCollagePlayback } from "./collage-playback.js";
 
 /**
  * @param {object} opts
@@ -64,6 +65,7 @@ export function createCollageEditor(opts) {
   let saveChain = Promise.resolve();
   let libraryItems = [];
   let librarySelected = {};
+  const playback = createCollagePlayback({ stage });
 
   function clipForLeafAction() {
     const selected = opts.getSelectedClip?.();
@@ -185,11 +187,14 @@ export function createCollageEditor(opts) {
     }
   }
 
-  function scheduleComposedPreview(clip) {
+  function scheduleComposedPreview(clip, tS = null) {
     if (!composedImg || !isCollage(clip)) return;
     const studioId = String(clip.dataset.studioId || "");
     if (!studioId) return;
+    /* Paused scrub ownership lives in collage-playback.sync → updateComposedStill. */
+    if (!opts.isPlaying?.()) return;
     if (composedTimer) clearTimeout(composedTimer);
+    const requestTs = tS == null ? Number(opts.getCollageLocalS?.() || 0) : Number(tS) || 0;
     composedTimer = setTimeout(async () => {
       composedTimer = null;
       const seq = ++composedSeq;
@@ -197,7 +202,7 @@ export function createCollageEditor(opts) {
         const res = await fetchImpl(`/api/studio/${encodeURIComponent(studioId)}/collage/preview`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ t_s: 0 }),
+          body: JSON.stringify({ t_s: requestTs }),
         });
         if (seq !== composedSeq) return;
         if (res.status === 409) return;
@@ -211,6 +216,8 @@ export function createCollageEditor(opts) {
         composedObjectUrl = URL.createObjectURL(blob);
         composedImg.src = composedObjectUrl;
         composedImg.hidden = false;
+        /* Below cell controls so selection labels stay visible. */
+        composedImg.style.zIndex = "0";
         stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
           img.style.opacity = "0";
         });
@@ -327,6 +334,23 @@ export function createCollageEditor(opts) {
       });
       stage.appendChild(handle);
     }
+    const playing = Boolean(opts.isPlaying?.());
+    playback.mount({
+      spec,
+      studioId: clip.dataset.studioId,
+      rects,
+      width,
+      height,
+      forceStill: false,
+    });
+    preview?.classList.toggle("has-play-media", true);
+    preview?.classList.toggle("is-paused", !playing);
+    playback.sync({
+      localS: Number(opts.getCollageLocalS?.() || 0),
+      playing,
+      seek: true,
+      spec,
+    });
     scheduleComposedPreview(clip);
   }
 
@@ -757,6 +781,8 @@ export function createCollageEditor(opts) {
   }
 
   function hidePreview() {
+    playback.teardown();
+    preview?.classList.remove("has-play-media");
     if (preview) preview.hidden = true;
     if (stage) stage.replaceChildren();
     selectedLeafId = null;
@@ -952,6 +978,21 @@ export function createCollageEditor(opts) {
     fillInspector,
     hidePreview,
     renderPreview,
+    syncPlayback: (args) => playback.sync(args),
+    pausePlayback: () => {
+      playback.pause();
+      const clip = opts.getSelectedClip?.();
+      const spec = clip && isCollage(clip) ? parseSpec(clip) : null;
+      playback.sync({
+        localS: Number(opts.getCollageLocalS?.() || 0),
+        playing: false,
+        seek: true,
+        spec,
+      });
+      preview?.classList.toggle("is-paused", true);
+    },
+    teardownPlayback: () => playback.teardown(),
+    isPlaybackFallback: () => playback.isFallback(),
     parseSpec,
   };
 }

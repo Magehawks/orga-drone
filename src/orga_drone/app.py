@@ -2344,6 +2344,39 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.get("/api/studio/{studio_item_id}/collage/leaves/{leaf_id}/stream")
+    async def api_studio_collage_leaf_stream(
+        studio_item_id: int,
+        leaf_id: str,
+    ) -> FileResponse:
+        """Stream one collage leaf file (library or external). Paths stay server-side."""
+        from orga_drone.studio_collage import iter_leaves
+        from orga_drone.studio_collage_still import resolve_leaf_source
+
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None or clip.item_kind != "collage" or not clip.collage_spec:
+            raise HTTPException(status_code=404, detail="Collage not found")
+        spec = collage_spec_from_raw(clip.collage_spec)
+        leaf = next(
+            (node for node in iter_leaves(spec["root"]) if str(node["id"]) == str(leaf_id)),
+            None,
+        )
+        if leaf is None:
+            raise HTTPException(status_code=404, detail="Collage cell not found")
+        media = leaf.get("media")
+        if not isinstance(media, dict):
+            raise HTTPException(status_code=404, detail="Collage cell has no media")
+        path = resolve_leaf_source(db, media)
+        if path is None or not path.is_file():
+            raise HTTPException(status_code=404, detail="Collage media missing")
+        return file_response(path)
+
     from orga_drone.studio_collage_still import CollageStillPreviewCoordinator
 
     collage_still_preview_gate = CollageStillPreviewCoordinator()
@@ -2475,6 +2508,7 @@ def create_app() -> FastAPI:
             )
 
         return _begin_export_job(_work, translate)
+
 
     @app.patch("/api/studio/{studio_item_id}/title-card")
     async def api_studio_patch_title_card(
