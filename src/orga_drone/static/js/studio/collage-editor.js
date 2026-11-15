@@ -214,7 +214,7 @@ export function createCollageEditor(opts) {
         });
         cell.appendChild(thumb);
         label.textContent = media.display_name || media.kind || "Media";
-      } else if (media.source === "external" && (media.has_path || media.path)) {
+      } else if (media.source === "external" && media.has_path) {
         label.textContent = media.display_name || media.kind || "Media";
       } else {
         label.textContent = missingLabel;
@@ -265,6 +265,11 @@ export function createCollageEditor(opts) {
 
   function fillInspector(clip) {
     if (!isCollage(clip)) return;
+    const ownerId = String(clip.dataset.studioId || "");
+    if (selectedLeafOwnerId && selectedLeafOwnerId !== ownerId) {
+      selectedLeafId = null;
+      selectedLeafOwnerId = null;
+    }
     opts.showInspector("inspector-collage");
     const spec = parseSpec(clip) || {};
     if (durationEl) {
@@ -294,11 +299,15 @@ export function createCollageEditor(opts) {
     renderPreview(clip);
   }
 
-  function selectedLeafMedia(clip) {
+  function leafMedia(clip, leafId) {
     const spec = parseSpec(clip);
-    if (!spec || !selectedLeafId) return null;
-    const leaf = iterLeaves(spec.root).find((item) => String(item.id) === String(selectedLeafId));
+    if (!spec || !leafId) return null;
+    const leaf = iterLeaves(spec.root).find((item) => String(item.id) === String(leafId));
     return leaf?.media || null;
+  }
+
+  function selectedLeafMedia(clip) {
+    return leafMedia(clip, selectedLeafId);
   }
 
   function fillLeafFraming(clip) {
@@ -543,7 +552,7 @@ export function createCollageEditor(opts) {
     saveChain = saveChain
       .catch(() => {})
       .then(() => {
-        const media = selectedLeafMedia(clip);
+        const media = leafMedia(clip, leafId);
         if (!media) return null;
         return patchCollage(
           clip,
