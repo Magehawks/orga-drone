@@ -3362,7 +3362,6 @@ class Database:
             clamp_collage_duration,
             collage_spec_from_raw,
             dump_collage_spec,
-            normalize_spec,
         )
 
         with self.connect() as conn:
