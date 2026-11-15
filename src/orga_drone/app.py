@@ -5574,8 +5574,20 @@ def create_app() -> FastAPI:
             if isinstance(payload.get("filename"), str)
             else "export.mp4"
         )
+        file_types_raw = payload.get("file_types")
+        file_types: tuple[str, ...] | None = None
+        if isinstance(file_types_raw, list) and file_types_raw:
+            cleaned = tuple(
+                str(item) for item in file_types_raw if isinstance(item, str) and item.strip()
+            )
+            if cleaned:
+                file_types = cleaned
         try:
-            path = pick_save_file(directory=directory or "", save_filename=filename or "export.mp4")
+            path = pick_save_file(
+                directory=directory or "",
+                save_filename=filename or "export.mp4",
+                file_types=file_types or ("MP4 Files (*.mp4)",),
+            )
         except SaveFilePickerError:
             return JSONResponse(
                 {

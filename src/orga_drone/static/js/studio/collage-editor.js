@@ -343,10 +343,16 @@ export function createCollageEditor(opts) {
   }
 
   async function pickStillSavePath(filename) {
+    const isJpeg =
+      String(filename).toLowerCase().endsWith(".jpg") ||
+      String(filename).toLowerCase().endsWith(".jpeg");
+    const fileTypes = isJpeg
+      ? ["JPEG Images (*.jpg;*.jpeg)", "PNG Images (*.png)"]
+      : ["PNG Images (*.png)", "JPEG Images (*.jpg;*.jpeg)"];
     const res = await fetchImpl("/api/desktop/pick-save-file", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename }),
+      body: JSON.stringify({ filename, file_types: fileTypes }),
     });
     if (res.status === 503) {
       throw new Error(msg("collageDesktopRequired", "Native file picker needs the desktop app."));

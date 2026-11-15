@@ -298,27 +298,28 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
     bottom = max(top + 1, min(sh, bottom))
     cropped = tile.crop((left, top, right, bottom))
     try:
-        if fit_mode == "fit":
-            # Contain: preserve aspect and letterbox inside the cell.
-            scale = min(rect_w / cropped.width, rect_h / cropped.height)
-            new_w = max(1, int(round(cropped.width * scale)))
-            new_h = max(1, int(round(cropped.height * scale)))
-            resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            cropped.close()
-            cell = Image.new("RGBA", (rect_w, rect_h), (0, 0, 0, 0))
-            try:
-                ox = (rect_w - new_w) // 2
-                oy = (rect_h - new_h) // 2
-                # Paste RGBA without a mask so source alpha is not multiplied twice.
-                cell.paste(resized, (ox, oy))
-            finally:
-                resized.close()
-            return cell
-        if cropped.size != (rect_w, rect_h):
-            resized = cropped.resize((rect_w, rect_h), Image.Resampling.LANCZOS)
-            cropped.close()
-            return resized
-        return cropped
+        if fit_mode != "fit":
+            # Fill/cover: source_window already cropped to cell aspect.
+            if cropped.size != (rect_w, rect_h):
+                resized = cropped.resize((rect_w, rect_h), Image.Resampling.LANCZOS)
+                cropped.close()
+                return resized
+            return cropped
+        # Fit/contain: preserve aspect and letterbox inside the cell.
+        scale = min(rect_w / cropped.width, rect_h / cropped.height)
+        new_w = max(1, int(round(cropped.width * scale)))
+        new_h = max(1, int(round(cropped.height * scale)))
+        resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        cropped.close()
+        cell = Image.new("RGBA", (rect_w, rect_h), (0, 0, 0, 0))
+        try:
+            ox = (rect_w - new_w) // 2
+            oy = (rect_h - new_h) // 2
+            # Paste RGBA without a mask so source alpha is not multiplied twice.
+            cell.paste(resized, (ox, oy))
+        finally:
+            resized.close()
+        return cell
     except Exception:
         cropped.close()
         raise
@@ -357,6 +358,23 @@ def _leaf_rgba(
             effect_settings=effect_settings,
             max_edge=max(long_edge, max(rect_w, rect_h)),
         )
+        # Preview-frame grades through JPEG and loses photo alpha. Restore the
+        # source alpha channel so transparent PNGs stay transparent after grade.
+        if kind == "photo":
+            source = _load_oriented_rgba(path)
+            try:
+                if source.size != tile.size:
+                    from PIL import Image as PILImage
+
+                    alpha = source.split()[3].resize(tile.size, PILImage.Resampling.LANCZOS)
+                else:
+                    alpha = source.split()[3]
+                try:
+                    tile.putalpha(alpha)
+                finally:
+                    alpha.close()
+            finally:
+                source.close()
     else:
         tile = _load_oriented_rgba(path)
     try:
@@ -415,11 +433,19 @@ def compose_collage_rgba(
         raise
 
 
+def _background_has_alpha(background: str) -> bool:
+    text = (background or "").strip().lower()
+    if text == "transparent":
+        return True
+    rgba = _parse_bg_rgba(text)
+    return rgba[3] < 255
+
+
 def _encode_image(canvas, dest: Path, *, fmt: str, background: str) -> None:
     from PIL import Image
 
     if fmt == "jpeg":
-        if background == "transparent":
+        if background == "transparent" or _background_has_alpha(background):
             raise StudioExportError(
                 "JPEG cannot use a transparent background. Choose a solid color."
             )
@@ -437,7 +463,8 @@ def _encode_image(canvas, dest: Path, *, fmt: str, background: str) -> None:
         finally:
             flat.close()
         return
-    if background == "transparent":
+    # PNG — keep alpha for transparent / RGBA hex backgrounds.
+    if _background_has_alpha(background):
         canvas.save(dest, format="PNG", optimize=True)
         return
     rgb = _parse_bg_rgba(background)[:3]
@@ -471,15 +498,15 @@ def render_collage_preview_png(
         _check_cancel(cancel_event)
         buf = io.BytesIO()
         background = normalize_spec(spec)["background"]
-        if background != "transparent":
+        if _background_has_alpha(background):
+            canvas.save(buf, format="PNG", optimize=True)
+        else:
             flat = Image.new("RGB", canvas.size, _parse_bg_rgba(background)[:3])
             try:
                 flat.paste(canvas, mask=canvas.split()[3])
                 flat.save(buf, format="PNG", optimize=True)
             finally:
                 flat.close()
-        else:
-            canvas.save(buf, format="PNG", optimize=True)
         return buf.getvalue()
     finally:
         canvas.close()
@@ -499,7 +526,7 @@ def export_collage_still(
     """Compose and publish one collage still without overwriting sources."""
     format_name = normalize_still_format(fmt)
     normalized = normalize_spec(spec)
-    if format_name == "jpeg" and normalized["background"] == "transparent":
+    if format_name == "jpeg" and _background_has_alpha(normalized["background"]):
         raise StudioExportError(
             "JPEG cannot use a transparent background. Choose a solid color."
         )
@@ -596,7 +623,7 @@ def inspect_collage_still(
         normalized = normalize_spec(spec)
         width, height = aspect_size(normalized["aspect"], long_edge=int(long_edge))
         refuse_canvas(width, height)
-        if format_name == "jpeg" and normalized["background"] == "transparent":
+        if format_name == "jpeg" and _background_has_alpha(normalized["background"]):
             raise StudioExportError(
                 "JPEG cannot use a transparent background. Choose a solid color."
             )
