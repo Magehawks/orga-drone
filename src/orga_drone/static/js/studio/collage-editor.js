@@ -41,12 +41,22 @@ export function createCollageEditor(opts) {
   const libraryFilter = document.getElementById("studio-collage-library-filter");
   const libraryEmpty = document.getElementById("studio-collage-library-empty");
   const libraryAdd = document.getElementById("studio-collage-library-add");
+  const composedImg = document.getElementById("studio-preview-collage-composed");
+  const exportFormatEl = document.getElementById("inspector-collage-export-format");
+  const exportBtn = document.getElementById("inspector-collage-export");
+  const exportStatus = document.getElementById("inspector-collage-export-status");
 
   const MEDIA_FILE_TYPES = [
     "Media (*.jpg;*.jpeg;*.png;*.webp;*.heic;*.mp4;*.mov;*.m4v;*.webm)",
     "Images (*.jpg;*.jpeg;*.png;*.webp;*.heic)",
     "Videos (*.mp4;*.mov;*.m4v;*.webm)",
   ];
+
+  let composedTimer = null;
+  let composedSeq = 0;
+  let composedObjectUrl = null;
+  let exportBusy = false;
+  let exportPollTimer = null;
 
   let selectedLeafId = null;
   let selectedLeafOwnerId = null;
@@ -159,12 +169,65 @@ export function createCollageEditor(opts) {
     return saveChain;
   }
 
+  function clearComposedPreview() {
+    if (composedTimer) {
+      clearTimeout(composedTimer);
+      composedTimer = null;
+    }
+    composedSeq += 1;
+    if (composedObjectUrl) {
+      URL.revokeObjectURL(composedObjectUrl);
+      composedObjectUrl = null;
+    }
+    if (composedImg) {
+      composedImg.hidden = true;
+      composedImg.removeAttribute("src");
+    }
+  }
+
+  function scheduleComposedPreview(clip) {
+    if (!composedImg || !isCollage(clip)) return;
+    const studioId = String(clip.dataset.studioId || "");
+    if (!studioId) return;
+    if (composedTimer) clearTimeout(composedTimer);
+    composedTimer = setTimeout(async () => {
+      composedTimer = null;
+      const seq = ++composedSeq;
+      try {
+        const res = await fetchImpl(`/api/studio/${encodeURIComponent(studioId)}/collage/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ t_s: 0 }),
+        });
+        if (seq !== composedSeq) return;
+        if (res.status === 409) return;
+        if (!res.ok) {
+          clearComposedPreview();
+          return;
+        }
+        const blob = await res.blob();
+        if (seq !== composedSeq) return;
+        if (composedObjectUrl) URL.revokeObjectURL(composedObjectUrl);
+        composedObjectUrl = URL.createObjectURL(blob);
+        composedImg.src = composedObjectUrl;
+        composedImg.hidden = false;
+        stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
+          img.style.opacity = "0";
+        });
+      } catch {
+        if (seq === composedSeq) clearComposedPreview();
+      }
+    }, 220);
+  }
+
   function renderPreview(clip) {
     if (!preview || !stage) return;
     const spec = parseSpec(clip);
     if (!isCollage(clip) || !spec) {
       preview.hidden = true;
+      clearComposedPreview();
       stage.replaceChildren();
+      if (composedImg) stage.appendChild(composedImg);
       return;
     }
     preview.hidden = false;
@@ -184,6 +247,9 @@ export function createCollageEditor(opts) {
     const emptyLabel = msg("collageEmptyCell", "Empty cell");
     const missingLabel = msg("collageMissingMedia", "Missing media");
     stage.replaceChildren();
+    if (composedImg) {
+      stage.appendChild(composedImg);
+    }
     for (const leaf of leaves) {
       const rect = rects[String(leaf.id)];
       if (!rect) continue;
@@ -260,6 +326,128 @@ export function createCollageEditor(opts) {
         };
       });
       stage.appendChild(handle);
+    }
+    scheduleComposedPreview(clip);
+  }
+
+  function setExportStatus(text, { error = false } = {}) {
+    if (!exportStatus) return;
+    if (!text) {
+      exportStatus.hidden = true;
+      exportStatus.textContent = "";
+      return;
+    }
+    exportStatus.hidden = false;
+    exportStatus.textContent = text;
+    exportStatus.classList.toggle("is-error", Boolean(error));
+  }
+
+  async function pickStillSavePath(filename) {
+    const isJpeg =
+      String(filename).toLowerCase().endsWith(".jpg") ||
+      String(filename).toLowerCase().endsWith(".jpeg");
+    const fileTypes = isJpeg
+      ? ["JPEG Images (*.jpg;*.jpeg)", "PNG Images (*.png)"]
+      : ["PNG Images (*.png)", "JPEG Images (*.jpg;*.jpeg)"];
+    const res = await fetchImpl("/api/desktop/pick-save-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, file_types: fileTypes }),
+    });
+    if (res.status === 503) {
+      throw new Error(msg("collageDesktopRequired", "Native file picker needs the desktop app."));
+    }
+    const data = await res.json().catch(() => null);
+    if (!data || data.status === "cancelled" || data.cancelled) return null;
+    if (!data.path) {
+      throw new Error(msg("collageDesktopRequired", "Native file picker needs the desktop app."));
+    }
+    return data.path;
+  }
+
+  function stopExportPoll() {
+    if (exportPollTimer) {
+      clearInterval(exportPollTimer);
+      exportPollTimer = null;
+    }
+  }
+
+  async function pollExportJob(jobId) {
+    try {
+      const res = await fetchImpl(`/api/studio/export/jobs/${encodeURIComponent(jobId)}`);
+      const data = await res.json().catch(() => null);
+      if (!data) return;
+      if (data.state === "completed") {
+        stopExportPoll();
+        exportBusy = false;
+        if (exportBtn) exportBtn.disabled = false;
+        setExportStatus(data.output_path || data.filename || "OK");
+        return;
+      }
+      if (data.state === "failed" || data.state === "cancelled") {
+        stopExportPoll();
+        exportBusy = false;
+        if (exportBtn) exportBtn.disabled = false;
+        setExportStatus(
+          data.state === "cancelled"
+            ? msg("collageExportCancelled", "Collage export cancelled.")
+            : data.error || msg("collageExportFailed", "Could not export collage."),
+          { error: true }
+        );
+      }
+    } catch {
+      /* keep polling briefly */
+    }
+  }
+
+  async function exportStill() {
+    if (exportBusy) return;
+    const clip = opts.getSelectedClip?.();
+    if (!isCollage(clip)) return;
+    const studioId = String(clip.dataset.studioId || "");
+    if (!studioId) return;
+    const fmt = exportFormatEl?.value === "jpeg" ? "jpeg" : "png";
+    const base = msg("collageExportDefault", "collage");
+    const filename = `${base}${fmt === "png" ? ".png" : ".jpg"}`;
+    let outputPath;
+    try {
+      outputPath = await pickStillSavePath(filename);
+    } catch (err) {
+      setExportStatus(
+        err && err.message ? err.message : msg("collageExportFailed", "Could not export collage."),
+        {
+          error: true,
+        }
+      );
+      return;
+    }
+    if (!outputPath) return;
+    exportBusy = true;
+    if (exportBtn) exportBtn.disabled = true;
+    setExportStatus("…");
+    try {
+      const res = await fetchImpl(`/api/studio/${encodeURIComponent(studioId)}/collage/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: fmt, output_path: outputPath, t_s: 0 }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !data.job_id) {
+        exportBusy = false;
+        if (exportBtn) exportBtn.disabled = false;
+        setExportStatus(
+          (data && data.detail) || msg("collageExportFailed", "Could not export collage."),
+          { error: true }
+        );
+        return;
+      }
+      stopExportPoll();
+      exportPollTimer = setInterval(() => pollExportJob(data.job_id), 400);
+      pollExportJob(data.job_id);
+    } catch {
+      exportBusy = false;
+      if (exportBtn) exportBtn.disabled = false;
+      setExportStatus(msg("collageExportFailed", "Could not export collage."), { error: true });
     }
   }
 
@@ -642,6 +830,9 @@ export function createCollageEditor(opts) {
     ).then(() => {
       if (isStillSelected(clip)) fillInspector(clip);
     });
+  });
+  exportBtn?.addEventListener("click", () => {
+    void exportStill();
   });
 
   window.addEventListener("pointermove", (event) => {

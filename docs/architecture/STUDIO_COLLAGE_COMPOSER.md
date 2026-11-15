@@ -54,7 +54,7 @@ preview placement (same math, tested).
 | 1 | Model + persistence | Schema, normalize, CRUD API, history columns, tests | ADR |
 | 2 | UI + layout editor | Collage add entry, inspector, presets, split/divider | 1 |
 | 3 | Media + leaf edit | Library picker, desktop picker, fit/fill/zoom/pan, missing media | 2 |
-| 4 | Still preview + image export | Composed preview-frame; PNG/JPEG export | 1, 3 |
+| 4 | Still preview + image export | Composed preview-frame; PNG/JPEG export (`studio_collage_still.py`, `/api/studio/{id}/collage/preview|export`) | 1, 3 |
 | 5 | Video play sync | Multi muted video/image cells on Story clock; last-frame hold | 2, 3 |
 | 6 | MP4 export | Encoder collage segment via existing pipeline | 1, 4 |
 | 7 | Integration + polish | DE/EN, limits, journey smoke, packaged E2E where feasible | 4–6 |

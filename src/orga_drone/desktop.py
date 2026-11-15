@@ -512,11 +512,16 @@ def pick_save_file(
             "(not available in browser-only mode)"
         )
 
+    filename = save_filename or "export.mp4"
+    types = file_types or ("MP4 Files (*.mp4)",)
+    preferred_ext = Path(filename).suffix.lower()
+    if not preferred_ext:
+        preferred_ext = ".mp4"
     result = windows[0].create_file_dialog(
         webview.FileDialog.SAVE,
         directory=directory or "",
-        save_filename=save_filename or "export.mp4",
-        file_types=file_types,
+        save_filename=filename,
+        file_types=types,
     )
     if not result:
         return None
@@ -524,8 +529,8 @@ def pick_save_file(
     if isinstance(chosen, bytes):
         chosen = chosen.decode("utf-8")
     path = str(chosen)
-    if path and not path.lower().endswith(".mp4"):
-        path = f"{path}.mp4"
+    if path and preferred_ext and not path.lower().endswith(preferred_ext):
+        path = f"{path}{preferred_ext}"
     return path
 
 
