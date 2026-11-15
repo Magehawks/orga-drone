@@ -163,6 +163,21 @@ export function createCollagePlayback(opts) {
     };
     walk(spec.root);
 
+    if (fallback) {
+      for (const [id, el] of [...mediaEls.entries()]) {
+        if (el instanceof HTMLVideoElement) {
+          try {
+            el.pause();
+          } catch {
+            /* ignore */
+          }
+        }
+        el.remove();
+        mediaEls.delete(id);
+      }
+      return;
+    }
+
     let videoSlots = 0;
     for (const leaf of leaves) {
       const id = String(leaf.id);

@@ -271,6 +271,7 @@ export function createCollageEditor(opts) {
       height,
       forceStill: false,
     });
+    preview?.classList.toggle("has-play-media", true);
     playback.sync({
       localS: Number(opts.getCollageLocalS?.() || 0),
       playing: Boolean(opts.isPlaying?.()),
@@ -586,6 +587,7 @@ export function createCollageEditor(opts) {
 
   function hidePreview() {
     playback.teardown();
+    preview?.classList.remove("has-play-media");
     if (preview) preview.hidden = true;
     if (stage) stage.replaceChildren();
     selectedLeafId = null;
