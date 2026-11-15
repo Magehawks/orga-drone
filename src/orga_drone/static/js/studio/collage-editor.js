@@ -42,6 +42,32 @@ export function createCollageEditor(opts) {
     return value && String(value).trim() ? String(value) : fallback;
   }
 
+  function gestureGroup(prefix) {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function isStillSelected(clip) {
+    const selected = opts.getSelectedClip?.();
+    return !!(
+      selected &&
+      clip &&
+      String(selected.dataset?.studioId || "") === String(clip.dataset?.studioId || "")
+    );
+  }
+
+  function aspectBox(spec, hostW, hostH) {
+    const css = aspectCss(spec);
+    const parts = String(css)
+      .split("/")
+      .map((part) => Number(String(part).trim()));
+    const aw = parts[0] > 0 ? parts[0] : 16;
+    const ah = parts[1] > 0 ? parts[1] : 9;
+    const fit = Math.min(hostW / aw, hostH / ah);
+    const width = Math.max(1, Math.floor(aw * fit));
+    const height = Math.max(1, Math.floor(ah * fit));
+    return { width, height, css };
+  }
+
   function parseSpec(clip) {
     if (!clip) return null;
     const raw = clip.dataset.collageSpec;
@@ -108,9 +134,15 @@ export function createCollageEditor(opts) {
     preview.hidden = false;
     const bg = spec.background === "transparent" ? "#0a0c0e" : spec.background || "#0a0c0e";
     stage.style.background = bg;
-    stage.style.aspectRatio = aspectCss(spec);
-    const width = Math.max(1, Math.round(stage.clientWidth || 640));
-    const height = Math.max(1, Math.round(stage.clientHeight || (width * 9) / 16));
+    const host = preview.getBoundingClientRect();
+    const hostW = Math.max(1, Math.round(host.width || preview.clientWidth || 640));
+    const hostH = Math.max(1, Math.round(host.height || preview.clientHeight || (hostW * 9) / 16));
+    const box = aspectBox(spec, hostW, hostH);
+    stage.style.aspectRatio = box.css;
+    stage.style.width = `${box.width}px`;
+    stage.style.height = `${box.height}px`;
+    const width = box.width;
+    const height = box.height;
     const rects = resolveRects(spec, width, height);
     const leaves = iterLeaves(spec.root);
     const emptyLabel = msg("collageEmptyCell", "Empty cell");
@@ -205,49 +237,71 @@ export function createCollageEditor(opts) {
   document.getElementById("inspector-collage-duration")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !durationEl) return;
-    queueSave(clip, { duration_s: Number(durationEl.value) }, "collage-duration");
+    queueSave(clip, { duration_s: Number(durationEl.value) }, gestureGroup("collage-duration"));
   });
   document.getElementById("inspector-collage-preset")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !presetEl) return;
     selectedLeafId = null;
-    queueSave(clip, { preset: presetEl.value }).then(() => fillInspector(clip));
+    queueSave(clip, { preset: presetEl.value }, gestureGroup("collage-preset")).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
   });
   document.getElementById("inspector-collage-aspect")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !aspectEl) return;
-    queueSave(clip, { aspect: aspectEl.value }, "collage-aspect").then(() => renderPreview(clip));
+    queueSave(clip, { aspect: aspectEl.value }, gestureGroup("collage-aspect")).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
   });
   document.getElementById("inspector-collage-gap")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !gapEl) return;
-    queueSave(clip, { gap_px: Number(gapEl.value) }, "collage-gap").then(() => renderPreview(clip));
+    queueSave(clip, { gap_px: Number(gapEl.value) }, gestureGroup("collage-gap")).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
   });
   document.getElementById("inspector-collage-background")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !bgEl) return;
-    queueSave(clip, { background: bgEl.value }, "collage-bg").then(() => renderPreview(clip));
+    queueSave(clip, { background: bgEl.value }, gestureGroup("collage-bg")).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
   });
   document.getElementById("inspector-collage-split-h")?.addEventListener("click", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !selectedLeafId) return;
-    queueSave(clip, { op: "split", leaf_id: selectedLeafId, dir: "h" }).then(() =>
-      fillInspector(clip)
-    );
+    queueSave(
+      clip,
+      { op: "split", leaf_id: selectedLeafId, dir: "h" },
+      gestureGroup("collage-split")
+    ).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
   });
   document.getElementById("inspector-collage-split-v")?.addEventListener("click", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !selectedLeafId) return;
-    queueSave(clip, { op: "split", leaf_id: selectedLeafId, dir: "v" }).then(() =>
-      fillInspector(clip)
-    );
+    queueSave(
+      clip,
+      { op: "split", leaf_id: selectedLeafId, dir: "v" },
+      gestureGroup("collage-split")
+    ).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
   });
   document.getElementById("inspector-collage-remove-cell")?.addEventListener("click", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !selectedLeafId) return;
     const leafId = selectedLeafId;
     selectedLeafId = null;
-    queueSave(clip, { op: "remove_leaf", leaf_id: leafId }).then(() => fillInspector(clip));
+    queueSave(
+      clip,
+      { op: "remove_leaf", leaf_id: leafId },
+      gestureGroup("collage-remove-cell")
+    ).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
   });
 
   window.addEventListener("pointermove", (event) => {
@@ -276,8 +330,10 @@ export function createCollageEditor(opts) {
     queueSave(
       clip,
       { op: "set_ratio", split_id: splitId, ratio: pendingRatio },
-      "collage-divider"
-    ).then(() => renderPreview(clip));
+      gestureGroup("collage-divider")
+    ).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
   });
 
   async function addCollage() {

@@ -2483,11 +2483,14 @@ video.studio-preview-media.studio-preview-layer-b {
 }
 .studio-preview-collage-stage {
   position: relative;
-  width: min(100%, 100%);
+  width: auto;
+  height: auto;
+  max-width: 100%;
   max-height: 100%;
   aspect-ratio: 16 / 9;
   background: #0a0c0e;
   overflow: hidden;
+  flex: 0 0 auto;
 }
 .studio-collage-cell {
   position: absolute;
