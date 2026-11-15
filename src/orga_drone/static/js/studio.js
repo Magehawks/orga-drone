@@ -70,6 +70,7 @@ import {
   shouldReconcileSeekSample,
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
+import { createCollageEditor } from "./studio/collage-editor.js";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
@@ -327,8 +328,10 @@ import {
     photo: root.dataset.kindPhoto || "Photo",
     video: root.dataset.kindVideo || "Video",
     title_card: root.dataset.kindTitleCard || "Title card",
+    collage: root.dataset.kindCollage || "Collage",
     unknown: root.dataset.kindUnknown || "Memory",
   };
+  let collageEditor = null;
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgTransitionNoRoom =
@@ -690,11 +693,16 @@ import {
     if (raw === "" || raw == null) {
       if (clip.dataset.kind === "photo") return defaultPhotoDuration;
       if (clip.dataset.kind === "title_card") return 3;
+      if (clip.dataset.kind === "collage") {
+        const collageDur = Number(clip.dataset.collageDuration);
+        return Number.isFinite(collageDur) && collageDur > 0 ? collageDur : 5;
+      }
       return 0;
     }
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0) return n;
     if (clip.dataset.kind === "title_card") return 3;
+    if (clip.dataset.kind === "collage") return 5;
     return 0;
   }
 
@@ -6735,6 +6743,7 @@ import {
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
     hideTitlecard();
+    collageEditor?.hidePreview();
     hideOverlayLayers();
     hideAnnotations();
     hidePrivacyMasks();
@@ -6756,6 +6765,7 @@ import {
     if (!previewImage) return;
     clearVideoElement();
     hideTitlecard();
+    collageEditor?.hidePreview();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewImage.hidden = false;
     if (!src) {
@@ -6818,6 +6828,7 @@ import {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
     hideTitlecard();
+    collageEditor?.hidePreview();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();
@@ -6888,6 +6899,7 @@ import {
     if (!previewTitlecard) return;
     if (previewImage) previewImage.hidden = true;
     clearVideoElement();
+    collageEditor?.hidePreview();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     setPreviewLoading(false);
     const bg = clip.dataset.background || "dark";
@@ -6901,6 +6913,15 @@ import {
       previewTitlecardSubtitle.textContent = sub;
       previewTitlecardSubtitle.hidden = !sub;
     }
+  }
+
+  function showCollage(clip) {
+    if (previewImage) previewImage.hidden = true;
+    clearVideoElement();
+    hideTitlecard();
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
+    setPreviewLoading(false);
+    collageEditor?.renderPreview(clip);
   }
 
   function fillTitlecardEl(el, titleEl, subEl, clip) {
@@ -7490,6 +7511,13 @@ import {
 
     if (kind === "title_card") {
       showTitlecard(clip);
+      applyTransitionPreview(hit);
+      updateCutEnabled();
+      return;
+    }
+
+    if (kind === "collage") {
+      showCollage(clip);
       applyTransitionPreview(hit);
       updateCutEnabled();
       return;
@@ -9025,6 +9053,7 @@ import {
       "inspector-music",
       "inspector-sfx",
       "inspector-titlecard",
+      "inspector-collage",
     ].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.hidden = id !== kind;
@@ -9081,7 +9110,12 @@ import {
       setInspectorHeading(kindLabels.title_card);
       fillTitlecardInspector(clip);
       syncColorScopesView();
+    } else if (kind === "collage") {
+      setInspectorHeading(kindLabels.collage);
+      collageEditor?.fillInspector(clip);
+      syncColorScopesView();
     } else {
+      collageEditor?.hidePreview();
       showInspector("inspector-clip");
       setInspectorHeading(kindLabels[kind] || kindLabels.unknown);
       const panel = document.getElementById("inspector-clip");
@@ -11663,6 +11697,22 @@ import {
 
   document.getElementById("studio-add-title-card")?.addEventListener("click", addTitleCard);
   document.getElementById("studio-add-title-card-empty")?.addEventListener("click", addTitleCard);
+
+  collageEditor = createCollageEditor({
+    root,
+    getSelectedClip: () => {
+      if (!state.selected || state.selected.type !== "clip") return null;
+      return findClip(grid, state.selected.id);
+    },
+    onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
+    showInspector,
+    showFlash: showRootFlash,
+    onSpecApplied: () => {
+      layoutTimeline();
+      updatePlayheadChrome();
+      syncPreviewMedia({ seek: true });
+    },
+  });
 
   async function persistTitlecard() {
     if (!state.selected || state.selected.type !== "clip") return;

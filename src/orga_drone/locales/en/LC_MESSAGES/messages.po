@@ -1038,3 +1038,42 @@ msgstr "Not used in any project."
 
 msgid "×%(count)s"
 msgstr "×%(count)s"
+
+msgid "Choose a layout, drag dividers in the preview, then add media to each cell."
+msgstr "Choose a layout, drag dividers in the preview, then add media to each cell."
+
+msgid "Layout preset"
+msgstr "Layout preset"
+
+msgid "Aspect"
+msgstr "Aspect"
+
+msgid "Gap (px)"
+msgstr "Gap (px)"
+
+msgid "Gap between cells in pixels"
+msgstr "Gap between cells in pixels"
+
+msgid "Collage background color"
+msgstr "Collage background color"
+
+msgid "Collage duration in seconds"
+msgstr "Collage duration in seconds"
+
+msgid "Selected cell"
+msgstr "Selected cell"
+
+msgid "Split horizontally"
+msgstr "Split horizontally"
+
+msgid "Split vertically"
+msgstr "Split vertically"
+
+msgid "Remove cell"
+msgstr "Remove cell"
+
+msgid "Empty cell"
+msgstr "Empty cell"
+
+msgid "Could not save collage."
+msgstr "Could not save collage."

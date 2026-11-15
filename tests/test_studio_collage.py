@@ -278,6 +278,31 @@ def test_public_patch_preserves_external_path(tmp_path: Path) -> None:
     assert updated.collage_spec and '"gap_px":12' in updated.collage_spec
 
 
+def test_http_preset_preserves_aspect_gap_background(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    db.set_app_state("studio_last_project_id", str(project.id))
+    created = client.post("/api/studio/collages", json={"preset": "1+1"})
+    clip_id = int(created.json()["id"])
+    client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={"aspect": "9:16", "gap_px": 24, "background": "#112233"},
+    )
+    preset = client.patch(
+        f"/api/studio/{clip_id}/collage",
+        json={"preset": "2x2"},
+    )
+    assert preset.status_code == 200
+    spec = preset.json()["collage_spec"]
+    assert spec["leaf_count"] == 4
+    assert spec["aspect"] == "9:16"
+    assert spec["gap_px"] == 24
+    assert spec["background"] == "#112233"
+
+
 def test_public_external_swap_preserves_source_identity(tmp_path: Path) -> None:
     path_one = str(tmp_path / "one.mp4")
     path_two = str(tmp_path / "two.mp4")

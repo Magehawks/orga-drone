@@ -2185,24 +2185,119 @@ def create_app() -> FastAPI:
         studio_item_id: int,
         request: Request,
     ) -> JSONResponse:
+        from orga_drone.studio_collage import (
+            assign_leaf_media,
+            normalize_spec,
+            preset_spec,
+            remove_leaf,
+            set_split_ratio,
+            split_leaf,
+        )
+
         try:
             payload = await request.json()
         except Exception:
             payload = None
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+        def _load_clip() -> Any:
+            for item in db.list_studio_items(_clip_project_id(studio_item_id)):
+                if item.id == studio_item_id:
+                    if item.item_kind != "collage":
+                        raise HTTPException(status_code=400, detail="not a collage")
+                    return item
+            raise HTTPException(status_code=404, detail="studio item not found")
+
         kwargs: dict[str, Any] = {}
-        if "spec" in payload:
-            kwargs["collage_spec"] = payload.get("spec")
         if "duration_s" in payload:
             raw = payload.get("duration_s")
             if not isinstance(raw, (int, float)) or isinstance(raw, bool):
                 raise HTTPException(status_code=400, detail="duration_s must be a number")
             kwargs["collage_duration_s"] = float(raw)
+
+        if "spec" in payload:
+            kwargs["collage_spec"] = payload.get("spec")
+        elif "preset" in payload:
+            if not isinstance(payload.get("preset"), str):
+                raise HTTPException(status_code=400, detail="preset must be a string")
+            try:
+                current = _load_clip()
+                current_spec = collage_spec_from_raw(current.collage_spec)
+                next_spec = preset_spec(str(payload["preset"]))
+                for key in (
+                    "aspect",
+                    "gap_px",
+                    "background",
+                    "corner_radius_px",
+                    "duration_s",
+                ):
+                    if key in current_spec:
+                        next_spec[key] = current_spec[key]
+                kwargs["collage_spec"] = next_spec
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        elif payload.get("op") is not None:
+            op = payload.get("op")
+            if not isinstance(op, str):
+                raise HTTPException(status_code=400, detail="op must be a string")
+            current = _load_clip()
+            try:
+                spec = collage_spec_from_raw(current.collage_spec)
+                if op == "set_ratio":
+                    split_id = payload.get("split_id")
+                    ratio = payload.get("ratio")
+                    if not isinstance(split_id, str):
+                        raise ValueError("split_id must be a string")
+                    if not isinstance(ratio, (int, float)) or isinstance(ratio, bool):
+                        raise ValueError("ratio must be a number")
+                    kwargs["collage_spec"] = set_split_ratio(spec, split_id, float(ratio))
+                elif op == "split":
+                    leaf_id = payload.get("leaf_id")
+                    direction = payload.get("dir") or payload.get("direction")
+                    if not isinstance(leaf_id, str) or not isinstance(direction, str):
+                        raise ValueError("leaf_id and dir are required")
+                    kwargs["collage_spec"] = split_leaf(
+                        spec, leaf_id, direction=direction
+                    )
+                elif op == "remove_leaf":
+                    leaf_id = payload.get("leaf_id")
+                    if not isinstance(leaf_id, str):
+                        raise ValueError("leaf_id must be a string")
+                    kwargs["collage_spec"] = remove_leaf(spec, leaf_id)
+                elif op == "assign_media":
+                    leaf_id = payload.get("leaf_id")
+                    media = payload.get("media")
+                    if not isinstance(leaf_id, str):
+                        raise ValueError("leaf_id must be a string")
+                    kwargs["collage_spec"] = assign_leaf_media(spec, leaf_id, media)
+                else:
+                    raise ValueError(f"unknown collage op: {op}")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if any(key in payload for key in ("gap_px", "aspect", "background")):
+            current = _load_clip()
+            if "collage_spec" in kwargs and isinstance(kwargs["collage_spec"], dict):
+                spec = normalize_spec(kwargs["collage_spec"])
+            elif "collage_spec" in kwargs:
+                spec = collage_spec_from_raw(kwargs["collage_spec"])
+            else:
+                spec = collage_spec_from_raw(current.collage_spec)
+            if "gap_px" in payload:
+                spec["gap_px"] = payload.get("gap_px")
+            if "aspect" in payload:
+                spec["aspect"] = payload.get("aspect")
+            if "background" in payload:
+                spec["background"] = payload.get("background")
+            kwargs["collage_spec"] = spec
+
         if not kwargs:
             raise HTTPException(status_code=400, detail="no collage fields to update")
         try:
-            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+            with story_edit(
+                db, _clip_project_id(studio_item_id), group=_history_group(request)
+            ):
                 clip = db.update_studio_collage(studio_item_id, **kwargs)
         except ValueError as exc:
             msg = str(exc)
