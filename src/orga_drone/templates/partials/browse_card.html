@@ -1,9 +1,10 @@
 <article class="card">
   {% set in_studio = studio_paths is defined and item.path in studio_paths %}
-  <label class="browse-select {% if in_studio %}is-disabled{% endif %}">
+  {% set is_selected = selected_media_ids is defined and item.id in selected_media_ids %}
+  <label class="browse-select">
     <input type="checkbox" name="media_ids" value="{{ item.id }}"
            form="browse-bulk-studio" class="browse-select-input"
-           {% if in_studio %}disabled{% endif %}
+           {% if is_selected %}checked{% endif %}
            aria-label="{{ _('Select for Studio') }}">
   </label>
   <a class="card-main" href="/media/{{ item.id }}?{{ browse_detail_qs }}">
@@ -78,7 +79,7 @@
   <form method="post" action="/media/{{ item.id }}/studio/add" class="card-studio">
     <input type="hidden" name="return_to" value="/browse?{{ browse_qs }}">
     {% if studio_paths is defined and item.path in studio_paths %}
-      <button type="submit" disabled>{{ _('In Studio') }}</button>
+      <button type="submit" class="is-in-open-studio" disabled>{{ _('In Studio') }}</button>
     {% else %}
       <button type="submit">{{ _('Add to Studio') }}</button>
     {% endif %}

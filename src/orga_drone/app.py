@@ -950,6 +950,7 @@ def create_app() -> FastAPI:
         msg: str | None = None,
         added: int | None = None,
         skipped: int | None = None,
+        selected: str | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
@@ -1022,6 +1023,20 @@ def create_app() -> FastAPI:
             if open_project is not None
             else set()
         )
+        selected_media_ids: set[int] = set()
+        for part in str(selected or "").split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                mid = int(part)
+            except ValueError:
+                continue
+            if mid > 0:
+                selected_media_ids.add(mid)
+        # Cap restored selection to one oversized page (same as bulk-add).
+        if len(selected_media_ids) > max(BROWSE_PAGE_SIZES):
+            selected_media_ids = set(sorted(selected_media_ids)[: max(BROWSE_PAGE_SIZES)])
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
@@ -1096,6 +1111,7 @@ def create_app() -> FastAPI:
             flash_msg=msg,
             flash_added=added,
             flash_skipped=skipped,
+            selected_media_ids=selected_media_ids,
             timeline_nav=timeline_nav,
             timeline_groups=timeline_groups,
         )
@@ -5111,6 +5127,16 @@ def create_app() -> FastAPI:
         if not media_ids:
             return RedirectResponse(url=base, status_code=303)
 
+        def choose_project_redirect() -> RedirectResponse:
+            """Return to Browse with selection preserved for chooser retry."""
+            selected = ",".join(str(mid) for mid in media_ids)
+            return RedirectResponse(
+                url=append_query_params(
+                    base, msg="studio_choose_project", selected=selected
+                ),
+                status_code=303,
+            )
+
         mode = str(form.get("project_mode") or "").strip().lower()
         open_studio = str(form.get("open_studio") or "").strip().lower() in {
             "1",
@@ -5129,24 +5155,15 @@ def create_app() -> FastAPI:
             except (TypeError, ValueError):
                 pid = 0
             if pid <= 0:
-                return RedirectResponse(
-                    url=append_query_params(base, msg="studio_choose_project"),
-                    status_code=303,
-                )
+                return choose_project_redirect()
             try:
                 target = open_project(db, pid)
             except ProjectActionError:
-                return RedirectResponse(
-                    url=append_query_params(base, msg="studio_choose_project"),
-                    status_code=303,
-                )
+                return choose_project_redirect()
         else:
             target = db.resolve_studio_page_project()
             if target is None:
-                return RedirectResponse(
-                    url=append_query_params(base, msg="studio_choose_project"),
-                    status_code=303,
-                )
+                return choose_project_redirect()
 
         before_ids = {item.id for item in db.list_studio_items(target.id)}
         added_n, skipped_n = db.add_studio_media_ids(

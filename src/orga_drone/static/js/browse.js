@@ -176,6 +176,21 @@
       resetChooserFields();
     });
     syncBulk();
+    // After a missing/invalid project redirect, selection is restored via
+    // checked checkboxes; reopen the chooser so the user can retry.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("msg") === "studio_choose_project") {
+        const n = document.querySelectorAll(
+          'input.browse-select-input[name="media_ids"][form="browse-bulk-studio"]:checked:not(:disabled)'
+        ).length;
+        if (n > 0) {
+          void openChooser();
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   const FILTER_KEY = "orga-drone:browse-filters";
