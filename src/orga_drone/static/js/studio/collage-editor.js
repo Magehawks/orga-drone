@@ -214,7 +214,7 @@ export function createCollageEditor(opts) {
         stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
           img.style.opacity = "0";
         });
-      } catch (_err) {
+      } catch {
         if (seq === composedSeq) clearComposedPreview();
       }
     }, 220);
@@ -389,7 +389,7 @@ export function createCollageEditor(opts) {
           { error: true }
         );
       }
-    } catch (_err) {
+    } catch {
       /* keep polling briefly */
     }
   }
@@ -438,7 +438,7 @@ export function createCollageEditor(opts) {
       stopExportPoll();
       exportPollTimer = setInterval(() => pollExportJob(data.job_id), 400);
       pollExportJob(data.job_id);
-    } catch (_err) {
+    } catch {
       exportBusy = false;
       if (exportBtn) exportBtn.disabled = false;
       setExportStatus(msg("collageExportFailed", "Could not export collage."), { error: true });

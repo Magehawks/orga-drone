@@ -242,3 +242,36 @@ def test_http_rejects_non_collage(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     card = db.add_studio_title_card(project.id, title_text="Hi", card_duration_s=3.0)
     res = client.post(f"/api/studio/{card.id}/collage/preview", json={})
     assert res.status_code == 400
+
+
+def test_fit_mode_letterboxes_without_stretch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    root = tmp_path / "media"
+    # Wide source into a square-ish 1:1 collage leaf via 1+1 with tall canvas.
+    wide = root / "wide.png"
+    _rgb(wide, (400, 100), (240, 20, 20))
+    mid = _add_photo(db, root, "wide.png", wide)
+    spec = preset_spec("1+1")
+    leaves = iter_leaves(spec["root"])
+    spec = assign_leaf_media(
+        spec,
+        leaves[0]["id"],
+        {"source": "library", "media_id": mid, "kind": "photo", "fit": "fit"},
+    )
+    spec = dict(spec)
+    spec["aspect"] = "1:1"
+    spec["background"] = "#102030"
+    canvas = compose_collage_rgba(db, spec, long_edge=200)
+    try:
+        # Center of left cell should be red; a corner of that cell should show bg.
+        rects = resolve_rects(spec, canvas.size[0], canvas.size[1])
+        left = rects[leaves[0]["id"]]
+        center = canvas.getpixel((left.x + left.w // 2, left.y + left.h // 2))
+        corner = canvas.getpixel((left.x + 2, left.y + 2))
+        assert center[0] > 200
+        assert corner[2] > corner[0]  # bluish background, not stretched red
+    finally:
+        canvas.close()

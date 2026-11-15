@@ -173,6 +173,10 @@ def _grade_payload(media: dict[str, Any]) -> str | None:
 def _grade_needs_still(effect_settings: str | None) -> bool:
     if not effect_settings:
         return False
+    from orga_drone.studio_managed_apply import grade_is_managed_sdr
+
+    if grade_is_managed_sdr(effect_settings):
+        return True
     image = image_adjust_from_effect_settings(effect_settings)
     look = color_look_from_effect_settings(effect_settings)
     hsl = hsl_adjust_from_effect_settings(effect_settings)
@@ -237,6 +241,9 @@ def _render_graded_or_video_rgba(
         if effect_settings
         else ColorWheels()
     )
+    from orga_drone.studio_managed_apply import grade_is_managed_sdr
+
+    managed = bool(effect_settings and grade_is_managed_sdr(effect_settings))
     req = PreviewFrameRequest(
         media_path=path,
         kind=kind,
@@ -246,7 +253,7 @@ def _render_graded_or_video_rgba(
         hsl=hsl,
         color_wheels=wheels,
         max_edge=max(64, int(max_edge)),
-        effect_settings=None,
+        effect_settings=effect_settings if managed else None,
     )
     try:
         jpeg = render_preview_frame(req, data_dir=settings.data_dir)
@@ -264,15 +271,22 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
     from PIL import Image
 
     sw, sh = tile.size
+    fit_mode = str(media.get("fit") or "fill").strip().lower()
+    zoom_raw = media.get("zoom")
+    pan_x_raw = media.get("pan_x")
+    pan_y_raw = media.get("pan_y")
+    zoom = float(zoom_raw if zoom_raw is not None else 1.0)
+    pan_x = float(pan_x_raw if pan_x_raw is not None else 0.5)
+    pan_y = float(pan_y_raw if pan_y_raw is not None else 0.5)
     win = source_window(
         source_w=sw,
         source_h=sh,
         cell_w=rect_w,
         cell_h=rect_h,
-        fit=str(media.get("fit") or "fill"),
-        zoom=float(media.get("zoom") or 1.0),
-        pan_x=float(media.get("pan_x") if media.get("pan_x") is not None else 0.5),
-        pan_y=float(media.get("pan_y") if media.get("pan_y") is not None else 0.5),
+        fit=fit_mode,
+        zoom=zoom,
+        pan_x=pan_x,
+        pan_y=pan_y,
     )
     left = int(round(win.x * sw))
     top = int(round(win.y * sh))
@@ -284,6 +298,21 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
     bottom = max(top + 1, min(sh, bottom))
     cropped = tile.crop((left, top, right, bottom))
     try:
+        if fit_mode == "fit":
+            # Contain: preserve aspect and letterbox inside the cell.
+            scale = min(rect_w / cropped.width, rect_h / cropped.height)
+            new_w = max(1, int(round(cropped.width * scale)))
+            new_h = max(1, int(round(cropped.height * scale)))
+            resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            cropped.close()
+            cell = Image.new("RGBA", (rect_w, rect_h), (0, 0, 0, 0))
+            try:
+                ox = (rect_w - new_w) // 2
+                oy = (rect_h - new_h) // 2
+                cell.paste(resized, (ox, oy), resized)
+            finally:
+                resized.close()
+            return cell
         if cropped.size != (rect_w, rect_h):
             resized = cropped.resize((rect_w, rect_h), Image.Resampling.LANCZOS)
             cropped.close()
