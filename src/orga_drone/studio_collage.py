@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
@@ -39,6 +40,7 @@ DEFAULT_FIT = "fill"
 
 _HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _LEAF_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_SOURCE_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,12 @@ def clamp_collage_duration(duration_s: float) -> float:
 
 def new_leaf_id() -> str:
     return f"leaf-{uuid.uuid4().hex[:10]}"
+
+
+def stable_external_source_key(path: str) -> str:
+    """Opaque handle for external media that survives public path scrubbing."""
+    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:16]
+    return f"src-{digest}"
 
 
 def _leaf(media: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -316,6 +324,12 @@ def _normalize_media(raw: Any) -> dict[str, Any]:
         if not path:
             raise CollageSpecError("external media requires path")
         out["path"] = path
+        source_key = str(raw.get("source_key") or "").strip()
+        if not source_key:
+            source_key = stable_external_source_key(path)
+        if not _SOURCE_KEY_RE.match(source_key):
+            raise CollageSpecError("invalid source_key")
+        out["source_key"] = source_key
         display = str(raw.get("display_name") or "").strip()
         if display:
             out["display_name"] = display[:240]
@@ -386,6 +400,12 @@ def resolve_rects(spec: dict[str, Any], width: int, height: int) -> dict[str, Re
     gap = int(normalized["gap_px"])
     out: dict[str, Rect] = {}
     _resolve_node(normalized["root"], 0, 0, w, h, gap, out)
+    expected = leaf_count(normalized)
+    if len(out) != expected:
+        raise CollageSpecError(
+            f"layout cannot place all cells ({len(out)}/{expected}); "
+            "reduce gap or widen splits"
+        )
     return out
 
 
@@ -399,7 +419,9 @@ def _resolve_node(
     out: dict[str, Rect],
 ) -> None:
     if w <= 0 or h <= 0:
-        return
+        raise CollageSpecError(
+            "layout does not fit canvas; reduce gap or widen splits"
+        )
     if node["type"] == "leaf":
         out[str(node["id"])] = Rect(x=x, y=y, w=w, h=h)
         return
@@ -407,18 +429,20 @@ def _resolve_node(
     ratio = float(node["ratio"])
     if direction == "h":
         usable = w - gap
-        if usable <= 1:
-            _resolve_node(node["a"], x, y, w, h, gap, out)
-            return
+        if usable < 2:
+            raise CollageSpecError(
+                "horizontal split does not fit; reduce gap or widen splits"
+            )
         first = max(1, min(usable - 1, round(usable * ratio)))
         second = usable - first
         _resolve_node(node["a"], x, y, first, h, gap, out)
         _resolve_node(node["b"], x + first + gap, y, second, h, gap, out)
         return
     usable = h - gap
-    if usable <= 1:
-        _resolve_node(node["a"], x, y, w, h, gap, out)
-        return
+    if usable < 2:
+        raise CollageSpecError(
+            "vertical split does not fit; reduce gap or widen splits"
+        )
     first = max(1, min(usable - 1, round(usable * ratio)))
     second = usable - first
     _resolve_node(node["a"], x, y, w, first, gap, out)
@@ -476,11 +500,16 @@ def merge_public_media_paths(
 ) -> dict[str, Any]:
     """Restore server-only external paths when a public spec is patched back."""
     persisted_norm = normalize_spec(persisted)
-    persisted_by_id = {
-        str(leaf["id"]): leaf.get("media")
-        for leaf in iter_leaves(persisted_norm["root"])
-        if isinstance(leaf.get("media"), dict)
-    }
+    persisted_by_key: dict[str, dict[str, Any]] = {}
+    persisted_by_id: dict[str, dict[str, Any]] = {}
+    for leaf in iter_leaves(persisted_norm["root"]):
+        media = leaf.get("media")
+        if not isinstance(media, dict):
+            continue
+        persisted_by_id[str(leaf["id"])] = media
+        key = str(media.get("source_key") or "").strip()
+        if key and media.get("path"):
+            persisted_by_key[key] = media
 
     def _restore(node: Any) -> None:
         if not isinstance(node, dict):
@@ -490,10 +519,16 @@ def merge_public_media_paths(
             if not isinstance(media, dict) or media.get("source") != "external":
                 return
             if media.get("path"):
+                media.pop("has_path", None)
                 return
-            prior = persisted_by_id.get(str(node.get("id")))
+            key = str(media.get("source_key") or "").strip()
+            prior = persisted_by_key.get(key) if key else None
+            if prior is None:
+                prior = persisted_by_id.get(str(node.get("id")))
             if isinstance(prior, dict) and prior.get("path"):
                 media["path"] = prior["path"]
+                if prior.get("source_key") and not media.get("source_key"):
+                    media["source_key"] = prior["source_key"]
                 if prior.get("display_name") and not media.get("display_name"):
                     media["display_name"] = prior["display_name"]
             media.pop("has_path", None)

@@ -11,12 +11,14 @@ from orga_drone.config import Settings
 from orga_drone.db import Database
 from orga_drone.studio_collage import (
     MAX_LEAVES,
+    CollageSpecError,
     assign_leaf_media,
     clamp_collage_duration,
     collage_spec_from_raw,
     dump_collage_spec,
     iter_leaves,
     leaf_count,
+    merge_public_media_paths,
     normalize_spec,
     preset_names,
     preset_spec,
@@ -141,6 +143,7 @@ def test_public_spec_strips_external_path() -> None:
     assert "path" not in media
     assert media["has_path"] is True
     assert media["display_name"] == "drone.mp4"
+    assert media["source_key"].startswith("src-")
 
 
 def test_persist_reopen_migration_and_estimate(tmp_path: Path) -> None:
@@ -273,6 +276,65 @@ def test_public_patch_preserves_external_path(tmp_path: Path) -> None:
     media2 = iter_leaves(collage_spec_from_raw(updated.collage_spec)["root"])[0]["media"]
     assert media2["path"] == str(tmp_path / "clip.mp4")
     assert updated.collage_spec and '"gap_px":12' in updated.collage_spec
+
+
+def test_public_external_swap_preserves_source_identity(tmp_path: Path) -> None:
+    path_one = str(tmp_path / "one.mp4")
+    path_two = str(tmp_path / "two.mp4")
+    spec = preset_spec("1+1")
+    leaves = iter_leaves(spec["root"])
+    leaf_a = leaves[0]["id"]
+    leaf_b = leaves[1]["id"]
+    with_one = assign_leaf_media(
+        spec,
+        leaf_a,
+        {
+            "source": "external",
+            "path": path_one,
+            "kind": "video",
+            "display_name": "one.mp4",
+            "zoom": 1.1,
+        },
+    )
+    with_both = assign_leaf_media(
+        with_one,
+        leaf_b,
+        {
+            "source": "external",
+            "path": path_two,
+            "kind": "video",
+            "display_name": "two.mp4",
+            "zoom": 1.5,
+        },
+    )
+    public = public_collage_spec(with_both)
+    pub_leaves = {leaf["id"]: leaf for leaf in iter_leaves(public["root"])}
+    # Swap media objects (as a client would after drag-swap), keeping source_key.
+    media_a = dict(pub_leaves[leaf_a]["media"])
+    media_b = dict(pub_leaves[leaf_b]["media"])
+    pub_leaves[leaf_a]["media"] = media_b
+    pub_leaves[leaf_b]["media"] = media_a
+    merged = merge_public_media_paths(public, with_both)
+    by_id = {leaf["id"]: leaf["media"] for leaf in iter_leaves(merged["root"])}
+    assert by_id[leaf_a]["path"] == path_two
+    assert by_id[leaf_a]["display_name"] == "two.mp4"
+    assert by_id[leaf_a]["zoom"] == 1.5
+    assert by_id[leaf_b]["path"] == path_one
+    assert by_id[leaf_b]["display_name"] == "one.mp4"
+    assert by_id[leaf_b]["zoom"] == 1.1
+
+
+def test_resolve_rects_rejects_undersized_nested_splits() -> None:
+    spec = preset_spec("1+1")
+    split_id = spec["root"]["id"]
+    tight = set_split_ratio(spec, split_id, 0.05)
+    first_leaf = iter_leaves(tight["root"])[0]["id"]
+    nested = split_leaf(tight, first_leaf, direction="h", ratio=0.05)
+    deep_leaf = iter_leaves(nested["root"])[0]["id"]
+    deeper = split_leaf(nested, deep_leaf, direction="h", ratio=0.05)
+    assert leaf_count(deeper) == 4
+    with pytest.raises(CollageSpecError, match="does not fit|cannot place"):
+        resolve_rects(deeper, 1920, 1080)
 
 
 def test_interrupted_collage_migration_is_restartable(tmp_path: Path) -> None:
