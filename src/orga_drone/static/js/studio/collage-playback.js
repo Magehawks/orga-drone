@@ -239,7 +239,7 @@ export function createCollagePlayback(opts) {
           /* photos via stream; videos in fallback stay on thumb when available */
           if (media && String(media.kind || "").toLowerCase() === "photo") {
             const key = media.source_key ? String(media.source_key) : "";
-            el.src = key ? ${url}?v= : url;
+            el.src = key ? url + "?v=" + encodeURIComponent(key) : url;
           }
         }
       }
