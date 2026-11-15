@@ -238,7 +238,8 @@ export function createCollagePlayback(opts) {
         } else if (url && !(el instanceof HTMLVideoElement)) {
           /* photos via stream; videos in fallback stay on thumb when available */
           if (media && String(media.kind || "").toLowerCase() === "photo") {
-            el.src = url;
+            const key = media.source_key ? String(media.source_key) : "";
+            el.src = key ? \?v=\ : url;
           }
         }
       }
