@@ -1187,5 +1187,22 @@
   "Split vertically": "Split vertically",
   "Remove cell": "Remove cell",
   "Empty cell": "Empty cell",
-  "Could not save collage.": "Could not save collage."
+  "Could not save collage.": "Could not save collage.",
+  "Clear media": "Clear media",
+  "Fit": "Fit",
+  "Pan X": "Pan X",
+  "Pan Y": "Pan Y",
+  "Choose from library": "Choose from library",
+  "Select photos and videos. They fill empty cells in order, or replace the selected cell first.": "Select photos and videos. They fill empty cells in order, or replace the selected cell first.",
+  "No matching photos or videos.": "No matching photos or videos.",
+  "Add to collage": "Add to collage",
+  "Media": "Media",
+  "Cell fit mode": "Cell fit mode",
+  "Cell zoom": "Cell zoom",
+  "Cell pan horizontal": "Cell pan horizontal",
+  "Cell pan vertical": "Cell pan vertical",
+  "Filter library media": "Filter library media",
+  "Missing media": "Missing media",
+  "Native file picker needs the desktop app.": "Native file picker needs the desktop app.",
+  "Select at least one photo or video.": "Select at least one photo or video."
 }

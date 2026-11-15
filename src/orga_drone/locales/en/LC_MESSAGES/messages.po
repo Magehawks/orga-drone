@@ -1077,3 +1077,69 @@ msgstr "Empty cell"
 
 msgid "Could not save collage."
 msgstr "Could not save collage."
+
+msgid "From library"
+msgstr "From library"
+
+msgid "From this computer"
+msgstr "From this computer"
+
+msgid "Clear media"
+msgstr "Clear media"
+
+msgid "Fit"
+msgstr "Fit"
+
+msgid "Fill"
+msgstr "Fill"
+
+msgid "Zoom"
+msgstr "Zoom"
+
+msgid "Pan X"
+msgstr "Pan X"
+
+msgid "Pan Y"
+msgstr "Pan Y"
+
+msgid "Choose from library"
+msgstr "Choose from library"
+
+msgid "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
+msgstr "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
+
+msgid "Filter"
+msgstr "Filter"
+
+msgid "No matching photos or videos."
+msgstr "No matching photos or videos."
+
+msgid "Add to collage"
+msgstr "Add to collage"
+
+msgid "Media"
+msgstr "Media"
+
+msgid "Cell fit mode"
+msgstr "Cell fit mode"
+
+msgid "Cell zoom"
+msgstr "Cell zoom"
+
+msgid "Cell pan horizontal"
+msgstr "Cell pan horizontal"
+
+msgid "Cell pan vertical"
+msgstr "Cell pan vertical"
+
+msgid "Filter library media"
+msgstr "Filter library media"
+
+msgid "Missing media"
+msgstr "Missing media"
+
+msgid "Native file picker needs the desktop app."
+msgstr "Native file picker needs the desktop app."
+
+msgid "Select at least one photo or video."
+msgstr "Select at least one photo or video."

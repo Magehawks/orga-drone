@@ -2187,6 +2187,7 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         from orga_drone.studio_collage import (
             assign_leaf_media,
+            iter_leaves,
             normalize_spec,
             preset_spec,
             remove_leaf,
@@ -2270,6 +2271,29 @@ def create_app() -> FastAPI:
                     media = payload.get("media")
                     if not isinstance(leaf_id, str):
                         raise ValueError("leaf_id must be a string")
+                    if isinstance(media, dict) and media.get("source") == "external":
+                        media = dict(media)
+                        media.pop("has_path", None)
+                        if not media.get("path"):
+                            prior_by_key = {
+                                str(leaf.get("media", {}).get("source_key") or ""): leaf.get(
+                                    "media"
+                                )
+                                for leaf in iter_leaves(spec["root"])
+                                if isinstance(leaf.get("media"), dict)
+                            }
+                            prior_by_id = {
+                                str(leaf["id"]): leaf.get("media")
+                                for leaf in iter_leaves(spec["root"])
+                            }
+                            key = str(media.get("source_key") or "").strip()
+                            prior = prior_by_key.get(key) if key else None
+                            if not isinstance(prior, dict):
+                                prior = prior_by_id.get(leaf_id)
+                            if isinstance(prior, dict) and prior.get("path"):
+                                media["path"] = prior["path"]
+                                if prior.get("source_key") and not media.get("source_key"):
+                                    media["source_key"] = prior["source_key"]
                     kwargs["collage_spec"] = assign_leaf_media(spec, leaf_id, media)
                 else:
                     raise ValueError(f"unknown collage op: {op}")
