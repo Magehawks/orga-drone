@@ -206,10 +206,12 @@ def test_png_alpha_and_jpeg_background(
         db, _spec(*ids, layout="horizontal", background="transparent", fmt="png"), tmp_path / "t.png"
     )
     with Image.open(png) as img:
-        assert img.mode in {"RGBA", "RGB"}
         rgba = img.convert("RGBA")
-        # Gap/centering margin should stay transparent.
-        assert rgba.getpixel((0, 0))[3] == 0 or rgba.size[1] == 40
+        assert rgba.size == (50, 40)
+        # Centering margin above the shorter first tile stays fully transparent.
+        assert rgba.getpixel((5, 0))[3] == 0
+        # Semi-transparent source alpha is preserved (not multiplied twice).
+        assert rgba.getpixel((5, 15))[3] == 128
 
     jpg = export_combine(
         db, _spec(*ids, layout="vertical", background="black", fmt="jpeg"), tmp_path / "t.jpg"
@@ -217,8 +219,9 @@ def test_png_alpha_and_jpeg_background(
     with Image.open(jpg) as img:
         assert img.format == "JPEG"
         assert img.mode == "RGB"
-        # Top-left margin for narrower second? First is 30 wide on 30 canvas — black fill on sides of second.
-        assert img.getpixel((0, 0)) == (0, 0, 0) or img.size[0] == 30
+        assert img.size == (30, 60)
+        # Narrower second tile is centered on black.
+        assert img.getpixel((0, 50)) == (0, 0, 0)
 
 
 def test_exif_orientation_applied_before_geometry(

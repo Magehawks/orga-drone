@@ -143,25 +143,32 @@ def require_combine_ready(spec: CombineSpec) -> None:
         raise StudioExportError("Add at least one more image.")
 
 
-def _oriented_size(img) -> tuple[int, int]:
-    """Width/height after EXIF orientation, without keeping a transposed copy."""
-    from PIL import ImageOps
+# EXIF Orientation values that swap width and height (no pixel decode needed).
+_ORIENT_SWAP_AXES = frozenset({5, 6, 7, 8})
 
-    # ImageOps.exif_transpose returns a new image when orientation ≠ 1.
-    transposed = ImageOps.exif_transpose(img)
-    if transposed is None:
-        w, h = img.size
-        return int(w), int(h)
-    w, h = transposed.size
-    if transposed is not img:
-        try:
-            transposed.close()
-        except Exception:
-            pass
-    return int(w), int(h)
+
+def _exif_orientation(img) -> int:
+    try:
+        exif = img.getexif()
+    except Exception:
+        return 1
+    if not exif:
+        return 1
+    try:
+        from PIL.ExifTags import Base
+
+        value = exif.get(Base.Orientation, 1)
+    except Exception:
+        value = exif.get(0x0112, 1)
+    try:
+        orient = int(value or 1)
+    except (TypeError, ValueError):
+        return 1
+    return orient if 1 <= orient <= 8 else 1
 
 
 def _header_inspect(path: Path) -> tuple[int, int]:
+    """Oriented width/height from headers only — no full pixel decode."""
     from PIL import Image
 
     from orga_drone.parse import ensure_heif_support
@@ -169,19 +176,15 @@ def _header_inspect(path: Path) -> tuple[int, int]:
     ensure_heif_support()
     try:
         with Image.open(path) as img:
-            # Header size first; orientation may swap axes without full decode.
-            try:
-                img.load()
-            except Exception as exc:  # noqa: BLE001
-                raise StudioExportError("Could not read this photo.") from exc
-            w, h = _oriented_size(img)
-    except StudioExportError:
-        raise
+            w, h = img.size
+            orient = _exif_orientation(img)
+            if orient in _ORIENT_SWAP_AXES:
+                w, h = h, w
     except OSError as exc:
         raise StudioExportError("Could not read this photo.") from exc
     if w < 1 or h < 1:
         raise StudioExportError("Could not read this photo.")
-    return w, h
+    return int(w), int(h)
 
 
 def inspect_sources(db: Database, spec: CombineSpec) -> tuple[InspectedSource, ...]:
@@ -559,7 +562,23 @@ def _compose_rgba(
                     raise StudioExportError(
                         "One of the selected photos changed or is missing. Refresh the list."
                     )
-                canvas.paste(tile, (placement.x, placement.y), tile)
+                # Alpha-composite once so translucent pixels keep source opacity
+                # (paste(..., mask=tile) would multiply alpha / darken RGB).
+                box = (
+                    placement.x,
+                    placement.y,
+                    placement.x + placement.width,
+                    placement.y + placement.height,
+                )
+                region = canvas.crop(box)
+                blended = None
+                try:
+                    blended = Image.alpha_composite(region, tile)
+                    canvas.paste(blended, box[:2])
+                finally:
+                    region.close()
+                    if blended is not None:
+                        blended.close()
             finally:
                 tile.close()
         return canvas
