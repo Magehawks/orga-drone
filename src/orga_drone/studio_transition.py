@@ -426,6 +426,11 @@ def item_effective_seconds(item: object) -> float | None:
             source_in = start
         if end is not None:
             source_out = end
+    card_duration = getattr(item, "card_duration_s", None)
+    if kind == "collage":
+        card_duration = getattr(item, "collage_duration_s", None)
+        if card_duration is None:
+            card_duration = getattr(item, "duration_s", None)
     seconds = effective_seconds(
         kind=kind,
         photo_duration_s=getattr(item, "photo_duration_s", None),
@@ -433,7 +438,7 @@ def item_effective_seconds(item: object) -> float | None:
         available=bool(getattr(item, "available", False)),
         source_in_s=source_in,
         source_out_s=source_out,
-        card_duration_s=getattr(item, "card_duration_s", None),
+        card_duration_s=card_duration,
         playback_speed=getattr(item, "playback_speed", None),
         section_repeats=repeats,
         effect_settings=settings,

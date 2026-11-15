@@ -47,6 +47,8 @@ _CLIP_COLUMNS: tuple[str, ...] = (
     "subtitle_text",
     "card_duration_s",
     "background",
+    "collage_spec",
+    "collage_duration_s",
     "added_at",
 )
 

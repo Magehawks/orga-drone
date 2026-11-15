@@ -78,6 +78,7 @@ from orga_drone.export.still_export import (
     normalize_share_preset,
     still_may_contain_location,
 )
+from orga_drone.studio_collage import COLLAGE_KIND, ITEM_KIND_COLLAGE
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 
 
@@ -270,7 +271,7 @@ def translate_export_error(
 def _unavailable_sources(db: Database, clips: list[StudioClip]) -> list[dict]:
     missing = []
     for clip in clips:
-        if clip.item_kind == TITLE_CARD_KIND:
+        if clip.item_kind in {TITLE_CARD_KIND, ITEM_KIND_COLLAGE}:
             continue
         try:
             _require_clip_source(db, clip)
@@ -290,6 +291,12 @@ def _project_has_title_cards(db: Database, project_id: int) -> bool:
     )
 
 
+def _project_has_collages(db: Database, project_id: int) -> bool:
+    return any(
+        clip.item_kind == ITEM_KIND_COLLAGE for clip in db.list_studio_items(project_id)
+    )
+
+
 def _project_has_available_photos(db: Database, project_id: int) -> bool:
     for clip in db.list_studio_items(project_id):
         if clip.kind == "photo":
@@ -300,9 +307,11 @@ def _project_has_available_photos(db: Database, project_id: int) -> bool:
 
 
 def _unlock_generated_only_resolutions(db: Database, project_id: int) -> bool:
-    """Title cards or photos may unlock 720/1080 when no video heights exist."""
-    return _project_has_title_cards(db, project_id) or _project_has_available_photos(
-        db, project_id
+    """Title cards, collages, or photos may unlock 720/1080 when no video heights exist."""
+    return (
+        _project_has_title_cards(db, project_id)
+        or _project_has_collages(db, project_id)
+        or _project_has_available_photos(db, project_id)
     )
 
 
@@ -392,6 +401,12 @@ def _clip_to_export_clip(
             background=clip.background or "dark",
             locale=locale,
             label=primary or secondary or "Title card",
+        )
+    if clip.item_kind == ITEM_KIND_COLLAGE or clip.kind == COLLAGE_KIND:
+        # MP4 collage segment lands in WP6 (#462). Persist/preview work must not
+        # silently drop the item or invent a second encoder path here.
+        raise StudioExportError(
+            "Collage MP4 export is not available yet; finish the collage export work package first."
         )
     media, path = _require_clip_source(db, clip)
     kind = clip.kind if clip.kind in {"photo", "video"} else media.kind
@@ -978,6 +993,10 @@ def prepare_studio_export(
             "The Story is empty. Add a photo, video, or title card before exporting."
         )
     for clip in source_rows:
+        if clip.item_kind == ITEM_KIND_COLLAGE or clip.kind == COLLAGE_KIND:
+            raise StudioExportError(
+                "Collage MP4 export is not available yet; finish the collage export work package first."
+            )
         if clip.item_kind != TITLE_CARD_KIND:
             _require_clip_source(db, clip)
     heights = collect_project_video_heights(db, project.id)

@@ -146,6 +146,11 @@ from orga_drone.studio_overlay import (
     resolve_overlay_asset,
     store_overlay_asset,
 )
+from orga_drone.studio_collage import (
+    COLLAGE_KIND,
+    collage_spec_from_raw,
+    public_collage_spec,
+)
 from orga_drone.studio_title_card import TITLE_CARD_KIND, display_lines
 from orga_drone.studio_transition import (
     apply_for_items,
@@ -1361,7 +1366,7 @@ def create_app() -> FastAPI:
             summary = summarize_studio_items(items)
             thumb_id: int | None = None
             for item in items:
-                if item.item_kind == "title_card" or item.source_media_id is None:
+                if item.item_kind in {"title_card", "collage"} or item.source_media_id is None:
                     continue
                 media = db.get_media(item.source_media_id)
                 if media is None or resolve_media_file(db, media) is None:
@@ -1471,7 +1476,11 @@ def create_app() -> FastAPI:
                     available=it.available,
                     source_in_s=it.source_start,
                     source_out_s=it.source_end,
-                    card_duration_s=it.card_duration_s,
+                    card_duration_s=(
+                        it.collage_duration_s
+                        if it.kind == COLLAGE_KIND
+                        else it.card_duration_s
+                    ),
                     section_repeats=1,
                 )
                 seconds: float | None
@@ -1499,6 +1508,9 @@ def create_app() -> FastAPI:
                     display_title, display_subtitle = display_lines(
                         it.title_text, it.subtitle_text, lang
                     )
+                elif it.kind == COLLAGE_KIND:
+                    display_title = get_translator(lang)("Collage")
+                    display_subtitle = ""
                 elif it.available and it.media_id is not None:
                     media_row = db.get_media(it.media_id)
                     if media_row is not None:
@@ -1557,14 +1569,25 @@ def create_app() -> FastAPI:
                             it.card_duration_s
                             if it.kind == TITLE_CARD_KIND and it.card_duration_s is not None
                             else (
-                                it.photo_duration_s
-                                if it.kind == "photo" and it.photo_duration_s is not None
+                                it.collage_duration_s
+                                if it.kind == COLLAGE_KIND
+                                and it.collage_duration_s is not None
                                 else (
-                                    DEFAULT_PHOTO_DURATION_S
+                                    it.photo_duration_s
                                     if it.kind == "photo"
-                                    else seconds
+                                    and it.photo_duration_s is not None
+                                    else (
+                                        DEFAULT_PHOTO_DURATION_S
+                                        if it.kind == "photo"
+                                        else seconds
+                                    )
                                 )
                             )
+                        ),
+                        "collage_spec": (
+                            public_collage_spec(collage_spec_from_raw(it.collage_spec))
+                            if it.kind == COLLAGE_KIND and it.collage_spec
+                            else None
                         ),
                         "stream_url": stream_url,
                         "proxy_url": proxy_url,
@@ -2106,6 +2129,98 @@ def create_app() -> FastAPI:
                 "subtitle": clip.subtitle_text or "",
                 "duration_s": clip.card_duration_s,
                 "background": clip.background,
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.post("/api/studio/collages")
+    async def api_studio_add_collage(request: Request) -> JSONResponse:
+        open_project = db.resolve_studio_page_project()
+        if open_project is None:
+            raise HTTPException(status_code=400, detail="no studio project open")
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        preset = payload.get("preset")
+        if preset is not None and not isinstance(preset, str):
+            raise HTTPException(status_code=400, detail="preset must be a string")
+        try:
+            with story_edit(db, open_project.id, group=_history_group(request)):
+                clip = db.add_studio_collage(
+                    open_project.id,
+                    preset=preset,
+                    collage_spec=payload.get("spec"),
+                    collage_duration_s=(
+                        float(payload["duration_s"])
+                        if isinstance(payload.get("duration_s"), (int, float))
+                        and not isinstance(payload.get("duration_s"), bool)
+                        else None
+                    ),
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        items = db.list_studio_items(open_project.id)
+        summary = _studio_summary(open_project.id, items)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": clip.id,
+                "duration_s": clip.collage_duration_s,
+                "collage_spec": (
+                    public_collage_spec(collage_spec_from_raw(clip.collage_spec))
+                    if clip.collage_spec
+                    else None
+                ),
+                "summary": summary.as_dict(),
+            }
+        )
+
+    @app.patch("/api/studio/{studio_item_id}/collage")
+    async def api_studio_patch_collage(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        kwargs: dict[str, Any] = {}
+        if "spec" in payload:
+            kwargs["collage_spec"] = payload.get("spec")
+        if "duration_s" in payload:
+            raw = payload.get("duration_s")
+            if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+                raise HTTPException(status_code=400, detail="duration_s must be a number")
+            kwargs["collage_duration_s"] = float(raw)
+        if not kwargs:
+            raise HTTPException(status_code=400, detail="no collage fields to update")
+        try:
+            with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
+                clip = db.update_studio_collage(studio_item_id, **kwargs)
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg:
+                raise HTTPException(status_code=404, detail=msg) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        items = db.list_studio_items(clip.project_id)
+        summary = _studio_summary(clip.project_id, items)
+        return JSONResponse(
+            {
+                "ok": True,
+                "id": clip.id,
+                "duration_s": clip.collage_duration_s,
+                "collage_spec": (
+                    public_collage_spec(collage_spec_from_raw(clip.collage_spec))
+                    if clip.collage_spec
+                    else None
+                ),
                 "summary": summary.as_dict(),
             }
         )
