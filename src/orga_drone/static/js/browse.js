@@ -55,7 +55,16 @@
   const bulkForm = document.getElementById("browse-bulk-studio");
   const bulkSubmit = document.getElementById("browse-bulk-submit");
   const bulkCount = document.getElementById("browse-bulk-count");
+  const projectDialog = document.getElementById("browse-studio-project-dialog");
+  const projectList = document.getElementById("browse-studio-project-list");
+  const projectEmpty = document.getElementById("browse-studio-project-empty");
+  const projectMode = document.getElementById("browse-bulk-project-mode");
+  const projectIdInput = document.getElementById("browse-bulk-project-id");
+  const projectTitleInput = document.getElementById("browse-bulk-project-title");
+  const openStudioInput = document.getElementById("browse-bulk-open-studio");
+  const newTitleInput = document.getElementById("browse-studio-new-title");
   if (bulkForm && bulkSubmit) {
+    let chooserReady = false;
     const syncBulk = () => {
       const selected = document.querySelectorAll(
         'input.browse-select-input[name="media_ids"][form="browse-bulk-studio"]:checked:not(:disabled)'
@@ -71,6 +80,57 @@
           bulkCount.textContent = "";
         }
       }
+    };
+    const resetChooserFields = () => {
+      if (projectMode) projectMode.value = "";
+      if (projectIdInput) projectIdInput.value = "";
+      if (projectTitleInput) projectTitleInput.value = "";
+      if (openStudioInput) openStudioInput.value = "";
+      chooserReady = false;
+    };
+    const renderProjects = (projects) => {
+      if (!projectList) return;
+      projectList.replaceChildren();
+      const rows = Array.isArray(projects) ? projects : [];
+      if (projectEmpty) projectEmpty.hidden = rows.length > 0;
+      for (const row of rows) {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "button secondary browse-studio-project-pick";
+        btn.textContent = row.title || `Project ${row.id}`;
+        btn.dataset.projectId = String(row.id);
+        btn.addEventListener("click", () => {
+          if (projectMode) projectMode.value = "existing";
+          if (projectIdInput) projectIdInput.value = String(row.id);
+          if (openStudioInput) openStudioInput.value = "1";
+          chooserReady = true;
+          if (typeof projectDialog?.close === "function") projectDialog.close();
+          bulkForm.requestSubmit();
+        });
+        li.appendChild(btn);
+        projectList.appendChild(li);
+      }
+    };
+    const openChooser = async () => {
+      if (!projectDialog || typeof projectDialog.showModal !== "function") {
+        return false;
+      }
+      try {
+        const res = await fetch("/api/studio/projects", {
+          headers: { Accept: "application/json" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          renderProjects(data.projects || []);
+        } else {
+          renderProjects([]);
+        }
+      } catch {
+        renderProjects([]);
+      }
+      projectDialog.showModal();
+      return true;
     };
     document.addEventListener("change", (event) => {
       const t = event.target;
@@ -90,9 +150,47 @@
       if (n === 0) {
         event.preventDefault();
         syncBulk();
+        return;
       }
+      if (chooserReady) {
+        return;
+      }
+      event.preventDefault();
+      void openChooser();
+    });
+    document.getElementById("browse-studio-new")?.addEventListener("click", () => {
+      if (projectMode) projectMode.value = "new";
+      if (projectTitleInput) {
+        projectTitleInput.value = (newTitleInput && newTitleInput.value.trim()) || "Your story";
+      }
+      if (openStudioInput) openStudioInput.value = "1";
+      chooserReady = true;
+      if (typeof projectDialog?.close === "function") projectDialog.close();
+      bulkForm.requestSubmit();
+    });
+    document.getElementById("browse-studio-cancel")?.addEventListener("click", () => {
+      resetChooserFields();
+      if (typeof projectDialog?.close === "function") projectDialog.close();
+    });
+    projectDialog?.addEventListener("cancel", () => {
+      resetChooserFields();
     });
     syncBulk();
+    // After a missing/invalid project redirect, selection is restored via
+    // checked checkboxes; reopen the chooser so the user can retry.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("msg") === "studio_choose_project") {
+        const n = document.querySelectorAll(
+          'input.browse-select-input[name="media_ids"][form="browse-bulk-studio"]:checked:not(:disabled)'
+        ).length;
+        if (n > 0) {
+          void openChooser();
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   const FILTER_KEY = "orga-drone:browse-filters";

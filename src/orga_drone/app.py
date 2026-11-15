@@ -950,6 +950,7 @@ def create_app() -> FastAPI:
         msg: str | None = None,
         added: int | None = None,
         skipped: int | None = None,
+        selected: str | None = None,
     ) -> HTMLResponse:
         has_gps = {"yes": True, "no": False}.get(gps or "")
         flows_only = {"yes": True, "no": False}.get(flows or "")
@@ -1022,6 +1023,20 @@ def create_app() -> FastAPI:
             if open_project is not None
             else set()
         )
+        selected_media_ids: set[int] = set()
+        for part in str(selected or "").split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                mid = int(part)
+            except ValueError:
+                continue
+            if mid > 0:
+                selected_media_ids.add(mid)
+        # Cap restored selection to one oversized page (same as bulk-add).
+        if len(selected_media_ids) > max(BROWSE_PAGE_SIZES):
+            selected_media_ids = set(sorted(selected_media_ids)[: max(BROWSE_PAGE_SIZES)])
         favorite_filter = favorite or ""
         if not favorite_filter and search.favorite is True:
             favorite_filter = "yes"
@@ -1096,6 +1111,7 @@ def create_app() -> FastAPI:
             flash_msg=msg,
             flash_added=added,
             flash_skipped=skipped,
+            selected_media_ids=selected_media_ids,
             timeline_nav=timeline_nav,
             timeline_groups=timeline_groups,
         )
@@ -5086,7 +5102,13 @@ def create_app() -> FastAPI:
 
     @app.post("/studio/add-bulk")
     async def studio_add_bulk(request: Request) -> RedirectResponse:
-        """Add selected Browse media IDs to the open Studio project (skip existing)."""
+        """Add selected Browse media IDs to a Studio project (skip existing).
+
+        ``project_mode=new|existing`` chooses or creates the target (#466).
+        Without a mode, the currently open project is used. A missing open
+        project no longer drops the selection into ``studio_need_project``;
+        Browse receives ``studio_choose_project`` so the chooser can retry.
+        """
         form = await request.form()
         return_to = str(form.get("return_to") or "browse")
         raw_ids = form.getlist("media_ids")
@@ -5102,15 +5124,67 @@ def create_app() -> FastAPI:
         media_ids = media_ids[: max(BROWSE_PAGE_SIZES)]
 
         base = studio_bulk_return_url(return_to)
-        open_project = db.resolve_studio_page_project()
-        if open_project is None:
-            return RedirectResponse(url="/studio?msg=studio_need_project", status_code=303)
         if not media_ids:
             return RedirectResponse(url=base, status_code=303)
 
+        def choose_project_redirect() -> RedirectResponse:
+            """Return to Browse with selection preserved for chooser retry."""
+            selected = ",".join(str(mid) for mid in media_ids)
+            return RedirectResponse(
+                url=append_query_params(
+                    base, msg="studio_choose_project", selected=selected
+                ),
+                status_code=303,
+            )
+
+        mode = str(form.get("project_mode") or "").strip().lower()
+        open_studio = str(form.get("open_studio") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        target = None
+        if mode == "new":
+            title = str(form.get("project_title") or "").strip() or "Your story"
+            target = create_project(db, title, open_created=True)
+        elif mode == "existing":
+            raw_pid = form.get("project_id")
+            try:
+                pid = int(str(raw_pid))
+            except (TypeError, ValueError):
+                pid = 0
+            if pid <= 0:
+                return choose_project_redirect()
+            try:
+                target = open_project(db, pid)
+            except ProjectActionError:
+                return choose_project_redirect()
+        else:
+            target = db.resolve_studio_page_project()
+            if target is None:
+                return choose_project_redirect()
+
+        before_ids = {item.id for item in db.list_studio_items(target.id)}
         added_n, skipped_n = db.add_studio_media_ids(
-            media_ids, project_id=open_project.id
+            media_ids, project_id=target.id
         )
+        if open_studio or mode in {"new", "existing"}:
+            after = db.list_studio_items(target.id)
+            select_id = next((item.id for item in after if item.id not in before_ids), None)
+            if select_id is None and after:
+                select_id = after[-1].id
+            params: dict[str, Any] = {
+                "msg": "studio_bulk_added",
+                "added": added_n,
+                "skipped": skipped_n,
+            }
+            if select_id is not None:
+                params["select"] = select_id
+            return RedirectResponse(
+                url=append_query_params("/studio", **params),
+                status_code=303,
+            )
         dest = append_query_params(
             base,
             msg="studio_bulk_added",

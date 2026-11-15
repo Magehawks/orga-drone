@@ -304,8 +304,8 @@ def test_browse_studio_add_return_to_preserves_page_and_filters(
     assert after.status_code == 200
     assert after.text.count('class="card"') >= 1
     assert f'action="/media/{mid}/studio/add"' in after.text
-    # Membership badge / disabled control for the added path.
-    assert "In Studio" in after.text or "Im Studio" in after.text
+    # Membership badge for the open project (not the Edit-in-Studio action).
+    assert 'class="is-in-open-studio"' in after.text
 
 
 def test_browse_filter_and_sort_with_pagination(

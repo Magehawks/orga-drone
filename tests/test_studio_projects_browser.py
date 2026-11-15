@@ -416,12 +416,12 @@ def test_add_and_browse_badge_are_scoped_to_open_project(
     assert clips_b[0].media_path == item.path
 
     browse = c.get("/browse")
-    assert "In Studio" in browse.text or "Im Studio" in browse.text
+    assert 'class="is-in-open-studio"' in browse.text
 
     c.get(f"/studio?project_id={a.id}")
     browse_a = c.get("/browse")
     assert f'action="/media/{mid}/studio/add"' in browse_a.text
-    assert "In Studio" not in browse_a.text and "Im Studio" not in browse_a.text
+    assert 'class="is-in-open-studio"' not in browse_a.text
 
 
 def test_clear_only_affects_open_project(

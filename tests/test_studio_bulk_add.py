@@ -164,7 +164,8 @@ def test_bulk_add_preserves_browse_state(
     assert "page=2" in html
     assert "page_size=100" in html
     assert 'class="browse-select-input"' in html
-    assert "Add selected to Studio" in html or "Auswahl zum Studio hinzufügen" in html
+    assert "Edit in Studio" in html or "Im Studio bearbeiten" in html
+    assert 'id="browse-studio-project-dialog"' in html
 
     # Extract return_to from bulk form and one selectable media id.
     form_idx = html.index('id="browse-bulk-studio"')
@@ -208,7 +209,7 @@ def test_bulk_add_preserves_browse_state(
 
     after = client.get(loc)
     assert after.status_code == 200
-    assert "In Studio" in after.text or "Im Studio" in after.text
+    assert 'class="is-in-open-studio"' in after.text
     assert f'value="{mid}"' in after.text
 
 
@@ -256,7 +257,7 @@ def test_bulk_add_empty_and_invalid_ids(
     assert evil.headers["location"].startswith("/browse?")
 
 
-def test_bulk_add_needs_open_project(
+def test_bulk_add_without_open_project_asks_chooser(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = _app(tmp_path, monkeypatch)
@@ -274,7 +275,185 @@ def test_bulk_add_needs_open_project(
         follow_redirects=False,
     )
     assert resp.status_code == 303
-    assert resp.headers["location"] == "/studio?msg=studio_need_project"
+    loc = resp.headers["location"]
+    assert loc.startswith("/browse?")
+    qs = parse_qs(urlparse(loc).query)
+    assert qs.get("msg") == ["studio_choose_project"]
+    assert qs.get("selected") == [str(ids[0])]
+    assert db.list_studio_projects() == []
+    page = client.get(loc)
+    assert page.status_code == 200
+    import re
+
+    checked = re.search(
+        rf'name="media_ids" value="{ids[0]}"[^>]*checked',
+        page.text,
+    ) or re.search(
+        rf'value="{ids[0]}"[^>]*form="browse-bulk-studio"[^>]*checked',
+        page.text,
+    )
+    assert checked is not None
+
+
+def test_bulk_add_missing_project_preserves_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    ids = _seed_many(db, tmp_path / "lib", 2)
+    client = TestClient(app)
+    project = db.ensure_default_studio_project()
+
+    resp = client.post(
+        "/studio/add-bulk",
+        data={
+            "return_to": "/browse",
+            "media_ids": [str(ids[0]), str(ids[1])],
+            "project_mode": "existing",
+            "project_id": "999999",
+            "open_studio": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    qs = parse_qs(urlparse(resp.headers["location"]).query)
+    assert qs.get("msg") == ["studio_choose_project"]
+    selected = qs.get("selected", [""])[0].split(",")
+    assert str(ids[0]) in selected and str(ids[1]) in selected
+    assert db.list_studio_items(project.id) == []
+
+    page = client.get(resp.headers["location"])
+    assert page.status_code == 200
+    import re
+
+    for mid in ids:
+        assert (
+            re.search(rf'name="media_ids" value="{mid}"[^>]*checked', page.text)
+            or re.search(
+                rf'value="{mid}"[^>]*form="browse-bulk-studio"[^>]*checked',
+                page.text,
+            )
+        )
+
+
+def test_bulk_add_allows_media_already_in_open_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    ids = _seed_many(db, tmp_path / "lib", 1)
+    client = TestClient(app)
+    open_proj = _open_project(db, client)
+    media = db.get_media(ids[0])
+    assert media is not None
+    db.add_studio_item(
+        media.path,
+        identity_key=make_identity_key(media.filename, media.size_bytes, media.recorded_at),
+        filename=media.filename,
+        recorded_at=media.recorded_at,
+        kind=media.kind,
+        project_id=open_proj.id,
+        source_media_id=media.id,
+    )
+    other = db.create_studio_project("Other story")
+
+    browse = client.get("/browse")
+    assert browse.status_code == 200
+    import re
+
+    checkbox = re.search(
+        rf'<input[^>]*name="media_ids" value="{ids[0]}"[^>]*>',
+        browse.text,
+    ) or re.search(
+        rf'<input[^>]*value="{ids[0]}"[^>]*form="browse-bulk-studio"[^>]*>',
+        browse.text,
+    )
+    assert checkbox is not None
+    assert "disabled" not in checkbox.group(0)
+
+    resp = client.post(
+        "/studio/add-bulk",
+        data={
+            "return_to": "/browse",
+            "media_ids": [str(ids[0])],
+            "project_mode": "existing",
+            "project_id": str(other.id),
+            "open_studio": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"].startswith("/studio?")
+    assert len(db.list_studio_items(other.id)) == 1
+    assert len(db.list_studio_items(open_proj.id)) == 1
+
+
+def test_bulk_add_new_project_opens_studio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    ids = _seed_many(db, tmp_path / "lib", 2)
+    client = TestClient(app)
+    db.set_open_studio_project_id(None)
+    for p in db.list_studio_projects():
+        db.delete_studio_project(p.id)
+
+    resp = client.post(
+        "/studio/add-bulk",
+        data={
+            "return_to": "/browse",
+            "media_ids": [str(ids[0]), str(ids[1])],
+            "project_mode": "new",
+            "project_title": "Flight set",
+            "open_studio": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    loc = resp.headers["location"]
+    assert loc.startswith("/studio?")
+    qs = parse_qs(urlparse(loc).query)
+    assert qs.get("msg") == ["studio_bulk_added"]
+    assert qs.get("added") == ["2"]
+    assert "select" in qs
+    projects = db.list_studio_projects()
+    assert len(projects) == 1
+    assert projects[0].title == "Flight set"
+    opened = db.get_open_studio_project()
+    assert opened is not None and opened.id == projects[0].id
+    assert len(db.list_studio_items(projects[0].id)) == 2
+
+
+def test_bulk_add_existing_project_opens_studio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    ids = _seed_many(db, tmp_path / "lib", 1)
+    client = TestClient(app)
+    project = db.ensure_default_studio_project()
+    other = db.create_studio_project("Keep me")
+    db.set_open_studio_project_id(other.id)
+
+    resp = client.post(
+        "/studio/add-bulk",
+        data={
+            "return_to": "/browse",
+            "media_ids": [str(ids[0])],
+            "project_mode": "existing",
+            "project_id": str(project.id),
+            "open_studio": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    loc = resp.headers["location"]
+    assert loc.startswith("/studio?")
+    opened = db.get_open_studio_project()
+    assert opened is not None and opened.id == project.id
+    assert len(db.list_studio_items(project.id)) == 1
+    assert db.list_studio_items(other.id) == []
 
 
 def test_list_view_renders_bulk_controls(

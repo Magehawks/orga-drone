@@ -1369,6 +1369,51 @@ button.cta, .button.cta {
   cursor: default;
 }
 .browse-bulk-hint { font-size: 0.85rem; }
+.browse-studio-project-dialog {
+  max-width: min(420px, 92vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg);
+}
+.browse-studio-project-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.browse-studio-project-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 1.1rem 1.15rem;
+}
+.browse-studio-project-panel h2,
+.browse-studio-project-panel h3 {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+.browse-studio-project-label {
+  font-size: 0.85rem;
+}
+.browse-studio-project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.browse-studio-project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+.browse-studio-project-list .button {
+  width: 100%;
+  justify-content: flex-start;
+}
 .browse-select {
   display: inline-flex;
   align-items: center;
