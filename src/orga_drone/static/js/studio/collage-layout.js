@@ -1,14 +1,6 @@
 /** Pure collage layout helpers (ADR 0038). Mirror of studio_collage.py geometry. */
 
-export const PRESET_NAMES = Object.freeze([
-  "1+1",
-  "2+1",
-  "1+2",
-  "2x2",
-  "3x2",
-  "1+2+1",
-  "3|2",
-]);
+export const PRESET_NAMES = Object.freeze(["1+1", "2+1", "1+2", "2x2", "3x2", "1+2+1", "3|2"]);
 
 export const MIN_RATIO = 0.05;
 export const MAX_RATIO = 0.95;

@@ -110,7 +110,7 @@ export function createCollageEditor(opts) {
     stage.style.background = bg;
     stage.style.aspectRatio = aspectCss(spec);
     const width = Math.max(1, Math.round(stage.clientWidth || 640));
-    const height = Math.max(1, Math.round(stage.clientHeight || width * 9 / 16));
+    const height = Math.max(1, Math.round(stage.clientHeight || (width * 9) / 16));
     const rects = resolveRects(spec, width, height);
     const leaves = iterLeaves(spec.root);
     const emptyLabel = msg("collageEmptyCell", "Empty cell");
@@ -171,9 +171,7 @@ export function createCollageEditor(opts) {
     opts.showInspector("inspector-collage");
     const spec = parseSpec(clip) || {};
     if (durationEl) {
-      durationEl.value = String(
-        clip.dataset.collageDuration || spec.duration_s || "5"
-      );
+      durationEl.value = String(clip.dataset.collageDuration || spec.duration_s || "5");
     }
     if (presetEl) {
       const names = Array.isArray(spec.presets) ? spec.presets : PRESET_NAMES;
@@ -181,8 +179,7 @@ export function createCollageEditor(opts) {
       presetEl.value = names.includes(presetEl.value) ? presetEl.value : "1+1";
     }
     if (aspectEl) {
-      const aspect =
-        typeof spec.aspect === "string" ? spec.aspect : "16:9";
+      const aspect = typeof spec.aspect === "string" ? spec.aspect : "16:9";
       aspectEl.value = aspect;
     }
     if (gapEl) gapEl.value = String(spec.gap_px ?? 8);
@@ -219,23 +216,17 @@ export function createCollageEditor(opts) {
   document.getElementById("inspector-collage-aspect")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !aspectEl) return;
-    queueSave(clip, { aspect: aspectEl.value }, "collage-aspect").then(() =>
-      renderPreview(clip)
-    );
+    queueSave(clip, { aspect: aspectEl.value }, "collage-aspect").then(() => renderPreview(clip));
   });
   document.getElementById("inspector-collage-gap")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !gapEl) return;
-    queueSave(clip, { gap_px: Number(gapEl.value) }, "collage-gap").then(() =>
-      renderPreview(clip)
-    );
+    queueSave(clip, { gap_px: Number(gapEl.value) }, "collage-gap").then(() => renderPreview(clip));
   });
   document.getElementById("inspector-collage-background")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !bgEl) return;
-    queueSave(clip, { background: bgEl.value }, "collage-bg").then(() =>
-      renderPreview(clip)
-    );
+    queueSave(clip, { background: bgEl.value }, "collage-bg").then(() => renderPreview(clip));
   });
   document.getElementById("inspector-collage-split-h")?.addEventListener("click", () => {
     const clip = opts.getSelectedClip();
@@ -267,10 +258,7 @@ export function createCollageEditor(opts) {
       drag.dir === "h"
         ? ((event.clientX - rect.left) / rect.width) * (stage.clientWidth || rect.width)
         : ((event.clientY - rect.top) / rect.height) * (stage.clientHeight || rect.height);
-    const ratio = Math.max(
-      0.05,
-      Math.min(0.95, (pos - drag.origin) / Math.max(1, drag.span))
-    );
+    const ratio = Math.max(0.05, Math.min(0.95, (pos - drag.origin) / Math.max(1, drag.span)));
     drag.pendingRatio = ratio;
     // Live visual only via re-render with local mutation would need a draft;
     // keep pointer feedback light until pointerup persists.
@@ -279,7 +267,12 @@ export function createCollageEditor(opts) {
     if (!drag) return;
     const { clip, splitId, pendingRatio, startRatio } = drag;
     drag = null;
-    if (pendingRatio === null || pendingRatio === undefined || Math.abs(pendingRatio - startRatio) < 0.001) return;
+    if (
+      pendingRatio === null ||
+      pendingRatio === undefined ||
+      Math.abs(pendingRatio - startRatio) < 0.001
+    )
+      return;
     queueSave(
       clip,
       { op: "set_ratio", split_id: splitId, ratio: pendingRatio },
