@@ -88,8 +88,13 @@ export function createCollagePlayback(opts) {
   const mediaEls = new Map();
   let activeStudioId = null;
   let fallback = false;
+  /** @type {HTMLImageElement | null} */
+  let composedEl = null;
+  let composedObjectUrl = null;
+  let composedSeq = 0;
 
   function teardown() {
+    composedSeq += 1;
     for (const el of mediaEls.values()) {
       if (el instanceof HTMLVideoElement) {
         try {
@@ -107,6 +112,14 @@ export function createCollagePlayback(opts) {
       el.remove();
     }
     mediaEls.clear();
+    if (composedObjectUrl) {
+      URL.revokeObjectURL(composedObjectUrl);
+      composedObjectUrl = null;
+    }
+    if (composedEl) {
+      composedEl.remove();
+      composedEl = null;
+    }
     activeStudioId = null;
     fallback = false;
   }
@@ -211,6 +224,9 @@ export function createCollagePlayback(opts) {
       if (el instanceof HTMLVideoElement && url && el.getAttribute("src") !== url) {
         el.src = url;
       }
+      if (stage && !el.isConnected) {
+        stage.appendChild(el);
+      }
     }
     for (const [id, el] of [...mediaEls.entries()]) {
       if (!keep.has(id)) {
@@ -234,7 +250,43 @@ export function createCollagePlayback(opts) {
    * @param {boolean} [args.seek]
    * @param {any} [args.spec]
    */
+  async function updateComposedStill(localS) {
+    if (!fallback || !stage || !activeStudioId) return;
+    const seq = ++composedSeq;
+    try {
+      const res = await fetch(`/api/studio/${encodeURIComponent(activeStudioId)}/collage/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t_s: Number(localS) || 0 }),
+      });
+      if (seq !== composedSeq) return;
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (seq !== composedSeq) return;
+      if (!composedEl) {
+        composedEl = document.createElement("img");
+        composedEl.alt = "";
+        composedEl.className = "studio-collage-play-media studio-collage-play-composed";
+      }
+      if (composedObjectUrl) URL.revokeObjectURL(composedObjectUrl);
+      composedObjectUrl = URL.createObjectURL(blob);
+      composedEl.src = composedObjectUrl;
+      composedEl.style.left = "0";
+      composedEl.style.top = "0";
+      composedEl.style.width = "100%";
+      composedEl.style.height = "100%";
+      composedEl.style.objectFit = "fill";
+      composedEl.style.zIndex = "0";
+      if (!composedEl.isConnected) stage.appendChild(composedEl);
+    } catch {
+      /* preview endpoint may be unavailable until WP4 */
+    }
+  }
+
   function sync({ localS, playing, seek = false, spec = null }) {
+    if (fallback) {
+      void updateComposedStill(localS);
+    }
     for (const [id, el] of mediaEls.entries()) {
       if (!(el instanceof HTMLVideoElement)) continue;
       let startOffset = 0;

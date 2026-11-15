@@ -585,6 +585,7 @@ export function createCollageEditor(opts) {
   }
 
   function hidePreview() {
+    playback.teardown();
     if (preview) preview.hidden = true;
     if (stage) stage.replaceChildren();
     selectedLeafId = null;
