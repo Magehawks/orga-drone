@@ -84,6 +84,7 @@ function harness() {
   const context = vm.createContext({
     state,
     rampEditor: null,
+    collageEditor: null,
     reuseDraft: null,
     syncToken: 0,
     loadedVideoSrc: "",
