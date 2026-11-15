@@ -913,6 +913,34 @@ export function createCollageEditor(opts) {
 
   document.getElementById("studio-add-collage")?.addEventListener("click", addCollage);
   document.getElementById("studio-add-collage-empty")?.addEventListener("click", addCollage);
+  document.getElementById("studio-empty-create-collage")?.addEventListener("click", addCollage);
+
+  const emptyRoot = document.getElementById("studio-empty-root");
+  const emptyStart = document.getElementById("studio-empty-start");
+  const emptyHints = document.getElementById("studio-empty-hints");
+  if (emptyRoot && emptyStart && emptyHints) {
+    const projectId =
+      document.getElementById("studio-root")?.getAttribute("data-project-id") || "";
+    const dismissKey = `orga-drone:studio-empty-start:${projectId}`;
+    const showHints = () => {
+      emptyStart.hidden = true;
+      emptyHints.hidden = false;
+      try {
+        if (projectId) sessionStorage.setItem(dismissKey, "1");
+      } catch {
+        /* ignore quota / private mode */
+      }
+    };
+    try {
+      if (projectId && sessionStorage.getItem(dismissKey) === "1") {
+        showHints();
+      }
+    } catch {
+      /* ignore */
+    }
+    document.getElementById("studio-empty-edit-normal")?.addEventListener("click", showHints);
+    document.getElementById("studio-empty-skip")?.addEventListener("click", showHints);
+  }
   document.getElementById("inspector-collage-from-library")?.addEventListener("click", () => {
     openLibraryPicker();
   });

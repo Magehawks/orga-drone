@@ -2963,6 +2963,23 @@ img.studio-preview-media,
   text-align: center;
   color: var(--muted);
 }
+.studio-empty-start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+.studio-empty-hints {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.studio-empty-hints[hidden],
+.studio-empty-start[hidden] {
+  display: none;
+}
 
 .studio-transport {
   display: flex;
