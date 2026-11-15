@@ -919,8 +919,7 @@ export function createCollageEditor(opts) {
   const emptyStart = document.getElementById("studio-empty-start");
   const emptyHints = document.getElementById("studio-empty-hints");
   if (emptyRoot && emptyStart && emptyHints) {
-    const projectId =
-      document.getElementById("studio-root")?.getAttribute("data-project-id") || "";
+    const projectId = document.getElementById("studio-root")?.getAttribute("data-project-id") || "";
     const dismissKey = `orga-drone:studio-empty-start:${projectId}`;
     const showHints = () => {
       emptyStart.hidden = true;
