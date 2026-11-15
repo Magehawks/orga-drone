@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import threading
 import time
 from pathlib import Path
 
@@ -379,6 +380,41 @@ def test_inspect_and_http_export_job(
         assert img.size == (50, 102)
     assert a.read_bytes() == originals[a]
     assert b.read_bytes() == originals[b]
+
+
+def test_preview_coordinator_supersedes_older_claims() -> None:
+    from orga_drone.photo_combine import CombinePreviewCoordinator
+
+    gate = CombinePreviewCoordinator()
+    first_seq, first_cancel = gate.claim()
+    assert gate.is_current(first_seq)
+    assert not first_cancel.is_set()
+    second_seq, second_cancel = gate.claim()
+    assert first_cancel.is_set()
+    assert not second_cancel.is_set()
+    assert not gate.is_current(first_seq)
+    assert gate.is_current(second_seq)
+    gate.release(second_cancel)
+    assert gate._cancel is None  # noqa: SLF001
+
+
+def test_render_preview_respects_cancel(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from orga_drone.export.studio_encoder import ExportCancelled
+
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    root = tmp_path / "media"
+    a = root / "a.png"
+    b = root / "b.png"
+    _rgb(a, (40, 30), (1, 2, 3))
+    _rgb(b, (40, 30), (4, 5, 6))
+    ids = [_add_photo(db, root, "a.png", a), _add_photo(db, root, "b.png", b)]
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(ExportCancelled):
+        render_preview_png(db, _spec(*ids), cancel_event=cancel)
 
 
 def test_detail_page_shows_combine_entry(

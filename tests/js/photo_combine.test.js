@@ -26,4 +26,6 @@ test("photo-combine.js targets combine endpoints and dialog entry", () => {
   assert.match(src, /detail-photo-combine-open/);
   assert.match(src, /\/api\/search/);
   assert.match(src, /entry_id/);
+  assert.match(src, /AbortController/);
+  assert.match(src, /status === 409/);
 });

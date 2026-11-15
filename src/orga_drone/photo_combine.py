@@ -6,6 +6,7 @@ the still-export publish/security path. No grades, thumbs, or source mutation.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import shutil
 import tempfile
@@ -141,6 +142,31 @@ def parse_combine_payload(payload: object) -> CombineSpec:
 def require_combine_ready(spec: CombineSpec) -> None:
     if len(spec.entries) < 2:
         raise StudioExportError("Add at least one more image.")
+
+
+class CombinePreviewCoordinator:
+    """Serialize full-resolution preview composes; newer requests supersede older ones."""
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self._seq = 0
+        self._cancel: threading.Event | None = None
+
+    def claim(self) -> tuple[int, threading.Event]:
+        """Register a preview request. Cancels any in-flight render."""
+        self._seq += 1
+        if self._cancel is not None:
+            self._cancel.set()
+        cancel = threading.Event()
+        self._cancel = cancel
+        return self._seq, cancel
+
+    def is_current(self, seq: int) -> bool:
+        return seq == self._seq
+
+    def release(self, cancel: threading.Event) -> None:
+        if self._cancel is cancel:
+            self._cancel = None
 
 
 # EXIF Orientation values that swap width and height (no pixel decode needed).

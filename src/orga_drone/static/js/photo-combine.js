@@ -52,6 +52,7 @@
   let revision = 1;
   let previewUrl = null;
   let previewTimer = null;
+  let previewAbort = null;
   let inspectTimer = null;
   let jobId = null;
   let pollTimer = null;
@@ -332,16 +333,24 @@
 
   async function runPreview() {
     if (entries.length < 2) {
+      if (previewAbort) {
+        previewAbort.abort();
+        previewAbort = null;
+      }
       revokePreview();
       return;
     }
     const expectedRevision = revision;
+    if (previewAbort) previewAbort.abort();
+    previewAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
     try {
       const res = await fetch("/api/photo-combine/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(specPayload()),
+        signal: previewAbort ? previewAbort.signal : undefined,
       });
+      if (res.status === 409) return;
       if (!res.ok) {
         const data = await res.json().catch(function () { return null; });
         setError((data && data.detail) || msg.failed);
@@ -356,7 +365,8 @@
       previewImg.src = previewUrl;
       previewImg.hidden = false;
       if (previewHint) previewHint.hidden = true;
-    } catch (_err) {
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
       revokePreview();
     }
   }

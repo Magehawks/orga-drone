@@ -4465,9 +4465,13 @@ def create_app() -> FastAPI:
             raise _media_export_error(exc, translate) from exc
         return JSONResponse({"ok": True, **result})
 
+    from orga_drone.photo_combine import CombinePreviewCoordinator
+
+    photo_combine_preview_gate = CombinePreviewCoordinator()
+
     @app.post("/api/photo-combine/preview")
     async def api_photo_combine_preview(request: Request) -> Response:
-        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
         from orga_drone.photo_combine import parse_combine_payload, render_preview_png
 
         try:
@@ -4477,9 +4481,24 @@ def create_app() -> FastAPI:
         translate = get_translator(lang_from_request(request))
         try:
             spec = parse_combine_payload(payload)
-            data = await asyncio.to_thread(render_preview_png, db, spec)
         except StudioExportError as exc:
             raise _media_export_error(exc, translate) from exc
+
+        my_seq, cancel_event = photo_combine_preview_gate.claim()
+        async with photo_combine_preview_gate.lock:
+            if not photo_combine_preview_gate.is_current(my_seq):
+                photo_combine_preview_gate.release(cancel_event)
+                return Response(status_code=409)
+            try:
+                data = await asyncio.to_thread(
+                    render_preview_png, db, spec, cancel_event=cancel_event
+                )
+            except ExportCancelled:
+                return Response(status_code=409)
+            except StudioExportError as exc:
+                raise _media_export_error(exc, translate) from exc
+            finally:
+                photo_combine_preview_gate.release(cancel_event)
         return Response(content=data, media_type="image/png")
 
     @app.post("/api/photo-combine/export")
