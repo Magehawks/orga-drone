@@ -2,10 +2,10 @@
 
 Status: **discovery complete for planning** (not shipped).  
 Tracking issue: [#465](https://github.com/Magehawks/orga-drone/issues/465).  
-Baseline: `origin/develop` @ `a183334` (after Photo Image Composer #453 / PR #454).  
-Collage Composer baseline: epic [#456](https://github.com/Magehawks/orga-drone/issues/456), ADR 0038 +
-`docs/architecture/STUDIO_COLLAGE_COMPOSER.md` on branch `feat/457-studio-collage-model`
-(worktree `orga-drone-wt/studio-collage`; docs committed, WP1 code not yet on develop).
+Baseline: `origin/develop` @ `27c7e87` (includes Collage WP1 #457 / PR #471).  
+Collage Composer baseline: epic [#456](https://github.com/Magehawks/orga-drone/issues/456), ADR 0038
+(Accepted) + `docs/architecture/STUDIO_COLLAGE_COMPOSER.md`. WP1 persistence is on develop;
+WP2+ UI/media/export remain in flight (PRs #472 / #473 and later WPs).
 
 Implementation ideas (`status:idea`, not `ready-for-dev`):
 
@@ -83,7 +83,7 @@ Copy today: **Add selected to Studio** / **Add to Studio**, not “Edit in Studi
 ### 3.3 Timeline / clip model
 
 - Ordered `studio_clips` per `studio_projects` (`position`).
-- `item_kind`: `media` | `title_card` on develop; collage adds `collage` (ADR 0038).
+- `item_kind`: `media` | `title_card` | `collage` on develop (ADR 0038 / WP1).
 - Duration: video trim/speed/ramps; photos `photo_duration_s`; title cards
   `card_duration_s`; collage will use `collage_duration_s`.
 - Grades/framing/overlays live in `effect_settings` (and canonical grade) on
@@ -114,7 +114,9 @@ Locked by ADR 0038 / epic #456:
   contract; apply once on leaf render (still + export).
 - `photo_combine` unchanged.
 
-Work packages: WP1–WP7 = issues #457–#463 (`status:ready-for-dev`).
+Work packages: WP1–WP7 = issues #457–#463. WP1 closed on develop; WP2–WP7
+`status:ready-for-dev` until each lands. External collage leaves use opaque
+`source_key` handles for public round-trips (WP1 review follow-up).
 
 ## 4. Proposed end-to-end UX flow
 
