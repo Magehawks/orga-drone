@@ -191,6 +191,7 @@ function harness() {
     "clearTimedSelection",
     "layoutEffectBars",
     "layoutClipAudio",
+    "syncLeafGradeUnsupportedChrome",
   ])
     context[name] = noop;
   for (const name of [

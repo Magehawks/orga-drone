@@ -3349,6 +3349,51 @@ class Database:
         assert clip is not None
         return clip
 
+    def set_studio_collage_leaf_grade(
+        self,
+        studio_item_id: int,
+        leaf_id: str,
+        *,
+        section: str,
+        payload: dict[str, object],
+    ) -> StudioClip:
+        """Patch one collage leaf grade using shared Color Workspace helpers (#469)."""
+        from orga_drone.studio_collage import ITEM_KIND_COLLAGE, collage_spec_from_raw
+        from orga_drone.studio_collage_grade import (
+            apply_color_look,
+            apply_color_wheels,
+            apply_hsl,
+            apply_image_adjust,
+            clear_leaf_grade,
+        )
+
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT project_id, item_kind, collage_spec FROM studio_clips WHERE id = ?",
+                (studio_item_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("studio item not found")
+        if str(row["item_kind"] or "") != ITEM_KIND_COLLAGE:
+            raise ValueError("not a collage")
+        spec = collage_spec_from_raw(
+            str(row["collage_spec"]) if row["collage_spec"] is not None else None
+        )
+        key = str(section or "").strip().lower()
+        if key == "image":
+            next_spec = apply_image_adjust(spec, leaf_id, payload)
+        elif key == "hsl":
+            next_spec = apply_hsl(spec, leaf_id, payload)
+        elif key in {"color-wheels", "color_wheels", "wheels"}:
+            next_spec = apply_color_wheels(spec, leaf_id, payload)
+        elif key in {"color", "color_look", "lut"}:
+            next_spec = apply_color_look(spec, leaf_id, payload)
+        elif key in {"clear", "reset"}:
+            next_spec = clear_leaf_grade(spec, leaf_id)
+        else:
+            raise ValueError(f"unknown collage leaf grade section: {section}")
+        return self.update_studio_collage(studio_item_id, collage_spec=next_spec)
+
     def update_studio_collage(
         self,
         studio_item_id: int,
