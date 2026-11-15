@@ -5,8 +5,10 @@ import {
   MAX_CONCURRENT_COLLAGE_VIDEOS,
   countVideoLeaves,
   leafMediaUrl,
+  leafNeedsFramedStill,
   leafSourceTime,
   shouldUseStillFallback,
+  specNeedsFramedStill,
 } from "../../src/orga_drone/static/js/studio/collage-playback.js";
 
 describe("collage-playback timing", () => {
@@ -41,5 +43,28 @@ describe("collage-playback timing", () => {
     assert.equal(countVideoLeaves(spec), 2);
     assert.equal(leafMediaUrl(9, spec.root.a), "/media/3/stream");
     assert.equal(leafMediaUrl(9, spec.root.b.b), "/api/studio/9/collage/leaves/c/stream");
+    assert.equal(
+      leafMediaUrl(9, {
+        id: "d",
+        media: { source: "library", identity_key: "abc", kind: "photo" },
+      }),
+      "/api/studio/9/collage/leaves/d/stream",
+    );
+  });
+
+  it("detects non-default zoom/pan framing", () => {
+    assert.equal(leafNeedsFramedStill({ zoom: 1, pan_x: 0.5, pan_y: 0.5 }), false);
+    assert.equal(leafNeedsFramedStill({ zoom: 1.4, pan_x: 0.5, pan_y: 0.5 }), true);
+    assert.equal(leafNeedsFramedStill({ zoom: 1, pan_x: 0.2, pan_y: 0.5 }), true);
+    assert.equal(
+      specNeedsFramedStill({
+        root: {
+          type: "leaf",
+          id: "a",
+          media: { source: "library", media_id: 1, kind: "photo", zoom: 1.2 },
+        },
+      }),
+      true,
+    );
   });
 });

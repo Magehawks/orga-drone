@@ -58,23 +58,63 @@ export function shouldUseStillFallback(videoLeafCount, cap = MAX_CONCURRENT_COLL
 }
 
 /**
- * Stream URL for a collage leaf. External leaves use the Studio leaf stream route.
+ * Stream URL for a collage leaf. External and identity-key library leaves use
+ * the Studio leaf stream route (server resolves paths / identity_key).
  * @param {string|number} studioId
  * @param {any} leaf
  */
 export function leafMediaUrl(studioId, leaf) {
   const media = leaf && leaf.media;
   if (!media) return null;
-  if (media.source === "library" && media.media_id) {
-    if (String(media.kind || "").toLowerCase() === "video") {
+  const leafStream = () =>
+    `/api/studio/${encodeURIComponent(String(studioId))}/collage/leaves/${encodeURIComponent(String(leaf.id))}/stream`;
+  if (media.source === "library") {
+    if (media.media_id) {
       return `/media/${media.media_id}/stream`;
     }
-    return `/media/${media.media_id}/stream`;
+    if (media.identity_key) {
+      return leafStream();
+    }
+    return null;
   }
   if (media.source === "external" && media.has_path) {
-    return `/api/studio/${encodeURIComponent(String(studioId))}/collage/leaves/${encodeURIComponent(String(leaf.id))}/stream`;
+    return leafStream();
   }
   return null;
+}
+
+/**
+ * True when live object-fit alone cannot match the saved framing window.
+ * @param {any} media
+ */
+export function leafNeedsFramedStill(media) {
+  if (!media) return false;
+  const zoom = Number(media.zoom);
+  const panX = Number(media.pan_x);
+  const panY = Number(media.pan_y);
+  if (Number.isFinite(zoom) && Math.abs(zoom - 1) > 0.001) return true;
+  if (Number.isFinite(panX) && Math.abs(panX - 0.5) > 0.001) return true;
+  if (Number.isFinite(panY) && Math.abs(panY - 0.5) > 0.001) return true;
+  return false;
+}
+
+/**
+ * @param {any} spec
+ */
+export function specNeedsFramedStill(spec) {
+  if (!spec || !spec.root) return false;
+  let needed = false;
+  const walk = (node) => {
+    if (!node || needed) return;
+    if (node.type === "leaf") {
+      if (leafNeedsFramedStill(node.media)) needed = true;
+      return;
+    }
+    walk(node.a);
+    walk(node.b);
+  };
+  walk(spec.root);
+  return needed;
 }
 
 /**
@@ -171,7 +211,10 @@ export function createCollagePlayback(opts) {
   function mount({ spec, studioId, rects, width, height, forceStill = false }) {
     if (!stage || !spec) return;
     const videoCount = countVideoLeaves(spec);
-    fallback = Boolean(forceStill) || shouldUseStillFallback(videoCount);
+    fallback =
+      Boolean(forceStill) ||
+      shouldUseStillFallback(videoCount) ||
+      specNeedsFramedStill(spec);
     activeStudioId = String(studioId || "");
     const keep = new Set();
     const leaves = [];
@@ -276,7 +319,7 @@ export function createCollagePlayback(opts) {
         if (media && media.source === "library" && media.media_id) {
           el.src = `/media/${media.media_id}/thumb`;
         } else if (url && !(el instanceof HTMLVideoElement)) {
-          /* photos via stream; videos in fallback stay on thumb when available */
+          /* photos via stream (incl. identity_key library); videos keep no thumb */
           if (media && String(media.kind || "").toLowerCase() === "photo") {
             const key = media.source_key ? String(media.source_key) : "";
             el.src = key ? url + "?v=" + encodeURIComponent(key) : url;

@@ -2350,8 +2350,8 @@ def create_app() -> FastAPI:
         leaf_id: str,
     ) -> FileResponse:
         """Stream one collage leaf file (library or external). Paths stay server-side."""
-        from orga_drone.media_files import resolve_media_file
         from orga_drone.studio_collage import iter_leaves
+        from orga_drone.studio_collage_still import resolve_leaf_source
 
         project_id = _clip_project_id(studio_item_id)
         if project_id is None:
@@ -2372,31 +2372,7 @@ def create_app() -> FastAPI:
         media = leaf.get("media")
         if not isinstance(media, dict):
             raise HTTPException(status_code=404, detail="Collage cell has no media")
-        path: Path | None = None
-        if media.get("source") == "library":
-            media_id = media.get("media_id")
-            if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
-                raise HTTPException(status_code=404, detail="Collage media missing")
-            row = db.get_media(media_id)
-            if row is None:
-                raise HTTPException(status_code=404, detail="Collage media missing")
-            path = resolve_media_file(db, row)
-        elif media.get("source") == "external":
-            raw = str(media.get("path") or "").strip()
-            if not raw:
-                raise HTTPException(status_code=404, detail="Collage media missing")
-            try:
-                path = Path(raw).expanduser().resolve(strict=True)
-            except OSError as exc:
-                raise HTTPException(status_code=404, detail="Collage media missing") from exc
-            suffix = path.suffix.lower()
-            kind = str(media.get("kind") or "").lower()
-            photo_ok = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".dng"}
-            video_ok = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"}
-            if kind == "photo" and suffix not in photo_ok:
-                raise HTTPException(status_code=404, detail="Collage media missing")
-            if kind == "video" and suffix not in video_ok:
-                raise HTTPException(status_code=404, detail="Collage media missing")
+        path = resolve_leaf_source(db, media)
         if path is None or not path.is_file():
             raise HTTPException(status_code=404, detail="Collage media missing")
         return file_response(path)
