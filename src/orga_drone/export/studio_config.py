@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from orga_drone.studio_audio import DetachedAudio
 from orga_drone.studio_frame import FrameTransform
@@ -25,11 +26,13 @@ class StudioExportClip:
     """One timeline clip for export (references source path; never copies media)."""
 
     source_path: Path | None
-    kind: str  # photo | video | title_card
+    kind: str  # photo | video | title_card | collage
     duration_s: float
     source_start_s: float = 0.0
     source_end_s: float | None = None
     playback_speed: float = 1.0
+    # Normalized collage layout SoT for MP4 segment materialization (#462).
+    collage_spec: dict[str, Any] | None = None
     # Video only. 1 plays the in/out range once. The encoder repeats that range.
     section_repeats: int = 1
     # Derived at export time from a known soundtrack. Not a stored repeat count.
