@@ -309,7 +309,8 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
             try:
                 ox = (rect_w - new_w) // 2
                 oy = (rect_h - new_h) // 2
-                cell.paste(resized, (ox, oy), resized)
+                # Paste RGBA without a mask so source alpha is not multiplied twice.
+                cell.paste(resized, (ox, oy))
             finally:
                 resized.close()
             return cell
