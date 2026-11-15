@@ -125,7 +125,9 @@ def test_resource_limit_and_fit_window() -> None:
     assert win_fill.w < 1.0 or win_fill.h < 1.0
 
 
-def test_public_spec_strips_external_path() -> None:
+def test_public_spec_strips_external_path(tmp_path: Path) -> None:
+    existing = tmp_path / "drone.mp4"
+    existing.write_bytes(b"x")
     spec = preset_spec("1+1")
     leaf_id = iter_leaves(spec["root"])[0]["id"]
     with_ext = assign_leaf_media(
@@ -133,7 +135,7 @@ def test_public_spec_strips_external_path() -> None:
         leaf_id,
         {
             "source": "external",
-            "path": "C:/secret/drone.mp4",
+            "path": str(existing),
             "kind": "video",
             "display_name": "drone.mp4",
         },
@@ -144,6 +146,18 @@ def test_public_spec_strips_external_path() -> None:
     assert media["has_path"] is True
     assert media["display_name"] == "drone.mp4"
     assert media["source_key"].startswith("src-")
+    missing = assign_leaf_media(
+        spec,
+        leaf_id,
+        {
+            "source": "external",
+            "path": str(tmp_path / "gone.mp4"),
+            "kind": "video",
+            "display_name": "gone.mp4",
+        },
+    )
+    missing_public = public_collage_spec(missing)
+    assert iter_leaves(missing_public["root"])[0]["media"]["has_path"] is False
 
 
 def test_persist_reopen_migration_and_estimate(tmp_path: Path) -> None:
@@ -332,6 +346,8 @@ def test_http_assign_clear_and_frame_leaf_media(
     )
     assert media["fit"] == "fit"
     assert media["zoom"] == 1.5
+    clip_path = tmp_path / "clip.mp4"
+    clip_path.write_bytes(b"x")
     ext = client.patch(
         f"/api/studio/{clip_id}/collage",
         json={
@@ -339,7 +355,7 @@ def test_http_assign_clear_and_frame_leaf_media(
             "leaf_id": leaf_b,
             "media": {
                 "source": "external",
-                "path": str(tmp_path / "clip.mp4"),
+                "path": str(clip_path),
                 "kind": "video",
                 "display_name": "clip.mp4",
             },

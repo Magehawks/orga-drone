@@ -11704,6 +11704,7 @@ import {
       if (!state.selected || state.selected.type !== "clip") return null;
       return findClip(grid, state.selected.id);
     },
+    onSelectClip: (id) => selectClip(id, { movePlayhead: false }),
     showInspector,
     showFlash: showRootFlash,
     onSpecApplied: () => {

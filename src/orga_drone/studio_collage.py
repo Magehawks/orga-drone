@@ -685,7 +685,10 @@ def public_collage_spec(spec: dict[str, Any]) -> dict[str, Any]:
             if isinstance(media, dict):
                 safe = {k: v for k, v in media.items() if k != "path"}
                 if media.get("source") == "external":
-                    safe["has_path"] = True
+                    from pathlib import Path
+
+                    path = str(media.get("path") or "").strip()
+                    safe["has_path"] = bool(path and Path(path).is_file())
                     if "display_name" not in safe:
                         safe["display_name"] = "External media"
                 out["media"] = safe

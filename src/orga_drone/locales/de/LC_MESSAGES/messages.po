@@ -1079,10 +1079,10 @@ msgid "Could not save collage."
 msgstr "Collage konnte nicht gespeichert werden."
 
 msgid "From library"
-msgstr "Aus Mediathek"
+msgstr "Aus der Mediathek"
 
 msgid "From this computer"
-msgstr "Vom Computer"
+msgstr "Von diesem Computer"
 
 msgid "Clear media"
 msgstr "Medium entfernen"

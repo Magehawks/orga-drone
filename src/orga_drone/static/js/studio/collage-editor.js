@@ -49,10 +49,29 @@ export function createCollageEditor(opts) {
   ];
 
   let selectedLeafId = null;
+  let selectedLeafOwnerId = null;
   let drag = null;
   let saveChain = Promise.resolve();
   let libraryItems = [];
   let librarySelected = {};
+
+  function clipForLeafAction() {
+    const selected = opts.getSelectedClip?.();
+    if (
+      selectedLeafOwnerId &&
+      selected &&
+      String(selected.dataset?.studioId || "") === String(selectedLeafOwnerId)
+    ) {
+      return selected;
+    }
+    if (selectedLeafOwnerId) {
+      const owner = document.querySelector(
+        `.studio-clip[data-studio-id="${CSS.escape(String(selectedLeafOwnerId))}"]`
+      );
+      if (owner) return owner;
+    }
+    return selected;
+  }
 
   function msg(key, fallback) {
     const value = root?.dataset?.[key];
@@ -204,8 +223,17 @@ export function createCollageEditor(opts) {
       cell.appendChild(label);
       cell.addEventListener("click", () => {
         selectedLeafId = String(leaf.id);
+        selectedLeafOwnerId = String(clip.dataset.studioId || "");
         if (cellActions) cellActions.hidden = false;
         fillLeafFraming(clip);
+        const selected = opts.getSelectedClip?.();
+        if (
+          selectedLeafOwnerId &&
+          selected &&
+          String(selected.dataset?.studioId || "") !== selectedLeafOwnerId
+        ) {
+          opts.onSelectClip?.(selectedLeafOwnerId);
+        }
         renderPreview(clip);
       });
       stage.appendChild(cell);
@@ -508,16 +536,25 @@ export function createCollageEditor(opts) {
   }
 
   function patchSelectedLeafMedia(mutator) {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
-    const media = selectedLeafMedia(clip);
-    if (!media) return;
-    const next = mutator({ ...media });
-    queueSave(
-      clip,
-      { op: "assign_media", leaf_id: selectedLeafId, media: next },
-      gestureGroup("collage-frame")
-    ).then(() => {
+    const leafId = selectedLeafId;
+    const group = gestureGroup("collage-frame");
+    saveChain = saveChain
+      .catch(() => {})
+      .then(() => {
+        const media = selectedLeafMedia(clip);
+        if (!media) return null;
+        return patchCollage(
+          clip,
+          { op: "assign_media", leaf_id: leafId, media: mutator({ ...media }) },
+          group
+        );
+      })
+      .catch((err) => {
+        opts.showFlash(err?.message || msg("collageFailed", "Could not save collage."));
+      });
+    saveChain.then(() => {
       if (isStillSelected(clip)) renderPreview(clip);
     });
   }
@@ -563,7 +600,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-split-h")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     queueSave(
       clip,
@@ -574,7 +611,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-split-v")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     queueSave(
       clip,
@@ -585,7 +622,7 @@ export function createCollageEditor(opts) {
     });
   });
   document.getElementById("inspector-collage-remove-cell")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     const leafId = selectedLeafId;
     selectedLeafId = null;
@@ -657,7 +694,7 @@ export function createCollageEditor(opts) {
     pickComputerFiles();
   });
   document.getElementById("inspector-collage-clear-cell")?.addEventListener("click", () => {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
     queueSave(
       clip,
@@ -675,19 +712,22 @@ export function createCollageEditor(opts) {
   });
   zoomEl?.addEventListener("change", () => {
     patchSelectedLeafMedia((media) => {
-      media.zoom = Number(zoomEl.value) || 1;
+      const zoom = Number(zoomEl.value);
+      media.zoom = Number.isFinite(zoom) ? zoom : 1;
       return media;
     });
   });
   panXEl?.addEventListener("change", () => {
     patchSelectedLeafMedia((media) => {
-      media.pan_x = Number(panXEl.value) || 0.5;
+      const pan = Number(panXEl.value);
+      media.pan_x = Number.isFinite(pan) ? pan : 0.5;
       return media;
     });
   });
   panYEl?.addEventListener("change", () => {
     patchSelectedLeafMedia((media) => {
-      media.pan_y = Number(panYEl.value) || 0.5;
+      const pan = Number(panYEl.value);
+      media.pan_y = Number.isFinite(pan) ? pan : 0.5;
       return media;
     });
   });
@@ -697,8 +737,14 @@ export function createCollageEditor(opts) {
   document.getElementById("studio-collage-library-add")?.addEventListener("click", () => {
     commitLibrarySelection();
   });
+  let libraryFilterTimer = 0;
   libraryFilter?.addEventListener("input", () => {
-    renderLibraryGrid(libraryFilter.value);
+    window.clearTimeout(libraryFilterTimer);
+    libraryFilterTimer = window.setTimeout(() => {
+      loadLibraryMedia(libraryFilter.value).catch(() => {
+        renderLibraryGrid(libraryFilter.value);
+      });
+    }, 180);
   });
 
   return {
