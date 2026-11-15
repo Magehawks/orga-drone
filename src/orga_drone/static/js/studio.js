@@ -6828,6 +6828,7 @@ import {
     if (!previewVideo) return;
     if (previewImage) previewImage.hidden = true;
     hideTitlecard();
+    collageEditor?.hidePreview();
     if (previewPlaceholder) previewPlaceholder.hidden = true;
     previewVideo.hidden = false;
     applyVolume();

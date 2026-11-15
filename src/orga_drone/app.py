@@ -2222,7 +2222,19 @@ def create_app() -> FastAPI:
             if not isinstance(payload.get("preset"), str):
                 raise HTTPException(status_code=400, detail="preset must be a string")
             try:
-                kwargs["collage_spec"] = preset_spec(str(payload["preset"]))
+                current = _load_clip()
+                current_spec = collage_spec_from_raw(current.collage_spec)
+                next_spec = preset_spec(str(payload["preset"]))
+                for key in (
+                    "aspect",
+                    "gap_px",
+                    "background",
+                    "corner_radius_px",
+                    "duration_s",
+                ):
+                    if key in current_spec:
+                        next_spec[key] = current_spec[key]
+                kwargs["collage_spec"] = next_spec
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         elif payload.get("op") is not None:
