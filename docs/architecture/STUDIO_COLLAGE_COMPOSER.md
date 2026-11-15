@@ -75,7 +75,7 @@ preview placement (same math, tested).
 | Max leaves | 16 |
 | Max split depth | 8 |
 | Concurrent live videos | 4 (then composed-still fallback) |
-| Collage duration | 0.5–120 s |
+| Collage duration | 1.0–120 s |
 | Zoom | 1.0–3.0 |
 | Still preview long edge | 1280 |
 | Still / MP4 working long edge | up to 1920 (export profiles drive MP4 canvas) |
