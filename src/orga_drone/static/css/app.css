@@ -1414,6 +1414,18 @@ button.cta, .button.cta {
   width: 100%;
   justify-content: flex-start;
 }
+.browse-studio-project-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+.browse-studio-project-row .browse-studio-project-pick {
+  flex: 1 1 auto;
+}
+.browse-studio-project-row .browse-studio-project-collage {
+  flex: 0 0 auto;
+  width: auto;
+}
 .browse-select {
   display: inline-flex;
   align-items: center;

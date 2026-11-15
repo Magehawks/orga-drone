@@ -183,12 +183,15 @@
   <input type="hidden" name="project_id" id="browse-bulk-project-id" value="">
   <input type="hidden" name="project_title" id="browse-bulk-project-title" value="">
   <input type="hidden" name="open_studio" id="browse-bulk-open-studio" value="">
+  <input type="hidden" name="seed" id="browse-bulk-seed" value="">
   <button type="submit" class="button" id="browse-bulk-submit" disabled>
     {{ _('Edit in Studio') }}
   </button>
   <span class="browse-bulk-hint muted" id="browse-bulk-count" hidden></span>
 </form>
-<dialog id="browse-studio-project-dialog" class="browse-studio-project-dialog" aria-labelledby="browse-studio-project-title">
+<dialog id="browse-studio-project-dialog" class="browse-studio-project-dialog"
+        aria-labelledby="browse-studio-project-title"
+        data-collage-label="{{ _('Collage')|e }}">
   <form method="dialog" class="browse-studio-project-panel">
     <h2 id="browse-studio-project-title">{{ _('Edit in Studio') }}</h2>
     <p class="muted">{{ _('Add the selected media to a new or existing project.') }}</p>
@@ -196,9 +199,11 @@
     <input type="text" id="browse-studio-new-title" maxlength="120" value="{{ _('Your story') }}">
     <div class="browse-studio-project-actions">
       <button type="button" class="button" id="browse-studio-new" value="new">{{ _('New project') }}</button>
+      <button type="button" class="button" id="browse-studio-new-collage" value="collage">{{ _('New collage') }}</button>
       <button type="button" class="button secondary" id="browse-studio-cancel" value="cancel">{{ _('Cancel') }}</button>
     </div>
     <h3>{{ _('Existing project') }}</h3>
+    <p class="muted">{{ _('Open a project to append clips, or seed a collage with the selection.') }}</p>
     <ul id="browse-studio-project-list" class="browse-studio-project-list"></ul>
     <p class="muted" id="browse-studio-project-empty" hidden>{{ _('No Studio projects yet.') }}</p>
   </form>

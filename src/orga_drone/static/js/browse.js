@@ -62,6 +62,7 @@
   const projectIdInput = document.getElementById("browse-bulk-project-id");
   const projectTitleInput = document.getElementById("browse-bulk-project-title");
   const openStudioInput = document.getElementById("browse-bulk-open-studio");
+  const seedInput = document.getElementById("browse-bulk-seed");
   const newTitleInput = document.getElementById("browse-studio-new-title");
   if (bulkForm && bulkSubmit) {
     let chooserReady = false;
@@ -86,7 +87,17 @@
       if (projectIdInput) projectIdInput.value = "";
       if (projectTitleInput) projectTitleInput.value = "";
       if (openStudioInput) openStudioInput.value = "";
+      if (seedInput) seedInput.value = "";
       chooserReady = false;
+    };
+    const submitChooser = ({ mode, projectId, seed }) => {
+      if (projectMode) projectMode.value = mode || "";
+      if (projectIdInput) projectIdInput.value = projectId ? String(projectId) : "";
+      if (seedInput) seedInput.value = seed || "";
+      if (openStudioInput) openStudioInput.value = "1";
+      chooserReady = true;
+      if (typeof projectDialog?.close === "function") projectDialog.close();
+      bulkForm.requestSubmit();
     };
     const renderProjects = (projects) => {
       if (!projectList) return;
@@ -95,20 +106,27 @@
       if (projectEmpty) projectEmpty.hidden = rows.length > 0;
       for (const row of rows) {
         const li = document.createElement("li");
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "button secondary browse-studio-project-pick";
-        btn.textContent = row.title || `Project ${row.id}`;
-        btn.dataset.projectId = String(row.id);
-        btn.addEventListener("click", () => {
-          if (projectMode) projectMode.value = "existing";
-          if (projectIdInput) projectIdInput.value = String(row.id);
-          if (openStudioInput) openStudioInput.value = "1";
-          chooserReady = true;
-          if (typeof projectDialog?.close === "function") projectDialog.close();
-          bulkForm.requestSubmit();
+        li.className = "browse-studio-project-row";
+        const title = row.title || `Project ${row.id}`;
+        const appendBtn = document.createElement("button");
+        appendBtn.type = "button";
+        appendBtn.className = "button secondary browse-studio-project-pick";
+        appendBtn.textContent = title;
+        appendBtn.dataset.projectId = String(row.id);
+        appendBtn.addEventListener("click", () => {
+          submitChooser({ mode: "existing", projectId: row.id, seed: "" });
         });
-        li.appendChild(btn);
+        const collageBtn = document.createElement("button");
+        collageBtn.type = "button";
+        collageBtn.className = "button ghost browse-studio-project-collage";
+        collageBtn.textContent =
+          (projectDialog && projectDialog.getAttribute("data-collage-label")) || "Collage";
+        collageBtn.dataset.projectId = String(row.id);
+        collageBtn.addEventListener("click", () => {
+          submitChooser({ mode: "existing", projectId: row.id, seed: "collage" });
+        });
+        li.appendChild(appendBtn);
+        li.appendChild(collageBtn);
         projectList.appendChild(li);
       }
     };
@@ -159,14 +177,16 @@
       void openChooser();
     });
     document.getElementById("browse-studio-new")?.addEventListener("click", () => {
-      if (projectMode) projectMode.value = "new";
       if (projectTitleInput) {
         projectTitleInput.value = (newTitleInput && newTitleInput.value.trim()) || "Your story";
       }
-      if (openStudioInput) openStudioInput.value = "1";
-      chooserReady = true;
-      if (typeof projectDialog?.close === "function") projectDialog.close();
-      bulkForm.requestSubmit();
+      submitChooser({ mode: "new", seed: "" });
+    });
+    document.getElementById("browse-studio-new-collage")?.addEventListener("click", () => {
+      if (projectTitleInput) {
+        projectTitleInput.value = (newTitleInput && newTitleInput.value.trim()) || "Your story";
+      }
+      submitChooser({ mode: "new", seed: "collage" });
     });
     document.getElementById("browse-studio-cancel")?.addEventListener("click", () => {
       resetChooserFields();
