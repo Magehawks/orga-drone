@@ -48,7 +48,7 @@ describe("collage-playback timing", () => {
         id: "d",
         media: { source: "library", identity_key: "abc", kind: "photo" },
       }),
-      "/api/studio/9/collage/leaves/d/stream",
+      "/api/studio/9/collage/leaves/d/stream"
     );
   });
 
@@ -64,7 +64,7 @@ describe("collage-playback timing", () => {
           media: { source: "library", media_id: 1, kind: "photo", zoom: 1.2 },
         },
       }),
-      true,
+      true
     );
   });
 });

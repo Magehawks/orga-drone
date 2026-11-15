@@ -187,11 +187,14 @@ export function createCollageEditor(opts) {
     }
   }
 
-  function scheduleComposedPreview(clip) {
+  function scheduleComposedPreview(clip, tS = null) {
     if (!composedImg || !isCollage(clip)) return;
     const studioId = String(clip.dataset.studioId || "");
     if (!studioId) return;
+    /* Paused scrub ownership lives in collage-playback.sync → updateComposedStill. */
+    if (!opts.isPlaying?.()) return;
     if (composedTimer) clearTimeout(composedTimer);
+    const requestTs = tS == null ? Number(opts.getCollageLocalS?.() || 0) : Number(tS) || 0;
     composedTimer = setTimeout(async () => {
       composedTimer = null;
       const seq = ++composedSeq;
@@ -199,7 +202,7 @@ export function createCollageEditor(opts) {
         const res = await fetchImpl(`/api/studio/${encodeURIComponent(studioId)}/collage/preview`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ t_s: 0 }),
+          body: JSON.stringify({ t_s: requestTs }),
         });
         if (seq !== composedSeq) return;
         if (res.status === 409) return;
@@ -213,7 +216,7 @@ export function createCollageEditor(opts) {
         composedObjectUrl = URL.createObjectURL(blob);
         composedImg.src = composedObjectUrl;
         composedImg.hidden = false;
-        composedImg.style.zIndex = opts.isPlaying?.() ? "0" : "2";
+        composedImg.style.zIndex = "0";
         stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
           img.style.opacity = "0";
         });

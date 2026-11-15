@@ -99,6 +99,18 @@ export function leafNeedsFramedStill(media) {
 }
 
 /**
+ * Identity-only library photos may be HEIC/HEIF/DNG; browsers cannot decode the
+ * raw leaf stream. Prefer composed stills instead of assigning undecodable src.
+ * @param {any} media
+ */
+export function leafNeedsDecodedStill(media) {
+  if (!media || media.source !== "library") return false;
+  if (media.media_id) return false;
+  if (!media.identity_key) return false;
+  return String(media.kind || "").toLowerCase() !== "video";
+}
+
+/**
  * @param {any} spec
  */
 export function specNeedsFramedStill(spec) {
@@ -107,7 +119,9 @@ export function specNeedsFramedStill(spec) {
   const walk = (node) => {
     if (!node || needed) return;
     if (node.type === "leaf") {
-      if (leafNeedsFramedStill(node.media)) needed = true;
+      if (leafNeedsFramedStill(node.media) || leafNeedsDecodedStill(node.media)) {
+        needed = true;
+      }
       return;
     }
     walk(node.a);
@@ -145,8 +159,7 @@ export function createCollagePlayback(opts) {
     }
     if (composedEl) {
       composedEl.hidden = playMediaVisible && !fallback;
-      composedEl.style.visibility =
-        !playMediaVisible || fallback ? "visible" : "hidden";
+      composedEl.style.visibility = !playMediaVisible || fallback ? "visible" : "hidden";
       composedEl.style.zIndex = !playMediaVisible || fallback ? "2" : "0";
     }
   }
@@ -212,9 +225,7 @@ export function createCollagePlayback(opts) {
     if (!stage || !spec) return;
     const videoCount = countVideoLeaves(spec);
     fallback =
-      Boolean(forceStill) ||
-      shouldUseStillFallback(videoCount) ||
-      specNeedsFramedStill(spec);
+      Boolean(forceStill) || shouldUseStillFallback(videoCount) || specNeedsFramedStill(spec);
     activeStudioId = String(studioId || "");
     const keep = new Set();
     const leaves = [];
@@ -428,7 +439,7 @@ export function createCollagePlayback(opts) {
       /* preview endpoint may be unavailable until WP4 */
     } finally {
       composedInFlight = false;
-      if (composedPendingLocalS != null && seq === composedSeq) {
+      if (composedPendingLocalS !== null && seq === composedSeq) {
         const pending = composedPendingLocalS;
         composedPendingLocalS = null;
         void updateComposedStill(pending);
@@ -446,7 +457,7 @@ export function createCollagePlayback(opts) {
     for (const [id, el] of mediaEls.entries()) {
       if (!(el instanceof HTMLVideoElement)) continue;
       let startOffset = 0;
-      let duration = Number.isFinite(el.duration) ? el.duration : null;
+      const duration = Number.isFinite(el.duration) ? el.duration : null;
       if (spec && spec.root) {
         const find = (node) => {
           if (!node) return null;
