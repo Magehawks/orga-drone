@@ -585,13 +585,24 @@
           </div>
         </div>
         {% else %}
-        <div class="studio-preview-empty panel empty">
-          <h2>{{ _('Your story is empty') }}</h2>
-          <p>{{ _('Add photos or videos from Browse, then arrange them in the Story track.') }}</p>
-          <p>{{ _('Or add a Title Card to start with a heading.') }}</p>
-          <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
-          <button type="button" class="button ghost" id="studio-add-title-card-empty">{{ _('Add title card') }}</button>
-          <button type="button" class="button ghost" id="studio-add-collage-empty">{{ _('Collage') }}</button>
+        <div class="studio-preview-empty panel empty" id="studio-empty-root" data-empty-start="1">
+          <div id="studio-empty-start" class="studio-empty-start">
+            <h2>{{ _('How do you want to start?') }}</h2>
+            <p>{{ _('Edit normally, create a collage, or skip. You can add a collage anytime from the toolbar.') }}</p>
+            <div class="studio-empty-start-actions">
+              <button type="button" class="button" id="studio-empty-edit-normal">{{ _('Edit normally') }}</button>
+              <button type="button" class="button" id="studio-empty-create-collage">{{ _('Create collage') }}</button>
+              <button type="button" class="button ghost" id="studio-empty-skip">{{ _('Skip') }}</button>
+            </div>
+          </div>
+          <div id="studio-empty-hints" class="studio-empty-hints" hidden>
+            <h2>{{ _('Your story is empty') }}</h2>
+            <p>{{ _('Add photos or videos from Browse, then arrange them in the Story track.') }}</p>
+            <p>{{ _('Or add a Title Card to start with a heading.') }}</p>
+            <a class="button" href="{{ browse_return_url or '/browse' }}">{{ _('Go to Browse') }}</a>
+            <button type="button" class="button ghost" id="studio-add-title-card-empty">{{ _('Add title card') }}</button>
+            <button type="button" class="button ghost" id="studio-add-collage-empty">{{ _('Collage') }}</button>
+          </div>
         </div>
         {% endif %}
       </div>
