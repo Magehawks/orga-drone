@@ -236,8 +236,18 @@ export function createCollagePlayback(opts) {
       const fit =
         media && String(media.fit || "fill").toLowerCase() === "fit" ? "contain" : "cover";
       el.style.objectFit = fit;
-      if (el instanceof HTMLVideoElement && url && el.getAttribute("src") !== url) {
-        el.src = url;
+      if (el instanceof HTMLVideoElement && url) {
+        const sourceKey = media && media.source_key ? String(media.source_key) : "";
+        const token = `${url}#${sourceKey}`;
+        if (el.dataset.sourceToken !== token) {
+          el.dataset.sourceToken = token;
+          el.src = url;
+          try {
+            el.load();
+          } catch {
+            /* ignore */
+          }
+        }
       }
       if (stage && !el.isConnected) {
         stage.appendChild(el);
