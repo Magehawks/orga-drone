@@ -2186,7 +2186,8 @@
     </aside>
   </div>
   <dialog id="studio-collage-library-dialog" class="photo-combine-dialog studio-collage-library-dialog" aria-labelledby="studio-collage-library-title">
-    <form method="dialog" class="photo-combine-dialog-inner">
+    {# Not method=dialog: Enter/submit must not close without commitLibrarySelection. #}
+    <div class="photo-combine-dialog-inner">
       <header class="photo-combine-dialog-header">
         <h2 id="studio-collage-library-title">{{ _('Choose from library') }}</h2>
         <p class="hint">{{ _('Select photos and videos. They fill empty cells in order, or replace the selected cell first.') }}</p>
@@ -2201,7 +2202,7 @@
         <button type="button" class="button ghost" id="studio-collage-library-cancel">{{ _('Cancel') }}</button>
         <button type="button" class="button" id="studio-collage-library-add" disabled>{{ _('Add to collage') }}</button>
       </footer>
-    </form>
+    </div>
   </dialog>
   {% else %}
   <div class="studio-project-landing">

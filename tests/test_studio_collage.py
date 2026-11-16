@@ -95,6 +95,36 @@ def test_custom_split_ratio_remove_and_swap() -> None:
     assert leaf_count(trimmed) == 2
 
 
+def test_library_media_id_accepts_digit_string() -> None:
+    spec = preset_spec("1+1")
+    leaf_id = iter_leaves(spec["root"])[0]["id"]
+    assigned = assign_leaf_media(
+        spec,
+        leaf_id,
+        {
+            "source": "library",
+            "media_id": "42",
+            "kind": "photo",
+            "fit": "fill",
+            "zoom": 1.0,
+            "pan_x": 0.5,
+            "pan_y": 0.5,
+        },
+    )
+    media = iter_leaves(assigned["root"])[0]["media"]
+    assert media["media_id"] == 42
+    with pytest.raises(CollageSpecError):
+        assign_leaf_media(
+            spec,
+            leaf_id,
+            {
+                "source": "library",
+                "media_id": "nope",
+                "kind": "photo",
+            },
+        )
+
+
 def test_resource_limit_and_fit_window() -> None:
     # Balanced growth avoids depth limit before leaf cap.
     current = preset_spec("2x2")

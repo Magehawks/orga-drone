@@ -310,9 +310,20 @@ def _normalize_media(raw: Any) -> dict[str, Any]:
     if source == "library":
         media_id = raw.get("media_id")
         if media_id is not None:
-            if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
+            # JSON clients may send whole numbers as int or digit strings.
+            if isinstance(media_id, bool):
                 raise CollageSpecError("media_id must be a positive integer")
-            out["media_id"] = int(media_id)
+            if isinstance(media_id, int):
+                parsed_id = media_id
+            elif isinstance(media_id, str) and media_id.strip().isdigit():
+                parsed_id = int(media_id.strip())
+            elif isinstance(media_id, float) and media_id.is_integer():
+                parsed_id = int(media_id)
+            else:
+                raise CollageSpecError("media_id must be a positive integer")
+            if parsed_id <= 0:
+                raise CollageSpecError("media_id must be a positive integer")
+            out["media_id"] = parsed_id
         identity = raw.get("identity_key")
         if identity is not None:
             text = str(identity).strip()

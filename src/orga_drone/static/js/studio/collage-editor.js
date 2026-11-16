@@ -596,22 +596,34 @@ export function createCollageEditor(opts) {
   }
 
   async function assignMediaList(clip, mediaList) {
-    if (!isCollage(clip) || !mediaList.length) return;
+    if (!isCollage(clip) || !mediaList.length) return false;
     const targets = mediaTargets(clip, mediaList.length);
-    for (let i = 0; i < targets.length; i += 1) {
-      const leafId = targets[i];
-      const media = mediaList[i];
-      await queueSave(
-        clip,
-        { op: "assign_media", leaf_id: leafId, media },
-        gestureGroup("collage-assign")
-      );
+    if (!targets.length) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return false;
     }
-    if (isStillSelected(clip)) {
-      fillInspector(clip);
-      // Rehydrate Color Workspace from the (possibly replaced) selected leaf.
-      notifyLeafSelection(clip);
+    const group = gestureGroup("collage-assign");
+    try {
+      for (let i = 0; i < targets.length; i += 1) {
+        const leafId = targets[i];
+        const media = mediaList[i];
+        // Await the real patch (not the swallowed queueSave catch) so a failed
+        // assign cannot look like success with empty cells.
+        await (saveChain = saveChain
+          .catch(() => {})
+          .then(() => patchCollage(clip, { op: "assign_media", leaf_id: leafId, media }, group)));
+      }
+    } catch (err) {
+      opts.showFlash(err?.message || msg("collageFailed", "Could not save collage."));
+      return false;
     }
+    // Dialog close / click-through can clear selection; always refresh this clip.
+    const studioId = String(clip.dataset.studioId || "");
+    if (studioId) opts.onSelectClip?.(studioId);
+    fillInspector(clip);
+    notifyLeafSelection(clip);
+    renderPreview(clip);
+    return true;
   }
 
   function syncLibraryAddButton() {
@@ -683,7 +695,7 @@ export function createCollageEditor(opts) {
   }
 
   async function openLibraryPicker() {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !libraryDialog) return;
     librarySelected = {};
     if (libraryFilter) libraryFilter.value = "";
@@ -707,31 +719,43 @@ export function createCollageEditor(opts) {
   }
 
   async function commitLibrarySelection() {
-    const clip = opts.getSelectedClip();
-    if (!isCollage(clip)) return;
+    const clip = clipForLeafAction();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
     const selected = Object.keys(librarySelected).map((key) => librarySelected[key]);
     if (!selected.length) {
       opts.showFlash(msg("collageSelectLibrary", "Select at least one photo or video."));
       return;
     }
-    closeLibraryPicker();
-    await assignMediaList(
-      clip,
-      selected.map((item) => ({
+    const mediaList = selected.map((item) => {
+      const mediaId = Number(item.id);
+      return {
         source: "library",
-        media_id: Number(item.id),
+        media_id: mediaId,
         kind: item.kind === "video" ? "video" : "photo",
         fit: "fill",
         zoom: 1,
         pan_x: 0.5,
         pan_y: 0.5,
-      }))
-    );
+      };
+    });
+    if (mediaList.some((entry) => !Number.isInteger(entry.media_id) || entry.media_id <= 0)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
+    // Close only after a successful assign so a failed save keeps the picker open.
+    const ok = await assignMediaList(clip, mediaList);
+    if (ok) closeLibraryPicker();
   }
 
   async function pickComputerFiles() {
-    const clip = opts.getSelectedClip();
-    if (!isCollage(clip)) return;
+    const clip = clipForLeafAction();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
     try {
       const res = await fetchImpl("/api/desktop/pick-open-file", {
         method: "POST",
@@ -1009,8 +1033,9 @@ export function createCollageEditor(opts) {
   document.getElementById("studio-collage-library-cancel")?.addEventListener("click", () => {
     closeLibraryPicker();
   });
-  document.getElementById("studio-collage-library-add")?.addEventListener("click", () => {
-    commitLibrarySelection();
+  document.getElementById("studio-collage-library-add")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    void commitLibrarySelection();
   });
   let libraryFilterTimer = 0;
   libraryFilter?.addEventListener("input", () => {
