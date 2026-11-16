@@ -12,8 +12,6 @@ from pathlib import Path
 from typing import Any, Callable, NoReturn
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
-_LOG = logging.getLogger("orga_drone.app")
-
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -198,6 +196,8 @@ from orga_drone.thumbs import (
     ensure_photo_preview,
     ensure_thumbnail,
 )
+
+_LOG = logging.getLogger("orga_drone.app")
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = PACKAGE_DIR / "templates"

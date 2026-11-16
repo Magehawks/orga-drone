@@ -944,9 +944,21 @@ def media_source_window(
                     h=float(normalized["h"]),
                 )
         fit = str(media.get("fit") or DEFAULT_FIT)
-        zoom = float(media.get("zoom") if media.get("zoom") is not None else 1.0)
-        pan_x = float(media.get("pan_x") if media.get("pan_x") is not None else 0.5)
-        pan_y = float(media.get("pan_y") if media.get("pan_y") is not None else 0.5)
+        zoom_raw = media.get("zoom", 1.0)
+        pan_x_raw = media.get("pan_x", 0.5)
+        pan_y_raw = media.get("pan_y", 0.5)
+        try:
+            zoom = float(zoom_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            zoom = 1.0
+        try:
+            pan_x = float(pan_x_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            pan_x = 0.5
+        try:
+            pan_y = float(pan_y_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            pan_y = 0.5
         return source_window(
             source_w=source_w,
             source_h=source_h,
