@@ -4,10 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 test("collage framing prefs round-trip and modifier matching", () => {
-  const source = readFileSync(
-    "src/orga_drone/static/js/studio/collage-framing-prefs.js",
-    "utf8"
-  );
+  const source = readFileSync("src/orga_drone/static/js/studio/collage-framing-prefs.js", "utf8");
   // Strip ESM export so the helpers can run in a plain VM context.
   const body = source
     .replace(/^export const /gm, "const ")

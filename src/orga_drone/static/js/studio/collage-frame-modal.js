@@ -225,7 +225,9 @@ export function createCollageFrameModal(opts = {}) {
   }
 
   function adjustFromLookId(lookId) {
-    const key = String(lookId || "").trim().toLowerCase();
+    const key = String(lookId || "")
+      .trim()
+      .toLowerCase();
     if (!key) return null;
     const values = quickLookModel()?.values;
     if (!values || typeof values !== "object") return null;
@@ -306,7 +308,11 @@ export function createCollageFrameModal(opts = {}) {
     };
     const onError = () => {
       if (seq !== gradeSeq || !session) return;
-      if (allowFallback && session.sourceUrl && !String(url).includes(session.sourceUrl.split("?")[0])) {
+      if (
+        allowFallback &&
+        session.sourceUrl &&
+        !String(url).includes(session.sourceUrl.split("?")[0])
+      ) {
         setStageImage(session.sourceUrl, { allowFallback: false, graded: false });
         return;
       }
@@ -475,7 +481,11 @@ export function createCollageFrameModal(opts = {}) {
   colorHost?.addEventListener("input", syncLiveGradeFromUi);
   colorHost?.addEventListener("change", syncLiveGradeFromUi);
   colorHost?.addEventListener("click", (event) => {
-    if (event.target?.closest?.("[data-quick-look-chip], #inspector-quick-look, #inspector-image-reset")) {
+    if (
+      event.target?.closest?.(
+        "[data-quick-look-chip], #inspector-quick-look, #inspector-image-reset"
+      )
+    ) {
       window.setTimeout(() => syncLiveGradeFromUi(event), 0);
     }
   });
@@ -623,7 +633,7 @@ export function createCollageFrameModal(opts = {}) {
     };
     const nw = box?.nw || 1;
     const nh = box?.nh || 1;
-    const cropAspect = ((crop.w * nw) / Math.max(1e-6, crop.h * nh));
+    const cropAspect = (crop.w * nw) / Math.max(1e-6, crop.h * nh);
     const apply = session.onApply;
     close();
     apply?.(next, { cropAspect });

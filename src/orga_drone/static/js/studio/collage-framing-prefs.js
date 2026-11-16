@@ -59,6 +59,7 @@ export function modifierMatches(modifier, event) {
   }
   if (key === "alt") return Boolean(event.altKey) && !event.ctrlKey && !event.metaKey;
   if (key === "ctrl") return Boolean(event.ctrlKey || event.metaKey) && !event.altKey;
-  if (key === "shift") return Boolean(event.shiftKey) && !event.altKey && !event.ctrlKey && !event.metaKey;
+  if (key === "shift")
+    return Boolean(event.shiftKey) && !event.altKey && !event.ctrlKey && !event.metaKey;
   return false;
 }

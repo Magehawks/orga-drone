@@ -52,7 +52,9 @@ export function sourceWindow({
   const py = Math.max(0, Math.min(1, Number.isFinite(pyRaw) ? pyRaw : 0.5));
   const srcAspect = sw / sh;
   const cellAspect = cw / ch;
-  const mode = String(fit || "fill").trim().toLowerCase();
+  const mode = String(fit || "fill")
+    .trim()
+    .toLowerCase();
   let winW;
   let winH;
   if (mode === "fit") {
