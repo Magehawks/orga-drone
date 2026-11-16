@@ -123,6 +123,7 @@ def preset_names() -> tuple[str, ...]:
         "3x2",
         "1+2+1",
         "3|2",
+        "3|1+2",
     )
 
 
@@ -158,9 +159,55 @@ def preset_spec(name: str) -> dict[str, Any]:
         left = _split("v", 1 / 3, _leaf(), _split("v", 0.5, _leaf(), _leaf()))
         right = _split("v", 0.5, _leaf(), _leaf())
         root = _split("h", 0.5, left, right)
+    elif key in {"3|1+2", "3left_video_2bottom"}:
+        # Three stacked cells on the left, one tall cell on the right (video),
+        # two cells across the bottom — a common photo+video magazine layout.
+        left3 = _split("v", 1 / 3, _leaf(), _split("v", 0.5, _leaf(), _leaf()))
+        top = _split("h", 0.42, left3, _leaf())
+        bottom = _split("h", 0.5, _leaf(), _leaf())
+        root = _split("v", 0.68, top, bottom)
     else:
         raise CollageSpecError(f"unknown collage preset: {name}")
     return normalize_spec(_blank_spec(root=root))
+
+
+def transfer_leaf_media(
+    source_spec: dict[str, Any], target_spec: dict[str, Any]
+) -> dict[str, Any]:
+    """Copy leaf media (and grades) onto ``target_spec`` in leaf order.
+
+    Extra source leaves are dropped when the target has fewer cells. Extra
+    target leaves stay empty. Framing and ``media.grade`` travel with the media.
+    """
+    source = normalize_spec(source_spec)
+    target = normalize_spec(target_spec)
+    source_media = [
+        dict(leaf["media"])
+        for leaf in iter_leaves(source["root"])
+        if isinstance(leaf.get("media"), dict)
+    ]
+    next_spec = target
+    for leaf, media in zip(iter_leaves(next_spec["root"]), source_media, strict=False):
+        next_spec = assign_leaf_media(next_spec, str(leaf["id"]), media)
+    return normalize_spec(next_spec)
+
+
+def apply_preset_preserving_media(
+    current_spec: dict[str, Any], preset_name: str
+) -> dict[str, Any]:
+    """Build a preset layout and keep assigned media in leaf order."""
+    current = normalize_spec(current_spec)
+    next_spec = preset_spec(preset_name)
+    for key in (
+        "aspect",
+        "gap_px",
+        "background",
+        "corner_radius_px",
+        "duration_s",
+    ):
+        if key in current:
+            next_spec[key] = current[key]
+    return transfer_leaf_media(current, next_spec)
 
 
 def default_spec() -> dict[str, Any]:
@@ -310,9 +357,20 @@ def _normalize_media(raw: Any) -> dict[str, Any]:
     if source == "library":
         media_id = raw.get("media_id")
         if media_id is not None:
-            if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
+            # JSON clients may send whole numbers as int or digit strings.
+            if isinstance(media_id, bool):
                 raise CollageSpecError("media_id must be a positive integer")
-            out["media_id"] = int(media_id)
+            if isinstance(media_id, int):
+                parsed_id = media_id
+            elif isinstance(media_id, str) and media_id.strip().isdigit():
+                parsed_id = int(media_id.strip())
+            elif isinstance(media_id, float) and media_id.is_integer():
+                parsed_id = int(media_id)
+            else:
+                raise CollageSpecError("media_id must be a positive integer")
+            if parsed_id <= 0:
+                raise CollageSpecError("media_id must be a positive integer")
+            out["media_id"] = parsed_id
         identity = raw.get("identity_key")
         if identity is not None:
             text = str(identity).strip()
@@ -339,7 +397,35 @@ def _normalize_media(raw: Any) -> dict[str, Any]:
         if not isinstance(raw["grade"], dict):
             raise CollageSpecError("grade must be an object")
         out["grade"] = raw["grade"]
+    if "crop" in raw and raw["crop"] is not None:
+        out["crop"] = _normalize_crop(raw["crop"])
     return out
+
+
+def _normalize_crop(raw: Any) -> dict[str, float]:
+    """Normalized source crop rectangle (free framing viewport)."""
+    if not isinstance(raw, dict):
+        raise CollageSpecError("crop must be an object")
+    try:
+        x = float(raw.get("x", 0.0))
+        y = float(raw.get("y", 0.0))
+        w = float(raw.get("w", 0.0))
+        h = float(raw.get("h", 0.0))
+    except (TypeError, ValueError) as exc:
+        raise CollageSpecError("crop x/y/w/h must be numbers") from exc
+    if not (w > 0.0 and h > 0.0):
+        raise CollageSpecError("crop w/h must be positive")
+    if x < 0.0 or y < 0.0 or x + w > 1.0 + 1e-6 or y + h > 1.0 + 1e-6:
+        raise CollageSpecError("crop must stay inside the source (0..1)")
+    # Snap into bounds for float noise.
+    w = min(w, 1.0 - x)
+    h = min(h, 1.0 - y)
+    return {
+        "x": round(max(0.0, x), 6),
+        "y": round(max(0.0, y), 6),
+        "w": round(max(1e-6, w), 6),
+        "h": round(max(1e-6, h), 6),
+    }
 
 
 def _normalize_aspect(raw: Any) -> str | dict[str, int]:
@@ -497,6 +583,83 @@ def split_leaf(
     return normalize_spec(normalized)
 
 
+def _band_of_leaves(count: int, *, direction: str) -> dict[str, Any]:
+    """Build ``count`` empty leaves in a balanced split tree along ``direction``."""
+    n = max(1, int(count))
+    nodes: list[dict[str, Any]] = [_leaf() for _ in range(n)]
+
+    def _build(items: list[dict[str, Any]]) -> dict[str, Any]:
+        if len(items) == 1:
+            return items[0]
+        mid = len(items) // 2
+        left_items = items[:mid]
+        right_items = items[mid:]
+        ratio = len(left_items) / max(1, len(items))
+        return _split(direction, ratio, _build(left_items), _build(right_items))
+
+    return _build(nodes)
+
+
+def add_band(
+    spec: dict[str, Any],
+    *,
+    edge: str,
+    cells: int = 1,
+) -> dict[str, Any]:
+    """Wrap the whole collage with a new row or column of empty cells.
+
+    ``edge`` is ``bottom``, ``top``, ``right``, or ``left``. ``cells`` is how
+    many empty tiles the new band contains (clamped to remaining leaf budget).
+    """
+    normalized = normalize_spec(spec)
+    current = leaf_count(normalized)
+    if current >= MAX_LEAVES:
+        raise CollageSpecError(f"cannot add cells; maximum is {MAX_LEAVES}")
+    edge_key = str(edge or "").strip().lower()
+    if edge_key not in {"bottom", "top", "right", "left"}:
+        raise CollageSpecError("edge must be bottom, top, right, or left")
+    wanted = max(1, int(cells))
+    room = MAX_LEAVES - current
+    band_cells = min(wanted, room)
+    if band_cells < 1:
+        raise CollageSpecError(f"cannot add cells; maximum is {MAX_LEAVES}")
+
+    # New horizontal band (row) chains left→right; vertical band (column) top→bottom.
+    if edge_key in {"bottom", "top"}:
+        band = _band_of_leaves(band_cells, direction="h")
+        # Keep most of the existing layout; new band takes ~28%.
+        ratio = 0.72 if edge_key == "bottom" else 0.28
+        if edge_key == "bottom":
+            normalized["root"] = _split("v", ratio, normalized["root"], band)
+        else:
+            normalized["root"] = _split("v", ratio, band, normalized["root"])
+    else:
+        band = _band_of_leaves(band_cells, direction="v")
+        ratio = 0.72 if edge_key == "right" else 0.28
+        if edge_key == "right":
+            normalized["root"] = _split("h", ratio, normalized["root"], band)
+        else:
+            normalized["root"] = _split("h", ratio, band, normalized["root"])
+    return normalize_spec(normalized)
+
+
+def split_leaf_times(
+    spec: dict[str, Any],
+    leaf_id: str,
+    *,
+    direction: str,
+    times: int = 1,
+) -> dict[str, Any]:
+    """Split one leaf repeatedly (e.g. 2 → three cells along that axis)."""
+    next_spec = normalize_spec(spec)
+    count = max(1, min(8, int(times)))
+    target = str(leaf_id)
+    for _ in range(count):
+        next_spec = split_leaf(next_spec, target, direction=direction)
+        # After a split, keep targeting the original leaf id (left/top child).
+    return next_spec
+
+
 def merge_public_media_paths(
     incoming: dict[str, Any], persisted: dict[str, Any]
 ) -> dict[str, Any]:
@@ -589,6 +752,58 @@ def _remove_leaf(
     return node, False
 
 
+def _same_leaf_source(prior: dict[str, Any], incoming: dict[str, Any]) -> bool:
+    """True when framing/look patches target the same underlying media."""
+    if str(prior.get("source") or "") != str(incoming.get("source") or ""):
+        return False
+    if str(prior.get("kind") or "") != str(incoming.get("kind") or ""):
+        return False
+    source = str(incoming.get("source") or "").strip().lower()
+    if source == "library":
+        if prior.get("media_id") is not None and incoming.get("media_id") is not None:
+            return int(prior["media_id"]) == int(incoming["media_id"])
+        return str(prior.get("identity_key") or "") == str(
+            incoming.get("identity_key") or ""
+        ) and bool(prior.get("identity_key") or incoming.get("identity_key"))
+    if source == "external":
+        prior_key = str(prior.get("source_key") or "").strip()
+        next_key = str(incoming.get("source_key") or "").strip()
+        if prior_key and next_key:
+            return prior_key == next_key
+        return str(prior.get("path") or "") == str(incoming.get("path") or "") and bool(
+            prior.get("path") or incoming.get("path")
+        )
+    return False
+
+
+def _merge_leaf_media_preserve(
+    prior: dict[str, Any] | None, incoming: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep grade/crop across framing patches of the same source.
+
+    ``grade: None`` or ``crop: None`` is an explicit clear. Omitting the key
+    preserves the prior value. A different media source replaces everything.
+    """
+    out = dict(incoming)
+    if not isinstance(prior, dict) or not _same_leaf_source(prior, out):
+        if out.get("grade") is None:
+            out.pop("grade", None)
+        if out.get("crop") is None:
+            out.pop("crop", None)
+        return out
+    if "grade" in out:
+        if out["grade"] is None:
+            out.pop("grade", None)
+    elif "grade" in prior:
+        out["grade"] = prior["grade"]
+    if "crop" in out:
+        if out["crop"] is None:
+            out.pop("crop", None)
+    elif "crop" in prior:
+        out["crop"] = prior["crop"]
+    return out
+
+
 def assign_leaf_media(
     spec: dict[str, Any], leaf_id: str, media: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -602,7 +817,9 @@ def assign_leaf_media(
                 if media is None:
                     node.pop("media", None)
                 else:
-                    node["media"] = _normalize_media(media)
+                    prior = node.get("media") if isinstance(node.get("media"), dict) else None
+                    merged = _merge_leaf_media_preserve(prior, media)
+                    node["media"] = _normalize_media(merged)
                 found = True
             return
         walk(node["a"])
@@ -612,6 +829,33 @@ def assign_leaf_media(
     if not found:
         raise CollageSpecError(f"leaf not found: {leaf_id}")
     return normalize_spec(normalized)
+
+
+def duration_for_video_assign(
+    current_duration_s: float | None,
+    video_duration_s: float | None,
+) -> float | None:
+    """If a video is longer than the collage, extend duration to match.
+
+    Returns the clamped duration to apply, or ``None`` when no change is needed.
+    Keeps a longer manual collage duration untouched.
+    """
+    if video_duration_s is None:
+        return None
+    try:
+        video_s = float(video_duration_s)
+    except (TypeError, ValueError):
+        return None
+    if not (video_s > 0):
+        return None
+    current = (
+        float(current_duration_s)
+        if current_duration_s is not None
+        else DEFAULT_DURATION_S
+    )
+    if current + 1e-6 >= video_s:
+        return None
+    return clamp_collage_duration(video_s)
 
 
 def swap_leaf_media(spec: dict[str, Any], leaf_a: str, leaf_b: str) -> dict[str, Any]:
@@ -674,6 +918,63 @@ def source_window(
     max_x = max(0.0, 1.0 - win_w)
     max_y = max(0.0, 1.0 - win_h)
     return SourceWindow(x=px * max_x, y=py * max_y, w=win_w, h=win_h)
+
+
+def media_source_window(
+    media: dict[str, Any] | None,
+    *,
+    source_w: int,
+    source_h: int,
+    cell_w: int,
+    cell_h: int,
+) -> SourceWindow:
+    """Prefer an explicit free ``crop`` rect; otherwise Fit/Fill zoom/pan."""
+    if isinstance(media, dict):
+        crop = media.get("crop")
+        if isinstance(crop, dict):
+            try:
+                normalized = _normalize_crop(crop)
+            except CollageSpecError:
+                normalized = None
+            if normalized is not None:
+                return SourceWindow(
+                    x=float(normalized["x"]),
+                    y=float(normalized["y"]),
+                    w=float(normalized["w"]),
+                    h=float(normalized["h"]),
+                )
+        fit = str(media.get("fit") or DEFAULT_FIT)
+        zoom_raw = media.get("zoom", 1.0)
+        pan_x_raw = media.get("pan_x", 0.5)
+        pan_y_raw = media.get("pan_y", 0.5)
+        try:
+            zoom = float(zoom_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            zoom = 1.0
+        try:
+            pan_x = float(pan_x_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            pan_x = 0.5
+        try:
+            pan_y = float(pan_y_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            pan_y = 0.5
+        return source_window(
+            source_w=source_w,
+            source_h=source_h,
+            cell_w=cell_w,
+            cell_h=cell_h,
+            fit=fit,
+            zoom=zoom,
+            pan_x=pan_x,
+            pan_y=pan_y,
+        )
+    return source_window(
+        source_w=source_w,
+        source_h=source_h,
+        cell_w=cell_w,
+        cell_h=cell_h,
+    )
 
 
 def public_collage_spec(spec: dict[str, Any]) -> dict[str, Any]:

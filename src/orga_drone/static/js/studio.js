@@ -67,8 +67,8 @@ import {
   shouldReconcileSeekSample,
 } from "./studio/timelapse.js";
 import { createColorCompare } from "./studio/color-compare.js";
-import { createCollageEditor } from "./studio/collage-editor.js";
-import { createCollagePlayback } from "./studio/collage-playback.js";
+import { createCollageEditor } from "./studio/collage-editor.js?v=collage-looks-keep-1";
+import { createCollagePlayback } from "./studio/collage-playback.js?v=collage-looks-keep-1";
 import {
   beginRequestToken,
   buildColorGradeSummaryParts,
@@ -4445,15 +4445,21 @@ import {
       if (input) input.value = String(shown);
       if (valueEl) valueEl.textContent = String(shown);
     });
-    const managed = managedGradeForClip(clip);
-    const managedPreset =
-      managed?.evaluator === "managed-sdr-v1"
-        ? managed?.grade?.extensions?.creative_preset?.id || ""
-        : "";
-    if (managedPreset) {
-      clip.dataset.quickLook = managedPreset;
+    // Collage leaf grades store Quick Looks on the leaf; never overwrite with a
+    // clip-level managed creative preset cached on the same DOM node.
+    const leafActive = isCollageLeafGradeActive(clip);
+    let lookId = clip.dataset.quickLook || "";
+    if (!leafActive) {
+      const managed = managedGradeForClip(clip);
+      const managedPreset =
+        managed?.evaluator === "managed-sdr-v1"
+          ? managed?.grade?.extensions?.creative_preset?.id || ""
+          : "";
+      if (managedPreset) {
+        clip.dataset.quickLook = managedPreset;
+        lookId = managedPreset;
+      }
     }
-    const lookId = clip.dataset.quickLook || managedPreset || "";
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = lookId;
     syncQuickLookChips(lookId);
@@ -4537,30 +4543,37 @@ import {
       token,
       queue: quickLookSaveQueue,
       execute: async () => {
-        // Managed grades compile Quick Looks to inspectable primaries (#361).
-        let managed = managedGradeForClip(clip);
-        if (!managed) {
-          try {
-            managed = await fetchGrade(studioId);
-            cacheManagedGradeOnClip(clip, managed);
-          } catch (_err) {
-            managed = null;
+        const leafId = collageLeafGradeTarget(studioId);
+        // Collage leaf grades stay on the classic look path (no managed grade).
+        if (!leafId) {
+          // Managed grades compile Quick Looks to inspectable primaries (#361).
+          let managed = managedGradeForClip(clip);
+          if (!managed) {
+            try {
+              managed = await fetchGrade(studioId);
+              cacheManagedGradeOnClip(clip, managed);
+            } catch (_err) {
+              managed = null;
+            }
+          }
+          if (managed && managed.evaluator === "managed-sdr-v1") {
+            const payload = await postGradeCommand(studioId, {
+              type: "apply_preset",
+              expectedRevision: managed.revision,
+              params: { preset_id: desiredLook },
+              historyGroup: `quick-look-${studioId}`,
+            });
+            const presetId =
+              payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
+            return { ok: true, quick_look: presetId, grade: payload };
           }
         }
-        if (managed && managed.evaluator === "managed-sdr-v1") {
-          const payload = await postGradeCommand(studioId, {
-            type: "apply_preset",
-            expectedRevision: managed.revision,
-            params: { preset_id: desiredLook },
-            historyGroup: `quick-look-${studioId}`,
-          });
-          const presetId = payload?.grade?.extensions?.creative_preset?.id || desiredLook || "";
-          return { ok: true, quick_look: presetId, grade: payload };
-        }
+        const lookPayload = { id: desiredLook };
+        if (leafId) lookPayload.leaf_id = leafId;
         const res = await fetch(`/api/studio/${studioId}/look`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ id: desiredLook }),
+          body: JSON.stringify(lookPayload),
         });
         const body = await readJson(res);
         if (!res.ok || !body || !body.ok) {
@@ -4582,6 +4595,7 @@ import {
         void managedColorEditor.fill();
       }
     }
+    applyLeafGradeCollageSpec(clip, body);
     clip.dataset.quickLook = body.quick_look || "";
     const selected = selectedAdjustableClip();
     if (
@@ -9301,6 +9315,10 @@ import {
     if (ownsPreview && collageEditor?.renderPreview) {
       collageEditor.renderPreview(clip);
     }
+    // Framing dialog shows a graded leaf still; refresh when Looks / HSL / LUT save.
+    if (ownsPreview && collageEditor?.refreshFrameModalGrade) {
+      collageEditor.refreshFrameModalGrade();
+    }
   }
 
   function isCollageLeafGradeActive(clip = null) {
@@ -9311,9 +9329,11 @@ import {
 
   function syncLeafGradeUnsupportedChrome(leafActive, collageClip = null) {
     const active = Boolean(leafActive);
-    document.getElementById("inspector-quick-look")?.toggleAttribute("disabled", active);
+    // Quick Looks + classic LUT/HSL apply per leaf. Managed Color Workspace and
+    // clip-only advanced detail stay clip-scoped.
+    document.getElementById("inspector-quick-look")?.toggleAttribute("disabled", false);
     document.querySelectorAll("[data-quick-look-chip]").forEach((btn) => {
-      btn.toggleAttribute("disabled", active);
+      btn.toggleAttribute("disabled", false);
     });
     document.getElementById("inspector-managed-color")?.toggleAttribute("hidden", active);
     // Sharpen/denoise live in the advanced image section; hide the whole block
@@ -11992,6 +12012,8 @@ import {
     onLeafSelected: (clip, _leaf, media) => {
       if (!clip) return;
       showInspector("inspector-collage", { also: ["inspector-clip"] });
+      const imagePanel = document.getElementById("inspector-image-panel");
+      if (imagePanel && media) imagePanel.hidden = false;
       const grade = media && media.grade && typeof media.grade === "object" ? media.grade : {};
       const image =
         grade.image && typeof grade.image === "object" ? grade.image : neutralImageAdjust();
@@ -12009,6 +12031,12 @@ import {
         grade.color_wheels && typeof grade.color_wheels === "object"
           ? grade.color_wheels
           : neutralColorWheels();
+      const lookId =
+        grade.look && typeof grade.look === "object" && typeof grade.look.id === "string"
+          ? String(grade.look.id || "").trim().toLowerCase()
+          : "";
+      // Per-leaf Quick Look label must follow the selected cell, not the previous one.
+      clip.dataset.quickLook = lookId;
       writeImageAdjust(clip, image, true);
       writeHsl(clip, hsl.ranges ? hsl : { ranges: hsl }, true);
       writeColorLook(clip, look);
@@ -12029,9 +12057,13 @@ import {
       }
       return 0;
     },
-    onSpecApplied: () => {
+    onSpecApplied: (clip) => {
       layoutTimeline();
       updatePlayheadChrome();
+      // Framing saves already paint live thumbs; rebuilding the stage here flickers.
+      if (clip?.dataset?.kind === "collage" && collageEditor?.isFramingQuiet?.()) {
+        return;
+      }
       syncPreviewMedia({ seek: true });
     },
   });
@@ -12201,13 +12233,7 @@ import {
   async function applyQuickLookFromUi(lookId) {
     const clip = selectedAdjustableClip();
     if (!clip) return;
-    if (isCollageLeafGradeActive(clip)) {
-      showFlash(
-        root.dataset.collageLeafLookHint ||
-          "Quick Looks are not available for collage cells yet. Use the image and LUT controls."
-      );
-      return;
-    }
+    // Collage leaves use the same Quick Look path with leaf_id (#469).
     const studioId = String(clip.dataset.studioId);
     const lookSelect = document.getElementById("inspector-quick-look");
     if (lookSelect) lookSelect.value = lookId || "";

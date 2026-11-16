@@ -158,6 +158,9 @@
          data-collage-missing-media="{{ _('Missing media')|e }}"
          data-collage-picker-unavailable="{{ _('Native file picker needs the desktop app.')|e }}"
          data-collage-select-library="{{ _('Select at least one photo or video.')|e }}"
+         data-collage-select-cell-first="{{ _('Select a cell in the collage first.')|e }}"
+         data-collage-library-empty="{{ _('No photos or videos in the library yet.')|e }}"
+         data-collage-library-no-match="{{ _('No matching photos or videos.')|e }}"
          data-collage-split-h="{{ _('Split horizontally')|e }}"
          data-collage-split-v="{{ _('Split vertically')|e }}"
          data-collage-remove-cell="{{ _('Remove cell')|e }}"
@@ -2091,24 +2094,94 @@
 
       <div class="studio-inspector-panel" id="inspector-collage" hidden>
         <p class="studio-inspector-kind">{{ _('Collage') }}</p>
-        <p class="hint">{{ _('Choose a layout, drag dividers in the preview, then add media to each cell.') }}</p>
+        <p class="hint">{{ _('Pick where you want more cells (left, right, or bottom), drag dividers to fine-tune, then add media. Click a cell to grade it.') }}</p>
         <label class="studio-inspector-field">
           <span>{{ _('Duration (s)') }}</span>
           <input type="number" id="inspector-collage-duration" min="1" max="120" step="0.1" inputmode="decimal"
                  aria-label="{{ _('Collage duration in seconds') }}">
         </label>
-        <label class="studio-inspector-field">
-          <span>{{ _('Layout preset') }}</span>
-          <select id="inspector-collage-preset" aria-label="{{ _('Layout preset') }}">
-            <option value="1+1">1 + 1</option>
-            <option value="2+1">2 + 1</option>
-            <option value="1+2">1 + 2</option>
-            <option value="2x2">2 × 2</option>
-            <option value="3x2">3 × 2</option>
-            <option value="1+2+1">1 + 2 + 1</option>
-            <option value="3|2">3 | 2</option>
+        <div class="studio-inspector-field">
+          <span id="inspector-collage-layout-label">{{ _('Layout') }}</span>
+          <div class="studio-collage-presets" id="inspector-collage-presets" role="radiogroup"
+               aria-labelledby="inspector-collage-layout-label">
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="true"
+                    data-collage-preset="1+1" title="{{ _('Two cells side by side') }}">
+              <span class="studio-collage-preset-thumb" data-layout="1+1" aria-hidden="true">
+                <i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('Side by side') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="2+1" title="{{ _('More cells on the left') }}">
+              <span class="studio-collage-preset-thumb" data-layout="2+1" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('More on the left') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="1+2" title="{{ _('More cells on the right') }}">
+              <span class="studio-collage-preset-thumb" data-layout="1+2" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('More on the right') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="2x2" title="{{ _('Four cells in a grid') }}">
+              <span class="studio-collage-preset-thumb" data-layout="2x2" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('2×2 grid') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="3x2" title="{{ _('Six cells in two rows') }}">
+              <span class="studio-collage-preset-thumb" data-layout="3x2" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('More on top and bottom') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="1+2+1" title="{{ _('One on top, two in the middle, one at the bottom') }}">
+              <span class="studio-collage-preset-thumb" data-layout="1+2+1" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('More in the middle') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="3|2" title="{{ _('Three cells on the left, two on the right') }}">
+              <span class="studio-collage-preset-thumb" data-layout="3|2" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('Three left, two right') }}</span>
+            </button>
+            <button type="button" class="studio-collage-preset" role="radio" aria-checked="false"
+                    data-collage-preset="3|1+2"
+                    title="{{ _('Three cells on the left, one tall cell on the right, two along the bottom') }}">
+              <span class="studio-collage-preset-thumb" data-layout="3|1+2" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </span>
+              <span class="studio-collage-preset-label">{{ _('Three left, tall right, two bottom') }}</span>
+            </button>
+          </div>
+          <p class="hint">{{ _('Templates are a starting point. Then add a row or column, or select a cell and split it further. Drag dividers to resize.') }}</p>
+          <select id="inspector-collage-preset" hidden aria-hidden="true" tabindex="-1">
+            <option value="1+1">1+1</option>
+            <option value="2+1">2+1</option>
+            <option value="1+2">1+2</option>
+            <option value="2x2">2x2</option>
+            <option value="3x2">3x2</option>
+            <option value="1+2+1">1+2+1</option>
+            <option value="3|2">3|2</option>
+            <option value="3|1+2">3|1+2</option>
           </select>
-        </label>
+        </div>
+        <div class="studio-inspector-actions" id="inspector-collage-build-actions">
+          <p class="studio-inspector-kind">{{ _('Build further') }}</p>
+          <div class="studio-collage-build-row">
+            <button type="button" class="button" id="inspector-collage-add-row">{{ _('Add row below') }}</button>
+            <button type="button" class="button ghost" id="inspector-collage-add-column">{{ _('Add column right') }}</button>
+          </div>
+          <p class="hint">{{ _('Adds empty cells to the whole collage. Select a cell below to split only that tile.') }}</p>
+        </div>
         <label class="studio-inspector-field">
           <span>{{ _('Aspect') }}</span>
           <select id="inspector-collage-aspect" aria-label="{{ _('Aspect') }}">
@@ -2134,8 +2207,15 @@
         </div>
         <div class="studio-inspector-actions" id="inspector-collage-cell-actions" hidden>
           <p class="studio-inspector-kind">{{ _('Selected cell') }}</p>
-          <button type="button" class="button ghost" id="inspector-collage-split-h">{{ _('Split horizontally') }}</button>
-          <button type="button" class="button ghost" id="inspector-collage-split-v">{{ _('Split vertically') }}</button>
+          <div class="studio-collage-build-row">
+            <button type="button" class="button" id="inspector-collage-split-h">{{ _('Split into 2 side by side') }}</button>
+            <button type="button" class="button ghost" id="inspector-collage-split-v">{{ _('Split into 2 stacked') }}</button>
+          </div>
+          <div class="studio-collage-build-row">
+            <button type="button" class="button ghost" id="inspector-collage-split-h3">{{ _('Split into 3 side by side') }}</button>
+            <button type="button" class="button ghost" id="inspector-collage-split-v3">{{ _('Split into 3 stacked') }}</button>
+          </div>
+          <p class="hint">{{ _('Splits only this cell into more tiles. Media stays on the first new cell.') }}</p>
           <button type="button" class="button ghost" id="inspector-collage-clear-cell">{{ _('Clear media') }}</button>
           <button type="button" class="button ghost" id="inspector-collage-remove-cell">{{ _('Remove cell') }}</button>
           <label class="studio-inspector-field">
@@ -2145,6 +2225,8 @@
               <option value="fit">{{ _('Fit') }}</option>
             </select>
           </label>
+          <p class="hint">{{ _('Click a cell photo to open framing. Drag the orange frame to move it; drag the handles to set width and height freely. The collage aspect adapts when possible. Looks, HSL, and LUTs are in the same dialog for this cell.') }}</p>
+          <button type="button" class="button" id="inspector-collage-open-frame">{{ _('Adjust framing…') }}</button>
           <label class="studio-inspector-field">
             <span>{{ _('Zoom') }}</span>
             <input type="range" id="inspector-collage-zoom" min="1" max="3" step="0.05" value="1"
@@ -2163,6 +2245,7 @@
         </div>
         <div class="studio-inspector-actions" id="inspector-collage-export-actions">
           <p class="studio-inspector-kind">{{ _('Still export') }}</p>
+          <p class="hint">{{ _('Photo-only collages: export a PNG or JPEG here. Story export always makes an MP4 of the whole memory.') }}</p>
           <label class="studio-inspector-field">
             <span>{{ _('Format') }}</span>
             <select id="inspector-collage-export-format" aria-label="{{ _('Collage still export format') }}">
@@ -2170,7 +2253,7 @@
               <option value="jpeg">JPEG</option>
             </select>
           </label>
-          <button type="button" class="button" id="inspector-collage-export">{{ _('Export still') }}</button>
+          <button type="button" class="button" id="inspector-collage-export">{{ _('Export still (PNG/JPEG)') }}</button>
           <p class="hint" id="inspector-collage-export-status" hidden></p>
         </div>
         <form method="post" id="inspector-collage-remove-form" class="studio-inspector-remove"
@@ -2185,23 +2268,82 @@
       </div>
     </aside>
   </div>
-  <dialog id="studio-collage-library-dialog" class="photo-combine-dialog studio-collage-library-dialog" aria-labelledby="studio-collage-library-title">
-    <form method="dialog" class="photo-combine-dialog-inner">
-      <header class="photo-combine-dialog-header">
-        <h2 id="studio-collage-library-title">{{ _('Choose from library') }}</h2>
-        <p class="hint">{{ _('Select photos and videos. They fill empty cells in order, or replace the selected cell first.') }}</p>
-      </header>
-      <label class="studio-inspector-field">
+  <dialog id="studio-collage-frame-dialog"
+          class="studio-export-dialog studio-collage-frame-dialog"
+          aria-labelledby="studio-collage-frame-title">
+    <div class="studio-export-form studio-collage-frame-form">
+      <div class="studio-collage-frame-header">
+        <h2 id="studio-collage-frame-title">{{ _('Adjust cell framing') }}</h2>
+        <div class="studio-collage-frame-replace" role="group" aria-label="{{ _('Replace cell media') }}">
+          <button type="button" class="button ghost" id="studio-collage-frame-from-library">{{ _('From library') }}</button>
+          <button type="button" class="button ghost" id="studio-collage-frame-from-computer">{{ _('From this computer') }}</button>
+        </div>
+      </div>
+      <p class="hint">{{ _('The full photo is shown. Drag the orange frame to move it; use the handles to set width and height freely. Mouse wheel scales the frame. Looks, HSL, and LUTs for this cell are on the right. Use From library or From this computer to replace the photo.') }}</p>
+      <div class="studio-collage-frame-body">
+        <div class="studio-collage-frame-main">
+          <div class="studio-collage-frame-stage" id="studio-collage-frame-stage">
+            <img id="studio-collage-frame-image" alt="" draggable="false">
+            <div class="studio-collage-frame-viewport" id="studio-collage-frame-viewport" aria-hidden="true"></div>
+          </div>
+          <div class="studio-collage-frame-controls">
+            <label class="studio-inspector-field">
+              <span>{{ _('Fit') }}</span>
+              <select id="studio-collage-frame-fit" aria-label="{{ _('Cell fit mode') }}">
+                <option value="fill">{{ _('Fill') }}</option>
+                <option value="fit">{{ _('Fit') }}</option>
+              </select>
+            </label>
+            <label class="studio-inspector-field">
+              <span>{{ _('Zoom') }}</span>
+              <input type="range" id="studio-collage-frame-zoom" min="1" max="3" step="0.05" value="1"
+                     aria-label="{{ _('Cell zoom') }}">
+            </label>
+          </div>
+        </div>
+        <div class="studio-collage-frame-color" id="studio-collage-frame-color"
+             aria-label="{{ _('Look & color') }}"></div>
+      </div>
+      <div class="studio-export-actions studio-collage-frame-actions">
+        <button type="button" class="button ghost" id="studio-collage-frame-cancel">{{ _('Cancel') }}</button>
+        <button type="button" class="button" id="studio-collage-frame-apply">{{ _('Apply framing') }}</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="studio-collage-source-dialog"
+          class="studio-export-dialog studio-collage-source-dialog"
+          aria-labelledby="studio-collage-source-title">
+    <div class="studio-export-form studio-collage-source-form">
+      <h2 id="studio-collage-source-title">{{ _('Add media to cell') }}</h2>
+      <p class="hint">{{ _('Choose a photo or video for this empty cell.') }}</p>
+      <div class="studio-export-actions studio-collage-source-actions">
+        <button type="button" class="button" id="studio-collage-source-library">{{ _('From library') }}</button>
+        <button type="button" class="button ghost" id="studio-collage-source-computer">{{ _('From this computer') }}</button>
+        <button type="button" class="button ghost" id="studio-collage-source-cancel">{{ _('Cancel') }}</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="studio-collage-library-dialog"
+          class="studio-export-dialog photo-combine-dialog photo-combine-library-dialog studio-collage-library-dialog"
+          aria-labelledby="studio-collage-library-title">
+    {# Not method=dialog: Enter/submit must not close without commitLibrarySelection. #}
+    <div class="studio-export-form photo-combine-library-form studio-collage-library-form">
+      <h2 id="studio-collage-library-title">{{ _('Choose from library') }}</h2>
+      <p class="hint">{{ _('Select photos and videos, then confirm with Add to collage. They fill empty cells in order, or replace the selected cell first.') }}</p>
+      <label class="studio-inspector-field" for="studio-collage-library-filter">
         <span>{{ _('Filter') }}</span>
-        <input type="search" id="studio-collage-library-filter" aria-label="{{ _('Filter library media') }}">
+        <input type="search" id="studio-collage-library-filter" autocomplete="off"
+               placeholder="{{ _('Filter by filename') }}"
+               aria-label="{{ _('Filter library media') }}">
       </label>
-      <div id="studio-collage-library-grid" class="photo-combine-library-grid" role="listbox" aria-multiselectable="true"></div>
+      <div id="studio-collage-library-grid" class="photo-combine-picker-grid" role="listbox"
+           aria-multiselectable="true" aria-label="{{ _('Library media') }}"></div>
       <p id="studio-collage-library-empty" class="hint" hidden>{{ _('No matching photos or videos.') }}</p>
-      <footer class="photo-combine-dialog-actions">
+      <div class="studio-export-actions studio-collage-library-actions">
         <button type="button" class="button ghost" id="studio-collage-library-cancel">{{ _('Cancel') }}</button>
         <button type="button" class="button" id="studio-collage-library-add" disabled>{{ _('Add to collage') }}</button>
-      </footer>
-    </form>
+      </div>
+    </div>
   </dialog>
   {% else %}
   <div class="studio-project-landing">
@@ -2264,5 +2406,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script type="module" src="/static/js/studio.js"></script>
+<script type="module" src="/static/js/studio.js?v=collage-looks-keep-1"></script>
 {% endblock %}

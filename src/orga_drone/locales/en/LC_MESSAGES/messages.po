@@ -1045,6 +1045,57 @@ msgstr "Choose a layout, drag dividers in the preview, then add media to each ce
 msgid "Layout preset"
 msgstr "Layout preset"
 
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Pick where you want more cells (left, right, or bottom), drag dividers to fine-tune, then add media. Click a cell to grade it."
+msgstr "Pick where you want more cells (left, right, or bottom), drag dividers to fine-tune, then add media. Click a cell to grade it."
+
+msgid "Or select a cell and split it left/right or top/bottom to build your own layout."
+msgstr "Or select a cell and split it left/right or top/bottom to build your own layout."
+
+msgid "Side by side"
+msgstr "Side by side"
+
+msgid "More on the left"
+msgstr "More on the left"
+
+msgid "More on the right"
+msgstr "More on the right"
+
+msgid "2×2 grid"
+msgstr "2×2 grid"
+
+msgid "More on top and bottom"
+msgstr "More on top and bottom"
+
+msgid "More in the middle"
+msgstr "More in the middle"
+
+msgid "Three left, two right"
+msgstr "Three left, two right"
+
+msgid "Split left / right"
+msgstr "Split left / right"
+
+msgid "Split top / bottom"
+msgstr "Split top / bottom"
+
+msgid "Studio collage framing"
+msgstr "Studio collage framing"
+
+msgid "Pan (drag)"
+msgstr "Pan (drag)"
+
+msgid "Zoom (mouse wheel)"
+msgstr "Zoom (mouse wheel)"
+
+msgid "Framing shortcuts saved on this device."
+msgstr "Framing shortcuts saved on this device."
+
+msgid "Drag in the selected cell to move the crop. Mouse wheel zooms. Change modifier keys under Settings → Studio collage framing."
+msgstr "Drag in the selected cell to move the crop. Mouse wheel zooms. Change modifier keys under Settings → Studio collage framing."
+
 msgid "Aspect"
 msgstr "Aspect"
 
@@ -1108,14 +1159,35 @@ msgstr "Choose from library"
 msgid "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
 msgstr "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
 
+msgid "Select photos and videos, then confirm with Add to collage. They fill empty cells in order, or replace the selected cell first."
+msgstr "Select photos and videos, then confirm with Add to collage. They fill empty cells in order, or replace the selected cell first."
+
 msgid "Filter"
 msgstr "Filter"
 
 msgid "No matching photos or videos."
 msgstr "No matching photos or videos."
 
+msgid "No photos or videos in the library yet."
+msgstr "No photos or videos in the library yet."
+
+msgid "Library media"
+msgstr "Library media"
+
 msgid "Add to collage"
 msgstr "Add to collage"
+
+msgid "Choose a layout, drag dividers in the preview, then add media to each cell. Click a cell to grade it with HSL, Looks, or LUTs."
+msgstr "Choose a layout, drag dividers in the preview, then add media to each cell. Click a cell to grade it with HSL, Looks, or LUTs."
+
+msgid "Photo-only collages: export a PNG or JPEG here. Story export always makes an MP4 of the whole memory."
+msgstr "Photo-only collages: export a PNG or JPEG here. Story export always makes an MP4 of the whole memory."
+
+msgid "Export still (PNG/JPEG)"
+msgstr "Export still (PNG/JPEG)"
+
+msgid "Stacks photos side by side or top to bottom. For a 2×2 grid, video cells, or color grades, use Studio → Collage."
+msgstr "Stacks photos side by side or top to bottom. For a 2×2 grid, video cells, or color grades, use Studio → Collage."
 
 msgid "Media"
 msgstr "Media"

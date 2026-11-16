@@ -80,6 +80,34 @@
   </form>
 </section>
 
+<section class="settings-section" id="settings-collage-framing"
+         data-saved="{{ _('Framing shortcuts saved on this device.')|e }}">
+  <h2>{{ _('Studio collage framing') }}</h2>
+  <p class="hint">{{ _('In a selected collage cell with media: drag to move the crop, mouse wheel to zoom. Optional modifier keys avoid clashes with other Studio controls.') }}</p>
+  <div class="settings-framing-grid">
+    <label class="studio-inspector-field" for="settings-collage-pan-modifier">
+      <span>{{ _('Pan (drag)') }}</span>
+      <select id="settings-collage-pan-modifier" aria-label="{{ _('Modifier for collage pan drag') }}">
+        <option value="none">{{ _('No modifier — left drag') }}</option>
+        <option value="alt">{{ _('Alt + left drag') }}</option>
+        <option value="ctrl">{{ _('Ctrl + left drag') }}</option>
+        <option value="shift">{{ _('Shift + left drag') }}</option>
+      </select>
+    </label>
+    <label class="studio-inspector-field" for="settings-collage-zoom-modifier">
+      <span>{{ _('Zoom (mouse wheel)') }}</span>
+      <select id="settings-collage-zoom-modifier" aria-label="{{ _('Modifier for collage wheel zoom') }}">
+        <option value="none">{{ _('No modifier — mouse wheel') }}</option>
+        <option value="alt">{{ _('Alt + mouse wheel') }}</option>
+        <option value="ctrl">{{ _('Ctrl + mouse wheel') }}</option>
+        <option value="shift">{{ _('Shift + mouse wheel') }}</option>
+      </select>
+    </label>
+  </div>
+  <p class="hint">{{ _('Arrow keys nudge the crop when a cell is selected. + and − change zoom.') }}</p>
+  <p id="settings-collage-framing-status" class="hint" role="status" hidden></p>
+</section>
+
 <section class="settings-section" id="settings-luts"
          data-lut-already="{{ _('This file is already in your library as \"{name}\".')|e }}"
          data-lut-restored="{{ _('The color file was restored in your library as \"{name}\".')|e }}"
@@ -120,4 +148,5 @@
   window.__LUT_CATALOG__ = {{ lut_catalog|tojson }};
 </script>
 <script src="/static/js/settings-luts.js" defer></script>
+<script type="module" src="/static/js/settings-collage-framing.js"></script>
 {% endblock %}

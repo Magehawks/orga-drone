@@ -27,9 +27,9 @@ from orga_drone.studio_collage import (
     CollageSpecError,
     aspect_size,
     iter_leaves,
+    media_source_window,
     normalize_spec,
     resolve_rects,
-    source_window,
 )
 from orga_drone.studio_color_wheels import ColorWheels, color_wheels_from_effect_settings
 from orga_drone.studio_hsl import HslAdjust, hsl_adjust_from_effect_settings
@@ -189,9 +189,14 @@ def _grade_payload(media: dict[str, Any]) -> str | None:
 def _grade_needs_still(effect_settings: str | None) -> bool:
     if not effect_settings:
         return False
+    from orga_drone.studio_looks import look_id_from_effect_settings
     from orga_drone.studio_managed_apply import grade_is_managed_sdr
 
     if grade_is_managed_sdr(effect_settings):
+        return True
+    # Quick Look id alone must still go through the graded still path (e.g. natural
+    # is slider-neutral but should stay on the look-aware compose path).
+    if look_id_from_effect_settings(effect_settings):
         return True
     image = image_adjust_from_effect_settings(effect_settings)
     look = color_look_from_effect_settings(effect_settings)
@@ -294,21 +299,12 @@ def _fit_tile(tile, rect_w: int, rect_h: int, media: dict[str, Any]):
 
     sw, sh = tile.size
     fit_mode = str(media.get("fit") or "fill").strip().lower()
-    zoom_raw = media.get("zoom")
-    pan_x_raw = media.get("pan_x")
-    pan_y_raw = media.get("pan_y")
-    zoom = float(zoom_raw if zoom_raw is not None else 1.0)
-    pan_x = float(pan_x_raw if pan_x_raw is not None else 0.5)
-    pan_y = float(pan_y_raw if pan_y_raw is not None else 0.5)
-    win = source_window(
+    win = media_source_window(
+        media,
         source_w=sw,
         source_h=sh,
         cell_w=rect_w,
         cell_h=rect_h,
-        fit=fit_mode,
-        zoom=zoom,
-        pan_x=pan_x,
-        pan_y=pan_y,
     )
     left = int(round(win.x * sw))
     top = int(round(win.y * sh))
@@ -390,6 +386,24 @@ def _probe_video_duration_s(path: Path) -> float | None:
     return duration
 
 
+def resolve_leaf_video_duration_s(
+    db: Database, media: dict[str, Any] | None
+) -> float | None:
+    """Best-effort duration for a collage leaf video, or None when unknown."""
+    if not isinstance(media, dict):
+        return None
+    if str(media.get("kind") or "").strip().lower() != "video":
+        return None
+    if str(media.get("source") or "").strip().lower() == "library":
+        duration = _library_media_duration_s(db, media)
+        if duration is not None:
+            return duration
+    path = resolve_leaf_source(db, media)
+    if path is None:
+        return None
+    return _probe_video_duration_s(path)
+
+
 def _library_media_duration_s(db: Database, media: dict[str, Any]) -> float | None:
     media_id = media.get("media_id")
     row = None
@@ -440,6 +454,77 @@ def _clamp_video_source_time(
     # Keep a small epsilon before EOF so ffmpeg -ss still returns a frame.
     hold_at = max(0.0, float(duration) - 0.05)
     return min(max(0.0, float(source_time)), hold_at)
+
+
+def render_collage_leaf_source_preview(
+    db: Database,
+    spec: dict[str, Any],
+    leaf_id: str,
+    *,
+    t_s: float = 0.0,
+    max_edge: int = PREVIEW_LONG_EDGE,
+) -> Path:
+    """Full-source graded JPEG for one leaf (no cell crop).
+
+    Used by the framing dialog so Looks / HSL / LUT show on the photo while the
+    orange viewport still tracks the uncropped source aspect.
+    """
+    normalized = normalize_spec(spec)
+    leaf = next(
+        (node for node in iter_leaves(normalized["root"]) if str(node.get("id")) == str(leaf_id)),
+        None,
+    )
+    if leaf is None:
+        raise StudioExportError("Collage cell not found.")
+    media = leaf.get("media")
+    if not isinstance(media, dict):
+        raise StudioExportError("Collage cell has no media.")
+    path = resolve_leaf_source(db, media)
+    if path is None or not path.is_file():
+        raise StudioExportError("Collage media missing.")
+
+    kind = str(media.get("kind") or "photo").strip().lower()
+    if kind not in {"photo", "video"}:
+        kind = "photo" if path.suffix.lower() in PHOTO_SUFFIXES else "video"
+
+    effect_settings = _grade_payload(media)
+    start_offset = float(media.get("start_offset_s") or 0.0)
+    source_time = start_offset + max(0.0, float(t_s))
+    if kind == "video":
+        source_time = _clamp_video_source_time(db, media, path, source_time)
+
+    image = (
+        image_adjust_from_effect_settings(effect_settings)
+        if effect_settings
+        else ImageAdjust()
+    )
+    look = (
+        color_look_from_effect_settings(effect_settings) if effect_settings else ColorLook()
+    )
+    hsl = hsl_adjust_from_effect_settings(effect_settings) if effect_settings else HslAdjust()
+    wheels = (
+        color_wheels_from_effect_settings(effect_settings)
+        if effect_settings
+        else ColorWheels()
+    )
+    from orga_drone.studio_managed_apply import grade_is_managed_sdr
+
+    managed = bool(effect_settings and grade_is_managed_sdr(effect_settings))
+    req = PreviewFrameRequest(
+        media_path=path,
+        kind=kind,
+        source_time_s=max(0.0, float(source_time)),
+        image=image,
+        look=look,
+        hsl=hsl,
+        color_wheels=wheels,
+        max_edge=max(64, int(max_edge)),
+        effect_settings=effect_settings if managed else None,
+    )
+    try:
+        return render_preview_frame(req, data_dir=settings.data_dir)
+    except PreviewFrameError as exc:
+        raise StudioExportError(str(exc) or "Could not build a collage leaf still.") from exc
 
 
 def _leaf_rgba(

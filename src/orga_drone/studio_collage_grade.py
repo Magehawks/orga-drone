@@ -66,7 +66,8 @@ def patch_leaf_grade(
     if next_obj:
         media["grade"] = next_obj
     else:
-        media.pop("grade", None)
+        # Explicit clear sentinel so assign_leaf_media does not restore prior grade.
+        media["grade"] = None
     return assign_leaf_media(normalized, leaf_id, media)
 
 
@@ -129,6 +130,22 @@ def apply_color_look(
     def mutator(blob: str) -> str:
         look = parse_color_look_payload(payload)
         return dump_color_look(blob, look)
+
+    return patch_leaf_grade(spec, leaf_id, mutator=mutator)
+
+
+def apply_quick_look(spec: dict[str, Any], leaf_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Apply a named Quick Look onto one leaf (image sliders + look id)."""
+    from orga_drone.studio_image import dump_effect_settings
+    from orga_drone.studio_looks import dump_look_id, look_image_adjust, parse_look_payload
+
+    look_id = parse_look_payload(payload)
+
+    def mutator(blob: str) -> str:
+        next_blob = blob
+        if look_id:
+            next_blob = dump_effect_settings(next_blob, look_image_adjust(look_id))
+        return dump_look_id(next_blob, look_id)
 
     return patch_leaf_grade(spec, leaf_id, mutator=mutator)
 

@@ -6,11 +6,18 @@
 import {
   PRESET_NAMES,
   aspectCss,
+  applyLeafThumbFraming,
   collectDividers,
   iterLeaves,
+  resetLeafThumbFraming,
   resolveRects,
+  sourceWindow,
 } from "./collage-layout.js";
-import { createCollagePlayback } from "./collage-playback.js";
+import {
+  createCollagePlayback,
+  shouldKeepComposedUnderlay,
+} from "./collage-playback.js?v=collage-looks-keep-1";
+import { createCollageFrameModal } from "./collage-frame-modal.js?v=collage-looks-keep-1";
 
 /**
  * @param {object} opts
@@ -28,6 +35,9 @@ export function createCollageEditor(opts) {
   const stage = document.getElementById("studio-preview-collage-stage");
   const durationEl = document.getElementById("inspector-collage-duration");
   const presetEl = document.getElementById("inspector-collage-preset");
+  const presetButtons = Array.from(
+    document.querySelectorAll("#inspector-collage-presets [data-collage-preset]")
+  );
   const aspectEl = document.getElementById("inspector-collage-aspect");
   const gapEl = document.getElementById("inspector-collage-gap");
   const bgEl = document.getElementById("inspector-collage-background");
@@ -42,6 +52,7 @@ export function createCollageEditor(opts) {
   const libraryFilter = document.getElementById("studio-collage-library-filter");
   const libraryEmpty = document.getElementById("studio-collage-library-empty");
   const libraryAdd = document.getElementById("studio-collage-library-add");
+  const sourceDialog = document.getElementById("studio-collage-source-dialog");
   const composedImg = document.getElementById("studio-preview-collage-composed");
   const exportFormatEl = document.getElementById("inspector-collage-export-format");
   const exportBtn = document.getElementById("inspector-collage-export");
@@ -51,6 +62,7 @@ export function createCollageEditor(opts) {
     "Media (*.jpg;*.jpeg;*.png;*.webp;*.heic;*.mp4;*.mov;*.m4v;*.webm)",
     "Images (*.jpg;*.jpeg;*.png;*.webp;*.heic)",
     "Videos (*.mp4;*.mov;*.m4v;*.webm)",
+    "All files (*.*)",
   ];
 
   let composedTimer = null;
@@ -62,10 +74,24 @@ export function createCollageEditor(opts) {
   let selectedLeafId = null;
   let selectedLeafOwnerId = null;
   let drag = null;
+  let framingDrag = null;
+  let framingLiveTimer = 0;
+  let framingCommitTimer = 0;
+  let framingQuiet = false;
+  let framingLiveSafetyTimer = 0;
   let saveChain = Promise.resolve();
   let libraryItems = [];
   let librarySelected = {};
+  let hostResizeTimer = 0;
+  let lastHostKey = "";
+  let previewClip = null;
   const playback = createCollagePlayback({ stage });
+  const frameModal = createCollageFrameModal({
+    showFlash: (text) => opts.showFlash?.(text),
+  });
+  const MIN_LEAF_ZOOM = 1;
+  const MAX_LEAF_ZOOM = 3;
+  const ZOOM_WHEEL_STEP = 0.08;
 
   function clipForLeafAction() {
     const selected = opts.getSelectedClip?.();
@@ -113,7 +139,56 @@ export function createCollageEditor(opts) {
     const fit = Math.min(hostW / aw, hostH / ah);
     const width = Math.max(1, Math.floor(aw * fit));
     const height = Math.max(1, Math.floor(ah * fit));
-    return { width, height, css };
+    return { width, height, css, aw, ah };
+  }
+
+  function measureCollageHost() {
+    // Prefer the visible preview frame — collage host can still be 0×0 on first show.
+    const frame = document.getElementById("studio-preview-frame");
+    const frameRect = frame?.getBoundingClientRect?.();
+    const hostRect = preview?.getBoundingClientRect?.();
+    let hostW = Math.round(hostRect?.width || preview?.clientWidth || 0);
+    let hostH = Math.round(hostRect?.height || preview?.clientHeight || 0);
+    if (hostW < 48 || hostH < 48) {
+      hostW = Math.round(frameRect?.width || frame?.clientWidth || 0);
+      hostH = Math.round(frameRect?.height || frame?.clientHeight || 0);
+    }
+    const reliable = hostW >= 48 && hostH >= 48;
+    if (!reliable) {
+      hostW = Math.max(hostW, 960);
+      hostH = Math.max(hostH, 540);
+    }
+    return { hostW, hostH, reliable };
+  }
+
+  function scheduleHostRelayout(clip, specCss) {
+    const run = () => {
+      if (previewClip !== clip) return;
+      if (!isCollage(clip)) return;
+      if (framingDrag || framingQuiet) return;
+      // Force style flush after unhide / studio chrome layout.
+      void preview?.offsetWidth;
+      void document.getElementById("studio-preview-frame")?.offsetWidth;
+      const again = measureCollageHost();
+      const key = `${again.hostW}x${again.hostH}:${specCss}`;
+      // Compare against the aspect-fit box — NOT raw host size (portrait stages
+      // are intentionally narrower than a 16:9 frame and looked "too small").
+      const expected = aspectBox(parseSpec(clip) || { aspect: "16:9" }, again.hostW, again.hostH);
+      const stageW = Math.round(stage?.clientWidth || 0);
+      const stageH = Math.round(stage?.clientHeight || 0);
+      const tooSmall =
+        expected.width >= 64 &&
+        expected.height >= 64 &&
+        (stageW < expected.width * 0.85 || stageH < expected.height * 0.85);
+      if (key !== lastHostKey || tooSmall) {
+        renderPreview(clip);
+      }
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+    window.setTimeout(run, 120);
+    window.setTimeout(run, 350);
   }
 
   function parseSpec(clip) {
@@ -185,68 +260,132 @@ export function createCollageEditor(opts) {
       composedImg.hidden = true;
       composedImg.removeAttribute("src");
     }
+    setHasComposedStill(false);
+    setFramingLive(false);
   }
 
-  function scheduleComposedPreview(clip, tS = null) {
+  function hideThumbsUnderComposed() {
+    stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
+      img.style.opacity = "0";
+    });
+  }
+
+  function showComposedUrl(nextUrl, seq) {
+    if (!composedImg) {
+      URL.revokeObjectURL(nextUrl);
+      return;
+    }
+    if (seq !== composedSeq) {
+      URL.revokeObjectURL(nextUrl);
+      return;
+    }
+    if (composedObjectUrl) URL.revokeObjectURL(composedObjectUrl);
+    composedObjectUrl = nextUrl;
+    // Ensure the composed still is still mounted after stage.replaceChildren().
+    if (composedImg.parentElement !== stage) {
+      stage?.insertBefore(composedImg, stage.firstChild);
+    }
+    composedImg.src = nextUrl;
+    composedImg.hidden = false;
+    // Under cell chrome (labels/selection), above stage background.
+    composedImg.style.zIndex = "0";
+    composedImg.style.pointerEvents = "none";
+    composedImg.style.opacity = "1";
+    composedImg.style.visibility = "visible";
+    setFramingLive(false);
+    setHasComposedStill(true);
+    hideThumbsUnderComposed();
+  }
+
+  function scheduleComposedPreview(clip, tS = null, { keepLiveUntilLoad = false } = {}) {
     if (!composedImg || !isCollage(clip)) return;
     const studioId = String(clip.dataset.studioId || "");
     if (!studioId) return;
-    /* Paused scrub ownership lives in collage-playback.sync → updateComposedStill. */
-    if (!opts.isPlaying?.()) return;
+    /* While playing, collage-playback owns the live still; editor still refreshes
+       the graded composed preview when paused so leaf Looks/HSL/LUTs show. */
     if (composedTimer) clearTimeout(composedTimer);
     const requestTs = tS == null ? Number(opts.getCollageLocalS?.() || 0) : Number(tS) || 0;
-    composedTimer = setTimeout(async () => {
-      composedTimer = null;
-      const seq = ++composedSeq;
-      try {
-        const res = await fetchImpl(`/api/studio/${encodeURIComponent(studioId)}/collage/preview`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ t_s: requestTs }),
-        });
-        if (seq !== composedSeq) return;
-        if (res.status === 409) return;
-        if (!res.ok) {
-          clearComposedPreview();
-          return;
+    composedTimer = setTimeout(
+      async () => {
+        composedTimer = null;
+        if (framingDrag) return;
+        const seq = ++composedSeq;
+        try {
+          const res = await fetchImpl(
+            `/api/studio/${encodeURIComponent(studioId)}/collage/preview`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ t_s: requestTs }),
+            }
+          );
+          if (seq !== composedSeq) return;
+          // Newer preview cancelled this one — keep current still; never stay in live-hide.
+          if (res.status === 409) {
+            if (keepLiveUntilLoad) setFramingLive(false);
+            return;
+          }
+          if (!res.ok) {
+            setFramingLive(false);
+            if (!composedObjectUrl) clearComposedPreview();
+            return;
+          }
+          const blob = await res.blob();
+          if (seq !== composedSeq) return;
+          const nextUrl = URL.createObjectURL(blob);
+          if (keepLiveUntilLoad) {
+            const swap = new Image();
+            swap.onload = () => showComposedUrl(nextUrl, seq);
+            swap.onerror = () => {
+              // Still assign — better a flash than a blank stage.
+              showComposedUrl(nextUrl, seq);
+            };
+            swap.src = nextUrl;
+            return;
+          }
+          showComposedUrl(nextUrl, seq);
+        } catch {
+          if (seq === composedSeq) {
+            setFramingLive(false);
+            if (!composedObjectUrl) clearComposedPreview();
+          }
         }
-        const blob = await res.blob();
-        if (seq !== composedSeq) return;
-        if (composedObjectUrl) URL.revokeObjectURL(composedObjectUrl);
-        composedObjectUrl = URL.createObjectURL(blob);
-        composedImg.src = composedObjectUrl;
-        composedImg.hidden = false;
-        /* Below cell controls so selection labels stay visible. */
-        composedImg.style.zIndex = "0";
-        stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
-          img.style.opacity = "0";
-        });
-      } catch {
-        if (seq === composedSeq) clearComposedPreview();
-      }
-    }, 220);
+      },
+      keepLiveUntilLoad ? 280 : 220
+    );
   }
 
   function renderPreview(clip) {
     if (!preview || !stage) return;
     const spec = parseSpec(clip);
     if (!isCollage(clip) || !spec) {
+      previewClip = null;
+      lastHostKey = "";
       preview.hidden = true;
       clearComposedPreview();
       stage.replaceChildren();
       if (composedImg) stage.appendChild(composedImg);
       return;
     }
+    previewClip = clip;
+    // Fresh paint: keep cell thumbs visible until composed arrives.
+    setFramingLive(false);
+    setHasComposedStill(false);
     preview.hidden = false;
+    // Flush after unhide so frame/host rects are real (first open was measuring 0).
+    void preview.offsetWidth;
+    void document.getElementById("studio-preview-frame")?.offsetWidth;
     const bg = spec.background === "transparent" ? "#0a0c0e" : spec.background || "#0a0c0e";
     stage.style.background = bg;
-    const host = preview.getBoundingClientRect();
-    const hostW = Math.max(1, Math.round(host.width || preview.clientWidth || 640));
-    const hostH = Math.max(1, Math.round(host.height || preview.clientHeight || (hostW * 9) / 16));
-    const box = aspectBox(spec, hostW, hostH);
+    const measured = measureCollageHost();
+    const box = aspectBox(spec, measured.hostW, measured.hostH);
+    lastHostKey = `${measured.hostW}x${measured.hostH}:${box.css}`;
+    // Explicit px size — % height inside the flex collage host collapses on first paint.
     stage.style.aspectRatio = box.css;
     stage.style.width = `${box.width}px`;
     stage.style.height = `${box.height}px`;
+    stage.style.maxWidth = "100%";
+    stage.style.maxHeight = "100%";
     const width = box.width;
     const height = box.height;
     const rects = resolveRects(spec, width, height);
@@ -294,21 +433,30 @@ export function createCollageEditor(opts) {
         cell.classList.add("is-missing");
       }
       cell.appendChild(label);
-      cell.addEventListener("click", () => {
-        selectedLeafId = String(leaf.id);
-        selectedLeafOwnerId = String(clip.dataset.studioId || "");
-        if (cellActions) cellActions.hidden = false;
-        fillLeafFraming(clip);
-        const selected = opts.getSelectedClip?.();
-        if (
-          selectedLeafOwnerId &&
-          selected &&
-          String(selected.dataset?.studioId || "") !== selectedLeafOwnerId
-        ) {
-          opts.onSelectClip?.(selectedLeafOwnerId);
+      if (media) {
+        cell.classList.add("has-media");
+        const thumb = cell.querySelector("img");
+        if (thumb) {
+          // Idle: simple visible fallback. Precise crop only while framing live.
+          resetLeafThumbFraming(thumb, media);
         }
-        opts.onLeafSelected?.(clip, leaf, media || null);
-        renderPreview(clip);
+      }
+      cell.addEventListener("click", () => {
+        const leafId = String(leaf.id);
+        // Always read current media from the clip dataset — closure media goes stale after Apply.
+        const current = leafMedia(clip, leafId) || media || null;
+        selectLeaf(clip, leaf, current);
+        stage
+          ?.querySelectorAll(".studio-collage-cell.is-selected")
+          .forEach((el) => el.classList.remove("is-selected"));
+        cell.classList.add("is-selected");
+        fillLeafFraming(clip);
+        notifyLeafSelection(clip);
+        if (!current) {
+          openSourceChooser();
+          return;
+        }
+        openFrameModalForLeaf(clip, leaf, current, cell);
       });
       stage.appendChild(cell);
     }
@@ -336,23 +484,42 @@ export function createCollageEditor(opts) {
       stage.appendChild(handle);
     }
     const playing = Boolean(opts.isPlaying?.());
+    const keepUnderlay = shouldKeepComposedUnderlay(spec, playing);
+    // Paused editing: force composed stills only — no raw leaf media under/over thumbs.
     playback.mount({
       spec,
       studioId: clip.dataset.studioId,
       rects,
       width,
       height,
-      forceStill: false,
+      forceStill: !playing,
     });
     preview?.classList.toggle("has-play-media", true);
     preview?.classList.toggle("is-paused", !playing);
+    // Playing without Looks: hide graded still so live layers own the picture.
+    // With Looks/framing (or photo-only): keep graded compose under live video.
+    if (playing && composedImg) {
+      if (keepUnderlay) {
+        composedImg.hidden = false;
+        composedImg.style.visibility = "visible";
+        composedImg.style.opacity = "1";
+        setHasComposedStill(true);
+        if (!composedImg.getAttribute("src")) scheduleComposedPreview(clip);
+      } else {
+        composedImg.hidden = true;
+        composedImg.style.visibility = "hidden";
+        setHasComposedStill(false);
+      }
+    }
     playback.sync({
       localS: Number(opts.getCollageLocalS?.() || 0),
       playing,
       seek: true,
       spec,
     });
-    scheduleComposedPreview(clip);
+    if (!playing) scheduleComposedPreview(clip);
+    // Always re-check after layout — clicking the track later was the only reliable resize.
+    scheduleHostRelayout(clip, box.css);
   }
 
   function setExportStatus(text, { error = false } = {}) {
@@ -483,24 +650,51 @@ export function createCollageEditor(opts) {
       selectedLeafId = null;
       selectedLeafOwnerId = null;
     }
+    const spec = parseSpec(clip) || {};
+    // Auto-select a cell so HSL / Looks / LUTs are available without an extra click.
+    if (!selectedLeafId || selectedLeafOwnerId !== ownerId) {
+      const leaves = spec.root ? iterLeaves(spec.root) : [];
+      const withMedia = leaves.find((leaf) => leaf && leaf.media);
+      const pick = withMedia || leaves[0] || null;
+      if (pick) {
+        selectedLeafId = String(pick.id);
+        selectedLeafOwnerId = ownerId;
+      }
+    }
     if (selectedLeafId && selectedLeafOwnerId === ownerId) {
       // Keep Color Workspace usable alongside collage layout controls.
       opts.showInspector("inspector-collage", { also: ["inspector-clip"] });
     } else {
       opts.showInspector("inspector-collage");
     }
-    const spec = parseSpec(clip) || {};
     if (durationEl) {
       durationEl.value = String(clip.dataset.collageDuration || spec.duration_s || "5");
     }
     if (presetEl) {
       const names = Array.isArray(spec.presets) ? spec.presets : PRESET_NAMES;
-      // Keep selected blank; presets replace the tree.
-      presetEl.value = names.includes(presetEl.value) ? presetEl.value : "1+1";
+      // Prefer matching the current tree shape; fall back to the control value.
+      const current = String(presetEl.value || "1+1");
+      const next = names.includes(current) ? current : "1+1";
+      presetEl.value = next;
+      syncPresetButtons(next);
     }
     if (aspectEl) {
-      const aspect = typeof spec.aspect === "string" ? spec.aspect : "16:9";
-      aspectEl.value = aspect;
+      if (typeof spec.aspect === "string") {
+        aspectEl.value = spec.aspect;
+      } else if (spec.aspect && typeof spec.aspect === "object") {
+        // Free crop may set a custom {w,h} aspect — keep select stable.
+        const custom = `custom:${spec.aspect.w}x${spec.aspect.h}`;
+        let opt = Array.from(aspectEl.options).find((o) => o.value === custom);
+        if (!opt) {
+          opt = document.createElement("option");
+          opt.value = custom;
+          opt.textContent = `${spec.aspect.w}×${spec.aspect.h}`;
+          aspectEl.appendChild(opt);
+        }
+        aspectEl.value = custom;
+      } else {
+        aspectEl.value = "16:9";
+      }
     }
     if (gapEl) gapEl.value = String(spec.gap_px ?? 8);
     if (bgEl && typeof spec.background === "string" && spec.background.startsWith("#")) {
@@ -515,6 +709,9 @@ export function createCollageEditor(opts) {
     if (cellActions) cellActions.hidden = !selectedLeafId;
     fillLeafFraming(clip);
     renderPreview(clip);
+    if (selectedLeafId && selectedLeafOwnerId === ownerId) {
+      notifyLeafSelection(clip);
+    }
   }
 
   function leafMedia(clip, leafId) {
@@ -596,22 +793,55 @@ export function createCollageEditor(opts) {
   }
 
   async function assignMediaList(clip, mediaList) {
-    if (!isCollage(clip) || !mediaList.length) return;
+    if (!isCollage(clip) || !mediaList.length) return false;
     const targets = mediaTargets(clip, mediaList.length);
-    for (let i = 0; i < targets.length; i += 1) {
-      const leafId = targets[i];
-      const media = mediaList[i];
-      await queueSave(
-        clip,
-        { op: "assign_media", leaf_id: leafId, media },
-        gestureGroup("collage-assign")
-      );
+    if (!targets.length) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return false;
     }
-    if (isStillSelected(clip)) {
-      fillInspector(clip);
-      // Rehydrate Color Workspace from the (possibly replaced) selected leaf.
-      notifyLeafSelection(clip);
+    const group = gestureGroup("collage-assign");
+    try {
+      for (let i = 0; i < targets.length; i += 1) {
+        const leafId = targets[i];
+        const media = mediaList[i];
+        // Await the real patch (not the swallowed queueSave catch) so a failed
+        // assign cannot look like success with empty cells.
+        await (saveChain = saveChain
+          .catch(() => {})
+          .then(() => patchCollage(clip, { op: "assign_media", leaf_id: leafId, media }, group)));
+      }
+    } catch (err) {
+      opts.showFlash(err?.message || msg("collageFailed", "Could not save collage."));
+      return false;
     }
+    // Dialog close / click-through can clear selection; always refresh this clip.
+    const studioId = String(clip.dataset.studioId || "");
+    if (studioId) opts.onSelectClip?.(studioId);
+    fillInspector(clip);
+    notifyLeafSelection(clip);
+    renderPreview(clip);
+    return true;
+  }
+
+  function syncPresetButtons(presetName) {
+    const selected = String(presetName || "");
+    presetButtons.forEach((btn) => {
+      const active = String(btn.getAttribute("data-collage-preset") || "") === selected;
+      btn.setAttribute("aria-checked", active ? "true" : "false");
+      btn.classList.toggle("is-selected", active);
+    });
+  }
+
+  function applyPresetChoice(presetName) {
+    const clip = opts.getSelectedClip();
+    const name = String(presetName || "").trim();
+    if (!isCollage(clip) || !name) return;
+    if (presetEl) presetEl.value = name;
+    syncPresetButtons(name);
+    selectedLeafId = null;
+    queueSave(clip, { preset: name }, gestureGroup("collage-preset")).then(() => {
+      if (isStillSelected(clip)) fillInspector(clip);
+    });
   }
 
   function syncLibraryAddButton() {
@@ -632,9 +862,19 @@ export function createCollageEditor(opts) {
         .toLowerCase()
         .includes(q);
     });
-    if (libraryEmpty) libraryEmpty.hidden = visible.length > 0 || libraryItems.length === 0;
-    if (!libraryItems.length && libraryEmpty) {
-      libraryEmpty.hidden = false;
+    if (libraryEmpty) {
+      if (!libraryItems.length) {
+        libraryEmpty.textContent = msg(
+          "collageLibraryEmpty",
+          "No photos or videos in the library yet."
+        );
+        libraryEmpty.hidden = false;
+      } else if (!visible.length) {
+        libraryEmpty.textContent = msg("collageLibraryNoMatch", "No matching photos or videos.");
+        libraryEmpty.hidden = false;
+      } else {
+        libraryEmpty.hidden = true;
+      }
     }
     visible.forEach((item) => {
       const id = String(item.id);
@@ -659,6 +899,15 @@ export function createCollageEditor(opts) {
         btn.setAttribute("aria-selected", librarySelected[id] ? "true" : "false");
         syncLibraryAddButton();
       });
+      // Double-click commits immediately so selection is not lost without the confirm button.
+      btn.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        librarySelected[id] = item;
+        btn.classList.add("is-selected");
+        btn.setAttribute("aria-selected", "true");
+        syncLibraryAddButton();
+        void commitLibrarySelection();
+      });
       libraryGrid.appendChild(btn);
     });
     syncLibraryAddButton();
@@ -682,9 +931,26 @@ export function createCollageEditor(opts) {
     renderLibraryGrid(libraryFilter ? libraryFilter.value : "");
   }
 
+  function openSourceChooser() {
+    if (!sourceDialog) {
+      openLibraryPicker();
+      return;
+    }
+    if (typeof sourceDialog.showModal === "function") sourceDialog.showModal();
+    else sourceDialog.setAttribute("open", "");
+  }
+
+  function closeSourceChooser() {
+    if (!sourceDialog) return;
+    if (typeof sourceDialog.close === "function") sourceDialog.close();
+    else sourceDialog.removeAttribute("open");
+  }
+
   async function openLibraryPicker() {
-    const clip = opts.getSelectedClip();
+    const clip = clipForLeafAction();
     if (!isCollage(clip) || !libraryDialog) return;
+    closeSourceChooser();
+    if (frameModal.isOpen?.()) frameModal.close();
     librarySelected = {};
     if (libraryFilter) libraryFilter.value = "";
     syncLibraryAddButton();
@@ -707,31 +973,45 @@ export function createCollageEditor(opts) {
   }
 
   async function commitLibrarySelection() {
-    const clip = opts.getSelectedClip();
-    if (!isCollage(clip)) return;
+    const clip = clipForLeafAction();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
     const selected = Object.keys(librarySelected).map((key) => librarySelected[key]);
     if (!selected.length) {
       opts.showFlash(msg("collageSelectLibrary", "Select at least one photo or video."));
       return;
     }
-    closeLibraryPicker();
-    await assignMediaList(
-      clip,
-      selected.map((item) => ({
+    const mediaList = selected.map((item) => {
+      const mediaId = Number(item.id);
+      return {
         source: "library",
-        media_id: Number(item.id),
+        media_id: mediaId,
         kind: item.kind === "video" ? "video" : "photo",
         fit: "fill",
         zoom: 1,
         pan_x: 0.5,
         pan_y: 0.5,
-      }))
-    );
+      };
+    });
+    if (mediaList.some((entry) => !Number.isInteger(entry.media_id) || entry.media_id <= 0)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
+    // Close only after a successful assign so a failed save keeps the picker open.
+    const ok = await assignMediaList(clip, mediaList);
+    if (ok) closeLibraryPicker();
   }
 
   async function pickComputerFiles() {
-    const clip = opts.getSelectedClip();
-    if (!isCollage(clip)) return;
+    const clip = clipForLeafAction();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Could not save collage."));
+      return;
+    }
+    closeSourceChooser();
+    if (frameModal.isOpen?.()) frameModal.close();
     try {
       const res = await fetchImpl("/api/desktop/pick-open-file", {
         method: "POST",
@@ -775,28 +1055,346 @@ export function createCollageEditor(opts) {
     }
   }
 
-  function patchSelectedLeafMedia(mutator) {
-    const clip = clipForLeafAction();
-    if (!isCollage(clip) || !selectedLeafId) return;
+  function clampLeafZoom(value) {
+    const zoom = Number(value);
+    if (!Number.isFinite(zoom)) return MIN_LEAF_ZOOM;
+    return Math.max(MIN_LEAF_ZOOM, Math.min(MAX_LEAF_ZOOM, zoom));
+  }
+
+  function clampPan(value) {
+    const pan = Number(value);
+    if (!Number.isFinite(pan)) return 0.5;
+    return Math.max(0, Math.min(1, pan));
+  }
+
+  /**
+   * Best-effort layout adapt after free crop: single-cell → collage aspect;
+   * multi-cell → nudge the parent split toward the crop aspect.
+   * @param {HTMLElement} clip
+   * @param {string} leafId
+   * @param {number} cropAspect
+   */
+  function adaptCollageToCropAspect(clip, leafId, cropAspect) {
+    if (!clip || !(cropAspect > 0.05) || !(cropAspect < 40)) return;
+    const spec = parseSpec(clip);
+    if (!spec?.root) return;
+    const leaves = iterLeaves(spec.root);
+    if (leaves.length === 1) {
+      const long = 1000;
+      const aspect =
+        cropAspect >= 1
+          ? { w: long, h: Math.max(1, Math.round(long / cropAspect)) }
+          : { w: Math.max(1, Math.round(long * cropAspect)), h: long };
+      queueSave(clip, { aspect }, gestureGroup("collage-frame-aspect")).then(() => {
+        if (isStillSelected(clip)) {
+          fillInspector(clip);
+          renderPreview(clip);
+        }
+      });
+      return;
+    }
+    const stageW = Math.max(1, stage?.clientWidth || 1);
+    const stageH = Math.max(1, stage?.clientHeight || 1);
+    const parent = findLeafParentSplit(spec.root, String(leafId), null, stageW, stageH);
+    if (!parent?.split || !parent.side) return;
+    const rects = resolveRects(spec, stageW, stageH);
+    const cell = rects[String(leafId)];
+    if (!cell || !(cell.w > 0) || !(cell.h > 0)) return;
+    const gap = Number(spec.gap_px) || 0;
+    let nextRatio;
+    if (parent.split.dir === "h") {
+      // Side-by-side: change width share for this leaf.
+      const usable = Math.max(1, (parent.boundW || cell.w * 2) - gap);
+      const desiredW = Math.max(1, Math.min(usable - 1, cell.h * cropAspect));
+      nextRatio = parent.side === "a" ? desiredW / usable : 1 - desiredW / usable;
+    } else {
+      // Stacked: change height share.
+      const usable = Math.max(1, (parent.boundH || cell.h * 2) - gap);
+      const desiredH = Math.max(1, Math.min(usable - 1, cell.w / cropAspect));
+      nextRatio = parent.side === "a" ? desiredH / usable : 1 - desiredH / usable;
+    }
+    nextRatio = Math.max(0.08, Math.min(0.92, nextRatio));
+    if (Math.abs(nextRatio - (Number(parent.split.ratio) || 0.5)) < 0.01) return;
+    queueSave(
+      clip,
+      { op: "set_ratio", split_id: parent.split.id, ratio: nextRatio },
+      gestureGroup("collage-frame-ratio")
+    ).then(() => {
+      if (isStillSelected(clip)) renderPreview(clip);
+    });
+  }
+
+  /**
+   * @param {any} node
+   * @param {string} leafId
+   * @param {{ split: any, side: "a"|"b", boundW: number, boundH: number } | null} [acc]
+   * @param {number} [boundW]
+   * @param {number} [boundH]
+   */
+  function findLeafParentSplit(node, leafId, acc = null, boundW = 0, boundH = 0) {
+    if (!node) return acc;
+    if (node.type === "leaf") {
+      return String(node.id) === String(leafId) ? acc : null;
+    }
+    if (node.type !== "split") return null;
+    const gap = 0;
+    const ratio = Math.max(0.05, Math.min(0.95, Number(node.ratio) || 0.5));
+    if (node.dir === "h") {
+      const usable = Math.max(1, boundW - gap);
+      const first = Math.max(1, Math.round(usable * ratio));
+      const foundA = findLeafParentSplit(
+        node.a,
+        leafId,
+        { split: node, side: "a", boundW, boundH },
+        first,
+        boundH
+      );
+      if (foundA) return foundA;
+      return findLeafParentSplit(
+        node.b,
+        leafId,
+        { split: node, side: "b", boundW, boundH },
+        Math.max(1, usable - first),
+        boundH
+      );
+    }
+    const usable = Math.max(1, boundH - gap);
+    const first = Math.max(1, Math.round(usable * ratio));
+    const foundA = findLeafParentSplit(
+      node.a,
+      leafId,
+      { split: node, side: "a", boundW, boundH },
+      boundW,
+      first
+    );
+    if (foundA) return foundA;
+    return findLeafParentSplit(
+      node.b,
+      leafId,
+      { split: node, side: "b", boundW, boundH },
+      boundW,
+      Math.max(1, usable - first)
+    );
+  }
+
+  function openFrameModalForLeaf(clip, leaf, media, cell) {
+    if (!clip || !leaf) return;
+    const leafId = String(leaf.id);
+    const current = leafMedia(clip, leafId) || media;
+    if (!current) return;
+    const sourceUrl = framingSourceUrl(clip, leaf, current);
+    if (!sourceUrl) {
+      opts.showFlash(
+        msg("collageFrameUnavailable", "This cell has no previewable photo for framing.")
+      );
+      return;
+    }
+    // Use layout rect aspect (same as export), not the on-screen button box.
+    const spec = parseSpec(clip);
+    const stageW = Math.max(1, stage?.clientWidth || 1);
+    const stageH = Math.max(1, stage?.clientHeight || 1);
+    const layoutRects = spec ? resolveRects(spec, stageW, stageH) : {};
+    const layout = layoutRects[leafId];
+    const screen = cell?.getBoundingClientRect?.();
+    const cellW = Math.max(1, Math.round(layout?.w || screen?.width || 1));
+    const cellH = Math.max(1, Math.round(layout?.h || screen?.height || 1));
+    frameModal.open({
+      sourceUrl,
+      media: current,
+      cellW,
+      cellH,
+      studioId: clip.dataset.studioId,
+      leafId,
+      onApply: (nextMedia, meta) => {
+        selectedLeafId = leafId;
+        selectedLeafOwnerId = String(clip.dataset.studioId || "");
+        // Framing must not wipe Looks/HSL/LUT applied while the dialog was open
+        // (session.media can be stale relative to clip.dataset.collageSpec).
+        const latest = leafMedia(clip, leafId) || current || {};
+        const merged = {
+          ...latest,
+          fit: nextMedia?.fit === "fit" ? "fit" : "fill",
+          zoom: nextMedia?.zoom,
+          pan_x: nextMedia?.pan_x,
+          pan_y: nextMedia?.pan_y,
+        };
+        if (nextMedia && Object.prototype.hasOwnProperty.call(nextMedia, "crop")) {
+          if (nextMedia.crop) merged.crop = nextMedia.crop;
+          else delete merged.crop;
+        }
+        if (latest.grade) merged.grade = latest.grade;
+        else delete merged.grade;
+        applyLeafFramingLocal(clip, leafId, merged);
+        commitLeafFraming(clip, leafId, merged, "collage-frame-modal");
+        if (meta?.cropAspect) adaptCollageToCropAspect(clip, leafId, Number(meta.cropAspect));
+        notifyLeafSelection(clip);
+      },
+    });
+  }
+
+  function refreshFrameModalGrade() {
+    if (!frameModal.isOpen?.()) return;
+    const clip = opts.getSelectedClip?.();
     const leafId = selectedLeafId;
-    const group = gestureGroup("collage-frame");
+    const media = clip && leafId ? leafMedia(clip, leafId) : null;
+    const grade = media && media.grade && typeof media.grade === "object" ? media.grade : null;
+    frameModal.refreshGradePreview?.({ grade });
+  }
+
+  function framingSourceUrl(clip, leaf, media) {
+    if (!media) return null;
+    const kind = String(media.kind || "").toLowerCase();
+    if (media.source === "library" && media.media_id) {
+      // Photos: full stream keeps source aspect. Videos stay on thumb (can't img-decode).
+      if (kind === "video") return `/media/${media.media_id}/thumb`;
+      return `/media/${media.media_id}/stream`;
+    }
+    if (media.source === "external" && media.has_path && clip?.dataset?.studioId && leaf?.id) {
+      if (kind === "video") return null;
+      return `/api/studio/${encodeURIComponent(String(clip.dataset.studioId))}/collage/leaves/${encodeURIComponent(String(leaf.id))}/stream`;
+    }
+    return null;
+  }
+
+  function restoreIdleThumbSources() {
+    stage?.querySelectorAll(".studio-collage-cell img[data-idle-src]").forEach((img) => {
+      const idle = img.dataset.idleSrc || "";
+      if (idle && img.getAttribute("src") !== idle) {
+        img.src = idle;
+      }
+      delete img.dataset.idleSrc;
+      img.style.opacity = "";
+    });
+  }
+
+  function setFramingLive(active) {
+    const on = Boolean(active);
+    preview?.classList.toggle("is-framing-live", on);
+    window.clearTimeout(framingLiveSafetyTimer);
+    framingLiveSafetyTimer = 0;
+    if (on) {
+      // Never leave the graded still hidden if a preview request 409s/fails.
+      framingLiveSafetyTimer = window.setTimeout(() => {
+        framingLiveSafetyTimer = 0;
+        if (!framingDrag) setFramingLive(false);
+      }, 2500);
+    } else {
+      restoreIdleThumbSources();
+    }
+  }
+
+  function setHasComposedStill(active) {
+    preview?.classList.toggle("has-composed-still", Boolean(active));
+  }
+
+  function isFramingQuiet() {
+    return Boolean(framingQuiet || framingDrag || preview?.classList.contains("is-framing-live"));
+  }
+
+  function applyLeafFramingLocal(clip, leafId, nextMedia) {
+    const spec = parseSpec(clip);
+    if (!spec || !spec.root) return;
+    const leaf = iterLeaves(spec.root).find((item) => String(item.id) === String(leafId));
+    if (!leaf) return;
+    leaf.media = nextMedia;
+    try {
+      clip.dataset.collageSpec = JSON.stringify(spec);
+    } catch {
+      /* ignore */
+    }
+    if (zoomEl) zoomEl.value = String(nextMedia.zoom ?? 1);
+    if (panXEl) panXEl.value = String(nextMedia.pan_x ?? 0.5);
+    if (panYEl) panYEl.value = String(nextMedia.pan_y ?? 0.5);
+    if (fitEl) fitEl.value = nextMedia.fit === "fit" ? "fit" : "fill";
+    const cell = stage?.querySelector(
+      `.studio-collage-cell[data-leaf-id="${CSS.escape(String(leafId))}"]`
+    );
+    const thumb = cell?.querySelector("img");
+    if (thumb && cell) {
+      // Live feedback: source_window crop, clipped to this cell only.
+      const box = cell.getBoundingClientRect();
+      applyLeafThumbFraming(thumb, nextMedia, Math.max(1, box.width), Math.max(1, box.height));
+      // Hide sibling thumbs during live framing so scaled/wrong crops can't stack.
+      stage?.querySelectorAll(".studio-collage-cell img").forEach((img) => {
+        img.style.opacity = img === thumb ? "1" : "0";
+      });
+    }
+  }
+
+  function commitLeafFraming(clip, leafId, nextMedia, groupPrefix = "collage-frame") {
+    if (!clip || !leafId || !nextMedia) return;
+    const group = gestureGroup(groupPrefix);
+    framingQuiet = true;
+    setFramingLive(true);
     saveChain = saveChain
       .catch(() => {})
-      .then(() => {
-        const media = leafMedia(clip, leafId);
-        if (!media) return null;
-        return patchCollage(
-          clip,
-          { op: "assign_media", leaf_id: leafId, media: mutator({ ...media }) },
-          group
-        );
-      })
+      .then(() =>
+        patchCollage(clip, { op: "assign_media", leaf_id: leafId, media: nextMedia }, group)
+      )
       .catch((err) => {
         opts.showFlash(err?.message || msg("collageFailed", "Could not save collage."));
       });
     saveChain.then(() => {
-      if (isStillSelected(clip)) renderPreview(clip);
+      framingQuiet = false;
+      if (!isStillSelected(clip)) {
+        setFramingLive(false);
+        return;
+      }
+      fillLeafFraming(clip);
+      // Keep live thumbs until the new graded still is decoded → no full-stage flicker.
+      scheduleComposedPreview(clip, null, { keepLiveUntilLoad: true });
     });
+  }
+
+  function patchSelectedLeafMedia(
+    mutator,
+    { refreshPreview = true, groupPrefix = "collage-frame", live = false } = {}
+  ) {
+    const clip = clipForLeafAction();
+    if (!isCollage(clip) || !selectedLeafId) return;
+    const leafId = selectedLeafId;
+    const media = leafMedia(clip, leafId);
+    if (!media) return;
+    const nextMedia = mutator({ ...media });
+    if (live) setFramingLive(true);
+    applyLeafFramingLocal(clip, leafId, nextMedia);
+    if (live) {
+      window.clearTimeout(framingCommitTimer);
+      framingCommitTimer = window.setTimeout(() => {
+        framingCommitTimer = 0;
+        commitLeafFraming(clip, leafId, nextMedia, groupPrefix);
+      }, 140);
+      return;
+    }
+    commitLeafFraming(clip, leafId, nextMedia, groupPrefix);
+    if (!refreshPreview) {
+      /* commitLeafFraming already refreshes composed still after save */
+    }
+  }
+
+  function endFramingLiveSoon() {
+    window.clearTimeout(framingLiveTimer);
+    framingLiveTimer = window.setTimeout(() => {
+      framingLiveTimer = 0;
+      if (!framingDrag) setFramingLive(false);
+    }, 160);
+  }
+
+  function selectLeaf(clip, leaf, media) {
+    selectedLeafId = String(leaf.id);
+    selectedLeafOwnerId = String(clip.dataset.studioId || "");
+    if (cellActions) cellActions.hidden = false;
+    fillLeafFraming(clip);
+    const selected = opts.getSelectedClip?.();
+    if (
+      selectedLeafOwnerId &&
+      selected &&
+      String(selected.dataset?.studioId || "") !== selectedLeafOwnerId
+    ) {
+      opts.onSelectClip?.(selectedLeafOwnerId);
+    }
+    const current = leafMedia(clip, leaf.id) || media || null;
+    opts.onLeafSelected?.(clip, leaf, current);
   }
 
   function hidePreview() {
@@ -813,17 +1411,20 @@ export function createCollageEditor(opts) {
     queueSave(clip, { duration_s: Number(durationEl.value) }, gestureGroup("collage-duration"));
   });
   document.getElementById("inspector-collage-preset")?.addEventListener("change", () => {
-    const clip = opts.getSelectedClip();
-    if (!isCollage(clip) || !presetEl) return;
-    selectedLeafId = null;
-    queueSave(clip, { preset: presetEl.value }, gestureGroup("collage-preset")).then(() => {
-      if (isStillSelected(clip)) fillInspector(clip);
+    if (!presetEl) return;
+    applyPresetChoice(presetEl.value);
+  });
+  presetButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyPresetChoice(btn.getAttribute("data-collage-preset") || "");
     });
   });
   document.getElementById("inspector-collage-aspect")?.addEventListener("change", () => {
     const clip = opts.getSelectedClip();
     if (!isCollage(clip) || !aspectEl) return;
-    queueSave(clip, { aspect: aspectEl.value }, gestureGroup("collage-aspect")).then(() => {
+    const raw = String(aspectEl.value || "");
+    if (raw.startsWith("custom:")) return;
+    queueSave(clip, { aspect: raw }, gestureGroup("collage-aspect")).then(() => {
       if (isStillSelected(clip)) renderPreview(clip);
     });
   });
@@ -841,28 +1442,74 @@ export function createCollageEditor(opts) {
       if (isStillSelected(clip)) renderPreview(clip);
     });
   });
-  document.getElementById("inspector-collage-split-h")?.addEventListener("click", () => {
-    const clip = clipForLeafAction();
-    if (!isCollage(clip) || !selectedLeafId) return;
-    queueSave(
-      clip,
-      { op: "split", leaf_id: selectedLeafId, dir: "h" },
-      gestureGroup("collage-split")
-    ).then(() => {
-      if (isStillSelected(clip)) fillInspector(clip);
+  function activeCollageClip() {
+    return opts.getSelectedClip?.() || previewClip || clipForLeafAction() || null;
+  }
+
+  function splitSelectedCell(dir, times = 1) {
+    const clip = activeCollageClip();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Select a collage first."));
+      return;
+    }
+    if (!selectedLeafId) {
+      opts.showFlash(msg("collageSelectCellFirst", "Select a cell in the collage first."));
+      return;
+    }
+    const payload = { op: "split", leaf_id: selectedLeafId, dir };
+    if (times > 1) payload.times = times;
+    queueSave(clip, payload, gestureGroup("collage-split")).then(() => {
+      fillInspector(clip);
+      renderPreview(clip);
     });
-  });
-  document.getElementById("inspector-collage-split-v")?.addEventListener("click", () => {
-    const clip = clipForLeafAction();
-    if (!isCollage(clip) || !selectedLeafId) return;
-    queueSave(
-      clip,
-      { op: "split", leaf_id: selectedLeafId, dir: "v" },
-      gestureGroup("collage-split")
-    ).then(() => {
-      if (isStillSelected(clip)) fillInspector(clip);
+  }
+
+  function addCollageBand(edge, cells = 1) {
+    const clip = activeCollageClip();
+    if (!isCollage(clip)) {
+      opts.showFlash(msg("collageFailed", "Select a collage first."));
+      return;
+    }
+    queueSave(clip, { op: "add_band", edge, cells }, gestureGroup("collage-add-band")).then(() => {
+      fillInspector(clip);
+      renderPreview(clip);
     });
+  }
+
+  // Event delegation: survives WebView cache quirks and late inspector show.
+  document.getElementById("inspector-collage")?.addEventListener("click", (event) => {
+    const btn = event.target?.closest?.("button[id]");
+    if (!btn) return;
+    switch (btn.id) {
+      case "inspector-collage-add-row":
+        event.preventDefault();
+        addCollageBand("bottom", 1);
+        break;
+      case "inspector-collage-add-column":
+        event.preventDefault();
+        addCollageBand("right", 1);
+        break;
+      case "inspector-collage-split-h":
+        event.preventDefault();
+        splitSelectedCell("h", 1);
+        break;
+      case "inspector-collage-split-v":
+        event.preventDefault();
+        splitSelectedCell("v", 1);
+        break;
+      case "inspector-collage-split-h3":
+        event.preventDefault();
+        splitSelectedCell("h", 2);
+        break;
+      case "inspector-collage-split-v3":
+        event.preventDefault();
+        splitSelectedCell("v", 2);
+        break;
+      default:
+        break;
+    }
   });
+
   document.getElementById("inspector-collage-remove-cell")?.addEventListener("click", () => {
     const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
@@ -881,6 +1528,45 @@ export function createCollageEditor(opts) {
   });
 
   window.addEventListener("pointermove", (event) => {
+    if (framingDrag) {
+      const dx = (event.clientX - framingDrag.startX) / framingDrag.width;
+      const dy = (event.clientY - framingDrag.startY) / framingDrag.height;
+      if (Math.abs(dx) > 0.008 || Math.abs(dy) > 0.008) framingDrag.moved = true;
+      const media = leafMedia(framingDrag.clip, framingDrag.leafId);
+      if (!media) return;
+      // Map finger travel 1:1 onto the visible crop (depends on zoom / aspect).
+      const cell = stage?.querySelector(
+        `.studio-collage-cell[data-leaf-id="${CSS.escape(String(framingDrag.leafId))}"]`
+      );
+      const thumb = cell?.querySelector("img");
+      const sw = Math.max(1, Number(thumb?.naturalWidth) || framingDrag.width);
+      const sh = Math.max(1, Number(thumb?.naturalHeight) || framingDrag.height);
+      const fit = String(media.fit || "fill").toLowerCase() === "fit" ? "fit" : "fill";
+      const win = sourceWindow({
+        sourceW: sw,
+        sourceH: sh,
+        cellW: framingDrag.width,
+        cellH: framingDrag.height,
+        fit,
+        zoom: media.zoom,
+        panX: 0.5,
+        panY: 0.5,
+      });
+      const maxX = Math.max(0, 1 - win.w);
+      const maxY = Math.max(0, 1 - win.h);
+      const dxPan = maxX > 1e-6 ? (dx * win.w) / maxX : 0;
+      const dyPan = maxY > 1e-6 ? (dy * win.h) / maxY : 0;
+      // Dragging the picture right → pan decreases (window moves left in source).
+      const nextMedia = {
+        ...media,
+        pan_x: clampPan(framingDrag.startPanX - dxPan),
+        pan_y: clampPan(framingDrag.startPanY - dyPan),
+      };
+      setFramingLive(true);
+      applyLeafFramingLocal(framingDrag.clip, framingDrag.leafId, nextMedia);
+      framingDrag.pendingMedia = nextMedia;
+      return;
+    }
     if (!drag || !stage) return;
     const rect = stage.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
@@ -893,7 +1579,24 @@ export function createCollageEditor(opts) {
     // Live visual only via re-render with local mutation would need a draft;
     // keep pointer feedback light until pointerup persists.
   });
-  window.addEventListener("pointerup", () => {
+  window.addEventListener("pointerup", (_event) => {
+    if (framingDrag) {
+      const active = framingDrag;
+      framingDrag = null;
+      stage
+        ?.querySelectorAll(".studio-collage-cell.is-framing")
+        .forEach((el) => el.classList.remove("is-framing"));
+      if (!active.moved || !active.pendingMedia) {
+        endFramingLiveSoon();
+        notifyLeafSelection(active.clip);
+        return;
+      }
+      selectedLeafId = active.leafId;
+      selectedLeafOwnerId = String(active.clip.dataset.studioId || "");
+      commitLeafFraming(active.clip, active.leafId, active.pendingMedia, "collage-frame-drag");
+      notifyLeafSelection(active.clip);
+      return;
+    }
     if (!drag) return;
     const { clip, splitId, pendingRatio, startRatio } = drag;
     drag = null;
@@ -910,6 +1613,51 @@ export function createCollageEditor(opts) {
     ).then(() => {
       if (isStillSelected(clip)) renderPreview(clip);
     });
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
+    const target = event.target;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+    const clip = clipForLeafAction();
+    if (!isCollage(clip) || !selectedLeafId) return;
+    const media = leafMedia(clip, selectedLeafId);
+    if (!media) return;
+    const key = event.key;
+    if (key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowUp" || key === "ArrowDown") {
+      event.preventDefault();
+      const step = event.shiftKey ? 0.02 : 0.05;
+      patchSelectedLeafMedia(
+        (entry) => {
+          if (key === "ArrowLeft") entry.pan_x = clampPan((Number(entry.pan_x) || 0.5) - step);
+          if (key === "ArrowRight") entry.pan_x = clampPan((Number(entry.pan_x) || 0.5) + step);
+          if (key === "ArrowUp") entry.pan_y = clampPan((Number(entry.pan_y) || 0.5) - step);
+          if (key === "ArrowDown") entry.pan_y = clampPan((Number(entry.pan_y) || 0.5) + step);
+          return entry;
+        },
+        { live: true, groupPrefix: "collage-frame-keys" }
+      );
+      return;
+    }
+    if (key === "+" || key === "=" || key === "-" || key === "_") {
+      event.preventDefault();
+      const direction = key === "-" || key === "_" ? -1 : 1;
+      patchSelectedLeafMedia(
+        (entry) => {
+          entry.zoom = clampLeafZoom((Number(entry.zoom) || 1) + direction * ZOOM_WHEEL_STEP);
+          return entry;
+        },
+        { live: true, groupPrefix: "collage-frame-keys" }
+      );
+    }
   });
 
   async function addCollage() {
@@ -965,6 +1713,25 @@ export function createCollageEditor(opts) {
   document.getElementById("inspector-collage-from-computer")?.addEventListener("click", () => {
     pickComputerFiles();
   });
+  document.getElementById("studio-collage-frame-from-library")?.addEventListener("click", () => {
+    openLibraryPicker();
+  });
+  document.getElementById("studio-collage-frame-from-computer")?.addEventListener("click", () => {
+    pickComputerFiles();
+  });
+  document.getElementById("studio-collage-source-library")?.addEventListener("click", () => {
+    openLibraryPicker();
+  });
+  document.getElementById("studio-collage-source-computer")?.addEventListener("click", () => {
+    pickComputerFiles();
+  });
+  document.getElementById("studio-collage-source-cancel")?.addEventListener("click", () => {
+    closeSourceChooser();
+  });
+  sourceDialog?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSourceChooser();
+  });
   document.getElementById("inspector-collage-clear-cell")?.addEventListener("click", () => {
     const clip = clipForLeafAction();
     if (!isCollage(clip) || !selectedLeafId) return;
@@ -979,38 +1746,59 @@ export function createCollageEditor(opts) {
       }
     });
   });
+  document.getElementById("inspector-collage-open-frame")?.addEventListener("click", () => {
+    const clip = clipForLeafAction();
+    if (!isCollage(clip) || !selectedLeafId) return;
+    const media = leafMedia(clip, selectedLeafId);
+    if (!media) return;
+    const leaf = { id: selectedLeafId };
+    const cell = stage?.querySelector(
+      `.studio-collage-cell[data-leaf-id="${CSS.escape(String(selectedLeafId))}"]`
+    );
+    openFrameModalForLeaf(clip, leaf, media, cell);
+  });
   fitEl?.addEventListener("change", () => {
     patchSelectedLeafMedia((media) => {
       media.fit = fitEl.value === "fit" ? "fit" : "fill";
       return media;
     });
   });
-  zoomEl?.addEventListener("change", () => {
-    patchSelectedLeafMedia((media) => {
-      const zoom = Number(zoomEl.value);
-      media.zoom = Number.isFinite(zoom) ? zoom : 1;
-      return media;
-    });
+  zoomEl?.addEventListener("input", () => {
+    patchSelectedLeafMedia(
+      (media) => {
+        const zoom = Number(zoomEl.value);
+        media.zoom = Number.isFinite(zoom) ? zoom : 1;
+        return media;
+      },
+      { live: true, groupPrefix: "collage-frame-slider" }
+    );
   });
-  panXEl?.addEventListener("change", () => {
-    patchSelectedLeafMedia((media) => {
-      const pan = Number(panXEl.value);
-      media.pan_x = Number.isFinite(pan) ? pan : 0.5;
-      return media;
-    });
+  panXEl?.addEventListener("input", () => {
+    patchSelectedLeafMedia(
+      (media) => {
+        const pan = Number(panXEl.value);
+        media.pan_x = Number.isFinite(pan) ? pan : 0.5;
+        return media;
+      },
+      { live: true, groupPrefix: "collage-frame-slider" }
+    );
   });
-  panYEl?.addEventListener("change", () => {
-    patchSelectedLeafMedia((media) => {
-      const pan = Number(panYEl.value);
-      media.pan_y = Number.isFinite(pan) ? pan : 0.5;
-      return media;
-    });
+  panYEl?.addEventListener("input", () => {
+    patchSelectedLeafMedia(
+      (media) => {
+        const pan = Number(panYEl.value);
+        media.pan_y = Number.isFinite(pan) ? pan : 0.5;
+        return media;
+      },
+      { live: true, groupPrefix: "collage-frame-slider" }
+    );
   });
   document.getElementById("studio-collage-library-cancel")?.addEventListener("click", () => {
     closeLibraryPicker();
   });
-  document.getElementById("studio-collage-library-add")?.addEventListener("click", () => {
-    commitLibrarySelection();
+  document.getElementById("studio-collage-library-add")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    void commitLibrarySelection();
   });
   let libraryFilterTimer = 0;
   libraryFilter?.addEventListener("input", () => {
@@ -1022,15 +1810,62 @@ export function createCollageEditor(opts) {
     }, 180);
   });
 
+  const frameEl = document.getElementById("studio-preview-frame");
+  const resizeTargets = [preview, preview?.parentElement, frameEl].filter(Boolean);
+  if (typeof ResizeObserver === "function" && resizeTargets.length) {
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(hostResizeTimer);
+      hostResizeTimer = window.setTimeout(() => {
+        const clip = previewClip || opts.getSelectedClip?.();
+        if (!clip || !isCollage(clip) || preview?.hidden) return;
+        if (framingDrag || framingQuiet) return;
+        const spec = parseSpec(clip);
+        scheduleHostRelayout(clip, aspectCss(spec));
+      }, 60);
+    });
+    resizeTargets.forEach((el) => {
+      try {
+        ro.observe(el);
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+
   return {
     isCollage,
     fillInspector,
     hidePreview,
     renderPreview,
+    refreshFrameModalGrade,
+    isFramingQuiet,
     getSelectedLeafId: () => selectedLeafId,
     getSelectedLeafOwnerId: () => selectedLeafOwnerId,
     selectedLeafMedia,
-    syncPlayback: (args) => playback.sync(args),
+    syncPlayback: (args) => {
+      const playing = Boolean(args?.playing);
+      preview?.classList.toggle("is-paused", !playing);
+      const clip = opts.getSelectedClip?.();
+      const spec = clip && isCollage(clip) ? parseSpec(clip) : null;
+      const keepUnderlay = shouldKeepComposedUnderlay(spec, playing);
+      if (playing && composedImg) {
+        if (keepUnderlay) {
+          composedImg.hidden = false;
+          composedImg.style.visibility = "visible";
+          composedImg.style.opacity = "1";
+          setHasComposedStill(true);
+          if (clip && !composedImg.getAttribute("src")) scheduleComposedPreview(clip);
+        } else {
+          composedImg.hidden = true;
+          composedImg.style.visibility = "hidden";
+          setHasComposedStill(false);
+        }
+      }
+      playback.sync(args);
+      if (!playing) {
+        if (clip && isCollage(clip)) scheduleComposedPreview(clip);
+      }
+    },
     pausePlayback: () => {
       playback.pause();
       const clip = opts.getSelectedClip?.();
@@ -1042,6 +1877,7 @@ export function createCollageEditor(opts) {
         spec,
       });
       preview?.classList.toggle("is-paused", true);
+      if (clip && isCollage(clip)) scheduleComposedPreview(clip);
     },
     teardownPlayback: () => playback.teardown(),
     isPlaybackFallback: () => playback.isFallback(),
