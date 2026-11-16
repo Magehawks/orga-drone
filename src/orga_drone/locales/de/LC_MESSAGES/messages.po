@@ -1045,6 +1045,78 @@ msgstr "Layout wählen, Trennlinien in der Vorschau ziehen, dann Medien in die Z
 msgid "Layout preset"
 msgstr "Layout-Vorlage"
 
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Pick where you want more cells (left, right, or bottom), drag dividers to fine-tune, then add media. Click a cell to grade it."
+msgstr "Wähle, wo mehr Zellen sein sollen (links, rechts oder unten), ziehe die Trenner zum Feintuning, dann Medien hinzufügen. Zelle anklicken zum Gradieren."
+
+msgid "Or select a cell and split it left/right or top/bottom to build your own layout."
+msgstr "Oder Zelle wählen und links/rechts bzw. oben/unten teilen, um ein eigenes Layout zu bauen."
+
+msgid "Side by side"
+msgstr "Nebeneinander"
+
+msgid "More on the left"
+msgstr "Mehr links"
+
+msgid "More on the right"
+msgstr "Mehr rechts"
+
+msgid "2×2 grid"
+msgstr "2×2-Raster"
+
+msgid "More on top and bottom"
+msgstr "Mehr oben und unten"
+
+msgid "More in the middle"
+msgstr "Mehr in der Mitte"
+
+msgid "Three left, two right"
+msgstr "Drei links, zwei rechts"
+
+msgid "Split left / right"
+msgstr "Links / rechts teilen"
+
+msgid "Split top / bottom"
+msgstr "Oben / unten teilen"
+
+msgid "Studio collage framing"
+msgstr "Studio-Collage-Ausschnitt"
+
+msgid "Pan (drag)"
+msgstr "Schwenken (Ziehen)"
+
+msgid "Zoom (mouse wheel)"
+msgstr "Zoom (Mausrad)"
+
+msgid "Framing shortcuts saved on this device."
+msgstr "Ausschnitt-Tasten auf diesem Gerät gespeichert."
+
+msgid "Drag in the selected cell to move the crop. Mouse wheel zooms. Change modifier keys under Settings → Studio collage framing."
+msgstr "In der gewählten Zelle ziehen, um den Ausschnitt zu verschieben. Mausrad zoomt. Modifier unter Einstellungen → Studio-Collage-Ausschnitt ändern."
+
+msgid "Click a cell photo to open framing. Drag the orange frame to move it; drag the handles to set width and height freely. The collage aspect adapts when possible. Looks, HSL, and LUTs are in the same dialog for this cell."
+msgstr "Zellenfoto anklicken, um den Ausschnitt zu öffnen. Den orangen Rahmen ziehen zum Verschieben; an den Griffen Breite und Höhe frei setzen. Das Collage-Format passt sich nach Möglichkeit an. Looks, HSL und LUTs sind im gleichen Dialog für diese Zelle."
+
+msgid "Adjust framing…"
+msgstr "Ausschnitt anpassen…"
+
+msgid "Adjust cell framing"
+msgstr "Zellenausschnitt anpassen"
+
+msgid "The full photo is shown. Drag the orange frame to move it; use the handles to set width and height freely. Mouse wheel scales the frame. The collage layout adapts when possible."
+msgstr "Das ganze Foto wird gezeigt. Den orangen Rahmen ziehen zum Verschieben; an den Griffen Breite und Höhe frei setzen. Mausrad skaliert den Rahmen. Das Collage-Layout passt sich nach Möglichkeit an."
+
+msgid "The full photo is shown. The orange frame is what appears in the collage cell. Drag to move, mouse wheel to zoom. Keep this panel open and use Color → Looks / HSL / LUT for this cell."
+msgstr "Das ganze Foto wird gezeigt. Der orange Rahmen ist der sichtbare Ausschnitt in der Collage-Zelle. Ziehen verschiebt, Mausrad zoomt. Panel offen lassen und unter Farbe → Looks / HSL / LUT für diese Zelle arbeiten."
+
+msgid "Apply framing"
+msgstr "Ausschnitt übernehmen"
+
+msgid "This cell has no previewable photo for framing."
+msgstr "Diese Zelle hat kein Foto für den Ausschnitt-Dialog."
+
 msgid "Aspect"
 msgstr "Seitenverhältnis"
 
@@ -1108,14 +1180,35 @@ msgstr "Aus Mediathek wählen"
 msgid "Select photos and videos. They fill empty cells in order, or replace the selected cell first."
 msgstr "Fotos und Videos auswählen. Sie füllen leere Zellen der Reihe nach oder ersetzen zuerst die gewählte Zelle."
 
+msgid "Select photos and videos, then confirm with Add to collage. They fill empty cells in order, or replace the selected cell first."
+msgstr "Fotos und Videos auswählen, dann mit „Zur Collage hinzufügen“ bestätigen. Sie füllen leere Zellen der Reihe nach oder ersetzen zuerst die gewählte Zelle."
+
 msgid "Filter"
 msgstr "Filter"
 
 msgid "No matching photos or videos."
 msgstr "Keine passenden Fotos oder Videos."
 
+msgid "No photos or videos in the library yet."
+msgstr "Noch keine Fotos oder Videos in der Mediathek."
+
+msgid "Library media"
+msgstr "Mediathek-Medien"
+
 msgid "Add to collage"
 msgstr "Zur Collage hinzufügen"
+
+msgid "Choose a layout, drag dividers in the preview, then add media to each cell. Click a cell to grade it with HSL, Looks, or LUTs."
+msgstr "Layout wählen, Trenner in der Vorschau ziehen, dann Medien in die Zellen legen. Zelle anklicken, um HSL, Looks oder LUTs zu setzen."
+
+msgid "Photo-only collages: export a PNG or JPEG here. Story export always makes an MP4 of the whole memory."
+msgstr "Nur-Foto-Collagen: hier als PNG oder JPEG exportieren. Der Story-Export erzeugt immer ein MP4 der gesamten Erinnerung."
+
+msgid "Export still (PNG/JPEG)"
+msgstr "Standbild exportieren (PNG/JPEG)"
+
+msgid "Stacks photos side by side or top to bottom. For a 2×2 grid, video cells, or color grades, use Studio → Collage."
+msgstr "Stapelt Fotos nebeneinander oder untereinander. Für 2×2-Raster, Videozellen oder Farbkorrektur: Studio → Collage."
 
 msgid "Media"
 msgstr "Medien"

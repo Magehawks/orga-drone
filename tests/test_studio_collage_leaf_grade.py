@@ -180,6 +180,42 @@ def test_api_leaf_hsl_and_image(
     assert other_image.exposure == 0
 
 
+def test_api_leaf_quick_look(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    db: Database = app.state.db
+    collage, leaf_ids, _ids = _seeded_collage(db, tmp_path / "lib")
+    db.set_open_studio_project_id(collage.project_id)
+    client = TestClient(app)
+    client.get(f"/studio?project_id={collage.project_id}")
+
+    res = client.patch(
+        f"/api/studio/{collage.id}/look",
+        json={"leaf_id": leaf_ids[0], "id": "vibrant"},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] is True
+    assert body["leaf_id"] == leaf_ids[0]
+    assert body["quick_look"] == "vibrant"
+    assert body["image"]["saturation"] == 38
+
+    clip = next(i for i in db.list_studio_items(collage.project_id) if i.id == collage.id)
+    leaves = {
+        str(leaf["id"]): leaf
+        for leaf in iter_leaves(collage_spec_from_raw(clip.collage_spec)["root"])
+    }
+    image = image_adjust_from_effect_settings(
+        grade_blob(leaves[leaf_ids[0]].get("media"))
+    )
+    assert image.saturation == 38
+    other = image_adjust_from_effect_settings(
+        grade_blob(leaves[leaf_ids[1]].get("media"))
+    )
+    assert other.saturation == 0
+
+
 def test_leaf_grade_affects_composed_still(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -205,3 +241,34 @@ def test_leaf_grade_affects_composed_still(
     with Image.open(__import__("io").BytesIO(out)) as img:
         graded_px = img.getpixel((20, 20))
     assert graded_px != neutral_px
+
+
+def test_leaf_quick_look_affects_composed_still(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefs = Settings(data_dir=tmp_path / "data")
+    monkeypatch.setattr("orga_drone.studio_collage_still.settings", prefs)
+    db = Database(tmp_path / "lib.sqlite3")
+    collage, leaf_ids, _ids = _seeded_collage(db, tmp_path / "media")
+    neutral = render_collage_preview_png(
+        db, collage_spec_from_raw(collage.collage_spec), t_s=0.0, long_edge=320
+    )
+    assert neutral
+    with Image.open(__import__("io").BytesIO(neutral)) as img:
+        neutral_px = img.getpixel((20, 20))
+
+    graded = db.set_studio_collage_leaf_grade(
+        collage.id,
+        leaf_ids[0],
+        section="look",
+        payload={"id": "black_and_white"},
+    )
+    out = render_collage_preview_png(
+        db, collage_spec_from_raw(graded.collage_spec), t_s=0.0, long_edge=320
+    )
+    assert out
+    with Image.open(__import__("io").BytesIO(out)) as img:
+        graded_px = img.getpixel((20, 20))
+    assert graded_px != neutral_px
+    # Near-gray after B&W look (channels close).
+    assert max(graded_px[:3]) - min(graded_px[:3]) < 18

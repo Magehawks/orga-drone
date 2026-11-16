@@ -7,9 +7,13 @@ import {
   leafMediaUrl,
   leafNeedsDecodedStill,
   leafNeedsFramedStill,
+  leafNeedsHonestStillPlay,
   leafSourceTime,
+  shouldKeepComposedUnderlay,
   shouldUseStillFallback,
+  specNeedsDecodedStill,
   specNeedsFramedStill,
+  specNeedsHonestStillPlay,
 } from "../../src/orga_drone/static/js/studio/collage-playback.js";
 
 describe("collage-playback timing", () => {
@@ -69,6 +73,34 @@ describe("collage-playback timing", () => {
     );
   });
 
+  it("does not treat zoom/pan framing as a decoded-still playback gate", () => {
+    assert.equal(
+      specNeedsDecodedStill({
+        root: {
+          type: "leaf",
+          id: "a",
+          media: { source: "library", media_id: 1, kind: "photo", zoom: 1.2 },
+        },
+      }),
+      false
+    );
+    assert.equal(
+      specNeedsDecodedStill({
+        root: {
+          type: "leaf",
+          id: "a",
+          media: {
+            source: "external",
+            kind: "photo",
+            display_name: "drone.HEIC",
+            has_path: true,
+          },
+        },
+      }),
+      true
+    );
+  });
+
   it("forces decoded stills for HEIC and identity-only photos", () => {
     assert.equal(
       leafNeedsDecodedStill({
@@ -91,6 +123,71 @@ describe("collage-playback timing", () => {
     assert.equal(
       leafNeedsDecodedStill({ source: "library", identity_key: "x", kind: "photo" }),
       true
+    );
+  });
+
+  it("keeps graded compose underlay instead of killing live video", () => {
+    assert.equal(
+      leafNeedsHonestStillPlay({
+        source: "library",
+        media_id: 1,
+        kind: "photo",
+        grade: { look: "warm" },
+      }),
+      true
+    );
+    assert.equal(
+      leafNeedsHonestStillPlay({
+        source: "library",
+        media_id: 1,
+        kind: "photo",
+        zoom: 1.3,
+      }),
+      true
+    );
+    assert.equal(
+      leafNeedsHonestStillPlay({
+        source: "library",
+        media_id: 1,
+        kind: "photo",
+      }),
+      false
+    );
+    const gradedVideo = {
+      root: {
+        type: "split",
+        a: {
+          type: "leaf",
+          id: "a",
+          media: {
+            source: "library",
+            media_id: 1,
+            kind: "photo",
+            grade: { look: "warm" },
+          },
+        },
+        b: {
+          type: "leaf",
+          id: "b",
+          media: { source: "library", media_id: 2, kind: "video" },
+        },
+      },
+    };
+    assert.equal(specNeedsHonestStillPlay(gradedVideo), true);
+    assert.equal(shouldKeepComposedUnderlay(gradedVideo, true), true);
+    assert.equal(shouldKeepComposedUnderlay(gradedVideo, false), false);
+    assert.equal(
+      shouldKeepComposedUnderlay(
+        {
+          root: {
+            type: "leaf",
+            id: "a",
+            media: { source: "library", media_id: 2, kind: "video" },
+          },
+        },
+        true
+      ),
+      false
     );
   });
 });

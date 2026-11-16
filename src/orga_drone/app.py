@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, NoReturn
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
+
+_LOG = logging.getLogger("orga_drone.app")
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -2202,14 +2205,18 @@ def create_app() -> FastAPI:
         request: Request,
     ) -> JSONResponse:
         from orga_drone.studio_collage import (
+            add_band,
+            apply_preset_preserving_media,
             assign_leaf_media,
+            duration_for_video_assign,
             iter_leaves,
             normalize_spec,
-            preset_spec,
             remove_leaf,
             set_split_ratio,
             split_leaf,
+            split_leaf_times,
         )
+        from orga_drone.studio_collage_still import resolve_leaf_video_duration_s
 
         try:
             payload = await request.json()
@@ -2241,17 +2248,9 @@ def create_app() -> FastAPI:
             try:
                 current = _load_clip()
                 current_spec = collage_spec_from_raw(current.collage_spec)
-                next_spec = preset_spec(str(payload["preset"]))
-                for key in (
-                    "aspect",
-                    "gap_px",
-                    "background",
-                    "corner_radius_px",
-                    "duration_s",
-                ):
-                    if key in current_spec:
-                        next_spec[key] = current_spec[key]
-                kwargs["collage_spec"] = next_spec
+                kwargs["collage_spec"] = apply_preset_preserving_media(
+                    current_spec, str(payload["preset"])
+                )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         elif payload.get("op") is not None:
@@ -2274,8 +2273,35 @@ def create_app() -> FastAPI:
                     direction = payload.get("dir") or payload.get("direction")
                     if not isinstance(leaf_id, str) or not isinstance(direction, str):
                         raise ValueError("leaf_id and dir are required")
-                    kwargs["collage_spec"] = split_leaf(
-                        spec, leaf_id, direction=direction
+                    times_raw = payload.get("times", 1)
+                    if isinstance(times_raw, bool) or not isinstance(times_raw, (int, float)):
+                        raise ValueError("times must be a number")
+                    times = max(1, int(times_raw))
+                    if times <= 1:
+                        kwargs["collage_spec"] = split_leaf(
+                            spec, leaf_id, direction=direction
+                        )
+                    else:
+                        kwargs["collage_spec"] = split_leaf_times(
+                            spec, leaf_id, direction=direction, times=times
+                        )
+                elif op == "add_band":
+                    edge = payload.get("edge")
+                    cells_raw = payload.get("cells", 1)
+                    if not isinstance(edge, str):
+                        raise ValueError("edge must be a string")
+                    if isinstance(cells_raw, bool) or not isinstance(
+                        cells_raw, (int, float)
+                    ):
+                        raise ValueError("cells must be a number")
+                    _LOG.info(
+                        "collage add_band studio=%s edge=%s cells=%s",
+                        studio_item_id,
+                        edge,
+                        int(cells_raw),
+                    )
+                    kwargs["collage_spec"] = add_band(
+                        spec, edge=edge, cells=int(cells_raw)
                     )
                 elif op == "remove_leaf":
                     leaf_id = payload.get("leaf_id")
@@ -2287,6 +2313,16 @@ def create_app() -> FastAPI:
                     media = payload.get("media")
                     if not isinstance(leaf_id, str):
                         raise ValueError("leaf_id must be a string")
+                    if isinstance(media, dict):
+                        _LOG.info(
+                            "collage assign_media studio=%s leaf=%s zoom=%s pan=(%s,%s) fit=%s",
+                            studio_item_id,
+                            leaf_id,
+                            media.get("zoom"),
+                            media.get("pan_x"),
+                            media.get("pan_y"),
+                            media.get("fit"),
+                        )
                     if isinstance(media, dict) and media.get("source") == "external":
                         media = dict(media)
                         media.pop("has_path", None)
@@ -2311,6 +2347,25 @@ def create_app() -> FastAPI:
                                 if prior.get("source_key") and not media.get("source_key"):
                                     media["source_key"] = prior["source_key"]
                     kwargs["collage_spec"] = assign_leaf_media(spec, leaf_id, media)
+                    # Video longer than the default/short collage → extend duration.
+                    assigned_media = None
+                    next_spec = kwargs.get("collage_spec")
+                    root = next_spec.get("root") if isinstance(next_spec, dict) else None
+                    if isinstance(root, dict):
+                        for leaf in iter_leaves(root):
+                            if str(leaf.get("id")) == leaf_id:
+                                assigned_media = leaf.get("media")
+                                break
+                    if (
+                        isinstance(assigned_media, dict)
+                        and str(assigned_media.get("kind") or "").lower() == "video"
+                    ):
+                        video_dur = resolve_leaf_video_duration_s(db, assigned_media)
+                        next_dur = duration_for_video_assign(
+                            current.collage_duration_s, video_dur
+                        )
+                        if next_dur is not None:
+                            kwargs["collage_duration_s"] = next_dur
                 else:
                     raise ValueError(f"unknown collage op: {op}")
             except ValueError as exc:
@@ -2393,6 +2448,58 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Collage media missing")
         return file_response(path)
 
+    @app.get("/api/studio/{studio_item_id}/collage/leaves/{leaf_id}/preview-frame")
+    async def api_studio_collage_leaf_preview_frame(
+        studio_item_id: int,
+        leaf_id: str,
+        t_s: float = Query(0.0),
+    ) -> Response:
+        """Graded full-source JPEG for one collage leaf (framing dialog Looks preview)."""
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_collage import CollageSpecError
+        from orga_drone.studio_collage_still import render_collage_leaf_source_preview
+        from orga_drone.studio_lut import LutMissingError
+        from orga_drone.studio_preview_frame import PreviewFrameError
+
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None or clip.item_kind != "collage" or not clip.collage_spec:
+            raise HTTPException(status_code=404, detail="Collage not found")
+        spec = collage_spec_from_raw(clip.collage_spec)
+        local = quantize_preview_time(float(t_s) if t_s == t_s else 0.0)
+        try:
+            jpeg = await asyncio.to_thread(
+                render_collage_leaf_source_preview,
+                db,
+                spec,
+                leaf_id,
+                t_s=local,
+            )
+        except LutMissingError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="A LUT file is missing. Choose the .cube again, or clear the look.",
+            ) from exc
+        except (StudioExportError, PreviewFrameError, CollageSpecError) as exc:
+            msg = str(exc) or "Could not build collage cell preview."
+            status = 404 if "not found" in msg.lower() or "missing" in msg.lower() else 409
+            raise HTTPException(status_code=status, detail=msg) from exc
+        return FileResponse(
+            jpeg,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Orga-Preview-Still": "1",
+                "X-Orga-Collage-Leaf": str(leaf_id),
+                "X-Orga-Preview-Time-S": f"{local:.3f}",
+            },
+        )
+
     from orga_drone.studio_collage_still import CollageStillPreviewCoordinator
 
     collage_still_preview_gate = CollageStillPreviewCoordinator()
@@ -2439,6 +2546,12 @@ def create_app() -> FastAPI:
                 long_edge = max(64, min(PREVIEW_LONG_EDGE, int(raw_edge)))
         translate = get_translator(lang_from_request(request))
         _clip, spec = _load_collage_spec_for_still(studio_item_id)
+        _LOG.info(
+            "collage preview studio=%s t_s=%.3f long_edge=%s",
+            studio_item_id,
+            t_s,
+            long_edge,
+        )
         my_seq, cancel_event = collage_still_preview_gate.claim()
         async with collage_still_preview_gate.lock:
             if not collage_still_preview_gate.is_current(my_seq):
@@ -3372,8 +3485,27 @@ def create_app() -> FastAPI:
                 status_code=400, detail="JSON body must include a quick look id"
             )
         try:
+            leaf_id = _collage_leaf_id(payload)
+            body = {k: v for k, v in payload.items() if k != "leaf_id"}
             with story_edit(db, _clip_project_id(studio_item_id), group=_history_group(request)):
-                item = db.set_studio_quick_look(studio_item_id, payload)
+                if leaf_id:
+                    item = db.set_studio_collage_leaf_grade(
+                        studio_item_id, leaf_id, section="look", payload=body
+                    )
+                    grade_blob = _leaf_grade_blob(item, leaf_id)
+                    look_out = {
+                        "ok": True,
+                        "id": item.id,
+                        "leaf_id": leaf_id,
+                        "quick_look": look_id_from_effect_settings(grade_blob),
+                        "image": image_adjust_from_effect_settings(grade_blob).as_dict(),
+                    }
+                    if getattr(item, "collage_spec", None):
+                        look_out["collage_spec"] = public_collage_spec(
+                            collage_spec_from_raw(item.collage_spec)
+                        )
+                    return JSONResponse(look_out)
+                item = db.set_studio_quick_look(studio_item_id, body)
         except ValueError as exc:
             msg = str(exc)
             if "not found" in msg:

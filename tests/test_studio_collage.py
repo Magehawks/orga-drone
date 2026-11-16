@@ -12,12 +12,15 @@ from orga_drone.db import Database
 from orga_drone.studio_collage import (
     MAX_LEAVES,
     CollageSpecError,
+    add_band,
     assign_leaf_media,
     clamp_collage_duration,
     collage_spec_from_raw,
     dump_collage_spec,
+    duration_for_video_assign,
     iter_leaves,
     leaf_count,
+    media_source_window,
     merge_public_media_paths,
     normalize_spec,
     preset_names,
@@ -28,6 +31,7 @@ from orga_drone.studio_collage import (
     set_split_ratio,
     source_window,
     split_leaf,
+    split_leaf_times,
     swap_leaf_media,
 )
 from orga_drone.studio_estimate import effective_seconds, summarize_studio_items
@@ -58,6 +62,19 @@ def test_all_presets_normalize_and_resolve() -> None:
             assert rect.x >= 0 and rect.y >= 0
             assert rect.x + rect.w <= 1920
             assert rect.y + rect.h <= 1080
+
+
+def test_add_band_and_split_times() -> None:
+    spec = preset_spec("1+1")
+    assert leaf_count(spec) == 2
+    with_row = add_band(spec, edge="bottom", cells=2)
+    assert leaf_count(with_row) == 4
+    leaves = iter_leaves(with_row["root"])
+    first = leaves[0]["id"]
+    into_three = split_leaf_times(with_row, first, direction="h", times=2)
+    assert leaf_count(into_three) == 6
+    too_many = add_band(preset_spec("3x2"), edge="right", cells=20)
+    assert leaf_count(too_many) <= 16
 
 
 def test_custom_split_ratio_remove_and_swap() -> None:
@@ -437,6 +454,79 @@ def test_http_preset_preserves_aspect_gap_background(
     assert spec["background"] == "#112233"
 
 
+def test_http_preset_preserves_leaf_media_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    db.set_app_state("studio_last_project_id", str(project.id))
+    root = tmp_path / "media"
+    root.mkdir()
+    root_id = db.add_root(root, label="t")
+    media_ids: list[int] = []
+    for name in ("a.jpg", "b.jpg"):
+        path = root / name
+        path.write_bytes(b"fake")
+        media_ids.append(
+            db.upsert_media(
+                {
+                    "root_id": root_id,
+                    "primary_asset_id": None,
+                    "kind": "photo",
+                    "filename": name,
+                    "path": str(path.resolve()),
+                    "size_bytes": 4,
+                    "duration_s": None,
+                    "recorded_at": "2024-06-01T12:00:00",
+                    "sequence": None,
+                    "mode": None,
+                    "drone_model": "Avata 2",
+                    "camera_model": None,
+                    "latitude": None,
+                    "longitude": None,
+                    "abs_alt": None,
+                    "has_srt": 0,
+                    "has_lrf": 0,
+                    "track_json": None,
+                }
+            )
+        )
+    created = client.post("/api/studio/collages", json={"preset": "1+1"})
+    clip_id = int(created.json()["id"])
+    leaf_ids = [
+        str(leaf["id"])
+        for leaf in iter_leaves(created.json()["collage_spec"]["root"])
+    ]
+    for leaf_id, mid in zip(leaf_ids, media_ids, strict=True):
+        assigned = client.patch(
+            f"/api/studio/{clip_id}/collage",
+            json={
+                "op": "assign_media",
+                "leaf_id": leaf_id,
+                "media": {
+                    "source": "library",
+                    "media_id": mid,
+                    "kind": "photo",
+                    "fit": "fill",
+                    "zoom": 1.2,
+                    "pan_x": 0.4,
+                    "pan_y": 0.6,
+                },
+            },
+        )
+        assert assigned.status_code == 200
+    preset = client.patch(f"/api/studio/{clip_id}/collage", json={"preset": "2x2"})
+    assert preset.status_code == 200
+    leaves = iter_leaves(preset.json()["collage_spec"]["root"])
+    assert len(leaves) == 4
+    assert leaves[0]["media"]["media_id"] == media_ids[0]
+    assert leaves[0]["media"]["zoom"] == 1.2
+    assert leaves[1]["media"]["media_id"] == media_ids[1]
+    assert "media" not in leaves[2]
+    assert "media" not in leaves[3]
+
+
 def test_public_external_swap_preserves_source_identity(tmp_path: Path) -> None:
     path_one = str(tmp_path / "one.mp4")
     path_two = str(tmp_path / "two.mp4")
@@ -579,3 +669,213 @@ def test_http_collage_leaf_stream(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     db.update_studio_collage(clip.id, collage_spec=lib_spec)
     lib = client.get(f"/api/studio/{clip.id}/collage/leaves/{leaf_id}/stream")
     assert lib.status_code == 200
+
+
+def test_http_collage_leaf_preview_frame_shows_grade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Framing dialog loads a graded full-source JPEG for the selected leaf."""
+    from PIL import Image
+
+    client, db = _client(tmp_path, monkeypatch)
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    photo = tmp_path / "grade-leaf.jpg"
+    Image.new("RGB", (48, 32), (40, 80, 120)).save(photo)
+    clip = db.add_studio_collage(project.id, preset="1+1")
+    leaf_id = iter_leaves(collage_spec_from_raw(clip.collage_spec)["root"])[0]["id"]
+    graded = assign_leaf_media(
+        collage_spec_from_raw(clip.collage_spec),
+        leaf_id,
+        {
+            "source": "external",
+            "path": str(photo.resolve()),
+            "kind": "photo",
+            "display_name": "grade-leaf.jpg",
+            "grade": {
+                "image": {
+                    "exposure": 20,
+                    "contrast": 0,
+                    "saturation": 0,
+                    "warmth": 0,
+                    "highlights": 0,
+                    "shadows": 0,
+                    "blacks": 0,
+                }
+            },
+        },
+    )
+    db.update_studio_collage(clip.id, collage_spec=graded)
+    res = client.get(f"/api/studio/{clip.id}/collage/leaves/{leaf_id}/preview-frame?t_s=0")
+    assert res.status_code == 200
+    assert res.headers.get("content-type", "").startswith("image/jpeg")
+    assert res.content[:2] == b"\xff\xd8"
+    missing = client.get(f"/api/studio/{clip.id}/collage/leaves/no-such/preview-frame")
+    assert missing.status_code in {404, 409}
+
+
+def test_collage_library_dialog_keeps_confirm_actions() -> None:
+    """Library picker must use the shared picker grid + visible confirm actions."""
+    page = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    assert 'id="studio-collage-library-dialog"' in page
+    assert 'id="studio-collage-library-add"' in page
+    assert "photo-combine-picker-grid" in page
+    assert "studio-collage-library-actions" in page
+    assert "method=\"dialog\"" not in page.split('id="studio-collage-library-dialog"', 1)[1].split(
+        "</dialog>", 1
+    )[0]
+    editor = Path("src/orga_drone/static/js/studio/collage-editor.js").read_text(
+        encoding="utf-8"
+    )
+    assert "All files (*.*)" in editor
+    assert "dblclick" in editor
+    assert "commitLibrarySelection" in editor
+
+
+def test_collage_framing_prefs_and_settings_surface() -> None:
+    prefs_js = Path(
+        "src/orga_drone/static/js/studio/collage-framing-prefs.js"
+    ).read_text(encoding="utf-8")
+    assert "orga-drone:collage-framing" in prefs_js
+    assert "modifierMatches" in prefs_js
+    editor = Path("src/orga_drone/static/js/studio/collage-editor.js").read_text(
+        encoding="utf-8"
+    )
+    assert "framingDrag" in editor
+    frame_modal = Path(
+        "src/orga_drone/static/js/studio/collage-frame-modal.js"
+    ).read_text(encoding="utf-8")
+    assert "wheel" in frame_modal
+    assert "collage-framing-prefs" in editor or "modifierMatches" in prefs_js
+    settings = Path("src/orga_drone/templates/settings.html").read_text(encoding="utf-8")
+    assert 'id="settings-collage-framing"' in settings
+    assert "settings-collage-framing.js" in settings
+    studio = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    assert "Adjust framing" in studio
+    assert "orange frame" in studio.lower() or "handles to set width" in studio
+
+
+def test_collage_layout_presets_use_visual_cards() -> None:
+    page = Path("src/orga_drone/templates/studio.html").read_text(encoding="utf-8")
+    assert 'id="inspector-collage-presets"' in page
+    assert 'data-collage-preset="2+1"' in page
+    assert "More on the left" in page
+    assert "More on the right" in page
+    assert "Two cells side by side" in page
+    assert "Split into 2 side by side" in page
+    editor = Path("src/orga_drone/static/js/studio/collage-editor.js").read_text(
+        encoding="utf-8"
+    )
+    assert "applyPresetChoice" in editor
+    assert "syncPresetButtons" in editor
+    css = Path("src/orga_drone/static/css/app.css").read_text(encoding="utf-8")
+    assert ".studio-collage-presets" in css
+
+
+def test_collage_quick_looks_are_not_blocked_in_ui() -> None:
+    """Leaf Quick Looks must reach /look with leaf_id (not an early UI return)."""
+    studio_js = Path("src/orga_drone/static/js/studio.js").read_text(encoding="utf-8")
+    assert "Quick Looks are not available for collage cells yet" not in studio_js
+    assert "lookPayload.leaf_id = leafId" in studio_js
+    # Switching cells must restore that leaf's look id into the inspector.
+    assert "clip.dataset.quickLook = lookId" in studio_js
+    assert "grade.look" in studio_js
+    editor = Path("src/orga_drone/static/js/studio/collage-editor.js").read_text(
+        encoding="utf-8"
+    )
+    # Graded composed preview must refresh while paused after a leaf look.
+    assert "if (!opts.isPlaying?.()) return;" not in editor.split(
+        "function scheduleComposedPreview", 1
+    )[1].split("function renderPreview", 1)[0]
+
+
+def test_duration_for_video_assign_extends_short_collage() -> None:
+    assert duration_for_video_assign(5.0, 12.4) == 12.4
+    assert duration_for_video_assign(5.0, 5.0) is None
+    assert duration_for_video_assign(20.0, 12.0) is None
+    assert duration_for_video_assign(None, 8.0) == 8.0
+    assert duration_for_video_assign(5.0, None) is None
+    assert duration_for_video_assign(5.0, 0) is None
+    # Clamped to collage max.
+    assert duration_for_video_assign(5.0, 999.0) == clamp_collage_duration(999.0)
+
+
+def test_assign_media_preserves_grade_when_omitted() -> None:
+    spec = preset_spec("1+1")
+    leaf_id = iter_leaves(spec["root"])[0]["id"]
+    graded = assign_leaf_media(
+        spec,
+        leaf_id,
+        {
+            "source": "library",
+            "media_id": 3,
+            "kind": "photo",
+            "fit": "fill",
+            "zoom": 1.0,
+            "pan_x": 0.5,
+            "pan_y": 0.5,
+            "grade": {"look": {"id": "vibrant"}, "image": {"saturation": 38}},
+        },
+    )
+    framed = assign_leaf_media(
+        graded,
+        leaf_id,
+        {
+            "source": "library",
+            "media_id": 3,
+            "kind": "photo",
+            "fit": "fill",
+            "zoom": 1.4,
+            "pan_x": 0.2,
+            "pan_y": 0.7,
+            "crop": {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5},
+        },
+    )
+    media = iter_leaves(framed["root"])[0]["media"]
+    assert media["zoom"] == 1.4
+    assert media["crop"]["w"] == 0.5
+    assert media["grade"]["look"]["id"] == "vibrant"
+    # Replacing with a different media id drops the old grade.
+    replaced = assign_leaf_media(
+        framed,
+        leaf_id,
+        {
+            "source": "library",
+            "media_id": 9,
+            "kind": "photo",
+            "fit": "fill",
+            "zoom": 1.0,
+            "pan_x": 0.5,
+            "pan_y": 0.5,
+        },
+    )
+    assert "grade" not in iter_leaves(replaced["root"])[0]["media"]
+
+
+def test_free_crop_overrides_fit_zoom_window() -> None:
+    media = {
+        "source": "library",
+        "media_id": 1,
+        "kind": "photo",
+        "fit": "fill",
+        "zoom": 2.0,
+        "pan_x": 0.2,
+        "pan_y": 0.8,
+        "crop": {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.5},
+    }
+    spec = preset_spec("1+1")
+    leaf_id = iter_leaves(spec["root"])[0]["id"]
+    assigned = assign_leaf_media(spec, leaf_id, media)
+    leaf = iter_leaves(assigned["root"])[0]
+    assert leaf["media"]["crop"] == {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.5}
+    win = media_source_window(
+        leaf["media"],
+        source_w=1000,
+        source_h=800,
+        cell_w=400,
+        cell_h=300,
+    )
+    assert win.x == pytest.approx(0.1)
+    assert win.y == pytest.approx(0.2)
+    assert win.w == pytest.approx(0.4)
+    assert win.h == pytest.approx(0.5)

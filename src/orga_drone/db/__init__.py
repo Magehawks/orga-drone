@@ -3364,6 +3364,7 @@ class Database:
             apply_color_wheels,
             apply_hsl,
             apply_image_adjust,
+            apply_quick_look,
             clear_leaf_grade,
         )
 
@@ -3388,6 +3389,8 @@ class Database:
             next_spec = apply_color_wheels(spec, leaf_id, payload)
         elif key in {"color", "color_look", "lut"}:
             next_spec = apply_color_look(spec, leaf_id, payload)
+        elif key in {"look", "quick_look", "quick-look"}:
+            next_spec = apply_quick_look(spec, leaf_id, payload)
         elif key in {"clear", "reset"}:
             next_spec = clear_leaf_grade(spec, leaf_id)
         else:

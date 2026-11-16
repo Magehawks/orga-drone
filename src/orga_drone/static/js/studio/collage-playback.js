@@ -125,7 +125,75 @@ export function leafNeedsDecodedStill(media) {
 }
 
 /**
+ * True when any leaf needs a decoded still (HEIC / identity-only), which the
+ * browser cannot play as a live element.
  * @param {any} spec
+ */
+export function specNeedsDecodedStill(spec) {
+  if (!spec || !spec.root) return false;
+  let needed = false;
+  const walk = (node) => {
+    if (!node || needed) return;
+    if (node.type === "leaf") {
+      if (leafNeedsDecodedStill(node.media)) needed = true;
+      return;
+    }
+    walk(node.a);
+    walk(node.b);
+  };
+  walk(spec.root);
+  return needed;
+}
+
+/**
+ * True when a leaf needs Looks / framing / decode honesty beyond a raw thumb.
+ * Used to keep the graded editor compose under live video (not whole-collage
+ * still fallback — that killed video and flickered).
+ * @param {any} media
+ */
+export function leafNeedsHonestStillPlay(media) {
+  if (!media) return false;
+  if (leafNeedsDecodedStill(media) || leafNeedsFramedStill(media)) return true;
+  const grade = media.grade;
+  if (!grade || typeof grade !== "object") return false;
+  return Object.keys(grade).length > 0;
+}
+
+/**
+ * @param {any} spec
+ */
+export function specNeedsHonestStillPlay(spec) {
+  if (!spec || !spec.root) return false;
+  let needed = false;
+  const walk = (node) => {
+    if (!node || needed) return;
+    if (node.type === "leaf") {
+      if (leafNeedsHonestStillPlay(node.media)) needed = true;
+      return;
+    }
+    walk(node.a);
+    walk(node.b);
+  };
+  walk(spec.root);
+  return needed;
+}
+
+/**
+ * Play with Looks/framing: keep graded compose underlay; mount videos only.
+ * @param {any} spec
+ * @param {boolean} playing
+ */
+export function shouldKeepComposedUnderlay(spec, playing) {
+  if (!playing) return false;
+  if (!spec || !spec.root) return false;
+  // Photo-only: the graded compose is the whole picture.
+  if (countVideoLeaves(spec) === 0) return true;
+  return specNeedsHonestStillPlay(spec);
+}
+
+/**
+ * @param {any} spec
+ * @deprecated Prefer specNeedsDecodedStill for playback gating; framing uses CSS.
  */
 export function specNeedsFramedStill(spec) {
   if (!spec || !spec.root) return false;
@@ -239,8 +307,10 @@ export function createCollagePlayback(opts) {
   function mount({ spec, studioId, rects, width, height, forceStill = false }) {
     if (!stage || !spec) return;
     const videoCount = countVideoLeaves(spec);
-    fallback =
-      Boolean(forceStill) || shouldUseStillFallback(videoCount) || specNeedsFramedStill(spec);
+    // Cap or paused editing → still path. Looks/framing do NOT kill live video;
+    // the editor keeps the graded compose under video layers instead.
+    fallback = Boolean(forceStill) || shouldUseStillFallback(videoCount);
+    const underlayHonest = shouldKeepComposedUnderlay(spec, !forceStill && !fallback);
     activeStudioId = String(studioId || "");
     const keep = new Set();
     const leaves = [];
@@ -301,7 +371,18 @@ export function createCollagePlayback(opts) {
         continue;
       }
       const url = leafMediaUrl(activeStudioId, leaf);
-      const isVideo = String(media.kind || "").toLowerCase() === "video" && !fallback;
+      const isVideo = String(media.kind || "").toLowerCase() === "video";
+      // With graded underlay, skip photo play-imgs so ungraded thumbs never cover Looks.
+      if (!isVideo && underlayHonest) {
+        const stale = mediaEls.get(id);
+        if (stale) {
+          stale.removeAttribute("src");
+          stale.remove();
+          mediaEls.delete(id);
+        }
+        keep.delete(id);
+        continue;
+      }
       let el = mediaEls.get(id);
       if (isVideo && videoSlots < MAX_CONCURRENT_COLLAGE_VIDEOS) {
         videoSlots += 1;
@@ -367,6 +448,22 @@ export function createCollagePlayback(opts) {
       const fit =
         media && String(media.fit || "fill").toLowerCase() === "fit" ? "contain" : "cover";
       el.style.objectFit = fit;
+      el.style.objectPosition = "50% 50%";
+      // Approximate saved zoom/pan on live play imgs so framing does not force still-only play.
+      if (el instanceof HTMLImageElement && leafNeedsFramedStill(media)) {
+        const zoom = Math.max(1, Number(media.zoom) || 1);
+        const panX = Number(media.pan_x);
+        const panY = Number(media.pan_y);
+        const ox = Number.isFinite(panX) ? Math.max(0, Math.min(1, panX)) * 100 : 50;
+        const oy = Number.isFinite(panY) ? Math.max(0, Math.min(1, panY)) * 100 : 50;
+        el.style.objectFit = fit;
+        el.style.objectPosition = `${ox}% ${oy}%`;
+        el.style.transform = zoom > 1.001 ? `scale(${zoom})` : "";
+        el.style.transformOrigin = `${ox}% ${oy}%`;
+      } else if (el instanceof HTMLImageElement) {
+        el.style.transform = "";
+        el.style.transformOrigin = "";
+      }
       if (el instanceof HTMLVideoElement && url) {
         const sourceKey = media && media.source_key ? String(media.source_key) : "";
         const token = `${url}#${sourceKey}`;
@@ -433,14 +530,26 @@ export function createCollagePlayback(opts) {
       if (!res.ok) return;
       const blob = await res.blob();
       if (seq !== composedSeq) return;
+      // Double-buffer: set src on a temp image first so revoke does not blank the stage.
+      const nextUrl = URL.createObjectURL(blob);
+      const probe = new Image();
+      await new Promise((resolve) => {
+        probe.onload = resolve;
+        probe.onerror = resolve;
+        probe.src = nextUrl;
+      });
+      if (seq !== composedSeq) {
+        URL.revokeObjectURL(nextUrl);
+        return;
+      }
       if (!composedEl) {
         composedEl = document.createElement("img");
         composedEl.alt = "";
         composedEl.className = "studio-collage-play-media studio-collage-play-composed";
       }
-      if (composedObjectUrl) URL.revokeObjectURL(composedObjectUrl);
-      composedObjectUrl = URL.createObjectURL(blob);
-      composedEl.src = composedObjectUrl;
+      const prevUrl = composedObjectUrl;
+      composedObjectUrl = nextUrl;
+      composedEl.src = nextUrl;
       composedEl.style.left = "0";
       composedEl.style.top = "0";
       composedEl.style.width = "100%";
@@ -450,6 +559,7 @@ export function createCollagePlayback(opts) {
       composedEl.hidden = false;
       composedEl.style.visibility = "visible";
       stage.appendChild(composedEl);
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
     } catch {
       /* preview endpoint may be unavailable until WP4 */
     } finally {
@@ -464,10 +574,14 @@ export function createCollagePlayback(opts) {
 
   function sync({ localS, playing, seek = false, spec = null }) {
     const isPlaying = Boolean(playing);
-    /* Paused: hide raw leaf media so the WP4 composed still (grades/framing) shows. */
+    /* Paused: hide raw leaf media. The editor owns the paused graded still
+       (scheduleComposedPreview) so we do not stack a second composed image. */
     setPlayMediaVisible(isPlaying && !fallback);
-    if (fallback || !isPlaying) {
+    if (isPlaying && fallback) {
       void updateComposedStill(localS);
+    } else if (!isPlaying && composedEl) {
+      composedEl.hidden = true;
+      composedEl.style.visibility = "hidden";
     }
     for (const [id, el] of mediaEls.entries()) {
       if (!(el instanceof HTMLVideoElement)) continue;
