@@ -70,9 +70,9 @@ Spec  = { version: 1, aspect, gap_px, background, corner_radius_px?,
   may show a placeholder. PNG, JPEG and Story MP4 export fail if an assigned
   source is unavailable or cannot be rendered. Intentionally empty cells can
   still export with their placeholder.
-- Export samples video independently of the preview cache. At video EOF it
-  holds the last decodable frame, even when the container has a longer audio
-  stream or ffprobe is unavailable.
+- Each export owns its frame cache and removes it with its staging files.
+  At video EOF it holds the last decodable frame, even when the container
+  has a longer audio stream or ffprobe is unavailable.
 - Collage stills and Story exports containing collages publish completed files
   through an exclusive claim. If the destination does not support an atomic
   claim, the export fails without replacing any existing file.

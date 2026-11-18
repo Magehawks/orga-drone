@@ -7,6 +7,7 @@ WebView2 / packaged E2E: NOT_RUN (see docs/discovery/470-creator-journey-evidenc
 from __future__ import annotations
 
 import io
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -300,6 +301,37 @@ def test_collage_still_does_not_reuse_nearby_preview_frame(
     with Image.open(output) as still:
         red, _, blue = still.convert("RGB").getpixel((30, 30))
         assert blue > 200 and red < 40
+
+
+def test_collage_export_rereads_replaced_video_with_same_size_and_mtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    source = _mp4(tmp_path / "source.mp4", color="red")
+    replacement = _mp4(tmp_path / "replacement.mp4", color="blue")
+    size = max(source.stat().st_size, replacement.stat().st_size)
+    for path in (source, replacement):
+        with path.open("r+b") as video:
+            video.truncate(size)
+    stat = source.stat()
+    os.utime(replacement, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    spec = collage_spec_from_raw(None)
+    spec = assign_leaf_media(
+        spec, iter_leaves(spec["root"])[0]["id"],
+        {"source": "external", "path": str(source), "kind": "video"},
+    )
+    first = export_collage_still(db, spec, tmp_path / "first.png", long_edge=160)
+    with Image.open(first) as red:
+        assert red.convert("RGB").getpixel((30, 30))[0] > 200
+
+    replacement.replace(source)
+    assert source.stat().st_size == size
+    assert source.stat().st_mtime_ns == stat.st_mtime_ns
+    second = export_collage_still(db, spec, tmp_path / "second.png", long_edge=160)
+    with Image.open(second) as blue:
+        red, _, blue_channel = blue.convert("RGB").getpixel((30, 30))
+        assert blue_channel > 200 and red < 40
 
 
 def test_per_leaf_grade_still_and_story_with_following_clip(

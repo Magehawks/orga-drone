@@ -78,7 +78,7 @@ class PreviewFrameRequest:
     # Collage MP4 export (#462): keep distinct 30 fps samples instead of the
     # 0.1 s preview cache bucket.
     exact_time: bool = False
-    strict_video_frame: bool = False
+    strict_source: bool = False
 
 
 def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
@@ -293,6 +293,7 @@ def cache_key_for(
     media_mtime_ns: int,
     media_size: int,
     data_dir: Path | None = None,
+    source_identity: tuple[int, int, int] | None = None,
 ) -> str:
     payload = {
         "path": str(req.media_path.resolve()),
@@ -300,7 +301,7 @@ def cache_key_for(
         "size": media_size,
         "kind": req.kind,
         "t": (
-            round(float(req.source_time_s), 6 if req.strict_video_frame else 4)
+            round(float(req.source_time_s), 6 if req.strict_source else 4)
             if req.exact_time else quantize_preview_time(req.source_time_s)
         ),
         # #358 animation clocks: same absolute PTS can sample different
@@ -323,7 +324,7 @@ def cache_key_for(
         "transition_side": str(req.transition_side or "single"),
         "repeat_pass": int(req.repeat_pass or 0),
         "exact_time": bool(req.exact_time),
-        **({"strict_video_frame": True} if req.strict_video_frame else {}),
+        **({"source_identity": source_identity} if req.strict_source else {}),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
@@ -394,6 +395,7 @@ def render_preview_frame(
         media_mtime_ns=st.st_mtime_ns,
         media_size=st.st_size,
         data_dir=data_dir,
+        source_identity=(st.st_dev, st.st_ino, st.st_ctime_ns) if req.strict_source else None,
     )
     dest = folder / f"{key}.jpg"
     if dest.is_file() and dest.stat().st_size > 0:
@@ -455,13 +457,14 @@ def render_preview_frame(
             raise PreviewFrameError(str(exc) or "Invalid color look.", code="lut_invalid") from exc
 
         abs_t = max(0.0, float(req.source_time_s))
+        strict_video = req.strict_source and req.kind == "video"
         cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
-        if req.strict_video_frame:
+        if strict_video:
             cmd.extend(["-xerror", "-err_detect", "explode"])
         if req.kind == "video":
-            cmd.extend(["-ss", f"{abs_t:.6f}" if req.strict_video_frame else f"{abs_t:.3f}"])
+            cmd.extend(["-ss", f"{abs_t:.6f}" if strict_video else f"{abs_t:.3f}"])
         cmd.extend(["-i", str(media)])
-        if req.strict_video_frame:
+        if strict_video:
             cmd.extend(["-map", "0:V:0"])
         cmd.extend(
             [
@@ -507,7 +510,7 @@ def render_preview_frame(
                 detail or "Could not build the preview still.",
                 code=(
                     "video_eof"
-                    if req.strict_video_frame and proc.returncode == 0 and not detail
+                    if strict_video and proc.returncode == 0 and not detail
                     else "preview_failed"
                 ),
             )

@@ -26,6 +26,7 @@ from orga_drone.ffmpeg_bin import find_ffmpeg
 from orga_drone.studio_collage import iter_leaves, normalize_spec
 from orga_drone.studio_collage_still import (
     EXPORT_LONG_EDGE,
+    CollageExportFrames,
     compose_collage_rgba,
     refuse_canvas,
 )
@@ -91,6 +92,7 @@ def render_collage_mp4_segment(
     refuse_canvas(int(width), int(height))
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-collage-mp4-"))
+    export_frames = CollageExportFrames(tmp_dir / "source-frames")
     try:
         _check_cancel(cancel_event)
         _emit(on_progress, phase="preparing", percent=5)
@@ -103,7 +105,7 @@ def render_collage_mp4_segment(
                 t_s=0.0,
                 cancel_event=cancel_event,
                 exact_time=True,
-                require_sources=True,
+                export_frames=export_frames,
             )
             try:
                 _check_cancel(cancel_event)
@@ -160,7 +162,7 @@ def render_collage_mp4_segment(
                 t_s=t_s,
                 cancel_event=cancel_event,
                 exact_time=True,
-                require_sources=True,
+                export_frames=export_frames,
             )
             try:
                 frame_path = frames_dir / f"frame_{index:06d}.jpg"
