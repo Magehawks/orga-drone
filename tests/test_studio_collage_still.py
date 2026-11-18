@@ -159,7 +159,7 @@ def test_jpeg_rejects_transparent(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         assert path.read_bytes() == original
 
 
-def test_png_export_and_missing_leaf(
+def test_png_export_with_intentionally_empty_leaf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _isolate(monkeypatch, tmp_path)
@@ -185,6 +185,49 @@ def test_png_export_and_missing_leaf(
     assert max(img.size) == 480
     for path, original in before.items():
         assert path.read_bytes() == original
+
+
+def test_missing_assigned_source_previews_but_blocks_still_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    spec, paths = _filled_1plus1(db, tmp_path / "media", tmp_path)
+    paths[0].unlink()
+    surviving_bytes = paths[1].read_bytes()
+    dest = tmp_path / "collage.png"
+
+    assert render_collage_preview_png(db, spec, long_edge=160)
+    inspect = inspect_collage_still(db, spec, long_edge=160)
+    assert inspect["ok"] is False
+    assert "source is unavailable" in inspect["error"]
+    with pytest.raises(StudioExportError, match="source is unavailable"):
+        export_collage_still(db, spec, dest, long_edge=160)
+    assert not dest.exists()
+    assert paths[1].read_bytes() == surviving_bytes
+
+
+def test_unrenderable_video_previews_but_blocks_still_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    source = tmp_path / "broken.mp4"
+    original = b"synthetic invalid video"
+    source.write_bytes(original)
+    spec = preset_spec("1+1")
+    spec = assign_leaf_media(
+        spec,
+        iter_leaves(spec["root"])[0]["id"],
+        {"source": "external", "path": str(source), "kind": "video"},
+    )
+    dest = tmp_path / "collage.jpg"
+
+    assert render_collage_preview_png(db, spec, long_edge=160)
+    with pytest.raises(StudioExportError, match="source could not be rendered"):
+        export_collage_still(db, spec, dest, fmt="jpeg", long_edge=160)
+    assert not dest.exists()
+    assert source.read_bytes() == original
 
 
 def test_inspect_and_http_preview_export(

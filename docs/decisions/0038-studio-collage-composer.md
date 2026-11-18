@@ -66,7 +66,10 @@ Spec  = { version: 1, aspect, gap_px, background, corner_radius_px?,
 - Fit = contain (letterbox inside cell); Fill = cover (crop). Zoom/pan reuse
   the framing window math spirit of ADR 0018, scoped to the cell rect.
 - Same source may appear in multiple leaves. Missing library or external files
-  mark the leaf unavailable without dropping the collage or project.
+  mark the leaf unavailable without dropping the collage or project. Preview
+  may show a placeholder. PNG, JPEG and Story MP4 export fail if an assigned
+  source is unavailable or cannot be rendered. Intentionally empty cells can
+  still export with their placeholder.
 
 ### 3. Media sources
 

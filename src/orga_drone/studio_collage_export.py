@@ -103,6 +103,7 @@ def render_collage_mp4_segment(
                 t_s=0.0,
                 cancel_event=cancel_event,
                 exact_time=True,
+                require_sources=True,
             )
             try:
                 _check_cancel(cancel_event)
@@ -159,6 +160,7 @@ def render_collage_mp4_segment(
                 t_s=t_s,
                 cancel_event=cancel_event,
                 exact_time=True,
+                require_sources=True,
             )
             try:
                 frame_path = frames_dir / f"frame_{index:06d}.jpg"

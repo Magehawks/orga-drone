@@ -9,6 +9,7 @@ from PIL import Image
 
 from orga_drone.config import Settings
 from orga_drone.db import Database
+from orga_drone.export.studio_encoder import StudioExportError
 from orga_drone.studio_collage import (
     assign_leaf_media,
     collage_spec_from_raw,
@@ -74,6 +75,29 @@ def test_collage_has_video_leaf_detects_kind() -> None:
         {"source": "library", "media_id": 1, "kind": "video"},
     )
     assert collage_has_video_leaf(with_video) is True
+
+
+@pytest.mark.parametrize(("kind", "suffix"), [("photo", ".jpg"), ("video", ".mp4")])
+def test_missing_assigned_source_blocks_story_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, suffix: str
+) -> None:
+    prefs = _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    spec = preset_spec("1+1")
+    spec = assign_leaf_media(
+        spec,
+        iter_leaves(spec["root"])[0]["id"],
+        {"source": "external", "path": str(tmp_path / f"missing{suffix}"), "kind": kind},
+    )
+    db.add_studio_collage(project.id, collage_spec=spec, collage_duration_s=1.0)
+    dest = prefs.data_dir / "exports" / "story.mp4"
+    dest.parent.mkdir(parents=True)
+
+    with pytest.raises(StudioExportError, match="source is unavailable"):
+        run_studio_export(db, height=720, output_path=dest, project_id=project.id)
+    assert not dest.exists()
 
 
 def test_photo_collage_mp4_segment_and_project_export(

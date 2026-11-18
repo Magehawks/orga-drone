@@ -1257,3 +1257,9 @@ msgstr "Collage-Export abgebrochen."
 
 msgid "collage"
 msgstr "collage"
+
+msgid "A collage source is unavailable. Reconnect or replace it and try again."
+msgstr "Eine Collagenquelle ist nicht verfügbar. Verbinde oder ersetze sie und versuche es erneut."
+
+msgid "A collage source could not be rendered. Check or replace it and try again."
+msgstr "Eine Collagenquelle konnte nicht gerendert werden. Prüfe oder ersetze sie und versuche es erneut."

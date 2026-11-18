@@ -48,6 +48,8 @@ PREVIEW_LONG_EDGE = 1_280
 EXPORT_LONG_EDGE = 1_920
 JPEG_QUALITY = 95
 PLACEHOLDER_RGBA = (28, 32, 36, 255)
+MISSING_EXPORT_MEDIA = "A collage source is unavailable. Reconnect or replace it and try again."
+UNREADABLE_EXPORT_MEDIA = "A collage source could not be rendered. Check or replace it and try again."
 
 PHOTO_SUFFIXES = frozenset(
     {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif", ".dng"}
@@ -172,7 +174,7 @@ def resolve_leaf_source(db: Database, media: dict[str, Any] | None) -> Path | No
         if kind not in {"photo", "video"}:
             if suffix not in PHOTO_SUFFIXES | VIDEO_SUFFIXES:
                 return None
-        return path
+        return path if path.is_file() else None
     return None
 
 
@@ -221,7 +223,7 @@ def _load_oriented_rgba(path: Path):
         img = Image.open(path)
         img.load()
     except OSError as exc:
-        raise StudioExportError("Could not read collage media.") from exc
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
     try:
         oriented = ImageOps.exif_transpose(img) or img
         return oriented.convert("RGBA")
@@ -535,6 +537,7 @@ def _leaf_rgba(
     *,
     t_s: float,
     long_edge: int,
+    require_sources: bool,
     exact_time: bool = False,
     cancel_event: threading.Event | None = None,
 ):
@@ -542,8 +545,12 @@ def _leaf_rgba(
 
     _check_cancel(cancel_event)
     media = leaf.get("media")
-    path = resolve_leaf_source(db, media if isinstance(media, dict) else None)
-    if path is None or not isinstance(media, dict):
+    if not isinstance(media, dict):
+        return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
+    path = resolve_leaf_source(db, media)
+    if path is None:
+        if require_sources:
+            raise StudioExportError(MISSING_EXPORT_MEDIA)
         return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
 
     kind = str(media.get("kind") or "photo").strip().lower()
@@ -568,8 +575,10 @@ def _leaf_rgba(
                 exact_time=exact_time,
                 cancel_event=cancel_event,
             )
-        except StudioExportError:
+        except StudioExportError as exc:
             _check_cancel(cancel_event)
+            if require_sources:
+                raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
             if kind != "video" or source_time <= 0:
                 return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
             # Last-resort hold: retry near the start rather than aborting the collage.
@@ -619,6 +628,7 @@ def compose_collage_rgba(
     t_s: float = 0.0,
     cancel_event: threading.Event | None = None,
     exact_time: bool = False,
+    require_sources: bool = False,
 ):
     """Compose one RGBA collage canvas from the layout SoT."""
     from PIL import Image
@@ -642,6 +652,7 @@ def compose_collage_rgba(
                 rect.h,
                 t_s=t_s,
                 long_edge=long_edge,
+                require_sources=require_sources,
                 exact_time=exact_time,
                 cancel_event=cancel_event,
             )
@@ -797,6 +808,7 @@ def export_collage_still(
             long_edge=long_edge,
             t_s=t_s,
             cancel_event=cancel_event,
+            require_sources=True,
         )
         if on_progress is not None:
             on_progress(
@@ -863,6 +875,8 @@ def inspect_collage_still(
         for leaf in iter_leaves(normalized["root"]):
             media = leaf.get("media")
             path = resolve_leaf_source(db, media if isinstance(media, dict) else None)
+            if isinstance(media, dict) and path is None:
+                raise StudioExportError(MISSING_EXPORT_MEDIA)
             leaves.append(
                 {
                     "leaf_id": leaf["id"],
