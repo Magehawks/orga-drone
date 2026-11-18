@@ -6,6 +6,7 @@ WebView2 / packaged E2E: NOT_RUN (see docs/discovery/470-creator-journey-evidenc
 
 from __future__ import annotations
 
+import io
 import re
 import subprocess
 from pathlib import Path
@@ -240,7 +241,8 @@ def test_external_video_story_holds_last_frame_without_ffprobe(
     _isolate(monkeypatch, tmp_path)
     monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: None)
     db = Database(tmp_path / "lib.sqlite3")
-    video = _mp4(tmp_path / "clip.mp4", duration_s=0.2, color="0x2060a0")
+    video = tmp_path / "clip.mp4"
+    ffmpeg = _two_color_video(video, fps=10)
     spec = collage_spec_from_raw(None)
     spec = assign_leaf_media(
         spec,
@@ -251,7 +253,53 @@ def test_external_video_story_holds_last_frame_without_ffprobe(
     render_collage_mp4_segment(
         db, spec, output, width=160, height=90, duration_s=0.4, long_edge=160
     )
-    assert output.is_file()
+    last = subprocess.run(
+        [ffmpeg, "-v", "error", "-ss", "0.3", "-i", str(output), "-frames:v", "1",
+         "-vf", "crop=2:2:30:30", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"],
+        check=True, capture_output=True, **subprocess_no_window_kwargs(),
+    ).stdout
+    assert len(last) == 12
+    assert last[2] > 200 and last[0] < 40
+
+
+def _two_color_video(video: Path, *, fps: int) -> str:
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        pytest.skip("ffmpeg required for synthetic video journey")
+    subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+         f"color=blue:s=160x90:r={fps}:d=0.2", "-f", "lavfi", "-i",
+         "anullsrc=channel_layout=stereo:sample_rate=48000:d=0.6", "-vf",
+         "drawbox=color=red:t=fill:enable='eq(n,0)'", "-c:v", "libx264",
+         "-c:a", "aac", str(video)],
+        check=True,
+        capture_output=True,
+        **subprocess_no_window_kwargs(),
+    )
+    return ffmpeg
+
+
+@pytest.mark.parametrize(("fmt", "suffix"), [("png", "png"), ("jpeg", "jpg")])
+def test_collage_still_does_not_reuse_nearby_preview_frame(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fmt: str, suffix: str
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    video = tmp_path / "two-colors.mp4"
+    _two_color_video(video, fps=30)
+    spec = collage_spec_from_raw(None)
+    spec = assign_leaf_media(
+        spec, iter_leaves(spec["root"])[0]["id"],
+        {"source": "external", "path": str(video), "kind": "video"},
+    )
+    with Image.open(io.BytesIO(render_collage_preview_png(db, spec, long_edge=160))) as preview:
+        assert preview.convert("RGB").getpixel((30, 30))[0] > 200
+    output = export_collage_still(
+        db, spec, tmp_path / f"still.{suffix}", fmt=fmt, long_edge=160, t_s=0.04
+    )
+    with Image.open(output) as still:
+        red, _, blue = still.convert("RGB").getpixel((30, 30))
+        assert blue > 200 and red < 40
 
 
 def test_per_leaf_grade_still_and_story_with_following_clip(

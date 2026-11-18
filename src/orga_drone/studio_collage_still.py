@@ -9,9 +9,12 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 import shutil
+import subprocess
 import tempfile
 import threading
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +25,7 @@ from orga_drone.export.studio_encoder import (
     StudioExportError,
     _publish_export_file,
 )
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_collage import (
     CollageSpecError,
@@ -242,6 +246,7 @@ def _render_graded_or_video_rgba(
     effect_settings: str | None,
     max_edge: int,
     exact_time: bool = False,
+    strict_video_frame: bool = False,
     cancel_event: threading.Event | None = None,
 ):
     from PIL import Image
@@ -281,10 +286,14 @@ def _render_graded_or_video_rgba(
         max_edge=max(64, int(max_edge)),
         effect_settings=effect_settings if managed else None,
         exact_time=bool(exact_time),
+        strict_video_frame=strict_video_frame,
     )
     try:
-        jpeg = render_preview_frame(req, data_dir=settings.data_dir)
-    except PreviewFrameError as exc:
+        if strict_video_frame:
+            jpeg = _render_export_video_frame(req, cancel_event)
+        else:
+            jpeg = render_preview_frame(req, data_dir=settings.data_dir)
+    except (OSError, PreviewFrameError) as exc:
         _check_cancel(cancel_event)
         raise StudioExportError(str(exc) or "Could not build a collage leaf still.") from exc
     _check_cancel(cancel_event)
@@ -451,18 +460,74 @@ def _clamp_video_source_time(
         duration = _library_media_duration_s(db, media)
     if duration is None:
         duration = _probe_video_duration_s(path)
-    if duration is None:
-        # The Windows bundle can read duration through ffmpeg without ffprobe.
-        from orga_drone.parse import probe_video_with_ffprobe
-
-        _, _, duration = probe_video_with_ffprobe(path)
-        if duration is not None:
-            _video_duration_cache[str(path)] = duration
     if duration is None or duration <= 0:
         return max(0.0, float(source_time))
     # Keep a small epsilon before EOF so ffmpeg -ss still returns a frame.
     hold_at = max(0.0, float(duration) - 0.05)
     return min(max(0.0, float(source_time)), hold_at)
+
+
+_last_frame_cache: dict[tuple[Path, int, int, int], int] = {}
+_last_frame_lock = threading.Lock()
+
+
+def _render_export_video_frame(
+    req: PreviewFrameRequest, cancel_event: threading.Event | None
+) -> Path:
+    path = req.media_path
+    stat = path.stat()
+    key = (path, stat.st_mtime_ns, stat.st_size, stat.st_ino)
+    with _last_frame_lock:
+        last_us = _last_frame_cache.get(key)
+    if last_us is not None:
+        req = replace(req, source_time_s=min(req.source_time_s, last_us / 1_000_000))
+    try:
+        return render_preview_frame(req, data_dir=settings.data_dir)
+    except PreviewFrameError as exc:
+        if exc.code != "video_eof" or last_us is not None:
+            raise
+        _check_cancel(cancel_event)
+        last_us = _last_video_frame_us(path)
+        _check_cancel(cancel_event)
+        if last_us >= round(req.source_time_s * 1_000_000):
+            raise
+        jpeg = render_preview_frame(
+            replace(req, source_time_s=last_us / 1_000_000), data_dir=settings.data_dir
+        )
+        with _last_frame_lock:
+            if len(_last_frame_cache) >= 64:
+                _last_frame_cache.pop(next(iter(_last_frame_cache)))
+            _last_frame_cache[key] = last_us
+        return jpeg
+
+
+def _last_video_frame_us(path: Path) -> int:
+    """Get a decoded frame timestamp, independent of container/audio duration."""
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA)
+    cmd = [
+        ffmpeg, "-hide_banner", "-nostats", "-v", "info",
+        "-xerror", "-err_detect", "explode", "-i", str(path),
+        "-map", "0:V:0", "-vf", "showinfo=checksum=0", "-f", "null", "-",
+    ]
+    try:
+        result = subprocess.run(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            timeout=30, check=False, **subprocess_below_normal_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
+    base = re.search(rb"\[Parsed_showinfo_[^\]]+\] config in time_base: (\d+)/(\d+)", result.stderr)
+    pts = max(
+        (int(match[1]) for match in re.finditer(
+            rb"\[Parsed_showinfo_[^\]]+\]\s+n:\s*\d+\s+pts:\s*(-?\d+)", result.stderr
+        )),
+        default=None,
+    )
+    if result.returncode or base is None or pts is None:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA)
+    return max(0, pts * int(base[1]) * 1_000_000 // int(base[2]))
 
 
 def render_collage_leaf_source_preview(
@@ -567,7 +632,7 @@ def _leaf_rgba(
     effect_settings = _grade_payload(media)
     start_offset = float(media.get("start_offset_s") or 0.0)
     source_time = start_offset + max(0.0, float(t_s))
-    if kind == "video":
+    if kind == "video" and not require_sources:
         source_time = _clamp_video_source_time(db, media, path, source_time)
     needs_preview = kind == "video" or _grade_needs_still(effect_settings)
 
@@ -579,7 +644,8 @@ def _leaf_rgba(
                 source_time_s=source_time,
                 effect_settings=effect_settings,
                 max_edge=max(long_edge, max(rect_w, rect_h)),
-                exact_time=exact_time,
+                exact_time=exact_time or (require_sources and kind == "video"),
+                strict_video_frame=require_sources and kind == "video",
                 cancel_event=cancel_event,
             )
         except StudioExportError as exc:
@@ -795,7 +861,7 @@ def export_collage_still(
             source_paths.append(str(path))
     protected_all = tuple(dict.fromkeys([*protected, *source_paths]))
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-collage-still-"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix=".orga-drone-collage-", dir=dest.parent))
     partial = tmp_dir / ("out.png" if format_name == "png" else "out.jpg")
     canvas = None
     try:
@@ -843,6 +909,7 @@ def export_collage_still(
             dest,
             protected=protected_all,
             protected_identities=identities,
+            require_atomic=True,
         )
         if on_progress is not None:
             on_progress(

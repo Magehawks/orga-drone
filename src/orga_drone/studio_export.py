@@ -37,6 +37,7 @@ from orga_drone.export.studio_encoder import (
     StudioExportError,
     StudioVideoEncoder,
     _protected_identities,
+    _unlink_export_temp,
     get_default_encoder,
     os_access_writable,
 )
@@ -1218,7 +1219,7 @@ def _materialize_collage_clips(
                 section_repeats=1,
             )
         )
-    return replace(config, clips=tuple(built))
+    return replace(config, clips=tuple(built), require_atomic_publish=True)
 
 
 def run_studio_export(
@@ -1258,10 +1259,7 @@ def run_studio_export(
         )
     finally:
         for seg in owned_segments:
-            try:
-                seg.unlink(missing_ok=True)
-            except OSError:
-                pass
+            _unlink_export_temp(seg)
 
 
 def _materialize_deferred_spatial_clips(

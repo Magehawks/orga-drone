@@ -78,6 +78,7 @@ class PreviewFrameRequest:
     # Collage MP4 export (#462): keep distinct 30 fps samples instead of the
     # 0.1 s preview cache bucket.
     exact_time: bool = False
+    strict_video_frame: bool = False
 
 
 def before_color_request(req: PreviewFrameRequest) -> PreviewFrameRequest:
@@ -299,9 +300,8 @@ def cache_key_for(
         "size": media_size,
         "kind": req.kind,
         "t": (
-            round(float(req.source_time_s), 4)
-            if req.exact_time
-            else quantize_preview_time(req.source_time_s)
+            round(float(req.source_time_s), 6 if req.strict_video_frame else 4)
+            if req.exact_time else quantize_preview_time(req.source_time_s)
         ),
         # #358 animation clocks: same absolute PTS can sample different
         # source-local / Story values after trim or Story placement changes.
@@ -323,6 +323,7 @@ def cache_key_for(
         "transition_side": str(req.transition_side or "single"),
         "repeat_pass": int(req.repeat_pass or 0),
         "exact_time": bool(req.exact_time),
+        **({"strict_video_frame": True} if req.strict_video_frame else {}),
         "image": req.image.as_dict(),
         "look": req.look.as_dict(),
         "hsl": req.hsl.as_dict(),
@@ -455,12 +456,15 @@ def render_preview_frame(
 
         abs_t = max(0.0, float(req.source_time_s))
         cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+        if req.strict_video_frame:
+            cmd.extend(["-xerror", "-err_detect", "explode"])
         if req.kind == "video":
-            cmd.extend(["-ss", f"{abs_t:.3f}"])
+            cmd.extend(["-ss", f"{abs_t:.6f}" if req.strict_video_frame else f"{abs_t:.3f}"])
+        cmd.extend(["-i", str(media)])
+        if req.strict_video_frame:
+            cmd.extend(["-map", "0:V:0"])
         cmd.extend(
             [
-                "-i",
-                str(media),
                 "-frames:v",
                 "1",
                 "-vf",
@@ -501,7 +505,11 @@ def render_preview_frame(
             detail = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
             raise PreviewFrameError(
                 detail or "Could not build the preview still.",
-                code="preview_failed",
+                code=(
+                    "video_eof"
+                    if req.strict_video_frame and proc.returncode == 0 and not detail
+                    else "preview_failed"
+                ),
             )
         if req.effect_settings and grade_needs_cpu_materialize(req.effect_settings):
             _apply_spatial_managed_jpeg(

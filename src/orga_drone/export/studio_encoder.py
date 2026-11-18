@@ -1127,6 +1127,7 @@ def _publish_export_file(
     *,
     protected: Iterable[Path | str] = (),
     protected_identities: Iterable[tuple[int, int]] = (),
+    require_atomic: bool = False,
 ) -> Path:
     """Create a new file for ``partial``. Never replace an existing file.
 
@@ -1150,14 +1151,14 @@ def _publish_export_file(
             if hook is not None:
                 hook(candidate)
             try:
-                _claim_new_export_file(partial, candidate)
+                _claim_new_export_file(partial, candidate, require_atomic=require_atomic)
             except _ExportNameTaken:
                 continue
             return candidate
     raise StudioExportError(EXPORT_NO_FREE_NAME)
 
 
-def _claim_new_export_file(partial: Path, dest: Path) -> None:
+def _claim_new_export_file(partial: Path, dest: Path, *, require_atomic: bool = False) -> None:
     """Create ``dest`` only while the name is still absent."""
     try:
         os.link(partial, dest)
@@ -1167,6 +1168,9 @@ def _claim_new_export_file(partial: Path, dest: Path) -> None:
     except OSError as exc:
         if _already_exists(exc) or _path_exists(dest):
             raise _ExportNameTaken from exc
+        if require_atomic:
+            _rename_new_export_file(partial, dest, exc)
+            return
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
     if hasattr(os, "O_BINARY"):
         flags |= os.O_BINARY
@@ -1192,6 +1196,19 @@ def _claim_new_export_file(partial: Path, dest: Path) -> None:
             pass
         raise
     os.close(fd)
+
+
+def _rename_new_export_file(partial: Path, dest: Path, link_error: OSError) -> None:
+    # Windows rename fails if the destination exists. POSIX rename replaces it.
+    if os.name == "nt":
+        try:
+            partial.rename(dest)
+            return
+        except OSError as exc:
+            if _already_exists(exc) or _path_exists(dest):
+                raise _ExportNameTaken from exc
+            link_error = exc
+    raise StudioExportError("Could not publish the collage export safely.") from link_error
 
 
 def _unlink_export_temp(path: Path) -> None:
@@ -1654,6 +1671,7 @@ class FfmpegStudioEncoder:
                 dest,
                 protected=protected,
                 protected_identities=protected_identities,
+                require_atomic=config.require_atomic_publish,
             )
             _emit(
                 on_progress,

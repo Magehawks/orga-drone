@@ -1263,3 +1263,6 @@ msgstr "Eine Collagenquelle ist nicht verfügbar. Verbinde oder ersetze sie und 
 
 msgid "A collage source could not be rendered. Check or replace it and try again."
 msgstr "Eine Collagenquelle konnte nicht gerendert werden. Prüfe oder ersetze sie und versuche es erneut."
+
+msgid "Could not publish the collage export safely."
+msgstr "Der Collagenexport konnte nicht sicher gespeichert werden."

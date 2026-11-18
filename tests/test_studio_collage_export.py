@@ -94,10 +94,44 @@ def test_missing_assigned_source_blocks_story_export(
     db.add_studio_collage(project.id, collage_spec=spec, collage_duration_s=1.0)
     dest = prefs.data_dir / "exports" / "story.mp4"
     dest.parent.mkdir(parents=True)
+    original = b"existing export"
+    dest.write_bytes(original)
 
     with pytest.raises(StudioExportError, match="source is unavailable"):
+        run_studio_export(
+            db, height=720, output_path=dest, project_id=project.id, overwrite=True
+        )
+    assert dest.read_bytes() == original
+    assert list(dest.parent.iterdir()) == [dest]
+    assert not list((prefs.data_dir / "tmp" / "collage-export").glob("*.mp4"))
+
+
+def test_story_cleans_up_failed_segment_and_preserves_existing_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefs = _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    db.add_studio_collage(project.id, preset="1+1", collage_duration_s=1.0)
+    dest = prefs.data_dir / "exports" / "story.mp4"
+    dest.parent.mkdir(parents=True)
+    original = b"existing export"
+    dest.write_bytes(original)
+    staging: list[Path] = []
+
+    def fail_encode(cmd: list[str], **kwargs: object) -> None:
+        Path(cmd[-1]).write_bytes(b"incomplete segment")
+        staging.append(Path(cmd[cmd.index("-i") + 1]).parent)
+        raise StudioExportError("simulated encoder failure")
+
+    monkeypatch.setattr("orga_drone.studio_collage_export._run_ffmpeg", fail_encode)
+    with pytest.raises(StudioExportError, match="simulated encoder failure"):
         run_studio_export(db, height=720, output_path=dest, project_id=project.id)
-    assert not dest.exists()
+    assert dest.read_bytes() == original
+    assert list(dest.parent.iterdir()) == [dest]
+    assert staging and not staging[0].exists()
+    assert not list((prefs.data_dir / "tmp" / "collage-export").glob("*.mp4"))
 
 
 def test_photo_collage_mp4_segment_and_project_export(
