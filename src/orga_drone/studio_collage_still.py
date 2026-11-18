@@ -451,6 +451,13 @@ def _clamp_video_source_time(
         duration = _library_media_duration_s(db, media)
     if duration is None:
         duration = _probe_video_duration_s(path)
+    if duration is None:
+        # The Windows bundle can read duration through ffmpeg without ffprobe.
+        from orga_drone.parse import probe_video_with_ffprobe
+
+        _, _, duration = probe_video_with_ffprobe(path)
+        if duration is not None:
+            _video_duration_cache[str(path)] = duration
     if duration is None or duration <= 0:
         return max(0.0, float(source_time))
     # Keep a small epsilon before EOF so ffmpeg -ss still returns a frame.

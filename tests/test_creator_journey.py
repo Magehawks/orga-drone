@@ -26,6 +26,7 @@ from orga_drone.studio_collage import (
     iter_leaves,
 )
 from orga_drone.studio_collage_grade import apply_hsl, grade_blob
+from orga_drone.studio_collage_export import render_collage_mp4_segment
 from orga_drone.studio_collage_seed import seed_collage_from_media_ids
 from orga_drone.studio_collage_still import (
     export_collage_still,
@@ -231,6 +232,26 @@ def test_hold_last_frame_uses_production_clamp(
     assert held == pytest.approx(0.45, abs=0.02)
     early = _clamp_video_source_time(db, media, video, source_time=0.1)
     assert early == pytest.approx(0.1, abs=0.01)
+
+
+def test_external_video_story_holds_last_frame_without_ffprobe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: None)
+    db = Database(tmp_path / "lib.sqlite3")
+    video = _mp4(tmp_path / "clip.mp4", duration_s=0.2, color="0x2060a0")
+    spec = collage_spec_from_raw(None)
+    spec = assign_leaf_media(
+        spec,
+        iter_leaves(spec["root"])[0]["id"],
+        {"source": "external", "path": str(video), "kind": "video"},
+    )
+    output = tmp_path / "segment.mp4"
+    render_collage_mp4_segment(
+        db, spec, output, width=160, height=90, duration_s=0.4, long_edge=160
+    )
+    assert output.is_file()
 
 
 def test_per_leaf_grade_still_and_story_with_following_clip(
