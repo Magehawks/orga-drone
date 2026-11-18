@@ -17,6 +17,7 @@ from PIL import Image
 
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
+from orga_drone.export.studio_encoder import StudioExportError
 from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
 from orga_drone.i18n import clear_catalog_cache
 from orga_drone.studio_collage import (
@@ -376,7 +377,7 @@ def test_per_leaf_grade_still_and_story_with_following_clip(
 def test_mixed_photo_video_collage_and_missing_media(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Mixed collage + missing library file stays export-safe."""
+    """Preview an offline leaf, then export after its source is restored."""
     prefs = _isolate(monkeypatch, tmp_path)
     db = Database(tmp_path / "lib.sqlite3")
     root = tmp_path / "media"
@@ -386,6 +387,7 @@ def test_mixed_photo_video_collage_and_missing_media(
     video_id = _add_media(db, root, video, kind="video", duration_s=0.5)
     missing_path = root / "gone.jpg"
     _jpg(missing_path, (10, 10, 10))
+    original = missing_path.read_bytes()
     missing_id = _add_media(db, root, missing_path, kind="photo")
     missing_path.unlink()
 
@@ -414,6 +416,11 @@ def test_mixed_photo_video_collage_and_missing_media(
 
     still_out = prefs.data_dir / "exports" / "mixed.png"
     still_out.parent.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(StudioExportError, match="source is unavailable"):
+        export_collage_still(db, spec, still_out, long_edge=640, t_s=0.4)
+    assert not still_out.exists()
+
+    missing_path.write_bytes(original)
     published = export_collage_still(
         db,
         collage_spec_from_raw(collage.collage_spec),
