@@ -144,6 +144,7 @@ class StudioExportConfig:
     protected_identities: tuple[tuple[int, int], ...] = ()
     # Catalog paths an export must not create or replace, even when the file is absent.
     protected_paths: tuple[str, ...] = ()
+    require_atomic_publish: bool = False
 
     def __post_init__(self) -> None:
         if self.music is not None and not self.music_tracks:

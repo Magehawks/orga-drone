@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -81,6 +83,33 @@ def _make_video(path: Path) -> Path:
         **subprocess_no_window_kwargs(),
     )
     return path
+
+
+def test_same_export_frame_renders_independently_in_separate_caches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    video = _make_video(tmp_path / "source.mp4")
+    req = PreviewFrameRequest(
+        video, "video", 0.0, ImageAdjust(), ColorLook(), strict_source=True
+    )
+    start_render = threading.Barrier(2)
+    run = subprocess.run
+
+    def run_concurrently(*args, **kwargs):
+        start_render.wait(timeout=5)
+        return run(*args, **kwargs)
+
+    monkeypatch.setattr("orga_drone.studio_preview_frame.subprocess.run", run_concurrently)
+    first, second = tmp_path / "first", tmp_path / "second"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        jobs = [
+            pool.submit(render_preview_frame, req, data_dir=tmp_path, cache_dir=cache)
+            for cache in (first, second)
+        ]
+        for job, cache in zip(jobs, (first, second), strict=True):
+            result = job.result(timeout=10)
+            assert result.parent == cache
+            assert result.stat().st_size > 0
 
 
 def _red_boost_cube(path: Path) -> Path:

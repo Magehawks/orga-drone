@@ -66,7 +66,16 @@ Spec  = { version: 1, aspect, gap_px, background, corner_radius_px?,
 - Fit = contain (letterbox inside cell); Fill = cover (crop). Zoom/pan reuse
   the framing window math spirit of ADR 0018, scoped to the cell rect.
 - Same source may appear in multiple leaves. Missing library or external files
-  mark the leaf unavailable without dropping the collage or project.
+  mark the leaf unavailable without dropping the collage or project. Preview
+  may show a placeholder. PNG, JPEG and Story MP4 export fail if an assigned
+  source is unavailable or cannot be rendered. Intentionally empty cells can
+  still export with their placeholder.
+- Each export owns its frame cache and removes it with its staging files.
+  At video EOF it holds the last decodable frame, even when the container
+  has a longer audio stream or ffprobe is unavailable.
+- Collage stills and Story exports containing collages publish completed files
+  through an exclusive claim. If the destination does not support an atomic
+  claim, the export fails without replacing any existing file.
 
 ### 3. Media sources
 

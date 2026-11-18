@@ -9,9 +9,12 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 import shutil
+import subprocess
 import tempfile
 import threading
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +25,7 @@ from orga_drone.export.studio_encoder import (
     StudioExportError,
     _publish_export_file,
 )
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_below_normal_kwargs
 from orga_drone.media_files import resolve_media_file
 from orga_drone.studio_collage import (
     CollageSpecError,
@@ -48,6 +52,8 @@ PREVIEW_LONG_EDGE = 1_280
 EXPORT_LONG_EDGE = 1_920
 JPEG_QUALITY = 95
 PLACEHOLDER_RGBA = (28, 32, 36, 255)
+MISSING_EXPORT_MEDIA = "A collage source is unavailable. Reconnect or replace it and try again."
+UNREADABLE_EXPORT_MEDIA = "A collage source could not be rendered. Check or replace it and try again."
 
 PHOTO_SUFFIXES = frozenset(
     {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif", ".dng"}
@@ -78,6 +84,16 @@ class CollageStillPreviewCoordinator:
     def release(self, cancel: threading.Event) -> None:
         if self._cancel is cancel:
             self._cancel = None
+
+
+@dataclass
+class CollageExportFrames:
+    """Frame cache owned by one export and removed with its staging directory."""
+
+    cache_dir: Path
+    last_frame_us: dict[tuple[Path, int, int, int, int, int], int] = field(
+        default_factory=dict
+    )
 
 
 def _check_cancel(cancel_event: threading.Event | None) -> None:
@@ -172,7 +188,7 @@ def resolve_leaf_source(db: Database, media: dict[str, Any] | None) -> Path | No
         if kind not in {"photo", "video"}:
             if suffix not in PHOTO_SUFFIXES | VIDEO_SUFFIXES:
                 return None
-        return path
+        return path if path.is_file() else None
     return None
 
 
@@ -218,18 +234,10 @@ def _load_oriented_rgba(path: Path):
 
     ensure_heif_support()
     try:
-        img = Image.open(path)
-        img.load()
+        with Image.open(path) as img, ImageOps.exif_transpose(img) as oriented:
+            return oriented.convert("RGBA")
     except OSError as exc:
-        raise StudioExportError("Could not read collage media.") from exc
-    try:
-        oriented = ImageOps.exif_transpose(img) or img
-        return oriented.convert("RGBA")
-    finally:
-        try:
-            img.close()
-        except Exception:
-            pass
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
 
 
 def _render_graded_or_video_rgba(
@@ -240,6 +248,7 @@ def _render_graded_or_video_rgba(
     effect_settings: str | None,
     max_edge: int,
     exact_time: bool = False,
+    export_frames: CollageExportFrames | None = None,
     cancel_event: threading.Event | None = None,
 ):
     from PIL import Image
@@ -279,17 +288,24 @@ def _render_graded_or_video_rgba(
         max_edge=max(64, int(max_edge)),
         effect_settings=effect_settings if managed else None,
         exact_time=bool(exact_time),
+        strict_source=export_frames is not None,
     )
     try:
-        jpeg = render_preview_frame(req, data_dir=settings.data_dir)
-    except PreviewFrameError as exc:
+        if export_frames is not None and kind == "video":
+            jpeg = _render_export_video_frame(req, export_frames, cancel_event)
+        else:
+            jpeg = render_preview_frame(
+                req,
+                data_dir=settings.data_dir,
+                cache_dir=export_frames.cache_dir if export_frames is not None else None,
+            )
+    except (OSError, PreviewFrameError) as exc:
         _check_cancel(cancel_event)
         raise StudioExportError(str(exc) or "Could not build a collage leaf still.") from exc
     _check_cancel(cancel_event)
     try:
-        img = Image.open(jpeg)
-        img.load()
-        return img.convert("RGBA")
+        with Image.open(jpeg) as img:
+            return img.convert("RGBA")
     except OSError as exc:
         raise StudioExportError("Could not read collage leaf still.") from exc
 
@@ -456,6 +472,67 @@ def _clamp_video_source_time(
     return min(max(0.0, float(source_time)), hold_at)
 
 
+def _render_export_video_frame(
+    req: PreviewFrameRequest,
+    export_frames: CollageExportFrames,
+    cancel_event: threading.Event | None,
+) -> Path:
+    path = req.media_path
+    stat = path.stat()
+    key = (path, stat.st_mtime_ns, stat.st_size, stat.st_dev, stat.st_ino, stat.st_ctime_ns)
+    last_us = export_frames.last_frame_us.get(key)
+    if last_us is not None:
+        req = replace(req, source_time_s=min(req.source_time_s, last_us / 1_000_000))
+    try:
+        return render_preview_frame(
+            req, data_dir=settings.data_dir, cache_dir=export_frames.cache_dir
+        )
+    except PreviewFrameError as exc:
+        if exc.code != "video_eof" or last_us is not None:
+            raise
+        _check_cancel(cancel_event)
+        last_us = _last_video_frame_us(path)
+        _check_cancel(cancel_event)
+        if last_us >= round(req.source_time_s * 1_000_000):
+            raise
+        jpeg = render_preview_frame(
+            replace(req, source_time_s=last_us / 1_000_000),
+            data_dir=settings.data_dir,
+            cache_dir=export_frames.cache_dir,
+        )
+        export_frames.last_frame_us[key] = last_us
+        return jpeg
+
+
+def _last_video_frame_us(path: Path) -> int:
+    """Get a decoded frame timestamp, independent of container/audio duration."""
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA)
+    cmd = [
+        ffmpeg, "-hide_banner", "-nostats", "-v", "info",
+        "-xerror", "-err_detect", "explode", "-i", str(path),
+        "-map", "0:V:0", "-vf", "showinfo=checksum=0", "-f", "null", "-",
+    ]
+    try:
+        result = subprocess.run(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            timeout=30, check=False, **subprocess_below_normal_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
+    base = re.search(rb"\[Parsed_showinfo_[^\]]+\] config in time_base: (\d+)/(\d+)", result.stderr)
+    pts = max(
+        (int(match[1]) for match in re.finditer(
+            rb"\[Parsed_showinfo_[^\]]+\]\s+n:\s*\d+\s+pts:\s*(-?\d+)", result.stderr
+        )),
+        default=None,
+    )
+    if result.returncode or base is None or pts is None:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA)
+    return max(0, pts * int(base[1]) * 1_000_000 // int(base[2]))
+
+
 def render_collage_leaf_source_preview(
     db: Database,
     spec: dict[str, Any],
@@ -535,6 +612,7 @@ def _leaf_rgba(
     *,
     t_s: float,
     long_edge: int,
+    export_frames: CollageExportFrames | None,
     exact_time: bool = False,
     cancel_event: threading.Event | None = None,
 ):
@@ -542,8 +620,12 @@ def _leaf_rgba(
 
     _check_cancel(cancel_event)
     media = leaf.get("media")
-    path = resolve_leaf_source(db, media if isinstance(media, dict) else None)
-    if path is None or not isinstance(media, dict):
+    if not isinstance(media, dict):
+        return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
+    path = resolve_leaf_source(db, media)
+    if path is None:
+        if export_frames is not None:
+            raise StudioExportError(MISSING_EXPORT_MEDIA)
         return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
 
     kind = str(media.get("kind") or "photo").strip().lower()
@@ -553,7 +635,7 @@ def _leaf_rgba(
     effect_settings = _grade_payload(media)
     start_offset = float(media.get("start_offset_s") or 0.0)
     source_time = start_offset + max(0.0, float(t_s))
-    if kind == "video":
+    if kind == "video" and export_frames is None:
         source_time = _clamp_video_source_time(db, media, path, source_time)
     needs_preview = kind == "video" or _grade_needs_still(effect_settings)
 
@@ -565,11 +647,14 @@ def _leaf_rgba(
                 source_time_s=source_time,
                 effect_settings=effect_settings,
                 max_edge=max(long_edge, max(rect_w, rect_h)),
-                exact_time=exact_time,
+                exact_time=exact_time or (export_frames is not None and kind == "video"),
+                export_frames=export_frames,
                 cancel_event=cancel_event,
             )
-        except StudioExportError:
+        except StudioExportError as exc:
             _check_cancel(cancel_event)
+            if export_frames is not None:
+                raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
             if kind != "video" or source_time <= 0:
                 return Image.new("RGBA", (rect_w, rect_h), PLACEHOLDER_RGBA)
             # Last-resort hold: retry near the start rather than aborting the collage.
@@ -619,6 +704,7 @@ def compose_collage_rgba(
     t_s: float = 0.0,
     cancel_event: threading.Event | None = None,
     exact_time: bool = False,
+    export_frames: CollageExportFrames | None = None,
 ):
     """Compose one RGBA collage canvas from the layout SoT."""
     from PIL import Image
@@ -642,6 +728,7 @@ def compose_collage_rgba(
                 rect.h,
                 t_s=t_s,
                 long_edge=long_edge,
+                export_frames=export_frames,
                 exact_time=exact_time,
                 cancel_event=cancel_event,
             )
@@ -777,7 +864,7 @@ def export_collage_still(
             source_paths.append(str(path))
     protected_all = tuple(dict.fromkeys([*protected, *source_paths]))
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-collage-still-"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix=".orga-drone-collage-", dir=dest.parent))
     partial = tmp_dir / ("out.png" if format_name == "png" else "out.jpg")
     canvas = None
     try:
@@ -797,6 +884,7 @@ def export_collage_still(
             long_edge=long_edge,
             t_s=t_s,
             cancel_event=cancel_event,
+            export_frames=CollageExportFrames(tmp_dir / "frames"),
         )
         if on_progress is not None:
             on_progress(
@@ -824,6 +912,7 @@ def export_collage_still(
             dest,
             protected=protected_all,
             protected_identities=identities,
+            require_atomic=True,
         )
         if on_progress is not None:
             on_progress(
@@ -863,6 +952,8 @@ def inspect_collage_still(
         for leaf in iter_leaves(normalized["root"]):
             media = leaf.get("media")
             path = resolve_leaf_source(db, media if isinstance(media, dict) else None)
+            if isinstance(media, dict) and path is None:
+                raise StudioExportError(MISSING_EXPORT_MEDIA)
             leaves.append(
                 {
                     "leaf_id": leaf["id"],
