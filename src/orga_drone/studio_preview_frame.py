@@ -50,7 +50,7 @@ JPEG_COLOR_CHAIN = (
 )
 
 _lock = threading.Lock()
-_inflight: dict[str, threading.Event] = {}
+_inflight: dict[Path, threading.Event] = {}
 
 
 @dataclass(frozen=True)
@@ -401,11 +401,12 @@ def render_preview_frame(
     if dest.is_file() and dest.stat().st_size > 0:
         return dest
 
+    inflight_key = dest.resolve()
     with _lock:
-        waiter = _inflight.get(key)
+        waiter = _inflight.get(inflight_key)
         if waiter is None:
             waiter = threading.Event()
-            _inflight[key] = waiter
+            _inflight[inflight_key] = waiter
             owner = True
         else:
             owner = False
@@ -532,6 +533,6 @@ def render_preview_frame(
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
         with _lock:
-            event = _inflight.pop(key, None)
+            event = _inflight.pop(inflight_key, None)
             if event is not None:
                 event.set()
