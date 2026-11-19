@@ -1836,15 +1836,6 @@ button.cta, .button.cta {
 .studio-creator.is-photo-context .studio-transport [data-transport="remove"] {
   display: none;
 }
-.studio-creator.is-photo-context #inspector-photo-still-export {
-  order: -2;
-  display: block !important;
-  margin-bottom: 0.75rem;
-  padding: 0.55rem 0.6rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--panel) 82%, var(--accent));
-}
 .studio-creator.is-photo-context #inspector-managed-color {
   order: -1;
 }
@@ -1852,11 +1843,64 @@ button.cta, .button.cta {
   display: flex;
   flex-direction: column;
 }
-.studio-creator.is-photo-context .studio-topbar-export {
-  opacity: 0.72;
-}
 .studio-creator.is-photo-context .studio-preview {
   padding: 0.35rem 0.45rem 0.55rem;
+}
+
+.studio-photo-still-export {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.studio-photo-still-export[hidden] {
+  display: none !important;
+}
+.studio-topbar-photo-export {
+  box-shadow: 0 0 14px var(--studio-accent-glow);
+}
+.studio-photo-still-export-popover {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 40;
+  width: min(22rem, 80vw);
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.studio-photo-still-export-popover[hidden] {
+  display: none !important;
+}
+.studio-managed-selection-summary {
+  list-style: none;
+  margin: 0.15rem 0 0.45rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+}
+.studio-managed-selection-summary[hidden] {
+  display: none !important;
+}
+.studio-managed-selection-summary li {
+  margin: 0.1rem 0;
+}
+.studio-managed-selection-summary li.is-active {
+  font-weight: 600;
+  color: var(--accent);
+}
+.studio-managed-brush-overlay {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+.studio-managed-brush-overlay[hidden] {
+  display: none !important;
 }
 
 .studio-context-mode-banner {

@@ -1266,3 +1266,21 @@ msgstr "Switch to Story for the timeline and MP4 export. Photo grades stay on th
 
 msgid "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
 msgstr "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
+
+msgid "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects."
+msgstr "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects."
+
+msgid "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview."
+msgstr "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview."
+
+msgid "Selection bindings"
+msgstr "Selection bindings"
+
+msgid "Active · {id} on {step} · rev {rev}"
+msgstr "Active · {id} on {step} · rev {rev}"
+
+msgid "{id} → {step}"
+msgstr "{id} → {step}"
+
+msgid "{id} (not bound)"
+msgstr "{id} (not bound)"

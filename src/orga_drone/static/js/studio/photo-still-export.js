@@ -1,20 +1,41 @@
-/** Photo-clip still export UI (#499 / Adaptive Studio PR1). */
+/** Photo-clip still export UI (#499 / Adaptive Studio PR1 / #505 topbar). */
+
+function clipKindOf(clip) {
+  if (!clip) return "";
+  if (typeof clip === "string") return String(clip).toLowerCase();
+  const kind = clip.kind || clip.dataset?.kind || clip.item_kind || "";
+  return String(kind).toLowerCase();
+}
+
+/**
+ * JPG/PNG topbar export is available only for single-photo projects.
+ * Focus (Photo/Story) must not affect this rule.
+ */
+export function projectAllowsPhotoStillExport(clips) {
+  const list = Array.isArray(clips) ? clips.filter(Boolean) : [];
+  if (list.length !== 1) return false;
+  return clipKindOf(list[0]) === "photo";
+}
 
 export function createPhotoStillExportUi({
   getSelectedClip,
+  getClips,
   fetchImpl = fetch,
   documentImpl = document,
 } = {}) {
-  const panel = documentImpl.getElementById("inspector-photo-still-export");
+  const panel = documentImpl.getElementById("studio-photo-still-export");
+  const openBtn = documentImpl.getElementById("studio-photo-still-export-open");
+  const popover = documentImpl.getElementById("studio-photo-still-export-popover");
   const formatEl = documentImpl.getElementById("inspector-photo-still-format");
   const exportBtn = documentImpl.getElementById("inspector-photo-still-export-btn");
   const statusEl = documentImpl.getElementById("inspector-photo-still-export-status");
-  if (!panel || !exportBtn) {
-    return { sync() {} };
+  if (!panel || !exportBtn || !openBtn) {
+    return { sync() {}, close() {} };
   }
 
   let busy = false;
   let pollTimer = null;
+  let open = false;
 
   function msg(key, fallback) {
     const value = panel.dataset[key];
@@ -34,6 +55,31 @@ export function createPhotoStillExportUi({
       clearInterval(pollTimer);
       pollTimer = null;
     }
+  }
+
+  function setOpen(next) {
+    open = Boolean(next);
+    if (popover) popover.hidden = !open;
+    openBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && formatEl) {
+      try {
+        formatEl.focus({ preventScroll: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function closePopover() {
+    setOpen(false);
+  }
+
+  function resolveExportClip() {
+    const selected = getSelectedClip?.();
+    if (selected && clipKindOf(selected) === "photo") return selected;
+    const clips = getClips?.() || [];
+    if (projectAllowsPhotoStillExport(clips)) return clips[0];
+    return null;
   }
 
   async function pickSavePath(filename) {
@@ -89,9 +135,9 @@ export function createPhotoStillExportUi({
 
   async function exportStill() {
     if (busy) return;
-    const clip = getSelectedClip?.();
-    if (!clip || clip.dataset.kind !== "photo") return;
-    const studioId = String(clip.dataset.studioId || "");
+    const clip = resolveExportClip();
+    if (!clip || clipKindOf(clip) !== "photo") return;
+    const studioId = String(clip.dataset?.studioId || clip.studio_id || clip.id || "");
     if (!studioId) return;
     const fmt = formatEl?.value === "png" ? "png" : "jpeg";
     const base = msg("photoStillDefault", "photo");
@@ -140,17 +186,42 @@ export function createPhotoStillExportUi({
     }
   }
 
-  function sync(clip) {
-    const show = Boolean(clip && clip.dataset.kind === "photo");
-    panel.hidden = !show;
-    if (!show) {
+  function sync() {
+    const clips = getClips?.() || [];
+    const allow = projectAllowsPhotoStillExport(clips);
+    openBtn.hidden = !allow;
+    openBtn.disabled = !allow;
+    panel.hidden = !allow;
+    if (!allow) {
+      closePopover();
       setStatus("");
     }
   }
+
+  openBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (openBtn.hidden || openBtn.disabled) return;
+    setOpen(!open);
+  });
 
   exportBtn.addEventListener("click", () => {
     void exportStill();
   });
 
-  return { sync };
+  documentImpl.addEventListener?.("keydown", (event) => {
+    if (event.key === "Escape" && open) {
+      closePopover();
+    }
+  });
+
+  documentImpl.addEventListener?.("click", (event) => {
+    if (!open) return;
+    const target = event.target;
+    if (panel.contains?.(target)) return;
+    closePopover();
+  });
+
+  sync();
+
+  return { sync, close: closePopover };
 }

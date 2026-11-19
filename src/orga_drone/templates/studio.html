@@ -307,6 +307,34 @@
         <button type="button" class="button ghost studio-context-btn" id="studio-context-story"
                 aria-pressed="true" title="{{ _('Story timeline focus') }}">{{ _('Story') }}</button>
       </div>
+      <div class="studio-photo-still-export" id="studio-photo-still-export" hidden
+           data-photo-still-default="{{ _('photo')|e }}"
+           data-photo-still-failed="{{ _('Could not export this photo.')|e }}"
+           data-photo-still-cancelled="{{ _('Photo export cancelled.')|e }}"
+           data-photo-still-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}">
+        <button type="button" class="button ghost studio-icon-button studio-topbar-photo-export"
+                id="studio-photo-still-export-open"
+                aria-expanded="false"
+                aria-controls="studio-photo-still-export-popover"
+                title="{{ _('Export photo (JPG/PNG)') }}"
+                aria-label="{{ _('Export photo (JPG/PNG)') }}">
+          {{ lucide('image') }}
+          <span class="studio-btn-label">{{ _('Export photo (JPG/PNG)') }}</span>
+        </button>
+        <div class="studio-photo-still-export-popover" id="studio-photo-still-export-popover"
+             role="dialog" aria-label="{{ _('Photo still export') }}" hidden>
+          <p class="hint">{{ _('Exports this photo at original size with its color grade and selections. The library file stays unchanged. Story export still makes an MP4 of the whole memory.') }}</p>
+          <label class="studio-inspector-field">
+            <span>{{ _('Format') }}</span>
+            <select id="inspector-photo-still-format" aria-label="{{ _('Photo still export format') }}">
+              <option value="jpeg">JPEG</option>
+              <option value="png">PNG</option>
+            </select>
+          </label>
+          <button type="button" class="button" id="inspector-photo-still-export-btn">{{ _('Export photo (JPG/PNG)') }}</button>
+          <p class="hint" id="inspector-photo-still-export-status" hidden></p>
+        </div>
+      </div>
       <button type="button" class="button studio-icon-button studio-topbar-export" id="studio-export-open"
               title="{{ _('Export Story MP4') }}" aria-label="{{ _('Export Story MP4') }}"
               {% if not items %}disabled{% endif %}>
@@ -325,7 +353,7 @@
   </header>
   {% if studio_mode == 'editor' and project %}
   <p class="studio-context-mode-banner" id="studio-context-mode-banner" hidden>
-    {{ _('Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG).') }}
+    {{ _('Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects.') }}
   </p>
   <p class="studio-context-continuity-hint" id="studio-context-continuity-hint" hidden>
     {{ _('Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.') }}
@@ -1229,9 +1257,15 @@
                  data-msg-cleared="{{ _('Selection cleared') }}"
                  data-msg-sample-meta="{{ _('Sample · rev {rev} · {domain} · frame {frame}') }}"
                  data-msg-selection="{{ _('Selection · {id} · rev {rev}') }}"
+                 data-msg-selection-bound="{{ _('Active · {id} on {step} · rev {rev}') }}"
+                 data-msg-binding-line="{{ _('{id} → {step}') }}"
+                 data-msg-binding-unbound="{{ _('{id} (not bound)') }}"
                  data-msg-no-selection="{{ _('No selection · rev {rev}') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
+              <p class="hint">{{ _('Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
+              <ul class="studio-managed-selection-summary meta-line" data-managed-selection-summary
+                  aria-label="{{ _('Selection bindings') }}" hidden></ul>
               <label class="studio-inspector-field">
                 <span>{{ _('Mask shape') }}</span>
                 <select data-managed-mask-shape aria-label="{{ _('Mask shape') }}">
@@ -1718,24 +1752,6 @@
             </div>
             <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
-
-          <div class="studio-inspector-actions" id="inspector-photo-still-export" hidden
-               data-photo-still-default="{{ _('photo')|e }}"
-               data-photo-still-failed="{{ _('Could not export this photo.')|e }}"
-               data-photo-still-cancelled="{{ _('Photo export cancelled.')|e }}"
-               data-photo-still-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}">
-            <p class="studio-inspector-kind">{{ _('Photo still export') }}</p>
-            <p class="hint">{{ _('Exports this photo at original size with its color grade and selections. The library file stays unchanged. Story export still makes an MP4 of the whole memory.') }}</p>
-            <label class="studio-inspector-field">
-              <span>{{ _('Format') }}</span>
-              <select id="inspector-photo-still-format" aria-label="{{ _('Photo still export format') }}">
-                <option value="jpeg">JPEG</option>
-                <option value="png">PNG</option>
-              </select>
-            </label>
-            <button type="button" class="button" id="inspector-photo-still-export-btn">{{ _('Export photo (JPG/PNG)') }}</button>
-            <p class="hint" id="inspector-photo-still-export-status" hidden></p>
-          </div>
 
           <div id="inspector-frame" hidden>
             <p class="studio-inspector-kind">{{ _('Framing') }}</p>

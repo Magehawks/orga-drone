@@ -1287,3 +1287,21 @@ msgstr "Wechsle zu Story für Timeline und MP4-Export. Foto-Grades bleiben auf d
 
 msgid "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
 msgstr "Foto-Fokus: Timeline ausgeblendet — nutze Bild-Werkzeuge und Export photo (JPG/PNG)."
+
+msgid "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects."
+msgstr "Foto-Fokus: Timeline ausgeblendet — nutze Bild-Werkzeuge. Export photo (JPG/PNG) steht in der Topbar bei Einzel-Foto-Projekten."
+
+msgid "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview."
+msgstr "Die aktive Selection ist die unter „An Step binden“ verknüpfte. „Pinsel zeichnen“ malt diese Selection auf der Vorschau."
+
+msgid "Selection bindings"
+msgstr "Selection-Verknüpfungen"
+
+msgid "Active · {id} on {step} · rev {rev}"
+msgstr "Aktiv · {id} auf {step} · Rev {rev}"
+
+msgid "{id} → {step}"
+msgstr "{id} → {step}"
+
+msgid "{id} (not bound)"
+msgstr "{id} (nicht verknüpft)"

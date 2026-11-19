@@ -2598,6 +2598,7 @@ import {
     layoutSfxSpans();
     layoutEffectBars();
     layoutClipAudio();
+    photoStillExport.sync();
   }
 
   function centerPlayheadInView() {
@@ -9526,7 +9527,7 @@ import {
       } else {
         syncColorScopesView();
       }
-      photoStillExport.sync(clip);
+      photoStillExport.sync();
       if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
@@ -11910,6 +11911,7 @@ import {
       if (!state.selected || state.selected.type !== "clip") return null;
       return findClip(grid, state.selected.id);
     },
+    getClips: () => clips(),
   });
   editingContext = createEditingContextController({
     root,
@@ -11928,13 +11930,8 @@ import {
         showInspector("inspector-clip");
         const managed = document.getElementById("inspector-managed-color");
         if (managed) managed.open = true;
-        const still = document.getElementById("inspector-photo-still-export");
-        if (still) {
-          still.hidden = false;
-          still.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        }
       }
-      photoStillExport.sync(selectedClip);
+      photoStillExport.sync();
       layoutTimeline();
     },
   });

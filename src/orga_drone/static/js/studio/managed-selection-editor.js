@@ -48,6 +48,7 @@ export function createManagedSelectionEditor({
   const brushHardness = panel.querySelector("[data-managed-brush-hardness]");
   const sampleSwatch = panel.querySelector("[data-managed-eyedropper-swatch]");
   const sampleMeta = panel.querySelector("[data-managed-eyedropper-meta]");
+  const summaryEl = panel.querySelector("[data-managed-selection-summary]");
 
   let current = null;
   let currentId = null;
@@ -58,6 +59,48 @@ export function createManagedSelectionEditor({
 
   function setStatus(text) {
     if (status) status.textContent = text || "";
+  }
+
+  function stepLabel(stepType) {
+    const option = bindSelect?.querySelector?.(`option[value="${stepType}"]`);
+    return option?.textContent?.trim() || stepType || "";
+  }
+
+  function renderSelectionSummary(gradeDoc) {
+    if (!summaryEl) return;
+    const selections = gradeDoc?.grade?.selections || [];
+    const steps = gradeDoc?.grade?.steps || [];
+    summaryEl.replaceChildren();
+    if (!selections.length) {
+      summaryEl.hidden = true;
+      return;
+    }
+    summaryEl.hidden = false;
+    const bindType = bindSelect?.value || "primaries-v1";
+    const activeStep = findStep(gradeDoc.grade, bindType);
+    const activeSelectionId = activeStep?.selection_id || null;
+    for (const selection of selections) {
+      const boundSteps = steps.filter((step) => step.selection_id === selection.id);
+      const li = document.createElement("li");
+      if (activeSelectionId && selection.id === activeSelectionId) {
+        li.classList.add("is-active");
+      }
+      if (boundSteps.length) {
+        const labels = boundSteps.map((step) => stepLabel(step.type)).join(", ");
+        li.textContent = (messages.bindingLine || "{id} → {step}")
+          .replace("{id}", String(selection.id))
+          .replace("{step}", labels);
+      } else {
+        li.textContent = (messages.bindingUnbound || "{id} (not bound)").replace(
+          "{id}",
+          String(selection.id)
+        );
+      }
+      if (selection.invert) {
+        li.textContent += " · invert";
+      }
+      summaryEl.appendChild(li);
+    }
   }
 
   function setEnabled(enabled) {
@@ -348,9 +391,15 @@ export function createManagedSelectionEditor({
       setStatus("");
       showSample(null);
       setViewerMode("none");
+      renderSelectionSummary(null);
       return;
     }
-    const bound = (payload.grade?.steps || []).find((step) => step.selection_id);
+    const bindType = bindSelect?.value || "primaries-v1";
+    const boundForBind = findStep(payload.grade, bindType);
+    const bound =
+      boundForBind?.selection_id
+        ? boundForBind
+        : (payload.grade?.steps || []).find((step) => step.selection_id) || boundForBind;
     const selection = (payload.grade?.selections || []).find(
       (entry) => entry.id === bound?.selection_id
     );
@@ -363,16 +412,22 @@ export function createManagedSelectionEditor({
     } else if (qualifierSelect) {
       qualifierSelect.value = "none";
     }
-    setStatus(
-      selection
-        ? (messages.selectionStatus || "Selection · {id} · rev {rev}")
-            .replace("{id}", String(selection.id))
-            .replace("{rev}", String(payload.revision))
-        : (messages.noSelectionStatus || "No selection · rev {rev}").replace(
-            "{rev}",
-            String(payload.revision)
-          )
-    );
+    renderSelectionSummary(payload);
+    if (selection && bound) {
+      setStatus(
+        (messages.selectionBound || messages.selectionStatus || "Active · {id} on {step} · rev {rev}")
+          .replace("{id}", String(selection.id))
+          .replace("{step}", stepLabel(bound.type))
+          .replace("{rev}", String(payload.revision))
+      );
+    } else {
+      setStatus(
+        (messages.noSelectionStatus || "No selection · rev {rev}").replace(
+          "{rev}",
+          String(payload.revision)
+        )
+      );
+    }
   }
 
   function fill() {
@@ -390,6 +445,11 @@ export function createManagedSelectionEditor({
   });
   clearBtn?.addEventListener("click", () => {
     void saveSelection({ clear: true });
+  });
+  bindSelect?.addEventListener("change", () => {
+    const studioId = getSelectedStudioId?.();
+    const payload = getGrade?.() || current;
+    if (payload) syncFromGrade(payload, studioId);
   });
   eyedropperBtn?.addEventListener("click", () => {
     setViewerMode(viewerMode === "eyedropper" ? "none" : "eyedropper");
