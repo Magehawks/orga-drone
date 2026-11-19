@@ -675,25 +675,97 @@ def materialize_spatial_managed_media(
         if dest.is_file() and dest.stat().st_size > 0:
             return dest
         from orga_drone.export.studio_encoder import _materialize_photo_still
-
-        still = work_dir / "source.jpg"
-        _materialize_photo_still(source, still)
-        tmp = work_dir / "graded.tmp.png"
-        if tmp.is_file():
-            tmp.unlink(missing_ok=True)
-        _grade_rgb_image(
-            still,
-            grade,
-            tmp,
-            source_time_s=float(source_in_s),
-            source_in_s=float(source_in_s),
-            source_out_s=source_out_s,
-            story_anchor_s=story_anchor_s,
-            playback_speed=float(playback_speed),
-            speed_ramp=speed_ramp,
+        from orga_drone.studio_spatial_bake_process import (
+            inflight_begin,
+            inflight_fail,
+            inflight_finish,
+            inflight_wait_error,
+            run_photo_grade_process,
+            should_bake_photo_in_process,
         )
-        _atomic_replace(tmp, dest)
-        return dest
+
+        # Speed ramps are not picklable into the bake worker; keep inline.
+        use_process = speed_ramp is None
+        inflight_key = str(work_dir.resolve())
+        # Loop: waiters may need to retry after an owner cancel (no poison).
+        for _attempt in range(32):
+            if dest.is_file() and dest.stat().st_size > 0:
+                return dest
+            owner, waiter = inflight_begin(inflight_key)
+            if not owner:
+                while not waiter.wait(timeout=0.2):
+                    _check_cancel(cancel_event)
+                if dest.is_file() and dest.stat().st_size > 0:
+                    return dest
+                err = inflight_wait_error(inflight_key)
+                if err is not None:
+                    raise err
+                # Owner cancelled or raced without publish — try to become owner.
+                continue
+            try:
+                _check_cancel(cancel_event)
+                if dest.is_file() and dest.stat().st_size > 0:
+                    return dest
+                still = work_dir / "source.jpg"
+                _materialize_photo_still(source, still)
+                tmp = work_dir / "graded.tmp.png"
+                if tmp.is_file():
+                    tmp.unlink(missing_ok=True)
+                from PIL import Image
+
+                with Image.open(still) as probe:
+                    width, height = probe.size
+                if use_process and should_bake_photo_in_process(
+                    width=width, height=height
+                ):
+                    run_photo_grade_process(
+                        still,
+                        grade,
+                        tmp,
+                        source_time_s=float(source_in_s),
+                        source_in_s=float(source_in_s),
+                        source_out_s=source_out_s,
+                        story_anchor_s=story_anchor_s,
+                        playback_speed=float(playback_speed),
+                        cancel_event=cancel_event,
+                    )
+                else:
+                    _check_cancel(cancel_event)
+                    _grade_rgb_image(
+                        still,
+                        grade,
+                        tmp,
+                        source_time_s=float(source_in_s),
+                        source_in_s=float(source_in_s),
+                        source_out_s=source_out_s,
+                        story_anchor_s=story_anchor_s,
+                        playback_speed=float(playback_speed),
+                        speed_ramp=speed_ramp,
+                    )
+                _check_cancel(cancel_event)
+                if not tmp.is_file() or tmp.stat().st_size <= 0:
+                    raise ManagedApplyError(
+                        "Spatial bake produced an empty still",
+                        code="UNSUPPORTED_GRADE",
+                    )
+                _atomic_replace(tmp, dest)
+                if on_progress is not None:
+                    on_progress(1.0)
+                return dest
+            except ManagedApplyError as exc:
+                # Cancel must not poison waiters — they retry as owners.
+                if getattr(exc, "code", None) != "CANCELLED":
+                    inflight_fail(inflight_key, exc)
+                raise
+            except BaseException as exc:
+                inflight_fail(inflight_key, exc)
+                raise
+            finally:
+                inflight_finish(inflight_key)
+        raise ManagedApplyError(
+            "Spatial bake could not acquire an in-flight slot",
+            code="UNSUPPORTED_GRADE",
+        )
 
     dest = work_dir / "graded.mp4"
     if dest.is_file() and dest.stat().st_size > 0:
