@@ -157,6 +157,88 @@ def test_cancel_before_bake_refuses_publish(
     assert not list((tmp_path / "work").rglob("graded.png"))
 
 
+def test_waiter_honors_own_cancel_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ORGA_SPATIAL_BAKE_INLINE", "1")
+    source = _write(tmp_path / "src.jpg", (64, 64))
+    work = tmp_path / "work"
+    digest = "waitercancel01"
+    waiter_error: list[BaseException] = []
+
+    from orga_drone.studio_managed_spatial_export import spatial_work_dir
+    from orga_drone.studio_spatial_bake_process import inflight_begin, inflight_finish
+
+    work_dir = spatial_work_dir(work, grade_digest=digest, source=source)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    key = str(work_dir.resolve())
+    owner, _waiter = inflight_begin(key)
+    assert owner
+
+    def _waiter_call() -> None:
+        cancel = threading.Event()
+        cancel.set()
+        try:
+            materialize_spatial_managed_media(
+                source,
+                _grade(),
+                work,
+                kind="photo",
+                grade_digest=digest,
+                cancel_event=cancel,
+            )
+        except BaseException as exc:  # noqa: BLE001
+            waiter_error.append(exc)
+
+    thread = threading.Thread(target=_waiter_call)
+    thread.start()
+    thread.join(timeout=5)
+    inflight_finish(key)
+    assert waiter_error and isinstance(waiter_error[0], ManagedApplyError)
+    assert waiter_error[0].code == "CANCELLED"
+
+
+def test_owner_cancel_allows_waiter_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import orga_drone.studio_managed_spatial_export as spatial_mod
+
+    monkeypatch.setenv("ORGA_SPATIAL_BAKE_INLINE", "1")
+    source = _write(tmp_path / "src.jpg", (64, 64))
+    work = tmp_path / "work"
+    digest = "ownercancel01"
+    phase = {"n": 0}
+    real_grade = spatial_mod._grade_rgb_image
+
+    def _grade_once(*args, **kwargs):  # noqa: ANN002, ANN003
+        phase["n"] += 1
+        if phase["n"] == 1:
+            raise ManagedApplyError("owner cancelled", code="CANCELLED")
+        return real_grade(*args, **kwargs)
+
+    monkeypatch.setattr(spatial_mod, "_grade_rgb_image", _grade_once)
+
+    # First caller cancels/fails with CANCELLED — should not publish error for waiters.
+    with pytest.raises(ManagedApplyError) as first:
+        materialize_spatial_managed_media(
+            source,
+            _grade(),
+            work,
+            kind="photo",
+            grade_digest=digest,
+        )
+    assert first.value.code == "CANCELLED"
+
+    graded = materialize_spatial_managed_media(
+        source,
+        _grade(),
+        work,
+        kind="photo",
+        grade_digest=digest,
+    )
+    assert graded.is_file()
+
+
 def test_run_photo_grade_process_terminates_on_cancel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

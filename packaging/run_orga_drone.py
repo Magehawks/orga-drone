@@ -19,6 +19,10 @@ def _log_crash(exc: BaseException) -> None:
 
 
 if __name__ == "__main__":
+    # Packaged EXE entry — required for spawn spatial bake workers (#509).
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     try:
         from orga_drone.__main__ import main
 

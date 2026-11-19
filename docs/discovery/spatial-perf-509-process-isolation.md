@@ -21,7 +21,10 @@ incident protocol).
 3. **In-flight dedupe**: concurrent `materialize_spatial_managed_media` calls
    for the same work directory wait on one owner bake (#510).
 4. Still export passes `cancel_event` into spatial materialize.
-5. `multiprocessing.freeze_support()` in `__main__` for frozen Windows builds.
+5. `multiprocessing.freeze_support()` in `__main__` **and** the packaged
+   entry `packaging/run_orga_drone.py` (PyInstaller does not run `__main__`).
+6. Owner `CANCELLED` does not poison in-flight waiters; waiters poll their own
+   `cancel_event` and may retry as owner after a cancelled bake.
 
 ## Non-scope
 
