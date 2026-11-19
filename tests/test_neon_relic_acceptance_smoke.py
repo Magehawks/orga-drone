@@ -1,9 +1,9 @@
-"""Smoke: Neon Relic acceptance harness grades a tiny synthetic photo (#514)."""
+"""Smoke: Neon Relic acceptance CLI grades a tiny synthetic photo (#514)."""
 
 from __future__ import annotations
 
 import importlib.util
-import os
+import json
 from pathlib import Path
 
 from PIL import Image
@@ -20,22 +20,29 @@ def _load():
     return mod
 
 
-def test_neon_relic_harness_tiny_bake(tmp_path: Path, monkeypatch) -> None:
+def test_neon_relic_main_writes_jpeg_and_metrics(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ORGA_SPATIAL_BAKE_INLINE", "1")
+    monkeypatch.delenv("ORGA_NEON_RELIC_DIR", raising=False)
     mod = _load()
     src = tmp_path / "before.jpg"
     Image.new("RGB", (48, 64), (40, 80, 30)).save(src, quality=90)
     out_dir = tmp_path / "out"
-    out_dir.mkdir()
-    # Call materialize path used by the script (avoid full CLI defaults).
-    os.environ["ORGA_SPATIAL_BAKE_INLINE"] = "1"
-    graded = mod.materialize_spatial_managed_media(
-        src,
-        mod._grade(),
-        tmp_path / "work",
-        kind="photo",
-        grade_digest="neonrelic514smoke",
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "neon_relic_creative_acceptance.py",
+            "--source",
+            str(src),
+            "--out-dir",
+            str(out_dir),
+        ],
     )
-    assert graded.is_file() and graded.stat().st_size > 0
-    means = mod._channel_means(graded)
-    assert means["r"] >= 0 and means["g"] >= 0 and means["b"] >= 0
+    assert mod.main() == 0
+    jpg = out_dir / "20-neon-relic-orga-export.jpg"
+    meta = out_dir / "20-neon-relic-orga-export.json"
+    assert jpg.is_file() and jpg.stat().st_size > 0
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["issue"] == 514
+    assert payload["result_means"]["r"] >= 0
+    # Grade should not be a byte-identical copy of the flat source fill.
+    assert jpg.read_bytes() != src.read_bytes()

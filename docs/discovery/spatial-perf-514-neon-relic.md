@@ -24,10 +24,23 @@ Studio output.
 
 ## Run (local)
 
+Private BEFORE/TARGET stay under a local evidence directory (not in git).
+Product Owner compares `20-neon-relic-orga-export.jpg` visually vs TARGET locally.
+
 ```text
 set PYTHONPATH=src
 set ORGA_SPATIAL_BAKE_PROCESS=1
-python scripts/neon_relic_creative_acceptance.py --source <BEFORE> --target <TARGET> --out-dir <dir>
+set ORGA_NEON_RELIC_DIR=C:\path\to\acceptance-evidence\neon-relic
+python scripts/neon_relic_creative_acceptance.py
+```
+
+Or with explicit paths:
+
+```text
+python scripts/neon_relic_creative_acceptance.py ^
+  --source C:\path\to\00-before-original.jpg ^
+  --target "C:\path\to\Magenta Blatt mit Regentropfen.png" ^
+  --out-dir C:\path\to\acceptance-evidence\neon-relic
 ```
 
 ## Results (2026-11-19)

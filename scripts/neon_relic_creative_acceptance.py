@@ -190,7 +190,11 @@ def main() -> int:
             rgb.save(out_jpg, format="JPEG", quality=92, optimize=True)
 
     result_means = _channel_means(out_jpg)
-    target_means = _channel_means(args.target) if args.target.is_file() else None
+    target_means = (
+        _channel_means(args.target)
+        if args.target is not None and args.target.is_file()
+        else None
+    )
     payload = {
         "issue": 514,
         "parent": 506,
