@@ -9,9 +9,7 @@ export function clampSyncedNumber(value, { min, max, step = 1, fallback = 0 } = 
   if (!Number.isFinite(number)) return fallback;
   let next = Math.min(max, Math.max(min, number));
   if (step > 0) {
-    const decimals = String(step).includes(".")
-      ? String(step).split(".")[1].length
-      : 0;
+    const decimals = String(step).includes(".") ? String(step).split(".")[1].length : 0;
     const scaled = Math.round(next / step) * step;
     next = Number(scaled.toFixed(decimals));
     next = Math.min(max, Math.max(min, next));
