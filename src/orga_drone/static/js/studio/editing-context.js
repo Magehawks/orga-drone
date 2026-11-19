@@ -24,9 +24,7 @@ export function projectSuggestsPhotoContext(clips) {
   if (!list.length) return false;
   return list.every((clip) => {
     const kind =
-      typeof clip === "string"
-        ? clip
-        : clip?.kind || clip?.dataset?.kind || clip?.item_kind || "";
+      typeof clip === "string" ? clip : clip?.kind || clip?.dataset?.kind || clip?.item_kind || "";
     return String(kind).toLowerCase() === "photo";
   });
 }
@@ -44,11 +42,7 @@ export function readStoredEditingContext(projectId, storage = globalThis.localSt
   }
 }
 
-export function writeStoredEditingContext(
-  projectId,
-  context,
-  storage = globalThis.localStorage
-) {
+export function writeStoredEditingContext(projectId, context, storage = globalThis.localStorage) {
   const next = normalizeEditingContext(context);
   try {
     storage?.setItem?.(storageKeyForProject(projectId), next);
@@ -71,13 +65,13 @@ export function resolveInitialEditingContext({
   if (stored !== undefined && stored !== null && String(stored).trim() !== "") {
     return normalizeEditingContext(stored);
   }
-  let fromStore = null;
+  let fromStore;
   try {
     fromStore = storage?.getItem?.(storageKeyForProject(projectId));
   } catch {
-    fromStore = null;
+    fromStore = undefined;
   }
-  if (fromStore != null && String(fromStore).trim() !== "") {
+  if (fromStore !== undefined && fromStore !== null && String(fromStore).trim() !== "") {
     return normalizeEditingContext(fromStore);
   }
   return projectSuggestsPhotoContext(clips) ? CONTEXT_PHOTO : CONTEXT_STORY;
@@ -117,10 +111,7 @@ export function createEditingContextController({
     }
     if (storyArea) {
       storyArea.hidden = false;
-      storyArea.setAttribute(
-        "aria-hidden",
-        context === CONTEXT_PHOTO ? "true" : "false"
-      );
+      storyArea.setAttribute("aria-hidden", context === CONTEXT_PHOTO ? "true" : "false");
     }
     if (typeof onChange === "function") onChange(context);
   }

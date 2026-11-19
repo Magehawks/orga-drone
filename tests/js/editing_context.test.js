@@ -91,14 +91,8 @@ test("normalizeEditingContext defaults unknown values to story", () => {
 test("projectSuggestsPhotoContext is true only for non-empty photo-only sets", () => {
   assert.equal(projectSuggestsPhotoContext([]), false);
   assert.equal(projectSuggestsPhotoContext([{ kind: "photo" }]), true);
-  assert.equal(
-    projectSuggestsPhotoContext([{ kind: "photo" }, { kind: "photo" }]),
-    true
-  );
-  assert.equal(
-    projectSuggestsPhotoContext([{ kind: "photo" }, { kind: "video" }]),
-    false
-  );
+  assert.equal(projectSuggestsPhotoContext([{ kind: "photo" }, { kind: "photo" }]), true);
+  assert.equal(projectSuggestsPhotoContext([{ kind: "photo" }, { kind: "video" }]), false);
   assert.equal(projectSuggestsPhotoContext(["photo", "photo"]), true);
   assert.equal(projectSuggestsPhotoContext(["photo", "video"]), false);
 });
