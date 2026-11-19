@@ -1263,3 +1263,6 @@ msgstr "Export Story MP4"
 
 msgid "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
 msgstr "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
+
+msgid "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
+msgstr "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."

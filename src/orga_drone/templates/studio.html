@@ -324,6 +324,9 @@
     </button>
   </header>
   {% if studio_mode == 'editor' and project %}
+  <p class="studio-context-mode-banner" id="studio-context-mode-banner" hidden>
+    {{ _('Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG).') }}
+  </p>
   <p class="studio-context-continuity-hint" id="studio-context-continuity-hint" hidden>
     {{ _('Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.') }}
   </p>

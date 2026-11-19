@@ -106,10 +106,33 @@ export function createEditingContextController({
   const photoBtn = documentImpl.getElementById("studio-context-photo");
   const storyBtn = documentImpl.getElementById("studio-context-story");
   const storyArea = documentImpl.querySelector(".studio-story-area");
+  const stage = documentImpl.querySelector(".studio-stage");
   const continuityHint = documentImpl.getElementById("studio-context-continuity-hint");
+  const modeBanner = documentImpl.getElementById("studio-context-mode-banner");
+  const STORY_HEIGHT_KEY = "orga-drone.studio.storyHeight";
 
   function currentClips() {
     return typeof getClips === "function" ? getClips() : [];
+  }
+
+  function readSavedStoryHeightPx() {
+    try {
+      const raw = Number.parseFloat(storage?.getItem?.(STORY_HEIGHT_KEY));
+      if (Number.isFinite(raw) && raw >= 300 && raw <= 480) return Math.round(raw);
+    } catch {
+      /* ignore */
+    }
+    return 352;
+  }
+
+  /** Clear/set stage inline story height so Photo focus is not overridden by resize state. */
+  function syncStageStoryHeight() {
+    if (!stage?.style) return;
+    if (context === CONTEXT_PHOTO) {
+      stage.style.setProperty("--studio-story-height", "0px");
+      return;
+    }
+    stage.style.setProperty("--studio-story-height", `${readSavedStoryHeightPx()}px`);
   }
 
   function apply() {
@@ -127,8 +150,12 @@ export function createEditingContextController({
       storyBtn.classList.toggle("is-active", context === CONTEXT_STORY);
     }
     if (storyArea) {
-      storyArea.hidden = false;
+      storyArea.hidden = context === CONTEXT_PHOTO;
       storyArea.setAttribute("aria-hidden", context === CONTEXT_PHOTO ? "true" : "false");
+    }
+    syncStageStoryHeight();
+    if (modeBanner) {
+      modeBanner.hidden = context !== CONTEXT_PHOTO;
     }
     if (continuityHint) {
       const showHint = context === CONTEXT_PHOTO && projectNeedsStoryTools(currentClips());

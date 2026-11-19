@@ -153,7 +153,16 @@ test("createEditingContextController toggles classes and never auto-switches on 
   const storyBtn = new FakeElement("studio-context-story");
   const storyArea = new FakeElement("story-area");
   const continuityHint = new FakeElement("studio-context-continuity-hint");
+  const modeBanner = new FakeElement("studio-context-mode-banner");
+  const stage = new FakeElement("studio-stage");
+  stage.style = {
+    props: {},
+    setProperty(name, value) {
+      this.props[name] = value;
+    },
+  };
   continuityHint.hidden = true;
+  modeBanner.hidden = true;
   storyArea.classList.add("studio-story-area");
   const storage = makeMemoryStorage();
   const changes = [];
@@ -164,10 +173,13 @@ test("createEditingContextController toggles classes and never auto-switches on 
       if (id === "studio-context-photo") return photoBtn;
       if (id === "studio-context-story") return storyBtn;
       if (id === "studio-context-continuity-hint") return continuityHint;
+      if (id === "studio-context-mode-banner") return modeBanner;
       return null;
     },
     querySelector(sel) {
-      return sel === ".studio-story-area" ? storyArea : null;
+      if (sel === ".studio-story-area") return storyArea;
+      if (sel === ".studio-stage") return stage;
+      return null;
     },
   };
 
@@ -185,6 +197,9 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(photoBtn.getAttribute("aria-pressed"), "true");
   assert.equal(storyBtn.getAttribute("aria-pressed"), "false");
   assert.equal(storyArea.getAttribute("aria-hidden"), "true");
+  assert.equal(storyArea.hidden, true);
+  assert.equal(modeBanner.hidden, false);
+  assert.equal(stage.style.props["--studio-story-height"], "0px");
   assert.equal(continuityHint.hidden, true);
   assert.deepEqual(changes, [CONTEXT_PHOTO]);
 
@@ -193,6 +208,9 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(readStoredEditingContext(12, storage), CONTEXT_STORY);
   assert.equal(root.classList.contains("is-story-context"), true);
   assert.equal(storyArea.getAttribute("aria-hidden"), "false");
+  assert.equal(storyArea.hidden, false);
+  assert.equal(modeBanner.hidden, true);
+  assert.match(stage.style.props["--studio-story-height"], /px$/);
 
   // Continuity (#501): adding clips / refresh must not flip context.
   clips = [{ kind: "photo" }, { kind: "video" }];

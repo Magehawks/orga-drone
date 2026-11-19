@@ -11926,6 +11926,13 @@ import {
       if (context === CONTEXT_PHOTO && selectedClip && clipKind(selectedClip) === "photo") {
         setInspectorTab("image");
         showInspector("inspector-clip");
+        const managed = document.getElementById("inspector-managed-color");
+        if (managed) managed.open = true;
+        const still = document.getElementById("inspector-photo-still-export");
+        if (still) {
+          still.hidden = false;
+          still.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
       }
       photoStillExport.sync(selectedClip);
       layoutTimeline();
