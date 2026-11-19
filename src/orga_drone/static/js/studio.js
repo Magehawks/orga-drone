@@ -14,6 +14,7 @@ import { createSpeedRampEditor } from "./studio/speed-ramp-editor.js";
 import { blurRadiusPx, isOverlapType, wipeMask } from "./studio/transition-pack.js";
 import { createTimelapseEditor } from "./studio/timelapse-editor.js";
 import { createManagedColorEditor } from "./studio/managed-color-editor.js";
+import { bindSliderNumberPair } from "./studio/slider-number-sync.js";
 import {
   isManagedWebglBakeMode,
   managedBakeUrl,
@@ -3340,16 +3341,29 @@ import {
 
   const HSL_RANGE_IDS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"];
   const HSL_FIELDS = [
-    ["hue", "inspector-hsl-hue", "inspector-hsl-hue-value"],
-    ["saturation", "inspector-hsl-saturation", "inspector-hsl-saturation-value"],
-    ["luminance", "inspector-hsl-luminance", "inspector-hsl-luminance-value"],
+    ["hue", "inspector-hsl-hue", "inspector-hsl-hue-number"],
+    ["saturation", "inspector-hsl-saturation", "inspector-hsl-saturation-number"],
+    ["luminance", "inspector-hsl-luminance", "inspector-hsl-luminance-number"],
   ];
   let selectedHslRange = "red";
+  const hslSliderPairs = {};
 
   function clampHslSlider(value) {
+    // Keep this self-contained: tests/js/hsl_preview.cjs extracts this block
+    // without ES module imports.
     const number = Number(value);
     if (!Number.isFinite(number)) return 0;
     return Math.max(-100, Math.min(100, Math.round(number)));
+  }
+
+  function applyHslControlsToClip({ commit = false } = {}) {
+    const clip = selectedAdjustableClip();
+    if (!clip) return;
+    writeHsl(clip, hslRangeFromControls(clip));
+    applyPreviewGrades(resolveAt(state.projectTimeS));
+    updateColorGradeSummary(clip);
+    setSaveState(false);
+    if (commit) queueHslSave(clip);
   }
 
   function neutralHslRange() {
@@ -4472,12 +4486,18 @@ import {
   function hslRangeFromControls(clip) {
     const base = readHsl(clip);
     const value = { ...(base.ranges[selectedHslRange] || neutralHslRange()) };
-    HSL_FIELDS.forEach(([key, inputId, valueId]) => {
+    HSL_FIELDS.forEach(([key, inputId, numberId]) => {
+      const pair = hslSliderPairs[key];
       const input = document.getElementById(inputId);
-      const valueEl = document.getElementById(valueId);
-      const shown = clampHslSlider(input ? input.value : value[key]);
+      const numberInput = document.getElementById(numberId);
+      const shown = pair
+        ? pair.getValue()
+        : clampHslSlider(input ? input.value : value[key]);
       value[key] = shown;
-      if (valueEl) valueEl.textContent = String(shown);
+      if (!pair) {
+        if (input) input.value = String(shown);
+        if (numberInput) numberInput.value = String(shown);
+      }
     });
     base.ranges[selectedHslRange] = value;
     return base;
@@ -4486,11 +4506,17 @@ import {
   function fillHsl(clip) {
     const hsl = readHsl(clip);
     const value = hsl.ranges[selectedHslRange] || neutralHslRange();
-    HSL_FIELDS.forEach(([key, inputId, valueId]) => {
+    HSL_FIELDS.forEach(([key, inputId, numberId]) => {
+      const pair = hslSliderPairs[key];
+      const shown = clampHslSlider(value[key]);
+      if (pair) {
+        pair.setValue(shown);
+        return;
+      }
       const input = document.getElementById(inputId);
-      const valueEl = document.getElementById(valueId);
-      if (input) input.value = String(value[key]);
-      if (valueEl) valueEl.textContent = String(value[key]);
+      const numberInput = document.getElementById(numberId);
+      if (input) input.value = String(shown);
+      if (numberInput) numberInput.value = String(shown);
     });
     document.querySelectorAll("[data-hsl-range]").forEach((button) => {
       const active = button.dataset.hslRange === selectedHslRange;
@@ -12457,23 +12483,19 @@ import {
     queueImageAdjustSave(clip);
   });
 
-  HSL_FIELDS.forEach(([, inputId]) => {
+  HSL_FIELDS.forEach(([key, inputId, numberId]) => {
     const input = document.getElementById(inputId);
-    if (!input) return;
-    input.addEventListener("input", () => {
-      const clip = selectedAdjustableClip();
-      if (!clip) return;
-      writeHsl(clip, hslRangeFromControls(clip));
-      applyPreviewGrades(resolveAt(state.projectTimeS));
-      updateColorGradeSummary(clip);
-      setSaveState(false);
-    });
-    input.addEventListener("change", () => {
-      const clip = selectedAdjustableClip();
-      if (!clip) return;
-      writeHsl(clip, hslRangeFromControls(clip));
-      updateColorGradeSummary(clip);
-      queueHslSave(clip);
+    const numberInput = document.getElementById(numberId);
+    if (!input || !numberInput) return;
+    hslSliderPairs[key] = bindSliderNumberPair({
+      slider: input,
+      numberInput,
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      onInput: () => applyHslControlsToClip({ commit: false }),
+      onCommit: () => applyHslControlsToClip({ commit: true }),
     });
   });
 

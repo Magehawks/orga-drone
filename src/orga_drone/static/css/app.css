@@ -4286,6 +4286,28 @@ html.is-edge-drag * {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+.studio-slider-number-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-slider-number-row input[type="range"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.studio-slider-number-input,
+.studio-inspector-field .studio-slider-number-input {
+  flex: 0 0 4.75rem;
+  width: 4.75rem;
+  max-width: 4.75rem;
+  padding: 0.25rem 0.35rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
 .studio-preview-filters {
   position: absolute;
   width: 0;
