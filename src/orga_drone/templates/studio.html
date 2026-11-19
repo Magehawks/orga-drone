@@ -1705,6 +1705,24 @@
             <input type="file" id="inspector-color-file-input" accept=".cube,text/plain" hidden>
           </details>
 
+          <div class="studio-inspector-actions" id="inspector-photo-still-export" hidden
+               data-photo-still-default="{{ _('photo')|e }}"
+               data-photo-still-failed="{{ _('Could not export this photo.')|e }}"
+               data-photo-still-cancelled="{{ _('Photo export cancelled.')|e }}"
+               data-photo-still-unavailable="{{ _('Export needs the desktop app for the save dialog.')|e }}">
+            <p class="studio-inspector-kind">{{ _('Photo still export') }}</p>
+            <p class="hint">{{ _('Exports this photo at original size with its color grade and selections. The library file stays unchanged. Story export still makes an MP4 of the whole memory.') }}</p>
+            <label class="studio-inspector-field">
+              <span>{{ _('Format') }}</span>
+              <select id="inspector-photo-still-format" aria-label="{{ _('Photo still export format') }}">
+                <option value="jpeg">JPEG</option>
+                <option value="png">PNG</option>
+              </select>
+            </label>
+            <button type="button" class="button" id="inspector-photo-still-export-btn">{{ _('Export photo (JPG/PNG)') }}</button>
+            <p class="hint" id="inspector-photo-still-export-status" hidden></p>
+          </div>
+
           <div id="inspector-frame" hidden>
             <p class="studio-inspector-kind">{{ _('Framing') }}</p>
             <label class="studio-inspector-field">

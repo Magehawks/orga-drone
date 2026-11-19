@@ -65,7 +65,7 @@ service, or generic drone administration product.
 | Studio color and detail | `studio_image.py`, `studio_hsl.py`, `studio_color_wheels.py`, `studio_lut.py`, `studio_detail.py`, `studio_looks.py`, `studio_color_animation.py` |
 | Studio overlays, masks, framing, map, HUD, audio | `studio_overlay.py`, `studio_mask.py`, `studio_frame.py`, `studio_map.py`, `studio_hud.py`, `studio_audio.py` |
 | Studio preview stills and playback proxy | `studio_preview_frame.py`, `studio_playback_proxy.py` |
-| Studio export | `studio_export.py`, `export/` |
+| Studio export | `studio_export.py`, `studio_clip_still.py` (photo JPG/PNG), `export/` |
 | HTML templates and CSS | `src/orga_drone/templates/`, `src/orga_drone/static/css/app.css` |
 | Studio frontend | `src/orga_drone/static/js/studio.js` (legacy entry plus extracted modules), `static/js/studio-lut-webgl.js`, target modules under `static/js/studio/` |
 | Desktop shell and pickers | `desktop.py` |
