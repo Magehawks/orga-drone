@@ -1873,6 +1873,23 @@ button.cta, .button.cta {
   display: block;
 }
 
+/* Photo focus: surface managed brush tools without a second masking system. */
+.studio-creator.is-photo-context [data-managed-brush-draw] {
+  background: var(--accent);
+  color: var(--accent-contrast, #111);
+  border-color: transparent;
+  font-weight: 600;
+}
+.studio-creator.is-photo-context [data-managed-brush-draw][aria-pressed="true"] {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, #fff);
+  outline-offset: 2px;
+}
+.studio-creator.is-photo-context [data-managed-selection-panel] {
+  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+}
+
 .studio-context-continuity-hint {
   margin: 0;
   padding: 0.35rem 0.85rem;

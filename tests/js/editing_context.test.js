@@ -154,6 +154,8 @@ test("createEditingContextController toggles classes and never auto-switches on 
   const storyArea = new FakeElement("story-area");
   const continuityHint = new FakeElement("studio-context-continuity-hint");
   const modeBanner = new FakeElement("studio-context-mode-banner");
+  const managedColor = new FakeElement("inspector-managed-color");
+  managedColor.open = false;
   const stage = new FakeElement("studio-stage");
   stage.style = {
     props: {},
@@ -174,6 +176,7 @@ test("createEditingContextController toggles classes and never auto-switches on 
       if (id === "studio-context-story") return storyBtn;
       if (id === "studio-context-continuity-hint") return continuityHint;
       if (id === "studio-context-mode-banner") return modeBanner;
+      if (id === "inspector-managed-color") return managedColor;
       return null;
     },
     querySelector(sel) {
@@ -199,6 +202,7 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(storyArea.getAttribute("aria-hidden"), "true");
   assert.equal(storyArea.hidden, true);
   assert.equal(modeBanner.hidden, false);
+  assert.equal(managedColor.open, true);
   assert.equal(stage.style.props["--studio-story-height"], "0px");
   assert.equal(continuityHint.hidden, true);
   assert.deepEqual(changes, [CONTEXT_PHOTO]);
@@ -210,6 +214,7 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(storyArea.getAttribute("aria-hidden"), "false");
   assert.equal(storyArea.hidden, false);
   assert.equal(modeBanner.hidden, true);
+  assert.equal(managedColor.open, true); // stays open; Story does not force-collapse
   assert.match(stage.style.props["--studio-story-height"], /px$/);
 
   // Continuity (#501): adding clips / refresh must not flip context.

@@ -161,6 +161,12 @@ export function createEditingContextController({
       const showHint = context === CONTEXT_PHOTO && projectNeedsStoryTools(currentClips());
       continuityHint.hidden = !showHint;
     }
+    // Photo focus: open Managed Color so brush/selection tools are reachable
+    // without hunting under collapsed details + long slider stacks.
+    const managedColor = documentImpl.getElementById("inspector-managed-color");
+    if (managedColor && context === CONTEXT_PHOTO) {
+      managedColor.open = true;
+    }
     if (typeof onChange === "function") onChange(context);
   }
 
