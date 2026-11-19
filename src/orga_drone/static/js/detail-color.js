@@ -141,7 +141,9 @@ function createDetailColor() {
         if (originalSrc) el.setAttribute("src", originalSrc);
         el.style.filter = "";
       });
-      window.dispatchEvent(new CustomEvent("orga-detail-color-preview", { detail: { mode: "css" } }));
+      window.dispatchEvent(
+        new CustomEvent("orga-detail-color-preview", { detail: { mode: "css" } })
+      );
       return;
     }
     const url = `/api/media/${encodeURIComponent(mediaId)}/color-preview?max_edge=1080&t=${Date.now()}`;
