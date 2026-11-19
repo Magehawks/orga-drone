@@ -20,6 +20,7 @@ import { createManagedLutEditor } from "./managed-lut-editor.js";
 import { createManagedSelectionEditor } from "./managed-selection-editor.js";
 import { createManagedStepEditor } from "./managed-step-editor.js";
 import { createPreviewTokenStore, contextDigestFromParts } from "./preview-token.js";
+import { bindSliderNumberPair } from "./slider-number-sync.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -84,6 +85,11 @@ export function createManagedColorEditor({
     hue: panel.querySelector("[data-managed-hue]"),
     saturation: panel.querySelector("[data-managed-hsl-sat]"),
     lightness: panel.querySelector("[data-managed-hsl-light]"),
+  };
+  const hslNumberFields = {
+    hue: panel.querySelector("[data-managed-hue-number]"),
+    saturation: panel.querySelector("[data-managed-hsl-sat-number]"),
+    lightness: panel.querySelector("[data-managed-hsl-light-number]"),
   };
   const labels = {
     exposure: panel.querySelector("[data-managed-exposure-value]"),
@@ -217,6 +223,59 @@ export function createManagedColorEditor({
     v.toFixed(2)
   );
 
+  const hueValueLabel = panel.querySelector("[data-managed-hue-value]");
+  const satValueLabel = panel.querySelector("[data-managed-hsl-sat-value]");
+  const lightValueLabel = panel.querySelector("[data-managed-hsl-light-value]");
+
+  const hslPairs = {
+    hue: bindSliderNumberPair({
+      slider: hslFields.hue,
+      numberInput: hslNumberFields.hue,
+      min: -180,
+      max: 180,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      onInput: (v) => {
+        if (hueValueLabel) hueValueLabel.textContent = `${Math.round(v)}°`;
+      },
+      onCommit: () => scheduleSave(),
+    }),
+    saturation: bindSliderNumberPair({
+      slider: hslFields.saturation,
+      numberInput: hslNumberFields.saturation,
+      min: 0,
+      max: 2,
+      step: 0.01,
+      fallback: 1,
+      format: (v) => v.toFixed(2),
+      onInput: (v) => {
+        if (satValueLabel) satValueLabel.textContent = v.toFixed(2);
+      },
+      onCommit: () => scheduleSave(),
+    }),
+    lightness: bindSliderNumberPair({
+      slider: hslFields.lightness,
+      numberInput: hslNumberFields.lightness,
+      min: -0.5,
+      max: 0.5,
+      step: 0.01,
+      fallback: 0,
+      format: (v) => v.toFixed(2),
+      onInput: (v) => {
+        if (lightValueLabel) lightValueLabel.textContent = v.toFixed(2);
+      },
+      onCommit: () => scheduleSave(),
+    }),
+  };
+
+  function paintHslGroup(values) {
+    Object.entries(hslPairs).forEach(([key, pair]) => {
+      if (!(key in values) || !pair) return;
+      pair.setValue(values[key], { emitInput: true });
+    });
+  }
+
   function setStatus(message) {
     if (status) status.textContent = message || "";
   }
@@ -227,6 +286,12 @@ export function createManagedColorEditor({
         if (input) input.disabled = !enabled || busy;
       }
     );
+    Object.values(hslNumberFields).forEach((input) => {
+      if (input) input.disabled = !enabled || busy;
+    });
+    Object.values(hslPairs).forEach((pair) => {
+      pair?.setDisabled?.(!enabled || busy);
+    });
     [resetBtn, wheelsResetBtn, hslResetBtn].forEach((button) => {
       if (button) button.disabled = !enabled || busy;
     });
@@ -331,7 +396,7 @@ export function createManagedColorEditor({
           ...neutralWheelsParams(),
           ...(findStep(current.grade, "wheels-v1")?.params || {}),
         });
-        paintGroup(hslFields, {
+        paintHslGroup({
           ...neutralManagedHslParams(),
           ...(findStep(current.grade, "managed-hsl-v1")?.params || {}),
         });
@@ -552,7 +617,7 @@ export function createManagedColorEditor({
     scheduleSave();
   });
   hslResetBtn?.addEventListener("click", () => {
-    paintGroup(hslFields, neutralManagedHslParams());
+    paintHslGroup(neutralManagedHslParams());
     scheduleSave();
   });
 
@@ -574,7 +639,7 @@ export function createManagedColorEditor({
     reset() {
       paintGroup(fields, neutralPrimariesParams());
       paintGroup(wheelFields, neutralWheelsParams());
-      paintGroup(hslFields, neutralManagedHslParams());
+      paintHslGroup(neutralManagedHslParams());
       stepEditor.reset();
       previewTokens.invalidate();
     },
