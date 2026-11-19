@@ -1,0 +1,24 @@
+[
+  {
+    "inline": true,
+    "width": 256,
+    "height": 256,
+    "bake_s": 3.4815938000028837,
+    "http_samples": 22,
+    "http_ok": 22,
+    "http_p50_ms": 6.823700001405086,
+    "http_p95_ms": 314.3215300002339,
+    "http_max_ms": 318.65950000064913
+  },
+  {
+    "inline": false,
+    "width": 256,
+    "height": 256,
+    "bake_s": 3.321150800002215,
+    "http_samples": 59,
+    "http_ok": 59,
+    "http_p50_ms": 2.2865999999339692,
+    "http_p95_ms": 3.002800003741868,
+    "http_max_ms": 3.2341999976779334
+  }
+]
