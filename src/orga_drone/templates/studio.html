@@ -323,6 +323,11 @@
       <span class="app-version studio-app-version">v{{ version }}</span>
     </button>
   </header>
+  {% if studio_mode == 'editor' and project %}
+  <p class="studio-context-continuity-hint" id="studio-context-continuity-hint" hidden>
+    {{ _('Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.') }}
+  </p>
+  {% endif %}
 
   {% if studio_mode == 'editor' and project %}
   <section id="studio-control" class="studio-control"

@@ -1281,3 +1281,6 @@ msgstr "Fokus Story-Timeline"
 
 msgid "Export Story MP4"
 msgstr "Story-MP4 exportieren"
+
+msgid "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
+msgstr "Wechsle zu Story für Timeline und MP4-Export. Foto-Grades bleiben auf diesem Clip."
