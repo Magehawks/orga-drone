@@ -449,6 +449,11 @@ def test_detail_page_reloads_the_saved_grade(
     assert '"exposure": 12' in page.text
     assert '"warmth": -4' in page.text
     assert "Reset adjustments" in page.text
+    assert 'id="detail-hsl"' in page.text
+    assert 'id="detail-hsl-hue-number"' in page.text
+    assert 'id="detail-color-wheels"' in page.text
+    assert 'id="detail-color-lut"' in page.text
+    assert "detail-color.js" in page.text
     assert 'id="detail-export-format"' in page.text
     assert 'id="detail-quick-look"' in page.text
     video = _add_video(db, tmp_path / "vid", "clip.mp4", height=1080, duration_s=1.0)

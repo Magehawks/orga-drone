@@ -455,15 +455,20 @@
     <div class="detail-actions-panel" id="detail-panel-image" role="tabpanel"
          data-detail-tab-panel="image" aria-labelledby="detail-tab-image" hidden>
       <div class="action-form studio-image-panel" id="detail-image-adjust"
+           data-media-id="{{ item.id }}"
            data-quick-looks-model='{{ quick_looks_model|tojson }}'
            data-photo-look="{{ photo_look|e }}"
+           data-photo-color='{{ photo_color|tojson }}'
            data-look-custom="{{ _('Custom')|e }}"
            data-look-natural="{{ _('Natural')|e }}"
            data-look-cinematic="{{ _('Cinematic')|e }}"
            data-look-golden-hour="{{ _('Golden Hour')|e }}"
            data-look-vibrant="{{ _('Vibrant')|e }}"
            data-look-cool="{{ _('Cool')|e }}"
-           data-look-black-and-white="{{ _('Black & White')|e }}">
+           data-look-black-and-white="{{ _('Black & White')|e }}"
+           data-msg-wrap="{{ _('Legacy grade wrapped. Convert to edit managed tools.')|e }}"
+           data-msg-managed="{{ _('Managed Color Workspace active on this photo.')|e }}"
+           data-msg-convert-confirm="{{ _('Convert to managed Color Workspace? Appearance can change.')|e }}">
         {% if photo_src %}
         <img id="detail-export-grade-preview" class="detail-export-grade-preview"
              src="{{ photo_src }}" alt="">
@@ -553,9 +558,143 @@
             <input type="range" id="detail-adjust-blacks" min="-100" max="100" step="1" value="0"
                    aria-label="{{ _('Blacks') }}">
           </label>
-          <p class="hint">{{ _('Sharpen, denoise, and color files stay in Studio for Story clips.') }}</p>
+          <p class="hint">{{ _('Sharpen and denoise stay in Studio for Story clips.') }}</p>
         </details>
-        <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Preview approximates the exported picture.') }}</p>
+        <details id="detail-image-section-hsl" class="studio-image-section" open>
+          <summary>{{ _('HSL color mixer') }}</summary>
+          <div id="detail-hsl" data-media-id="{{ item.id }}">
+            <div class="studio-hsl-swatches" role="tablist" aria-label="{{ _('Color range') }}">
+              <button type="button" class="studio-hsl-swatch is-active" data-detail-hsl-range="red"
+                      style="--hsl-swatch: #e5484d" role="tab" aria-selected="true"
+                      title="{{ _('Red') }}" aria-label="{{ _('Red') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="orange"
+                      style="--hsl-swatch: #f76b15" role="tab" aria-selected="false"
+                      title="{{ _('Orange') }}" aria-label="{{ _('Orange') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="yellow"
+                      style="--hsl-swatch: #f5d90a" role="tab" aria-selected="false"
+                      title="{{ _('Yellow') }}" aria-label="{{ _('Yellow') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="green"
+                      style="--hsl-swatch: #30a46c" role="tab" aria-selected="false"
+                      title="{{ _('Green') }}" aria-label="{{ _('Green') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="aqua"
+                      style="--hsl-swatch: #00a2c7" role="tab" aria-selected="false"
+                      title="{{ _('Aqua') }}" aria-label="{{ _('Aqua') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="blue"
+                      style="--hsl-swatch: #3e63dd" role="tab" aria-selected="false"
+                      title="{{ _('Blue') }}" aria-label="{{ _('Blue') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="purple"
+                      style="--hsl-swatch: #8e4ec6" role="tab" aria-selected="false"
+                      title="{{ _('Purple') }}" aria-label="{{ _('Purple') }}"></button>
+              <button type="button" class="studio-hsl-swatch" data-detail-hsl-range="magenta"
+                      style="--hsl-swatch: #d6409f" role="tab" aria-selected="false"
+                      title="{{ _('Magenta') }}" aria-label="{{ _('Magenta') }}"></button>
+            </div>
+            <p class="hint">{{ _('Adjust one color range without changing the others. Neutral values leave the picture unchanged.') }}</p>
+            <label class="studio-inspector-field studio-slider-number-field">
+              <span class="studio-image-adjust-label"><span>{{ _('Hue') }}</span></span>
+              <div class="studio-slider-number-row">
+                <input type="range" id="detail-hsl-hue" min="-100" max="100" step="1" value="0" aria-label="{{ _('Hue') }}">
+                <input type="number" id="detail-hsl-hue-number" class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric"
+                       aria-label="{{ _('Hue value') }}">
+              </div>
+            </label>
+            <label class="studio-inspector-field studio-slider-number-field">
+              <span class="studio-image-adjust-label"><span>{{ _('Saturation') }}</span></span>
+              <div class="studio-slider-number-row">
+                <input type="range" id="detail-hsl-saturation" min="-100" max="100" step="1" value="0" aria-label="{{ _('Saturation') }}">
+                <input type="number" id="detail-hsl-saturation-number" class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric"
+                       aria-label="{{ _('Saturation value') }}">
+              </div>
+            </label>
+            <label class="studio-inspector-field studio-slider-number-field">
+              <span class="studio-image-adjust-label"><span>{{ _('Luminance') }}</span></span>
+              <div class="studio-slider-number-row">
+                <input type="range" id="detail-hsl-luminance" min="-100" max="100" step="1" value="0" aria-label="{{ _('Luminance') }}">
+                <input type="number" id="detail-hsl-luminance-number" class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric"
+                       aria-label="{{ _('Luminance value') }}">
+              </div>
+            </label>
+            <div class="studio-hsl-actions">
+              <button type="button" class="button ghost" id="detail-hsl-reset">{{ _('Reset this color') }}</button>
+              <button type="button" class="button ghost" id="detail-hsl-reset-all">{{ _('Reset all HSL') }}</button>
+            </div>
+          </div>
+        </details>
+        <details id="detail-image-section-color-wheels" class="studio-image-section">
+          <summary>{{ _('Color Grading') }}</summary>
+          <div id="detail-color-wheels">
+            <p class="hint">{{ _('Drag the point in each wheel. The centre is neutral; the angle sets the hue direction and the distance sets the strength.') }}</p>
+            <div class="studio-color-wheel-grid">
+              <div class="studio-color-wheel-field">
+                <div class="studio-color-wheel" id="detail-color-wheel-shadows" data-detail-color-wheel="shadows"
+                     role="slider" tabindex="0" aria-label="{{ _('Shadows') }}"
+                     aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                  <span class="studio-color-wheel-point" id="detail-color-wheel-point-shadows" aria-hidden="true"></span>
+                </div>
+                <div class="studio-color-wheel-caption">
+                  <span>{{ _('Shadows') }}</span>
+                  <button type="button" class="button ghost studio-color-wheel-reset"
+                          id="detail-color-wheel-reset-shadows"
+                          title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Shadows') }}">↺</button>
+                </div>
+              </div>
+              <div class="studio-color-wheel-field">
+                <div class="studio-color-wheel" id="detail-color-wheel-midtones" data-detail-color-wheel="midtones"
+                     role="slider" tabindex="0" aria-label="{{ _('Midtones') }}"
+                     aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                  <span class="studio-color-wheel-point" id="detail-color-wheel-point-midtones" aria-hidden="true"></span>
+                </div>
+                <div class="studio-color-wheel-caption">
+                  <span>{{ _('Midtones') }}</span>
+                  <button type="button" class="button ghost studio-color-wheel-reset"
+                          id="detail-color-wheel-reset-midtones"
+                          title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Midtones') }}">↺</button>
+                </div>
+              </div>
+              <div class="studio-color-wheel-field">
+                <div class="studio-color-wheel" id="detail-color-wheel-highlights" data-detail-color-wheel="highlights"
+                     role="slider" tabindex="0" aria-label="{{ _('Highlights') }}"
+                     aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+                  <span class="studio-color-wheel-point" id="detail-color-wheel-point-highlights" aria-hidden="true"></span>
+                </div>
+                <div class="studio-color-wheel-caption">
+                  <span>{{ _('Highlights') }}</span>
+                  <button type="button" class="button ghost studio-color-wheel-reset"
+                          id="detail-color-wheel-reset-highlights"
+                          title="{{ _('Reset') }}" aria-label="{{ _('Reset') }} {{ _('Highlights') }}">↺</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+        <details id="detail-image-section-lut" class="studio-image-section">
+          <summary>{{ _('Color file (LUT)') }}</summary>
+          <label class="studio-inspector-field" for="detail-color-lut">
+            <span>{{ _('LUT') }}</span>
+            <select id="detail-color-lut" aria-label="{{ _('LUT') }}">
+              <option value="">{{ _('None') }}</option>
+            </select>
+          </label>
+          <p class="hint">{{ _('Uses the shared LUT library. Source media stays unchanged.') }}</p>
+        </details>
+        <div class="studio-hsl-actions" id="detail-color-history">
+          <button type="button" class="button ghost" id="detail-color-undo" disabled>{{ _('Undo') }}</button>
+          <button type="button" class="button ghost" id="detail-color-redo" disabled>{{ _('Redo') }}</button>
+        </div>
+        <details id="detail-image-section-managed" class="studio-image-section" data-detail-managed-panel>
+          <summary>{{ _('Managed Color Workspace') }}</summary>
+          <p class="hint">{{ _('Optional. Wrap this photo grade, then convert to managed SDR. Masks, scopes, and animation stay in Studio.') }}</p>
+          <p class="meta-line" data-detail-managed-status role="status" aria-live="polite"></p>
+          <div class="studio-hsl-actions">
+            <button type="button" class="button ghost" data-detail-managed-wrap>{{ _('Wrap legacy grade') }}</button>
+            <button type="button" class="button ghost" data-detail-managed-convert hidden>{{ _('Convert to managed') }}</button>
+          </div>
+          <div data-detail-managed-editor hidden></div>
+        </details>
+        <p class="hint">{{ _('Saved on this photo only. The library file stays unchanged. Advanced color uses a server preview that matches export.') }}</p>
       </div>
       <div class="action-form photo-combine-entry" id="detail-photo-combine-entry">
         <p class="studio-inspector-kind">{{ _('Combine images') }}</p>
@@ -875,6 +1014,9 @@
   <script src="/static/js/detail-actions.js"></script>
   {% if item_exportable %}
   <script src="/static/js/detail-export.js"></script>
+  {% endif %}
+  {% if item.kind == 'photo' and item_exportable %}
+  <script type="module" src="/static/js/detail-color.js"></script>
   {% endif %}
   {% if item.kind == 'photo' and item_exportable %}
   <script src="/static/js/photo-combine.js"></script>

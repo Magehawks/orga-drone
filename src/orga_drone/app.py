@@ -98,6 +98,10 @@ from orga_drone.studio_looks import (
     look_id_from_effect_settings,
     quick_looks_preview_model,
 )
+from orga_drone.photo_color import (
+    photo_color_needs_server_preview,
+    photo_color_parts,
+)
 from orga_drone.lut_library import (
     LutInUseError,
     delete_lut,
@@ -1327,6 +1331,17 @@ def create_app() -> FastAPI:
             album for album in db.list_albums() if album.id not in member_ids
         ]
         media_project_usage = db.studio_projects_for_media(item.id)
+        photo_color_payload = None
+        if item.kind == "photo":
+            photo_raw = db.get_image_adjust_json(item.path)
+            photo_parts = photo_color_parts(photo_raw)
+            photo_color_payload = {
+                "hsl": photo_parts.hsl.as_dict(),
+                "color_wheels": photo_parts.color_wheels.as_dict(),
+                "color": photo_parts.color_look.as_dict(),
+                "managed": photo_parts.managed,
+                "needs_server_preview": photo_color_needs_server_preview(photo_raw),
+            }
         return render(
             request,
             "detail.html",
@@ -1371,6 +1386,11 @@ def create_app() -> FastAPI:
             ),
             photo_look=(
                 db.get_photo_look_id(item.path) if item.kind == "photo" else ""
+            ),
+            photo_color=photo_color_payload,
+            hsl_model=hsl_preview_model() if item.kind == "photo" else None,
+            color_wheels_model=(
+                color_wheels_preview_model() if item.kind == "photo" else None
             ),
             media_albums=media_albums,
             albums_available=albums_available,
@@ -5218,6 +5238,78 @@ def create_app() -> FastAPI:
                 detail=str(exc) or translate("Could not build the photo color preview."),
             ) from exc
         return FileResponse(jpeg, media_type="image/jpeg")
+
+    @app.post("/api/media/{media_id}/grade/wrap")
+    async def api_media_grade_wrap(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import effect_settings_from_photo_raw
+        from orga_drone.studio_grade_persistence import (
+            require_writes_enabled,
+            wrap_legacy_to_canonical,
+        )
+
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        try:
+            require_writes_enabled(settings.data_dir)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        existing = db.get_image_adjust_json(row.path)
+        effect = effect_settings_from_photo_raw(existing)
+        try:
+            document = wrap_legacy_to_canonical(effect)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        blob = json.dumps(document, separators=(",", ":"), sort_keys=True)
+        db.set_image_adjust_json(
+            row.path,
+            blob,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.post("/api/media/{media_id}/grade/convert-managed")
+    async def api_media_grade_convert_managed(
+        media_id: int, request: Request
+    ) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import effect_settings_from_photo_raw
+        from orga_drone.studio_grade_persistence import (
+            convert_legacy_to_managed,
+            require_writes_enabled,
+        )
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        try:
+            require_writes_enabled(settings.data_dir)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        existing = db.get_image_adjust_json(row.path)
+        effect = effect_settings_from_photo_raw(existing)
+        try:
+            document = convert_legacy_to_managed(
+                effect,
+                revision=1,
+                acknowledge_appearance_change=bool(
+                    payload.get("acknowledge_appearance_change")
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        blob = json.dumps(document, separators=(",", ":"), sort_keys=True)
+        db.set_image_adjust_json(
+            row.path,
+            blob,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse(_photo_color_response(row))
 
     @app.post("/api/media/{media_id}/export")
     async def api_media_export(media_id: int, request: Request) -> JSONResponse:

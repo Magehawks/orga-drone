@@ -248,11 +248,17 @@
     adjustInputs.forEach((row) => {
       if (row.value) row.value.textContent = String(adjust[row.key]);
     });
+    const detailColor = window.orgaDetailColor;
+    if (detailColor?.needsServerPreview?.() && !compareOriginal) {
+      detailColor.refreshServerPreview?.();
+      return;
+    }
     const targets = [gradePreview, pagePreview].filter(Boolean);
     if (compareOriginal || imageAdjustIsNeutral(adjust)) {
       targets.forEach((el) => {
         el.style.filter = "";
       });
+      window.dispatchEvent(new CustomEvent("orga-detail-basic-preview"));
       return;
     }
     const css = cssFilterFor(adjust);
