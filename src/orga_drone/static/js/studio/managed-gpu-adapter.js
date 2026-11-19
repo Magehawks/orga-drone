@@ -133,6 +133,26 @@ export function isManagedWebglBakeMode(mode) {
   return mode === "webgl-bake" || mode === "webgl-bake-approx" || mode === "webgl-bake-tetrahedral";
 }
 
+/**
+ * True when the Studio preview must fetch the CPU preview-frame JPEG so
+ * managed grades (especially spatial selections) are visible.
+ *
+ * Photos never use the WebGL LUT path, so any non-identity managed grade needs
+ * the still. Videos only need it when the GPU adapter reports cpu-fallback
+ * (spatial selections / unsupported ops); pointwise bake modes stay on WebGL.
+ *
+ * @param {object|null|undefined} gradeDoc
+ * @param {string} kind clip kind: "photo" | "video" | …
+ * @param {{ lutPrecision?: string }=} [options]
+ */
+export function managedGradeNeedsCpuPreviewStill(gradeDoc, kind, options = {}) {
+  if (!gradeDoc || gradeDoc.evaluator !== "managed-sdr-v1") return false;
+  const probe = probeManagedGpuCapabilities(gradeDoc, options);
+  if (probe.mode === "none" || probe.mode === "identity") return false;
+  if (String(kind || "") === "photo") return true;
+  return probe.mode === "cpu-fallback" || !isManagedWebglBakeMode(probe.mode);
+}
+
 export function managedBakeUrl(studioId, revision) {
   if (!studioId) return "";
   const rev =

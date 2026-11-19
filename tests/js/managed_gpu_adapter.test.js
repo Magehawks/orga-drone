@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isManagedWebglBakeMode,
   managedBakeUrl,
+  managedGradeNeedsCpuPreviewStill,
   probeManagedGpuCapabilities,
 } from "../../src/orga_drone/static/js/studio/managed-gpu-adapter.js";
 
@@ -74,4 +75,20 @@ test("isManagedWebglBakeMode accepts tetrahedral and legacy bake modes", () => {
   assert.equal(isManagedWebglBakeMode("webgl-bake-approx"), true);
   assert.equal(isManagedWebglBakeMode("webgl-bake"), true);
   assert.equal(isManagedWebglBakeMode("cpu-fallback"), false);
+});
+
+test("managedGradeNeedsCpuPreviewStill: photo always, video only for spatial", () => {
+  const pointwise = grade([
+    { id: "p1", type: "primaries-v1", enabled: true, selection_id: null },
+  ]);
+  const spatial = grade([
+    { id: "p1", type: "primaries-v1", enabled: true, selection_id: "sel-1" },
+  ]);
+  const empty = grade([]);
+  assert.equal(managedGradeNeedsCpuPreviewStill(pointwise, "photo"), true);
+  assert.equal(managedGradeNeedsCpuPreviewStill(spatial, "photo"), true);
+  assert.equal(managedGradeNeedsCpuPreviewStill(pointwise, "video"), false);
+  assert.equal(managedGradeNeedsCpuPreviewStill(spatial, "video"), true);
+  assert.equal(managedGradeNeedsCpuPreviewStill(empty, "photo"), false);
+  assert.equal(managedGradeNeedsCpuPreviewStill(null, "photo"), false);
 });

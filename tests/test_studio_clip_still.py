@@ -13,6 +13,7 @@ from PIL import Image
 from orga_drone.config import Settings
 from orga_drone.db import Database, make_identity_key
 from orga_drone.studio_clip_still import (
+    apply_studio_photo_privacy_masks,
     effect_settings_has_color,
     export_studio_photo_clip_still,
     materialize_studio_photo_grade_source,
@@ -341,6 +342,49 @@ def test_unmasked_legacy_export_still_works(
     with Image.open(result) as img:
         pixel = img.convert("RGB").getpixel((0, 0))
     assert sum(pixel) > 30
+
+
+def test_still_export_applies_privacy_blur_masks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    prefs = _isolate(monkeypatch, tmp_path)
+    photo = tmp_path / "hard.jpg"
+    # High-frequency stripe pattern so blur is measurable.
+    img = Image.new("RGB", (64, 64))
+    px = img.load()
+    for y in range(64):
+        for x in range(64):
+            v = 255 if (x // 4) % 2 == 0 else 0
+            px[x, y] = (v, v, v)
+    img.save(photo, format="JPEG", quality=95)
+    effect = json.dumps(
+        {
+            "masks": [
+                {
+                    "id": "blur-top",
+                    "effect": "blur",
+                    "strength": 90,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "w": 1.0,
+                    "h": 0.35,
+                }
+            ]
+        }
+    )
+    masked = apply_studio_photo_privacy_masks(
+        photo, effect, data_dir=prefs.data_dir
+    )
+    assert masked != photo
+    with Image.open(photo) as src_img, Image.open(masked) as out_img:
+        src = src_img.convert("RGB")
+        out = out_img.convert("RGB")
+        assert out.size == src.size
+        # Top band should soften; center stripe contrast remains high.
+        top_src = [src.getpixel((x, 8))[0] for x in range(0, 64, 4)]
+        top_out = [out.getpixel((x, 8))[0] for x in range(0, 64, 4)]
+        mid_out = [out.getpixel((x, 40))[0] for x in range(0, 64, 4)]
+        assert max(top_src) - min(top_src) >= 200
+        assert max(top_out) - min(top_out) < max(top_src) - min(top_src)
+        assert max(mid_out) - min(mid_out) >= 200
 
 
 def test_cpu_reference_matches_materialize(
