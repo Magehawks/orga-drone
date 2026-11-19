@@ -2233,6 +2233,28 @@ def create_app() -> FastAPI:
                     return item
             raise HTTPException(status_code=404, detail="studio item not found")
 
+        def _leaf_media(spec: dict[str, Any], leaf_id: str) -> Any:
+            return next(
+                (
+                    leaf.get("media")
+                    for leaf in iter_leaves(spec["root"])
+                    if leaf["id"] == leaf_id
+                ),
+                None,
+            )
+
+        def _assignment_conflict() -> HTTPException:
+            translate = get_translator(lang_from_request(request))
+            return HTTPException(
+                status_code=409,
+                detail=translate("Collage media changed while reading video metadata. Try again."),
+            )
+
+        def _video_source(media: dict[str, Any]) -> tuple[Any, ...]:
+            return tuple(
+                media.get(key) for key in ("source", "media_id", "identity_key", "path")
+            )
+
         def _assign_media(
             spec: dict[str, Any], leaf_id: str, media: Any
         ) -> dict[str, Any]:
@@ -2351,46 +2373,34 @@ def create_app() -> FastAPI:
                             media.get("pan_y"),
                             media.get("fit"),
                         )
-                    probed_source: tuple[Any, ...] | None = None
-                    video_dur: float | None = None
-                    while True:
-                        next_spec = _assign_media(spec, leaf_id, media)
-                        kwargs["collage_spec"] = next_spec
-                        assigned_media = next(
-                            (
-                                leaf.get("media")
-                                for leaf in iter_leaves(next_spec["root"])
-                                if str(leaf["id"]) == leaf_id
-                            ),
-                            None,
+                    next_spec = _assign_media(spec, leaf_id, media)
+                    assigned_media = _leaf_media(next_spec, leaf_id)
+                    if (
+                        isinstance(assigned_media, dict)
+                        and assigned_media.get("kind") == "video"
+                    ):
+                        video_dur = await asyncio.to_thread(
+                            resolve_leaf_video_duration_s, db, assigned_media
                         )
-                        if (
-                            not isinstance(assigned_media, dict)
-                            or assigned_media.get("kind") != "video"
-                        ):
-                            break
-                        source = tuple(
-                            assigned_media.get(key)
-                            for key in ("source", "media_id", "identity_key", "path")
-                        )
-                        if source != probed_source:
-                            video_dur = await asyncio.to_thread(
-                                resolve_leaf_video_duration_s, db, assigned_media
-                            )
-                            probed_source = source
-                            latest = _load_clip()
-                            if latest.collage_spec != current.collage_spec:
-                                # Reapply to edits made while the probe was running.
-                                current = latest
-                                spec = collage_spec_from_raw(current.collage_spec)
-                                continue
-                            current = latest
+                        latest = _load_clip()
+                        if latest.collage_spec != current.collage_spec:
+                            latest_spec = collage_spec_from_raw(latest.collage_spec)
+                            if _leaf_media(latest_spec, leaf_id) != _leaf_media(spec, leaf_id):
+                                raise _assignment_conflict()
+                            next_spec = _assign_media(latest_spec, leaf_id, media)
+                            rebased_media = _leaf_media(next_spec, leaf_id)
+                            # A redacted path can also depend on a different cell's source key.
+                            if (
+                                not isinstance(rebased_media, dict)
+                                or _video_source(rebased_media) != _video_source(assigned_media)
+                            ):
+                                raise _assignment_conflict()
                         next_dur = duration_for_video_assign(
-                            current.collage_duration_s, video_dur
+                            latest.collage_duration_s, video_dur
                         )
                         if next_dur is not None:
                             kwargs["collage_duration_s"] = next_dur
-                        break
+                    kwargs["collage_spec"] = next_spec
                 else:
                     raise ValueError(f"unknown collage op: {op}")
             except ValueError as exc:

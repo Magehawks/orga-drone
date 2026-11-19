@@ -85,8 +85,9 @@ Spec  = { version: 1, aspect, gap_px, background, corner_radius_px?,
   raw paths as the primary UX.
 - Video assignment waits for best-effort duration metadata in the existing
   worker pool, so the API can serve reads while probing. Apply the assignment
-  to the latest collage state after the probe returns. The ffprobe timeout
-  remains eight seconds.
+  to the latest collage state after the probe returns. If the target media
+  or resolved source changed during the probe, ask the caller to retry. The
+  ffprobe timeout remains eight seconds.
 - Grades/LUTs: optional per-leaf grade envelope using the canonical Color
   Workspace contract already used for media clips. Apply once on the leaf
   render path (preview still + export); no double grading.

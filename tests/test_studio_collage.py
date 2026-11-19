@@ -109,6 +109,62 @@ def test_slow_collage_probe_allows_reads_and_preserves_a_concurrent_edit(
     assert media["has_path"] and media["kind"] == "video"
 
 
+def test_slow_framing_request_cannot_overwrite_replaced_video(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    first = tmp_path / "first.mp4"
+    replacement = tmp_path / "replacement.mp4"
+    url, payload = _video_assignment_request(db, first)
+    first_media = payload["media"]
+    replacement.write_bytes(b"synthetic replacement")
+    clip_id = int(url.split("/")[3])
+    clip = db.list_studio_items()[0]
+    assert clip.id == clip_id
+    spec = assign_leaf_media(
+        collage_spec_from_raw(clip.collage_spec), payload["leaf_id"], first_media
+    )
+    db.update_studio_collage(clip_id, collage_spec=spec)
+    public_media = iter_leaves(public_collage_spec(spec)["root"])[0]["media"]
+    entered, release = threading.Event(), threading.Event()
+    probes: list[str] = []
+
+    def probe(cmd: list[str], **kwargs: object):
+        name = Path(cmd[-1]).name
+        probes.append(name)
+        if name == first.name:
+            entered.set()
+            if not release.wait(timeout=20):
+                raise subprocess.TimeoutExpired(cmd, 8)
+        return subprocess.CompletedProcess(cmd, 0, b'{"format":{"duration":"12.4"}}')
+
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: "ffprobe")
+    monkeypatch.setattr("subprocess.run", probe)
+    with client, ThreadPoolExecutor(max_workers=2) as pool:
+        framing = pool.submit(
+            client.patch, url, json={**payload, "media": {**public_media, "zoom": 1.5}},
+        )
+        try:
+            assert entered.wait(timeout=5)
+            replace = pool.submit(
+                client.patch, url,
+                json={**payload, "media": {**first_media, "path": str(replacement)}},
+            )
+            replaced = replace.result(timeout=5)
+            assert replaced.status_code == 200
+        finally:
+            release.set()
+        conflict = framing.result(timeout=5)
+
+    assert probes == [first.name, replacement.name]
+    assert conflict.status_code == 409
+    saved = iter_leaves(collage_spec_from_raw(db.list_studio_items()[0].collage_spec)["root"])[0]
+    replaced_media = iter_leaves(replaced.json()["collage_spec"]["root"])[0]["media"]
+    assert saved["media"]["path"] == str(replacement)
+    assert saved["media"]["source_key"] == replaced_media["source_key"]
+    assert saved["media"]["zoom"] == replaced_media["zoom"] == 1.0
+
+
 @pytest.mark.parametrize(
     ("outcome", "duration", "expected_calls"),
     [

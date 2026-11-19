@@ -1266,3 +1266,6 @@ msgstr "Eine Collagenquelle konnte nicht gerendert werden. Prüfe oder ersetze s
 
 msgid "Could not publish the collage export safely."
 msgstr "Der Collagenexport konnte nicht sicher gespeichert werden."
+
+msgid "Collage media changed while reading video metadata. Try again."
+msgstr "Das Medium der Collage wurde während der Dauerermittlung geändert. Versuche es erneut."

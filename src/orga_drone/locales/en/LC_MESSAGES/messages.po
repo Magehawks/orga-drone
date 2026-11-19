@@ -1245,3 +1245,6 @@ msgstr "A collage source could not be rendered. Check or replace it and try agai
 
 msgid "Could not publish the collage export safely."
 msgstr "Could not publish the collage export safely."
+
+msgid "Collage media changed while reading video metadata. Try again."
+msgstr "Collage media changed while reading video metadata. Try again."
