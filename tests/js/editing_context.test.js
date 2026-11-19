@@ -6,6 +6,7 @@ import {
   CONTEXT_STORY,
   createEditingContextController,
   normalizeEditingContext,
+  projectNeedsStoryTools,
   projectSuggestsPhotoContext,
   readStoredEditingContext,
   resolveInitialEditingContext,
@@ -139,19 +140,30 @@ test("resolveInitialEditingContext suggests photo for photo-only projects withou
   );
 });
 
+test("projectNeedsStoryTools detects non-photo Story items", () => {
+  assert.equal(projectNeedsStoryTools([{ kind: "photo" }]), false);
+  assert.equal(projectNeedsStoryTools([{ kind: "photo" }, { kind: "video" }]), true);
+  assert.equal(projectNeedsStoryTools([{ kind: "title" }]), true);
+  assert.equal(projectNeedsStoryTools([]), false);
+});
+
 test("createEditingContextController toggles classes and never auto-switches on refresh", () => {
   const root = new FakeElement("studio-root");
   const photoBtn = new FakeElement("studio-context-photo");
   const storyBtn = new FakeElement("studio-context-story");
   const storyArea = new FakeElement("story-area");
+  const continuityHint = new FakeElement("studio-context-continuity-hint");
+  continuityHint.hidden = true;
   storyArea.classList.add("studio-story-area");
   const storage = makeMemoryStorage();
   const changes = [];
+  let clips = [{ kind: "photo" }];
 
   const documentImpl = {
     getElementById(id) {
       if (id === "studio-context-photo") return photoBtn;
       if (id === "studio-context-story") return storyBtn;
+      if (id === "studio-context-continuity-hint") return continuityHint;
       return null;
     },
     querySelector(sel) {
@@ -162,7 +174,7 @@ test("createEditingContextController toggles classes and never auto-switches on 
   const controller = createEditingContextController({
     root,
     projectId: 12,
-    getClips: () => [{ kind: "photo" }],
+    getClips: () => clips,
     storage,
     documentImpl,
     onChange: (ctx) => changes.push(ctx),
@@ -173,6 +185,7 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(photoBtn.getAttribute("aria-pressed"), "true");
   assert.equal(storyBtn.getAttribute("aria-pressed"), "false");
   assert.equal(storyArea.getAttribute("aria-hidden"), "true");
+  assert.equal(continuityHint.hidden, true);
   assert.deepEqual(changes, [CONTEXT_PHOTO]);
 
   controller.setContext(CONTEXT_STORY);
@@ -182,11 +195,24 @@ test("createEditingContextController toggles classes and never auto-switches on 
   assert.equal(storyArea.getAttribute("aria-hidden"), "false");
 
   // Continuity (#501): adding clips / refresh must not flip context.
+  clips = [{ kind: "photo" }, { kind: "video" }];
   controller.refresh();
   assert.equal(controller.getContext(), CONTEXT_STORY);
   assert.equal(changes.at(-1), CONTEXT_STORY);
+  assert.equal(continuityHint.hidden, true);
 
   photoBtn.click();
   assert.equal(controller.getContext(), CONTEXT_PHOTO);
   assert.equal(storage.getItem(storageKeyForProject(12)), CONTEXT_PHOTO);
+  assert.equal(continuityHint.hidden, false);
+
+  // Stored Photo focus survives mixed media on a fresh resolve (#501).
+  assert.equal(
+    resolveInitialEditingContext({
+      projectId: 12,
+      clips,
+      storage,
+    }),
+    CONTEXT_PHOTO
+  );
 });

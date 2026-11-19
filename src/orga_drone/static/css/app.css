@@ -1846,6 +1846,18 @@ button.cta, .button.cta {
 .studio-creator.is-photo-context .studio-topbar-export .studio-btn-label::after {
   content: none;
 }
+
+.studio-context-continuity-hint {
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.studio-creator:not(.is-photo-context) .studio-context-continuity-hint {
+  display: none;
+}
 .studio-browser,
 .studio-inspector {
   background: var(--panel);

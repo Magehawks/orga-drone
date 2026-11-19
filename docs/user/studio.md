@@ -7,7 +7,9 @@
 3. Use the top-bar **Photo** / **Story** focus when you care about one
    photo’s color tools (Photo collapses the timeline chrome) or the full
    timeline and MP4 export (Story). The choice is remembered per project and
-   does not flip just because you add another clip.
+   does not flip just because you add another clip. Grades and selections stay
+   on each clip; switch to Story when you need the timeline or MP4 without
+   re-importing.
 4. Drag clips to reorder. On videos, drag the left/right edges to trim.
 5. Use Fit / zoom / **10 s** / **1 s** on the timeline to find a cut. Compact tracks is optional.
 6. Add transitions, music, image adjustments, masks, and title cards as needed.

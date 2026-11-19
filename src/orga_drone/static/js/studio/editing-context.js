@@ -1,15 +1,22 @@
 /**
- * Adaptive Studio editing context (#500).
+ * Adaptive Studio editing context (#500 / #501).
  *
  * Photo context focuses color tools and still export; Story context keeps the
  * full timeline. Preference is per-project and never auto-switches merely
- * because another clip was added (#501).
+ * because another clip was added (#501). Clip grades stay on each clip's
+ * effect_settings — there is no second grade store.
  */
 
 export const CONTEXT_PHOTO = "photo";
 export const CONTEXT_STORY = "story";
 
 const STORAGE_PREFIX = "orga-drone.studio.editing-context.";
+
+function clipKindOf(clip) {
+  if (typeof clip === "string") return String(clip).toLowerCase();
+  const kind = clip?.kind || clip?.dataset?.kind || clip?.item_kind || "";
+  return String(kind).toLowerCase();
+}
 
 export function normalizeEditingContext(raw) {
   const value = String(raw || "")
@@ -22,11 +29,16 @@ export function normalizeEditingContext(raw) {
 export function projectSuggestsPhotoContext(clips) {
   const list = Array.isArray(clips) ? clips.filter(Boolean) : [];
   if (!list.length) return false;
-  return list.every((clip) => {
-    const kind =
-      typeof clip === "string" ? clip : clip?.kind || clip?.dataset?.kind || clip?.item_kind || "";
-    return String(kind).toLowerCase() === "photo";
-  });
+  return list.every((clip) => clipKindOf(clip) === "photo");
+}
+
+/**
+ * True when the project has at least one non-photo Story item (video, title,
+ * collage). Used only for continuity hints — never to force a context switch.
+ */
+export function projectNeedsStoryTools(clips) {
+  const list = Array.isArray(clips) ? clips.filter(Boolean) : [];
+  return list.some((clip) => clipKindOf(clip) !== "photo");
 }
 
 export function storageKeyForProject(projectId) {
@@ -54,7 +66,7 @@ export function writeStoredEditingContext(projectId, context, storage = globalTh
 
 /**
  * Resolve initial context: explicit stored preference wins; otherwise photo-only
- * projects open in photo context.
+ * projects open in photo context. Mixed media never clears a stored Photo focus.
  */
 export function resolveInitialEditingContext({
   projectId,
@@ -94,6 +106,11 @@ export function createEditingContextController({
   const photoBtn = documentImpl.getElementById("studio-context-photo");
   const storyBtn = documentImpl.getElementById("studio-context-story");
   const storyArea = documentImpl.querySelector(".studio-story-area");
+  const continuityHint = documentImpl.getElementById("studio-context-continuity-hint");
+
+  function currentClips() {
+    return typeof getClips === "function" ? getClips() : [];
+  }
 
   function apply() {
     if (root) {
@@ -112,6 +129,10 @@ export function createEditingContextController({
     if (storyArea) {
       storyArea.hidden = false;
       storyArea.setAttribute("aria-hidden", context === CONTEXT_PHOTO ? "true" : "false");
+    }
+    if (continuityHint) {
+      const showHint = context === CONTEXT_PHOTO && projectNeedsStoryTools(currentClips());
+      continuityHint.hidden = !showHint;
     }
     if (typeof onChange === "function") onChange(context);
   }
@@ -138,7 +159,7 @@ export function createEditingContextController({
     setContext,
     isPhoto: () => context === CONTEXT_PHOTO,
     isStory: () => context === CONTEXT_STORY,
-    /** Re-apply DOM classes after layout changes; never auto-switch context. */
+    /** Re-apply DOM classes after layout / clip-list changes; never auto-switch. */
     refresh() {
       apply();
     },
