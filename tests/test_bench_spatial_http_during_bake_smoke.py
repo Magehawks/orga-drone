@@ -1,4 +1,4 @@
-"""Smoke for #513 HTTP-during-bake harness (tiny inline bake)."""
+"""Smoke for #513 HTTP-during-bake harness (inline vs process worker)."""
 
 from __future__ import annotations
 
@@ -17,11 +17,19 @@ def _load():
     return mod
 
 
-def test_http_during_bake_smoke_inline(monkeypatch) -> None:
-    monkeypatch.setenv("ORGA_SPATIAL_BAKE_INLINE", "1")
+def test_http_during_bake_worker_beats_inline_tail() -> None:
+    """Lock hang-class regression: process worker keeps HTTP p95 well below inline.
+
+    96×96 meets the process-isolation pixel threshold used in production code.
+    Bounds stay loose for CI hosts.
+    """
     mod = _load()
-    # Keep CI cheap: tiny image, inline path only.
-    row = mod._run(width=32, height=32, inline=True)
-    assert row["http_ok"] >= 1
-    assert row["bake_s"] is not None and row["bake_s"] < 60.0
-    assert row["http_p50_ms"] is not None
+    inline = mod._run(width=96, height=96, inline=True)
+    worker = mod._run(width=96, height=96, inline=False)
+    assert inline["http_ok"] >= 1 and worker["http_ok"] >= 1
+    assert inline["http_p95_ms"] is not None and worker["http_p95_ms"] is not None
+    assert inline["bake_s"] is not None and inline["bake_s"] < 120.0
+    assert worker["bake_s"] is not None and worker["bake_s"] < 120.0
+    # Worker must not show the multi-hundred-ms GIL starvation tail.
+    assert worker["http_p95_ms"] < 50.0
+    assert worker["http_p95_ms"] < inline["http_p95_ms"]
