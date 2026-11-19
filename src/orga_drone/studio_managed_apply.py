@@ -301,6 +301,7 @@ def apply_managed_grade_rgb(
     lattice_domain: str = "encoded-bt709",
     uv: Uv | None = None,
     lut_resolver: LutResolver | None = None,
+    selection_coverages: Mapping[str, float] | None = None,
 ) -> Rgb:
     """Apply a managed grade to one RGB sample.
 
@@ -309,7 +310,8 @@ def apply_managed_grade_rgb(
     decodes to linear, converts into each step domain, then encodes to the grade
     output profile for presentation/export boundaries.
 
-    Steps with ``selection_id`` require ``uv`` (normalized source coordinates).
+    Steps with ``selection_id`` require ``uv`` (normalized source coordinates)
+    unless a precomputed ``selection_coverages`` entry is supplied for that id.
     Creative LUT steps require ``lut_resolver``.
     """
     if isinstance(grade, GradeModel):
@@ -379,20 +381,24 @@ def apply_managed_grade_rgb(
         coverage = no_selection_coverage()
         selection_id = step.get("selection_id")
         if selection_id:
-            if uv is None:
-                raise ManagedApplyError(
-                    "masked steps require a spatial adapter",
-                    code="UNSUPPORTED_GRADE",
-                )
-            try:
-                selection = selection_by_id(selections, str(selection_id))
-                sample = _encoded_bt709_sample(working, domain=domain)
-                coverage = evaluate_selection(selection, point=uv, rgb=sample)
-            except ManagedSelectionError as exc:
-                raise ManagedApplyError(
-                    str(exc) or "masked steps require a spatial adapter",
-                    code="UNSUPPORTED_GRADE",
-                ) from exc
+            sid = str(selection_id)
+            if selection_coverages is not None and sid in selection_coverages:
+                coverage = float(selection_coverages[sid])
+            else:
+                if uv is None:
+                    raise ManagedApplyError(
+                        "masked steps require a spatial adapter",
+                        code="UNSUPPORTED_GRADE",
+                    )
+                try:
+                    selection = selection_by_id(selections, sid)
+                    sample = _encoded_bt709_sample(working, domain=domain)
+                    coverage = evaluate_selection(selection, point=uv, rgb=sample)
+                except ManagedSelectionError as exc:
+                    raise ManagedApplyError(
+                        str(exc) or "masked steps require a spatial adapter",
+                        code="UNSUPPORTED_GRADE",
+                    ) from exc
 
         working = apply_managed_step(
             working,
@@ -525,6 +531,15 @@ def require_managed_executable(
     )
 
 
+def _selection_qualifier_is_active(selection: Mapping[str, Any] | None) -> bool:
+    if selection is None:
+        return False
+    qualifier = selection.get("qualifier")
+    if not isinstance(qualifier, Mapping):
+        return False
+    return str(qualifier.get("type") or "") not in {"", "none"}
+
+
 def apply_managed_grade_image(
     pixels: Sequence[Sequence[Rgb]],
     grade: Mapping[str, Any] | GradeModel,
@@ -532,20 +547,76 @@ def apply_managed_grade_image(
     lattice_domain: str = "encoded-bt709",
     lut_resolver: LutResolver | None = None,
 ) -> list[list[Rgb]]:
-    """Apply a managed grade to a row-major RGB image using pixel-center UVs."""
+    """Apply a managed grade to a row-major RGB image using pixel-center UVs.
+
+    Spatial masks without RGB qualifiers are rasterized once per selection so
+    brush geometry is not re-evaluated for every step on every pixel.
+    """
+    from orga_drone.studio_managed_selection import (
+        ManagedSelectionError,
+        rasterize_selection_coverage,
+        selection_by_id,
+    )
+
     if not pixels:
         return []
     height = len(pixels)
     width = len(pixels[0]) if height else 0
     if width <= 0:
         return [list(row) for row in pixels]
+
+    if isinstance(grade, GradeModel):
+        if grade.evaluator != "managed-sdr-v1" or grade.grade is None:
+            raise ManagedApplyError(
+                "managed applicator requires managed-sdr-v1",
+                code="UNSUPPORTED_GRADE",
+            )
+        document: Mapping[str, Any] = grade.grade
+    else:
+        document = grade
+
+    raw_selections = document.get("selections") if isinstance(document, Mapping) else None
+    selections: list[Mapping[str, Any]] = [
+        entry
+        for entry in (list(raw_selections) if isinstance(raw_selections, list) else [])
+        if isinstance(entry, Mapping)
+    ]
+    raw_steps = document.get("steps") if isinstance(document, Mapping) else None
+    needed_ids: set[str] = set()
+    for step in list(raw_steps) if isinstance(raw_steps, list) else []:
+        if not isinstance(step, Mapping) or not step.get("enabled", True):
+            continue
+        selection_id = step.get("selection_id")
+        if selection_id:
+            needed_ids.add(str(selection_id))
+
+    coverage_maps: dict[str, list[float]] = {}
+    for selection_id in needed_ids:
+        try:
+            selection = selection_by_id(selections, selection_id)
+        except ManagedSelectionError as exc:
+            raise ManagedApplyError(str(exc), code="UNSUPPORTED_GRADE") from exc
+        if _selection_qualifier_is_active(selection):
+            continue
+        try:
+            coverage_maps[selection_id] = rasterize_selection_coverage(
+                selection, width=width, height=height
+            )
+        except ManagedSelectionError as exc:
+            raise ManagedApplyError(str(exc), code="UNSUPPORTED_GRADE") from exc
+
     out: list[list[Rgb]] = []
     for y, row in enumerate(pixels):
         if len(row) != width:
             raise ManagedApplyError("image rows must share a width", code="RANGE")
         out_row: list[Rgb] = []
+        row_base = y * width
         for x, sample in enumerate(row):
             uv = ((x + 0.5) / width, (y + 0.5) / height)
+            pixel_coverages = {
+                selection_id: weights[row_base + x]
+                for selection_id, weights in coverage_maps.items()
+            }
             out_row.append(
                 apply_managed_grade_rgb(
                     sample,
@@ -553,6 +624,7 @@ def apply_managed_grade_image(
                     lattice_domain=lattice_domain,
                     uv=uv,
                     lut_resolver=lut_resolver,
+                    selection_coverages=pixel_coverages or None,
                 )
             )
         out.append(out_row)

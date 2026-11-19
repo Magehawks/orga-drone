@@ -236,6 +236,143 @@ def invert_selection_coverage(coverage: float) -> float:
     return invert_coverage(coverage)
 
 
+def _brush_leaf_pixel_bounds(
+    leaf: Mapping[str, Any],
+    *,
+    width: int,
+    height: int,
+) -> tuple[int, int, int, int] | None:
+    """Inclusive pixel bounds covering all strokes (+ radius), or None if empty."""
+    strokes = leaf.get("strokes")
+    if not isinstance(strokes, Sequence) or isinstance(strokes, (str, bytes)) or not strokes:
+        return None
+    min_x = 1.0
+    min_y = 1.0
+    max_x = 0.0
+    max_y = 0.0
+    found = False
+    for stroke in strokes:
+        if not isinstance(stroke, Mapping):
+            continue
+        try:
+            polyline = _as_points(stroke.get("points") or (), label="brush.points")
+            radius = float(stroke.get("radius", 0.05) or 0.05)
+        except ManagedSelectionError:
+            continue
+        if not polyline or radius <= 0.0:
+            continue
+        found = True
+        for px, py in polyline:
+            min_x = min(min_x, px - radius)
+            max_x = max(max_x, px + radius)
+            min_y = min(min_y, py - radius)
+            max_y = max(max_y, py + radius)
+    if not found:
+        return None
+    x0 = max(0, int(min_x * width) - 1)
+    x1 = min(width - 1, int(max_x * width) + 1)
+    y0 = max(0, int(min_y * height) - 1)
+    y1 = min(height - 1, int(max_y * height) + 1)
+    if x1 < x0 or y1 < y0:
+        return None
+    return x0, y0, x1, y1
+
+
+def rasterize_mask_coverage(
+    mask: Mapping[str, Any] | None,
+    *,
+    width: int,
+    height: int,
+) -> list[float]:
+    """Row-major spatial mask weights in ``[0, 1]`` (no qualifier / invert).
+
+    Brush-only unions may evaluate only stroke bounding boxes. Mixed or
+    non-brush leaves fall back to a full-frame pass. Empty / absent masks match
+    ``mask_coverage`` semantics.
+    """
+    if width <= 0 or height <= 0:
+        raise ManagedSelectionError("raster size must be positive", code="SELECTION")
+    size = width * height
+    if mask is None:
+        return [1.0] * size
+    if "leaves" not in mask:
+        return [0.0] * size
+    leaves = mask.get("leaves")
+    if not isinstance(leaves, Sequence) or isinstance(leaves, (str, bytes)):
+        raise ManagedSelectionError("mask.leaves must be a list", code="SELECTION")
+    if not leaves:
+        return [0.0] * size
+
+    brush_only = True
+    bounds: list[tuple[int, int, int, int]] = []
+    for leaf in leaves:
+        if not isinstance(leaf, Mapping):
+            raise ManagedSelectionError("mask leaf must be an object", code="SELECTION")
+        if leaf.get("type") != "brush":
+            brush_only = False
+            break
+        box = _brush_leaf_pixel_bounds(leaf, width=width, height=height)
+        if box is not None:
+            bounds.append(box)
+
+    out = [0.0] * size
+    if brush_only and bounds:
+        x0 = min(b[0] for b in bounds)
+        y0 = min(b[1] for b in bounds)
+        x1 = max(b[2] for b in bounds)
+        y1 = max(b[3] for b in bounds)
+        for y in range(y0, y1 + 1):
+            row = y * width
+            v = (y + 0.5) / height
+            for x in range(x0, x1 + 1):
+                u = (x + 0.5) / width
+                out[row + x] = mask_coverage((u, v), mask)
+        return out
+
+    for y in range(height):
+        row = y * width
+        v = (y + 0.5) / height
+        for x in range(width):
+            u = (x + 0.5) / width
+            out[row + x] = mask_coverage((u, v), mask)
+    return out
+
+
+def rasterize_selection_coverage(
+    selection: Mapping[str, Any] | None,
+    *,
+    width: int,
+    height: int,
+) -> list[float]:
+    """Spatial mask raster with invert applied. Qualifiers are not baked here."""
+    if selection is None:
+        return [1.0] * (width * height)
+    mask = selection.get("mask")
+    mask_map: Mapping[str, Any] | None
+    if mask is None:
+        mask_map = None
+    elif isinstance(mask, Mapping):
+        mask_map = mask
+    else:
+        raise ManagedSelectionError("selection.mask must be an object", code="SELECTION")
+    qualifier = selection.get("qualifier")
+    if qualifier is not None and not isinstance(qualifier, Mapping):
+        raise ManagedSelectionError("selection.qualifier must be an object", code="SELECTION")
+    if isinstance(qualifier, Mapping) and str(qualifier.get("type") or "") not in {
+        "",
+        "none",
+    }:
+        # Qualifier depends on RGB — callers must combine per pixel.
+        raise ManagedSelectionError(
+            "qualifier selections cannot be fully rasterized",
+            code="SELECTION",
+        )
+    weights = rasterize_mask_coverage(mask_map, width=width, height=height)
+    if bool(selection.get("invert", False)):
+        return [invert_coverage(value) for value in weights]
+    return weights
+
+
 __all__ = [
     "ManagedSelectionError",
     "RASTERIZER_VERSION",
@@ -243,5 +380,7 @@ __all__ = [
     "leaf_coverage",
     "mask_coverage",
     "qualifier_coverage",
+    "rasterize_mask_coverage",
+    "rasterize_selection_coverage",
     "selection_by_id",
 ]
