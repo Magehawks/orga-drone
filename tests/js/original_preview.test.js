@@ -85,6 +85,7 @@ function harness() {
     state,
     rampEditor: null,
     collageEditor: null,
+    photoStillExport: { sync() {} },
     reuseDraft: null,
     syncToken: 0,
     loadedVideoSrc: "",

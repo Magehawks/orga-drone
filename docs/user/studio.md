@@ -8,6 +8,9 @@
 4. Use Fit / zoom / **10 s** / **1 s** on the timeline to find a cut. Compact tracks is optional.
 5. Add transitions, music, image adjustments, masks, and title cards as needed.
 6. Preview with Play. Export when you are happy (see [Export](export.md)).
+   For a single photo clip, Image → **Export photo (JPG/PNG)** writes a
+   full-resolution still with that clip’s color grade and selections. Story
+   **Export** still writes the whole memory as MP4.
 
 **Useful habits**
 

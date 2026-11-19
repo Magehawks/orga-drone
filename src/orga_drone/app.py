@@ -2633,6 +2633,89 @@ def create_app() -> FastAPI:
                 collage_still_preview_gate.release(cancel_event)
         return Response(content=data, media_type="image/png")
 
+    @app.post("/api/studio/{studio_item_id}/still/export")
+    async def api_studio_photo_still_export(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        """Full-resolution JPG/PNG of one photo clip, including spatial grades (#499)."""
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_clip_still import export_studio_photo_clip_still
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        output_path = payload.get("output_path")
+        if not isinstance(output_path, str) or not output_path.strip():
+            raise HTTPException(status_code=400, detail="output_path is required")
+        translate = get_translator(lang_from_request(request))
+        preset = payload.get("preset") or "best"
+        if not isinstance(preset, str):
+            raise HTTPException(status_code=400, detail="preset must be a string")
+        still_format = payload.get("format") or payload.get("still_format") or "jpeg"
+        if still_format is not None and not isinstance(still_format, str):
+            raise HTTPException(status_code=400, detail="format must be a string")
+
+        def _work(
+            on_progress: Callable[..., None],
+            cancel_event: threading.Event | None,
+        ) -> Path:
+            def _map_progress(fraction: float) -> None:
+                on_progress(
+                    {
+                        "phase": "preparing",
+                        "clip_index": 1,
+                        "clip_total": 1,
+                        "percent": int(round(max(0.0, min(1.0, float(fraction))) * 100)),
+                    }
+                )
+
+            return export_studio_photo_clip_still(
+                db,
+                studio_item_id,
+                Path(output_path),
+                preset=preset,
+                still_format=still_format,
+                cancel_event=cancel_event,
+                on_progress=_map_progress,
+            )
+
+        try:
+            # Validate clip kind early so the job store is not opened for videos.
+            from orga_drone.studio_clip_still import inspect_studio_photo_clip_still
+
+            inspect_studio_photo_clip_still(
+                db, studio_item_id, preset=preset, still_format=still_format
+            )
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+        return _begin_export_job(_work, translate)
+
+    @app.get("/api/studio/{studio_item_id}/still/export/options")
+    async def api_studio_photo_still_export_options(
+        studio_item_id: int,
+        request: Request,
+    ) -> JSONResponse:
+        from orga_drone.export.studio_encoder import StudioExportError
+        from orga_drone.studio_clip_still import inspect_studio_photo_clip_still
+
+        translate = get_translator(lang_from_request(request))
+        fmt = request.query_params.get("format") or "jpeg"
+        try:
+            payload = await asyncio.to_thread(
+                inspect_studio_photo_clip_still,
+                db,
+                studio_item_id,
+                preset="best",
+                still_format=fmt,
+            )
+        except StudioExportError as exc:
+            raise _media_export_error(exc, translate) from exc
+        return JSONResponse(payload)
+
     @app.post("/api/studio/{studio_item_id}/collage/export")
     async def api_studio_collage_export(
         studio_item_id: int,

@@ -95,6 +95,7 @@ import {
   hasActiveControlGesture,
 } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
+import { createPhotoStillExportUi } from "./studio/photo-still-export.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
 import { createDetailControls, readDetail, writeDetail } from "./studio/inspector/detail.js";
@@ -347,6 +348,7 @@ import {
     unknown: root.dataset.kindUnknown || "Memory",
   };
   let collageEditor = null;
+  let photoStillExport = { sync() {} };
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgTransitionNoRoom =
@@ -9513,6 +9515,7 @@ import {
       } else {
         syncColorScopesView();
       }
+      photoStillExport.sync(clip);
       if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
@@ -11889,6 +11892,12 @@ import {
   }
 
   createExportUi({ projectId });
+  photoStillExport = createPhotoStillExportUi({
+    getSelectedClip: () => {
+      if (!state.selected || state.selected.type !== "clip") return null;
+      return findClip(grid, state.selected.id);
+    },
+  });
 
   document.getElementById("studio-music-add")?.addEventListener("click", (event) => {
     event.stopPropagation();
