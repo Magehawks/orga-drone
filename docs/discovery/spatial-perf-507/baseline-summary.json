@@ -1,0 +1,40 @@
+{
+    "host":  "Windows 11 / Python 3.12.3",
+    "http_contention_256":  {
+                                "samples":  42,
+                                "p50_ms":  247.5,
+                                "server":  "ThreadingHTTPServer not FastAPI",
+                                "max_ms":  328.9,
+                                "p95_ms":  323.4
+                            },
+    "hotspots":  [
+                     "apply_managed_grade_rgb",
+                     "evaluate_selection",
+                     "leaf_coverage",
+                     "brush_stroke_coverage",
+                     "_distance_to_segment"
+                 ],
+    "results":  [
+                    {
+                        "seconds_mean":  0.919,
+                        "width":  64,
+                        "height":  64,
+                        "mpix_s":  0.00446
+                    },
+                    {
+                        "seconds_mean":  13.49,
+                        "width":  256,
+                        "height":  256,
+                        "mpix_s":  0.00486
+                    },
+                    {
+                        "seconds_mean":  463.41,
+                        "width":  1125,
+                        "note":  "Neon Relic BEFORE local path not committed",
+                        "height":  1984,
+                        "mpix_s":  0.00482
+                    }
+                ],
+    "develop_sha":  "083ec12e13229fb25f6f4c305975a9e37d73681d",
+    "grade":  "brush~18 strokes + invert + primaries + hsl"
+}
