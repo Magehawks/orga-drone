@@ -234,20 +234,21 @@ def quantize_preview_time(t_s: float, *, step: float = PREVIEW_QUANTIZE_S) -> fl
     return round(value / step) * step
 
 
-def preview_filter_chain(
+def color_filter_chain(
     image: ImageAdjust,
     look: ColorLook,
     *,
     data_dir: Path,
     work_dir: Path,
-    max_edge: int = PREVIEW_MAX_EDGE,
-    even_dimensions: bool = False,
-    saturation: float = 1.0,
     hsl: HslAdjust | None = None,
     color_wheels: ColorWheels | None = None,
     effect_settings: str | None = None,
+    saturation: float = 1.0,
 ) -> str:
-    """Same grade→LUT→HSL→wheels order as export; scale for preview."""
+    """Shared grade→LUT→HSL→wheels (or managed bake) order for stills and export.
+
+    No preview scale or JPEG colour boundary — callers add those when needed.
+    """
     parts: list[str] = []
     managed = ffmpeg_managed_grade_chain(
         effect_settings,
@@ -270,6 +271,36 @@ def preview_filter_chain(
             parts.append(ffmpeg_color_wheels_chain(color_wheels, data_dir=data_dir))
     if saturation != 1.0:
         parts.append(f"eq=saturation={max(0.0, min(1.0, saturation)):.6f}")
+    return ",".join(parts)
+
+
+def preview_filter_chain(
+    image: ImageAdjust,
+    look: ColorLook,
+    *,
+    data_dir: Path,
+    work_dir: Path,
+    max_edge: int = PREVIEW_MAX_EDGE,
+    even_dimensions: bool = False,
+    saturation: float = 1.0,
+    hsl: HslAdjust | None = None,
+    color_wheels: ColorWheels | None = None,
+    effect_settings: str | None = None,
+) -> str:
+    """Same grade→LUT→HSL→wheels order as export; scale for preview."""
+    parts: list[str] = []
+    color = color_filter_chain(
+        image,
+        look,
+        data_dir=data_dir,
+        work_dir=work_dir,
+        hsl=hsl,
+        color_wheels=color_wheels,
+        effect_settings=effect_settings,
+        saturation=saturation,
+    )
+    if color:
+        parts.append(color)
     edge = max(64, min(2160, int(max_edge)))
     # Same scale pattern as export framing: no filter quotes (Windows argv-safe).
     # FFmpeg 7.1 can crash encoding odd-height JPEG inputs on the photo/no-LUT

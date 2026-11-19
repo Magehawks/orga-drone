@@ -1672,11 +1672,13 @@ def prepare_media_export(
     media, path = _require_export_media(db, media_id)
     key = normalize_share_preset(preset, allow_custom=(media.kind == "photo"))
     if media.kind == "photo":
+        color_raw = db.get_image_adjust_json(path)
         adjust = image if image is not None else db.get_image_adjust(path)
         spec = inspect_photo_preset(
             path,
             key,
             image=adjust,
+            color_raw=color_raw if image is None else None,
             still_format=still_format,
             width=width,
             height=height,
@@ -1743,7 +1745,9 @@ def run_media_export(
     custom_h = None
     custom_lock = True
     custom_q = None
+    color_raw = None
     if media.kind == "photo":
+        color_raw = db.get_image_adjust_json(path)
         if adjust is None:
             adjust = db.get_image_adjust(path)
         fmt = still_format
@@ -1784,6 +1788,7 @@ def run_media_export(
                 protected_identities=plan.protected_identities,
                 cancel_event=cancel_event,
                 image=adjust,
+                color_raw=color_raw if image is None else None,
                 still_format=fmt,
                 width=custom_w,
                 height=custom_h,

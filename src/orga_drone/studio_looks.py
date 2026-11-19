@@ -95,20 +95,22 @@ def parse_look_payload(payload: Mapping[str, object]) -> str:
     return key
 
 
-def dump_photo_adjust(image: ImageAdjust, look_id: str = "") -> str:
+def dump_photo_adjust(
+    image: ImageAdjust,
+    look_id: str = "",
+    *,
+    existing: str | None = None,
+) -> str:
     """Persist a library-photo grade. Flat ImageAdjust fields; optional look id.
 
     Older rows store only the four basic sliders. Extra tonal keys and an
     optional ``look`` object are additive and stay compatible with
-    ``image_adjust_from_stored``.
+    ``image_adjust_from_stored``. When ``existing`` is provided, advanced color
+    keys (HSL, wheels, LUT, grade) are preserved (#491).
     """
-    data: dict[str, object] = dict(image.as_dict())
-    key = str(look_id or "").strip().lower()
-    if key:
-        if key not in _LOOK_VALUES:
-            raise ValueError("unknown quick look")
-        data[LOOK_KEY] = {"id": key}
-    return json.dumps(data, separators=(",", ":"), sort_keys=True)
+    from orga_drone.photo_color import merge_photo_image_adjust
+
+    return merge_photo_image_adjust(existing, image, look_id=look_id)
 
 
 def look_id_from_stored(raw: str | None) -> str:
