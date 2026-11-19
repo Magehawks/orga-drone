@@ -54,6 +54,21 @@ function buildPanel() {
   const wrapBtn = button(false);
   const convertBtn = button(false);
   const resetBtn = button(false);
+  const hslFields = {
+    hue: range({ value: 0, disabled: true }),
+    saturation: range({ value: 1, disabled: true }),
+    lightness: range({ value: 0, disabled: true }),
+  };
+  const hslNumbers = {
+    hue: range({ value: 0, disabled: true }),
+    saturation: range({ value: 1, disabled: true }),
+    lightness: range({ value: 0, disabled: true }),
+  };
+  const hslLabels = {
+    hue: label(),
+    saturation: label(),
+    lightness: label(),
+  };
   const map = {
     "[data-managed-color-status]": status,
     "[data-managed-color-wrap]": wrapBtn,
@@ -69,6 +84,17 @@ function buildPanel() {
     "[data-managed-shadows]": fields.shadows,
     "[data-managed-highlights]": fields.highlights,
     "[data-managed-whites]": fields.whites,
+    "[data-managed-hue]": hslFields.hue,
+    "[data-managed-hsl-sat]": hslFields.saturation,
+    "[data-managed-hsl-light]": hslFields.lightness,
+    "[data-managed-hue-number]": hslNumbers.hue,
+    "[data-managed-hsl-sat-number]": hslNumbers.saturation,
+    "[data-managed-hsl-light-number]": hslNumbers.lightness,
+    "[data-managed-hue-value]": hslLabels.hue,
+    "[data-managed-hsl-sat-value]": hslLabels.saturation,
+    "[data-managed-hsl-light-value]": hslLabels.lightness,
+    "[data-managed-hsl-reset]": button(false),
+    "[data-managed-wheels-reset]": button(false),
     "[data-managed-exposure-value]": labels.exposure,
     "[data-managed-kelvin-value]": labels.kelvin,
     "[data-managed-tint-value]": labels.tint,
