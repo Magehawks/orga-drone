@@ -198,10 +198,17 @@ def test_managed_sdr_api_parity_journey(tmp_path: Path, monkeypatch: pytest.Monk
     spatial_path = tmp_path / "spatial.jpg"
     spatial_path.write_bytes(spatial_still.content)
     spatial_preview = Image.open(spatial_path).convert("RGB")
-    assert spatial_preview.size == preview.size
+    # Spatial CPU previews intentionally clamp below the general still edge (#508).
+    from orga_drone.studio_preview_frame import SPATIAL_PREVIEW_MAX_EDGE
+
+    assert max(spatial_preview.size) <= SPATIAL_PREVIEW_MAX_EDGE
+    assert max(spatial_preview.size) < max(preview.size)
+    preview_at_spatial = preview.resize(spatial_preview.size, Image.Resampling.BILINEAR)
     diff = sum(
         abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
-        for a, b in zip(preview.getdata(), spatial_preview.getdata(), strict=True)
+        for a, b in zip(
+            preview_at_spatial.getdata(), spatial_preview.getdata(), strict=True
+        )
     )
     assert diff > 0, "spatial selection should change preview pixels"
 
