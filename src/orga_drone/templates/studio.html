@@ -301,11 +301,17 @@
       <a class="button ghost studio-icon-button" id="studio-projects-back" href="/studio/projects">{{ _('Back to projects') }}</a>
     </div>
     <div class="studio-topbar-actions">
+      <div class="studio-context-toggle" role="group" aria-label="{{ _('Editing focus') }}">
+        <button type="button" class="button ghost studio-context-btn" id="studio-context-photo"
+                aria-pressed="false" title="{{ _('Photo editing focus') }}">{{ _('Photo') }}</button>
+        <button type="button" class="button ghost studio-context-btn" id="studio-context-story"
+                aria-pressed="true" title="{{ _('Story timeline focus') }}">{{ _('Story') }}</button>
+      </div>
       <button type="button" class="button studio-icon-button studio-topbar-export" id="studio-export-open"
-              title="{{ _('Export') }}" aria-label="{{ _('Export') }}"
+              title="{{ _('Export Story MP4') }}" aria-label="{{ _('Export Story MP4') }}"
               {% if not items %}disabled{% endif %}>
         {{ lucide('download') }}
-        <span class="studio-btn-label">{{ _('Export') }}</span>
+        <span class="studio-btn-label">{{ _('Export MP4') }}</span>
       </button>
     </div>
     {% else %}

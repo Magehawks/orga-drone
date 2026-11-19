@@ -1797,6 +1797,55 @@ button.cta, .button.cta {
   gap: 0;
   border-bottom: 1px solid var(--border);
 }
+
+.studio-context-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-right: 0.35rem;
+  padding: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, var(--surface-deep));
+}
+.studio-context-btn {
+  min-width: 4.25rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.82rem;
+}
+.studio-context-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Photo focus: enlarge preview, collapse timeline chrome without deleting tracks. */
+.studio-creator.is-photo-context .studio-stage {
+  --studio-story-height: 2.75rem;
+}
+.studio-creator.is-photo-context .studio-story-area {
+  min-height: 2.75rem;
+  max-height: 2.75rem;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+}
+.studio-creator.is-photo-context .studio-timeline-toolbar,
+.studio-creator.is-photo-context .studio-timeline-row,
+.studio-creator.is-photo-context .studio-story-resize {
+  visibility: hidden;
+  pointer-events: none;
+}
+.studio-creator.is-photo-context #inspector-photo-still-export {
+  order: -1;
+  display: block;
+}
+.studio-creator.is-photo-context #inspector-image-panel {
+  display: flex;
+  flex-direction: column;
+}
+.studio-creator.is-photo-context .studio-topbar-export .studio-btn-label::after {
+  content: none;
+}
 .studio-browser,
 .studio-inspector {
   background: var(--panel);

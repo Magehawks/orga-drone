@@ -4,13 +4,17 @@
 
 1. Open **Studio** and pick or create a project.
 2. Add photos/videos from Browse or the Studio media list.
-3. Drag clips to reorder. On videos, drag the left/right edges to trim.
-4. Use Fit / zoom / **10 s** / **1 s** on the timeline to find a cut. Compact tracks is optional.
-5. Add transitions, music, image adjustments, masks, and title cards as needed.
-6. Preview with Play. Export when you are happy (see [Export](export.md)).
+3. Use the top-bar **Photo** / **Story** focus when you care about one
+   photo’s color tools (Photo collapses the timeline chrome) or the full
+   timeline and MP4 export (Story). The choice is remembered per project and
+   does not flip just because you add another clip.
+4. Drag clips to reorder. On videos, drag the left/right edges to trim.
+5. Use Fit / zoom / **10 s** / **1 s** on the timeline to find a cut. Compact tracks is optional.
+6. Add transitions, music, image adjustments, masks, and title cards as needed.
+7. Preview with Play. Export when you are happy (see [Export](export.md)).
    For a single photo clip, Image → **Export photo (JPG/PNG)** writes a
    full-resolution still with that clip’s color grade and selections. Story
-   **Export** still writes the whole memory as MP4.
+   **Export MP4** still writes the whole memory as MP4.
 
 **Useful habits**
 

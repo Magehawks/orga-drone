@@ -86,6 +86,13 @@ function harness() {
     rampEditor: null,
     collageEditor: null,
     photoStillExport: { sync() {} },
+    editingContext: {
+      getContext: () => "story",
+      isPhoto: () => false,
+      isStory: () => true,
+      setContext() {},
+      refresh() {},
+    },
     reuseDraft: null,
     syncToken: 0,
     loadedVideoSrc: "",

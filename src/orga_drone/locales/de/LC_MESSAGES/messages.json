@@ -1314,5 +1314,9 @@
   "Export still": "Standbild exportieren",
   "Could not export collage.": "Collage konnte nicht exportiert werden.",
   "Collage export cancelled.": "Collage-Export abgebrochen.",
-  "collage": "collage"
+  "collage": "collage",
+  "Editing focus": "Bearbeitungsfokus",
+  "Photo editing focus": "Fokus Foto-Bearbeitung",
+  "Story timeline focus": "Fokus Story-Timeline",
+  "Export Story MP4": "Story-MP4 exportieren"
 }

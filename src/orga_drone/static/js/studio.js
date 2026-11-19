@@ -96,6 +96,10 @@ import {
 } from "./studio/control-bridge.js";
 import { createExportUi } from "./studio/export.js";
 import { createPhotoStillExportUi } from "./studio/photo-still-export.js";
+import {
+  CONTEXT_PHOTO,
+  createEditingContextController,
+} from "./studio/editing-context.js";
 import { formatLaneTime, formatTemplate, formatTime } from "./studio/format.js";
 import { createProjectBrowser } from "./studio/project-browser.js";
 import { createDetailControls, readDetail, writeDetail } from "./studio/inspector/detail.js";
@@ -349,6 +353,13 @@ import {
   };
   let collageEditor = null;
   let photoStillExport = { sync() {} };
+  let editingContext = {
+    getContext: () => "story",
+    isPhoto: () => false,
+    isStory: () => true,
+    setContext() {},
+    refresh() {},
+  };
   const msgBetween = root.dataset.transitionBetween || "Between {a} and {b}";
   const msgTransitionAria = root.dataset.transitionAria || "{type} between {a} and {b}";
   const msgTransitionNoRoom =
@@ -9543,6 +9554,8 @@ import {
       } catch (_) {
         storedTab = "clip";
       }
+      // Photo focus prioritizes color tools without forcing a Story tab switch.
+      if (editingContext.isPhoto() && isPhoto) storedTab = "image";
       setInspectorTab(storedTab);
       refreshInspectorTabMarks(clip);
     }
@@ -11896,6 +11909,26 @@ import {
     getSelectedClip: () => {
       if (!state.selected || state.selected.type !== "clip") return null;
       return findClip(grid, state.selected.id);
+    },
+  });
+  editingContext = createEditingContextController({
+    root,
+    projectId,
+    getClips: () =>
+      clips().map((clip) => ({
+        kind: clipKind(clip),
+      })),
+    onChange: (context) => {
+      const selectedClip =
+        state.selected && state.selected.type === "clip"
+          ? findClip(grid, state.selected.id)
+          : null;
+      if (context === CONTEXT_PHOTO && selectedClip && clipKind(selectedClip) === "photo") {
+        setInspectorTab("image");
+        showInspector("inspector-clip");
+      }
+      photoStillExport.sync(selectedClip);
+      layoutTimeline();
     },
   });
 
