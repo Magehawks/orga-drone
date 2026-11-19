@@ -1291,5 +1291,9 @@
   "Export still": "Export still",
   "Could not export collage.": "Could not export collage.",
   "Collage export cancelled.": "Collage export cancelled.",
-  "collage": "collage"
+  "collage": "collage",
+  "Editing focus": "Editing focus",
+  "Photo editing focus": "Photo editing focus",
+  "Story timeline focus": "Story timeline focus",
+  "Export Story MP4": "Export Story MP4"
 }

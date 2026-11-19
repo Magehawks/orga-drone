@@ -1248,3 +1248,15 @@ msgstr "Could not publish the collage export safely."
 
 msgid "Collage media changed while reading video metadata. Try again."
 msgstr "Collage media changed while reading video metadata. Try again."
+
+msgid "Editing focus"
+msgstr "Editing focus"
+
+msgid "Photo editing focus"
+msgstr "Photo editing focus"
+
+msgid "Story timeline focus"
+msgstr "Story timeline focus"
+
+msgid "Export Story MP4"
+msgstr "Export Story MP4"

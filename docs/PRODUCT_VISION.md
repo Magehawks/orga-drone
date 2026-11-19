@@ -152,6 +152,7 @@ professional video-editing knowledge.
 | Persisted Studio project title (non-destructive project/clip model) | **Available now** |
 | Multiple local Studio projects (browser, switch, rename, delete) | **Available now** |
 | Creator Studio layout (preview, Story track, inspector) | **Available now** (UI foundation) |
+| Adaptive Photo / Story editing focus | **Available now** (per-project Photo vs Story toggle; Photo collapses timeline chrome and opens Image tools + still export; Story keeps the full timeline and MP4 export; preference is stored locally and does not auto-switch merely because another clip was added; one project model, no separate Photo Project) |
 | Time-based Story canvas (Fit to story / zoom, shared ruler and playhead) | **Available now** (UI state only; not a professional NLE) |
 | Synced Story preview (playhead ↔ active clip ↔ media) | **Available now** |
 | Simple video Cut (split Story item at playhead; source in/out offsets) | **Available now** |

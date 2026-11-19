@@ -1269,3 +1269,15 @@ msgstr "Der Collagenexport konnte nicht sicher gespeichert werden."
 
 msgid "Collage media changed while reading video metadata. Try again."
 msgstr "Das Medium der Collage wurde während der Dauerermittlung geändert. Versuche es erneut."
+
+msgid "Editing focus"
+msgstr "Bearbeitungsfokus"
+
+msgid "Photo editing focus"
+msgstr "Fokus Foto-Bearbeitung"
+
+msgid "Story timeline focus"
+msgstr "Fokus Story-Timeline"
+
+msgid "Export Story MP4"
+msgstr "Story-MP4 exportieren"
