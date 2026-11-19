@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 
 PREVIEW_STILLS_DIR = "preview-stills"
 PREVIEW_MAX_EDGE = 1080
+# Spatial CPU grades re-evaluate masks per pixel; keep interactive previews smaller
+# than the general still budget. Full-resolution export stays on the export path.
+SPATIAL_PREVIEW_MAX_EDGE = 512
 PREVIEW_QUANTIZE_S = 0.1
 PREVIEW_JPEG_Q = 3
 PREVIEW_CACHE_MAX_BYTES = 400 * 1024 * 1024
@@ -421,6 +424,12 @@ def render_preview_frame(
         require_lut_asset(data_dir, req.look.conversion_lut)
     if req.look.creative_lut and req.look.creative_strength > 0:
         require_lut_asset(data_dir, req.look.creative_lut)
+    # Spatial CPU materialize is O(pixels×strokes); clamp preview edge so Studio
+    # stays interactive. Export / still paths keep full resolution separately.
+    if req.effect_settings and grade_needs_cpu_materialize(req.effect_settings):
+        edge = max(64, min(int(req.max_edge), SPATIAL_PREVIEW_MAX_EDGE))
+        if edge != int(req.max_edge):
+            req = replace(req, max_edge=edge)
     key = cache_key_for(
         req,
         media_mtime_ns=st.st_mtime_ns,
