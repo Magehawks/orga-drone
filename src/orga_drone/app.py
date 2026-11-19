@@ -2233,6 +2233,56 @@ def create_app() -> FastAPI:
                     return item
             raise HTTPException(status_code=404, detail="studio item not found")
 
+        def _leaf_media(spec: dict[str, Any], leaf_id: str) -> Any:
+            return next(
+                (
+                    leaf.get("media")
+                    for leaf in iter_leaves(spec["root"])
+                    if leaf["id"] == leaf_id
+                ),
+                None,
+            )
+
+        def _assignment_conflict() -> HTTPException:
+            translate = get_translator(lang_from_request(request))
+            return HTTPException(
+                status_code=409,
+                detail=translate("Collage media changed while reading video metadata. Try again."),
+            )
+
+        def _video_source(media: dict[str, Any]) -> tuple[Any, ...]:
+            return tuple(
+                media.get(key) for key in ("source", "media_id", "identity_key", "path")
+            )
+
+        def _assign_media(
+            spec: dict[str, Any], leaf_id: str, media: Any
+        ) -> dict[str, Any]:
+            if isinstance(media, dict) and media.get("source") == "external":
+                media = dict(media)
+                media.pop("has_path", None)
+                if not media.get("path"):
+                    prior_by_key = {
+                        str(leaf.get("media", {}).get("source_key") or ""): leaf.get(
+                            "media"
+                        )
+                        for leaf in iter_leaves(spec["root"])
+                        if isinstance(leaf.get("media"), dict)
+                    }
+                    prior_by_id = {
+                        str(leaf["id"]): leaf.get("media")
+                        for leaf in iter_leaves(spec["root"])
+                    }
+                    key = str(media.get("source_key") or "").strip()
+                    prior = prior_by_key.get(key) if key else None
+                    if not isinstance(prior, dict):
+                        prior = prior_by_id.get(leaf_id)
+                    if isinstance(prior, dict) and prior.get("path"):
+                        media["path"] = prior["path"]
+                        if prior.get("source_key") and not media.get("source_key"):
+                            media["source_key"] = prior["source_key"]
+            return assign_leaf_media(spec, leaf_id, media)
+
         kwargs: dict[str, Any] = {}
         if "duration_s" in payload:
             raw = payload.get("duration_s")
@@ -2323,49 +2373,34 @@ def create_app() -> FastAPI:
                             media.get("pan_y"),
                             media.get("fit"),
                         )
-                    if isinstance(media, dict) and media.get("source") == "external":
-                        media = dict(media)
-                        media.pop("has_path", None)
-                        if not media.get("path"):
-                            prior_by_key = {
-                                str(leaf.get("media", {}).get("source_key") or ""): leaf.get(
-                                    "media"
-                                )
-                                for leaf in iter_leaves(spec["root"])
-                                if isinstance(leaf.get("media"), dict)
-                            }
-                            prior_by_id = {
-                                str(leaf["id"]): leaf.get("media")
-                                for leaf in iter_leaves(spec["root"])
-                            }
-                            key = str(media.get("source_key") or "").strip()
-                            prior = prior_by_key.get(key) if key else None
-                            if not isinstance(prior, dict):
-                                prior = prior_by_id.get(leaf_id)
-                            if isinstance(prior, dict) and prior.get("path"):
-                                media["path"] = prior["path"]
-                                if prior.get("source_key") and not media.get("source_key"):
-                                    media["source_key"] = prior["source_key"]
-                    kwargs["collage_spec"] = assign_leaf_media(spec, leaf_id, media)
-                    # Video longer than the default/short collage → extend duration.
-                    assigned_media = None
-                    next_spec = kwargs.get("collage_spec")
-                    root = next_spec.get("root") if isinstance(next_spec, dict) else None
-                    if isinstance(root, dict):
-                        for leaf in iter_leaves(root):
-                            if str(leaf.get("id")) == leaf_id:
-                                assigned_media = leaf.get("media")
-                                break
+                    next_spec = _assign_media(spec, leaf_id, media)
+                    assigned_media = _leaf_media(next_spec, leaf_id)
                     if (
                         isinstance(assigned_media, dict)
-                        and str(assigned_media.get("kind") or "").lower() == "video"
+                        and assigned_media.get("kind") == "video"
                     ):
-                        video_dur = resolve_leaf_video_duration_s(db, assigned_media)
+                        video_dur = await asyncio.to_thread(
+                            resolve_leaf_video_duration_s, db, assigned_media
+                        )
+                        latest = _load_clip()
+                        if latest.collage_spec != current.collage_spec:
+                            latest_spec = collage_spec_from_raw(latest.collage_spec)
+                            if _leaf_media(latest_spec, leaf_id) != _leaf_media(spec, leaf_id):
+                                raise _assignment_conflict()
+                            next_spec = _assign_media(latest_spec, leaf_id, media)
+                            rebased_media = _leaf_media(next_spec, leaf_id)
+                            # A redacted path can also depend on a different cell's source key.
+                            if (
+                                not isinstance(rebased_media, dict)
+                                or _video_source(rebased_media) != _video_source(assigned_media)
+                            ):
+                                raise _assignment_conflict()
                         next_dur = duration_for_video_assign(
-                            current.collage_duration_s, video_dur
+                            latest.collage_duration_s, video_dur
                         )
                         if next_dur is not None:
                             kwargs["collage_duration_s"] = next_dur
+                    kwargs["collage_spec"] = next_spec
                 else:
                     raise ValueError(f"unknown collage op: {op}")
             except ValueError as exc:
