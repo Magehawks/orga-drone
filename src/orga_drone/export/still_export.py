@@ -689,11 +689,21 @@ def _grade_rgb(
 
     if color_raw is not None:
         parts = photo_color_parts(color_raw)
-        image_part = parts.image
+        # Export may pass a request ImageAdjust (Detail always does). Prefer it
+        # for the basic grade while keeping HSL/LUT/wheels from persisted JSON.
+        image_part = image if image is not None else parts.image
         look = parts.color_look
         hsl = parts.hsl
         wheels = parts.color_wheels
         effect = parts.effect_settings if parts.managed else None
+        if (
+            image_part.is_neutral
+            and look.is_neutral
+            and hsl.is_neutral
+            and wheels.is_neutral
+            and not parts.managed
+        ):
+            return rgb
     else:
         from orga_drone.studio_color_wheels import ColorWheels
         from orga_drone.studio_hsl import HslAdjust
