@@ -36,6 +36,7 @@ import orga_drone.app  # noqa: E402
 import orga_drone.app_prefs  # noqa: E402
 import orga_drone.auto_tags  # noqa: E402
 import orga_drone.desktop  # noqa: E402
+import orga_drone.studio_clip_still  # noqa: E402
 import orga_drone.studio_collage_still  # noqa: E402
 import orga_drone.studio_export  # noqa: E402
 import orga_drone.thumbs  # noqa: E402
@@ -63,6 +64,7 @@ _SETTINGS_BINDING_MODULES = (
     orga_drone.app_prefs,
     orga_drone.auto_tags,
     orga_drone.desktop,
+    orga_drone.studio_clip_still,
     orga_drone.studio_collage_still,
     orga_drone.studio_export,
     orga_drone.thumbs,
