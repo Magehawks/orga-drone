@@ -23,10 +23,16 @@
   const msgEstimating = root.dataset.exportEstimating || "Estimating…";
   const msgDoneIn = root.dataset.exportDoneIn || "Done in {time}";
   const msgSuccess = root.dataset.exportSuccess || "Exported {filename}.";
-  const msgFileMissing = root.dataset.exportFileMissing || "The exported file is no longer available.";
-  const msgOpenUnavailable = root.dataset.exportOpenUnavailable || "Opening the exported video is not available on this device.";
-  const msgRevealUnavailable = root.dataset.exportRevealUnavailable || "Showing the file in its folder is not available on this device.";
-  const msgUnavailable = root.dataset.exportUnavailable || "Export needs the desktop app for the save dialog.";
+  const msgFileMissing =
+    root.dataset.exportFileMissing || "The exported file is no longer available.";
+  const msgOpenUnavailable =
+    root.dataset.exportOpenUnavailable ||
+    "Opening the exported video is not available on this device.";
+  const msgRevealUnavailable =
+    root.dataset.exportRevealUnavailable ||
+    "Showing the file in its folder is not available on this device.";
+  const msgUnavailable =
+    root.dataset.exportUnavailable || "Export needs the desktop app for the save dialog.";
   const msgOpenVideo = root.dataset.openVideo || "Open video";
   const msgOpenImage = root.dataset.openImage || "Open image";
   const msgNoPreset = root.dataset.noPreset || "No exportable resolution for this file.";
@@ -136,9 +142,7 @@
   function readQuickLooksModel() {
     const fallback = { ids: [], values: {} };
     const raw =
-      (adjustPanel && adjustPanel.dataset.quickLooksModel) ||
-      root.dataset.quickLooksModel ||
-      "";
+      (adjustPanel && adjustPanel.dataset.quickLooksModel) || root.dataset.quickLooksModel || "";
     try {
       const parsed = JSON.parse(raw || "");
       if (!parsed || typeof parsed !== "object") return fallback;
@@ -317,7 +321,8 @@
     const h = Number(optionsCache && optionsCache.source_height);
     if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) return { width: w, height: h };
     const best = presetById("best");
-    if (best && best.width && best.height) return { width: Number(best.width), height: Number(best.height) };
+    if (best && best.width && best.height)
+      return { width: Number(best.width), height: Number(best.height) };
     return { width: 0, height: 0 };
   }
 
@@ -383,7 +388,8 @@
     }
     const profile = selectedProfile();
     const fmt = selectedStillFormat();
-    if (formatWrap) formatWrap.hidden = !(profile === "original" || profile === "print" || profile === "custom");
+    if (formatWrap)
+      formatWrap.hidden = !(profile === "original" || profile === "print" || profile === "custom");
     if (socialWrap) socialWrap.hidden = profile !== "social";
     if (customWrap) customWrap.hidden = profile !== "custom";
     if (lockWrap) lockWrap.hidden = profile !== "custom";
@@ -492,10 +498,18 @@
   }
 
   function suggestionFor(preset) {
-    const base = preset && preset.suggested_filename
-      ? String(preset.suggested_filename)
-      : (kind === "video" ? "export.mp4" : "export.jpg");
-    if (kind === "photo" && preset && (preset.id === "best" || preset.id === "custom") && selectedStillFormat() === "png") {
+    const base =
+      preset && preset.suggested_filename
+        ? String(preset.suggested_filename)
+        : kind === "video"
+          ? "export.mp4"
+          : "export.jpg";
+    if (
+      kind === "photo" &&
+      preset &&
+      (preset.id === "best" || preset.id === "custom") &&
+      selectedStillFormat() === "png"
+    ) {
       return base.replace(/\.[^.]+$/, ".png");
     }
     if (kind === "photo" && preset && preset.id === "custom") {
@@ -561,8 +575,10 @@
     if (jpegQualityInput) {
       const def = custom && custom.jpeg_quality_default != null ? custom.jpeg_quality_default : 95;
       jpegQualityInput.value = String(def);
-      if (custom && custom.jpeg_quality_min != null) jpegQualityInput.min = String(custom.jpeg_quality_min);
-      if (custom && custom.jpeg_quality_max != null) jpegQualityInput.max = String(custom.jpeg_quality_max);
+      if (custom && custom.jpeg_quality_min != null)
+        jpegQualityInput.min = String(custom.jpeg_quality_min);
+      if (custom && custom.jpeg_quality_max != null)
+        jpegQualityInput.max = String(custom.jpeg_quality_max);
     }
     if (lockAspectInput) lockAspectInput.checked = true;
   }
@@ -574,12 +590,22 @@
     if (changed === "width" && widthInput && heightInput) {
       const w = Number(widthInput.value);
       if (!(w > 0)) return;
-      heightInput.value = String(Math.max(1, Math.min(src.height, Math.round(src.height * (Math.min(w, src.width) / src.width)))));
+      heightInput.value = String(
+        Math.max(
+          1,
+          Math.min(src.height, Math.round(src.height * (Math.min(w, src.width) / src.width)))
+        )
+      );
     }
     if (changed === "height" && widthInput && heightInput) {
       const h = Number(heightInput.value);
       if (!(h > 0)) return;
-      widthInput.value = String(Math.max(1, Math.min(src.width, Math.round(src.width * (Math.min(h, src.height) / src.height)))));
+      widthInput.value = String(
+        Math.max(
+          1,
+          Math.min(src.width, Math.round(src.width * (Math.min(h, src.height) / src.height)))
+        )
+      );
     }
   }
 
@@ -630,7 +656,10 @@
     if (exportProgressBar) exportProgressBar.style.width = `${percent}%`;
     if (exportProgressEl) exportProgressEl.setAttribute("aria-valuenow", String(percent));
     if (exportProgress) {
-      exportProgress.classList.toggle("is-working", job.state === "running" || job.state === "pending");
+      exportProgress.classList.toggle(
+        "is-working",
+        job.state === "running" || job.state === "pending"
+      );
     }
     if (exportProgressLabel) exportProgressLabel.textContent = `${phaseLabel(job)} (${percent}%)`;
     const elapsed = localElapsedS != null ? localElapsedS : Number(job.elapsed_s) || 0;
@@ -641,7 +670,8 @@
       etaS = (elapsed / (percent / 100)) * (1 - percent / 100);
     }
     if (job.state === "completed") etaText = msgDoneIn.replace("{time}", formatDuration(elapsed));
-    else if (etaS != null && Number.isFinite(Number(etaS))) etaText = msgEta.replace("{time}", formatDuration(etaS));
+    else if (etaS != null && Number.isFinite(Number(etaS)))
+      etaText = msgEta.replace("{time}", formatDuration(etaS));
     if (exportProgressMeta) exportProgressMeta.textContent = `${elapsedText} · ${etaText}`;
   }
 
@@ -752,7 +782,9 @@
     setSuccessError("");
     if (openBtn) {
       openBtn.hidden = job.open_available === false;
-      openBtn.textContent = String(filename).toLowerCase().endsWith(".mp4") ? msgOpenVideo : msgOpenImage;
+      openBtn.textContent = String(filename).toLowerCase().endsWith(".mp4")
+        ? msgOpenVideo
+        : msgOpenImage;
     }
     if (revealBtn) revealBtn.hidden = job.reveal_available === false;
     banner.hidden = false;
@@ -926,6 +958,14 @@
     setRunningUi(true);
     setStatus(msgRunningHint);
     setProgressVisible(false);
+    try {
+      if (typeof window.orgaDetailColor?.flushPendingSaves === "function") {
+        await window.orgaDetailColor.flushPendingSaves();
+      }
+      await saveAdjust({ keepLook: Boolean(activeLookId) });
+    } catch (_) {
+      /* best-effort flush; export still uses last persisted grade */
+    }
     let pickedPath = null;
     try {
       const pickRes = await fetch("/api/desktop/pick-save-file", {
@@ -997,10 +1037,10 @@
     if (exportCancelBtn) exportCancelBtn.disabled = true;
     setStatus(msgCancelling);
     try {
-      const res = await fetch(
-        `/api/studio/export/jobs/${encodeURIComponent(activeJobId)}/cancel`,
-        { method: "POST", headers: { Accept: "application/json" } }
-      );
+      const res = await fetch(`/api/studio/export/jobs/${encodeURIComponent(activeJobId)}/cancel`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
       if (!res.ok) {
         cancelRequested = false;
         if (exportCancelBtn) exportCancelBtn.disabled = false;
@@ -1051,8 +1091,7 @@
     } catch (_) {
       saved = null;
     }
-    const lookId =
-      (adjustPanel && adjustPanel.dataset.photoLook) || root.dataset.photoLook || "";
+    const lookId = (adjustPanel && adjustPanel.dataset.photoLook) || root.dataset.photoLook || "";
     if (!saved || typeof saved !== "object") {
       writeAdjust({}, { lookId: lookId || "" });
       return;

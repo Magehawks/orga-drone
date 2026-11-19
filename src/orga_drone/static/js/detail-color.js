@@ -59,6 +59,9 @@ function createDetailColor() {
   let selectedRange = "red";
   let previewTimer = 0;
   let saveTimer = 0;
+  let previewGeneration = 0;
+  let hslDirty = false;
+  let writeQueue = Promise.resolve();
   const hslPairs = {};
   const undoBtn = document.getElementById("detail-color-undo");
   const redoBtn = document.getElementById("detail-color-redo");
@@ -134,7 +137,8 @@ function createDetailColor() {
     WHEEL_IDS.forEach(paintWheel);
   }
 
-  async function refreshServerPreview() {
+  async function refreshServerPreview(expectedGeneration = previewGeneration) {
+    if (expectedGeneration !== previewGeneration) return;
     const targets = [gradePreview, pagePreview].filter(Boolean);
     if (!needsServerPreview()) {
       targets.forEach((el) => {
@@ -146,21 +150,36 @@ function createDetailColor() {
       );
       return;
     }
-    const url = `/api/media/${encodeURIComponent(mediaId)}/color-preview?max_edge=1080&t=${Date.now()}`;
+    const generation = expectedGeneration;
+    const url = `/api/media/${encodeURIComponent(mediaId)}/color-preview?max_edge=1080&t=${Date.now()}&g=${generation}`;
     targets.forEach((el) => {
       el.style.filter = "";
       el.setAttribute("src", url);
+      el.dataset.previewGeneration = String(generation);
     });
     window.dispatchEvent(
-      new CustomEvent("orga-detail-color-preview", { detail: { mode: "server", url } })
+      new CustomEvent("orga-detail-color-preview", {
+        detail: { mode: "server", url, generation },
+      })
     );
   }
 
   function schedulePreview() {
     window.clearTimeout(previewTimer);
+    const generation = previewGeneration;
     previewTimer = window.setTimeout(() => {
-      void refreshServerPreview();
+      void refreshServerPreview(generation);
     }, 80);
+  }
+
+  function enqueueWrite(task) {
+    const generation = ++previewGeneration;
+    writeQueue = writeQueue
+      .catch(() => {})
+      .then(async () => {
+        await task(generation);
+      });
+    return writeQueue;
   }
 
   async function patchJson(path, body) {
@@ -174,33 +193,55 @@ function createDetailColor() {
     return data;
   }
 
-  async function saveHsl(commit = true) {
+  async function persistHsl(generation) {
+    const payload = readHslFromControls();
+    state.hsl = payload;
+    try {
+      const data = await patchJson(`/api/media/${mediaId}/hsl`, payload);
+      if (generation !== previewGeneration) return;
+      state.hsl = data.hsl || payload;
+      applyHistoryFlags(data);
+      await refreshServerPreview(generation);
+    } catch (_) {
+      /* keep local state; next commit retries */
+    }
+  }
+
+  function saveHsl(_commit = true) {
     state.hsl = readHslFromControls();
-    schedulePreview();
-    if (!commit) return;
+    hslDirty = true;
     window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(async () => {
-      try {
-        const data = await patchJson(`/api/media/${mediaId}/hsl`, state.hsl);
-        state.hsl = data.hsl || state.hsl;
-        applyHistoryFlags(data);
-      } catch (_) {
-        /* keep local state; next commit retries */
-      }
+    // Persist on input and commit so server previews/exports never lag UI state.
+    saveTimer = window.setTimeout(() => {
+      hslDirty = false;
+      void enqueueWrite((generation) => persistHsl(generation));
     }, 160);
   }
 
   async function saveWheels(wheels) {
     state.color_wheels = wheels;
     fillWheels();
-    schedulePreview();
-    try {
-      const data = await patchJson(`/api/media/${mediaId}/color-wheels`, wheels);
-      state.color_wheels = data.color_wheels || wheels;
-      applyHistoryFlags(data);
-    } catch (_) {
-      /* ignore transient */
+    await enqueueWrite(async (generation) => {
+      try {
+        const data = await patchJson(`/api/media/${mediaId}/color-wheels`, wheels);
+        if (generation !== previewGeneration) return;
+        state.color_wheels = data.color_wheels || wheels;
+        applyHistoryFlags(data);
+        await refreshServerPreview(generation);
+      } catch (_) {
+        /* ignore transient */
+      }
+    });
+  }
+
+  async function flushPendingSaves() {
+    window.clearTimeout(previewTimer);
+    window.clearTimeout(saveTimer);
+    if (hslDirty) {
+      hslDirty = false;
+      void enqueueWrite((generation) => persistHsl(generation));
     }
+    await writeQueue;
   }
 
   function pointFromEvent(wheelEl, event) {
@@ -333,7 +374,7 @@ function createDetailColor() {
     }
   }
 
-  document.getElementById("detail-color-lut")?.addEventListener("change", async (event) => {
+  document.getElementById("detail-color-lut")?.addEventListener("change", (event) => {
     const asset = event.target.value || "";
     const body = {
       input_profile: state.color?.input_profile || "rec709",
@@ -342,14 +383,17 @@ function createDetailColor() {
       creative_strength: state.color?.creative_strength ?? 100,
       conversion_confirmed: Boolean(state.color?.conversion_confirmed),
     };
-    try {
-      const data = await patchJson(`/api/media/${mediaId}/color-look`, body);
-      state.color = data.color || body;
-      applyHistoryFlags(data);
-      schedulePreview();
-    } catch (_) {
-      /* ignore */
-    }
+    void enqueueWrite(async (generation) => {
+      try {
+        const data = await patchJson(`/api/media/${mediaId}/color-look`, body);
+        if (generation !== previewGeneration) return;
+        state.color = data.color || body;
+        applyHistoryFlags(data);
+        await refreshServerPreview(generation);
+      } catch (_) {
+        /* ignore */
+      }
+    });
   });
 
   async function postHistory(kind) {
@@ -438,6 +482,7 @@ function createDetailColor() {
   window.orgaDetailColor = {
     needsServerPreview,
     refreshServerPreview,
+    flushPendingSaves,
     getState: () => state,
   };
   window.addEventListener("orga-detail-basic-preview", () => {
