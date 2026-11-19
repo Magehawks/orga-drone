@@ -1,0 +1,23 @@
+{
+  "issue": 514,
+  "parent": 506,
+  "bake_s": 270.47,
+  "result_means": {
+    "r": 91.15468279569892,
+    "g": 94.22877329749105,
+    "b": 53.71003405017921
+  },
+  "result_chroma_ratio": 0.2867,
+  "target_means": {
+    "r": 70.57767979844252,
+    "g": 40.09470784343666,
+    "b": 61.46655787143075
+  },
+  "target_chroma_ratio": 0.2879,
+  "notes": [
+    "Grade via Orga-Drone materialize_spatial_managed_media (Studio still path).",
+    "Brush mask approximates leaf; not AI freistellung — edge fidelity limited.",
+    "Magenta via primaries tint/kelvin; BG desat via inverted selection HSL.",
+    "Private BEFORE/TARGET/JPG remain under local acceptance-evidence only."
+  ]
+}
