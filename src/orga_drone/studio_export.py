@@ -1666,19 +1666,23 @@ def prepare_media_export(
 ) -> MediaExportPlan:
     """Validate one photo or video export. Does not render.
 
-    ``image`` grades a photo before the preset. None uses the saved grade.
+    ``image`` overrides the basic ImageAdjust for a photo before the preset.
+    None uses the saved ImageAdjust. Persisted HSL/LUT/wheels always apply.
     A video ignores the grade, ``still_format``, and custom still options.
     """
     media, path = _require_export_media(db, media_id)
     key = normalize_share_preset(preset, allow_custom=(media.kind == "photo"))
     if media.kind == "photo":
+        # Always keep persisted HSL/LUT/wheels. Detail export posts ImageAdjust
+        # keys on every request; dropping color_raw when ``image`` is set was
+        # ignoring advanced color while the server preview still applied it.
         color_raw = db.get_image_adjust_json(path)
         adjust = image if image is not None else db.get_image_adjust(path)
         spec = inspect_photo_preset(
             path,
             key,
             image=adjust,
-            color_raw=color_raw if image is None else None,
+            color_raw=color_raw,
             still_format=still_format,
             width=width,
             height=height,
@@ -1735,7 +1739,8 @@ def run_media_export(
 ) -> Path:
     """Export one library photo as a still, or one video through the Studio encoder.
 
-    ``image`` grades a photo before the preset. None uses the saved grade.
+    ``image`` overrides the basic ImageAdjust for a photo before the preset.
+    None uses the saved ImageAdjust. Persisted HSL/LUT/wheels always apply.
     A video ignores the grade, ``still_format``, and custom still options.
     """
     media, path = _require_export_media(db, media_id)
@@ -1788,7 +1793,7 @@ def run_media_export(
                 protected_identities=plan.protected_identities,
                 cancel_event=cancel_event,
                 image=adjust,
-                color_raw=color_raw if image is None else None,
+                color_raw=color_raw,
                 still_format=fmt,
                 width=custom_w,
                 height=custom_h,
