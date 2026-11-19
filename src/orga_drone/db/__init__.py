@@ -2242,10 +2242,8 @@ class Database:
                     (media_path, now, orphan["id"]),
                 )
 
-    def get_image_adjust(self, media_path: str | Path):
-        """Saved photo grade. Missing or corrupt JSON is neutral."""
-        from orga_drone.studio_image import image_adjust_from_stored
-
+    def get_image_adjust_json(self, media_path: str | Path) -> str | None:
+        """Raw photo color JSON from media_meta, or None when missing."""
         media_path = str(media_path)
         with self.connect() as conn:
             row = conn.execute(
@@ -2253,36 +2251,38 @@ class Database:
                 (media_path,),
             ).fetchone()
         if row is None:
-            return image_adjust_from_stored(None)
-        return image_adjust_from_stored(row["image_adjust_json"])
+            return None
+        value = row["image_adjust_json"]
+        return None if value is None else str(value)
+
+    def get_image_adjust(self, media_path: str | Path):
+        """Saved photo grade. Missing or corrupt JSON is neutral."""
+        from orga_drone.studio_image import image_adjust_from_stored
+
+        return image_adjust_from_stored(self.get_image_adjust_json(media_path))
 
     def get_photo_look_id(self, media_path: str | Path) -> str:
         """Quick Look id for a photo. Missing → empty (Custom)."""
         from orga_drone.studio_looks import look_id_from_stored
 
-        media_path = str(media_path)
-        with self.connect() as conn:
-            row = conn.execute(
-                "SELECT image_adjust_json FROM media_meta WHERE media_path = ?",
-                (media_path,),
-            ).fetchone()
-        if row is None:
-            return ""
-        return look_id_from_stored(row["image_adjust_json"])
+        return look_id_from_stored(self.get_image_adjust_json(media_path))
 
-    def set_image_adjust(
+    def set_image_adjust_json(
         self,
         media_path: str | Path,
-        image,
+        raw: str | None,
         *,
         identity_key: str | None = None,
-        look_id: str = "",
+        record_undo: bool = True,
     ) -> None:
-        """Store a photo grade on the user-meta row. Does not change other fields or the file."""
-        from orga_drone.studio_looks import dump_photo_adjust
+        """Replace the photo color JSON blob. Does not modify the source file."""
+        from orga_drone.photo_color import push_photo_color_undo
 
         media_path = str(media_path)
-        raw = dump_photo_adjust(image, look_id)
+        previous = self.get_image_adjust_json(media_path)
+        payload = "" if raw is None else str(raw)
+        if record_undo and previous != payload:
+            push_photo_color_undo(media_path, previous)
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as conn:
             existing = conn.execute(
@@ -2296,7 +2296,7 @@ class Database:
                            identity_key = COALESCE(?, identity_key),
                            updated_at = ?
                        WHERE media_path = ?""",
-                    (raw, identity_key, now, media_path),
+                    (payload or None, identity_key, now, media_path),
                 )
                 return
             conn.execute(
@@ -2304,8 +2304,30 @@ class Database:
                      media_path, identity_key, stars, favorite, tags_json, notes,
                      updated_at, image_adjust_json
                    ) VALUES (?, ?, 0, 0, '[]', '', ?, ?)""",
-                (media_path, identity_key, now, raw),
+                (media_path, identity_key, now, payload or None),
             )
+
+    def set_image_adjust(
+        self,
+        media_path: str | Path,
+        image,
+        *,
+        identity_key: str | None = None,
+        look_id: str = "",
+        record_undo: bool = True,
+    ) -> None:
+        """Store a photo grade on the user-meta row. Does not change other fields or the file."""
+        from orga_drone.studio_looks import dump_photo_adjust
+
+        media_path = str(media_path)
+        existing = self.get_image_adjust_json(media_path)
+        raw = dump_photo_adjust(image, look_id, existing=existing)
+        self.set_image_adjust_json(
+            media_path,
+            raw,
+            identity_key=identity_key,
+            record_undo=record_undo,
+        )
 
     def ensure_default_studio_project(self, *, title: str = "Your story") -> StudioProject:
         """Return the first Studio project, creating one if the table is empty."""

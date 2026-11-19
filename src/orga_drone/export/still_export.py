@@ -14,9 +14,10 @@ Byte-copy policy (Original / Print ``best``):
 - An explicit JPEG or PNG choice always produces that format; a mismatched
   source is re-encoded (8-bit RGB) without source location tags.
 
-A non-neutral grade uses the Studio ffmpeg filter chain
-(``ffmpeg_grade_chain``) and then the same preset. The library file is never
-written. Re-encodes do not claim EXIF or ICC preservation.
+A non-neutral grade uses the shared Studio color filter chain
+(``color_filter_chain``: grade → LUT → HSL → wheels, or managed bake) and then
+the same preset. The library file is never written. Re-encodes do not claim
+EXIF or ICC preservation.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from orga_drone.export.studio_encoder import (
     StudioExportError,
     _publish_export_file,
 )
-from orga_drone.studio_image import ImageAdjust, ffmpeg_grade_chain
+from orga_drone.studio_image import ImageAdjust
 
 PRESET_BEST = "best"
 PRESET_WHATSAPP = "whatsapp"
@@ -185,7 +186,16 @@ def resolve_custom_dimensions(
     return max(1, out_w), max(1, out_h)
 
 
-def _is_graded(image: ImageAdjust | None) -> bool:
+def _is_graded(
+    image: ImageAdjust | None,
+    *,
+    color_raw: str | None = None,
+) -> bool:
+    if color_raw is not None:
+        from orga_drone.photo_color import photo_color_is_active
+
+        if photo_color_is_active(color_raw):
+            return True
     return image is not None and not image.is_neutral
 
 
@@ -434,6 +444,7 @@ def inspect_photo_preset(
     preset: str,
     *,
     image: ImageAdjust | None = None,
+    color_raw: str | None = None,
     still_format: str | None = None,
     width: object | None = None,
     height: object | None = None,
@@ -442,7 +453,7 @@ def inspect_photo_preset(
 ) -> PhotoPresetSpec:
     """Pixel size and suffix for one photo preset. Does not write a file."""
     key = normalize_share_preset(preset, allow_custom=True)
-    graded = _is_graded(image)
+    graded = _is_graded(image, color_raw=color_raw)
     fmt = (
         normalize_still_format(still_format)
         if key in {PRESET_BEST, PRESET_CUSTOM}
@@ -533,6 +544,7 @@ def export_photo_file(
     protected_identities: Iterable[tuple[int, int]] = (),
     cancel_event: threading.Event | None = None,
     image: ImageAdjust | None = None,
+    color_raw: str | None = None,
     still_format: str | None = None,
     width: object | None = None,
     height: object | None = None,
@@ -553,6 +565,7 @@ def export_photo_file(
             partial,
             key,
             image=image,
+            color_raw=color_raw,
             cancel_event=cancel_event,
             still_format=still_format,
             width=width,
@@ -580,6 +593,7 @@ def _write_preset(
     preset: str,
     *,
     image: ImageAdjust | None = None,
+    color_raw: str | None = None,
     cancel_event: threading.Event | None = None,
     still_format: str | None = None,
     width: object | None = None,
@@ -587,7 +601,7 @@ def _write_preset(
     lock_aspect: bool = True,
     jpeg_quality: object | None = None,
 ) -> None:
-    graded = _is_graded(image)
+    graded = _is_graded(image, color_raw=color_raw)
     fmt = (
         normalize_still_format(still_format)
         if preset in {PRESET_BEST, PRESET_CUSTOM}
@@ -609,7 +623,12 @@ def _write_preset(
 
         rgb = _oriented_rgb(img)
         if graded:
-            rgb = _grade_rgb(rgb, image, cancel_event=cancel_event)
+            rgb = _grade_rgb(
+                rgb,
+                image,
+                color_raw=color_raw,
+                cancel_event=cancel_event,
+            )
 
         if preset == PRESET_CUSTOM:
             out_w, out_h = resolve_custom_dimensions(
@@ -653,17 +672,57 @@ def _write_preset(
         img.close()
 
 
-def _grade_rgb(rgb, image: ImageAdjust | None, *, cancel_event: threading.Event | None):
-    """Run the Studio grade on one still. The source file is not an ffmpeg input."""
-    if image is None or image.is_neutral:
-        return rgb
+def _grade_rgb(
+    rgb,
+    image: ImageAdjust | None,
+    *,
+    color_raw: str | None = None,
+    cancel_event: threading.Event | None,
+):
+    """Run the shared Studio color stack on one still (full resolution)."""
     if cancel_event is not None and cancel_event.is_set():
         raise ExportCancelled()
-    chain = ffmpeg_grade_chain(image)
+    from orga_drone.config import settings
+    from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
+    from orga_drone.photo_color import photo_color_parts
+    from orga_drone.studio_preview_frame import color_filter_chain
+
+    if color_raw is not None:
+        parts = photo_color_parts(color_raw)
+        image_part = parts.image
+        look = parts.color_look
+        hsl = parts.hsl
+        wheels = parts.color_wheels
+        effect = parts.effect_settings if parts.managed else None
+    else:
+        from orga_drone.studio_color_wheels import ColorWheels
+        from orga_drone.studio_hsl import HslAdjust
+        from orga_drone.studio_lut import ColorLook
+
+        image_part = image or ImageAdjust()
+        look = ColorLook()
+        hsl = HslAdjust()
+        wheels = ColorWheels()
+        effect = None
+        if image_part.is_neutral:
+            return rgb
+
+    work_dir = settings.data_dir / "export-work" / "photo-color"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        chain = color_filter_chain(
+            image_part,
+            look,
+            data_dir=settings.data_dir,
+            work_dir=work_dir,
+            hsl=hsl,
+            color_wheels=wheels,
+            effect_settings=effect,
+        )
+    except Exception as exc:  # LutMissingError / OSError surface as export errors
+        raise StudioExportError(str(exc) or "Could not build the photo color filters.") from exc
     if not chain:
         return rgb
-    from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
-
     ffmpeg = find_ffmpeg()
     if not ffmpeg:
         raise StudioExportError("Install ffmpeg or: pip install imageio-ffmpeg")

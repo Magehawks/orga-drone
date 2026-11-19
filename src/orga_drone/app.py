@@ -5026,9 +5026,198 @@ def create_app() -> FastAPI:
             identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
             look_id=look_id,
         )
-        return JSONResponse(
-            {"ok": True, "image": image.as_dict(), "look_id": look_id or ""}
+        return JSONResponse(_photo_color_response(row))
+
+    def _require_photo_row(media_id: int, translate):
+        row = db.get_media(media_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=translate("Media not found."))
+        if row.kind != "photo":
+            raise HTTPException(
+                status_code=400,
+                detail=translate("Photo adjustments are only for a photo."),
+            )
+        return row
+
+    def _photo_color_response(row) -> dict:
+        from orga_drone.photo_color import (
+            photo_color_history_flags,
+            photo_color_needs_server_preview,
+            photo_color_parts,
         )
+
+        raw = db.get_image_adjust_json(row.path)
+        parts = photo_color_parts(raw)
+        return {
+            "ok": True,
+            "image": parts.image.as_dict(),
+            "look_id": parts.look_id or "",
+            "hsl": parts.hsl.as_dict(),
+            "color_wheels": parts.color_wheels.as_dict(),
+            "color": parts.color_look.as_dict(),
+            "managed": parts.managed,
+            "needs_server_preview": photo_color_needs_server_preview(raw),
+            **photo_color_history_flags(row.path),
+        }
+
+    @app.get("/api/media/{media_id}/color")
+    async def api_media_color_get(media_id: int, request: Request) -> JSONResponse:
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        return JSONResponse(_photo_color_response(row))
+
+    @app.patch("/api/media/{media_id}/hsl")
+    async def api_media_hsl_patch(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import merge_photo_hsl, photo_color_parts
+        from orga_drone.studio_hsl import parse_hsl_payload
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        existing = db.get_image_adjust_json(row.path)
+        current = photo_color_parts(existing).hsl
+        try:
+            hsl = parse_hsl_payload(payload, current)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw = merge_photo_hsl(existing, hsl)
+        db.set_image_adjust_json(
+            row.path,
+            raw,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.patch("/api/media/{media_id}/color-wheels")
+    async def api_media_color_wheels_patch(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import merge_photo_color_wheels, photo_color_parts
+        from orga_drone.studio_color_wheels import parse_color_wheels_payload
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        existing = db.get_image_adjust_json(row.path)
+        current = photo_color_parts(existing).color_wheels
+        try:
+            wheels = parse_color_wheels_payload(payload, current)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw = merge_photo_color_wheels(existing, wheels)
+        db.set_image_adjust_json(
+            row.path,
+            raw,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.patch("/api/media/{media_id}/color-look")
+    async def api_media_color_look_patch(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import merge_photo_color_look
+        from orga_drone.studio_lut import parse_color_look_payload
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        existing = db.get_image_adjust_json(row.path)
+        try:
+            look = parse_color_look_payload(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw = merge_photo_color_look(existing, look)
+        db.set_image_adjust_json(
+            row.path,
+            raw,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.post("/api/media/{media_id}/color/undo")
+    async def api_media_color_undo(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import undo_photo_color
+
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        current = db.get_image_adjust_json(row.path)
+        previous = undo_photo_color(row.path, current)
+        if previous is None:
+            raise HTTPException(status_code=409, detail=translate("Nothing to undo."))
+        db.set_image_adjust_json(
+            row.path,
+            previous or None,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+            record_undo=False,
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.post("/api/media/{media_id}/color/redo")
+    async def api_media_color_redo(media_id: int, request: Request) -> JSONResponse:
+        from orga_drone.db import make_identity_key
+        from orga_drone.photo_color import redo_photo_color
+
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        current = db.get_image_adjust_json(row.path)
+        nxt = redo_photo_color(row.path, current)
+        if nxt is None:
+            raise HTTPException(status_code=409, detail=translate("Nothing to redo."))
+        db.set_image_adjust_json(
+            row.path,
+            nxt or None,
+            identity_key=make_identity_key(row.filename, row.size_bytes, row.recorded_at),
+            record_undo=False,
+        )
+        return JSONResponse(_photo_color_response(row))
+
+    @app.get("/api/media/{media_id}/color-preview")
+    async def api_media_color_preview(media_id: int, request: Request) -> Response:
+        from orga_drone.config import settings
+        from orga_drone.photo_color_preview import render_photo_color_preview
+        from orga_drone.studio_preview_frame import PreviewFrameError
+
+        translate = get_translator(lang_from_request(request))
+        row = _require_photo_row(media_id, translate)
+        path = Path(row.path)
+        if not path.is_file():
+            raise HTTPException(
+                status_code=404, detail=translate("The source file is not available.")
+            )
+        try:
+            edge = int(request.query_params.get("max_edge") or 1080)
+        except ValueError:
+            edge = 1080
+        edge = max(64, min(2160, edge))
+        try:
+            jpeg = render_photo_color_preview(
+                path,
+                db.get_image_adjust_json(row.path),
+                data_dir=settings.data_dir,
+                max_edge=edge,
+            )
+        except PreviewFrameError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc) or translate("Could not build the photo color preview."),
+            ) from exc
+        return FileResponse(jpeg, media_type="image/jpeg")
 
     @app.post("/api/media/{media_id}/export")
     async def api_media_export(media_id: int, request: Request) -> JSONResponse:
