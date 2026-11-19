@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -47,6 +50,105 @@ def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient
 
     app = create_app()
     return TestClient(app), app.state.db
+
+
+def _video_assignment_request(db: Database, source: Path) -> tuple[str, dict]:
+    project = db.ensure_default_studio_project()
+    assert project is not None
+    clip = db.add_studio_collage(project.id, preset="1+1", collage_duration_s=5.0)
+    leaf_id = iter_leaves(collage_spec_from_raw(clip.collage_spec)["root"])[0]["id"]
+    source.write_bytes(b"synthetic video; ffprobe is simulated")
+    return f"/api/studio/{clip.id}/collage", {
+        "op": "assign_media",
+        "leaf_id": leaf_id,
+        "media": {"source": "external", "path": str(source), "kind": "video"},
+    }
+
+
+def test_slow_collage_probe_allows_reads_and_preserves_a_concurrent_edit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    url, payload = _video_assignment_request(db, tmp_path / "slow.mp4")
+    entered = threading.Event()
+    release = threading.Event()
+    calls: list[float] = []
+
+    def slow_probe(cmd: list[str], *, timeout: float, **kwargs: object):
+        calls.append(timeout)
+        entered.set()
+        if not release.wait(timeout=20):
+            raise subprocess.TimeoutExpired(cmd, timeout)
+        return subprocess.CompletedProcess(cmd, 0, b'{"format":{"duration":"12.4"}}')
+
+    monkeypatch.setattr("orga_drone.ffmpeg_bin.find_ffprobe", lambda: "ffprobe")
+    monkeypatch.setattr("subprocess.run", slow_probe)
+    # The context-managed client shares one ASGI portal/event loop across threads.
+    with client, ThreadPoolExecutor(max_workers=4) as pool:
+        assignment = pool.submit(client.patch, url, json=payload)
+        try:
+            assert entered.wait(timeout=5)
+            health = pool.submit(client.get, "/health")
+            leaf = pool.submit(client.get, f"{url}/leaves/{payload['leaf_id']}/stream")
+            assert health.result(timeout=5).json()["status"] == "ok"
+            read = leaf.result(timeout=5)
+            assert read.status_code == 404
+            assert read.json()["detail"] == "Collage cell has no media"
+            edit = pool.submit(client.patch, url, json={"gap_px": 12, "duration_s": 20.0})
+            assert edit.result(timeout=5).status_code == 200
+            assert not assignment.done()
+        finally:
+            release.set()
+        response = assignment.result(timeout=5)
+
+    assert calls == [8]
+    assert response.status_code == 200
+    assert response.json()["collage_spec"]["gap_px"] == 12
+    assert response.json()["duration_s"] == 20.0
+    media = iter_leaves(response.json()["collage_spec"]["root"])[0]["media"]
+    assert media["has_path"] and media["kind"] == "video"
+
+
+@pytest.mark.parametrize(
+    ("outcome", "duration", "expected_calls"),
+    [
+        ("success", 12.4, [8]),
+        ("timeout", 5.0, [8]),
+        ("failure", 5.0, [8]),
+        ("unavailable", 5.0, []),
+    ],
+)
+def test_video_assignment_preserves_probe_results_and_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: str,
+    duration: float,
+    expected_calls: list[int],
+) -> None:
+    client, db = _client(tmp_path, monkeypatch)
+    url, payload = _video_assignment_request(db, tmp_path / "clip.mp4")
+    calls: list[float] = []
+
+    def probe(cmd: list[str], *, timeout: float, **kwargs: object):
+        calls.append(timeout)
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(cmd, timeout)
+        if outcome == "failure":
+            return subprocess.CompletedProcess(cmd, 1, b"")
+        return subprocess.CompletedProcess(cmd, 0, b'{"format":{"duration":"12.4"}}')
+
+    monkeypatch.setattr(
+        "orga_drone.ffmpeg_bin.find_ffprobe",
+        lambda: None if outcome == "unavailable" else "ffprobe",
+    )
+    monkeypatch.setattr("subprocess.run", probe)
+    response = client.patch(url, json=payload)
+
+    assert calls == expected_calls
+    assert response.status_code == 200
+    assert response.json()["duration_s"] == duration
+    media = iter_leaves(response.json()["collage_spec"]["root"])[0]["media"]
+    assert media["has_path"] and "path" not in media and media["kind"] == "video"
 
 
 def test_all_presets_normalize_and_resolve() -> None:
