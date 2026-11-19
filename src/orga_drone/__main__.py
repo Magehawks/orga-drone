@@ -183,4 +183,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Required for spawn-based spatial bake workers in frozen Windows builds (#509).
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     main()

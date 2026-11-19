@@ -258,6 +258,8 @@ def materialize_studio_photo_grade_source(
                     work,
                     kind="photo",
                     grade_digest=digest,
+                    cancel_event=cancel_event,
+                    on_progress=on_progress,
                 )
             except ManagedApplyError as exc:
                 raise StudioExportError(str(exc), code=exc.code.lower()) from exc
