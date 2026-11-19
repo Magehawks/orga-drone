@@ -328,9 +328,12 @@ def test_http_project_api_list_create_open_update_delete(
     assert 'id="studio-projects-back"' in title_cluster
     assert 'id="studio-project-title"' in title_cluster
     assert "studio-project-identity-label" in title_cluster
+    # Topbar actions include Photo/Story focus toggle plus Export MP4.
     actions = after_creator.split("studio-topbar-actions", 1)[1].split(
-        "</div>", 1
+        "studio-workspace", 1
     )[0]
+    assert 'id="studio-context-photo"' in actions
+    assert 'id="studio-context-story"' in actions
     assert 'id="studio-export-open"' in actions
     assert "studio-topbar-export" in actions
     assert "studio-clear-form" not in actions
