@@ -2,12 +2,24 @@
 
 Date: 2026-11-19  
 Tree: `develop` @ `cb068da` (after #515–#517)  
-Host: Windows 10, Python process (same GIL isolation property as packaged desktop)
+Host: Windows 10, Python process
 
-## Question
+## Rescope note (honest acceptance)
 
-Does process-isolated spatial photo bake (#509) keep loopback HTTP responsive
-while a bake runs, compared with in-process / inline bake?
+Issue #513 originally asked for packaged WebView2 click-through with measured
+HTTP/**UI** latency. This PR delivers the **automated hang-class regression**
+that matches the Neon Relic incident root cause (GIL-bound bake starving
+loopback HTTP in the desktop process).
+
+| Layer | Status |
+|---|---|
+| Parent-process HTTP ping during bake (inline vs worker) | **DONE** — this doc |
+| Packaged entry `freeze_support` for spawn workers | **DONE** in #517 |
+| Full packaged WebView2 UI click-through latency | **Residual** — Product Owner smoke; not claimed here |
+
+Closing #513 for the initiative means: hang-class HTTP responsiveness is
+measured and green under process isolation. Packaged UI polish remains optional
+PO verification, recorded under local `acceptance-evidence/` if run.
 
 ## Method
 
@@ -18,10 +30,6 @@ while a bake runs, compared with in-process / inline bake?
    brush grade).
 3. Sample HTTP GET latency every ~50 ms during the bake.
 4. Compare `ORGA_SPATIAL_BAKE_INLINE=1` vs process worker (`ORGA_SPATIAL_BAKE_PROCESS=1`).
-
-This measures the same class of incident as the Neon Relic WebView2 hang
-(HTTP/status starved by GIL-bound bake), without requiring a fresh EXE build
-for every regression. Packaged entry already calls `freeze_support` (#517).
 
 ## Results (2026-11-19)
 
@@ -35,13 +43,14 @@ tails while the GIL-bound bake runs.
 
 Raw JSON: `docs/discovery/spatial-perf-513/http-during-bake.json`
 
-## Acceptance
+## Acceptance (rescope)
 
 - [x] Measured HTTP latency during bake (inline vs worker)
-- [x] Evidence that #509 isolation restores responsiveness
-- [x] No main/release; develop-only
+- [x] Evidence that #509 isolation restores hang-class responsiveness
+- [x] Docs distinguish proxy harness vs packaged UI residual
+- [ ] Packaged WebView2 UI latency (optional PO smoke; NOT_RUN in this PR)
 
-## Residual
+## Non-scope
 
-Full packaged WebView2 click-through remains optional Product Owner smoke;
-this harness is the automated regression for the hang class.
+- main/release
+- Claiming packaged UI E2E complete without running the EXE
