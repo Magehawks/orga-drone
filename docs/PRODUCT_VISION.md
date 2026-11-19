@@ -271,10 +271,15 @@ See `README.md` for the detailed feature status table. In short:
   picture. Info holds the date, drone, and the other file facts together with
   rating, tags, notes, albums, rename, and flow merge. Studio sits in Share.
   Photo Look & color (Studio Quick Looks, four basic sliders, show-original
-  compare) and Fine-tune tonals sit in Image with the Studio grade math, plus
-  **Combine images** for joining several library photos into one file. Export
-  sits in its own tab (photo profiles or video presets, JPEG or PNG where
-  supported, and the export action). The map, coordinates, and spot download sit in Location when
+  compare), Fine-tune tonals, the eight-range HSL mixer (with numeric inputs),
+  colour wheels, and shared LUT picker sit in Image using the same Studio
+  color builders as Story clips (no second engine; no timeline). Advanced color
+  uses a server still preview that matches still export. An optional Managed
+  Color Workspace wrap/convert gate is available when canonical writes are
+  enabled; masks, scopes, and animation stay in Studio. **Combine images**
+  joins several library photos into one file. Export sits in its own tab
+  (photo profiles or video presets, JPEG or PNG where supported, and the
+  export action). The map, coordinates, and spot download sit in Location when
   GPS exists; without GPS that tab stays hidden. One panel at a time. A video
   has no Image tab. Tab order is Info, Location, Share, Image, Export.
 - **Detail-page export:** one photo or one video as a local file. Nothing is
@@ -284,8 +289,9 @@ See `README.md` for the detailed feature status table. In short:
   optional effective-PPI helper for a chosen paper size (guidance only; no
   upscaling). Custom resizes inside the source pixel box (no upscale) with
   optional JPEG quality. Studio Quick Looks and the Image-tab grade (brightness,
-  contrast, saturation, warmth, fine-tune tonals; −100…100, neutral 0) use the
-  Studio adjustment math and are applied by the Export tab. Neutral Original /
+  contrast, saturation, warmth, fine-tune tonals; −100…100, neutral 0) plus
+  HSL, colour wheels, and LUT use the shared Studio color stack and are
+  applied by the Export tab. Neutral Original /
   Print may byte-copy only when the chosen JPEG or PNG matches the source
   container and location checks pass (EXIF GPS, common XMP/GPS markers, and a
   bounded file scan; unreadable metadata fails closed). Graded exports and
