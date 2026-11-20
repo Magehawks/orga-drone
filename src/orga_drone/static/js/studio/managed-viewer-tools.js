@@ -130,19 +130,39 @@ function paintPolygonOverlay(mediaEl, points, { closed = false } = {}) {
   });
 }
 
+/** Hit-test a polygon vertex in UV space; returns index or -1. */
+export function hitTestPolygonVertex(points, uv, thresholdUv = 0.02) {
+  if (!uv || !Array.isArray(points) || !points.length) return -1;
+  let best = -1;
+  let bestDist = thresholdUv;
+  points.forEach((pt, index) => {
+    if (!pt || pt.length < 2) return;
+    const dist = Math.hypot(Number(pt[0]) - uv.u, Number(pt[1]) - uv.v);
+    if (dist <= bestDist) {
+      bestDist = dist;
+      best = index;
+    }
+  });
+  return best;
+}
+
 export function createManagedViewerTools({
   getMediaEl,
   mediaEl,
   getMode,
   getBrushSettings,
+  getEditablePolygon,
   onEyedropperSample,
   onBrushStrokeComplete,
   onPolygonComplete,
+  onPolygonEdited,
   onStatus,
   messages = {},
 }) {
   let drawing = false;
   let polygonActive = false;
+  let polygonDragging = false;
+  let dragIndex = -1;
   let points = [];
   let pointerId = null;
   let boundEl = null;
@@ -218,6 +238,28 @@ export function createManagedViewerTools({
       return;
     }
     if (mode === "polygon") {
+      // Drag an existing closed polygon vertex (#533) before starting a new draw.
+      if (!polygonActive) {
+        const editable = getEditablePolygon?.();
+        const editPoints = Array.isArray(editable?.points) ? editable.points : null;
+        if (editPoints && editPoints.length >= 3) {
+          const hit = hitTestPolygonVertex(editPoints, uv);
+          if (hit >= 0) {
+            polygonDragging = true;
+            dragIndex = hit;
+            pointerId = event.pointerId;
+            points = editPoints.map((pt) => [Number(pt[0]), Number(pt[1])]);
+            try {
+              el?.setPointerCapture?.(event.pointerId);
+            } catch {
+              /* ignore */
+            }
+            paintPolygonOverlay(el, points, { closed: true });
+            setStatus(messages.polygonDragging || "Polygon: drag vertex to refine");
+            return;
+          }
+        }
+      }
       const now = Date.now();
       const isDouble = now - lastClickAt < 350 && points.length >= 2;
       lastClickAt = now;
@@ -239,6 +281,15 @@ export function createManagedViewerTools({
   }
 
   function onPointerMove(event) {
+    if (polygonDragging) {
+      if (pointerId !== null && event.pointerId !== pointerId) return;
+      const el = activeMedia();
+      const uv = pointerToSourceUv(event, el);
+      if (!uv || dragIndex < 0 || !points[dragIndex]) return;
+      points[dragIndex] = [uv.u, uv.v];
+      paintPolygonOverlay(el, points, { closed: true });
+      return;
+    }
     if (!drawing || (pointerId !== null && event.pointerId !== pointerId)) return;
     const el = activeMedia();
     const uv = pointerToSourceUv(event, el);
@@ -253,16 +304,29 @@ export function createManagedViewerTools({
   }
 
   function onPointerUp(event) {
+    if (polygonDragging) {
+      if (pointerId !== null && event.pointerId !== pointerId) return;
+      polygonDragging = false;
+      pointerId = null;
+      const edited = points.map((pt) => [pt[0], pt[1]]);
+      dragIndex = -1;
+      paintPolygonOverlay(activeMedia(), edited, { closed: true });
+      onPolygonEdited?.({ points: edited, closed: true });
+      setStatus(messages.polygonEdited || "Polygon vertex updated");
+      return;
+    }
     if (!drawing) return;
     if (pointerId !== null && event.pointerId !== pointerId) return;
     finishStroke();
   }
 
   function onKeyDown(event) {
-    if (event.key === "Escape" && (drawing || polygonActive)) {
+    if (event.key === "Escape" && (drawing || polygonActive || polygonDragging)) {
       const wasBrush = drawing;
       drawing = false;
       polygonActive = false;
+      polygonDragging = false;
+      dragIndex = -1;
       points = [];
       pointerId = null;
       clearBrushOverlay(activeMedia());

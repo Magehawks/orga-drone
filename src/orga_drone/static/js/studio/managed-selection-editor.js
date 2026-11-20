@@ -506,7 +506,8 @@ export function createManagedSelectionEditor({
     setViewerMode(viewerMode === "polygon" ? "none" : "polygon");
     setStatus(
       viewerMode === "polygon"
-        ? messages.polygonHint || "Polygon: click to place points, Enter or double-click to close"
+        ? messages.polygonHint ||
+            "Polygon: click to place points, drag handles to refine, Enter or double-click to close"
         : ""
     );
     tools.rebind?.();
@@ -515,6 +516,21 @@ export function createManagedSelectionEditor({
     if (!pendingSample) return;
     void saveSelection({ acceptSample: true });
   });
+
+  function currentPolygonPoints() {
+    const studioId = getSelectedStudioId?.();
+    const payload = getGrade?.() || current;
+    const grade = payload?.grade;
+    if (!grade || !studioId) return null;
+    const bindType = bindSelect?.value || "primaries-v1";
+    const step = (grade.steps || []).find((entry) => entry?.type === bindType);
+    const selectionId = step?.selection_id;
+    if (!selectionId) return null;
+    const selection = (grade.selections || []).find((entry) => entry?.id === selectionId);
+    const leaf = selection?.mask?.leaves?.find((entry) => entry?.type === "polygon");
+    if (!leaf || !Array.isArray(leaf.points) || leaf.points.length < 3) return null;
+    return { points: leaf.points, closed: leaf.closed !== false };
+  }
 
   tools = createManagedViewerTools({
     getMediaEl: () => {
@@ -528,6 +544,7 @@ export function createManagedSelectionEditor({
       hardness: numberFromInput(brushHardness, 0.5),
       pressure: 1,
     }),
+    getEditablePolygon: () => currentPolygonPoints(),
     onEyedropperSample: (uv) => runEyedropper(uv),
     onBrushStrokeComplete: (stroke) => {
       void saveSelection({ stroke });
@@ -539,6 +556,11 @@ export function createManagedSelectionEditor({
       });
       setViewerMode("none");
     },
+    onPolygonEdited: (poly) => {
+      void saveSelection({
+        stroke: { kind: "polygon", points: poly.points, closed: true },
+      });
+    },
     onStatus: setStatus,
     messages: {
       ...messages,
@@ -547,6 +569,8 @@ export function createManagedSelectionEditor({
       polygonDrawing: messages.polygonDrawing,
       polygonCancelled: messages.polygonCancelled,
       polygonNeedPoints: messages.polygonNeedPoints,
+      polygonDragging: messages.polygonDragging,
+      polygonEdited: messages.polygonEdited,
     },
   });
 

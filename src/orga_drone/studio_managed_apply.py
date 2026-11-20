@@ -7,8 +7,12 @@ Neither is silently omitted.
 
 from __future__ import annotations
 
+import json
 import math
+import os
+from array import array
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +52,44 @@ Uv = tuple[float, float]
 LutResolver = Callable[[Mapping[str, Any]], ManagedCube]
 
 ADAPTER_VERSION = "managed-sdr-cpu-v1"
+
+# Parallel exact spatial apply (#532). Coverage is rasterized once at full frame;
+# row strips only consume precomputed weights so UVs stay image-correct.
+_SPATIAL_PARALLEL_MIN_PIXELS = 96 * 96
+_SPATIAL_PARALLEL_DEFAULT_WORKERS = 8
+_spatial_pool: ProcessPoolExecutor | None = None
+_spatial_pool_workers = 0
+_spatial_pool_busy = False
+
+
+def _spatial_apply_worker_count(*, width: int, height: int) -> int:
+    """Return process workers for exact spatial apply, or 1 to stay serial."""
+    raw = os.getenv("ORGA_SPATIAL_APPLY_WORKERS", "").strip()
+    if raw:
+        try:
+            forced = int(raw)
+        except ValueError:
+            forced = 0
+        if forced <= 1:
+            return 1
+        return max(1, min(forced, 16))
+    if int(width) * int(height) < _SPATIAL_PARALLEL_MIN_PIXELS:
+        return 1
+    cpu = os.cpu_count() or 2
+    return max(1, min(_SPATIAL_PARALLEL_DEFAULT_WORKERS, cpu))
+
+
+def _get_spatial_pool(workers: int) -> ProcessPoolExecutor:
+    """Reuse a process pool across bakes — spawn cost dominates preview (#532)."""
+    global _spatial_pool, _spatial_pool_workers
+    if _spatial_pool is not None and _spatial_pool_workers == workers:
+        return _spatial_pool
+    if _spatial_pool is not None:
+        _spatial_pool.shutdown(wait=False, cancel_futures=True)
+        _spatial_pool = None
+    _spatial_pool = ProcessPoolExecutor(max_workers=workers)
+    _spatial_pool_workers = workers
+    return _spatial_pool
 BAKE_SIZE = 33
 IDENTITY_HUE_OFFSET_CURVE: Curve = ((0.0, 0.0), (360.0, 0.0))
 IDENTITY_HUE_MULT_CURVE: Curve = ((0.0, 1.0), (360.0, 1.0))
@@ -543,6 +585,223 @@ def _selection_qualifier_is_active(selection: Mapping[str, Any] | None) -> bool:
     return str(qualifier.get("type") or "") not in {"", "none"}
 
 
+def _apply_managed_grade_rows(
+    rows: Sequence[Sequence[Rgb]],
+    *,
+    y0: int,
+    width: int,
+    height: int,
+    coverage_maps: Mapping[str, Sequence[float]],
+    compiled: Sequence[tuple[Mapping[str, Any], str | None, str]],
+    step_selection_ids: Sequence[str | None],
+    selections: Sequence[Mapping[str, Any]],
+    lattice: str,
+    input_profile: str,
+    output_profile: str,
+    lut_resolver: LutResolver | None = None,
+    coverage_row_base: int | None = None,
+) -> list[list[Rgb]]:
+    """Exact per-pixel apply for a contiguous row strip (full-frame UV/coverage).
+
+    When ``coverage_row_base`` is set, ``coverage_maps`` hold only the strip's
+    rows (index ``local_y * width + x``). UVs still use full-frame ``y0``/height.
+    """
+    from orga_drone.studio_managed_selection import (
+        ManagedSelectionError,
+        selection_by_id,
+    )
+
+    out: list[list[Rgb]] = []
+    for local_y, row in enumerate(rows):
+        if len(row) != width:
+            raise ManagedApplyError("image rows must share a width", code="RANGE")
+        y = y0 + local_y
+        out_row: list[Rgb] = []
+        if coverage_row_base is None:
+            cov_base = y * width
+        else:
+            cov_base = local_y * width
+        for x, sample in enumerate(row):
+            cov_idx = cov_base + x
+            # Identity skip when every bound step has zero coverage (#524).
+            if coverage_maps and step_selection_ids:
+                any_active = False
+                for selection_id in step_selection_ids:
+                    if selection_id is None:
+                        any_active = True
+                        break
+                    weights = coverage_maps.get(selection_id)
+                    if weights is None:
+                        any_active = True
+                        break
+                    if weights[cov_idx] > 0.0:
+                        any_active = True
+                        break
+                if not any_active:
+                    out_row.append(sample)
+                    continue
+
+            # Prefer staying in encoded lattice when only encoded-domain steps
+            # are active for this pixel (invert-background desat path, #532).
+            encoded_only = False
+            if (
+                lattice in {"encoded-bt709", "bt709-sdr", "bt709"}
+                and coverage_maps
+                and step_selection_ids
+            ):
+                encoded_only = True
+                for step, sid, target in compiled:
+                    if sid is None:
+                        encoded_only = False
+                        break
+                    weights = coverage_maps.get(sid)
+                    if weights is None:
+                        encoded_only = False
+                        break
+                    if float(weights[cov_idx]) > 0.0 and target != "bt709-sdr":
+                        encoded_only = False
+                        break
+
+            if encoded_only:
+                working = sample
+                domain = "bt709-sdr"
+            elif lattice in {"encoded-bt709", "bt709-sdr", "bt709"}:
+                working = _decode_profile("bt709-sdr", sample)
+                domain = "linear-bt709"
+            elif lattice == "srgb":
+                working = _decode_profile("srgb", sample)
+                domain = "linear-bt709"
+            elif lattice == "linear-bt709":
+                working = sample
+                domain = "linear-bt709"
+            else:
+                working = _decode_profile(input_profile, sample)
+                domain = "linear-bt709"
+            for step, sid, target in compiled:
+                coverage = 1.0
+                if sid is not None:
+                    weights = coverage_maps.get(sid)
+                    if weights is not None:
+                        coverage = float(weights[cov_idx])
+                    else:
+                        # Qualifier / uncached path needs the step domain sample.
+                        working = _to_domain(working, current=domain, target=target)
+                        domain = target
+                        uv = ((x + 0.5) / width, (y + 0.5) / height)
+                        try:
+                            selection = selection_by_id(selections, sid)
+                            encoded = _encoded_bt709_sample(working, domain=domain)
+                            coverage = evaluate_selection(
+                                selection, point=uv, rgb=encoded
+                            )
+                        except ManagedSelectionError as exc:
+                            raise ManagedApplyError(
+                                str(exc) or "masked steps require a spatial adapter",
+                                code="UNSUPPORTED_GRADE",
+                            ) from exc
+                        if coverage <= 0.0:
+                            continue
+                        working = apply_managed_step(
+                            working,
+                            step,
+                            coverage=coverage,
+                            lut_resolver=lut_resolver,
+                        )
+                        continue
+                if coverage <= 0.0:
+                    continue
+                working = _to_domain(working, current=domain, target=target)
+                domain = target
+                working = apply_managed_step(
+                    working,
+                    step,
+                    coverage=coverage,
+                    lut_resolver=lut_resolver,
+                )
+            if encoded_only and domain == "bt709-sdr":
+                out_row.append(working)
+            else:
+                working = _to_domain(working, current=domain, target="linear-bt709")
+                out_row.append(
+                    _encode_profile(
+                        output_profile if output_profile != "bt709" else "bt709-sdr",
+                        working,
+                    )
+                )
+        out.append(out_row)
+    return out
+
+
+def _rows_to_float_array(rows: Sequence[Sequence[Rgb]]) -> array:
+    """Pack RGB rows as float64 for pickle-cheap strip transfer (exact vs serial)."""
+    buf: array = array("d")
+    for row in rows:
+        for sample in row:
+            buf.extend((float(sample[0]), float(sample[1]), float(sample[2])))
+    return buf
+
+
+def _float_array_to_rows(buf: array, *, width: int, height: int) -> list[list[Rgb]]:
+    rows: list[list[Rgb]] = []
+    index = 0
+    for _y in range(height):
+        row: list[Rgb] = []
+        for _x in range(width):
+            row.append((buf[index], buf[index + 1], buf[index + 2]))
+            index += 3
+        rows.append(row)
+    return rows
+
+
+def _parallel_strip_worker(
+    payload: tuple[
+        array,
+        int,
+        int,
+        int,
+        int,
+        dict[str, array],
+        list[tuple[dict[str, Any], str | None, str]],
+        list[str | None],
+        list[dict[str, Any]],
+        str,
+        str,
+        str,
+    ],
+) -> array:
+    """Spawn entry — float arrays pickle ~2–8× cheaper than nested tuples."""
+    (
+        pixel_buf,
+        y0,
+        width,
+        strip_h,
+        height,
+        coverage_strip,
+        compiled,
+        step_selection_ids,
+        selections,
+        lattice,
+        input_profile,
+        output_profile,
+    ) = payload
+    rows = _float_array_to_rows(pixel_buf, width=width, height=strip_h)
+    out_rows = _apply_managed_grade_rows(
+        rows,
+        y0=y0,
+        width=width,
+        height=height,
+        coverage_maps=coverage_strip,
+        compiled=compiled,
+        step_selection_ids=step_selection_ids,
+        selections=selections,
+        lattice=lattice,
+        input_profile=input_profile,
+        output_profile=output_profile,
+        coverage_row_base=0,
+    )
+    return _rows_to_float_array(out_rows)
+
+
 def apply_managed_grade_image(
     pixels: Sequence[Sequence[Rgb]],
     grade: Mapping[str, Any] | GradeModel,
@@ -554,10 +813,14 @@ def apply_managed_grade_image(
 
     Spatial masks without RGB qualifiers are rasterized once per selection so
     brush geometry is not re-evaluated for every step on every pixel.
+
+    Large frames fan out exact row strips across processes (#532) while keeping
+    one full-frame coverage raster so strip height cannot distort UVs. Creative
+    LUT resolvers force the serial path (resolver is not pickle-safe).
     """
     from orga_drone.studio_managed_selection import (
         ManagedSelectionError,
-        rasterize_selection_coverage,
+        rasterize_mask_coverage,
         selection_by_id,
     )
 
@@ -594,6 +857,8 @@ def apply_managed_grade_image(
             needed_ids.add(str(selection_id))
 
     coverage_maps: dict[str, list[float]] = {}
+    # Deduplicate identical masks (common leaf + invert-bg pattern) (#532).
+    mask_raster_cache: dict[str, list[float]] = {}
     for selection_id in needed_ids:
         try:
             selection = selection_by_id(selections, selection_id)
@@ -602,9 +867,23 @@ def apply_managed_grade_image(
         if _selection_qualifier_is_active(selection):
             continue
         try:
-            coverage_maps[selection_id] = rasterize_selection_coverage(
-                selection, width=width, height=height
-            )
+            mask_obj = selection.get("mask") if selection is not None else None
+            if isinstance(mask_obj, Mapping):
+                mask_key = json.dumps(mask_obj, sort_keys=True, separators=(",", ":"))
+            else:
+                mask_key = "__none__"
+            base = mask_raster_cache.get(mask_key)
+            if base is None:
+                base = rasterize_mask_coverage(
+                    mask_obj if isinstance(mask_obj, Mapping) else None,
+                    width=width,
+                    height=height,
+                )
+                mask_raster_cache[mask_key] = base
+            if selection is not None and bool(selection.get("invert", False)):
+                coverage_maps[selection_id] = [1.0 - value for value in base]
+            else:
+                coverage_maps[selection_id] = base
         except ManagedSelectionError as exc:
             raise ManagedApplyError(str(exc), code="UNSUPPORTED_GRADE") from exc
 
@@ -640,79 +919,95 @@ def apply_managed_grade_image(
     output_obj: Mapping[str, Any] = raw_output if isinstance(raw_output, Mapping) else {}
     output_profile = str(output_obj.get("profile") or "bt709-sdr")
     lattice = _normalize_domain(lattice_domain)
+    input_profile = str(input_obj.get("profile") or "bt709-sdr")
 
-    out: list[list[Rgb]] = []
-    for y, row in enumerate(pixels):
-        if len(row) != width:
-            raise ManagedApplyError("image rows must share a width", code="RANGE")
-        out_row: list[Rgb] = []
-        row_base = y * width
-        for x, sample in enumerate(row):
-            idx = row_base + x
-            # Identity skip when every bound step has zero coverage (#524).
-            if coverage_maps and step_selection_ids:
-                any_active = False
-                for selection_id in step_selection_ids:
-                    if selection_id is None:
-                        any_active = True
-                        break
-                    weights = coverage_maps.get(selection_id)
-                    if weights is None:
-                        any_active = True
-                        break
-                    if weights[idx] > 0.0:
-                        any_active = True
-                        break
-                if not any_active:
-                    out_row.append(sample)
-                    continue
+    global _spatial_pool_busy
+    workers = _spatial_apply_worker_count(width=width, height=height)
+    # Creative LUT resolvers are callables — keep exact serial path.
+    # Also stay serial when this process already owns a pool.map (no nested deadlock).
+    if (
+        lut_resolver is not None
+        or workers <= 1
+        or height < 2
+        or _spatial_pool_busy
+    ):
+        return _apply_managed_grade_rows(
+            list(pixels),
+            y0=0,
+            width=width,
+            height=height,
+            coverage_maps=coverage_maps,
+            compiled=compiled,
+            step_selection_ids=step_selection_ids,
+            selections=selections,
+            lattice=lattice,
+            input_profile=input_profile,
+            output_profile=output_profile,
+            lut_resolver=lut_resolver,
+        )
 
-            if lattice in {"encoded-bt709", "bt709-sdr", "bt709"}:
-                working = _decode_profile("bt709-sdr", sample)
-            elif lattice == "srgb":
-                working = _decode_profile("srgb", sample)
-            elif lattice == "linear-bt709":
-                working = sample
-            else:
-                working = _decode_profile(str(input_obj.get("profile") or "bt709-sdr"), sample)
-            domain = "linear-bt709"
-            for step, sid, target in compiled:
-                working = _to_domain(working, current=domain, target=target)
-                domain = target
-                coverage = 1.0
-                if sid is not None:
-                    weights = coverage_maps.get(sid)
-                    if weights is not None:
-                        coverage = weights[idx]
-                    else:
-                        uv = ((x + 0.5) / width, (y + 0.5) / height)
-                        try:
-                            selection = selection_by_id(selections, sid)
-                            encoded = _encoded_bt709_sample(working, domain=domain)
-                            coverage = evaluate_selection(
-                                selection, point=uv, rgb=encoded
-                            )
-                        except ManagedSelectionError as exc:
-                            raise ManagedApplyError(
-                                str(exc) or "masked steps require a spatial adapter",
-                                code="UNSUPPORTED_GRADE",
-                            ) from exc
-                if coverage <= 0.0:
-                    continue
-                working = apply_managed_step(
-                    working,
-                    step,
-                    coverage=coverage,
-                    lut_resolver=lut_resolver,
-                )
-            working = _to_domain(working, current=domain, target="linear-bt709")
-            out_row.append(
-                _encode_profile(
-                    output_profile if output_profile != "bt709" else "bt709-sdr",
-                    working,
-                )
+    # Plain dicts / float arrays for spawn pickling on Windows.
+    compiled_plain: list[tuple[dict[str, Any], str | None, str]] = [
+        (dict(step), sid, target) for step, sid, target in compiled
+    ]
+    selections_plain = [dict(entry) for entry in selections]
+    strip = max(1, (height + workers - 1) // workers)
+    payloads: list[
+        tuple[
+            array,
+            int,
+            int,
+            int,
+            int,
+            dict[str, array],
+            list[tuple[dict[str, Any], str | None, str]],
+            list[str | None],
+            list[dict[str, Any]],
+            str,
+            str,
+            str,
+        ]
+    ] = []
+    pixel_rows = [list(row) for row in pixels]
+    for y0 in range(0, height, strip):
+        y1 = min(height, y0 + strip)
+        lo = y0 * width
+        hi = y1 * width
+        coverage_strip = {
+            selection_id: array("d", weights[lo:hi])
+            for selection_id, weights in coverage_maps.items()
+        }
+        payloads.append(
+            (
+                _rows_to_float_array(pixel_rows[y0:y1]),
+                y0,
+                width,
+                y1 - y0,
+                height,
+                coverage_strip,
+                compiled_plain,
+                list(step_selection_ids),
+                selections_plain,
+                lattice,
+                input_profile,
+                output_profile,
             )
-        out.append(out_row)
+        )
+
+    pool = _get_spatial_pool(min(workers, len(payloads)))
+    out: list[list[Rgb]] = []
+    _spatial_pool_busy = True
+    try:
+        for part in pool.map(_parallel_strip_worker, payloads):
+            strip_h = len(part) // (width * 3)
+            out.extend(_float_array_to_rows(part, width=width, height=strip_h))
+    finally:
+        _spatial_pool_busy = False
+    if len(out) != height:
+        raise ManagedApplyError(
+            "parallel spatial apply returned unexpected row count",
+            code="UNSUPPORTED_GRADE",
+        )
     return out
 
 

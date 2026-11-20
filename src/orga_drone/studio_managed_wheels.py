@@ -109,6 +109,12 @@ def managed_hsl(
         for part in (hue_offset_deg, saturation_mult, lightness_offset)
     ):
         raise ManagedWheelsError("HSL parameters must be finite", code="RANGE")
+    # Full desaturate: HSL lightness only (common invert-background path, #532).
+    if saturation_mult == 0.0 and hue_offset_deg == 0.0:
+        lo = min(rgb[0], rgb[1], rgb[2])
+        hi = max(rgb[0], rgb[1], rgb[2])
+        lightness = min(1.0, max(0.0, 0.5 * (lo + hi) + lightness_offset))
+        return (lightness, lightness, lightness)
     hue, saturation, lightness = rgb_to_hsl(rgb)
     return hsl_to_rgb(
         (hue + hue_offset_deg) % 360.0,
