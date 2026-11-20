@@ -99,6 +99,37 @@ function paintBrushOverlay(mediaEl, points, radiusUv) {
   ctx.stroke();
 }
 
+function paintPolygonOverlay(mediaEl, points, { closed = false } = {}) {
+  const canvas = ensureBrushOverlay(mediaEl);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!points.length) return;
+  ctx.strokeStyle = "rgba(64, 200, 255, 0.95)";
+  ctx.fillStyle = "rgba(64, 200, 255, 0.18)";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  points.forEach((pt, index) => {
+    const x = pt[0] * canvas.width;
+    const y = pt[1] * canvas.height;
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  if (closed && points.length >= 3) {
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.stroke();
+  points.forEach((pt) => {
+    ctx.beginPath();
+    ctx.arc(pt[0] * canvas.width, pt[1] * canvas.height, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(64, 200, 255, 0.95)";
+    ctx.fill();
+  });
+}
+
 export function createManagedViewerTools({
   getMediaEl,
   mediaEl,
@@ -106,13 +137,16 @@ export function createManagedViewerTools({
   getBrushSettings,
   onEyedropperSample,
   onBrushStrokeComplete,
+  onPolygonComplete,
   onStatus,
   messages = {},
 }) {
   let drawing = false;
+  let polygonActive = false;
   let points = [];
   let pointerId = null;
   let boundEl = null;
+  let lastClickAt = 0;
 
   function activeMedia() {
     return getMediaEl?.() || mediaEl || null;
@@ -142,6 +176,20 @@ export function createManagedViewerTools({
     });
   }
 
+  function finishPolygon() {
+    if (!polygonActive) return;
+    const polyPoints = points.slice();
+    polygonActive = false;
+    points = [];
+    clearBrushOverlay(activeMedia());
+    if (polyPoints.length < 3) {
+      setStatus(messages.polygonNeedPoints || "Polygon needs at least 3 points");
+      return;
+    }
+    paintPolygonOverlay(activeMedia(), polyPoints, { closed: true });
+    onPolygonComplete?.({ points: polyPoints, closed: true });
+  }
+
   function onPointerDown(event) {
     const mode = getMode?.() || "none";
     if (mode === "none") return;
@@ -167,6 +215,24 @@ export function createManagedViewerTools({
       const settings = getBrushSettings?.() || {};
       paintBrushOverlay(el, points, settings.radius);
       setStatus(messages.brushDrawing || "Brush drawing…");
+      return;
+    }
+    if (mode === "polygon") {
+      const now = Date.now();
+      const isDouble = now - lastClickAt < 350 && points.length >= 2;
+      lastClickAt = now;
+      if (!polygonActive) {
+        polygonActive = true;
+        points = [];
+      }
+      if (isDouble) {
+        finishPolygon();
+        return;
+      }
+      points.push([uv.u, uv.v]);
+      paintPolygonOverlay(el, points, { closed: false });
+      const template = messages.polygonDrawing || "Polygon: {count} points — Enter/double-click to close, Esc to cancel";
+      setStatus(template.replace("{count}", String(points.length)));
     }
   }
 
@@ -191,12 +257,23 @@ export function createManagedViewerTools({
   }
 
   function onKeyDown(event) {
-    if (event.key === "Escape" && drawing) {
+    if (event.key === "Escape" && (drawing || polygonActive)) {
+      const wasBrush = drawing;
       drawing = false;
+      polygonActive = false;
       points = [];
       pointerId = null;
       clearBrushOverlay(activeMedia());
-      setStatus(messages.brushCancelled || "Brush cancelled");
+      setStatus(
+        wasBrush
+          ? messages.brushCancelled || "Brush cancelled"
+          : messages.polygonCancelled || "Polygon cancelled"
+      );
+      return;
+    }
+    if ((event.key === "Enter" || event.key === " ") && polygonActive) {
+      event.preventDefault();
+      finishPolygon();
     }
   }
 

@@ -8,6 +8,7 @@ import {
   neutralManagedHslParams,
   neutralPrimariesParams,
   neutralWheelsParams,
+  polygonLeaf,
   postGradeCommand,
   qualifierFromSample,
   radialLeaf,
@@ -44,6 +45,7 @@ export function createManagedSelectionEditor({
   const eyedropperBtn = panel.querySelector("[data-managed-eyedropper]");
   const acceptBtn = panel.querySelector("[data-managed-eyedropper-accept]");
   const brushBtn = panel.querySelector("[data-managed-brush-draw]");
+  const polygonBtn = panel.querySelector("[data-managed-polygon-draw]");
   const brushRadius = panel.querySelector("[data-managed-brush-radius]");
   const brushHardness = panel.querySelector("[data-managed-brush-hardness]");
   const sampleSwatch = panel.querySelector("[data-managed-eyedropper-swatch]");
@@ -116,6 +118,7 @@ export function createManagedSelectionEditor({
       eyedropperBtn,
       acceptBtn,
       brushBtn,
+      polygonBtn,
       brushRadius,
       brushHardness,
     ].forEach((el) => {
@@ -133,11 +136,18 @@ export function createManagedSelectionEditor({
     if (brushBtn) {
       brushBtn.setAttribute("aria-pressed", viewerMode === "brush" ? "true" : "false");
     }
+    if (polygonBtn) {
+      polygonBtn.setAttribute("aria-pressed", viewerMode === "polygon" ? "true" : "false");
+    }
     const provided = getPreviewMediaEl?.();
     const media = Array.isArray(provided) ? resolveActivePreviewMedia(provided) : provided || null;
     if (media && media.style) {
       media.style.cursor =
-        viewerMode === "eyedropper" ? "crosshair" : viewerMode === "brush" ? "cell" : "";
+        viewerMode === "eyedropper" || viewerMode === "polygon"
+          ? "crosshair"
+          : viewerMode === "brush"
+            ? "cell"
+            : "";
     }
   }
 
@@ -192,6 +202,13 @@ export function createManagedSelectionEditor({
   function buildLeaf(stroke) {
     const shape = shapeSelect?.value || "radial";
     const feather = numberFromInput(featherInput, 0.05);
+    if (stroke?.kind === "polygon" || (stroke?.points && stroke?.closed)) {
+      return polygonLeaf({
+        points: stroke.points,
+        feather,
+        closed: stroke.closed !== false,
+      });
+    }
     if (stroke) {
       return brushLeaf({
         points: stroke.points,
@@ -201,6 +218,18 @@ export function createManagedSelectionEditor({
       });
     }
     if (shape === "linear") return linearLeaf({ feather });
+    if (shape === "polygon") {
+      return polygonLeaf({
+        points: [
+          [0.3, 0.3],
+          [0.7, 0.3],
+          [0.7, 0.7],
+          [0.3, 0.7],
+        ],
+        feather,
+        closed: true,
+      });
+    }
     if (shape === "brush") {
       return brushLeaf({
         radius: numberFromInput(brushRadius, 0.08),
@@ -283,18 +312,23 @@ export function createManagedSelectionEditor({
         if (!Array.isArray(selection.mask.leaves)) selection.mask.leaves = [];
         if (stroke) {
           const leaf = buildLeaf(stroke);
-          const brushIndex = selection.mask.leaves.findIndex((entry) => entry?.type === "brush");
-          if (brushIndex >= 0) {
-            const brush = selection.mask.leaves[brushIndex];
-            const strokes = Array.isArray(brush.strokes) ? brush.strokes.slice() : [];
-            strokes.push(...(leaf.strokes || []));
-            selection.mask.leaves[brushIndex] = { ...brush, strokes };
-          } else if (selection.mask.leaves.length === 0) {
+          if (leaf.type === "polygon") {
             selection.mask.leaves = [leaf];
+            if (shapeSelect) shapeSelect.value = "polygon";
           } else {
-            selection.mask.leaves.push(leaf);
+            const brushIndex = selection.mask.leaves.findIndex((entry) => entry?.type === "brush");
+            if (brushIndex >= 0) {
+              const brush = selection.mask.leaves[brushIndex];
+              const strokes = Array.isArray(brush.strokes) ? brush.strokes.slice() : [];
+              strokes.push(...(leaf.strokes || []));
+              selection.mask.leaves[brushIndex] = { ...brush, strokes };
+            } else if (selection.mask.leaves.length === 0) {
+              selection.mask.leaves = [leaf];
+            } else {
+              selection.mask.leaves.push(leaf);
+            }
+            if (shapeSelect) shapeSelect.value = "brush";
           }
-          if (shapeSelect) shapeSelect.value = "brush";
         } else if (!acceptSample) {
           selection.mask = { combine: "union", leaves: [buildLeaf(null)] };
         }
@@ -467,6 +501,17 @@ export function createManagedSelectionEditor({
     setStatus(viewerMode === "brush" ? messages.brushHint || "Brush: draw on the preview" : "");
     tools.rebind?.();
   });
+  polygonBtn?.addEventListener("click", () => {
+    if (shapeSelect) shapeSelect.value = "polygon";
+    setViewerMode(viewerMode === "polygon" ? "none" : "polygon");
+    setStatus(
+      viewerMode === "polygon"
+        ? messages.polygonHint ||
+            "Polygon: click to place points, Enter or double-click to close"
+        : ""
+    );
+    tools.rebind?.();
+  });
   acceptBtn?.addEventListener("click", () => {
     if (!pendingSample) return;
     void saveSelection({ acceptSample: true });
@@ -489,8 +534,21 @@ export function createManagedSelectionEditor({
       void saveSelection({ stroke });
       setViewerMode("none");
     },
+    onPolygonComplete: (poly) => {
+      void saveSelection({
+        stroke: { kind: "polygon", points: poly.points, closed: true },
+      });
+      setViewerMode("none");
+    },
     onStatus: setStatus,
-    messages,
+    messages: {
+      ...messages,
+      brushDrawing: messages.brushDrawing,
+      brushCancelled: messages.brushCancelled,
+      polygonDrawing: messages.polygonDrawing,
+      polygonCancelled: messages.polygonCancelled,
+      polygonNeedPoints: messages.polygonNeedPoints,
+    },
   });
 
   return {

@@ -16,7 +16,9 @@ from orga_drone.studio_managed_masks import (
     invert_coverage,
     linear_coverage,
     no_selection_coverage,
+    polygon_coverage,
     radial_coverage,
+    stamp_brush_stroke_coverage,
 )
 from orga_drone.studio_managed_qualifiers import (
     ManagedQualifierError,
@@ -28,7 +30,11 @@ from orga_drone.studio_managed_qualifiers import (
 
 Point = tuple[float, float]
 Rgb = tuple[float, float, float]
-RASTERIZER_VERSION = "selection-raster-v1"
+# v2: stamp-based brush raster (#525) + polygon leaf (#527).
+RASTERIZER_VERSION = "selection-raster-v2"
+# Max abs delta vs analytic brush_stroke_coverage in the soft band (stamps).
+BRUSH_STAMP_TOLERANCE = 0.08
+MAX_POLYGON_POINTS = 4096
 
 
 class ManagedSelectionError(ValueError):
@@ -53,7 +59,7 @@ def _as_points(value: object, *, label: str) -> list[Point]:
 
 
 def leaf_coverage(point: Point, leaf: Mapping[str, Any]) -> float:
-    """Coverage for one linear, radial or brush leaf at a normalized source point."""
+    """Coverage for one linear, radial, brush or polygon leaf at a source UV."""
     kind = leaf.get("type")
     if kind == "linear":
         start = _as_point(leaf.get("start"), label="linear.start")
@@ -72,15 +78,23 @@ def leaf_coverage(point: Point, leaf: Mapping[str, Any]) -> float:
         if not strokes:
             return 0.0
         mode = str(leaf.get("combine", "union") or "union")
-        coverages: list[float] = []
+        add_coverages: list[float] = []
+        subtract_strokes: list[Mapping[str, Any]] = []
         for stroke in strokes:
             if not isinstance(stroke, Mapping):
                 raise ManagedSelectionError("brush stroke must be an object", code="SELECTION")
+            if str(stroke.get("mode", "add") or "add") == "subtract":
+                subtract_strokes.append(stroke)
+                continue
             polyline = _as_points(stroke.get("points") or (), label="brush.points")
             radius = float(stroke.get("radius", 0.05) or 0.05)
-            hardness = float(stroke.get("hardness", 0.5) if stroke.get("hardness") is not None else 0.5)
-            pressure = float(stroke.get("pressure", 1.0) if stroke.get("pressure") is not None else 1.0)
-            coverages.append(
+            hardness = float(
+                stroke.get("hardness", 0.5) if stroke.get("hardness") is not None else 0.5
+            )
+            pressure = float(
+                stroke.get("pressure", 1.0) if stroke.get("pressure") is not None else 1.0
+            )
+            add_coverages.append(
                 brush_stroke_coverage(
                     point,
                     polyline,
@@ -89,7 +103,38 @@ def leaf_coverage(point: Point, leaf: Mapping[str, Any]) -> float:
                     pressure=pressure,
                 )
             )
-        return combine_coverages(coverages, mode)
+        result = combine_coverages(add_coverages, mode) if add_coverages else 0.0
+        for stroke in subtract_strokes:
+            polyline = _as_points(stroke.get("points") or (), label="brush.points")
+            radius = float(stroke.get("radius", 0.05) or 0.05)
+            hardness = float(
+                stroke.get("hardness", 0.5) if stroke.get("hardness") is not None else 0.5
+            )
+            pressure = float(
+                stroke.get("pressure", 1.0) if stroke.get("pressure") is not None else 1.0
+            )
+            result = max(
+                0.0,
+                result
+                - brush_stroke_coverage(
+                    point,
+                    polyline,
+                    radius=radius,
+                    hardness=hardness,
+                    pressure=pressure,
+                ),
+            )
+        return result
+    if kind == "polygon":
+        points = _as_points(leaf.get("points") or (), label="polygon.points")
+        if len(points) > MAX_POLYGON_POINTS:
+            raise ManagedSelectionError(
+                f"polygon.points exceeds {MAX_POLYGON_POINTS}",
+                code="SELECTION",
+            )
+        feather = float(leaf.get("feather", 0.0) or 0.0)
+        closed = bool(leaf.get("closed", True))
+        return polygon_coverage(point, points, feather, closed=closed)
     raise ManagedSelectionError(f"unsupported mask leaf: {kind}", code="SELECTION")
 
 
@@ -278,6 +323,84 @@ def _brush_leaf_pixel_bounds(
     return x0, y0, x1, y1
 
 
+def _polygon_leaf_pixel_bounds(
+    leaf: Mapping[str, Any],
+    *,
+    width: int,
+    height: int,
+) -> tuple[int, int, int, int] | None:
+    points = leaf.get("points")
+    if not isinstance(points, Sequence) or isinstance(points, (str, bytes)) or len(points) < 3:
+        return None
+    try:
+        verts = _as_points(points, label="polygon.points")
+        feather = float(leaf.get("feather", 0.0) or 0.0)
+    except ManagedSelectionError:
+        return None
+    xs = [p[0] for p in verts]
+    ys = [p[1] for p in verts]
+    pad = max(0.0, feather)
+    x0 = max(0, int((min(xs) - pad) * width) - 1)
+    x1 = min(width - 1, int((max(xs) + pad) * width) + 1)
+    y0 = max(0, int((min(ys) - pad) * height) - 1)
+    y1 = min(height - 1, int((max(ys) + pad) * height) + 1)
+    if x1 < x0 or y1 < y0:
+        return None
+    return x0, y0, x1, y1
+
+
+def _rasterize_brush_leaf_stamped(
+    leaf: Mapping[str, Any],
+    *,
+    width: int,
+    height: int,
+) -> list[float]:
+    """Stamp soft brush discs once per leaf (#525)."""
+    strokes = leaf.get("strokes")
+    out = [0.0] * (width * height)
+    if not isinstance(strokes, Sequence) or isinstance(strokes, (str, bytes)):
+        raise ManagedSelectionError("brush.strokes must be a list", code="SELECTION")
+    mode = str(leaf.get("combine", "union") or "union")
+    add_strokes: list[Mapping[str, Any]] = []
+    sub_strokes: list[Mapping[str, Any]] = []
+    for stroke in strokes:
+        if not isinstance(stroke, Mapping):
+            raise ManagedSelectionError("brush stroke must be an object", code="SELECTION")
+        if str(stroke.get("mode", "add") or "add") == "subtract":
+            sub_strokes.append(stroke)
+        else:
+            add_strokes.append(stroke)
+
+    def _stamp(stroke: Mapping[str, Any], *, combine: str) -> None:
+        polyline = _as_points(stroke.get("points") or (), label="brush.points")
+        radius = float(stroke.get("radius", 0.05) or 0.05)
+        hardness = float(
+            stroke.get("hardness", 0.5) if stroke.get("hardness") is not None else 0.5
+        )
+        pressure = float(
+            stroke.get("pressure", 1.0) if stroke.get("pressure") is not None else 1.0
+        )
+        try:
+            stamp_brush_stroke_coverage(
+                width,
+                height,
+                polyline,
+                radius=radius,
+                hardness=hardness,
+                pressure=pressure,
+                out=out,
+                combine=combine,
+            )
+        except ManagedMaskError as exc:
+            raise ManagedSelectionError(str(exc), code="SELECTION") from exc
+
+    for stroke in add_strokes:
+        _stamp(stroke, combine=mode)
+    for stroke in sub_strokes:
+        _stamp(stroke, combine="subtraction")
+    return out
+
+
 def rasterize_mask_coverage(
     mask: Mapping[str, Any] | None,
     *,
@@ -286,8 +409,8 @@ def rasterize_mask_coverage(
 ) -> list[float]:
     """Row-major spatial mask weights in ``[0, 1]`` (no qualifier / invert).
 
-    Brush-only unions may evaluate only stroke bounding boxes. Mixed or
-    non-brush leaves fall back to a full-frame pass. Empty / absent masks match
+    Single brush or polygon leaves use ROI + stamp/analytic fill. Mixed leaves
+    fall back to a full-frame analytic pass. Empty / absent masks match
     ``mask_coverage`` semantics.
     """
     if width <= 0 or height <= 0:
@@ -303,24 +426,76 @@ def rasterize_mask_coverage(
     if not leaves:
         return [0.0] * size
 
+    # Fast path: one brush leaf → stamp raster (#525).
+    if len(leaves) == 1 and isinstance(leaves[0], Mapping) and leaves[0].get("type") == "brush":
+        return _rasterize_brush_leaf_stamped(leaves[0], width=width, height=height)
+
+    # Fast path: one polygon leaf → bbox analytic fill (#527).
+    if len(leaves) == 1 and isinstance(leaves[0], Mapping) and leaves[0].get("type") == "polygon":
+        out = [0.0] * size
+        box = _polygon_leaf_pixel_bounds(leaves[0], width=width, height=height)
+        if box is None:
+            return out
+        x0, y0, x1, y1 = box
+        for y in range(y0, y1 + 1):
+            row = y * width
+            v = (y + 0.5) / height
+            for x in range(x0, x1 + 1):
+                u = (x + 0.5) / width
+                out[row + x] = leaf_coverage((u, v), leaves[0])
+        return out
+
     brush_only = True
     bounds: list[tuple[int, int, int, int]] = []
     for leaf in leaves:
         if not isinstance(leaf, Mapping):
             raise ManagedSelectionError("mask leaf must be an object", code="SELECTION")
-        if leaf.get("type") != "brush":
+        kind = leaf.get("type")
+        if kind == "brush":
+            box = _brush_leaf_pixel_bounds(leaf, width=width, height=height)
+            if box is not None:
+                bounds.append(box)
+        elif kind == "polygon":
             brush_only = False
+            box = _polygon_leaf_pixel_bounds(leaf, width=width, height=height)
+            if box is not None:
+                bounds.append(box)
+        else:
+            brush_only = False
+            bounds = []
             break
-        box = _brush_leaf_pixel_bounds(leaf, width=width, height=height)
-        if box is not None:
-            bounds.append(box)
 
     out = [0.0] * size
-    if brush_only and bounds:
+    if bounds and (brush_only or all(
+        isinstance(leaf, Mapping) and leaf.get("type") in {"brush", "polygon"}
+        for leaf in leaves
+    )):
         x0 = min(b[0] for b in bounds)
         y0 = min(b[1] for b in bounds)
         x1 = max(b[2] for b in bounds)
         y1 = max(b[3] for b in bounds)
+        # Multi-brush: stamp each then combine is complex; use analytic ROI.
+        if brush_only and all(
+            isinstance(leaf, Mapping) and leaf.get("type") == "brush" for leaf in leaves
+        ):
+            # Stamp each brush leaf and union.
+            mode = str(mask.get("combine", "union") or "union")
+            first = True
+            for leaf in leaves:
+                if not isinstance(leaf, Mapping):
+                    continue
+                stamped = _rasterize_brush_leaf_stamped(leaf, width=width, height=height)
+                if first:
+                    out = stamped
+                    first = False
+                    continue
+                if mode == "union":
+                    out = [max(a, b) for a, b in zip(out, stamped, strict=True)]
+                elif mode == "intersection":
+                    out = [min(a, b) for a, b in zip(out, stamped, strict=True)]
+                else:
+                    out = [max(0.0, a - b) for a, b in zip(out, stamped, strict=True)]
+            return out
         for y in range(y0, y1 + 1):
             row = y * width
             v = (y + 0.5) / height
@@ -374,6 +549,8 @@ def rasterize_selection_coverage(
 
 
 __all__ = [
+    "BRUSH_STAMP_TOLERANCE",
+    "MAX_POLYGON_POINTS",
     "ManagedSelectionError",
     "RASTERIZER_VERSION",
     "evaluate_selection",

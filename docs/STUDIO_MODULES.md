@@ -60,7 +60,7 @@ the architecture, use [`ARCHITECTURE.md`](ARCHITECTURE.md).
   the panel and refreshes it from image-inspector fill; preview invalidation
   stays in the entry. `studio/managed-curve-editor.js` owns the seven managed
   curve families (RGB/luma/hue-sat maps) via `upsert_step_params` commands.
-  `studio/managed-selection-editor.js` owns linear/radial/brush masks and
+  `studio/managed-selection-editor.js` owns linear/radial/brush/polygon masks and
   RGB/HSL/luma qualifiers bound to a managed step. See
   `tests/js/grade_api.test.js` and `tests/js/managed_color_editor.test.js`.
   `studio/managed-lut-editor.js` owns the managed creative-lut-v1 step against
