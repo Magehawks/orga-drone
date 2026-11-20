@@ -145,6 +145,10 @@ export function createManagedColorEditor({
         .msgPolygonCancelled,
       polygonNeedPoints: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgPolygonNeedPoints,
+      polygonDragging: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgPolygonDragging,
+      polygonEdited: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgPolygonEdited,
       selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
       selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
       selectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSelection,
