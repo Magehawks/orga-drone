@@ -813,6 +813,66 @@ def test_upsert_step_params_create_update_and_unknown_keys() -> None:
         )
 
 
+def test_selection_display_name_and_overlay_roundtrip() -> None:
+    """Optional name/overlay are validated and preserved (#536)."""
+    source = managed()
+    source["grade"]["selections"] = [
+        {
+            "id": "s1",
+            "name": "Blatt",
+            "overlay": {"visible": True},
+            "mask": {"combine": "union", "leaves": []},
+            "qualifier": {"type": "none"},
+            "invert": False,
+        }
+    ]
+    model = read_grade(source)
+    assert model.to_dict()["grade"]["selections"][0]["name"] == "Blatt"
+    assert model.to_dict()["grade"]["selections"][0]["overlay"]["visible"] is True
+
+    renamed = validate_patch(
+        model,
+        command(
+            "upsert_selection",
+            selection={
+                "id": "s1",
+                "name": "Hintergrund",
+                "overlay": {"visible": False},
+                "mask": {"combine": "union", "leaves": []},
+                "qualifier": {"type": "none"},
+                "invert": True,
+            },
+        ),
+        7,
+    )
+    sel = renamed.proposed.grade["selections"][0]
+    assert sel["name"] == "Hintergrund"
+    assert sel["overlay"]["visible"] is False
+    assert sel["invert"] is True
+
+
+def test_selection_display_name_rejects_invalid() -> None:
+    source = managed()
+    source["grade"]["selections"] = [
+        {
+            "id": "s1",
+            "name": "x" * 81,
+            "mask": {},
+            "qualifier": {},
+            "invert": False,
+        }
+    ]
+    with pytest.raises(GradeError, match="Selection name exceeds limit"):
+        read_grade(source)
+    source["grade"]["selections"][0]["name"] = 12
+    with pytest.raises(GradeError, match="Expected a string"):
+        read_grade(source)
+    source["grade"]["selections"][0]["name"] = "ok"
+    source["grade"]["selections"][0]["overlay"] = {"visible": "yes"}
+    with pytest.raises(GradeError, match="Expected a boolean"):
+        read_grade(source)
+
+
 def test_upsert_selection_bind_and_remove_step() -> None:
     source = managed()
     source["grade"]["steps"] = [

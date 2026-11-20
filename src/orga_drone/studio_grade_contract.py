@@ -13,6 +13,8 @@ MAX_SELECTIONS = 32
 MAX_CURVE_POINTS = 4096
 MAX_BRUSH_POINTS = 100000
 MAX_SAFE_INTEGER = 2**53 - 1
+# Optional human-readable selection label (#536); IDs remain authoritative.
+MAX_SELECTION_NAME_LEN = 80
 LEGACY_KEYS = (
     "image",
     "color",
