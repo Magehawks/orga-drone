@@ -20,7 +20,13 @@ test("polygonLeaf builds closed UV polygon", () => {
 });
 
 test("brushLeaf unchanged for regression", () => {
-  const leaf = brushLeaf({ points: [[0.4, 0.5], [0.6, 0.5]], radius: 0.1 });
+  const leaf = brushLeaf({
+    points: [
+      [0.4, 0.5],
+      [0.6, 0.5],
+    ],
+    radius: 0.1,
+  });
   assert.equal(leaf.type, "brush");
   assert.equal(leaf.strokes.length, 1);
 });

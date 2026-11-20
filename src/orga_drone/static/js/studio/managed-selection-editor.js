@@ -506,8 +506,7 @@ export function createManagedSelectionEditor({
     setViewerMode(viewerMode === "polygon" ? "none" : "polygon");
     setStatus(
       viewerMode === "polygon"
-        ? messages.polygonHint ||
-            "Polygon: click to place points, Enter or double-click to close"
+        ? messages.polygonHint || "Polygon: click to place points, Enter or double-click to close"
         : ""
     );
     tools.rebind?.();

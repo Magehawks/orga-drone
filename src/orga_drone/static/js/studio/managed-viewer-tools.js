@@ -231,7 +231,9 @@ export function createManagedViewerTools({
       }
       points.push([uv.u, uv.v]);
       paintPolygonOverlay(el, points, { closed: false });
-      const template = messages.polygonDrawing || "Polygon: {count} points — Enter/double-click to close, Esc to cancel";
+      const template =
+        messages.polygonDrawing ||
+        "Polygon: {count} points — Enter/double-click to close, Esc to cancel";
       setStatus(template.replace("{count}", String(points.length)));
     }
   }
