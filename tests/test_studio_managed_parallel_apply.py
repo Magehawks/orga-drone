@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from orga_drone.studio_managed_apply import apply_managed_grade_image
