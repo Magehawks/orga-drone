@@ -18,6 +18,7 @@ import { bindSliderNumberPair } from "./studio/slider-number-sync.js";
 import {
   isManagedWebglBakeMode,
   managedBakeUrl,
+  managedGradeNeedsCpuPreviewStill,
   probeManagedGpuCapabilities,
 } from "./studio/managed-gpu-adapter.js";
 import { fetchGrade, postGradeCommand } from "./studio/grade-api.js";
@@ -2598,6 +2599,7 @@ import {
     layoutSfxSpans();
     layoutEffectBars();
     layoutClipAudio();
+    photoStillExport.sync();
   }
 
   function centerPlayheadInView() {
@@ -3771,6 +3773,12 @@ import {
     return false;
   }
 
+  function managedStillActiveFor(clip) {
+    return managedGradeNeedsCpuPreviewStill(managedGradeForClip(clip), clip?.dataset?.kind, {
+      lutPrecision: managedLutPrecisionHint(),
+    });
+  }
+
   function lutStillSourceOffset(clip, localS) {
     if (!clip || clip.dataset.kind !== "video") return 0;
     const offset = Math.max(0, Number(localS) || 0);
@@ -3866,18 +3874,20 @@ import {
       const hslActive = !hslIsNeutral(hsl);
       const wheelsActive = !colorWheelsIsNeutral(colorWheels);
       const lookActive = colorLookNeedsStill(look, clip);
-      if (!lookActive && !hslActive && !wheelsActive) {
+      const managedStillActive = managedStillActiveFor(clip);
+      if (!lookActive && !hslActive && !wheelsActive && !managedStillActive) {
         clearLutPreviewStill();
         return;
       }
       // The proxy already contains grade + LUT + HSL + wheels at video
       // resolution. Keep its frame for pause/seek/selection instead of
-      // overpainting a soft still JPEG.
-      if (lutWebglReadyFor(clip)) {
+      // overpainting a soft still JPEG. Spatial managed grades never claim
+      // WebGL readiness, so they stay on the CPU preview-frame path.
+      if (!managedStillActive && lutWebglReadyFor(clip)) {
         clearLutPreviewStill();
         return;
       }
-      if (lutProxySrcFor(clip)) {
+      if (!managedStillActive && lutProxySrcFor(clip)) {
         clearLutPreviewStill();
         return;
       }
@@ -3924,6 +3934,12 @@ import {
       const sourceOff = lutStillSourceOffset(clip, localS);
       const quant = quantizePreviewTime(sourceOff);
       const storyQuant = quantizePreviewTime(state.projectTimeS);
+      const managed = managedGradeForClip(clip);
+      const managedKey = managed
+        ? `managed:${managed.revision}:${managed.evaluator}:${(managed.grade?.steps || [])
+            .map((step) => `${step?.id}:${step?.selection_id || ""}:${step?.enabled !== false ? 1 : 0}`)
+            .join(",")}`
+        : "";
       const key = JSON.stringify([
         studioId,
         clip.dataset.mediaId,
@@ -3939,6 +3955,7 @@ import {
         hsl,
         colorWheels,
         clip.dataset.saturationRamp,
+        managedKey,
       ]);
       if (key === lutStillKey) return;
       // Reject old responses now, including during the debounce and image decode.
@@ -3953,6 +3970,16 @@ import {
         // The endpoint reads persisted settings. Do not race an in-flight edit.
         await Promise.all([colorSaveChain, imageSaveChain, hslSaveChain, colorWheelsSaveChain]);
         if (token !== lutStillToken) return;
+        // Managed grade cache may still be cold on first paint; warm it once
+        // so spatial selections do not leave the raw photo on screen.
+        if (managedStillActive || managedStillActiveFor(clip)) {
+          try {
+            await ensureManagedGradeCached(clip);
+          } catch (_) {
+            /* miss stays on legacy/look path */
+          }
+          if (token !== lutStillToken) return;
+        }
         const controller = new AbortController();
         lutStillAbort = controller;
         const url = buildPreviewFrameUrl(studioId, {
@@ -5310,6 +5337,9 @@ import {
       const selected = selectedAdjustableClip();
       if (selected && String(selected.dataset.studioId) === String(requestedStudioId || "")) {
         fillImageAdjust(selected);
+        // Cache was cold during the first applyPreviewGrades; spatial managed
+        // grades need a second pass so the CPU still overlays the raw photo.
+        applyPreviewGrades(resolveAt(state.projectTimeS));
       }
     })();
     const bwRamp = document.getElementById("inspector-saturation-ramp");
@@ -9526,7 +9556,7 @@ import {
       } else {
         syncColorScopesView();
       }
-      photoStillExport.sync(clip);
+      photoStillExport.sync();
       if (isVideo) fillSaturationRamp(clip);
       const overlayWrap = document.getElementById("inspector-overlays");
       if (overlayWrap) overlayWrap.hidden = !(isPhoto || isVideo);
@@ -11910,6 +11940,7 @@ import {
       if (!state.selected || state.selected.type !== "clip") return null;
       return findClip(grid, state.selected.id);
     },
+    getClips: () => clips(),
   });
   editingContext = createEditingContextController({
     root,
@@ -11926,8 +11957,10 @@ import {
       if (context === CONTEXT_PHOTO && selectedClip && clipKind(selectedClip) === "photo") {
         setInspectorTab("image");
         showInspector("inspector-clip");
+        const managed = document.getElementById("inspector-managed-color");
+        if (managed) managed.open = true;
       }
-      photoStillExport.sync(selectedClip);
+      photoStillExport.sync();
       layoutTimeline();
     },
   });
@@ -14953,6 +14986,8 @@ import {
       if (clip) {
         cacheManagedGradeOnClip(clip, managedColorEditor?.currentGrade?.());
         scheduleLutProxyPrepare(clip);
+        // Force still-key invalidation for spatial managed grades before seek.
+        applyPreviewGrades(resolveAt(state.projectTimeS));
         syncPreviewMedia({ seek: true });
       }
     },

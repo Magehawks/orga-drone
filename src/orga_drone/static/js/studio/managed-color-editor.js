@@ -141,6 +141,11 @@ export function createManagedColorEditor({
       selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
       selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
       selectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSelection,
+      selectionBound: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgSelectionBound,
+      bindingLine: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBindingLine,
+      bindingUnbound: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgBindingUnbound,
       noSelectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgNoSelection,
     },

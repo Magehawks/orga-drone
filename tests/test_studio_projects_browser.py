@@ -334,10 +334,13 @@ def test_http_project_api_list_create_open_update_delete(
     )[0]
     assert 'id="studio-context-photo"' in actions
     assert 'id="studio-context-story"' in actions
+    assert 'id="studio-photo-still-export-open"' in actions
+    assert "studio-topbar-photo-export" in actions
     assert 'id="studio-export-open"' in actions
     assert "studio-topbar-export" in actions
     assert "studio-clear-form" not in actions
     assert 'id="studio-projects-back"' not in actions
+    assert 'id="inspector-photo-still-export"' not in after_creator
     # Accent discipline: secondary topbar links stay ghost; Export is the filled CTA.
     assert 'class="button ghost studio-back"' in after_creator
     assert (

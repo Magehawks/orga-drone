@@ -1296,5 +1296,13 @@
   "Photo editing focus": "Photo editing focus",
   "Story timeline focus": "Story timeline focus",
   "Export Story MP4": "Export Story MP4",
-  "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.": "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
+  "Export photo (JPG/PNG)": "Export photo (JPG/PNG)",
+  "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.": "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip.",
+  "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects.": "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects.",
+  "Exports this photo at original size with its color grade, selections, and privacy masks. The library file stays unchanged. Story export still makes an MP4 of the whole memory.": "Exports this photo at original size with its color grade, selections, and privacy masks. The library file stays unchanged. Story export still makes an MP4 of the whole memory.",
+  "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview.": "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview.",
+  "Selection bindings": "Selection bindings",
+  "Active · {id} on {step} · rev {rev}": "Active · {id} on {step} · rev {rev}",
+  "{id} → {step}": "{id} → {step}",
+  "{id} (not bound)": "{id} (not bound)"
 }

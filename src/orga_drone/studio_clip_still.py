@@ -1,9 +1,10 @@
 """Full-resolution still export for one Studio photo clip (#499).
 
 Applies the clip's color grade in source space (including managed spatial
-selections), then writes JPG/PNG through the existing still preset writer.
-Story framing, overlays, and privacy masks are intentionally omitted: this
-path publishes the graded photograph, not a Story frame composite.
+selections), then optional privacy blur/pixelate masks on the graded still,
+then writes JPG/PNG through the existing still preset writer.
+Story framing and overlays stay omitted: this path publishes the graded
+photograph (plus privacy masks), not a full Story frame composite.
 
 Source library files are never modified.
 """
@@ -42,6 +43,12 @@ from orga_drone.studio_managed_apply import (
     grade_needs_cpu_materialize,
     managed_grade_digest,
     require_managed_executable,
+)
+from orga_drone.studio_mask import (
+    MaskRenderError,
+    ffmpeg_mask_graph,
+    mask_windows,
+    masks_from_effect_settings,
 )
 from orga_drone.studio_preview_frame import color_filter_chain
 
@@ -211,6 +218,102 @@ def _ffmpeg_grade_still(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def apply_studio_photo_privacy_masks(
+    graded: Path,
+    effect_settings: str | None,
+    *,
+    data_dir: Path | None = None,
+    cancel_event: threading.Event | None = None,
+) -> Path:
+    """Apply privacy blur/pixelate masks onto an already graded still.
+
+    Returns ``graded`` unchanged when no masks are configured.
+    """
+    _check_cancel(cancel_event)
+    masks = masks_from_effect_settings(effect_settings)
+    if not masks:
+        return graded
+
+    from PIL import Image
+
+    try:
+        with Image.open(graded) as image:
+            width, height = image.size
+    except OSError as exc:
+        raise StudioExportError("Could not read the graded still for privacy masks.") from exc
+    if width < 2 or height < 2:
+        raise StudioExportError("Graded still is too small for privacy masks.")
+
+    try:
+        windows = mask_windows(
+            masks,
+            frame_width=width,
+            frame_height=height,
+            source_width=width,
+            source_height=height,
+            frame=None,
+        )
+        graph = ffmpeg_mask_graph(
+            base_chain="format=gbrp",
+            fades=[],
+            windows=windows,
+            include_tail=True,
+        )
+    except (MaskRenderError, ValueError) as exc:
+        raise StudioExportError(str(exc)) from exc
+
+    base = (data_dir or settings.data_dir) / "export-work" / "studio-clip-still"
+    base.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(
+        f"{graded.resolve()}|{graded.stat().st_size}|{graded.stat().st_mtime_ns}|{effect_settings or ''}".encode(
+            "utf-8"
+        )
+    ).hexdigest()[:20]
+    dest = base / f"masked_{digest}.png"
+    if dest.is_file() and dest.stat().st_size > 0:
+        return dest
+
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise StudioExportError("FFmpeg is required for privacy masks on still export.")
+    tmp = dest.with_suffix(".tmp.png")
+    if tmp.is_file():
+        tmp.unlink(missing_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(graded),
+        "-filter_complex",
+        graph,
+        "-map",
+        "[vout]",
+        "-frames:v",
+        "1",
+        str(tmp),
+    ]
+    _check_cancel(cancel_event)
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=180,
+            **subprocess_no_window_kwargs(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise StudioExportError("Privacy mask pass timed out.") from exc
+    except OSError as exc:
+        raise StudioExportError("Could not run FFmpeg for privacy masks.") from exc
+    if proc.returncode != 0 or not tmp.is_file() or tmp.stat().st_size <= 0:
+        detail = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+        raise StudioExportError(detail or "Could not apply privacy masks to the still.")
+    tmp.replace(dest)
+    return dest
+
+
 def materialize_studio_photo_grade_source(
     source: Path,
     effect_settings: str | None,
@@ -360,8 +463,16 @@ def export_studio_photo_clip_still(
         clip.effect_settings,
         data_dir=settings.data_dir,
         cancel_event=cancel_event,
-        on_progress=lambda f: _progress(0.05 + 0.7 * float(f)),
+        on_progress=lambda f: _progress(0.05 + 0.55 * float(f)),
     )
+    _check_cancel(cancel_event)
+    graded = apply_studio_photo_privacy_masks(
+        graded,
+        clip.effect_settings,
+        data_dir=settings.data_dir,
+        cancel_event=cancel_event,
+    )
+    _progress(0.75)
     _check_cancel(cancel_event)
 
     # Graded media is already color-correct; avoid a second grade pass.

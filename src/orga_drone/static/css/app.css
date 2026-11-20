@@ -1801,17 +1801,19 @@ button.cta, .button.cta {
 .studio-context-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.15rem;
-  margin-right: 0.35rem;
-  padding: 0.1rem;
+  gap: 0.2rem;
+  margin-right: 0.45rem;
+  padding: 0.15rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--panel) 88%, var(--surface-deep));
 }
 .studio-context-btn {
-  min-width: 4.25rem;
-  padding: 0.25rem 0.55rem;
-  font-size: 0.82rem;
+  min-width: 5rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 .studio-context-btn.is-active {
   background: var(--accent);
@@ -1819,32 +1821,117 @@ button.cta, .button.cta {
   border-color: transparent;
 }
 
-/* Photo focus: enlarge preview, collapse timeline chrome without deleting tracks. */
+/*
+ * Photo focus must win over the inline --studio-story-height that layout/resize
+ * writes on .studio-stage (localStorage storyHeight). Without !important / JS
+ * clear, the timeline stays ~300px and the mode switch looks like a no-op.
+ */
 .studio-creator.is-photo-context .studio-stage {
-  --studio-story-height: 2.75rem;
+  --studio-story-height: 0px !important;
 }
 .studio-creator.is-photo-context .studio-story-area {
-  min-height: 2.75rem;
-  max-height: 2.75rem;
-  overflow: hidden;
-  border-top: 1px solid var(--border);
+  display: none !important;
 }
-.studio-creator.is-photo-context .studio-timeline-toolbar,
-.studio-creator.is-photo-context .studio-timeline-row,
-.studio-creator.is-photo-context .studio-story-resize {
-  visibility: hidden;
-  pointer-events: none;
+.studio-creator.is-photo-context .studio-transport [data-transport="cut"],
+.studio-creator.is-photo-context .studio-transport [data-transport="remove"] {
+  display: none;
 }
-.studio-creator.is-photo-context #inspector-photo-still-export {
+.studio-creator.is-photo-context #inspector-managed-color {
   order: -1;
-  display: block;
 }
 .studio-creator.is-photo-context #inspector-image-panel {
   display: flex;
   flex-direction: column;
 }
-.studio-creator.is-photo-context .studio-topbar-export .studio-btn-label::after {
-  content: none;
+.studio-creator.is-photo-context .studio-preview {
+  padding: 0.35rem 0.45rem 0.55rem;
+}
+
+.studio-photo-still-export {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.studio-photo-still-export[hidden] {
+  display: none !important;
+}
+.studio-topbar-photo-export {
+  box-shadow: 0 0 14px var(--studio-accent-glow);
+}
+.studio-photo-still-export-popover {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 40;
+  width: min(22rem, 80vw);
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.studio-photo-still-export-popover[hidden] {
+  display: none !important;
+}
+.studio-managed-selection-summary {
+  list-style: none;
+  margin: 0.15rem 0 0.45rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+}
+.studio-managed-selection-summary[hidden] {
+  display: none !important;
+}
+.studio-managed-selection-summary li {
+  margin: 0.1rem 0;
+}
+.studio-managed-selection-summary li.is-active {
+  font-weight: 600;
+  color: var(--accent);
+}
+.studio-managed-brush-overlay {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+.studio-managed-brush-overlay[hidden] {
+  display: none !important;
+}
+
+.studio-context-mode-banner {
+  display: none;
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.studio-creator.is-photo-context .studio-context-mode-banner {
+  display: block;
+}
+
+/* Photo focus: surface managed brush tools without a second masking system. */
+.studio-creator.is-photo-context [data-managed-brush-draw] {
+  background: var(--accent);
+  color: var(--accent-contrast, #111);
+  border-color: transparent;
+  font-weight: 600;
+}
+.studio-creator.is-photo-context [data-managed-brush-draw][aria-pressed="true"] {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, #fff);
+  outline-offset: 2px;
+}
+.studio-creator.is-photo-context [data-managed-selection-panel] {
+  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
 }
 
 .studio-context-continuity-hint {

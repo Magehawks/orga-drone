@@ -37,6 +37,68 @@ export function resolveActivePreviewMedia(candidates = []) {
   return candidates.find((el) => el) || null;
 }
 
+function ensureBrushOverlay(mediaEl) {
+  const host = mediaEl?.parentElement;
+  if (!host) return null;
+  let canvas = host.querySelector?.("[data-managed-brush-overlay]");
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    canvas.className = "studio-managed-brush-overlay";
+    canvas.dataset.managedBrushOverlay = "1";
+    canvas.setAttribute("aria-hidden", "true");
+    host.appendChild(canvas);
+  }
+  const rect = mediaEl.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  canvas.style.left = `${Math.round(rect.left - hostRect.left)}px`;
+  canvas.style.top = `${Math.round(rect.top - hostRect.top)}px`;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.hidden = false;
+  return canvas;
+}
+
+function clearBrushOverlay(mediaEl) {
+  const host = mediaEl?.parentElement;
+  const canvas = host?.querySelector?.("[data-managed-brush-overlay]");
+  if (!canvas) return;
+  const ctx = canvas.getContext?.("2d");
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.hidden = true;
+}
+
+function paintBrushOverlay(mediaEl, points, radiusUv) {
+  const canvas = ensureBrushOverlay(mediaEl);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!points.length) return;
+  const radiusPx = Math.max(2, (Number(radiusUv) || 0.08) * Math.min(canvas.width, canvas.height));
+  ctx.strokeStyle = "rgba(255, 64, 180, 0.95)";
+  ctx.fillStyle = "rgba(255, 64, 180, 0.28)";
+  ctx.lineWidth = Math.max(2, radiusPx * 0.35);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  points.forEach((pt, index) => {
+    const x = pt[0] * canvas.width;
+    const y = pt[1] * canvas.height;
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  const last = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(last[0] * canvas.width, last[1] * canvas.height, radiusPx, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
 export function createManagedViewerTools({
   getMediaEl,
   mediaEl,
@@ -66,6 +128,7 @@ export function createManagedViewerTools({
     pointerId = null;
     const strokePoints = points.slice();
     points = [];
+    clearBrushOverlay(activeMedia());
     if (strokePoints.length < 1) return;
     if (strokePoints.length === 1) {
       strokePoints.push([Math.min(1, strokePoints[0][0] + 0.001), strokePoints[0][1]]);
@@ -101,19 +164,24 @@ export function createManagedViewerTools({
       } catch {
         /* ignore */
       }
+      const settings = getBrushSettings?.() || {};
+      paintBrushOverlay(el, points, settings.radius);
       setStatus(messages.brushDrawing || "Brush drawing…");
     }
   }
 
   function onPointerMove(event) {
     if (!drawing || (pointerId !== null && event.pointerId !== pointerId)) return;
-    const uv = pointerToSourceUv(event, activeMedia());
+    const el = activeMedia();
+    const uv = pointerToSourceUv(event, el);
     if (!uv) return;
     const last = points[points.length - 1];
     if (last && Math.hypot(uv.u - last[0], uv.v - last[1]) < 0.004) {
       return;
     }
     points.push([uv.u, uv.v]);
+    const settings = getBrushSettings?.() || {};
+    paintBrushOverlay(el, points, settings.radius);
   }
 
   function onPointerUp(event) {
@@ -127,6 +195,7 @@ export function createManagedViewerTools({
       drawing = false;
       points = [];
       pointerId = null;
+      clearBrushOverlay(activeMedia());
       setStatus(messages.brushCancelled || "Brush cancelled");
     }
   }
@@ -138,6 +207,7 @@ export function createManagedViewerTools({
       boundEl.removeEventListener("pointermove", onPointerMove);
       boundEl.removeEventListener("pointerup", onPointerUp);
       boundEl.removeEventListener("pointercancel", onPointerUp);
+      clearBrushOverlay(boundEl);
     }
     boundEl = el || null;
     if (!boundEl) return;
@@ -155,6 +225,7 @@ export function createManagedViewerTools({
       bind(activeMedia());
     },
     destroy() {
+      clearBrushOverlay(boundEl);
       bind(null);
       document.removeEventListener("keydown", onKeyDown);
     },
