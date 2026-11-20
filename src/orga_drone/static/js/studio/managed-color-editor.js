@@ -157,8 +157,29 @@ export function createManagedColorEditor({
       bindingLine: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBindingLine,
       bindingUnbound: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgBindingUnbound,
+      bindingUnboundShort: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgBindingUnboundShort,
       noSelectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgNoSelection,
+      untitledMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgUntitledMask,
+      maskSelected: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgMaskSelected,
+      renameMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenameMask,
+      renamePrompt: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenamePrompt,
+      deleteMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgDeleteMask,
+      deleteConfirm: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgDeleteConfirm,
+      maskDeleted: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgMaskDeleted,
+      hideOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgHideOverlay,
+      showOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgShowOverlay,
+      hideOverlayAria: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgHideOverlayAria,
+      showOverlayAria: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgShowOverlayAria,
+      typePolygon: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypePolygon,
+      typeBrush: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeBrush,
+      typeRadial: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeRadial,
+      typeLinear: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeLinear,
+      typeEmpty: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeEmpty,
+      invertShort: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgInvertShort,
     },
     onChanged: (payload) => {
       current = payload;

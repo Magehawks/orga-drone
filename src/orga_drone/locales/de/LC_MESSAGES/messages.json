@@ -1323,5 +1323,20 @@
   "{id} (not bound)": "{id} (nicht verknüpft)",
   "Polygon: click to place points, drag handles to refine, Enter or double-click to close": "Polygon: Punkte setzen, Griffe ziehen zum Verfeinern, Enter oder Doppelklick zum Schliessen",
   "Polygon: drag vertex to refine": "Polygon: Eckpunkt ziehen zum Verfeinern",
-  "Polygon vertex updated": "Polygon-Eckpunkt aktualisiert"
+  "Polygon vertex updated": "Polygon-Eckpunkt aktualisiert",
+  "Masks": "Masken",
+  "Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points.": "Wähle eine Maske, um ihren Bereich in der Vorschau hervorzuheben. Die Overlay-Anzeige ist nur für die Vorschau und erscheint nicht im Export. Pinsel zeichnet die gebundene Auswahl; Polygon setzt editierbare Konturpunkte.",
+  "Mask {id}": "Maske {id}",
+  "Selected mask · {name}": "Gewählte Maske · {name}",
+  "Mask name": "Maskenname",
+  "Delete": "Löschen",
+  "Delete mask “{name}”?": "Maske „{name}“ löschen?",
+  "Mask deleted": "Maske gelöscht",
+  "Hide": "Ausblenden",
+  "Show": "Einblenden",
+  "Hide selection overlay": "Auswahl-Overlay ausblenden",
+  "Show selection overlay": "Auswahl-Overlay einblenden",
+  "unbound": "ungebunden",
+  "Empty": "Leer",
+  "invert": "invertiert"
 }
