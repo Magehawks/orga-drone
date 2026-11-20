@@ -73,6 +73,9 @@ def _spatial_apply_worker_count(*, width: int, height: int) -> int:
         if forced <= 1:
             return 1
         return max(1, min(forced, 16))
+    # Default serial under pytest — spawn pools hang/starve CI runners.
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return 1
     if int(width) * int(height) < _SPATIAL_PARALLEL_MIN_PIXELS:
         return 1
     cpu = os.cpu_count() or 2
