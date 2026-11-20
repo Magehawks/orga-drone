@@ -44,7 +44,7 @@ export function createPhotoStillExportUi({
 
   function setStatus(text, { error = false } = {}) {
     if (!statusEl) return;
-    const value = text == null ? "" : String(text);
+    const value = text === null || text === undefined ? "" : String(text);
     statusEl.hidden = !value;
     statusEl.textContent = value;
     statusEl.classList.toggle("is-error", Boolean(error) && Boolean(value));

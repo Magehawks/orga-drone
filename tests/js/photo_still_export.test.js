@@ -9,14 +9,8 @@ test("projectAllowsPhotoStillExport is true only for exactly one photo", () => {
   assert.equal(projectAllowsPhotoStillExport([]), false);
   assert.equal(projectAllowsPhotoStillExport([{ kind: "photo" }]), true);
   assert.equal(projectAllowsPhotoStillExport([{ dataset: { kind: "photo" } }]), true);
-  assert.equal(
-    projectAllowsPhotoStillExport([{ kind: "photo" }, { kind: "photo" }]),
-    false
-  );
-  assert.equal(
-    projectAllowsPhotoStillExport([{ kind: "photo" }, { kind: "video" }]),
-    false
-  );
+  assert.equal(projectAllowsPhotoStillExport([{ kind: "photo" }, { kind: "photo" }]), false);
+  assert.equal(projectAllowsPhotoStillExport([{ kind: "photo" }, { kind: "video" }]), false);
   assert.equal(projectAllowsPhotoStillExport([{ kind: "video" }]), false);
   assert.equal(projectAllowsPhotoStillExport([{ kind: "title" }]), false);
 });

@@ -78,12 +78,8 @@ test("isManagedWebglBakeMode accepts tetrahedral and legacy bake modes", () => {
 });
 
 test("managedGradeNeedsCpuPreviewStill: photo always, video only for spatial", () => {
-  const pointwise = grade([
-    { id: "p1", type: "primaries-v1", enabled: true, selection_id: null },
-  ]);
-  const spatial = grade([
-    { id: "p1", type: "primaries-v1", enabled: true, selection_id: "sel-1" },
-  ]);
+  const pointwise = grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: null }]);
+  const spatial = grade([{ id: "p1", type: "primaries-v1", enabled: true, selection_id: "sel-1" }]);
   const empty = grade([]);
   assert.equal(managedGradeNeedsCpuPreviewStill(pointwise, "photo"), true);
   assert.equal(managedGradeNeedsCpuPreviewStill(spatial, "photo"), true);

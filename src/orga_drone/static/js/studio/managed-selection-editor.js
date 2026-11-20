@@ -396,10 +396,9 @@ export function createManagedSelectionEditor({
     }
     const bindType = bindSelect?.value || "primaries-v1";
     const boundForBind = findStep(payload.grade, bindType);
-    const bound =
-      boundForBind?.selection_id
-        ? boundForBind
-        : (payload.grade?.steps || []).find((step) => step.selection_id) || boundForBind;
+    const bound = boundForBind?.selection_id
+      ? boundForBind
+      : (payload.grade?.steps || []).find((step) => step.selection_id) || boundForBind;
     const selection = (payload.grade?.selections || []).find(
       (entry) => entry.id === bound?.selection_id
     );
@@ -415,7 +414,11 @@ export function createManagedSelectionEditor({
     renderSelectionSummary(payload);
     if (selection && bound) {
       setStatus(
-        (messages.selectionBound || messages.selectionStatus || "Active · {id} on {step} · rev {rev}")
+        (
+          messages.selectionBound ||
+          messages.selectionStatus ||
+          "Active · {id} on {step} · rev {rev}"
+        )
           .replace("{id}", String(selection.id))
           .replace("{step}", stepLabel(bound.type))
           .replace("{rev}", String(payload.revision))
