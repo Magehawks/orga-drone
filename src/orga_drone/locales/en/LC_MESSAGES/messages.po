@@ -1261,14 +1261,17 @@ msgstr "Story timeline focus"
 msgid "Export Story MP4"
 msgstr "Export Story MP4"
 
+msgid "Export photo (JPG/PNG)"
+msgstr "Export photo (JPG/PNG)"
+
 msgid "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
 msgstr "Switch to Story for the timeline and MP4 export. Photo grades stay on this clip."
 
-msgid "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
-msgstr "Photo focus: timeline hidden — use Image tools and Export photo (JPG/PNG)."
-
 msgid "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects."
 msgstr "Photo focus: timeline hidden — use Image tools. Export photo (JPG/PNG) is in the top bar for single-photo projects."
+
+msgid "Exports this photo at original size with its color grade, selections, and privacy masks. The library file stays unchanged. Story export still makes an MP4 of the whole memory."
+msgstr "Exports this photo at original size with its color grade, selections, and privacy masks. The library file stays unchanged. Story export still makes an MP4 of the whole memory."
 
 msgid "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview."
 msgstr "Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview."
