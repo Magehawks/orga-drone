@@ -270,6 +270,16 @@ export function brushLeaf({
   };
 }
 
+/** Closed polygon leaf in source UV [0,1] (#527). */
+export function polygonLeaf({ points = [], feather = 0.05, closed = true } = {}) {
+  return {
+    type: "polygon",
+    points: Array.isArray(points) ? points.map((pt) => [Number(pt[0]), Number(pt[1])]) : [],
+    feather: Number(feather) || 0,
+    closed: Boolean(closed),
+  };
+}
+
 export function upsertSelection(grade, selection) {
   const next = structuredClone(grade || {});
   if (!Array.isArray(next.selections)) next.selections = [];

@@ -1253,6 +1253,10 @@
                  data-msg-brush="{{ _('Brush: draw on the preview') }}"
                  data-msg-brush-drawing="{{ _('Brush drawing…') }}"
                  data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
+                 data-msg-polygon="{{ _('Polygon: click to place points, Enter or double-click to close') }}"
+                 data-msg-polygon-drawing="{{ _('Polygon: {count} points — Enter/double-click to close, Esc to cancel') }}"
+                 data-msg-polygon-cancelled="{{ _('Polygon cancelled') }}"
+                 data-msg-polygon-need-points="{{ _('Polygon needs at least 3 points') }}"
                  data-msg-saved="{{ _('Selection saved') }}"
                  data-msg-cleared="{{ _('Selection cleared') }}"
                  data-msg-sample-meta="{{ _('Sample · rev {rev} · {domain} · frame {frame}') }}"
@@ -1262,7 +1266,7 @@
                  data-msg-binding-unbound="{{ _('{id} (not bound)') }}"
                  data-msg-no-selection="{{ _('No selection · rev {rev}') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
-              <p class="hint">{{ _('Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview.') }}</p>
+              <p class="hint">{{ _('Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview. Polygon places editable contour points.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
               <ul class="studio-managed-selection-summary meta-line" data-managed-selection-summary
                   aria-label="{{ _('Selection bindings') }}" hidden></ul>
@@ -1272,6 +1276,7 @@
                   <option value="radial">{{ _('Radial') }}</option>
                   <option value="linear">{{ _('Linear') }}</option>
                   <option value="brush">{{ _('Brush') }}</option>
+                  <option value="polygon">{{ _('Polygon') }}</option>
                 </select>
               </label>
               <label class="studio-inspector-field">
@@ -1302,6 +1307,7 @@
               <div class="studio-managed-selection-tools">
                 <button type="button" class="button ghost" data-managed-eyedropper aria-pressed="false">{{ _('Eyedropper') }}</button>
                 <button type="button" class="button ghost" data-managed-brush-draw aria-pressed="false">{{ _('Draw brush') }}</button>
+                <button type="button" class="button ghost" data-managed-polygon-draw aria-pressed="false">{{ _('Draw polygon') }}</button>
                 <button type="button" class="button ghost" data-managed-eyedropper-accept disabled>{{ _('Accept sample') }}</button>
               </div>
               <div class="studio-managed-eyedropper-feedback" aria-live="polite">

@@ -190,6 +190,9 @@ def apply_managed_step(
         mix = float(step["mix"])
     if not 0.0 <= mix <= 1.0:
         raise ManagedApplyError("mix must be from 0 to 1", code="RANGE")
+    # Coverage/mix zero → identity (issue #524). Skip expensive color math.
+    if mix <= 0.0 or coverage <= 0.0:
+        return rgb
 
     processed: Rgb
     if kind == "primaries-v1":
@@ -605,6 +608,39 @@ def apply_managed_grade_image(
         except ManagedSelectionError as exc:
             raise ManagedApplyError(str(exc), code="UNSUPPORTED_GRADE") from exc
 
+    # Compile enabled steps once (#526) — avoid re-parsing the grade per pixel.
+    compiled: list[tuple[Mapping[str, Any], str | None, str]] = []
+    step_selection_ids: list[str | None] = []
+    for step in list(raw_steps) if isinstance(raw_steps, list) else []:
+        if not isinstance(step, Mapping) or not step.get("enabled", True):
+            continue
+        kind = step.get("type")
+        descriptor = OPERATION_DESCRIPTORS.get(str(kind))
+        if descriptor is None:
+            raise ManagedApplyError(
+                f"unknown enabled step: {kind}",
+                code="UNSUPPORTED_GRADE",
+            )
+        target = descriptor.get("domain", "linear-bt709")
+        if target == "declared":
+            step_params = step.get("params")
+            params_map: Mapping[str, Any] = (
+                step_params if isinstance(step_params, Mapping) else {}
+            )
+            target = str(params_map.get("domain") or "linear-bt709")
+        target = _normalize_domain(str(target))
+        selection_id = step.get("selection_id")
+        sid = str(selection_id) if selection_id else None
+        step_selection_ids.append(sid)
+        compiled.append((step, sid, target))
+
+    raw_input = document.get("input") if isinstance(document, Mapping) else None
+    input_obj: Mapping[str, Any] = raw_input if isinstance(raw_input, Mapping) else {}
+    raw_output = document.get("output") if isinstance(document, Mapping) else None
+    output_obj: Mapping[str, Any] = raw_output if isinstance(raw_output, Mapping) else {}
+    output_profile = str(output_obj.get("profile") or "bt709-sdr")
+    lattice = _normalize_domain(lattice_domain)
+
     out: list[list[Rgb]] = []
     for y, row in enumerate(pixels):
         if len(row) != width:
@@ -612,19 +648,68 @@ def apply_managed_grade_image(
         out_row: list[Rgb] = []
         row_base = y * width
         for x, sample in enumerate(row):
-            uv = ((x + 0.5) / width, (y + 0.5) / height)
-            pixel_coverages = {
-                selection_id: weights[row_base + x]
-                for selection_id, weights in coverage_maps.items()
-            }
-            out_row.append(
-                apply_managed_grade_rgb(
-                    sample,
-                    grade,
-                    lattice_domain=lattice_domain,
-                    uv=uv,
+            idx = row_base + x
+            # Identity skip when every bound step has zero coverage (#524).
+            if coverage_maps and step_selection_ids:
+                any_active = False
+                for selection_id in step_selection_ids:
+                    if selection_id is None:
+                        any_active = True
+                        break
+                    weights = coverage_maps.get(selection_id)
+                    if weights is None:
+                        any_active = True
+                        break
+                    if weights[idx] > 0.0:
+                        any_active = True
+                        break
+                if not any_active:
+                    out_row.append(sample)
+                    continue
+
+            if lattice in {"encoded-bt709", "bt709-sdr", "bt709"}:
+                working = _decode_profile("bt709-sdr", sample)
+            elif lattice == "srgb":
+                working = _decode_profile("srgb", sample)
+            elif lattice == "linear-bt709":
+                working = sample
+            else:
+                working = _decode_profile(str(input_obj.get("profile") or "bt709-sdr"), sample)
+            domain = "linear-bt709"
+            for step, sid, target in compiled:
+                working = _to_domain(working, current=domain, target=target)
+                domain = target
+                coverage = 1.0
+                if sid is not None:
+                    weights = coverage_maps.get(sid)
+                    if weights is not None:
+                        coverage = weights[idx]
+                    else:
+                        uv = ((x + 0.5) / width, (y + 0.5) / height)
+                        try:
+                            selection = selection_by_id(selections, sid)
+                            encoded = _encoded_bt709_sample(working, domain=domain)
+                            coverage = evaluate_selection(
+                                selection, point=uv, rgb=encoded
+                            )
+                        except ManagedSelectionError as exc:
+                            raise ManagedApplyError(
+                                str(exc) or "masked steps require a spatial adapter",
+                                code="UNSUPPORTED_GRADE",
+                            ) from exc
+                if coverage <= 0.0:
+                    continue
+                working = apply_managed_step(
+                    working,
+                    step,
+                    coverage=coverage,
                     lut_resolver=lut_resolver,
-                    selection_coverages=pixel_coverages or None,
+                )
+            working = _to_domain(working, current=domain, target="linear-bt709")
+            out_row.append(
+                _encode_profile(
+                    output_profile if output_profile != "bt709" else "bt709-sdr",
+                    working,
                 )
             )
         out.append(out_row)

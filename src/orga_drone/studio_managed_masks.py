@@ -150,6 +150,143 @@ def no_selection_coverage() -> float:
     return 1.0
 
 
+def point_in_polygon(point: Point, vertices: Sequence[Point]) -> bool:
+    """Even-odd fill rule for a closed polygon (issue #527)."""
+    if len(vertices) < 3:
+        return False
+    x, y = point
+    inside = False
+    previous = vertices[-1]
+    for current in vertices:
+        xi, yi = current
+        xj, yj = previous
+        if (yi > y) != (yj > y):
+            # Avoid divide-by-zero on horizontal edges (even-odd skips them).
+            if yj != yi and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+                inside = not inside
+        previous = current
+    return inside
+
+
+def distance_to_polygon_edges(point: Point, vertices: Sequence[Point]) -> float:
+    """Minimum distance to any edge of a closed polygon."""
+    if len(vertices) < 2:
+        return math.hypot(point[0] - vertices[0][0], point[1] - vertices[0][1]) if vertices else 0.0
+    best = float("inf")
+    count = len(vertices)
+    for index in range(count):
+        start = vertices[index]
+        end = vertices[(index + 1) % count]
+        best = min(best, _distance_to_segment(point, start, end))
+    return best
+
+
+def polygon_coverage(
+    point: Point,
+    vertices: Sequence[Point],
+    feather: float,
+    *,
+    closed: bool = True,
+) -> float:
+    """Filled closed polygon with optional smoothstep feather band (#527).
+
+    Even-odd interior is full coverage. Feather expands a soft band outside the
+    boundary (and softens the hard edge). Open paths (closed=False) have zero
+    coverage — callers must close before fill.
+    """
+    if feather < 0.0:
+        raise ManagedMaskError("feather must be at least zero", code="MASK")
+    if not closed or len(vertices) < 3:
+        return 0.0
+    inside = point_in_polygon(point, vertices)
+    if feather == 0.0:
+        return 1.0 if inside else 0.0
+    dist = distance_to_polygon_edges(point, vertices)
+    # Signed distance: negative inside, positive outside (linear-matte family).
+    signed = -dist if inside else dist
+    return 1.0 - smoothstep(-feather / 2.0, feather / 2.0, signed)
+
+
+def stamp_brush_stroke_coverage(
+    width: int,
+    height: int,
+    polyline: Sequence[Point],
+    *,
+    radius: float,
+    hardness: float,
+    pressure: float = 1.0,
+    out: list[float] | None = None,
+    combine: str = "union",
+) -> list[float]:
+    """Rasterize one soft brush stroke into a row-major weight buffer (#525).
+
+    Stamps soft discs along the polyline. Matches ``brush_stroke_coverage``
+    within a documented feather-band tolerance (see discovery note). Analytic
+    ``brush_stroke_coverage`` remains the pointwise reference for evaluate.
+    """
+    if width <= 0 or height <= 0:
+        raise ManagedMaskError("raster size must be positive", code="MASK")
+    if radius <= 0.0:
+        raise ManagedMaskError("brush radius must be positive", code="MASK")
+    if not 0.0 <= hardness <= 1.0:
+        raise ManagedMaskError("brush hardness must be from 0 to 1", code="MASK")
+    if not 0.0 <= pressure <= 1.0:
+        raise ManagedMaskError("brush pressure must be from 0 to 1", code="MASK")
+    buf = out if out is not None else [0.0] * (width * height)
+    if len(polyline) < 1:
+        return buf
+
+    def _combine(previous: float, value: float) -> float:
+        if combine == "union":
+            return max(previous, value)
+        if combine == "intersection":
+            return min(previous, value) if previous > 0.0 else value
+        # subtraction against existing buffer
+        return max(0.0, previous - value)
+
+    inner = hardness * radius
+    # Sample the polyline in UV space (same metric as brush_stroke_coverage).
+    samples: list[Point] = []
+    if len(polyline) == 1:
+        samples.append((float(polyline[0][0]), float(polyline[0][1])))
+    else:
+        for index in range(len(polyline) - 1):
+            x0, y0 = float(polyline[index][0]), float(polyline[index][1])
+            x1, y1 = float(polyline[index + 1][0]), float(polyline[index + 1][1])
+            seg_len = math.hypot(x1 - x0, y1 - y0)
+            step = max(1e-4, radius * 0.2)
+            count = max(1, int(seg_len / step) + 1)
+            for s in range(count + 1):
+                t = s / count
+                samples.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t))
+
+    # Pixel pad from UV radius (cover anisotropic aspect).
+    pad_x = int(radius * width) + 2
+    pad_y = int(radius * height) + 2
+    for cu, cv in samples:
+        cx = cu * width
+        cy = cv * height
+        x0 = max(0, int(cx) - pad_x)
+        x1 = min(width - 1, int(cx) + pad_x)
+        y0 = max(0, int(cy) - pad_y)
+        y1 = min(height - 1, int(cy) + pad_y)
+        for y in range(y0, y1 + 1):
+            row = y * width
+            v = (y + 0.5) / height
+            for x in range(x0, x1 + 1):
+                u = (x + 0.5) / width
+                distance = math.hypot(u - cu, v - cv)
+                if distance <= inner:
+                    coverage = pressure
+                elif distance >= radius:
+                    continue
+                else:
+                    coverage = pressure * (1.0 - smoothstep(inner, radius, distance))
+                idx = row + x
+                buf[idx] = _combine(buf[idx], coverage)
+    return buf
+
+
 def step_blend(step_input: Rgb, processed: Rgb, mix: float, coverage: float) -> Rgb:
     if not 0.0 <= mix <= 1.0 or not 0.0 <= coverage <= 1.0:
         raise ManagedMaskError("mix and coverage must be from 0 to 1", code="MASK")

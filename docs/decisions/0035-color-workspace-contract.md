@@ -74,3 +74,7 @@ The proposal selects BT.709 SDR as the first managed working profile; HDR/wide-g
 Product Owner approval on 2026-11-12 accepts this architecture: one versioned grade envelope, explicit `legacy-v1` and `managed-sdr-v1` evaluators, one serial grade for Creative and Pro, and one inspectable render plan. There is no automatic managed conversion and no second grade model.
 
 Canonical production writes remain disabled. The approved #351 safeguard is a separate verified SQLite backup, checksum, user-only permissions, and a tested restore that warns about lost later edits (`docs/planning/351-grade-backup-layout.md`). Startup minimum-reader enforcement is not switched on until a canonical database file exists.
+
+## Amendment — Precision masking (#522, 2026-11-20)
+
+Managed spatial mask leaves now include **polygon** (closed UV vertices, even-odd fill, feather) alongside linear/radial/brush. Bake rasterization may use stamp-based brush weights (`selection-raster-v2`) within a documented soft-band tolerance versus analytic evaluate. Contract text in `COLOR_WORKSPACE_CONTRACT.md` is authoritative for leaf semantics.

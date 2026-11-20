@@ -189,7 +189,8 @@ professional video-editing knowledge.
 | Studio photo still export (single-photo project) | **Available now** (JPG/PNG at original size by default from the Studio top bar when the project has exactly one photo clip; includes managed spatial grades/selections and rectangular privacy masks; Story MP4 export unchanged; library file never modified) |
 | Open / reveal exported MP4 after success | **Available now** (Windows desktop; process-local last export) |
 | Limited color points on the Studio effect lane (presets + manual, up to 8 linear points for exposure/contrast/saturation/warmth and creative LUT strength; #211) | **Available now** (pause/scrub LUT stills; color bar + Vorlagen/Manuell including color-file fade; not a general NLE keyframe editor) |
-| Further light editing (curves, freeform masks, general keyframes, tracking), extra transition types | **Later** |
+| Managed polygon spatial selections (straight segments, feather, invert; Studio draw + grade API; not AI freistellung) | **Available now** |
+| Further light editing (curves, privacy freeform masks, general keyframes, tracking), extra transition types | **Later** |
 | Independent per-song placement, trimming, or waveforms | **Later** |
 
 ### 4. Share

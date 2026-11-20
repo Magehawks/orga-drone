@@ -76,6 +76,8 @@ def _brush_grade() -> dict:
 
 
 def test_rasterize_selection_matches_evaluate_selection() -> None:
+    from orga_drone.studio_managed_selection import BRUSH_STAMP_TOLERANCE
+
     selection = _brush_grade()["selections"][0]
     width, height = 48, 36
     raster = rasterize_selection_coverage(selection, width=width, height=height)
@@ -83,17 +85,20 @@ def test_rasterize_selection_matches_evaluate_selection() -> None:
         for x in range(width):
             uv = ((x + 0.5) / width, (y + 0.5) / height)
             expected = evaluate_selection(selection, point=uv, rgb=(0.5, 0.5, 0.5))
-            assert abs(raster[y * width + x] - expected) < 1e-9
+            # Stamp raster (#525) may diverge in the soft band within tolerance.
+            assert abs(raster[y * width + x] - expected) <= BRUSH_STAMP_TOLERANCE + 1e-6
 
 
 def test_apply_managed_grade_image_matches_per_pixel_path() -> None:
+    from orga_drone.studio_managed_selection import BRUSH_STAMP_TOLERANCE
+
     grade = _brush_grade()
     width = height = 24
     pixels = [
         [((x / 23.0), (y / 23.0), 0.25) for x in range(width)] for y in range(height)
     ]
     out = apply_managed_grade_image(pixels, grade, lattice_domain="encoded-bt709")
-    # Spot-check corners and center against fresh per-pixel evaluation without maps.
+    # Spot-check vs analytic evaluate path; stamp raster may differ within tolerance.
     from orga_drone.studio_managed_apply import apply_managed_grade_rgb
 
     for y, x in ((0, 0), (12, 12), (23, 23)):
@@ -101,7 +106,10 @@ def test_apply_managed_grade_image_matches_per_pixel_path() -> None:
         direct = apply_managed_grade_rgb(
             pixels[y][x], grade, lattice_domain="encoded-bt709", uv=uv
         )
-        assert all(abs(a - b) < 1e-6 for a, b in zip(out[y][x], direct, strict=True))
+        assert all(
+            abs(a - b) <= BRUSH_STAMP_TOLERANCE + 1e-5
+            for a, b in zip(out[y][x], direct, strict=True)
+        )
 
 
 def test_spatial_preview_clamps_max_edge(tmp_path: Path) -> None:
