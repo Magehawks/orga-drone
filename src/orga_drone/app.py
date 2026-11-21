@@ -3766,6 +3766,109 @@ def create_app() -> FastAPI:
             },
         )
 
+    @app.post("/api/studio/{studio_item_id}/grade/object-select")
+    async def api_studio_grade_object_select(
+        studio_item_id: int, request: Request
+    ) -> JSONResponse:
+        """Local offline object proposal from a click seed (#539/#540).
+
+        Does not mutate the grade. Client accepts via upsert_selection.
+        Uses source media pixels only — never uploads.
+        """
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_object_select import ObjectSelectError, propose_object_polygon
+
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw_u = payload.get("u")
+        raw_v = payload.get("v")
+        if raw_u is None or raw_v is None:
+            raise HTTPException(status_code=400, detail="u and v are required")
+        try:
+            u = float(raw_u)
+            v = float(raw_v)
+            max_edge = (
+                int(payload["max_edge"]) if payload.get("max_edge") is not None else 640
+            )
+            tol = float(payload["tol"]) if payload.get("tol") is not None else 16.0
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400, detail="u, v, max_edge and tol must be numbers"
+            ) from exc
+        if not (0.0 <= u <= 1.0 and 0.0 <= v <= 1.0):
+            raise HTTPException(status_code=400, detail="u and v must be in [0, 1]")
+        if max_edge < 64 or max_edge > 2048:
+            raise HTTPException(status_code=400, detail="max_edge must be 64..2048")
+        if tol < 1.0 or tol > 64.0:
+            raise HTTPException(status_code=400, detail="tol must be 1..64")
+
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        if clip.item_kind != "media" or clip.kind != "photo":
+            raise HTTPException(
+                status_code=422,
+                detail="Object select is available for photo clips in this release.",
+            )
+        media_row = (
+            db.get_media(int(clip.source_media_id))
+            if clip.source_media_id is not None
+            else None
+        )
+        media_path = resolve_media_file(db, media_row) if media_row is not None else None
+        if media_path is None:
+            raise HTTPException(status_code=409, detail="This media file is offline.")
+        model = read_grade(clip.effect_settings)
+        if model.evaluator != "managed-sdr-v1" or model.grade is None:
+            raise HTTPException(status_code=422, detail="Managed grade required")
+        expected_revision = payload.get("expected_revision")
+        if expected_revision is not None:
+            try:
+                if int(expected_revision) != int(model.revision):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "message": "Grade changed since this proposal started",
+                            "code": "STALE_REVISION",
+                            "revision": model.revision,
+                        },
+                    )
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="expected_revision must be an integer"
+                ) from exc
+        try:
+            proposal = propose_object_polygon(
+                Path(media_path), u, v, max_edge=max_edge, tol=tol
+            )
+        except ObjectSelectError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return JSONResponse(
+            {
+                "ok": True,
+                "revision": model.revision,
+                "proposal": {
+                    "points": proposal.points,
+                    "closed": proposal.closed,
+                    "coverage": proposal.coverage,
+                    "method": proposal.method,
+                    "elapsed_s": round(proposal.elapsed_s, 4),
+                    "proposal_size": list(proposal.proposal_size),
+                    "seed_uv": list(proposal.seed_uv),
+                },
+            }
+        )
+
     @app.get("/api/studio/{studio_item_id}/preview-frame")
     async def api_studio_preview_frame(
         studio_item_id: int,

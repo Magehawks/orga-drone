@@ -13,6 +13,7 @@ import {
   qualifierFromSample,
   radialLeaf,
   linearLeaf,
+  proposeObjectSelect,
   sampleEyedropper,
 } from "./grade-api.js";
 import {
@@ -49,6 +50,7 @@ export function createManagedSelectionEditor({
   const clearBtn = panel.querySelector("[data-managed-selection-clear]");
   const bindSelect = panel.querySelector("[data-managed-selection-bind]");
   const eyedropperBtn = panel.querySelector("[data-managed-eyedropper]");
+  const objectSelectBtn = panel.querySelector("[data-managed-object-select]");
   const acceptBtn = panel.querySelector("[data-managed-eyedropper-accept]");
   const brushBtn = panel.querySelector("[data-managed-brush-draw]");
   const polygonBtn = panel.querySelector("[data-managed-polygon-draw]");
@@ -344,6 +346,7 @@ export function createManagedSelectionEditor({
       clearBtn,
       bindSelect,
       eyedropperBtn,
+      objectSelectBtn,
       acceptBtn,
       brushBtn,
       polygonBtn,
@@ -361,6 +364,12 @@ export function createManagedSelectionEditor({
     if (eyedropperBtn) {
       eyedropperBtn.setAttribute("aria-pressed", viewerMode === "eyedropper" ? "true" : "false");
     }
+    if (objectSelectBtn) {
+      objectSelectBtn.setAttribute(
+        "aria-pressed",
+        viewerMode === "object-select" ? "true" : "false"
+      );
+    }
     if (brushBtn) {
       brushBtn.setAttribute("aria-pressed", viewerMode === "brush" ? "true" : "false");
     }
@@ -371,7 +380,7 @@ export function createManagedSelectionEditor({
     const media = Array.isArray(provided) ? resolveActivePreviewMedia(provided) : provided || null;
     if (media && media.style) {
       media.style.cursor =
-        viewerMode === "eyedropper" || viewerMode === "polygon"
+        viewerMode === "eyedropper" || viewerMode === "object-select" || viewerMode === "polygon"
           ? "crosshair"
           : viewerMode === "brush"
             ? "cell"
@@ -529,11 +538,19 @@ export function createManagedSelectionEditor({
           step = findStep(payload.grade, bindType);
         }
         if (!step?.id) throw new Error("step not found");
-        const reuseId = step.selection_id || null;
-        const previous = (payload.grade.selections || []).find((entry) => entry.id === reuseId);
+        // Explicit selectionId (object proposal) creates a new named mask instead of
+        // overwriting the currently bound selection.
+        const reuseId = stroke?.selectionId || step.selection_id || null;
+        const previous = stroke?.selectionId
+          ? null
+          : (payload.grade.selections || []).find((entry) => entry.id === reuseId);
         const selection = previous
           ? structuredClone(previous)
           : emptySelection(reuseId || undefined);
+        if (stroke?.selectionId) selection.id = stroke.selectionId;
+        if (typeof stroke?.name === "string" && stroke.name.trim()) {
+          selection.name = stroke.name.trim();
+        }
         if (!selection.mask || typeof selection.mask !== "object") {
           selection.mask = { combine: "union", leaves: [] };
         }
@@ -635,6 +652,52 @@ export function createManagedSelectionEditor({
     }
   }
 
+  async function runObjectSelect(uv) {
+    const studioId = getSelectedStudioId?.();
+    const gradeDoc = getGrade?.() || current;
+    if (!studioId || !gradeDoc?.grade || gradeDoc.evaluator !== "managed-sdr-v1") return;
+    const token = beginRequestToken(tokens, `obj-${studioId}`);
+    setStatus(messages.objectSelecting || "Proposing object…");
+    try {
+      const data = await proposeObjectSelect(studioId, {
+        u: uv.u,
+        v: uv.v,
+        expectedRevision: gradeDoc.revision,
+      });
+      if (!isCurrentRequestToken(tokens, `obj-${studioId}`, token)) return;
+      if (String(getSelectedStudioId?.()) !== String(studioId)) return;
+      const proposal = data?.proposal;
+      if (!proposal?.points || proposal.points.length < 3) {
+        setStatus(messages.objectFailed || "Object proposal failed");
+        setViewerMode("none");
+        return;
+      }
+      const name = messages.objectDefaultName || "Object";
+      const selectionId = `obj-${Date.now().toString(36)}`;
+      // Persist as a normal named polygon selection; bind + inspect for refine.
+      if (shapeSelect) shapeSelect.value = "polygon";
+      inspectedSelectionId = selectionId;
+      await saveSelection({
+        stroke: {
+          kind: "polygon",
+          points: proposal.points,
+          closed: proposal.closed !== false,
+          selectionId,
+          name,
+        },
+      });
+      setViewerMode("polygon");
+      tools.rebind?.();
+      setStatus(
+        (messages.objectSelected || "Object proposal accepted · {name}").replace("{name}", name)
+      );
+    } catch (error) {
+      if (!isCurrentRequestToken(tokens, `obj-${studioId}`, token)) return;
+      setStatus(String(error.message || messages.objectFailed || error));
+      setViewerMode("none");
+    }
+  }
+
   function syncFromGrade(payload, studioId) {
     const previousId = currentId;
     const previousRevision = current?.revision;
@@ -730,6 +793,15 @@ export function createManagedSelectionEditor({
     );
     tools.rebind?.();
   });
+  objectSelectBtn?.addEventListener("click", () => {
+    setViewerMode(viewerMode === "object-select" ? "none" : "object-select");
+    setStatus(
+      viewerMode === "object-select"
+        ? messages.objectSelectHint || "Select object: click the subject on the preview"
+        : ""
+    );
+    tools.rebind?.();
+  });
   brushBtn?.addEventListener("click", () => {
     if (shapeSelect) shapeSelect.value = "brush";
     setViewerMode(viewerMode === "brush" ? "none" : "brush");
@@ -781,6 +853,7 @@ export function createManagedSelectionEditor({
     }),
     getEditablePolygon: () => currentPolygonPoints(),
     onEyedropperSample: (uv) => runEyedropper(uv),
+    onObjectSelect: (uv) => runObjectSelect(uv),
     onBrushStrokeComplete: (stroke) => {
       void saveSelection({ stroke });
       setViewerMode("none");
@@ -810,6 +883,10 @@ export function createManagedSelectionEditor({
       polygonVertexRemoved: messages.polygonVertexRemoved,
       polygonMoving: messages.polygonMoving,
       polygonMoved: messages.polygonMoved,
+      objectSelecting: messages.objectSelecting,
+      objectSelected: messages.objectSelected,
+      objectFailed: messages.objectFailed,
+      objectDefaultName: messages.objectDefaultName,
     },
   });
 

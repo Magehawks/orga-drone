@@ -1250,6 +1250,11 @@
                  data-msg-sampled="{{ _('Sampled — accept to apply qualifier') }}"
                  data-msg-sample-stale="{{ _('Sample is stale. Sample again.') }}"
                  data-msg-eyedropper="{{ _('Eyedropper: click the preview') }}"
+                 data-msg-object-select="{{ _('Select object: click the subject on the preview') }}"
+                 data-msg-object-selecting="{{ _('Proposing object…') }}"
+                 data-msg-object-selected="{{ _('Object proposal accepted · {name}') }}"
+                 data-msg-object-failed="{{ _('Object proposal failed') }}"
+                 data-msg-object-default-name="{{ _('Object') }}"
                  data-msg-brush="{{ _('Brush: draw on the preview') }}"
                  data-msg-brush-drawing="{{ _('Brush drawing…') }}"
                  data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
@@ -1333,6 +1338,7 @@
               </label>
               <div class="studio-managed-selection-tools">
                 <button type="button" class="button ghost" data-managed-eyedropper aria-pressed="false">{{ _('Eyedropper') }}</button>
+                <button type="button" class="button ghost" data-managed-object-select aria-pressed="false">{{ _('Select object') }}</button>
                 <button type="button" class="button ghost" data-managed-brush-draw aria-pressed="false">{{ _('Draw brush') }}</button>
                 <button type="button" class="button ghost" data-managed-polygon-draw aria-pressed="false">{{ _('Draw polygon') }}</button>
                 <button type="button" class="button ghost" data-managed-eyedropper-accept disabled>{{ _('Accept sample') }}</button>
