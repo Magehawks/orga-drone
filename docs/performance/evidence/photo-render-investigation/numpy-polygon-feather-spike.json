@@ -1,0 +1,13 @@
+{
+  "probe_size": [
+    282,
+    496
+  ],
+  "vertices": 59,
+  "pure_python_median_s": 6.016378999999688,
+  "numpy_placeholder_median_s": 0.0027991999995720107,
+  "estimated_fullres_pure_python_s": 96.00604787233544,
+  "estimated_fullres_numpy_placeholder_s": 0.04466808509955336,
+  "speedup_approx": 2149.3208777220543,
+  "note": "NumPy path is a fill+blur placeholder, not numerical parity with smoothstep feather."
+}

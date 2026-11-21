@@ -1,0 +1,227 @@
+{
+  "issue": 551,
+  "git_sha": "0034e9257b56a56ba0730364353c36393ad75a5c",
+  "before": "C:\\Users\\Niwes\\Projects\\orga-drone-wt\\precision-mask-develop\\acceptance-evidence\\neon-relic\\00-before-original.jpg",
+  "neon_acceptance_export_s": 174.41,
+  "machine": {
+    "cpu": "AMD Ryzen 7 5700X 8C/16T",
+    "ram_gb": 32,
+    "gpu": "AMD Radeon RX 6700 XT",
+    "os": "Windows 11 Pro 10.0.26300",
+    "python": "3.12.3"
+  },
+  "grade_source": "sqlite-neon-acceptance",
+  "selection_count": 2,
+  "step_count": 2,
+  "polygon_vertices": 25,
+  "stage_breakdown": {
+    "decode_load_s": 0.18830200000047626,
+    "float_pack_s": 0.41206790000069304,
+    "mask_raster_all_selections_s": 8.73096379999879,
+    "apply_managed_grade_image_s": 26.14143360000162,
+    "encode_jpeg_s": 2.0206637999999657,
+    "total_staged_s": 37.493431100001544,
+    "megapixels": 2.232,
+    "size": [
+      1125,
+      1984
+    ]
+  },
+  "cprofile": {
+    "wall_s": 86.57293639999989,
+    "profile_txt": "C:\\Users\\Niwes\\Projects\\orga-drone-wt\\masking-ux-develop\\docs\\performance\\evidence\\photo-render-investigation\\cprofile-apply-workers1.txt"
+  },
+  "materialize_workers_1": {
+    "workers": "1",
+    "runs": [
+      30.006617099999858,
+      30.254283700000087
+    ],
+    "min": 30.006617099999858,
+    "max": 30.254283700000087,
+    "median": 30.130450399999972,
+    "mean": 30.130450399999972,
+    "p95": 30.006617099999858
+  },
+  "materialize_workers_auto": {
+    "workers": "auto",
+    "runs": [
+      19.135531400001128,
+      19.51901100000032,
+      19.674195800000234
+    ],
+    "min": 19.135531400001128,
+    "max": 19.674195800000234,
+    "median": 19.51901100000032,
+    "mean": 19.442912733333895,
+    "p95": 19.51901100000032
+  },
+  "materialize_workers_8": {
+    "workers": "8",
+    "runs": [
+      19.425335500000074,
+      19.432016500000827,
+      20.48707689999901
+    ],
+    "min": 19.425335500000074,
+    "max": 20.48707689999901,
+    "median": 19.432016500000827,
+    "mean": 19.78147629999997,
+    "p95": 19.432016500000827
+  },
+  "kernel_desat": [
+    {
+      "size": [
+        1125,
+        1984
+      ],
+      "python": {
+        "op": "pure_python_desat",
+        "size": [
+          1125,
+          1984
+        ],
+        "runs": [
+          0.3329070999989199,
+          0.4007376999998087
+        ],
+        "median_s": 0.3668223999993643,
+        "mp_per_s": 6.084688394176224
+      },
+      "numpy": {
+        "available": true,
+        "op": "numpy_where_desat",
+        "size": [
+          1125,
+          1984
+        ],
+        "runs": [
+          0.07200870000087889,
+          0.07683689999976195,
+          0.067737199999101,
+          0.06740489999901911,
+          0.06700559999990219
+        ],
+        "median_s": 0.067737199999101,
+        "mp_per_s": 32.95087485206981
+      }
+    },
+    {
+      "size": [
+        2000,
+        4000
+      ],
+      "python": {
+        "op": "pure_python_desat",
+        "size": [
+          800,
+          800
+        ],
+        "runs": [
+          0.11563100000057602
+        ],
+        "median_s": 0.11563100000057602,
+        "mp_per_s": 5.534847921377588,
+        "note": "downscaled pure-python sample"
+      },
+      "numpy": {
+        "available": true,
+        "op": "numpy_where_desat",
+        "size": [
+          2000,
+          4000
+        ],
+        "runs": [
+          0.22946670000055747,
+          0.2680325000001176,
+          0.2848381999992853,
+          0.2641174000000319,
+          0.28035820000150125
+        ],
+        "median_s": 0.2680325000001176,
+        "mp_per_s": 29.847126747676086
+      }
+    },
+    {
+      "size": [
+        3000,
+        4000
+      ],
+      "python": {
+        "op": "pure_python_desat",
+        "size": [
+          800,
+          800
+        ],
+        "runs": [
+          0.10984359999929438
+        ],
+        "median_s": 0.10984359999929438,
+        "mp_per_s": 5.826465993504503,
+        "note": "downscaled pure-python sample"
+      },
+      "numpy": {
+        "available": true,
+        "op": "numpy_where_desat",
+        "size": [
+          3000,
+          4000
+        ],
+        "runs": [
+          0.37761239999963436,
+          0.358549700000367,
+          0.3637230999993335,
+          0.3715385999985301,
+          0.4021474000001035
+        ],
+        "median_s": 0.3715385999985301,
+        "mp_per_s": 32.29812460952233
+      }
+    },
+    {
+      "size": [
+        4000,
+        6000
+      ],
+      "python": {
+        "op": "pure_python_desat",
+        "size": [
+          800,
+          800
+        ],
+        "runs": [
+          0.10201739999865822
+        ],
+        "median_s": 0.10201739999865822,
+        "mp_per_s": 6.273439629008557,
+        "note": "downscaled pure-python sample"
+      },
+      "numpy": {
+        "available": true,
+        "op": "numpy_where_desat",
+        "size": [
+          4000,
+          6000
+        ],
+        "runs": [
+          0.7897130000001198,
+          0.9807275000002846,
+          0.9295223000008264,
+          0.8735739999992802,
+          0.8437911000000895
+        ],
+        "median_s": 0.8735739999992802,
+        "mp_per_s": 27.473345131631408
+      }
+    }
+  ],
+  "native_kernel_sources": {
+    "rust_src": "C:\\Users\\Niwes\\Projects\\orga-drone-wt\\masking-ux-develop\\docs\\performance\\evidence\\photo-render-investigation\\kernels\\desat_kernel.rs",
+    "csharp_src": "C:\\Users\\Niwes\\Projects\\orga-drone-wt\\masking-ux-develop\\docs\\performance\\evidence\\photo-render-investigation\\kernels\\DesatKernel.cs",
+    "rustc": {
+      "ok": false,
+      "reason": "rustc not on PATH"
+    },
+    "csharp_toolchain": "present"
+  }
+}

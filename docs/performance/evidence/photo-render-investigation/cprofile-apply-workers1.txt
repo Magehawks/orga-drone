@@ -1,0 +1,48 @@
+         244234619 function calls in 86.465 seconds
+
+   Ordered by: cumulative time
+   List reduced from 79 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.143    0.143   86.464   86.464 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:808(apply_managed_grade_image)
+        1    7.544    7.544   59.523   59.523 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:591(_apply_managed_grade_rows)
+  2324560    6.917    0.000   30.213    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:205(apply_managed_step)
+        2    0.275    0.137   26.798   13.399 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_selection.py:404(rasterize_mask_coverage)
+   364266    0.729    0.000   26.523    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_selection.py:61(leaf_coverage)
+   364266    0.408    0.000   17.564    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_masks.py:184(polygon_coverage)
+   364266    3.871    0.000   16.016    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_masks.py:171(distance_to_polygon_edges)
+  4443273    6.553    0.000   12.769    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:157(_encode_profile)
+  4556560    1.628    0.000   10.731    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:179(_to_domain)
+  9106650    6.555    0.000   10.617    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_masks.py:74(_distance_to_segment)
+   364268    1.839    0.000    7.938    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_selection.py:55(_as_points)
+  2211273    2.639    0.000    7.901    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_wheels.py:99(managed_hsl)
+ 37576096    5.770    0.000    5.770    0.000 {built-in method builtins.min}
+  6633819    2.503    0.000    5.711    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:117(_param_float_any)
+  9106700    4.194    0.000    5.695    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_selection.py:46(_as_point)
+  4443273    3.042    0.000    5.685    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:144(_decode_profile)
+   113287    0.350    0.000    5.382    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:205(apply_primaries)
+ 29149170    4.863    0.000    4.863    0.000 {built-in method builtins.max}
+  2324560    1.498    0.000    3.880    0.000 {built-in method builtins.all}
+ 15843842    2.405    0.000    3.713    0.000 {built-in method builtins.isinstance}
+  7766689    2.919    0.000    3.657    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_apply.py:107(_param_float)
+ 19570060    2.937    0.000    2.937    0.000 {method 'get' of 'dict' objects}
+  8845092    1.725    0.000    2.319    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_wheels.py:107(<genexpr>)
+ 13329819    2.081    0.000    2.081    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_lut.py:30(encode_bt709)
+   113287    0.353    0.000    1.570    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:133(kelvin_tint_to_gains)
+   113287    0.709    0.000    1.538    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:165(tone_controls_to_curve)
+  6696000    1.468    0.000    1.468    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_lut.py:37(decode_srgb)
+ 14740369    1.399    0.000    1.399    0.000 {built-in method math.isfinite}
+  2688857    0.629    0.000    1.308    0.000 <frozen abc>:117(__instancecheck__)
+  9106650    1.224    0.000    1.224    0.000 {built-in method math.hypot}
+  6633819    1.175    0.000    1.175    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_lut.py:43(decode_bt709)
+ 11496457    0.948    0.000    0.948    0.000 {built-in method builtins.len}
+   364266    0.786    0.000    0.815    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_masks.py:153(point_in_polygon)
+   113287    0.087    0.000    0.796    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:105(apply_tone_curve)
+   226574    0.386    0.000    0.732    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_image.py:265(blackbody_channel_gains)
+   113287    0.295    0.000    0.679    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:78(piecewise_linear)
+  2688857    0.679    0.000    0.679    0.000 {built-in method _abc._abc_instancecheck}
+   679722    0.415    0.000    0.645    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:122(_finite_slider)
+  2573849    0.480    0.000    0.480    0.000 {method 'append' of 'list' objects}
+   113287    0.149    0.000    0.452    0.000 C:\Users\Niwes\Projects\orga-drone-wt\masking-ux-develop\src\orga_drone\studio_managed_primaries.py:51(primaries_balance)
+
+
