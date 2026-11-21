@@ -27,10 +27,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-BEFORE = Path(
+_DEFAULT_BEFORE = Path(
     r"C:\Users\Niwes\Projects\orga-drone-wt\precision-mask-develop"
     r"\acceptance-evidence\neon-relic\00-before-original.jpg"
 )
+BEFORE = Path(os.environ.get("ORGA_PERF_BEFORE", str(_DEFAULT_BEFORE)))
 NEON_RUN = (
     ROOT
     / "acceptance-evidence"

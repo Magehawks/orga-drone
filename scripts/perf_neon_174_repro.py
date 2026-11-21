@@ -14,10 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-BEFORE = Path(
+_DEFAULT_BEFORE = Path(
     r"C:\Users\Niwes\Projects\orga-drone-wt\precision-mask-develop"
     r"\acceptance-evidence\neon-relic\00-before-original.jpg"
 )
+BEFORE = Path(os.environ.get("ORGA_PERF_BEFORE", str(_DEFAULT_BEFORE)))
 OUT = ROOT / "docs" / "performance" / "evidence" / "photo-render-investigation"
 
 

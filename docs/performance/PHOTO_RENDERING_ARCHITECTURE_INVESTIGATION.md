@@ -265,8 +265,8 @@ Measurable product targets (from charter): warm preview &lt;500 ms; complex 2.23
 | Item | Status |
 |---|---|
 | Parent issue | [#551](https://github.com/Magehawks/orga-drone/issues/551) |
-| Investigation PR | *(filled at merge)* |
-| Independent review | *(filled at merge)* |
+| Investigation PR | [#555](https://github.com/Magehawks/orga-drone/pull/555) |
+| Independent review | [REVIEW_APPROVED](https://github.com/Magehawks/orga-drone/pull/555#issuecomment-7062537188) |
 | CI | *(filled at merge)* |
 | Merge SHA into `develop` | *(filled at merge)* |
 
