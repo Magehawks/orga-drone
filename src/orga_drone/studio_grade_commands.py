@@ -26,6 +26,7 @@ COMMAND_CAPABILITIES = (
     "upsert_step_params",
     "remove_step",
     "upsert_selection",
+    "remove_selection",
     "bind_step_selection",
     "apply_preset",
     "upsert_animation",
@@ -222,6 +223,24 @@ def validate_patch(
         if not replaced:
             next_selections.append(dict(entry))
         grade["selections"] = next_selections
+    elif kind == "remove_selection":
+        # Atomic unbind + delete for Inspector mask list (#537).
+        if set(params) != {"selection_id"}:
+            fail("command.params", "Expected selection_id only")
+        selection_id = identifier(params["selection_id"], "command.params.selection_id")
+        found = any(
+            entry.get("id") == selection_id for entry in (grade.get("selections") or [])
+        )
+        if not found:
+            fail("command.params.selection_id", "Unknown selection ID")
+        for step in steps:
+            if step.get("selection_id") == selection_id:
+                step["selection_id"] = None
+        grade["selections"] = [
+            entry
+            for entry in grade.get("selections") or []
+            if entry.get("id") != selection_id
+        ]
     elif kind == "bind_step_selection":
         if set(params) != {"step_id", "selection_id"}:
             fail("command.params", "Expected step_id and selection_id only")

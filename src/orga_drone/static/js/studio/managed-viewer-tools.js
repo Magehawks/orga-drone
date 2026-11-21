@@ -99,7 +99,11 @@ function paintBrushOverlay(mediaEl, points, radiusUv) {
   ctx.stroke();
 }
 
-function paintPolygonOverlay(mediaEl, points, { closed = false } = {}) {
+export function paintPolygonOverlay(
+  mediaEl,
+  points,
+  { closed = false, squareHandles = false } = {}
+) {
   const canvas = ensureBrushOverlay(mediaEl);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -123,11 +127,132 @@ function paintPolygonOverlay(mediaEl, points, { closed = false } = {}) {
   }
   ctx.stroke();
   points.forEach((pt) => {
-    ctx.beginPath();
-    ctx.arc(pt[0] * canvas.width, pt[1] * canvas.height, 4, 0, Math.PI * 2);
+    const x = pt[0] * canvas.width;
+    const y = pt[1] * canvas.height;
     ctx.fillStyle = "rgba(64, 200, 255, 0.95)";
-    ctx.fill();
+    if (squareHandles) {
+      const s = 7;
+      ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      ctx.strokeStyle = "rgba(20, 20, 20, 0.85)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+      ctx.strokeStyle = "rgba(64, 200, 255, 0.95)";
+      ctx.lineWidth = 2;
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
+}
+
+/** Draw a server-rasterized selection coverage PNG (#537). Preview only. */
+export function paintSelectionRasterOverlay(mediaEl, imageBitmap, selection = null) {
+  const canvas = ensureBrushOverlay(mediaEl);
+  if (!canvas || !imageBitmap) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+  const poly = selection?.mask?.leaves?.find(
+    (leaf) => leaf?.type === "polygon" && Array.isArray(leaf.points) && leaf.points.length >= 3
+  );
+  if (poly) {
+    ctx.strokeStyle = "rgba(64, 200, 255, 0.95)";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    poly.points.forEach((pt, index) => {
+      const x = Number(pt[0]) * canvas.width;
+      const y = Number(pt[1]) * canvas.height;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    poly.points.forEach((pt) => {
+      const x = Number(pt[0]) * canvas.width;
+      const y = Number(pt[1]) * canvas.height;
+      const s = 7;
+      ctx.fillStyle = "rgba(64, 200, 255, 0.95)";
+      ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      ctx.strokeStyle = "rgba(20, 20, 20, 0.85)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+    });
+  }
+}
+
+/** Fallback local outline when raster overlay is unavailable. */
+export function paintSelectionInspectionOverlay(mediaEl, selection, { invertedHint = false } = {}) {
+  if (!mediaEl || !selection) {
+    clearBrushOverlay(mediaEl);
+    return;
+  }
+  const leaves = selection?.mask?.leaves;
+  if (!Array.isArray(leaves) || !leaves.length) {
+    clearBrushOverlay(mediaEl);
+    return;
+  }
+  const poly = leaves.find((leaf) => leaf?.type === "polygon" && Array.isArray(leaf.points));
+  if (poly && poly.points.length >= 3) {
+    paintPolygonOverlay(mediaEl, poly.points, {
+      closed: Boolean(poly.closed !== false),
+      squareHandles: true,
+    });
+    return;
+  }
+  const brush = leaves.find((leaf) => leaf?.type === "brush");
+  if (brush && Array.isArray(brush.strokes) && brush.strokes.length) {
+    const pts = [];
+    for (const stroke of brush.strokes) {
+      if (Array.isArray(stroke?.points)) pts.push(...stroke.points);
+    }
+    if (pts.length) {
+      paintBrushOverlay(mediaEl, pts, brush.strokes[0]?.radius || 0.08);
+      return;
+    }
+  }
+  const radial = leaves.find((leaf) => leaf?.type === "radial");
+  if (radial?.center && radial?.axes) {
+    const canvas = ensureBrushOverlay(mediaEl);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = Number(radial.center[0]) * canvas.width;
+    const cy = Number(radial.center[1]) * canvas.height;
+    const rx = Math.max(2, Number(radial.axes[0]) * canvas.width);
+    const ry = Math.max(2, Number(radial.axes[1]) * canvas.height);
+    ctx.fillStyle = invertedHint ? "rgba(255, 180, 64, 0.14)" : "rgba(64, 200, 255, 0.18)";
+    ctx.strokeStyle = invertedHint ? "rgba(255, 180, 64, 0.95)" : "rgba(64, 200, 255, 0.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    return;
+  }
+  const linear = leaves.find((leaf) => leaf?.type === "linear");
+  if (linear?.start && linear?.end) {
+    const canvas = ensureBrushOverlay(mediaEl);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "rgba(64, 200, 255, 0.95)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(Number(linear.start[0]) * canvas.width, Number(linear.start[1]) * canvas.height);
+    ctx.lineTo(Number(linear.end[0]) * canvas.width, Number(linear.end[1]) * canvas.height);
+    ctx.stroke();
+    return;
+  }
+  clearBrushOverlay(mediaEl);
+}
+
+export function clearManagedSelectionOverlay(mediaEl) {
+  clearBrushOverlay(mediaEl);
 }
 
 /** Hit-test a polygon vertex in UV space; returns index or -1. */

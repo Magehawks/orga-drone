@@ -15,7 +15,13 @@ import {
   linearLeaf,
   sampleEyedropper,
 } from "./grade-api.js";
-import { createManagedViewerTools, resolveActivePreviewMedia } from "./managed-viewer-tools.js";
+import {
+  clearManagedSelectionOverlay,
+  createManagedViewerTools,
+  paintSelectionInspectionOverlay,
+  paintSelectionRasterOverlay,
+  resolveActivePreviewMedia,
+} from "./managed-viewer-tools.js";
 
 function numberFromInput(input, fallback) {
   const value = Number(input?.value);
@@ -51,11 +57,13 @@ export function createManagedSelectionEditor({
   const sampleSwatch = panel.querySelector("[data-managed-eyedropper-swatch]");
   const sampleMeta = panel.querySelector("[data-managed-eyedropper-meta]");
   const summaryEl = panel.querySelector("[data-managed-selection-summary]");
+  const listHeading = panel.querySelector("[data-managed-mask-list-heading]");
 
   let current = null;
   let currentId = null;
   let pendingSample = null;
   let viewerMode = "none";
+  let inspectedSelectionId = null;
   let tools = { rebind() {}, destroy() {} };
   const tokens = new Map();
 
@@ -68,6 +76,80 @@ export function createManagedSelectionEditor({
     return option?.textContent?.trim() || stepType || "";
   }
 
+  function leafTypeLabel(selection) {
+    const type = selection?.mask?.leaves?.[0]?.type || "none";
+    const map = {
+      polygon: messages.typePolygon || "Polygon",
+      brush: messages.typeBrush || "Brush",
+      radial: messages.typeRadial || "Radial",
+      linear: messages.typeLinear || "Linear",
+      none: messages.typeEmpty || "Empty",
+    };
+    return map[type] || type;
+  }
+
+  function displayName(selection) {
+    const named = typeof selection?.name === "string" ? selection.name.trim() : "";
+    if (named) return named;
+    return (messages.untitledMask || "Mask {id}").replace("{id}", String(selection?.id || ""));
+  }
+
+  function overlayVisible(selection) {
+    if (selection?.overlay && typeof selection.overlay.visible === "boolean") {
+      return selection.overlay.visible;
+    }
+    return true;
+  }
+
+  let overlayToken = 0;
+
+  async function refreshInspectionOverlay(gradeDoc) {
+    const media = resolveActivePreviewMedia([getPreviewMediaEl?.()].flat().filter(Boolean));
+    if (!media || !inspectedSelectionId) {
+      clearManagedSelectionOverlay(media);
+      return;
+    }
+    const selection = (gradeDoc?.grade?.selections || []).find(
+      (entry) => entry.id === inspectedSelectionId
+    );
+    if (!selection || !overlayVisible(selection)) {
+      clearManagedSelectionOverlay(media);
+      return;
+    }
+    const studioId = getSelectedStudioId?.();
+    const revision = gradeDoc?.revision;
+    if (!studioId || revision === undefined || revision === null) {
+      paintSelectionInspectionOverlay(media, selection, {
+        invertedHint: Boolean(selection.invert),
+      });
+      return;
+    }
+    const token = ++overlayToken;
+    try {
+      const url =
+        `/api/studio/${studioId}/grade/selection-overlay` +
+        `?selection_id=${encodeURIComponent(String(inspectedSelectionId))}` +
+        `&expected_revision=${encodeURIComponent(String(revision))}` +
+        `&max_edge=640`;
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`overlay ${res.status}`);
+      const blob = await res.blob();
+      if (token !== overlayToken) return;
+      const bitmap = await createImageBitmap(blob);
+      if (token !== overlayToken) {
+        bitmap.close?.();
+        return;
+      }
+      paintSelectionRasterOverlay(media, bitmap, selection);
+      bitmap.close?.();
+    } catch {
+      if (token !== overlayToken) return;
+      paintSelectionInspectionOverlay(media, selection, {
+        invertedHint: Boolean(selection.invert),
+      });
+    }
+  }
+
   function renderSelectionSummary(gradeDoc) {
     if (!summaryEl) return;
     const selections = gradeDoc?.grade?.selections || [];
@@ -75,33 +157,173 @@ export function createManagedSelectionEditor({
     summaryEl.replaceChildren();
     if (!selections.length) {
       summaryEl.hidden = true;
+      if (listHeading) listHeading.hidden = true;
+      inspectedSelectionId = null;
+      refreshInspectionOverlay(null);
       return;
     }
     summaryEl.hidden = false;
+    if (listHeading) listHeading.hidden = false;
     const bindType = bindSelect?.value || "primaries-v1";
     const activeStep = findStep(gradeDoc.grade, bindType);
-    const activeSelectionId = activeStep?.selection_id || null;
+    const boundSelectionId = activeStep?.selection_id || null;
+    if (inspectedSelectionId && !selections.some((entry) => entry.id === inspectedSelectionId)) {
+      inspectedSelectionId = null;
+    }
+    if (!inspectedSelectionId && boundSelectionId) {
+      inspectedSelectionId = boundSelectionId;
+    }
     for (const selection of selections) {
       const boundSteps = steps.filter((step) => step.selection_id === selection.id);
       const li = document.createElement("li");
-      if (activeSelectionId && selection.id === activeSelectionId) {
-        li.classList.add("is-active");
-      }
-      if (boundSteps.length) {
-        const labels = boundSteps.map((step) => stepLabel(step.type)).join(", ");
-        li.textContent = (messages.bindingLine || "{id} → {step}")
-          .replace("{id}", String(selection.id))
-          .replace("{step}", labels);
-      } else {
-        li.textContent = (messages.bindingUnbound || "{id} (not bound)").replace(
-          "{id}",
-          String(selection.id)
+      li.className = "studio-mask-list-item";
+      li.tabIndex = 0;
+      li.setAttribute("role", "option");
+      li.dataset.selectionId = String(selection.id);
+      const isInspected = inspectedSelectionId && selection.id === inspectedSelectionId;
+      const isBound = boundSelectionId && selection.id === boundSelectionId;
+      if (isInspected) li.classList.add("is-active");
+      if (isBound) li.classList.add("is-bound");
+
+      const title = document.createElement("button");
+      title.type = "button";
+      title.className = "studio-mask-list-select";
+      const gradePart = boundSteps.length
+        ? boundSteps.map((step) => stepLabel(step.type)).join(", ")
+        : messages.bindingUnboundShort || "unbound";
+      const invertPart = selection.invert ? ` · ${messages.invertShort || "invert"}` : "";
+      title.textContent = `${displayName(selection)} · ${leafTypeLabel(selection)} · ${gradePart}${invertPart}`;
+      title.title = String(selection.id);
+      title.addEventListener("click", (event) => {
+        event.preventDefault();
+        inspectedSelectionId = selection.id;
+        if (invertInput) invertInput.checked = Boolean(selection.invert);
+        if (selection?.mask?.leaves?.[0]?.type && shapeSelect) {
+          shapeSelect.value = selection.mask.leaves[0].type;
+        }
+        renderSelectionSummary(gradeDoc);
+        setStatus(
+          (messages.maskSelected || "Selected mask · {name}")
+            .replace("{name}", displayName(selection))
+            .replace("{id}", String(selection.id))
         );
-      }
-      if (selection.invert) {
-        li.textContent += " · invert";
-      }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "studio-mask-list-actions";
+
+      const overlayBtn = document.createElement("button");
+      overlayBtn.type = "button";
+      overlayBtn.className = "button ghost studio-mask-list-action";
+      const ovVisible = overlayVisible(selection);
+      overlayBtn.textContent = ovVisible
+        ? messages.hideOverlay || "Hide"
+        : messages.showOverlay || "Show";
+      overlayBtn.setAttribute(
+        "aria-label",
+        ovVisible
+          ? messages.hideOverlayAria || "Hide selection overlay"
+          : messages.showOverlayAria || "Show selection overlay"
+      );
+      overlayBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void upsertSelectionMeta(selection.id, {
+          overlay: { visible: !ovVisible },
+        });
+      });
+
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "button ghost studio-mask-list-action";
+      renameBtn.textContent = messages.renameMask || "Rename";
+      renameBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const next = window.prompt(
+          messages.renamePrompt || "Mask name",
+          typeof selection.name === "string" ? selection.name : displayName(selection)
+        );
+        if (next === null) return;
+        const trimmed = String(next).trim().slice(0, 80);
+        void upsertSelectionMeta(selection.id, { name: trimmed });
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "button ghost studio-mask-list-action";
+      deleteBtn.textContent = messages.deleteMask || "Delete";
+      deleteBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (
+          !window.confirm(
+            (messages.deleteConfirm || "Delete mask “{name}”?").replace(
+              "{name}",
+              displayName(selection)
+            )
+          )
+        ) {
+          return;
+        }
+        void deleteSelection(selection.id);
+      });
+
+      actions.append(overlayBtn, renameBtn, deleteBtn);
+      li.append(title, actions);
       summaryEl.appendChild(li);
+    }
+    refreshInspectionOverlay(gradeDoc);
+  }
+
+  async function upsertSelectionMeta(selectionId, patch) {
+    const studioId = getSelectedStudioId?.();
+    const gradeDoc = getGrade?.() || current;
+    if (!studioId || !gradeDoc?.grade || gradeDoc.evaluator !== "managed-sdr-v1") return;
+    const previous = (gradeDoc.grade.selections || []).find((entry) => entry.id === selectionId);
+    if (!previous) return;
+    const selection = structuredClone(previous);
+    if (Object.prototype.hasOwnProperty.call(patch, "name")) selection.name = patch.name;
+    if (Object.prototype.hasOwnProperty.call(patch, "overlay")) {
+      selection.overlay = { ...(selection.overlay || {}), ...patch.overlay };
+    }
+    const token = beginRequestToken(tokens, studioId);
+    try {
+      const payload = await postGradeCommand(studioId, {
+        type: "upsert_selection",
+        expectedRevision: gradeDoc.revision,
+        params: { selection },
+        historyGroup: `selection-meta-${selectionId}`,
+      });
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      current = payload;
+      onChanged?.(payload);
+    } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      setStatus(String(error.message || error));
+    }
+  }
+
+  async function deleteSelection(selectionId) {
+    const studioId = getSelectedStudioId?.();
+    const gradeDoc = getGrade?.() || current;
+    if (!studioId || !gradeDoc?.grade || gradeDoc.evaluator !== "managed-sdr-v1") return;
+    const token = beginRequestToken(tokens, studioId);
+    try {
+      const payload = await postGradeCommand(studioId, {
+        type: "remove_selection",
+        expectedRevision: gradeDoc.revision,
+        params: { selection_id: selectionId },
+        historyGroup: `selection-delete-${selectionId}`,
+      });
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      if (inspectedSelectionId === selectionId) inspectedSelectionId = null;
+      current = payload;
+      setStatus(messages.maskDeleted || "Mask deleted");
+      onChanged?.(payload);
+    } catch (error) {
+      if (!isCurrentRequestToken(tokens, studioId, token)) return;
+      setStatus(String(error.message || error));
     }
   }
 
@@ -412,6 +634,13 @@ export function createManagedSelectionEditor({
     const previousRevision = current?.revision;
     current = payload || null;
     currentId = studioId ? String(studioId) : null;
+    if (String(previousId || "") !== String(currentId || "")) {
+      inspectedSelectionId = null;
+      overlayToken += 1;
+      clearManagedSelectionOverlay(
+        resolveActivePreviewMedia([getPreviewMediaEl?.()].flat().filter(Boolean))
+      );
+    }
     if (
       String(previousId || "") !== String(currentId || "") ||
       Number(previousRevision) !== Number(payload?.revision)
@@ -524,7 +753,7 @@ export function createManagedSelectionEditor({
     if (!grade || !studioId) return null;
     const bindType = bindSelect?.value || "primaries-v1";
     const step = (grade.steps || []).find((entry) => entry?.type === bindType);
-    const selectionId = step?.selection_id;
+    const selectionId = inspectedSelectionId || step?.selection_id;
     if (!selectionId) return null;
     const selection = (grade.selections || []).find((entry) => entry?.id === selectionId);
     const leaf = selection?.mask?.leaves?.find((entry) => entry?.type === "polygon");

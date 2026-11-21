@@ -1876,23 +1876,73 @@ button.cta, .button.cta {
 .studio-photo-still-export-popover[hidden] {
   display: none !important;
 }
+.studio-mask-list-heading {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #9aa3ad);
+}
+.studio-mask-list-heading[hidden] {
+  display: none !important;
+}
 .studio-managed-selection-summary {
   list-style: none;
   margin: 0.15rem 0 0.45rem;
-  padding: 0.35rem 0.45rem;
+  padding: 0.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 11rem;
+  overflow: auto;
 }
 .studio-managed-selection-summary[hidden] {
   display: none !important;
 }
-.studio-managed-selection-summary li {
-  margin: 0.1rem 0;
+.studio-managed-selection-summary li,
+.studio-mask-list-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
 }
-.studio-managed-selection-summary li.is-active {
+.studio-managed-selection-summary li.is-active,
+.studio-mask-list-item.is-active {
   font-weight: 600;
   color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.studio-mask-list-item.is-bound .studio-mask-list-select::after {
+  content: "";
+}
+.studio-mask-list-select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.studio-mask-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.studio-mask-list-action {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  min-height: 0;
 }
 .studio-managed-brush-overlay {
   position: absolute;

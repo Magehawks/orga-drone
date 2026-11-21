@@ -554,6 +554,7 @@ __all__ = [
     "ManagedSelectionError",
     "RASTERIZER_VERSION",
     "evaluate_selection",
+    "invert_selection_coverage",
     "leaf_coverage",
     "mask_coverage",
     "qualifier_coverage",

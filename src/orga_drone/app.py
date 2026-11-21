@@ -3658,6 +3658,114 @@ def create_app() -> FastAPI:
             }
         )
 
+    @app.get("/api/studio/{studio_item_id}/grade/selection-overlay")
+    async def api_studio_selection_overlay(
+        studio_item_id: int,
+        selection_id: str = Query(...),
+        max_edge: int = Query(512, ge=64, le=2048),
+        expected_revision: str | None = Query(None),
+    ) -> Response:
+        """Preview-only PNG of the affected selection region (#537).
+
+        Uses spatial mask rasterization (feather + combine) and invert.
+        RGB qualifiers are not baked into this overlay. Never mixed into export.
+        """
+        from io import BytesIO
+
+        from PIL import Image
+
+        from orga_drone.studio_grade_model import read_grade
+        from orga_drone.studio_managed_selection import (
+            ManagedSelectionError,
+            rasterize_selection_coverage,
+            selection_by_id,
+        )
+
+        project_id = _clip_project_id(studio_item_id)
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        clip = next(
+            (item for item in db.list_studio_items(project_id) if item.id == studio_item_id),
+            None,
+        )
+        if clip is None:
+            raise HTTPException(status_code=404, detail="Studio item not found")
+        model = read_grade(clip.effect_settings)
+        if model.evaluator != "managed-sdr-v1" or model.grade is None:
+            raise HTTPException(status_code=422, detail="Managed grade required")
+        if expected_revision is not None and expected_revision != "":
+            try:
+                if int(expected_revision) != int(model.revision):
+                    raise HTTPException(status_code=409, detail="Grade revision mismatch")
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="expected_revision must be an integer"
+                ) from exc
+        try:
+            selection = selection_by_id(model.grade.get("selections") or [], selection_id)
+        except ManagedSelectionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if selection is None:
+            raise HTTPException(status_code=404, detail="selection not found")
+
+        # Prefer media aspect; fall back to square preview raster.
+        width = 512
+        height = 512
+        if clip.media_path:
+            media_path = Path(clip.media_path)
+            if media_path.is_file():
+                try:
+                    with Image.open(media_path) as src:
+                        sw, sh = src.size
+                    if sw > 0 and sh > 0:
+                        scale = float(max_edge) / float(max(sw, sh))
+                        width = max(1, int(round(sw * scale)))
+                        height = max(1, int(round(sh * scale)))
+                except OSError:
+                    pass
+        try:
+            weights = rasterize_selection_coverage(
+                selection, width=width, height=height
+            )
+        except ManagedSelectionError as exc:
+            # Qualifier-only / unsupported: fall back to spatial mask without qualifier.
+            if "qualifier" in str(exc).lower():
+                mask = selection.get("mask") if isinstance(selection, dict) else None
+                from orga_drone.studio_managed_masks import invert_coverage
+                from orga_drone.studio_managed_selection import rasterize_mask_coverage
+
+                weights = rasterize_mask_coverage(
+                    mask if isinstance(mask, dict) else None,
+                    width=width,
+                    height=height,
+                )
+                if bool(selection.get("invert", False)):
+                    weights = [invert_coverage(value) for value in weights]
+            else:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        rgba = bytearray(width * height * 4)
+        for index, weight in enumerate(weights):
+            alpha = max(0, min(255, int(round(float(weight) * 140.0))))
+            base = index * 4
+            if alpha:
+                rgba[base] = 64
+                rgba[base + 1] = 200
+                rgba[base + 2] = 255
+                rgba[base + 3] = alpha
+        image = Image.frombytes("RGBA", (width, height), bytes(rgba))
+        buffer = BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        return Response(
+            content=buffer.getvalue(),
+            media_type="image/png",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Orga-Overlay": "preview-only",
+                "X-Orga-Selection-Id": selection_id,
+            },
+        )
+
     @app.get("/api/studio/{studio_item_id}/preview-frame")
     async def api_studio_preview_frame(
         studio_item_id: int,

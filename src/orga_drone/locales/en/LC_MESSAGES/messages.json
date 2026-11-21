@@ -1300,5 +1300,20 @@
   "{id} (not bound)": "{id} (not bound)",
   "Polygon: click to place points, drag handles to refine, Enter or double-click to close": "Polygon: click to place points, drag handles to refine, Enter or double-click to close",
   "Polygon: drag vertex to refine": "Polygon: drag vertex to refine",
-  "Polygon vertex updated": "Polygon vertex updated"
+  "Polygon vertex updated": "Polygon vertex updated",
+  "Masks": "Masks",
+  "Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points.": "Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points.",
+  "Mask {id}": "Mask {id}",
+  "Selected mask · {name}": "Selected mask · {name}",
+  "Mask name": "Mask name",
+  "Delete": "Delete",
+  "Delete mask “{name}”?": "Delete mask “{name}”?",
+  "Mask deleted": "Mask deleted",
+  "Hide": "Hide",
+  "Show": "Show",
+  "Hide selection overlay": "Hide selection overlay",
+  "Show selection overlay": "Show selection overlay",
+  "unbound": "unbound",
+  "Empty": "Empty",
+  "invert": "invert"
 }
