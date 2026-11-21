@@ -271,6 +271,54 @@ export function hitTestPolygonVertex(points, uv, thresholdUv = 0.02) {
   return best;
 }
 
+/** Distance from point to segment; used for edge insert (#538). */
+export function distanceToSegment(uv, a, b) {
+  const ax = Number(a[0]);
+  const ay = Number(a[1]);
+  const bx = Number(b[0]);
+  const by = Number(b[1]);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 <= 1e-12) return Math.hypot(uv.u - ax, uv.v - ay);
+  let t = ((uv.u - ax) * dx + (uv.v - ay) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(uv.u - (ax + t * dx), uv.v - (ay + t * dy));
+}
+
+/** Hit-test polygon edge; returns insert index after vertex i, or -1. */
+export function hitTestPolygonEdge(points, uv, thresholdUv = 0.015) {
+  if (!uv || !Array.isArray(points) || points.length < 2) return -1;
+  let best = -1;
+  let bestDist = thresholdUv;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const dist = distanceToSegment(uv, a, b);
+    if (dist <= bestDist) {
+      bestDist = dist;
+      best = i + 1;
+    }
+  }
+  return best;
+}
+
+/** Even-odd point-in-polygon for whole-mask move (#538). */
+export function pointInPolygon(uv, points) {
+  if (!uv || !Array.isArray(points) || points.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const xi = Number(points[i][0]);
+    const yi = Number(points[i][1]);
+    const xj = Number(points[j][0]);
+    const yj = Number(points[j][1]);
+    const intersect =
+      yi > uv.v !== yj > uv.v && uv.u < ((xj - xi) * (uv.v - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 export function createManagedViewerTools({
   getMediaEl,
   mediaEl,
@@ -287,11 +335,16 @@ export function createManagedViewerTools({
   let drawing = false;
   let polygonActive = false;
   let polygonDragging = false;
+  let polygonMoving = false;
   let dragIndex = -1;
+  let moveOrigin = null;
+  let moveBase = null;
   let points = [];
   let pointerId = null;
   let boundEl = null;
   let lastClickAt = 0;
+  const MIN_POLYGON_POINTS = 3;
+  const MAX_POLYGON_POINTS = 4096;
 
   function activeMedia() {
     return getMediaEl?.() || mediaEl || null;
@@ -363,14 +416,29 @@ export function createManagedViewerTools({
       return;
     }
     if (mode === "polygon") {
-      // Drag an existing closed polygon vertex (#533) before starting a new draw.
+      // Edit existing closed polygon (#533/#538) before starting a new draw.
       if (!polygonActive) {
         const editable = getEditablePolygon?.();
         const editPoints = Array.isArray(editable?.points) ? editable.points : null;
         if (editPoints && editPoints.length >= 3) {
           const hit = hitTestPolygonVertex(editPoints, uv);
+          // Alt/Option+click removes a vertex (keep ≥3).
+          if (hit >= 0 && (event.altKey || event.metaKey)) {
+            if (editPoints.length <= MIN_POLYGON_POINTS) {
+              setStatus(messages.polygonNeedPoints || "Polygon needs at least 3 points");
+              return;
+            }
+            const next = editPoints
+              .map((pt) => [Number(pt[0]), Number(pt[1])])
+              .filter((_, index) => index !== hit);
+            paintPolygonOverlay(el, next, { closed: true, squareHandles: true });
+            onPolygonEdited?.({ points: next, closed: true });
+            setStatus(messages.polygonVertexRemoved || "Polygon vertex removed");
+            return;
+          }
           if (hit >= 0) {
             polygonDragging = true;
+            polygonMoving = false;
             dragIndex = hit;
             pointerId = event.pointerId;
             points = editPoints.map((pt) => [Number(pt[0]), Number(pt[1])]);
@@ -379,8 +447,43 @@ export function createManagedViewerTools({
             } catch {
               /* ignore */
             }
-            paintPolygonOverlay(el, points, { closed: true });
+            paintPolygonOverlay(el, points, { closed: true, squareHandles: true });
             setStatus(messages.polygonDragging || "Polygon: drag vertex to refine");
+            return;
+          }
+          const edgeInsert = hitTestPolygonEdge(editPoints, uv);
+          if (edgeInsert >= 0 && editPoints.length < MAX_POLYGON_POINTS) {
+            const next = editPoints.map((pt) => [Number(pt[0]), Number(pt[1])]);
+            next.splice(edgeInsert, 0, [uv.u, uv.v]);
+            polygonDragging = true;
+            polygonMoving = false;
+            dragIndex = edgeInsert;
+            pointerId = event.pointerId;
+            points = next;
+            try {
+              el?.setPointerCapture?.(event.pointerId);
+            } catch {
+              /* ignore */
+            }
+            paintPolygonOverlay(el, points, { closed: true, squareHandles: true });
+            setStatus(messages.polygonVertexAdded || "Polygon: vertex added — drag to place");
+            return;
+          }
+          if (pointInPolygon(uv, editPoints)) {
+            polygonMoving = true;
+            polygonDragging = false;
+            dragIndex = -1;
+            pointerId = event.pointerId;
+            moveOrigin = { u: uv.u, v: uv.v };
+            moveBase = editPoints.map((pt) => [Number(pt[0]), Number(pt[1])]);
+            points = moveBase.map((pt) => [pt[0], pt[1]]);
+            try {
+              el?.setPointerCapture?.(event.pointerId);
+            } catch {
+              /* ignore */
+            }
+            paintPolygonOverlay(el, points, { closed: true, squareHandles: true });
+            setStatus(messages.polygonMoving || "Polygon: move selection");
             return;
           }
         }
@@ -406,13 +509,27 @@ export function createManagedViewerTools({
   }
 
   function onPointerMove(event) {
+    if (polygonMoving) {
+      if (pointerId !== null && event.pointerId !== pointerId) return;
+      const el = activeMedia();
+      const uv = pointerToSourceUv(event, el);
+      if (!uv || !moveOrigin || !moveBase) return;
+      const du = uv.u - moveOrigin.u;
+      const dv = uv.v - moveOrigin.v;
+      points = moveBase.map((pt) => [
+        Math.max(0, Math.min(1, pt[0] + du)),
+        Math.max(0, Math.min(1, pt[1] + dv)),
+      ]);
+      paintPolygonOverlay(el, points, { closed: true, squareHandles: true });
+      return;
+    }
     if (polygonDragging) {
       if (pointerId !== null && event.pointerId !== pointerId) return;
       const el = activeMedia();
       const uv = pointerToSourceUv(event, el);
       if (!uv || dragIndex < 0 || !points[dragIndex]) return;
       points[dragIndex] = [uv.u, uv.v];
-      paintPolygonOverlay(el, points, { closed: true });
+      paintPolygonOverlay(el, points, { closed: true, squareHandles: true });
       return;
     }
     if (!drawing || (pointerId !== null && event.pointerId !== pointerId)) return;
@@ -429,13 +546,25 @@ export function createManagedViewerTools({
   }
 
   function onPointerUp(event) {
+    if (polygonMoving) {
+      if (pointerId !== null && event.pointerId !== pointerId) return;
+      polygonMoving = false;
+      pointerId = null;
+      moveOrigin = null;
+      moveBase = null;
+      const edited = points.map((pt) => [pt[0], pt[1]]);
+      paintPolygonOverlay(activeMedia(), edited, { closed: true, squareHandles: true });
+      onPolygonEdited?.({ points: edited, closed: true });
+      setStatus(messages.polygonMoved || "Polygon selection moved");
+      return;
+    }
     if (polygonDragging) {
       if (pointerId !== null && event.pointerId !== pointerId) return;
       polygonDragging = false;
       pointerId = null;
       const edited = points.map((pt) => [pt[0], pt[1]]);
       dragIndex = -1;
-      paintPolygonOverlay(activeMedia(), edited, { closed: true });
+      paintPolygonOverlay(activeMedia(), edited, { closed: true, squareHandles: true });
       onPolygonEdited?.({ points: edited, closed: true });
       setStatus(messages.polygonEdited || "Polygon vertex updated");
       return;
@@ -446,15 +575,26 @@ export function createManagedViewerTools({
   }
 
   function onKeyDown(event) {
-    if (event.key === "Escape" && (drawing || polygonActive || polygonDragging)) {
+    if (event.key === "Escape" && (drawing || polygonActive || polygonDragging || polygonMoving)) {
       const wasBrush = drawing;
       drawing = false;
       polygonActive = false;
       polygonDragging = false;
+      polygonMoving = false;
       dragIndex = -1;
+      moveOrigin = null;
+      moveBase = null;
       points = [];
       pointerId = null;
       clearBrushOverlay(activeMedia());
+      // Re-paint current editable polygon after cancel so inspection stays visible.
+      const editable = getEditablePolygon?.();
+      if (editable?.points?.length >= 3) {
+        paintPolygonOverlay(activeMedia(), editable.points, {
+          closed: editable.closed !== false,
+          squareHandles: true,
+        });
+      }
       setStatus(
         wasBrush
           ? messages.brushCancelled || "Brush cancelled"

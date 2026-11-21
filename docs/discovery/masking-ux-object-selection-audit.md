@@ -53,20 +53,22 @@ cannot bind to managed steps.
 - Polygon draw (click points, Enter/double-click close, Esc cancel).
 - **Vertex drag** for an existing closed polygon while polygon tool active
   (#533 / #534) via `hitTestPolygonVertex` + `onPolygonEdited`.
+- **Add vertex on edge click**, **Alt/Meta+click remove** (keeps ≥3 points), and
+  **whole-mask interior move** (#538) via `hitTestPolygonEdge` /
+  `pointInPolygon` + `onPolygonEdited`. Selecting a polygon in the Inspector
+  arms polygon edit mode so handles work without re-arming Draw.
+- Esc cancels an in-progress vertex/move edit and restores the last committed
+  contour overlay.
 - Brush stroke add (paint path); UV mapping via `pointerToSourceUv`.
 - Linear / radial leaf params via form fields (not full on-canvas handles).
 - Rectangular **privacy** masks (blur/pixelate) — separate from color selections.
+- Overlay hide without disabling grade (#537).
 
-### Missing
+### Missing / later polish
 
-- Always-visible contour + square handles when a polygon mask is **selected**
-  (without requiring Draw polygon mode).
-- Add vertex on edge click; remove vertex safely.
-- Whole-mask move (interior drag or dedicated control) vs vertex edit.
-- Clear cursor / cancel semantics for pan vs edit.
-- Brush: show selected region; optional whole-selection move (investigate).
+- Dedicated pan-vs-edit cursor affordances.
+- Brush: optional whole-selection move.
 - Linear/radial: improve geometric controls without regressing privacy masks.
-- Persistent overlay hide without disabling grade.
 
 ## Feature C — Local object-aware selection
 

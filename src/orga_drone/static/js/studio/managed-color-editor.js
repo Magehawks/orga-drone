@@ -149,6 +149,13 @@ export function createManagedColorEditor({
         .msgPolygonDragging,
       polygonEdited: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgPolygonEdited,
+      polygonVertexAdded: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgPolygonVertexAdded,
+      polygonVertexRemoved: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgPolygonVertexRemoved,
+      polygonMoving: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgPolygonMoving,
+      polygonMoved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgPolygonMoved,
       selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
       selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
       selectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSelection,
