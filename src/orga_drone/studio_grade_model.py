@@ -11,6 +11,7 @@ from orga_drone.studio_grade_contract import (
     MAX_BRUSH_POINTS,
     MAX_BYTES,
     MAX_CURVE_POINTS,
+    MAX_SELECTION_NAME_LEN,
     MAX_SELECTIONS,
     MAX_STEPS,
     array_value,
@@ -304,6 +305,20 @@ def _validate_grade(grade: dict[str, Any]) -> None:
                 object_value(item.get("qualifier"), path + ".qualifier")
                 if type(item.get("invert")) is not bool:
                     fail(path + ".invert", "Expected a boolean")
+                # Optional display name for Inspector mask list (#536).
+                if "name" in item and item.get("name") is not None:
+                    name = item.get("name")
+                    if type(name) is not str:
+                        fail(path + ".name", "Expected a string")
+                    if len(name) > MAX_SELECTION_NAME_LEN:
+                        fail(path + ".name", "Selection name exceeds limit")
+                    if "\x00" in name:
+                        fail(path + ".name", "Selection name contains NUL")
+                # Optional preview-only overlay prefs; never affect export bake.
+                if "overlay" in item and item.get("overlay") is not None:
+                    overlay = object_value(item.get("overlay"), path + ".overlay")
+                    if "visible" in overlay and type(overlay.get("visible")) is not bool:
+                        fail(path + ".overlay.visible", "Expected a boolean")
     for index, step in enumerate(steps):
         path = f"grade.steps[{index}]"
         op = identifier(step.get("type"), path + ".type")
