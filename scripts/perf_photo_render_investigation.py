@@ -18,7 +18,6 @@ import statistics
 import sys
 import tempfile
 import time
-from array import array
 from io import StringIO
 from pathlib import Path
 
@@ -349,7 +348,7 @@ def _stage_breakdown(grade: dict) -> dict:
     stages["encode_jpeg_s"] = time.perf_counter() - t0
     stages["total_staged_s"] = sum(stages.values())
     stages["megapixels"] = round((w * h) / 1e6, 3)
-    stages["size"] = [w, h]
+    stages["size"] = [w, h]  # type: ignore[assignment]
     os.environ.pop("ORGA_SPATIAL_APPLY_WORKERS", None)
     return stages
 

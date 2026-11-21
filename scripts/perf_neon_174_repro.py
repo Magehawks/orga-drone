@@ -22,7 +22,7 @@ BEFORE = Path(os.environ.get("ORGA_PERF_BEFORE", str(_DEFAULT_BEFORE)))
 OUT = ROOT / "docs" / "performance" / "evidence" / "photo-render-investigation"
 
 
-def build_grade() -> dict:
+def build_grade() -> tuple[dict, dict]:
     from orga_drone.studio_object_select import propose_object_polygon
 
     seeds = [(0.42, 0.70), (0.48, 0.72), (0.52, 0.68), (0.45, 0.78), (0.55, 0.75)]
@@ -45,7 +45,7 @@ def build_grade() -> dict:
             for leaf in (sel.get("mask") or {}).get("leaves") or []:
                 if leaf.get("type") == "polygon" and leaf.get("points"):
                     pts = leaf["points"]
-                    best = (0.0, pts, ("cached", 0), 0.0, len(pts))
+                    best = (0.0, pts, (0.0, 0.0), 0.0, len(pts))
                     break
     assert best, "no polygon available"
     points = best[1]
