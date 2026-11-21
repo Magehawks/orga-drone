@@ -74,23 +74,17 @@ cannot bind to managed steps.
 
 ### Available now
 
-- Manual brush / polygon / qualifier paths only.
-- PRODUCT_VISION explicitly marks AI / freeform sky masks as **Later** today;
-  this initiative is PO-authorized scope to ship a **local offline** object
-  proposal path and must update vision labels when implemented.
+- Manual brush / polygon / qualifier paths.
+- **Classical local object proposal** (#539/#540, ADR 0039): Select object →
+  click → LAB-ish flood fill + morph + LCC → UV polygon → named selection via
+  `upsert_selection`. No cloud, no ONNX, core app usable without models.
+- Refine with Feature B polygon tools / brush after accept.
 
-### Missing (entire workstream)
+### Missing / later polish
 
-- Technology evaluation (classical vs ONNX/local model) with Neon Relic and
-  other fixtures.
-- Offline inference; optional transparent model download; core app usable
-  without model.
-- License / redistribution ADR.
-- Click-object → proposal overlay → accept/discard → named selection in list.
-- Map downscaled inference → full-res geometry; refine with brush/polygon.
-- Persist accepted mask without re-inference; cancellable non-blocking job.
-- Dense mask asset storage if polygon approximation is insufficient (compatible
-  extension + cleanup rules).
+- Optional local model download (new ADR only if classical+refine fails Neon).
+- Video-clip object proposal (photo-only in this release).
+- Dense mask asset storage if polygon approximation is insufficient.
 
 ## Neon Relic creative context
 

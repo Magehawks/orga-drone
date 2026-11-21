@@ -329,6 +329,31 @@ export async function sampleEyedropper(
   return data;
 }
 
+/** Local offline object proposal from a preview click (#539/#540). Does not mutate. */
+export async function proposeObjectSelect(studioId, { u, v, expectedRevision, tol } = {}) {
+  const body = { u, v, expected_revision: expectedRevision };
+  if (Number.isFinite(Number(tol))) body.tol = Number(tol);
+  const response = await fetch(`/api/studio/${studioId}/grade/object-select`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data?.detail;
+    const message =
+      (typeof detail === "string" && detail) || detail?.message || "object select proposal failed";
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = detail?.code;
+    throw error;
+  }
+  return data;
+}
+
 /** Pick a suggested qualifier object from an eyedropper sample payload. */
 export function qualifierFromSample(sample, kind = "rgb") {
   const suggested = sample?.suggested?.[kind] || sample?.sample?.suggested?.[kind];

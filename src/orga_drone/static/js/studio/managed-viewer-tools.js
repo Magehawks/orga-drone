@@ -287,7 +287,7 @@ export function distanceToSegment(uv, a, b) {
 }
 
 /** Hit-test polygon edge; returns insert index after vertex i, or -1. */
-export function hitTestPolygonEdge(points, uv, thresholdUv = 0.015) {
+export function hitTestPolygonEdge(points, uv, thresholdUv = 0.022) {
   if (!uv || !Array.isArray(points) || points.length < 2) return -1;
   let best = -1;
   let bestDist = thresholdUv;
@@ -326,6 +326,7 @@ export function createManagedViewerTools({
   getBrushSettings,
   getEditablePolygon,
   onEyedropperSample,
+  onObjectSelect,
   onBrushStrokeComplete,
   onPolygonComplete,
   onPolygonEdited,
@@ -399,6 +400,10 @@ export function createManagedViewerTools({
     event.stopPropagation();
     if (mode === "eyedropper") {
       void onEyedropperSample?.(uv);
+      return;
+    }
+    if (mode === "object-select") {
+      void onObjectSelect?.(uv);
       return;
     }
     if (mode === "brush") {
