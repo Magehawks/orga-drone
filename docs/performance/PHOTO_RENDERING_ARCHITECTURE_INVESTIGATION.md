@@ -1,4 +1,4 @@
-# Photo rendering architecture investigation
+﻿# Photo rendering architecture investigation
 
 Tracking: [#551](https://github.com/Magehawks/orga-drone/issues/551)  
 Baseline tree: `develop` @ `0034e9257b56a56ba0730364353c36393ad75a5c`  
@@ -267,8 +267,8 @@ Measurable product targets (from charter): warm preview &lt;500 ms; complex 2.23
 | Parent issue | [#551](https://github.com/Magehawks/orga-drone/issues/551) |
 | Investigation PR | [#555](https://github.com/Magehawks/orga-drone/pull/555) |
 | Independent review | [REVIEW_APPROVED](https://github.com/Magehawks/orga-drone/pull/555#issuecomment-7062537188) |
-| CI | *(filled at merge)* |
-| Merge SHA into `develop` | *(filled at merge)* |
+| CI | [success](https://github.com/Magehawks/orga-drone/actions/runs/44903886311) |
+| Merge SHA into `develop` | [`a0ae315`](https://github.com/Magehawks/orga-drone/commit/a0ae31515485dcd861d1915cc1bd84de4084ebdb) |
 
 Follow-up implementation issues:
 
