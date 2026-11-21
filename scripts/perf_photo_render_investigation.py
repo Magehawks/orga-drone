@@ -302,7 +302,7 @@ def _stage_breakdown(grade: dict) -> dict:
     from orga_drone.studio_managed_selection import rasterize_mask_coverage
 
     os.environ["ORGA_SPATIAL_APPLY_WORKERS"] = "1"
-    stages: dict[str, float] = {}
+    stages: dict[str, object] = {}
 
     t0 = time.perf_counter()
     with Image.open(BEFORE) as im:
@@ -348,7 +348,7 @@ def _stage_breakdown(grade: dict) -> dict:
     stages["encode_jpeg_s"] = time.perf_counter() - t0
     stages["total_staged_s"] = sum(stages.values())
     stages["megapixels"] = round((w * h) / 1e6, 3)
-    stages["size"] = [w, h]  # type: ignore[assignment]
+    stages["size"] = [w, h]
     os.environ.pop("ORGA_SPATIAL_APPLY_WORKERS", None)
     return stages
 
