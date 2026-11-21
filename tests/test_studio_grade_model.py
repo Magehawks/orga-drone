@@ -813,6 +813,37 @@ def test_upsert_step_params_create_update_and_unknown_keys() -> None:
         )
 
 
+def test_remove_selection_unbinds_and_deletes() -> None:
+    source = managed()
+    source["grade"]["steps"] = [
+        {
+            "id": "p1",
+            "type": "primaries-v1",
+            "enabled": True,
+            "mix": 1,
+            "params": {"exposure": 0},
+            "selection_id": "s1",
+        }
+    ]
+    source["grade"]["selections"] = [
+        {
+            "id": "s1",
+            "name": "Blatt",
+            "mask": {"combine": "union", "leaves": []},
+            "qualifier": {"type": "none"},
+            "invert": False,
+        }
+    ]
+    model = read_grade(source)
+    removed = validate_patch(
+        model,
+        command("remove_selection", selection_id="s1"),
+        7,
+    )
+    assert removed.proposed.grade["selections"] == []
+    assert removed.proposed.grade["steps"][0]["selection_id"] is None
+
+
 def test_selection_display_name_and_overlay_roundtrip() -> None:
     """Optional name/overlay are validated and preserved (#536)."""
     source = managed()

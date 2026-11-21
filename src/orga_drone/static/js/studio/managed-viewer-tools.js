@@ -99,7 +99,11 @@ function paintBrushOverlay(mediaEl, points, radiusUv) {
   ctx.stroke();
 }
 
-export function paintPolygonOverlay(mediaEl, points, { closed = false, squareHandles = false } = {}) {
+export function paintPolygonOverlay(
+  mediaEl,
+  points,
+  { closed = false, squareHandles = false } = {}
+) {
   const canvas = ensureBrushOverlay(mediaEl);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -142,7 +146,44 @@ export function paintPolygonOverlay(mediaEl, points, { closed = false, squareHan
   });
 }
 
-/** Preview-only inspection overlay for a managed selection (#537). Never used in export. */
+/** Draw a server-rasterized selection coverage PNG (#537). Preview only. */
+export function paintSelectionRasterOverlay(mediaEl, imageBitmap, selection = null) {
+  const canvas = ensureBrushOverlay(mediaEl);
+  if (!canvas || !imageBitmap) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+  const poly = selection?.mask?.leaves?.find(
+    (leaf) => leaf?.type === "polygon" && Array.isArray(leaf.points) && leaf.points.length >= 3
+  );
+  if (poly) {
+    ctx.strokeStyle = "rgba(64, 200, 255, 0.95)";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    poly.points.forEach((pt, index) => {
+      const x = Number(pt[0]) * canvas.width;
+      const y = Number(pt[1]) * canvas.height;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    poly.points.forEach((pt) => {
+      const x = Number(pt[0]) * canvas.width;
+      const y = Number(pt[1]) * canvas.height;
+      const s = 7;
+      ctx.fillStyle = "rgba(64, 200, 255, 0.95)";
+      ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      ctx.strokeStyle = "rgba(20, 20, 20, 0.85)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+    });
+  }
+}
+
+/** Fallback local outline when raster overlay is unavailable. */
 export function paintSelectionInspectionOverlay(mediaEl, selection, { invertedHint = false } = {}) {
   if (!mediaEl || !selection) {
     clearBrushOverlay(mediaEl);
@@ -155,7 +196,10 @@ export function paintSelectionInspectionOverlay(mediaEl, selection, { invertedHi
   }
   const poly = leaves.find((leaf) => leaf?.type === "polygon" && Array.isArray(leaf.points));
   if (poly && poly.points.length >= 3) {
-    paintPolygonOverlay(mediaEl, poly.points, { closed: Boolean(poly.closed !== false), squareHandles: true });
+    paintPolygonOverlay(mediaEl, poly.points, {
+      closed: Boolean(poly.closed !== false),
+      squareHandles: true,
+    });
     return;
   }
   const brush = leaves.find((leaf) => leaf?.type === "brush");

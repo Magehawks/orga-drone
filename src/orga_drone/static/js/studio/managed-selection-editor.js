@@ -19,6 +19,7 @@ import {
   clearManagedSelectionOverlay,
   createManagedViewerTools,
   paintSelectionInspectionOverlay,
+  paintSelectionRasterOverlay,
   resolveActivePreviewMedia,
 } from "./managed-viewer-tools.js";
 
@@ -100,10 +101,10 @@ export function createManagedSelectionEditor({
     return true;
   }
 
-  function refreshInspectionOverlay(gradeDoc) {
-    const media = resolveActivePreviewMedia(
-      [getPreviewMediaEl?.()].flat().filter(Boolean)
-    );
+  let overlayToken = 0;
+
+  async function refreshInspectionOverlay(gradeDoc) {
+    const media = resolveActivePreviewMedia([getPreviewMediaEl?.()].flat().filter(Boolean));
     if (!media || !inspectedSelectionId) {
       clearManagedSelectionOverlay(media);
       return;
@@ -115,9 +116,38 @@ export function createManagedSelectionEditor({
       clearManagedSelectionOverlay(media);
       return;
     }
-    paintSelectionInspectionOverlay(media, selection, {
-      invertedHint: Boolean(selection.invert),
-    });
+    const studioId = getSelectedStudioId?.();
+    const revision = gradeDoc?.revision;
+    if (!studioId || revision === undefined || revision === null) {
+      paintSelectionInspectionOverlay(media, selection, {
+        invertedHint: Boolean(selection.invert),
+      });
+      return;
+    }
+    const token = ++overlayToken;
+    try {
+      const url =
+        `/api/studio/${studioId}/grade/selection-overlay` +
+        `?selection_id=${encodeURIComponent(String(inspectedSelectionId))}` +
+        `&expected_revision=${encodeURIComponent(String(revision))}` +
+        `&max_edge=640`;
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`overlay ${res.status}`);
+      const blob = await res.blob();
+      if (token !== overlayToken) return;
+      const bitmap = await createImageBitmap(blob);
+      if (token !== overlayToken) {
+        bitmap.close?.();
+        return;
+      }
+      paintSelectionRasterOverlay(media, bitmap, selection);
+      bitmap.close?.();
+    } catch {
+      if (token !== overlayToken) return;
+      paintSelectionInspectionOverlay(media, selection, {
+        invertedHint: Boolean(selection.invert),
+      });
+    }
   }
 
   function renderSelectionSummary(gradeDoc) {
@@ -137,10 +167,7 @@ export function createManagedSelectionEditor({
     const bindType = bindSelect?.value || "primaries-v1";
     const activeStep = findStep(gradeDoc.grade, bindType);
     const boundSelectionId = activeStep?.selection_id || null;
-    if (
-      inspectedSelectionId &&
-      !selections.some((entry) => entry.id === inspectedSelectionId)
-    ) {
+    if (inspectedSelectionId && !selections.some((entry) => entry.id === inspectedSelectionId)) {
       inspectedSelectionId = null;
     }
     if (!inspectedSelectionId && boundSelectionId) {
@@ -217,7 +244,7 @@ export function createManagedSelectionEditor({
           messages.renamePrompt || "Mask name",
           typeof selection.name === "string" ? selection.name : displayName(selection)
         );
-        if (next == null) return;
+        if (next === null) return;
         const trimmed = String(next).trim().slice(0, 80);
         void upsertSelectionMeta(selection.id, { name: trimmed });
       });
@@ -282,35 +309,13 @@ export function createManagedSelectionEditor({
     const gradeDoc = getGrade?.() || current;
     if (!studioId || !gradeDoc?.grade || gradeDoc.evaluator !== "managed-sdr-v1") return;
     const token = beginRequestToken(tokens, studioId);
-    const historyGroup = `selection-delete-${selectionId}`;
-    let expectedRevision = gradeDoc.revision;
-    let payload = gradeDoc;
     try {
-      const bound = (payload.grade.steps || []).filter(
-        (step) => step.selection_id === selectionId
-      );
-      for (const step of bound) {
-        payload = await postGradeCommand(studioId, {
-          type: "bind_step_selection",
-          expectedRevision,
-          params: { step_id: step.id, selection_id: null },
-          historyGroup,
-        });
-        expectedRevision = payload.revision;
-      }
-      // Unbound selections are GC'd by bind_step_selection; if still present, clear leaves.
-      const leftover = (payload.grade.selections || []).find((entry) => entry.id === selectionId);
-      if (leftover) {
-        const cleared = structuredClone(leftover);
-        cleared.mask = { combine: "union", leaves: [] };
-        cleared.qualifier = { type: "none" };
-        payload = await postGradeCommand(studioId, {
-          type: "upsert_selection",
-          expectedRevision,
-          params: { selection: cleared },
-          historyGroup,
-        });
-      }
+      const payload = await postGradeCommand(studioId, {
+        type: "remove_selection",
+        expectedRevision: gradeDoc.revision,
+        params: { selection_id: selectionId },
+        historyGroup: `selection-delete-${selectionId}`,
+      });
       if (!isCurrentRequestToken(tokens, studioId, token)) return;
       if (inspectedSelectionId === selectionId) inspectedSelectionId = null;
       current = payload;
@@ -629,6 +634,13 @@ export function createManagedSelectionEditor({
     const previousRevision = current?.revision;
     current = payload || null;
     currentId = studioId ? String(studioId) : null;
+    if (String(previousId || "") !== String(currentId || "")) {
+      inspectedSelectionId = null;
+      overlayToken += 1;
+      clearManagedSelectionOverlay(
+        resolveActivePreviewMedia([getPreviewMediaEl?.()].flat().filter(Boolean))
+      );
+    }
     if (
       String(previousId || "") !== String(currentId || "") ||
       Number(previousRevision) !== Number(payload?.revision)

@@ -19,7 +19,19 @@ test("hitTestPolygonVertex finds nearest point within threshold", () => {
 test("paintSelectionInspectionOverlay tolerates missing media", () => {
   assert.doesNotThrow(() => {
     paintSelectionInspectionOverlay(null, {
-      mask: { leaves: [{ type: "polygon", points: [[0, 0], [1, 0], [1, 1]], closed: true }] },
+      mask: {
+        leaves: [
+          {
+            type: "polygon",
+            points: [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+            ],
+            closed: true,
+          },
+        ],
+      },
     });
     clearManagedSelectionOverlay(null);
   });

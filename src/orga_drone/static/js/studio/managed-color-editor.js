@@ -166,7 +166,8 @@ export function createManagedColorEditor({
       renameMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenameMask,
       renamePrompt: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenamePrompt,
       deleteMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgDeleteMask,
-      deleteConfirm: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgDeleteConfirm,
+      deleteConfirm: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgDeleteConfirm,
       maskDeleted: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgMaskDeleted,
       hideOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgHideOverlay,
       showOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgShowOverlay,
