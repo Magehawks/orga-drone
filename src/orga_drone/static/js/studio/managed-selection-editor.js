@@ -198,8 +198,14 @@ export function createManagedSelectionEditor({
         event.preventDefault();
         inspectedSelectionId = selection.id;
         if (invertInput) invertInput.checked = Boolean(selection.invert);
-        if (selection?.mask?.leaves?.[0]?.type && shapeSelect) {
-          shapeSelect.value = selection.mask.leaves[0].type;
+        const leafType = selection?.mask?.leaves?.[0]?.type;
+        if (leafType && shapeSelect) {
+          shapeSelect.value = leafType;
+        }
+        // Enable polygon edit mode so add/remove/move work without re-arming Draw (#538).
+        if (leafType === "polygon") {
+          setViewerMode("polygon");
+          tools.rebind?.();
         }
         renderSelectionSummary(gradeDoc);
         setStatus(
@@ -800,6 +806,10 @@ export function createManagedSelectionEditor({
       polygonNeedPoints: messages.polygonNeedPoints,
       polygonDragging: messages.polygonDragging,
       polygonEdited: messages.polygonEdited,
+      polygonVertexAdded: messages.polygonVertexAdded,
+      polygonVertexRemoved: messages.polygonVertexRemoved,
+      polygonMoving: messages.polygonMoving,
+      polygonMoved: messages.polygonMoved,
     },
   });
 

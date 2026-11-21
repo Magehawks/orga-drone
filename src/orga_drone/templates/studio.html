@@ -1253,12 +1253,16 @@
                  data-msg-brush="{{ _('Brush: draw on the preview') }}"
                  data-msg-brush-drawing="{{ _('Brush drawing…') }}"
                  data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
-                 data-msg-polygon="{{ _('Polygon: click to place points, drag handles to refine, Enter or double-click to close') }}"
+                 data-msg-polygon="{{ _('Polygon: click to place points; drag handles, click edge to add, Alt+click to remove, drag interior to move') }}"
                  data-msg-polygon-drawing="{{ _('Polygon: {count} points — Enter/double-click to close, Esc to cancel') }}"
                  data-msg-polygon-cancelled="{{ _('Polygon cancelled') }}"
                  data-msg-polygon-need-points="{{ _('Polygon needs at least 3 points') }}"
                  data-msg-polygon-dragging="{{ _('Polygon: drag vertex to refine') }}"
                  data-msg-polygon-edited="{{ _('Polygon vertex updated') }}"
+                 data-msg-polygon-vertex-added="{{ _('Polygon: vertex added — drag to place') }}"
+                 data-msg-polygon-vertex-removed="{{ _('Polygon vertex removed') }}"
+                 data-msg-polygon-moving="{{ _('Polygon: move selection') }}"
+                 data-msg-polygon-moved="{{ _('Polygon selection moved') }}"
                  data-msg-saved="{{ _('Selection saved') }}"
                  data-msg-cleared="{{ _('Selection cleared') }}"
                  data-msg-sample-meta="{{ _('Sample · rev {rev} · {domain} · frame {frame}') }}"
@@ -1287,7 +1291,7 @@
                  data-msg-type-empty="{{ _('Empty') }}"
                  data-msg-invert-short="{{ _('invert') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
-              <p class="hint">{{ _('Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points.') }}</p>
+              <p class="hint">{{ _('Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points. With a polygon selected: drag handles, click an edge to add a vertex, Alt+click a handle to remove, drag the interior to move.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
               <div class="studio-mask-list-heading" data-managed-mask-list-heading hidden>{{ _('Masks') }}</div>
               <ul class="studio-managed-selection-summary meta-line" data-managed-selection-summary
