@@ -1,4 +1,34 @@
-/** Viewer eyedropper + brush stroke capture for managed selections (#356/#357). */
+/** Viewer eyedropper + brush stroke capture for managed selections (#356/#357/#561). */
+
+/**
+ * Client-space rectangle of the painted picture inside a media element.
+ *
+ * Studio preview media uses ``object-fit: contain``. The element's
+ * ``getBoundingClientRect()`` includes letterbox gutters; mask UV and overlays
+ * must use the content rect instead (#561).
+ *
+ * @returns {{ left: number, top: number, width: number, height: number } | null}
+ */
+export function mediaContentClientRect(mediaEl) {
+  if (!mediaEl?.getBoundingClientRect) return null;
+  const rect = mediaEl.getBoundingClientRect();
+  if (!(rect.width > 0) || !(rect.height > 0)) return null;
+  const intrinsicW = Number(mediaEl.videoWidth || mediaEl.naturalWidth || mediaEl.width || 0) || 0;
+  const intrinsicH =
+    Number(mediaEl.videoHeight || mediaEl.naturalHeight || mediaEl.height || 0) || 0;
+  if (!(intrinsicW > 0) || !(intrinsicH > 0)) {
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  }
+  const scale = Math.min(rect.width / intrinsicW, rect.height / intrinsicH);
+  const width = intrinsicW * scale;
+  const height = intrinsicH * scale;
+  return {
+    left: rect.left + (rect.width - width) / 2,
+    top: rect.top + (rect.height - height) / 2,
+    width,
+    height,
+  };
+}
 
 /**
  * Map a pointer event on the preview media box to normalized source UV [0,1].
@@ -7,26 +37,38 @@
  */
 export function pointerToSourceUv(event, mediaEl) {
   if (!mediaEl || !event) return null;
-  const rect = mediaEl.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-  const intrinsicW = Number(mediaEl.videoWidth || mediaEl.naturalWidth || mediaEl.width || 0) || 0;
-  const intrinsicH =
-    Number(mediaEl.videoHeight || mediaEl.naturalHeight || mediaEl.height || 0) || 0;
-  let left = rect.left;
-  let top = rect.top;
-  let width = rect.width;
-  let height = rect.height;
-  if (intrinsicW > 0 && intrinsicH > 0) {
-    const scale = Math.min(rect.width / intrinsicW, rect.height / intrinsicH);
-    width = intrinsicW * scale;
-    height = intrinsicH * scale;
-    left = rect.left + (rect.width - width) / 2;
-    top = rect.top + (rect.height - height) / 2;
-  }
-  const x = (event.clientX - left) / width;
-  const y = (event.clientY - top) / height;
+  const content = mediaContentClientRect(mediaEl);
+  if (!content || !(content.width > 0) || !(content.height > 0)) return null;
+  const x = (event.clientX - content.left) / content.width;
+  const y = (event.clientY - content.top) / content.height;
   if (x < 0 || x > 1 || y < 0 || y > 1) return null;
   return { u: x, v: y };
+}
+
+/** Map source UV back to client pixels using the same content rect as pointers. */
+export function sourceUvToClient(uv, mediaEl) {
+  const content = mediaContentClientRect(mediaEl);
+  if (!content || !uv) return null;
+  const u = Number(uv.u);
+  const v = Number(uv.v);
+  if (!Number.isFinite(u) || !Number.isFinite(v)) return null;
+  return {
+    clientX: content.left + u * content.width,
+    clientY: content.top + v * content.height,
+  };
+}
+
+/** Host-relative overlay box matching the painted picture (#561). */
+export function overlayLayoutForMedia(mediaEl, hostEl) {
+  const content = mediaContentClientRect(mediaEl);
+  if (!content || !hostEl?.getBoundingClientRect) return null;
+  const hostRect = hostEl.getBoundingClientRect();
+  return {
+    left: Math.round(content.left - hostRect.left),
+    top: Math.round(content.top - hostRect.top),
+    width: Math.max(1, Math.round(content.width)),
+    height: Math.max(1, Math.round(content.height)),
+  };
 }
 
 /** Prefer the visible primary preview media element. */
@@ -40,6 +82,8 @@ export function resolveActivePreviewMedia(candidates = []) {
 function ensureBrushOverlay(mediaEl) {
   const host = mediaEl?.parentElement;
   if (!host) return null;
+  const layout = overlayLayoutForMedia(mediaEl, host);
+  if (!layout) return null;
   let canvas = host.querySelector?.("[data-managed-brush-overlay]");
   if (!canvas) {
     canvas = document.createElement("canvas");
@@ -48,16 +92,13 @@ function ensureBrushOverlay(mediaEl) {
     canvas.setAttribute("aria-hidden", "true");
     host.appendChild(canvas);
   }
-  const rect = mediaEl.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const width = Math.max(1, Math.round(rect.width));
-  const height = Math.max(1, Math.round(rect.height));
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-  canvas.style.left = `${Math.round(rect.left - hostRect.left)}px`;
-  canvas.style.top = `${Math.round(rect.top - hostRect.top)}px`;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  // Align overlay to the painted picture, not the letterboxed media box (#561).
+  if (canvas.width !== layout.width) canvas.width = layout.width;
+  if (canvas.height !== layout.height) canvas.height = layout.height;
+  canvas.style.left = `${layout.left}px`;
+  canvas.style.top = `${layout.top}px`;
+  canvas.style.width = `${layout.width}px`;
+  canvas.style.height = `${layout.height}px`;
   canvas.hidden = false;
   return canvas;
 }
