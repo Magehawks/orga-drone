@@ -249,31 +249,60 @@ def propose_object_polygon(
         else:
             work = rgb
             nw, nh = sw, sh
-    raw = work.tobytes()
-    pixels = [
-        (raw[i], raw[i + 1], raw[i + 2]) for i in range(0, len(raw), 3)
-    ]
     sx = int(round(_clamp01(u) * (nw - 1)))
     sy = int(round(_clamp01(v) * (nh - 1)))
-    mask = _flood_mask(pixels, nw, nh, (sx, sy), float(tol))
-    # Light morphological close to bridge thin gaps (veins / noise).
-    closed = (
-        _mask_to_image(mask, nw, nh)
-        .filter(ImageFilter.MaxFilter(5))
-        .filter(ImageFilter.MinFilter(5))
-    )
-    mask = _largest_component(_image_to_mask(closed), nw, nh)
-    coverage = sum(1 for bit in mask if bit) / float(nw * nh)
-    if coverage < 0.001 or coverage > 0.98:
-        raise ObjectSelectError("Object proposal coverage out of usable range")
-    ring = _boundary_ring(mask, nw, nh)
-    simplified = _simplify_closed(ring, max_points=max(3, int(max_points)), width=nw, height=nh)
-    points = [
-        [_clamp01(x / float(nw - 1)), _clamp01(y / float(nh - 1))] for x, y in simplified
-    ]
-    # Drop duplicate closing point if present.
-    if len(points) >= 2 and points[0] == points[-1]:
-        points = points[:-1]
+    method = "lab-flood+morph+lcc+polyline"
+    points: list[list[float]]
+    coverage: float
+    try:
+        from orga_drone.studio_object_select_fast import (
+            contour_points_uv,
+            fast_object_select_enabled,
+            propose_mask_fast,
+        )
+
+        if fast_object_select_enabled():
+            mask_u8, coverage = propose_mask_fast(
+                work, seed_xy=(sx, sy), tol=float(tol)
+            )
+            if coverage < 0.001 or coverage > 0.98:
+                raise ObjectSelectError("Object proposal coverage out of usable range")
+            points = contour_points_uv(
+                mask_u8, max_points=max(3, int(max_points))
+            )
+            method = "lab-flood+morph+lcc+polyline+opencv"
+        else:
+            raise RuntimeError("fast path disabled")
+    except ObjectSelectError:
+        raise
+    except Exception:
+        raw = work.tobytes()
+        pixels = [
+            (raw[i], raw[i + 1], raw[i + 2]) for i in range(0, len(raw), 3)
+        ]
+        mask = _flood_mask(pixels, nw, nh, (sx, sy), float(tol))
+        # Light morphological close to bridge thin gaps (veins / noise).
+        closed = (
+            _mask_to_image(mask, nw, nh)
+            .filter(ImageFilter.MaxFilter(5))
+            .filter(ImageFilter.MinFilter(5))
+        )
+        mask = _largest_component(_image_to_mask(closed), nw, nh)
+        coverage = sum(1 for bit in mask if bit) / float(nw * nh)
+        if coverage < 0.001 or coverage > 0.98:
+            raise ObjectSelectError("Object proposal coverage out of usable range")
+        ring = _boundary_ring(mask, nw, nh)
+        simplified = _simplify_closed(
+            ring, max_points=max(3, int(max_points)), width=nw, height=nh
+        )
+        points = [
+            [_clamp01(x / float(nw - 1)), _clamp01(y / float(nh - 1))]
+            for x, y in simplified
+        ]
+        # Drop duplicate closing point if present.
+        if len(points) >= 2 and points[0] == points[-1]:
+            points = points[:-1]
+        method = "lab-flood+morph+lcc+polyline"
     if len(points) < 3:
         raise ObjectSelectError("Object proposal produced fewer than 3 points")
     elapsed = time.perf_counter() - t0
@@ -281,7 +310,7 @@ def propose_object_polygon(
         points=points,
         closed=True,
         coverage=float(coverage),
-        method="lab-flood+morph+lcc+polyline",
+        method=method,
         elapsed_s=float(elapsed),
         proposal_size=(nw, nh),
         seed_uv=(float(u), float(v)),
