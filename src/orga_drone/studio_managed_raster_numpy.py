@@ -126,7 +126,7 @@ def _opencv_hard_fill(
         dtype=np.float32,
     )
     pts_i = np.round(pts).astype(np.int32)
-    cv2.fillPoly(canvas, [pts_i], 1, lineType=cv2.LINE_8)
+    cv2.fillPoly(canvas, [pts_i], (1,), lineType=cv2.LINE_8)
     return canvas.astype(bool)
 
 
@@ -187,7 +187,7 @@ def rasterize_polygon_coverage_numpy(
             # Exact correction on a 1px morphological ring keeps hard-mask parity.
             import cv2
 
-            iu = np.asarray(inside, dtype=np.uint8)
+            iu: Any = np.asarray(inside, dtype=np.uint8)
             kernel = np.ones((3, 3), dtype=np.uint8)
             band = cv2.dilate(iu, kernel) != cv2.erode(iu, kernel)
             if np.any(band):
@@ -209,11 +209,11 @@ def rasterize_polygon_coverage_numpy(
             approx = _opencv_hard_fill(
                 width, height, verts, x0=xa_e, y0=ya_e, x1=xb_e, y1=yb_e
             )
-            iu = np.asarray(approx, dtype=np.uint8)
-            kernel = cv2.getStructuringElement(
+            soft_u8 = np.asarray(approx, dtype=np.uint8)
+            morph_kernel = cv2.getStructuringElement(
                 cv2.MORPH_ELLIPSE, (2 * pad_x + 1, 2 * pad_y + 1)
             )
-            band = cv2.dilate(iu, kernel) != cv2.erode(iu, kernel)
+            band = cv2.dilate(soft_u8, morph_kernel) != cv2.erode(soft_u8, morph_kernel)
             # Morphology cannot see outside the frame; polygons that touch UV 0/1
             # need an exact strip along the image border (#552).
             if xa_e == 0:
