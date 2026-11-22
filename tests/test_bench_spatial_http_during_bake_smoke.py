@@ -32,4 +32,7 @@ def test_http_during_bake_worker_beats_inline_tail() -> None:
     assert worker["bake_s"] is not None and worker["bake_s"] < 120.0
     # Worker must not show the multi-hundred-ms GIL starvation tail.
     assert worker["http_p95_ms"] < 50.0
-    assert worker["http_p95_ms"] < inline["http_p95_ms"]
+    # When NumPy apply keeps both paths snappy (#553), absolute bound is enough;
+    # otherwise the process worker must beat the inline HTTP tail.
+    if inline["http_p95_ms"] >= 25.0:
+        assert worker["http_p95_ms"] < inline["http_p95_ms"]
