@@ -53,6 +53,20 @@ def _mask_raster_cache_enabled() -> bool:
     return raw not in {"0", "false", "off", "no"}
 
 
+def _mask_raster_backend_token() -> str:
+    """Effective raster path for cache identity (#552 follow-up).
+
+    Must change when ``ORGA_MASK_RASTER_BACKEND`` forces the Python oracle so a
+    warm NumPy entry cannot be served after an in-process backend switch.
+    """
+    try:
+        from orga_drone.studio_managed_raster_numpy import numpy_raster_enabled
+
+        return "numpy" if numpy_raster_enabled() else "python"
+    except ImportError:
+        return "python"
+
+
 def _mask_raster_cache_key(
     mask: Mapping[str, Any] | None,
     *,
@@ -63,7 +77,8 @@ def _mask_raster_cache_key(
         payload = "__none__"
     else:
         payload = json.dumps(mask, sort_keys=True, separators=(",", ":"), default=str)
-    return f"{RASTERIZER_VERSION}:{width}x{height}:{payload}"
+    backend = _mask_raster_backend_token()
+    return f"{RASTERIZER_VERSION}:{backend}:{width}x{height}:{payload}"
 
 
 class ManagedSelectionError(ValueError):
@@ -586,8 +601,8 @@ def rasterize_mask_coverage(
 
     Single brush or polygon leaves use ROI + stamp/NumPy fill. Mixed leaves
     fall back to a full-frame analytic pass. Empty / absent masks match
-    ``mask_coverage`` semantics. Warm results are cached by mask JSON + size
-    unless ``ORGA_MASK_RASTER_CACHE=0``.
+    ``mask_coverage`` semantics. Warm results are cached by mask JSON + size +
+    effective backend unless ``ORGA_MASK_RASTER_CACHE=0``.
     """
     if width <= 0 or height <= 0:
         raise ManagedSelectionError("raster size must be positive", code="SELECTION")
