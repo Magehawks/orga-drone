@@ -85,6 +85,37 @@ def test_rasterize_mask_uses_numpy_and_matches_python_backend(
     assert max_abs <= NUMPY_POLYGON_PARITY_MAX_ABS
 
 
+def test_mask_raster_cache_misses_after_backend_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Oracle env must not reuse a NumPy warm entry without clearing the LRU."""
+    pytest.importorskip("numpy")
+    mask = {
+        "combine": "union",
+        "leaves": [
+            {
+                "type": "polygon",
+                "points": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]],
+                "feather": 0.04,
+                "closed": True,
+            }
+        ],
+    }
+    width, height = 64, 48
+    monkeypatch.setenv("ORGA_MASK_RASTER_CACHE", "1")
+    monkeypatch.setenv("ORGA_MASK_RASTER_BACKEND", "numpy")
+    clear_mask_raster_cache()
+    numpy_hit = rasterize_mask_coverage(mask, width=width, height=height)
+    # No clear_mask_raster_cache(): backend token must force a miss.
+    monkeypatch.setenv("ORGA_MASK_RASTER_BACKEND", "python")
+    python_hit = rasterize_mask_coverage(mask, width=width, height=height)
+    max_abs = max(abs(a - b) for a, b in zip(numpy_hit, python_hit, strict=True))
+    assert max_abs <= NUMPY_POLYGON_PARITY_MAX_ABS
+    # Distinct cache keys: warm NumPy entry remains, Python path still populates.
+    monkeypatch.setenv("ORGA_MASK_RASTER_BACKEND", "numpy")
+    assert rasterize_mask_coverage(mask, width=width, height=height) == numpy_hit
+
+
 def test_warm_mask_raster_cache_skips_recompute(monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("numpy")
     mask = {
