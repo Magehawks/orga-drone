@@ -12,11 +12,9 @@ import argparse
 import base64
 import json
 import os
-import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -143,21 +141,44 @@ def make_portrait(path: Path) -> None:
 
 
 def dispatch_pointer(cdp: CDP, client_x: float, client_y: float, typ: str) -> dict:
-    return cdp.evaluate(
-        f"""(() => {{
-          const media = document.querySelector('img.studio-preview-media:not([hidden])')
-            || document.querySelector('img.studio-preview');
-          if (!media) return {{ok:false, reason:'no-media'}};
-          const init = {{
-            bubbles: true, cancelable: true, composed: true,
-            clientX: {client_x}, clientY: {client_y},
-            pointerId: 1, pointerType: 'mouse',
-            button: 0, buttons: {1 if typ != "pointerup" else 0}
-          }};
-          media.dispatchEvent(new PointerEvent({json.dumps(typ)}, init));
-          return {{ok:true}};
-        }})()"""
+    """Prefer CDP mouse injection so the hit-tested preview media receives the event."""
+    if typ == "pointerdown":
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mousePressed",
+                "x": float(client_x),
+                "y": float(client_y),
+                "button": "left",
+                "buttons": 1,
+                "clickCount": 1,
+            },
+        )
+        return {"ok": True, "via": "cdp-mouse"}
+    if typ == "pointerup":
+        cdp.call(
+            "Input.dispatchMouseEvent",
+            {
+                "type": "mouseReleased",
+                "x": float(client_x),
+                "y": float(client_y),
+                "button": "left",
+                "buttons": 0,
+                "clickCount": 1,
+            },
+        )
+        return {"ok": True, "via": "cdp-mouse"}
+    cdp.call(
+        "Input.dispatchMouseEvent",
+        {
+            "type": "mouseMoved",
+            "x": float(client_x),
+            "y": float(client_y),
+            "button": "left",
+            "buttons": 1,
+        },
     )
+    return {"ok": True, "via": "cdp-mouse"}
 
 
 def measure_layout(cdp: CDP) -> dict:
@@ -301,8 +322,34 @@ def main() -> int:
             })()"""
         )
         assert clip_id, "no photo clip"
-        g = fetch(cdp, f"/api/studio/{clip_id}/grade")["data"]
-        if g.get("evaluator") != "managed-sdr-v1":
+        # Use the Studio UI wrap/convert path so the client grade state enables mask tools.
+        convert = cdp.evaluate(
+            """(async () => {
+              window.confirm = () => true;
+              const panel = document.querySelector('#inspector-managed-color');
+              if (panel) {
+                panel.open = true;
+                panel.removeAttribute('hidden');
+              }
+              const wrap = document.querySelector('[data-managed-color-wrap]');
+              const convert = document.querySelector('[data-managed-color-convert]');
+              if (wrap) wrap.click();
+              await new Promise((r) => setTimeout(r, 600));
+              if (convert) convert.click();
+              await new Promise((r) => setTimeout(r, 900));
+              const status = document.querySelector('[data-managed-color-status]')?.textContent || '';
+              const poly = document.querySelector('[data-managed-polygon-draw]');
+              return {
+                status,
+                polyDisabled: !!poly?.disabled,
+                polyExists: !!poly
+              };
+            })()""",
+            await_promise=True,
+        )
+        report["convert"] = convert
+        if convert.get("polyDisabled"):
+            # Fallback: API convert + clip reselect often used by older drivers.
             fetch(cdp, f"/api/studio/{clip_id}/grade/wrap", "POST")
             fetch(
                 cdp,
@@ -310,16 +357,47 @@ def main() -> int:
                 "POST",
                 {"acknowledge_appearance_change": True},
             )
+            cdp.evaluate(
+                f"""(() => {{
+                  const clip = document.querySelector(
+                    '.studio-clip[data-studio-id="{int(clip_id)}"]'
+                  ) || document.querySelector('.studio-clip[data-kind="photo"]');
+                  const hit = clip && (clip.querySelector('[data-select-clip]') || clip);
+                  if (hit) hit.click();
+                  return true;
+                }})()"""
+            )
+            time.sleep(1.0)
 
-        # Enable polygon tool.
-        armed = cdp.evaluate(
+        # Open Managed Color Workspace, scroll tools into view, arm polygon.
+        primed = cdp.evaluate(
             """(() => {
-              const b=document.querySelector('[data-managed-polygon-draw]');
-              if (b) { b.click(); return true; }
-              return false;
+              const panel = document.querySelector('#inspector-managed-color');
+              if (panel) {
+                panel.open = true;
+                panel.removeAttribute('hidden');
+              }
+              const sel = document.querySelector('[data-managed-selection-panel]');
+              if (sel) {
+                sel.hidden = false;
+                sel.removeAttribute('hidden');
+              }
+              const b = document.querySelector('[data-managed-polygon-draw]');
+              if (!b) return {ok:false, reason:'missing'};
+              b.scrollIntoView({block:'center', inline:'nearest'});
+              if (b.disabled) return {ok:false, reason:'disabled'};
+              b.click();
+              return {
+                ok: true,
+                pressed: b.getAttribute('aria-pressed'),
+                disabled: b.disabled,
+                status: document.querySelector('[data-managed-selection-status]')?.textContent || ''
+              };
             })()"""
         )
-        assert armed, "polygon button missing"
+        assert primed and primed.get("ok"), f"polygon arm failed: {primed}"
+        assert primed.get("pressed") == "true", f"polygon not armed: {primed}"
+        time.sleep(0.2)
 
         layout0 = measure_layout(cdp)
         report["layout_before"] = layout0
@@ -340,7 +418,8 @@ def main() -> int:
         report["clicked"] = clicked
         overlay = layout1.get("overlay")
         assert overlay, "overlay canvas missing after polygon clicks"
-        # Overlay must match content rect (letterbox-aware), not full media box.
+        # Compare against the live content rect (inspector open can shift the frame).
+        content = layout1["content"]
         media = layout1["media"]
         assert abs(overlay["width"] - content["width"]) < 3.0, (overlay, content)
         assert abs(overlay["height"] - content["height"]) < 3.0, (overlay, content)
@@ -359,30 +438,42 @@ def main() -> int:
         cdp.evaluate(
             """(() => {
               const b=document.querySelector('[data-managed-brush-draw]');
-              if (b) b.click();
+              if (b) {
+                b.scrollIntoView({block:'center'});
+                b.click();
+              }
               return !!b;
             })()"""
         )
         time.sleep(0.2)
+        layout_brush_pre = measure_layout(cdp)
+        content = layout_brush_pre["content"]
         path = [(0.40, 0.45), (0.48, 0.50), (0.56, 0.55)]
         for i, (u, v) in enumerate(path):
             cx = content["left"] + u * content["width"]
             cy = content["top"] + v * content["height"]
-            typ = "pointerdown" if i == 0 else ("pointerup" if i == len(path) - 1 else "pointermove")
-            if i == len(path) - 1:
-                dispatch_pointer(cdp, cx, cy, "pointermove")
-                dispatch_pointer(cdp, cx, cy, "pointerup")
-            elif i == 0:
+            if i == 0:
                 dispatch_pointer(cdp, cx, cy, "pointerdown")
             else:
                 dispatch_pointer(cdp, cx, cy, "pointermove")
             time.sleep(0.05)
-        time.sleep(0.2)
-        report["screenshot_brush"] = str(cdp.shot(out / "02-brush-on-leaf.png"))
+        # Assert overlay while the stroke is still active (finish clears it).
         layout2 = measure_layout(cdp)
-        report["layout_brush"] = layout2
-        if layout2.get("overlay"):
-            assert abs(layout2["overlay"]["width"] - content["width"]) < 3.0
+        report["layout_brush_inflight"] = layout2
+        mid = layout2.get("overlay")
+        content2 = layout2["content"]
+        assert mid and mid.get("width", 0) > 0, "brush overlay missing mid-stroke"
+        assert abs(mid["width"] - content2["width"]) < 3.0, (mid, content2)
+        assert abs(mid["left"] - content2["left"]) < 3.0, (mid, content2)
+        report["screenshot_brush"] = str(cdp.shot(out / "02-brush-on-leaf.png"))
+        last = path[-1]
+        dispatch_pointer(
+            cdp,
+            content2["left"] + last[0] * content2["width"],
+            content2["top"] + last[1] * content2["height"],
+            "pointerup",
+        )
+        time.sleep(0.2)
 
         report["ok"] = True
         (out / "e2e-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
