@@ -187,20 +187,21 @@ def rasterize_polygon_coverage_numpy(
             # Exact correction on a 1px morphological ring keeps hard-mask parity.
             import cv2
 
-            iu = inside.astype(np.uint8)
+            iu = np.asarray(inside, dtype=np.uint8)
             kernel = np.ones((3, 3), dtype=np.uint8)
             band = cv2.dilate(iu, kernel) != cv2.erode(iu, kernel)
             if np.any(band):
                 by, bx = np.nonzero(band)
                 ub, vb = _uv_for_roi_indices(by, bx)
-                inside = inside.copy()
-                inside[by, bx] = _even_odd_inside_points(ub, vb, verts)
+                corrected = np.array(inside, copy=True, dtype=bool)
+                corrected[by, bx] = _even_odd_inside_points(ub, vb, verts)
+                inside = corrected
         else:
             xs = np.arange(xa_e, xb_e + 1, dtype=np.float64)
             ys = np.arange(ya_e, yb_e + 1, dtype=np.float64)
             u, v = np.meshgrid((xs + 0.5) / width, (ys + 0.5) / height, indexing="xy")
             inside = _even_odd_inside_points(u, v, verts)
-        patch = inside.astype(np.float64)
+        patch = np.asarray(inside, dtype=np.float64)
     else:
         if _opencv_available():
             import cv2
@@ -208,7 +209,7 @@ def rasterize_polygon_coverage_numpy(
             approx = _opencv_hard_fill(
                 width, height, verts, x0=xa_e, y0=ya_e, x1=xb_e, y1=yb_e
             )
-            iu = approx.astype(np.uint8)
+            iu = np.asarray(approx, dtype=np.uint8)
             kernel = cv2.getStructuringElement(
                 cv2.MORPH_ELLIPSE, (2 * pad_x + 1, 2 * pad_y + 1)
             )
