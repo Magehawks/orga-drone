@@ -1,4 +1,4 @@
-"""Classical local object proposal (#539/#540)."""
+"""Classical local object proposal (#539/#540/#554)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from orga_drone.studio_object_select import (
     propose_object_polygon,
     proposal_to_selection,
 )
+from orga_drone.studio_object_select_fast import fast_object_select_enabled
 
 
 def _fixture(tmp_path: Path) -> Path:
@@ -49,3 +50,28 @@ def test_propose_object_rejects_out_of_range_uv(tmp_path: Path) -> None:
 def test_propose_object_rejects_missing_file(tmp_path: Path) -> None:
     with pytest.raises(ObjectSelectError):
         propose_object_polygon(tmp_path / "missing.jpg", 0.5, 0.5)
+
+
+def test_propose_object_fast_path_when_opencv_available(tmp_path: Path) -> None:
+    if not fast_object_select_enabled():
+        pytest.skip("OpenCV/NumPy fast path unavailable")
+    path = _fixture(tmp_path)
+    proposal = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
+    assert proposal.method.endswith("+opencv")
+    assert proposal.closed is True
+    assert len(proposal.points) >= 3
+    assert 0.05 < proposal.coverage < 0.6
+
+
+def test_propose_object_python_backend_matches_coverage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    if not fast_object_select_enabled():
+        pytest.skip("OpenCV/NumPy fast path unavailable")
+    path = _fixture(tmp_path)
+    fast = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
+    monkeypatch.setenv("ORGA_OBJECT_SELECT_BACKEND", "python")
+    # Force re-import gate via env on next call (gate reads env each time).
+    assert not fast_object_select_enabled()
+    ref = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
+    assert ref.method == "lab-flood+morph+lcc+polyline"
+    assert abs(fast.coverage - ref.coverage) < 1e-9
+    assert len(fast.points) >= 3 and len(ref.points) >= 3
