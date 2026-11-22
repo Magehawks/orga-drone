@@ -1,0 +1,8 @@
+{
+  "merge_sha": "54bcf8edadd1dcf787c67f425f1089f7e58831a6",
+  "issue": 552,
+  "acceptance_export_s": 174.41,
+  "bake_workers_1_inline_median_s": 38.788,
+  "bake_workers_8_inline_median_s": 16.194,
+  "note": "Neon 59-vert / 3-step after NumPy mask raster. Apply remains dominant."
+}
