@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -315,6 +316,7 @@ def test_api_still_export_job_e2e(
         state = final.get("state") or final.get("status")
         if state in {"completed", "done", "failed", "cancelled", "error"}:
             break
+        time.sleep(0.05)
     assert final is not None
     state = final.get("state") or final.get("status")
     assert state in {"completed", "done"}, final
