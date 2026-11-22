@@ -147,33 +147,57 @@ def _grade_rgb_image(
     with Image.open(path) as image:
         rgb = image.convert("RGB")
         width, height = rgb.size
-        flat = list(rgb.getdata())
-        rows = [
-            [
-                (
-                    flat[y * width + x][0] / 255.0,
-                    flat[y * width + x][1] / 255.0,
-                    flat[y * width + x][2] / 255.0,
-                )
-                for x in range(width)
+        # NumPy pack/unpack (#553) avoids multi-second Python nested-list copies.
+        try:
+            import numpy as np
+
+            from orga_drone.studio_managed_apply_numpy import numpy_apply_enabled
+
+            use_numpy_buffers = numpy_apply_enabled()
+        except ImportError:
+            np = None  # type: ignore[assignment]
+            use_numpy_buffers = False
+
+        if use_numpy_buffers and np is not None:
+            arr = np.asarray(rgb, dtype=np.float64) / 255.0
+            graded = apply_managed_grade_image(
+                arr, active_grade, lattice_domain=lattice_domain
+            )
+            graded_arr = (
+                graded
+                if isinstance(graded, np.ndarray)
+                else np.asarray(graded, dtype=np.float64)
+            )
+            out_bytes = np.clip(np.rint(graded_arr * 255.0), 0, 255).astype(np.uint8)
+            out = Image.fromarray(out_bytes, mode="RGB")
+        else:
+            flat = list(rgb.getdata())
+            rows = [
+                [
+                    (
+                        flat[y * width + x][0] / 255.0,
+                        flat[y * width + x][1] / 255.0,
+                        flat[y * width + x][2] / 255.0,
+                    )
+                    for x in range(width)
+                ]
+                for y in range(height)
             ]
-            for y in range(height)
-        ]
-        graded = apply_managed_grade_image(
-            rows, active_grade, lattice_domain=lattice_domain
-        )
-        out = Image.new("RGB", (width, height))
-        out.putdata(
-            [
-                (
-                    int(min(255, max(0, round(sample[0] * 255)))),
-                    int(min(255, max(0, round(sample[1] * 255)))),
-                    int(min(255, max(0, round(sample[2] * 255)))),
-                )
-                for row in graded
-                for sample in row
-            ]
-        )
+            graded = apply_managed_grade_image(
+                rows, active_grade, lattice_domain=lattice_domain
+            )
+            out = Image.new("RGB", (width, height))
+            out.putdata(
+                [
+                    (
+                        int(min(255, max(0, round(sample[0] * 255)))),
+                        int(min(255, max(0, round(sample[1] * 255)))),
+                        int(min(255, max(0, round(sample[2] * 255)))),
+                    )
+                    for row in graded
+                    for sample in row
+                ]
+            )
         dest.parent.mkdir(parents=True, exist_ok=True)
         out.save(dest, format="PNG")
     return dest

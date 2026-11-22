@@ -815,12 +815,12 @@ def _parallel_strip_worker(
 
 
 def apply_managed_grade_image(
-    pixels: Sequence[Sequence[Rgb]],
+    pixels: Sequence[Sequence[Rgb]] | Any,
     grade: Mapping[str, Any] | GradeModel,
     *,
     lattice_domain: str = "encoded-bt709",
     lut_resolver: LutResolver | None = None,
-) -> list[list[Rgb]]:
+) -> list[list[Rgb]] | Any:
     """Apply a managed grade to a row-major RGB image using pixel-center UVs.
 
     Spatial masks without RGB qualifiers are rasterized once per selection so
@@ -829,6 +829,9 @@ def apply_managed_grade_image(
     Large frames fan out exact row strips across processes (#532) while keeping
     one full-frame coverage raster so strip height cannot distort UVs. Creative
     LUT resolvers force the serial path (resolver is not pickle-safe).
+
+    When ``pixels`` is a NumPy ``HxWx3`` float array and the NumPy apply path
+    succeeds, the return value is also an ``HxWx3`` array (#553).
     """
     from orga_drone.studio_managed_selection import (
         ManagedSelectionError,
@@ -836,12 +839,28 @@ def apply_managed_grade_image(
         selection_by_id,
     )
 
-    if not pixels:
-        return []
-    height = len(pixels)
-    width = len(pixels[0]) if height else 0
-    if width <= 0:
-        return [list(row) for row in pixels]
+    try:
+        import numpy as np
+    except ImportError:
+        np = None  # type: ignore[assignment]
+
+    pixels_np = pixels if np is not None and isinstance(pixels, np.ndarray) else None
+    pixels_is_numpy = pixels_np is not None
+
+    if pixels_np is not None:
+        if pixels_np.size == 0:
+            return pixels_np
+        if pixels_np.ndim != 3 or pixels_np.shape[2] != 3:
+            raise ManagedApplyError("numpy pixels must be HxWx3", code="RANGE")
+        height = int(pixels_np.shape[0])
+        width = int(pixels_np.shape[1])
+    else:
+        if not pixels:
+            return []
+        height = len(pixels)
+        width = len(pixels[0]) if height else 0
+        if width <= 0:
+            return [list(row) for row in pixels]
 
     if isinstance(grade, GradeModel):
         if grade.evaluator != "managed-sdr-v1" or grade.grade is None:
@@ -933,6 +952,31 @@ def apply_managed_grade_image(
     lattice = _normalize_domain(lattice_domain)
     input_profile = str(input_obj.get("profile") or "bt709-sdr")
 
+    # Vectorized NumPy apply (#553) before process strips when the grade fits.
+    if lut_resolver is None:
+        from orga_drone.studio_managed_apply_numpy import apply_managed_grade_array
+
+        accelerated = apply_managed_grade_array(
+            pixels,
+            compiled=compiled,
+            coverage_maps=coverage_maps,
+            lattice=lattice,
+            input_profile=input_profile,
+            output_profile=output_profile,
+            return_numpy=pixels_is_numpy,
+        )
+        if accelerated is not None:
+            return accelerated
+
+    pixel_rows: Sequence[Sequence[Rgb]]
+    if pixels_np is not None:
+        pixel_rows = [
+            [(float(px[0]), float(px[1]), float(px[2])) for px in row]
+            for row in pixels_np.tolist()
+        ]
+    else:
+        pixel_rows = pixels  # type: ignore[assignment]
+
     global _spatial_pool_busy
     workers = _spatial_apply_worker_count(width=width, height=height)
     # Creative LUT resolvers are callables — keep exact serial path.
@@ -943,8 +987,8 @@ def apply_managed_grade_image(
         or height < 2
         or _spatial_pool_busy
     ):
-        return _apply_managed_grade_rows(
-            list(pixels),
+        graded_rows = _apply_managed_grade_rows(
+            list(pixel_rows),
             y0=0,
             width=width,
             height=height,
@@ -957,6 +1001,10 @@ def apply_managed_grade_image(
             output_profile=output_profile,
             lut_resolver=lut_resolver,
         )
+        if pixels_is_numpy:
+            assert np is not None
+            return np.asarray(graded_rows, dtype=np.float64)
+        return graded_rows
 
     # Plain dicts / float arrays for spawn pickling on Windows.
     compiled_plain: list[tuple[dict[str, Any], str | None, str]] = [
@@ -980,7 +1028,7 @@ def apply_managed_grade_image(
             str,
         ]
     ] = []
-    pixel_rows = [list(row) for row in pixels]
+    strip_rows = [list(row) for row in pixel_rows]
     for y0 in range(0, height, strip):
         y1 = min(height, y0 + strip)
         lo = y0 * width
@@ -991,7 +1039,7 @@ def apply_managed_grade_image(
         }
         payloads.append(
             (
-                _rows_to_float_array(pixel_rows[y0:y1]),
+                _rows_to_float_array(strip_rows[y0:y1]),
                 y0,
                 width,
                 y1 - y0,
@@ -1020,6 +1068,9 @@ def apply_managed_grade_image(
             "parallel spatial apply returned unexpected row count",
             code="UNSUPPORTED_GRADE",
         )
+    if pixels_is_numpy:
+        assert np is not None
+        return np.asarray(out, dtype=np.float64)
     return out
 
 

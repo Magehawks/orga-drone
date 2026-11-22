@@ -1,0 +1,9 @@
+{
+  "issue": 553,
+  "depends_on": 552,
+  "bake_workers_1_inline_median_s": 3.104,
+  "bake_workers_1_inline_runs_s": [3.256, 3.077, 3.104],
+  "post_552_bake_workers_1_s": 38.788,
+  "acceptance_bake_under_5s": true,
+  "note": "Neon 59-vert / 3-step source bake after NumPy apply + buffer pack/unpack."
+}
