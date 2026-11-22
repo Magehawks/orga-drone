@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import multiprocessing as mp
 import os
 from array import array
 from collections.abc import Callable, Mapping, Sequence
@@ -83,14 +84,22 @@ def _spatial_apply_worker_count(*, width: int, height: int) -> int:
 
 
 def _get_spatial_pool(workers: int) -> ProcessPoolExecutor:
-    """Reuse a process pool across bakes — spawn cost dominates preview (#532)."""
+    """Reuse a process pool across bakes — spawn cost dominates preview (#532).
+
+    Always use the ``spawn`` start method. Fork + OpenCV/NumPy worker threads
+    can deadlock on Linux CI after the parent has already imported ``cv2``
+    during mask rasterization (#552).
+    """
     global _spatial_pool, _spatial_pool_workers
     if _spatial_pool is not None and _spatial_pool_workers == workers:
         return _spatial_pool
     if _spatial_pool is not None:
         _spatial_pool.shutdown(wait=False, cancel_futures=True)
         _spatial_pool = None
-    _spatial_pool = ProcessPoolExecutor(max_workers=workers)
+    _spatial_pool = ProcessPoolExecutor(
+        max_workers=workers,
+        mp_context=mp.get_context("spawn"),
+    )
     _spatial_pool_workers = workers
     return _spatial_pool
 BAKE_SIZE = 33

@@ -35,9 +35,14 @@ def numpy_raster_enabled() -> bool:
 
 def _opencv_available() -> bool:
     try:
-        import cv2  # noqa: F401
+        import cv2
     except ImportError:
         return False
+    # Keep OpenCV single-threaded so later process pools stay healthy.
+    try:
+        cv2.setNumThreads(1)
+    except Exception:
+        pass
     return True
 
 
