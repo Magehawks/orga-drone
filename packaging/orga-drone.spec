@@ -35,6 +35,8 @@ hiddenimports = [
     "orga_drone.app",
     "orga_drone.__main__",
     "orga_drone.desktop",
+    "numpy",
+    "cv2",
     "webview",
     "webview.platforms.winforms",
     "webview.platforms.edgechromium",

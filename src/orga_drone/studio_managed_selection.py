@@ -6,6 +6,9 @@ writes and privacy masks stay elsewhere.
 
 from __future__ import annotations
 
+import json
+import os
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -30,11 +33,37 @@ from orga_drone.studio_managed_qualifiers import (
 
 Point = tuple[float, float]
 Rgb = tuple[float, float, float]
-# v2: stamp-based brush raster (#525) + polygon leaf (#527).
-RASTERIZER_VERSION = "selection-raster-v2"
+# v3: NumPy UV-space polygon/linear/radial raster (#552); brush stamps unchanged.
+RASTERIZER_VERSION = "selection-raster-v3"
 # Max abs delta vs analytic brush_stroke_coverage in the soft band (stamps).
 BRUSH_STAMP_TOLERANCE = 0.08
 MAX_POLYGON_POINTS = 4096
+# Process-local warm cache for identical mask geometry + size (#552).
+_MASK_RASTER_LRU: OrderedDict[str, list[float]] = OrderedDict()
+_MASK_RASTER_LRU_MAX = 48
+
+
+def clear_mask_raster_cache() -> None:
+    """Drop warm mask-coverage rasters (tests / after grade identity changes)."""
+    _MASK_RASTER_LRU.clear()
+
+
+def _mask_raster_cache_enabled() -> bool:
+    raw = os.getenv("ORGA_MASK_RASTER_CACHE", "1").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+def _mask_raster_cache_key(
+    mask: Mapping[str, Any] | None,
+    *,
+    width: int,
+    height: int,
+) -> str:
+    if mask is None:
+        payload = "__none__"
+    else:
+        payload = json.dumps(mask, sort_keys=True, separators=(",", ":"), default=str)
+    return f"{RASTERIZER_VERSION}:{width}x{height}:{payload}"
 
 
 class ManagedSelectionError(ValueError):
@@ -401,20 +430,13 @@ def _rasterize_brush_leaf_stamped(
     return out
 
 
-def rasterize_mask_coverage(
+def _rasterize_mask_coverage_uncached(
     mask: Mapping[str, Any] | None,
     *,
     width: int,
     height: int,
 ) -> list[float]:
-    """Row-major spatial mask weights in ``[0, 1]`` (no qualifier / invert).
-
-    Single brush or polygon leaves use ROI + stamp/analytic fill. Mixed leaves
-    fall back to a full-frame analytic pass. Empty / absent masks match
-    ``mask_coverage`` semantics.
-    """
-    if width <= 0 or height <= 0:
-        raise ManagedSelectionError("raster size must be positive", code="SELECTION")
+    """Row-major spatial mask weights without warm cache."""
     size = width * height
     if mask is None:
         return [1.0] * size
@@ -430,10 +452,17 @@ def rasterize_mask_coverage(
     if len(leaves) == 1 and isinstance(leaves[0], Mapping) and leaves[0].get("type") == "brush":
         return _rasterize_brush_leaf_stamped(leaves[0], width=width, height=height)
 
-    # Fast path: one polygon leaf → bbox analytic fill (#527).
+    # Fast path: one polygon leaf → NumPy UV raster (#552) or bbox Python fill.
     if len(leaves) == 1 and isinstance(leaves[0], Mapping) and leaves[0].get("type") == "polygon":
-        out = [0.0] * size
         box = _polygon_leaf_pixel_bounds(leaves[0], width=width, height=height)
+        from orga_drone.studio_managed_raster_numpy import try_rasterize_polygon_leaf
+
+        accelerated = try_rasterize_polygon_leaf(
+            leaves[0], width=width, height=height, box=box
+        )
+        if accelerated is not None:
+            return accelerated
+        out = [0.0] * size
         if box is None:
             return out
         x0, y0, x1, y1 = box
@@ -496,6 +525,9 @@ def rasterize_mask_coverage(
                 else:
                     out = [max(0.0, a - b) for a, b in zip(out, stamped, strict=True)]
             return out
+        # Single-polygon among mixed brush/polygon leaves still benefits from NumPy
+        # when there is exactly one polygon and no brush (handled above). Mixed
+        # brush+polygon keeps the analytic ROI path for correctness.
         for y in range(y0, y1 + 1):
             row = y * width
             v = (y + 0.5) / height
@@ -504,6 +536,37 @@ def rasterize_mask_coverage(
                 out[row + x] = mask_coverage((u, v), mask)
         return out
 
+    # Full-frame: accelerate solitary linear/radial leaves via NumPy (#552).
+    if (
+        len(leaves) == 1
+        and isinstance(leaves[0], Mapping)
+        and leaves[0].get("type") in {"linear", "radial"}
+    ):
+        from orga_drone.studio_managed_raster_numpy import (
+            numpy_raster_enabled,
+            rasterize_linear_coverage_numpy,
+            rasterize_radial_coverage_numpy,
+        )
+
+        if numpy_raster_enabled():
+            leaf = leaves[0]
+            try:
+                if leaf.get("type") == "linear":
+                    start = _as_point(leaf.get("start"), label="linear.start")
+                    end = _as_point(leaf.get("end"), label="linear.end")
+                    feather = float(leaf.get("feather", 0.0) or 0.0)
+                    return rasterize_linear_coverage_numpy(
+                        width, height, start, end, feather
+                    )
+                center = _as_point(leaf.get("center"), label="radial.center")
+                axes = _as_point(leaf.get("axes"), label="radial.axes")
+                feather = float(leaf.get("feather", 0.0) or 0.0)
+                return rasterize_radial_coverage_numpy(
+                    width, height, center, axes, feather
+                )
+            except (ManagedMaskError, ManagedSelectionError, ValueError):
+                pass
+
     for y in range(height):
         row = y * width
         v = (y + 0.5) / height
@@ -511,6 +574,35 @@ def rasterize_mask_coverage(
             u = (x + 0.5) / width
             out[row + x] = mask_coverage((u, v), mask)
     return out
+
+
+def rasterize_mask_coverage(
+    mask: Mapping[str, Any] | None,
+    *,
+    width: int,
+    height: int,
+) -> list[float]:
+    """Row-major spatial mask weights in ``[0, 1]`` (no qualifier / invert).
+
+    Single brush or polygon leaves use ROI + stamp/NumPy fill. Mixed leaves
+    fall back to a full-frame analytic pass. Empty / absent masks match
+    ``mask_coverage`` semantics. Warm results are cached by mask JSON + size
+    unless ``ORGA_MASK_RASTER_CACHE=0``.
+    """
+    if width <= 0 or height <= 0:
+        raise ManagedSelectionError("raster size must be positive", code="SELECTION")
+    if _mask_raster_cache_enabled():
+        key = _mask_raster_cache_key(mask, width=width, height=height)
+        cached = _MASK_RASTER_LRU.get(key)
+        if cached is not None:
+            _MASK_RASTER_LRU.move_to_end(key)
+            return list(cached)
+        result = _rasterize_mask_coverage_uncached(mask, width=width, height=height)
+        _MASK_RASTER_LRU[key] = list(result)
+        while len(_MASK_RASTER_LRU) > _MASK_RASTER_LRU_MAX:
+            _MASK_RASTER_LRU.popitem(last=False)
+        return result
+    return _rasterize_mask_coverage_uncached(mask, width=width, height=height)
 
 
 def rasterize_selection_coverage(
@@ -553,6 +645,7 @@ __all__ = [
     "MAX_POLYGON_POINTS",
     "ManagedSelectionError",
     "RASTERIZER_VERSION",
+    "clear_mask_raster_cache",
     "evaluate_selection",
     "invert_selection_coverage",
     "leaf_coverage",

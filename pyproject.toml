@@ -20,6 +20,8 @@ dependencies = [
   "pillow-heif>=0.18.0",
   "python-dotenv>=1.0.1",
   "imageio-ffmpeg>=0.5.1",
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.8,<5",
   "pywebview>=5.0",
   "reverse-geocoder>=1.5.1",
 ]
@@ -71,5 +73,8 @@ module = [
   "pillow_heif",
   "pythonnet",
   "websocket",
+  "numpy",
+  "numpy.*",
+  "cv2",
 ]
 ignore_missing_imports = true
