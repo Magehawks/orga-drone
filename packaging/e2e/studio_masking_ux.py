@@ -426,7 +426,7 @@ def main() -> int:
             cdp,
             f"/api/studio/{clip_id}/still/export",
             "POST",
-            {"format": "jpeg", "preset": "standard", "output_path": str(export_path.resolve())},
+            {"format": "jpeg", "preset": "best", "output_path": str(export_path.resolve())},
         )
         assert started["ok"], started
         job_id = started["data"]["job_id"]
