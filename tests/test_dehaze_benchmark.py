@@ -105,3 +105,27 @@ def test_synthetic_fixture_is_deterministic() -> None:
     second_clean, second_hazy = dehaze.synthetic_pair(width=48, height=32)
     assert first_clean.tobytes() == second_clean.tobytes()
     assert first_hazy.tobytes() == second_hazy.tobytes()
+
+
+def test_full_strength_on_dark_scene_raises_near_black_share() -> None:
+    """Document the validation failure mode: global dehaze crushes dark scenes."""
+    image = Image.new("RGB", (96, 64), (28, 32, 40))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((10, 10, 40, 40), fill=(18, 20, 24))
+    draw.rectangle((50, 8, 90, 28), fill=(220, 230, 240))
+    atmosphere = dehaze.estimate_atmosphere(image)
+    levels = dehaze.levels_for(atmosphere, 100)
+    result = dehaze.apply_levels(image, levels)
+    source_pixels = image.load()
+    result_pixels = result.load()
+    width, height = image.size
+    total = width * height
+    source_dark = sum(
+        1 for y in range(height) for x in range(width) if max(source_pixels[x, y]) < 8
+    ) / total
+    result_dark = sum(
+        1 for y in range(height) for x in range(width) if max(result_pixels[x, y]) < 8
+    ) / total
+    assert result_dark > source_dark
+    assert result_dark > 0.05
+

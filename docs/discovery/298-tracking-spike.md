@@ -1,4 +1,4 @@
-# Local motion tracking spike (#298)
+﻿# Local motion tracking spike (#298)
 
 Status: feasibility only. This is not a Studio tracker, not a mask editor,
 and not a reason to package OpenCV.
@@ -44,3 +44,14 @@ Preview and export would keep using `studio_mask.py`.
 
 No new route, no Control API action, no `studio.js` behavior, and no change
 to saved mask JSON.
+
+## Acceptance-matrix closeout (2026-11-24)
+
+See [298-299-300-acceptance-matrix.md](298-299-300-acceptance-matrix.md).
+
+opencv-python-headless is now a runtime dependency for spatial mask raster
+work on `develop`. That packaging change does **not** reopen a shipping
+motion tracker, Subject Focus, or portrait auto-reframe. The spike verdict stays
+**NO-GO for a production tracking editor** until a separately approved
+implementation issue proves preview/export parity, honest lost-state handling
+under scale/rotation, and real-footage evidence.
