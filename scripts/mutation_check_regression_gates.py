@@ -195,6 +195,23 @@ def build_mutations() -> list[Mutation]:
             ],
         ),
         Mutation(
+            name="disabled_collage_staging_disk_guard",
+            path=ROOT / "src/orga_drone/studio_collage_export.py",
+            old="    if free - needed < reserve:\n        raise StudioExportError(\n",
+            new=(
+                "    if False and free - needed < reserve:  # MUTATION disabled_collage_staging_disk_guard\n"
+                "        raise StudioExportError(\n"
+            ),
+            verify_cmd=[
+                py,
+                "-m",
+                "pytest",
+                "-q",
+                "--tb=line",
+                "tests/test_studio_collage_disk_safety.py::test_low_space_before_render_preserves_destination",
+            ],
+        ),
+        Mutation(
             name="incorrect_scope_accumulation",
             path=ROOT / "src/orga_drone/static/js/studio/scopes/accumulate.js",
             old="export function histogramBin(code) {\n  return Math.min(255, Math.floor(256 * clamp01(code)));\n}\n",

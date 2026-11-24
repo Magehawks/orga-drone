@@ -411,3 +411,132 @@ def test_removing_disk_guard_breaks_low_space_contract(
         db, spec, out, width=1280, height=720, duration_s=0.2
     )
     assert out.is_file() and out.stat().st_size > 0
+
+
+def test_concurrent_export_rejected_while_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Safe concurrent exports: job store admits only one Studio export."""
+    from orga_drone.export.jobs import ExportJobStore
+    from orga_drone.studio_export import start_studio_export_job
+
+    prefs = _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    project, _clip, _spec = _photo_collage(db, tmp_path, duration_s=0.5)
+    dest = prefs.data_dir / "exports" / "story.mp4"
+    dest.parent.mkdir(parents=True)
+    store = ExportJobStore()
+    started = threading.Event()
+    release = threading.Event()
+
+    def work(on_progress, cancel_event):
+        started.set()
+        assert release.wait(timeout=5)
+        dest.write_bytes(b"ok-export")
+        return dest
+
+    job_id = start_studio_export_job(store, work, lambda s: s)
+    assert started.wait(timeout=2)
+    with pytest.raises(StudioExportError, match="already running"):
+        start_studio_export_job(store, work, lambda s: s)
+    release.set()
+    for _ in range(50):
+        job = store.get(job_id)
+        if job is not None and job.state in {"completed", "failed", "cancelled"}:
+            break
+        threading.Event().wait(0.05)
+    second = start_studio_export_job(store, work, lambda s: s)
+    assert second != job_id
+
+
+def test_video_prefetch_export_decodes_expected_layout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prefetched leaf sequences still publish a decodable Story MP4."""
+    prefs = _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    project, clip, spec = _photo_collage(db, tmp_path, duration_s=0.5)
+    left = tmp_path / "left.mp4"
+    right = tmp_path / "right.mp4"
+    _make_video(left)
+    _make_video(right)
+    leaves = iter_leaves(spec["root"])
+    spec = assign_leaf_media(
+        spec,
+        leaves[0]["id"],
+        {"source": "external", "kind": "video", "path": str(left)},
+    )
+    spec = assign_leaf_media(
+        spec,
+        leaves[1]["id"],
+        {"source": "external", "kind": "video", "path": str(right)},
+    )
+    db.update_studio_collage(clip.id, collage_spec=spec, collage_duration_s=0.5)
+    dest = prefs.data_dir / "exports" / "prefetch.mp4"
+    dest.parent.mkdir(parents=True)
+    published = run_studio_export(
+        db, height=720, output_path=dest, project_id=project.id
+    )
+    assert published.is_file()
+    ffmpeg = find_ffmpeg()
+    assert ffmpeg
+    decode = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(published), "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        **subprocess_no_window_kwargs(),
+    )
+    assert decode.returncode == 0
+    import json as _json
+
+    ffprobe = find_ffprobe()
+    if ffprobe:
+        probe = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-count_frames",
+                "-show_entries",
+                "stream=width,height,nb_read_frames:format=duration",
+                "-of",
+                "json",
+                str(published),
+            ],
+            capture_output=True,
+            text=True,
+            **subprocess_no_window_kwargs(),
+        )
+        assert probe.returncode == 0
+        info = _json.loads(probe.stdout)
+        stream = info["streams"][0]
+        assert int(stream["width"]) == 1280
+        assert int(stream["height"]) == 720
+        assert float(info["format"]["duration"]) >= 0.4
+        frames = int(stream.get("nb_read_frames") or 0)
+        assert frames >= 12
+
+
+def test_retry_after_low_space_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefs = _isolate(monkeypatch, tmp_path)
+    db = Database(tmp_path / "lib.sqlite3")
+    project, _clip, _spec = _photo_collage(db, tmp_path, duration_s=0.3)
+    dest = prefs.data_dir / "exports" / "retry.mp4"
+    dest.parent.mkdir(parents=True)
+    original = b"pre-existing"
+    dest.write_bytes(original)
+    monkeypatch.setattr(collage, "_staging_free_bytes_override", 1024)
+    with pytest.raises(StudioExportError, match="Not enough temporary disk space"):
+        run_studio_export(
+            db, height=720, output_path=dest, project_id=project.id, overwrite=True
+        )
+    assert dest.read_bytes() == original
+    monkeypatch.setattr(collage, "_staging_free_bytes_override", None)
+    published = run_studio_export(
+        db, height=720, output_path=dest, project_id=project.id, overwrite=True
+    )
+    assert published.is_file() and published.stat().st_size > 1000

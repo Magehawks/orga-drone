@@ -21,7 +21,7 @@ Update both when evidence changes. Labels follow
 | Color Workspace operators | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | acceptance/reference + managed operator suites on develop; deeper visual/perf still PARTIAL |
 | Scopes | PASS | PARTIAL | PASS | NOT_RUN | PARTIAL | JS accumulate/panel/tap + non-packaged perf; packaged live-tap NOT_RUN |
 | Video editing / playback | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
-| Collage edit / export | PASS | PASS | PARTIAL | NOT_RUN | N/A | collage model/export cleanup + playback JS; native collage NOT_RUN |
+| Collage edit / export | PASS | PASS | PASS | PASS | N/A | collage model/export cleanup + disk-safety + playback JS; native WebView2 + packaged EXE disk E2E PASS |
 | Supported transitions / effects | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | transition timing unit+export; soft-wipe / drone packs parallel PENDING |
 | Project persistence / Undo-Redo | PASS | PASS | NOT_RUN | NOT_RUN | N/A | `test_studio_history`, Control API undo conflict/two-clip |
 | Control API / MCP | PASS | PASS | N/A | PARTIAL | N/A | Control API pytest PASS; MCP in external repo; WebView control smoke opt-in |

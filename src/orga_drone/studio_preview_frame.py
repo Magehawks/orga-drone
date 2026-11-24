@@ -405,6 +405,7 @@ def render_preview_frame(
     *,
     data_dir: Path,
     cache_dir: Path | None = None,
+    allow_eviction: bool = True,
 ) -> Path:
     """Return a JPEG path (cached). Raises PreviewFrameError / LutMissingError."""
     if req.kind not in {"photo", "video"}:
@@ -567,7 +568,8 @@ def render_preview_frame(
                 repeat_pass=int(req.repeat_pass or 0),
             )
         completed.replace(dest)
-        _evict_if_needed(folder)
+        if allow_eviction:
+            _evict_if_needed(folder)
         return dest
     finally:
         if work is not None:

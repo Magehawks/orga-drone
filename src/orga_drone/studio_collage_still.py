@@ -40,8 +40,11 @@ from orga_drone.studio_hsl import HslAdjust, hsl_adjust_from_effect_settings
 from orga_drone.studio_image import ImageAdjust, image_adjust_from_effect_settings
 from orga_drone.studio_lut import ColorLook, color_look_from_effect_settings
 from orga_drone.studio_preview_frame import (
+    PREVIEW_JPEG_Q,
     PreviewFrameError,
     PreviewFrameRequest,
+    cache_key_for,
+    preview_filter_chain,
     render_preview_frame,
 )
 from orga_drone.studio_export import _snapshot_export_destination
@@ -88,12 +91,197 @@ class CollageStillPreviewCoordinator:
 
 @dataclass
 class CollageExportFrames:
-    """Frame cache owned by one export and removed with its staging directory."""
+    """Frame cache owned by one export and removed with its staging directory.
+
+    Optional per-leaf JPEG sequences avoid one FFmpeg process per output frame
+    (#487). Sequences live under ``cache_dir`` and are deleted with staging.
+    """
 
     cache_dir: Path
     last_frame_us: dict[tuple[Path, int, int, int, int, int], int] = field(
         default_factory=dict
     )
+    # sequence_id -> directory of frame_000000.jpg ...
+    sequences: dict[str, Path] = field(default_factory=dict)
+    # sequence_id -> {start_s, fps, available, path_key}
+    sequence_meta: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+
+def _export_sequence_id(req: PreviewFrameRequest, *, media_mtime_ns: int, media_size: int) -> str:
+    """Stable identity for one graded leaf extract sequence (time-independent)."""
+    sample = replace(req, source_time_s=0.0, story_time_s=None)
+    return cache_key_for(
+        sample,
+        media_mtime_ns=media_mtime_ns,
+        media_size=media_size,
+        data_dir=settings.data_dir,
+        source_identity=(0, 0, 0) if req.strict_source else None,
+    )
+
+
+def can_prefetch_export_sequence(req: PreviewFrameRequest) -> bool:
+    """True when one sequential FFmpeg extract can replace per-frame seeks."""
+    if req.kind != "video":
+        return False
+    from orga_drone.studio_managed_apply import grade_needs_cpu_materialize
+
+    if req.effect_settings and grade_needs_cpu_materialize(req.effect_settings):
+        return False
+    return True
+
+
+def lookup_export_sequence_frame(
+    export_frames: CollageExportFrames,
+    req: PreviewFrameRequest,
+) -> Path | None:
+    """Return a prefetched JPEG when the leaf sequence covers ``req``."""
+    try:
+        st = req.media_path.stat()
+    except OSError:
+        return None
+    seq_id = _export_sequence_id(
+        req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size
+    )
+    seq_dir = export_frames.sequences.get(seq_id)
+    meta = export_frames.sequence_meta.get(seq_id)
+    if seq_dir is None or meta is None:
+        return None
+    available = int(meta.get("available") or 0)
+    if available <= 0:
+        return None
+    fps = float(meta.get("fps") or 30.0)
+    start_s = float(meta.get("start_s") or 0.0)
+    rel = max(0.0, float(req.source_time_s) - start_s)
+    idx = int(round(rel * fps))
+    if idx < 0:
+        idx = 0
+    if idx >= available:
+        idx = available - 1
+    frame = seq_dir / f"frame_{idx:06d}.jpg"
+    if frame.is_file() and frame.stat().st_size > 0:
+        return frame
+    return None
+
+
+def prefetch_export_video_sequence(
+    export_frames: CollageExportFrames,
+    req: PreviewFrameRequest,
+    *,
+    frame_count: int,
+    fps: float,
+    start_s: float,
+    cancel_event: threading.Event | None = None,
+    on_bytes: Any | None = None,
+) -> int:
+    """Extract ``frame_count`` graded JPEGs with one FFmpeg process.
+
+    Returns frames written. Caller owns disk-space policy via ``on_bytes``.
+    """
+    _check_cancel(cancel_event)
+    if frame_count < 1 or not can_prefetch_export_sequence(req):
+        return 0
+    media = req.media_path
+    try:
+        st = media.stat()
+    except OSError as exc:
+        raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
+    seq_id = _export_sequence_id(
+        req, media_mtime_ns=st.st_mtime_ns, media_size=st.st_size
+    )
+    if seq_id in export_frames.sequences:
+        return int(export_frames.sequence_meta[seq_id].get("available") or 0)
+
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        raise StudioExportError(
+            "Install ffmpeg or: pip install imageio-ffmpeg",
+            code="ffmpeg_missing",
+        )
+    seq_dir = export_frames.cache_dir / "seq" / seq_id[:24]
+    if seq_dir.exists():
+        shutil.rmtree(seq_dir, ignore_errors=True)
+    seq_dir.mkdir(parents=True, exist_ok=True)
+    work = export_frames.cache_dir / "seq-work" / seq_id[:16]
+    if work.exists():
+        shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        _check_cancel(cancel_event)
+        try:
+            vf_body = preview_filter_chain(
+                req.image,
+                req.look,
+                data_dir=settings.data_dir,
+                work_dir=work,
+                max_edge=req.max_edge,
+                even_dimensions=False,
+                saturation=req.saturation,
+                hsl=req.hsl,
+                color_wheels=req.color_wheels,
+                effect_settings=req.effect_settings,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise StudioExportError(str(exc) or UNREADABLE_EXPORT_MEDIA) from exc
+        vf = f"fps={float(fps):.6f}," + vf_body
+        pattern = str(seq_dir / "frame_%06d.jpg")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{max(0.0, float(start_s)):.6f}",
+            "-i",
+            str(media),
+            "-frames:v",
+            str(int(frame_count)),
+            "-vf",
+            vf,
+            "-q:v",
+            str(PREVIEW_JPEG_Q),
+            "-start_number",
+            "0",
+            pattern,
+        ]
+        timeout_s = max(60.0, float(frame_count) * 0.75)
+        try:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=timeout_s,
+                **subprocess_below_normal_kwargs(),
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise StudioExportError(UNREADABLE_EXPORT_MEDIA) from exc
+        _check_cancel(cancel_event)
+        written = 0
+        total_bytes = 0
+        for index in range(int(frame_count)):
+            frame = seq_dir / f"frame_{index:06d}.jpg"
+            if not frame.is_file() or frame.stat().st_size <= 0:
+                break
+            size = int(frame.stat().st_size)
+            if on_bytes is not None:
+                on_bytes(size)
+            total_bytes += size
+            written += 1
+        if written <= 0:
+            detail = (result.stderr or b"").decode("utf-8", errors="replace").strip()
+            raise StudioExportError(detail or UNREADABLE_EXPORT_MEDIA)
+        export_frames.sequences[seq_id] = seq_dir
+        export_frames.sequence_meta[seq_id] = {
+            "start_s": float(start_s),
+            "fps": float(fps),
+            "available": int(written),
+            "bytes": int(total_bytes),
+        }
+        return written
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def _check_cancel(cancel_event: threading.Event | None) -> None:
@@ -483,9 +671,15 @@ def _render_export_video_frame(
     last_us = export_frames.last_frame_us.get(key)
     if last_us is not None:
         req = replace(req, source_time_s=min(req.source_time_s, last_us / 1_000_000))
+    cached = lookup_export_sequence_frame(export_frames, req)
+    if cached is not None:
+        return cached
     try:
         return render_preview_frame(
-            req, data_dir=settings.data_dir, cache_dir=export_frames.cache_dir
+            req,
+            data_dir=settings.data_dir,
+            cache_dir=export_frames.cache_dir,
+            allow_eviction=False,
         )
     except PreviewFrameError as exc:
         if exc.code != "video_eof" or last_us is not None:

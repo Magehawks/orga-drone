@@ -1,0 +1,18 @@
+[
+  {
+    "mutation": "disabled_collage_staging_disk_guard",
+    "failed_as_expected": true,
+    "returncode": 1
+  },
+  {
+    "mutation": "missing_collage_export_cleanup",
+    "failed_as_expected": true,
+    "returncode": 1
+  },
+  {
+    "mutation": "CLEAN_SUITE",
+    "failed_as_expected": true,
+    "returncode": 0,
+    "pass": true
+  }
+]

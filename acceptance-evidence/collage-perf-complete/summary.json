@@ -1,0 +1,99 @@
+[
+  {
+    "label": "phase-720p-2s",
+    "status": "PASS",
+    "elapsed_s": 13.89619070000117,
+    "ffmpeg_extract_s": 0.0,
+    "extract_calls": 0,
+    "encode_s": 1.5178766999997606,
+    "jpeg_write_s": 2.9964529999961087
+  },
+  {
+    "label": "pilot-1080",
+    "status": "PASS",
+    "height": 1080,
+    "duration_s": 3,
+    "elapsed_s": 14.87455829999817,
+    "encoding_s": 11.587464499996713,
+    "prefetch_s": 2.7041908000028343,
+    "jpeg_write_s": 3.567090200020175,
+    "temp_bytes": 74979590,
+    "temp_files": 272,
+    "tree_rss_bytes": 825954304,
+    "stopped": []
+  },
+  {
+    "label": "failure",
+    "status": "PASS",
+    "height": 1080,
+    "duration_s": 3,
+    "elapsed_s": 2.3966065000022354,
+    "encoding_s": null,
+    "prefetch_s": 2.072823399998015,
+    "jpeg_write_s": 0.07239279999703285,
+    "temp_bytes": 20640510,
+    "temp_files": 142,
+    "tree_rss_bytes": 483151872,
+    "stopped": []
+  },
+  {
+    "label": "cancel",
+    "status": "PASS",
+    "height": 1080,
+    "duration_s": 3,
+    "elapsed_s": 1.939162299997406,
+    "encoding_s": null,
+    "prefetch_s": 1.602963199999067,
+    "jpeg_write_s": 0.07426569999734056,
+    "temp_bytes": 27852530,
+    "temp_files": 180,
+    "tree_rss_bytes": 453005312,
+    "stopped": [
+      "injected cancel after three real frames"
+    ]
+  },
+  {
+    "label": "pilot-2160",
+    "status": "PASS",
+    "height": 2160,
+    "duration_s": 3,
+    "elapsed_s": 46.35501089999889,
+    "encoding_s": 36.558546500000375,
+    "prefetch_s": 3.261587099997996,
+    "jpeg_write_s": 8.232249500000762,
+    "temp_bytes": 121185498,
+    "temp_files": 272,
+    "tree_rss_bytes": 2745573376,
+    "stopped": []
+  },
+  {
+    "label": "A",
+    "status": "PASS",
+    "height": 1080,
+    "duration_s": 30,
+    "elapsed_s": 111.6749947999997,
+    "encoding_s": 89.99012760000187,
+    "prefetch_s": 24.052270600001066,
+    "jpeg_write_s": 24.1709352999751,
+    "temp_bytes": 786967186,
+    "temp_files": 2702,
+    "tree_rss_bytes": 1692061696,
+    "stopped": []
+  },
+  {
+    "label": "C",
+    "status": "ABORTED",
+    "height": 2160,
+    "duration_s": 30,
+    "elapsed_s": 324.7819296999987,
+    "encoding_s": null,
+    "prefetch_s": 28.209275900000648,
+    "jpeg_write_s": 73.8870040999318,
+    "temp_bytes": 973095418,
+    "temp_files": 2506,
+    "tree_rss_bytes": 915423232,
+    "stopped": [
+      "disk safety limit"
+    ]
+  }
+]
