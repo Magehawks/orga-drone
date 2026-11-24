@@ -52,3 +52,11 @@ boundary between two processes of the same user.
 
 NO production pairing change in 2.4.0 until a reviewed contract accepts that
 residual risk. This spike does not add DPAPI, a new route, or a stored key.
+
+## Follow-up audit (2026-11-24)
+
+See [273-274-secure-assistant-acceptance-and-blockers.md](273-274-secure-assistant-acceptance-and-blockers.md)
+and proposed [ADR 0033](../decisions/0033-secure-local-assistant-pairing.md).
+The five PO handoff/store/state/identity/boundary decisions remain unresolved.
+Production pairing and #274 Settings UX stay gated. ADR 0033 is Proposed only.
+

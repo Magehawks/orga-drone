@@ -48,6 +48,12 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         id: chrome
 
+      - name: Pairing security baseline
+        # Mandatory ADR 0032 credential baseline (wrong bearer, revoke, restart,
+        # no key on disk, no generation path). #273 production pairing remains
+        # blocked until ADR 0033 is Accepted. Do not weaken these assertions.
+        run: pytest tests/test_pairing_spike.py tests/test_pairing_security_baseline.py -q --tb=short
+
       - name: Unit tests
         # The journey file has its own check so a failure is visible as
         # "App journey smoke". Local `pytest` still runs it.
