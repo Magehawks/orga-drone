@@ -1,6 +1,6 @@
-# 2.4.0 execution checkpoint
+﻿# 2.4.0 execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` includes `#401`, `#402`, and `#403`.
+Updated: 2026-11-24. Integration branch `develop` includes `#401`, `#402`, `#403`, and later merges through `ed22c9d`. Tracking/Dehaze close-out: `docs/discovery/298-302-acceptance-closeout.md`.
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -23,11 +23,11 @@ is not acceptance.
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Phase B loop playback parity is not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | VERIFY | #411 | Discovery recommends Concept C: keep shipped hybrid ramp, declutter Speed panel. Packaged WebView2 NOT_RUN. | PO selection of Concept C | Do not rebuild the speed engine. |
 | #297 | Local object removal | DONE | #398 merged `e397c26` | PO accepted the NO-GO. No removal UI. OpenCV is not packaged for this purpose. | — | Do not reopen as a feature. |
-| #298 | Local motion tracking | VERIFY | #402 merged | Synthetic optical-flow spike. Recommendation NO-GO for a 2.4.0 tracker. Real footage NOT_RUN. | PO acceptance of the NO-GO | Do not ship a tracker or package OpenCV. |
-| #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
-| #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Automatic detection is forbidden. Subject following waits on #298. | #298 evidence | Do not add a second crop model. |
+| #298 | Local motion tracking | DONE (discovery NO-GO) | #305, #402 + close-out | Spike NO-GO for 2.4.0 tracker. Real footage NOT_RUN. Close-out matrix recorded. | PO close acknowledgment | Close #298 as completed discovery. Do not ship a product tracker. OpenCV for other CV features is not tracking approval. |
+| #299 | Subject Focus | BLOCKED | — | No implementation. Requires approved shared tracking foundation after #298 NO-GO. | #298 shipping foundation | Keep open. Do not implement. |
+| #300 | Portrait auto-reframing | BLOCKED (tracked follow) | manual Ken Burns in `studio_frame.py` | Automatic detection forbidden. Tracked follow blocked on #298. Manual framing remains. | Approved tracking foundation | Keep open. Do not add a second crop model or auto-follow. |
 | #301 | Drone-friendly transitions | VERIFY | #401 merged `88c79e9` | Blur dissolve and four soft wipes landed. Packaged WebView2 for these transitions is NOT_RUN. | PO acceptance | Do not reimplement. Do not add more transition types. |
-| #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
+| #302 | Dehaze alternatives | DONE (discovery NO-GO) | #304, #309 + close-out | FFmpeg-only dehaze NO-GO on real fixtures. Close-out matrix recorded. | Future PO-approved R&D issue | Close #302 as completed discovery. Do not claim a shipping dehaze. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
 | #325 | Timelapse target duration | VERIFY | #404 merged | Target-duration draft drives decoded MP4 evidence. Journey smoke uses fixed red-then-blue clip order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |
@@ -58,9 +58,10 @@ Integration cycle in progress against `develop` at `88c79e9`. Canonical writes s
 - #273 bounded security spike approved. Production pairing stays gated.
 - #298 bounded OpenCV spike approved. Not a product tracker. NO-GO for 2.4.0 shipping tracker.
 - #302 FFmpeg-only dehaze is NO-GO.
+- #298/#302 discovery close-out matrix recorded in `docs/discovery/298-302-acceptance-closeout.md`. Close discovery issues independently; keep #299/#300 open and blocked.
 - #295 Concept C recommended: declutter Speed panel; keep hybrid ramp.
 - Do not merge to `main` or publish a release without explicit authorization.
 
 ## Exact next task
 
-Finish the review/integration cycle for open 2.4.0 PRs into `develop`. Keep canonical Color Workspace writes disabled. Do not treat partial foundations as issue completion. Packaged WebView2 and GitHub release-ZIP admission remain NOT_RUN.
+PO: acknowledge #298/#302 discovery close-out and close those issues when ready. Keep #299/#300 open and blocked. Do not start a product tracker, Subject Focus, tracked reframe, or Dehaze slider without a new approved implementation issue. Keep canonical Color Workspace writes disabled. Packaged WebView2 and GitHub release-ZIP admission remain NOT_RUN.

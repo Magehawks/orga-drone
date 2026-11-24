@@ -1,4 +1,4 @@
-# Local motion tracking spike (#298)
+﻿# Local motion tracking spike (#298)
 
 Status: feasibility only. This is not a Studio tracker, not a mask editor,
 and not a reason to package OpenCV.
@@ -44,3 +44,8 @@ Preview and export would keep using `studio_mask.py`.
 
 No new route, no Control API action, no `studio.js` behavior, and no change
 to saved mask JSON.
+
+## Close-out
+
+See [298-302-acceptance-closeout.md](298-302-acceptance-closeout.md) for the
+2026-11-24 acceptance matrix and issue close recommendations.

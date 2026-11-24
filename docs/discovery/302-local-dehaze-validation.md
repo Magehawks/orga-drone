@@ -1,4 +1,4 @@
-# Local dehaze real-fixture validation (#302)
+﻿# Local dehaze real-fixture validation (#302)
 
 Status: **validation complete. NO-GO for adding a Dehaze slider in the current
 FFmpeg-only Studio pipeline.** The synthetic GO in
@@ -318,3 +318,8 @@ NumPy, SciPy, a network service, or generative AI.
 - The large-PNG `colorlevels` crash was reproduced on one file; its exact
   trigger is not isolated.
 - No packaged EXE/WebView2 run, no 10-bit source, and no long-clip export.
+
+## Close-out
+
+See [298-302-acceptance-closeout.md](298-302-acceptance-closeout.md) for the
+2026-11-24 acceptance matrix and issue close recommendations.
