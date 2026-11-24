@@ -1,6 +1,9 @@
 # Fixture manifest policy (#283)
 
-Machine-readable pin: [`../../tests/fixtures/manifest.json`](../../tests/fixtures/manifest.json).
+Authoritative machine-readable pin:
+[`../../tests/fixtures/regression_fixture_manifest.json`](../../tests/fixtures/regression_fixture_manifest.json).
+
+Human summary only — do not invent a second competing JSON manifest.
 
 ## Rules
 
@@ -24,4 +27,5 @@ Machine-readable pin: [`../../tests/fixtures/manifest.json`](../../tests/fixture
 
 Creators may point `ORGA_DRONE_REAL_FIXTURE_ROOT` at a private folder. Gate scripts
 must refuse to upload those files as CI artifacts. Public evidence may include only
-aggregate metrics and synthetic screenshots.
+aggregate metrics and synthetic screenshots. Potensic / DJI representative slots in
+the JSON stay `NOT_FABRICATED` until real local fixtures exist.

@@ -36,17 +36,27 @@ Browser-only evidence must never be reported as native Windows acceptance.
 
 Do not claim **PASS** for **NOT_RUN** or **PENDING**.
 
-## Living artifacts
+## Authoritative artifacts
 
-| Artifact | Purpose |
+Exactly one of each — competing runners, harnesses, or manifests are not allowed:
+
+| Role | Path |
 | --- | --- |
-| [`qa/COVERAGE_MATRIX.md`](qa/COVERAGE_MATRIX.md) | Journey x layer matrix for #275 / #283 / #284 |
-| [`qa/FIXTURE_MANIFEST.md`](qa/FIXTURE_MANIFEST.md) | Versioned synthetic + optional real-footage fixture policy (#283) |
-| [`qa/INTEGRATION_OWNERSHIP.md`](qa/INTEGRATION_OWNERSHIP.md) | Parallel worktree ownership and PR gates (#284) |
-| [`tests/fixtures/manifest.json`](../tests/fixtures/manifest.json) | Machine-readable fixture pin |
-| [`tests/fixtures/regression_gate_modules.json`](../tests/fixtures/regression_gate_modules.json) | Required modules the inventory test pins |
-| [`discovery/275-shared-action-contract-matrix.md`](discovery/275-shared-action-contract-matrix.md) | Control API / MCP / WebView2 audit notes |
-| [`discovery/regression-gates-mutation-evidence.md`](discovery/regression-gates-mutation-evidence.md) | Controlled mutation prove-out |
+| Regression runner | [`scripts/run_regression_gates.py`](../scripts/run_regression_gates.py) |
+| Mutation verification harness | [`scripts/mutation_check_regression_gates.py`](../scripts/mutation_check_regression_gates.py) |
+| Fixture manifest | [`tests/fixtures/regression_fixture_manifest.json`](../tests/fixtures/regression_fixture_manifest.json) |
+| Coverage matrix | [`tests/fixtures/regression_coverage_matrix.json`](../tests/fixtures/regression_coverage_matrix.json) |
+| CI gate strategy (this doc) | [`REGRESSION_GATES.md`](REGRESSION_GATES.md) |
+
+Human-readable companions: [`qa/COVERAGE_MATRIX.md`](qa/COVERAGE_MATRIX.md),
+[`qa/FIXTURE_MANIFEST.md`](qa/FIXTURE_MANIFEST.md),
+[`qa/INTEGRATION_OWNERSHIP.md`](qa/INTEGRATION_OWNERSHIP.md).
+Module inventory pin: [`tests/fixtures/regression_gate_modules.json`](../tests/fixtures/regression_gate_modules.json)
+(lean `python_gate_nodes` / `js_gate_nodes` for CI; broader module lists for
+masking, Color Workspace, scopes, playback, and collage contracts when present
+on `develop`). Mutation evidence:
+[`discovery/regression-gates-mutation-evidence.md`](discovery/regression-gates-mutation-evidence.md),
+[`discovery/275-283-284-mutation-results.json`](discovery/275-283-284-mutation-results.json).
 
 ## Exact reproduction commands
 
@@ -76,8 +86,8 @@ Equivalent explicit list:
 ```bash
 python scripts/run_regression_gates.py
 # equivalent: pytest nodes from tests/fixtures/regression_gate_modules.json
-# python_gate_nodes, then:
-node --test tests/js/scopes_accumulate.test.js
+# python_gate_nodes, then node --test on js_gate_nodes
+# (scopes accumulate + control bridge by default)
 ```
 
 ### Layer 3 — browser UI
@@ -102,9 +112,10 @@ python packaging/e2e/windows_e2e.py --exe $exe.FullName --output-dir docs/discov
 ```
 
 CI workflow: [`.github/workflows/windows-e2e.yml`](../.github/workflows/windows-e2e.yml)
-runs on PRs to **main**. Reproducible offline acceptance uses the local commands
-above. It is **not** a required check on every develop PR. Absence on develop
-PRs is a documented limitation, not a pass.
+runs on PRs to **main** and is a **required** status check for `main` (native
+Windows acceptance gate). `workflow_dispatch` supports reproducible offline /
+develop acceptance runs without claiming PASS on every develop PR. Absence of a
+fresh packaged `evidence.json` on a develop PR is **NOT_RUN**, not a pass.
 
 ### Mutation integrity prove-out
 
@@ -134,18 +145,21 @@ editor here.
 | Windows packaged E2E | `Windows packaged E2E` | PR->`main` (+ local repro) | Layer 4 |
 | Main admission policy | `Main admission` | PR->`main` | Evidence binding for promotion |
 
-### Product Owner approval needed (repository settings)
+### Repository policy (required checks)
 
-`develop` branch protection currently has **empty required status check contexts**
-(API inspection). Enabling the following as required contexts needs explicit PO
-approval and does not happen from this PR alone:
+Deterministic regression checks are **mandatory** on `develop` via branch
+protection required contexts:
 
 1. `Ruff, MyPy and unit tests`
 2. `JavaScript lint, format and tests`
 3. `App journey smoke`
 4. `Creator regression gates`
 
-`main` already uses packaged E2E + Main admission. Do not weaken those gates.
+Native Windows acceptance is **mandatory** on `main` via required contexts
+`Windows packaged E2E` and `Main admission policy`. Do not weaken those gates.
+Requiring packaged Windows E2E on every develop PR remains a separate
+cost/latency decision; until enabled, develop PRs document Layer 4 as
+**NOT_RUN** and still cannot promote to `main` without the Windows gate.
 
 ## Test integrity rules
 

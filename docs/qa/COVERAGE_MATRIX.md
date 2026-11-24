@@ -1,7 +1,9 @@
 # Creator journey coverage matrix (#275 / #283 / #284)
 
 Audited commit base: `origin/develop` @ `ed22c9d` (before this PR).
-Update the Status column when evidence changes. Labels follow
+Authoritative machine-readable matrix:
+[`../../tests/fixtures/regression_coverage_matrix.json`](../../tests/fixtures/regression_coverage_matrix.json).
+Update both when evidence changes. Labels follow
 [`../REGRESSION_GATES.md`](../REGRESSION_GATES.md).
 
 ## Mandatory creator journeys
@@ -15,11 +17,11 @@ Update the Status column when evidence changes. Labels follow
 | Image Composer / photo combine | PASS | PASS | NOT_RUN | NOT_RUN | N/A | `test_photo_combine`, JS `photo_combine.test.js` |
 | Photo export profiles | PASS | PASS | NOT_RUN | PARTIAL | N/A | `test_studio_photo_export`, packaged `image_export` |
 | Studio photo editing | PASS | PASS | NOT_RUN | PARTIAL | N/A | studio image/HSL/wheels + packaged edit_persistence |
-| Masks / object selection | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | mask letterbox/geometry PASS on develop; precision/object selection parallel PENDING |
-| Color Workspace operators | PARTIAL | PARTIAL | NOT_RUN | NOT_RUN | PENDING | 	est_color_workspace_acceptance_matrix inventoried; in-flight color-ws workstreams PENDING |
-| Scopes | PASS | PARTIAL | NOT_RUN | NOT_RUN | PENDING | JS accumulate/panel/tap suites; packaged scopes probe NOT_RUN |
-| Video editing / playback | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | cut/speed/proxy unit+API; packaged playback harness NOT_RUN on develop CI |
-| Collage edit / export | PASS | PASS | NOT_RUN | NOT_RUN | N/A | collage model/export cleanup assertions; native collage NOT_RUN |
+| Masks / object selection | PASS | PASS | PARTIAL | PENDING_INTEGRATION | PARTIAL | mask letterbox/geometry + managed/object-select suites on develop; packaged native align PENDING_INTEGRATION |
+| Color Workspace operators | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | acceptance/reference + managed operator suites on develop; deeper visual/perf still PARTIAL |
+| Scopes | PASS | PARTIAL | PASS | NOT_RUN | PARTIAL | JS accumulate/panel/tap + non-packaged perf; packaged live-tap NOT_RUN |
+| Video editing / playback | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
+| Collage edit / export | PASS | PASS | PARTIAL | NOT_RUN | N/A | collage model/export cleanup + playback JS; native collage NOT_RUN |
 | Supported transitions / effects | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | transition timing unit+export; soft-wipe / drone packs parallel PENDING |
 | Project persistence / Undo-Redo | PASS | PASS | NOT_RUN | NOT_RUN | N/A | `test_studio_history`, Control API undo conflict/two-clip |
 | Control API / MCP | PASS | PASS | N/A | PARTIAL | N/A | Control API pytest PASS; MCP in external repo; WebView control smoke opt-in |
@@ -60,7 +62,7 @@ Update the Status column when evidence changes. Labels follow
 | Synthetic JPEG/PNG/MP4 (generated) | yes (tests create) | PASS |
 | Sanitized SRT samples | `tests/fixtures/*.srt` | PASS |
 | Grade / intent / speed-ramp JSON | `tests/fixtures/*.json` | PASS |
-| Versioned manifest | `tests/fixtures/manifest.json` | PASS (this PR) |
+| Versioned manifest | `tests/fixtures/regression_fixture_manifest.json` | PASS (this PR) |
 | Optional privacy-safe DJI/Potensic | local opt-in only | PENDING / never fabricate |
 
 ## Integration / PR gates (#284)

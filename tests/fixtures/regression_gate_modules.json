@@ -1,19 +1,20 @@
 {
   "schema": "orga-drone-regression-gate-modules-v1",
-  "issues": [
-    275,
-    283,
-    284
-  ],
+  "issues": [275, 283, 284],
   "python_modules": [
     "tests/test_regression_gate_inventory.py",
     "tests/test_local_http.py",
     "tests/test_control_api.py",
     "tests/test_studio_history.py",
     "tests/test_studio_mask.py",
+    "tests/test_studio_object_select.py",
+    "tests/test_studio_managed_masks.py",
     "tests/test_studio_transition.py",
     "tests/test_photo_hsl_export_api.py",
     "tests/test_studio_collage_export.py",
+    "tests/test_studio_collage_integration.py",
+    "tests/test_studio_playback_proxy.py",
+    "tests/test_studio_preview_frame.py",
     "tests/test_pr_journey_smoke.py",
     "tests/test_studio_actions.py",
     "tests/test_creator_journey.py",
@@ -36,14 +37,33 @@
     "tests/test_pr_journey_smoke.py"
   ],
   "js_modules": [
-    "tests/js/scopes_accumulate.test.js"
+    "tests/js/scopes_accumulate.test.js",
+    "tests/js/control_bridge.test.js",
+    "tests/js/scopes_nonpackaged_perf.test.js",
+    "tests/js/color_workspace.test.js",
+    "tests/js/collage_playback.test.js"
+  ],
+  "js_gate_nodes": [
+    "tests/js/scopes_accumulate.test.js",
+    "tests/js/control_bridge.test.js"
+  ],
+  "optional_when_present": [
+    "tests/test_color_workspace_reference_vectors.py",
+    "tests/js/scopes_panel.test.js",
+    "tests/js/scopes_engine_tap.test.js",
+    "tests/js/managed_color_editor.test.js",
+    "packaging/e2e/studio_mask_coordinate_align.py",
+    "packaging/e2e/studio_color_scopes.py"
   ],
   "docs": [
     "docs/REGRESSION_GATES.md",
     "docs/qa/COVERAGE_MATRIX.md",
     "docs/qa/FIXTURE_MANIFEST.md",
     "docs/qa/INTEGRATION_OWNERSHIP.md",
-    "tests/fixtures/manifest.json"
+    "tests/fixtures/regression_fixture_manifest.json",
+    "tests/fixtures/regression_coverage_matrix.json",
+    "scripts/run_regression_gates.py",
+    "scripts/mutation_check_regression_gates.py"
   ],
   "mutation_targets": [
     "incorrect_canvas_coordinate_mapping",
@@ -56,5 +76,5 @@
     "incorrect_scope_accumulation",
     "authorization_bypass"
   ],
-  "notes": "python_modules pins inventory existence; python_gate_nodes is the curated CI/mutation clean suite (fast, artifact-asserting)."
+  "notes": "python_modules/js_modules pin inventory existence for masking, Color Workspace, scopes, playback, and collage contracts present on develop. python_gate_nodes + js_gate_nodes are the curated CI/mutation clean suite (lean, artifact-asserting). optional_when_present is inventoried only when the path exists — never claim PASS for missing suites."
 }

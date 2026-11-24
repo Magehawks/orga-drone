@@ -1,4 +1,4 @@
-# Studio action architecture for 2.4.0
+﻿# Studio action architecture for 2.4.0
 
 Status: **analysis for issue #272.** This document describes the implementation
 that exists today and the shared action contract used by #276. It is not a
@@ -290,7 +290,7 @@ second implementation risk, not a SOLID exercise.
 
 ## 6. Test and fixture gaps
 
-Living coverage matrix (PASS / PARTIAL / GAP / NOT_RUN):  
+Living coverage matrix (PASS / PARTIAL / GAP / NOT_RUN) — permanent gates in [../REGRESSION_GATES.md](../REGRESSION_GATES.md); historical #275 inventory:  
 [`docs/discovery/275-shared-action-contract-matrix.md`](../discovery/275-shared-action-contract-matrix.md) (#275).
 
 Existing coverage is strong for routes and effect math. Shared-contract status

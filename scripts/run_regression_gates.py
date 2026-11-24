@@ -30,7 +30,7 @@ def main() -> int:
             for rel in payload["python_modules"]
             if rel.startswith("tests/") and rel.endswith(".py")
         ]
-    js_tests = list(payload["js_modules"])
+    js_tests = list(payload.get("js_gate_nodes") or payload["js_modules"])
     print("Creator regression gates — Python")
     print("PYTHONPATH includes", ROOT / "src")
     py = subprocess.run(
@@ -40,7 +40,7 @@ def main() -> int:
     )
     if py.returncode != 0:
         return py.returncode
-    print("Creator regression gates — scopes accumulate JS")
+    print("Creator regression gates — JS")
     js = subprocess.run(["node", "--test", *js_tests], cwd=ROOT, env=_env())
     return js.returncode
 

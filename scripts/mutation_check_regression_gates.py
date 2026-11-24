@@ -279,11 +279,39 @@ def main() -> int:
             print(clean.stderr)
             return 3
 
+        compact = []
+        for row in results:
+            entry = {
+                "mutation": row["mutation"],
+                "failed_as_expected": row["failed_as_expected"],
+                "returncode": row["returncode"],
+                "reverted": row["mutation"] != "CLEAN_SUITE",
+            }
+            if "path" in row:
+                entry["production_path"] = str(Path(row["path"]).as_posix())
+            if "verify_cmd" in row:
+                # Drop absolute interpreter paths from committed evidence.
+                cmd = list(row["verify_cmd"])
+                if cmd and Path(cmd[0]).name.lower().startswith("python"):
+                    cmd[0] = "python"
+                entry["verify_cmd"] = cmd
+            compact.append(entry)
         evidence = {
-            "schema": "orga-drone-regression-mutation-evidence-v1",
+            "schema": "orga-drone-regression-mutation-results-v1",
             "issues": [275, 283, 284],
-            "results": results,
+            "harness": "scripts/mutation_check_regression_gates.py",
+            "all_caught": all(
+                r["failed_as_expected"] for r in compact if r["mutation"] != "CLEAN_SUITE"
+            ),
+            "clean_suite_after_revert": (
+                "PASS"
+                if next(r for r in compact if r["mutation"] == "CLEAN_SUITE")["returncode"] == 0
+                else "FAIL"
+            ),
+            "results": [r for r in compact if r["mutation"] != "CLEAN_SUITE"],
         }
+        json_out = ROOT / "docs/discovery/275-283-284-mutation-results.json"
+        json_out.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
         out = ROOT / "docs/discovery/regression-gates-mutation-evidence.md"
         lines = [
             "# Regression gate mutation evidence",
@@ -310,16 +338,14 @@ def main() -> int:
                 f"{'PASS' if clean_row['returncode'] == 0 else 'FAIL'} "
                 f"(exit {clean_row['returncode']}).",
                 "",
-                "Raw machine JSON is retained in git history of this file's fenced block.",
-                "",
-                "```json",
-                json.dumps(evidence, indent=2)[:12000],
-                "```",
+                "Machine-readable companion: "
+                "[`275-283-284-mutation-results.json`](275-283-284-mutation-results.json).",
                 "",
             ]
         )
         out.write_text("\n".join(lines), encoding="utf-8", newline="\n")
         print(f"wrote {out}")
+        print(f"wrote {json_out}")
         return 0
     finally:
         if touched:
