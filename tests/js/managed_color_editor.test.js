@@ -49,6 +49,21 @@ function buildPanel() {
     highlights: range({ value: 0, disabled: true }),
     whites: range({ value: 0, disabled: true }),
   };
+  const primaryNumbers = Object.fromEntries(
+    Object.entries(fields).map(([key, el]) => [key, range({ value: el.value, disabled: true })])
+  );
+  const wheelFields = {
+    lift: range({ value: 0, disabled: true }),
+    gamma: range({ value: 1, disabled: true }),
+    gain: range({ value: 1, disabled: true }),
+    offset: range({ value: 0, disabled: true }),
+  };
+  const wheelNumbers = Object.fromEntries(
+    Object.entries(wheelFields).map(([key, el]) => [
+      key,
+      range({ value: el.value, disabled: true }),
+    ])
+  );
   const labels = Object.fromEntries(Object.keys(fields).map((key) => [key, label()]));
   const status = { textContent: "" };
   const wrapBtn = button(false);
@@ -84,6 +99,28 @@ function buildPanel() {
     "[data-managed-shadows]": fields.shadows,
     "[data-managed-highlights]": fields.highlights,
     "[data-managed-whites]": fields.whites,
+    "[data-managed-exposure-number]": primaryNumbers.exposure,
+    "[data-managed-kelvin-number]": primaryNumbers.kelvin,
+    "[data-managed-tint-number]": primaryNumbers.tint,
+    "[data-managed-contrast-number]": primaryNumbers.contrast,
+    "[data-managed-pivot-number]": primaryNumbers.pivot,
+    "[data-managed-saturation-number]": primaryNumbers.saturation,
+    "[data-managed-blacks-number]": primaryNumbers.blacks,
+    "[data-managed-shadows-number]": primaryNumbers.shadows,
+    "[data-managed-highlights-number]": primaryNumbers.highlights,
+    "[data-managed-whites-number]": primaryNumbers.whites,
+    "[data-managed-lift]": wheelFields.lift,
+    "[data-managed-gamma]": wheelFields.gamma,
+    "[data-managed-gain]": wheelFields.gain,
+    "[data-managed-offset]": wheelFields.offset,
+    "[data-managed-lift-number]": wheelNumbers.lift,
+    "[data-managed-gamma-number]": wheelNumbers.gamma,
+    "[data-managed-gain-number]": wheelNumbers.gain,
+    "[data-managed-offset-number]": wheelNumbers.offset,
+    "[data-managed-lift-value]": label(),
+    "[data-managed-gamma-value]": label(),
+    "[data-managed-gain-value]": label(),
+    "[data-managed-offset-value]": label(),
     "[data-managed-hue]": hslFields.hue,
     "[data-managed-hsl-sat]": hslFields.saturation,
     "[data-managed-hsl-light]": hslFields.lightness,
@@ -302,4 +339,51 @@ test("managed editor paints primaries and command-saves after reset", async () =
   assert.equal(commands[0].body.params.params.exposure, 0);
   assert.ok(commands[0].headers["X-Studio-History-Group"]);
   assert.deepEqual(changed, [8]);
+});
+
+test("convert re-enables primaries after busy clears", async () => {
+  const fixture = buildPanel();
+  let revision = 1;
+  globalThis.confirm = () => true;
+  globalThis.fetch = async (url, options = {}) => {
+    const method = String(options.method || "GET").toUpperCase();
+    if (method === "POST" && String(url).includes("convert-managed")) {
+      revision += 1;
+      return {
+        ok: true,
+        async json() {
+          return {
+            evaluator: "managed-sdr-v1",
+            authority: "canonical",
+            revision,
+            grade: {
+              steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }],
+            },
+          };
+        },
+      };
+    }
+    return {
+      ok: true,
+      async json() {
+        return {
+          evaluator: "managed-sdr-v1",
+          authority: "canonical",
+          revision,
+          grade: {
+            steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }],
+          },
+        };
+      },
+    };
+  };
+  const editor = createManagedColorEditor({
+    panel: fixture.panel,
+    getSelectedStudioId: () => "9",
+  });
+  await editor.fill();
+  fixture.convertBtn.click();
+  await tick();
+  await tick();
+  assert.equal(fixture.fields.exposure.disabled, false);
 });

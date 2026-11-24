@@ -118,28 +118,94 @@ def webview2_version() -> str:
 
 
 class CDP:
+    """Page-target CDP session with explicit navigate/load event handling.
+
+    WebView2 can recycle the page target around the first navigation. Connecting
+    before HTTP is ready and evaluating during an in-flight navigation is what
+    produced intermittent ``Connection aborted`` failures — not a missing retry.
+    """
+
     def __init__(self, websocket_url: str) -> None:
         import websocket  # type: ignore[import-untyped]
 
+        self._websocket = websocket
+        self._websocket_url = websocket_url
         self._next_id = 1
         self._ws = websocket.create_connection(
             websocket_url, timeout=20, suppress_origin=True
         )
-        self._ws.settimeout(45)
+        # Operator journeys hold long awaitPromise evaluates + screenshots.
+        self._ws.settimeout(120)
+
+    def _recv(self) -> dict[str, Any]:
+        try:
+            raw = self._ws.recv()
+        except Exception as exc:  # noqa: BLE001 - surface transport aborts clearly
+            raise E2EError(f"CDP WebSocket aborted: {exc}") from exc
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        message = json.loads(raw)
+        if not isinstance(message, dict):
+            raise E2EError(f"CDP returned non-object message: {message!r}")
+        return message
 
     def call(self, method: str, params: dict[str, Any] | None = None) -> Any:
         message_id = self._next_id
         self._next_id += 1
-        self._ws.send(
-            json.dumps({"id": message_id, "method": method, "params": params or {}})
-        )
+        try:
+            self._ws.send(
+                json.dumps({"id": message_id, "method": method, "params": params or {}})
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise E2EError(f"CDP send failed for {method}: {exc}") from exc
         while True:
-            message = json.loads(self._ws.recv())
+            message = self._recv()
             if message.get("id") != message_id:
                 continue
             if "error" in message:
                 raise E2EError(f"CDP {method} failed: {message['error']}")
             return message.get("result")
+
+    def enable_page_runtime(self) -> None:
+        self.call("Page.enable")
+        self.call("Runtime.enable")
+
+    def navigate(self, url: str, *, timeout_s: float = 90) -> None:
+        """Navigate and wait for loadEventFired on this page session."""
+        self.enable_page_runtime()
+        message_id = self._next_id
+        self._next_id += 1
+        try:
+            self._ws.send(
+                json.dumps(
+                    {
+                        "id": message_id,
+                        "method": "Page.navigate",
+                        "params": {"url": url},
+                    }
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise E2EError(f"CDP Page.navigate send failed: {exc}") from exc
+        nav_ack = False
+        loaded = False
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            message = self._recv()
+            if message.get("id") == message_id:
+                if "error" in message:
+                    raise E2EError(f"CDP Page.navigate failed: {message['error']}")
+                nav_ack = True
+            elif message.get("method") in {
+                "Page.loadEventFired",
+                "Page.domContentEventFired",
+            }:
+                loaded = True
+            if nav_ack and loaded:
+                return
+        raise E2EError(
+            f"Timed out waiting for navigation load ({url}); nav_ack={nav_ack} loaded={loaded}"
+        )
 
     def evaluate(
         self,
@@ -162,7 +228,10 @@ class CDP:
         return result.get("result", {}).get("value")
 
     def close(self) -> None:
-        self._ws.close()
+        try:
+            self._ws.close()
+        except Exception:  # noqa: BLE001 - best-effort close
+            pass
 
 
 class AppProcess:

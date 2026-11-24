@@ -144,13 +144,25 @@ def run(out: Path) -> None:
     try:
         result["browser"] = wait_cdp(debug, 120)["Browser"]
         result["source_hashes"] = originals
+        # Attach only after the HTTP server answers; then navigate with load wait.
+        import urllib.request as _urlreq
+        health_deadline = time.monotonic() + 60
+        while time.monotonic() < health_deadline:
+            try:
+                with _urlreq.urlopen(base + "/health", timeout=2) as resp:
+                    if resp.status == 200:
+                        break
+            except Exception:
+                time.sleep(0.2)
+        else:
+            raise AssertionError("Timed out waiting for /health")
         cdp = _harness.CDP(wait_page_target(debug, 120)["webSocketDebuggerUrl"])
-        cdp.call("Page.enable")
+        cdp.enable_page_runtime()
         cdp.call(
             "Emulation.setDeviceMetricsOverride",
             dict(width=1600, height=1000, deviceScaleFactor=1, mobile=False),
         )
-        cdp.call("Page.navigate", {"url": base + f"/studio?project_id={project.id}"})
+        cdp.navigate(base + f"/studio?project_id={project.id}", timeout_s=90)
         until("!!document.getElementById('studio-grid')")
         select(ids[0])
 
@@ -242,7 +254,15 @@ def run(out: Path) -> None:
                 cdp.close()
             except Exception:  # noqa: BLE001
                 pass
-        process.terminate()
+            cdp = None
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+            )
+        else:
+            process.terminate()
         try:
             process.wait(timeout=20)
         except subprocess.TimeoutExpired:

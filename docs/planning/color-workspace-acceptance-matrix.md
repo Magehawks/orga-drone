@@ -1,6 +1,6 @@
 # Color Workspace acceptance matrix (#364 / #365)
 
-Pinned `develop` tip at authoring: `757976c` (2026-11-13).
+Pinned `develop` tip at authoring: `ed22c9d` (2026-11-24). Updated by `feat/color-workspace-352-363`.
 Status labels: **PASS** | **FAIL** | **NOT_RUN** | **BLOCKED**.
 
 A passing API/unit test is **not** packaged Windows UI parity.
@@ -127,13 +127,23 @@ pytest tests/test_studio_grade_animation.py \
 5. ≥5 cold/warm performance samples on packaged binary
 6. Windows EXE / installer / RC (forbidden this sprint)
 
+## 11. This PR completion slice (`feat/color-workspace-352-363`)
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| Primaries/wheels slider ↔ number sync | PASS | `managed-color-editor.js` + `studio.html` + JS unit |
+| Regression contract (order / persistence / preview-export) | PASS | `tests/test_color_workspace_regression_contract.py` |
+| Native source-app operator journey (CDP) | PASS (local harness) | `packaging/e2e/studio_color_workspace_operators.py` |
+| Packaged EXE WebView2 | NOT_RUN — deferred by PO | unchanged |
+| Shared-file ownership vs Masking | PASS (documented) | Additive UI/locale/tests only; no mask-engine rewrite |
+
 ## Issue mapping
 
 | Issue | Matrix implication |
 |---|---|
 | #358 | Client story_s + bounded complex story-local export; fail-closed slow_span / loop+ramp / ramp+repeats; packaged NOT_RUN |
 | #360 | Tetrahedral + capability-gated RGBA32F exact; RGBA16F/RGBA8 exact:false measured; packaged budgets NOT_RUN |
-| #361 | Step editor + Quick Look `apply_preset` compile shipped |
+| #361 | Step editor + Quick Look + primaries/wheels numeric sync shipped |
 | #362/#366 | Source-app live tap + Node + CDP latency PASS; packaged EXE latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |

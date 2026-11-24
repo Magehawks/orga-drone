@@ -102,7 +102,7 @@ export function createManagedStepEditor({
     }
   }
 
-  function renderRow(step, index, total) {
+  function renderRow(step, index, total, orderedIds) {
     const row = document.createElement("div");
     row.className = "studio-managed-step-row";
     row.dataset.stepId = String(step.id);
@@ -149,11 +149,12 @@ export function createManagedStepEditor({
     const up = document.createElement("button");
     up.type = "button";
     up.className = "button ghost";
+    up.dataset.managedStepMove = "up";
     up.textContent = messages.moveUp || "Move up";
     up.disabled = index === 0;
     up.addEventListener("click", () => {
-      const grade = getGrade?.()?.grade;
-      const next = reorderStepIds(grade?.steps, step.id, "up");
+      const steps = (orderedIds || []).map((id) => ({ id }));
+      const next = reorderStepIds(steps, step.id, "up");
       if (!next) return;
       void runCommand("reorder_steps", { ids: next });
     });
@@ -161,11 +162,12 @@ export function createManagedStepEditor({
     const down = document.createElement("button");
     down.type = "button";
     down.className = "button ghost";
+    down.dataset.managedStepMove = "down";
     down.textContent = messages.moveDown || "Move down";
     down.disabled = index >= total - 1;
     down.addEventListener("click", () => {
-      const grade = getGrade?.()?.grade;
-      const next = reorderStepIds(grade?.steps, step.id, "down");
+      const steps = (orderedIds || []).map((id) => ({ id }));
+      const next = reorderStepIds(steps, step.id, "down");
       if (!next) return;
       void runCommand("reorder_steps", { ids: next });
     });
@@ -197,9 +199,10 @@ export function createManagedStepEditor({
       setStatus(messages.empty || "No steps yet");
       return;
     }
+    const orderedIds = steps.map((step) => String(step?.id || "")).filter(Boolean);
     steps.forEach((step, index) => {
       if (!step?.id) return;
-      list.append(renderRow(step, index, steps.length));
+      list.append(renderRow(step, index, steps.length, orderedIds));
     });
     if (!busy) {
       setStatus(
