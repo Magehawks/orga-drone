@@ -1,6 +1,6 @@
 ﻿# Color Workspace scopes / parity / integration gates (#362, #364, #365, #366)
 
-Pinned `origin/develop` at branch start: see git tip on `feat/color-scopes-362-366`.
+Pinned `origin/develop`: `572d6e6` (2026-11-24 acceptance PR).
 Status labels: **PASS** | **FAIL** | **NOT_RUN** | **BLOCKED**.
 
 This matrix is the acceptance inventory for the scopes + integration gate PR.
@@ -22,7 +22,7 @@ FAIL/BLOCKED evidence.
 | Scope toggles never alter saved grade/export | PASS | E2E + `test_scopes_integration_gate.py` |
 | Focused unit/integration evidence | PASS | Node + pytest gates below |
 | Local CDP live journey + screenshots | PASS | docs/planning/362-scopes-live-cdp.json |
-| Packaged EXE WebView2 latency/memory | NOT_RUN | Source-app CDP measured; EXE/MOTW deferred |
+| Packaged EXE WebView2 latency/memory | FAIL (operators PASS; scopes harness) | `docs/planning/color-scopes-packaged-e2e-evidence.json` |
 | Independent review / PO merge | NOT_RUN | Requested on PR; human decision |
 
 ## #366 Scope pixel tap + reference accumulation
@@ -36,7 +36,7 @@ FAIL/BLOCKED evidence.
 | Deterministic subsampling separated from full-res reference | PASS | `sampleFactor` once in accumulate |
 | Cancellation / stale generation | PASS | producer destroy test |
 | Render latency/memory impact measured | PASS (source-app) | Node harness + WebView2 CDP samples |
-| Packaged EXE impact | NOT_RUN | Explicit |
+| Packaged EXE impact | PARTIAL | Operators packaged PASS; scopes full journey FAIL |
 | Project-composite tap | NOT_RUN | Out of this slice; remains labeled-only |
 
 ## #364 Independent fixtures / harness
@@ -46,7 +46,7 @@ FAIL/BLOCKED evidence.
 | Independent synthetic fixtures + CPU reference | PASS | fixtures + Python luma peak reference |
 | #320 ≤3.0 unchanged; detail/temporal/perf separate | PASS | matrix policy + existing parity tests |
 | ≥5 cold/warm p50/p95 + memory samples | PASS (source-level) | Node JSON + WebView2 CDP latency JSON |
-| Packaged EXE matrix | NOT_RUN | Deferred |
+| Packaged EXE matrix | PARTIAL | Operators packaged EN+DE; scopes `--exe` wired, journey blocked |
 | Wrong bins / stale frames fail CI | PASS | mutation proof in `test_scopes_integration_gate.py` |
 
 ## #365 Complete Color Workspace admission
@@ -56,7 +56,7 @@ FAIL/BLOCKED evidence.
 | Feature controls/operators mapped | PASS (prior PRs) | See main acceptance matrix |
 | Scopes + tap gates | PASS (source) | This PR |
 | Strict numerical preview/export parity (API) | PASS | `test_managed_sdr_parity_journey.py` |
-| Packaged WebView2 parity / EXE E2E | NOT_RUN | Mandatory for full admission |
+| Packaged WebView2 parity / EXE E2E | PARTIAL | Operators packaged PASS; scopes packaged FAIL (documented) |
 | Full workspace accepted | **NOT declared** | Packaged gates incomplete |
 
 ## Shared renderer ownership
@@ -73,7 +73,9 @@ FAIL/BLOCKED evidence.
 ```bash
 node --test tests/js/scopes_*.test.js
 pytest tests/test_scopes_integration_gate.py tests/test_managed_sdr_parity_journey.py tests/test_color_workspace_acceptance_matrix.py -q
-python packaging/e2e/studio_color_scopes.py --out /tmp/scopes-e2e
+python packaging/e2e/studio_color_scopes.py --out <out>            # source-app
+python packaging/e2e/studio_color_scopes.py --exe <orga-drone.exe> --out <out>
+python packaging/e2e/studio_color_workspace_operators.py --exe <orga-drone.exe> --out <out> --locale de
 ```
 
 ## Measured source-app CDP latency (this PR)

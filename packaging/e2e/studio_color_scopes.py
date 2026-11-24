@@ -46,8 +46,46 @@ def _percentile(samples: list[float], p: float) -> float:
     idx = min(len(ordered) - 1, max(0, int(round((p / 100.0) * (len(ordered) - 1)))))
     return ordered[idx]
 
+def _packaged_attach_cdp(*, debug: int, base: str, project_id: int) -> Any:
+    """Attach CDP and open Studio (packaged WebView2 bootstrap)."""
+    import urllib.request
 
-def run(out: Path) -> None:
+    wait_cdp(debug, 120)
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=2) as resp:
+                if resp.status == 200:
+                    break
+        except Exception:
+            time.sleep(0.2)
+    else:
+        raise AssertionError("Timed out waiting for /health")
+    page = wait_page_target(debug, 120)
+    cdp = _harness.CDP(page["webSocketDebuggerUrl"])
+    cdp.enable_page_runtime()
+    cdp.call(
+        "Emulation.setDeviceMetricsOverride",
+        {"width": 1440, "height": 900, "deviceScaleFactor": 1, "mobile": False},
+    )
+    cdp.navigate(f"{base}/studio?project_id={project_id}", timeout_s=90)
+    grid_deadline = time.monotonic() + 120
+    while time.monotonic() < grid_deadline:
+        if cdp.evaluate(
+            "!!document.getElementById('studio-grid')",
+            await_promise=False,
+            user_gesture=False,
+        ):
+            return cdp
+        time.sleep(0.05)
+    raise AssertionError("Timed out: !!document.getElementById('studio-grid')")
+
+
+
+
+
+def run(out: Path, *, exe: Path | None = None) -> None:
+    out = out.resolve()
     from orga_drone.config import Settings
     from orga_drone.db import Database
 
@@ -103,26 +141,34 @@ def run(out: Path) -> None:
         ORGA_DRONE_GEOCODE="off",
         ORGA_DRONE_E2E="1",
         ORGA_DRONE_CDP_PORT=str(debug),
+        ORGA_DRONE_LANG="en",
     )
     env.pop("ORGA_DRONE_BROWSER", None)
     base = f"http://127.0.0.1:{port}"
     cdp = None
-    with (out / "app.log").open("wb") as log:
-        process = subprocess.Popen(
-            [sys.executable, "-m", "orga_drone"],
-            cwd=repo,
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
+    cmd, cwd, runtime_label, packaged_exe = _harness.orga_drone_process_command(exe, repo)
+    if packaged_exe:
+        env.pop("PYTHONPATH", None)
+    log_fp = (out / "app.log").open("wb")
+    process = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        env=env,
+        stdout=log_fp,
+        stderr=subprocess.STDOUT,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
     result: dict[str, Any] = {
         "status": "INCOMPLETE",
         "cases": [],
         "measurements": {},
-        "packaged_exe": False,
-        "runtime": "python -m orga_drone + CDP WebView2/Chromium",
+        "packaged_exe": packaged_exe,
+        "runtime": runtime_label,
     }
+
+    if packaged_exe:
+        cdp = _packaged_attach_cdp(debug=debug, base=base, project_id=project.id)
+        result["browser"] = wait_cdp(debug, 5).get("Browser")
 
     def ev(expression: str) -> Any:
         assert cdp
@@ -131,7 +177,8 @@ def run(out: Path) -> None:
     def until(expression: str, timeout_s: float = 45) -> None:
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
-            if ev(expression):
+            assert cdp is not None
+            if cdp.evaluate(expression, await_promise=False, user_gesture=False):
                 return
             time.sleep(0.05)
         raise AssertionError("Timed out: " + expression)
@@ -164,17 +211,12 @@ def run(out: Path) -> None:
             }})()"""
         )
 
+
     try:
-        result["browser"] = wait_cdp(debug, 120)["Browser"]
         result["source_hashes"] = originals
-        cdp = _harness.CDP(wait_page_target(debug, 120)["webSocketDebuggerUrl"])
-        cdp.call("Page.enable")
-        cdp.call(
-            "Emulation.setDeviceMetricsOverride",
-            dict(width=1600, height=1000, deviceScaleFactor=1, mobile=False),
-        )
-        cdp.call("Page.navigate", {"url": base + f"/studio?project_id={project.id}"})
-        until("!!document.getElementById('studio-grid')")
+        if not packaged_exe:
+            result["browser"] = wait_cdp(debug, 120).get("Browser")
+            cdp = _packaged_attach_cdp(debug=debug, base=base, project_id=project.id)
         select_clip(cid_a)
 
         creative = ev(
@@ -609,7 +651,7 @@ def run(out: Path) -> None:
             "heap_delta_samples": samples.get("memDeltas") or [],
             "panel_metrics": samples.get("metrics"),
             "notes": samples.get("note"),
-            "packaged_exe": False,
+            "packaged_exe": packaged_exe,
         }
         result["cases"].append({"name": "latency_memory_samples", "ok": True})
         (out / "scopes-latency.json").write_text(
@@ -661,7 +703,7 @@ def run(out: Path) -> None:
         result["live_media_scopes"] = "PASS"
         result["screenshots"] = sorted(p.name for p in shots.glob("*.png"))
         # Packaged EXE latency remains a separate gate.
-        result["packaged_exe_latency_memory"] = "NOT_RUN"
+        result["packaged_exe_latency_memory"] = "PASS" if packaged_exe else "NOT_RUN"
     except Exception as exc:  # noqa: BLE001
         result["status"] = "FAIL"
         result["error"] = str(exc)
@@ -677,19 +719,35 @@ def run(out: Path) -> None:
                 cdp.close()
             except Exception:  # noqa: BLE001
                 pass
-        process.terminate()
+            cdp = None
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+            )
+        else:
+            process.terminate()
         try:
             process.wait(timeout=20)
         except subprocess.TimeoutExpired:
             process.kill()
+        try:
+            log_fp.close()
+        except Exception:
+            pass
         (out / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--exe", type=Path, default=None, help="Packaged orga-drone.exe")
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
-    run(args.out)
+    if args.out is None:
+        raise SystemExit("--out is required")
+    run(args.out, exe=args.exe)
     print(json.dumps({"status": "PASS", "out": str(args.out)}, indent=2))
     return 0
 

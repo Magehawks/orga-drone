@@ -28,7 +28,7 @@ free_port = _harness.free_port
 wait_cdp, wait_page_target = _harness.wait_cdp, _harness.wait_page_target
 
 
-def run(out: Path) -> None:
+def run(out: Path, *, exe: Path | None = None) -> None:
     from orga_drone.config import Settings
     from orga_drone.db import Database
     from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
@@ -106,10 +106,13 @@ def run(out: Path) -> None:
     env.pop("ORGA_DRONE_BROWSER", None)
     base = f"http://127.0.0.1:{port}"
     cdp = None
+    cmd, cwd, runtime_label, packaged_exe = _harness.orga_drone_process_command(exe, repo)
+    if packaged_exe:
+        env.pop("PYTHONPATH", None)
     with (out / "app.log").open("wb") as log:
         process = subprocess.Popen(
-            [sys.executable, "-m", "orga_drone"],
-            cwd=repo,
+            cmd,
+            cwd=str(cwd),
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -272,9 +275,10 @@ def run(out: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--exe", type=Path, default=None, help="Packaged orga-drone.exe (optional)")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    run(args.out)
+    run(args.out, exe=args.exe)
     print(json.dumps({"status": "PASS", "out": str(args.out)}, indent=2))
     return 0
 

@@ -1,0 +1,51 @@
+{
+  "schema": "color-workspace-scopes-acceptance-v1",
+  "develop_sha": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
+  "packaged_exe_sha256": "63d98ff87979a13180cc2788650070a7d6adfa8d474a399abcf71c8c793f0dab",
+  "packaged_exe_build": "pyinstaller onefolder @ 572d6e6 (final-accept worktree artifact; same commit as color-accept)",
+  "rgb_tolerance_legacy_l320": 3.0,
+  "runs": {
+    "scopes_source_webview2": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_scopes.py --out acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/scopes-source-en",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/scopes-source-en/result.json",
+      "latency": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/scopes-source-en/scopes-latency.json"
+    },
+    "operators_source_en": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_workspace_operators.py --out .../operators-source-en-retry --locale en",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/operators-source-en-retry/result.json"
+    },
+    "operators_source_de": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_workspace_operators.py --out .../operators-source-de-v3 --locale de",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/operators-source-de-v3/result.json"
+    },
+    "operators_packaged_en": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_workspace_operators.py --exe dist/orga-drone.exe --out .../operators-packaged-en --locale en",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-165433/operators-packaged-en/result.json"
+    },
+    "operators_packaged_de": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_workspace_operators.py --exe dist/orga-drone.exe --out .../operators-packaged-de --locale de",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-170640/operators-packaged-de/result.json"
+    },
+    "scopes_packaged_full_journey": {
+      "verdict": "PASS",
+      "command": "python packaging/e2e/studio_color_scopes.py --out <abs-out>/scopes-packaged --exe <packaged-orga-drone.exe>",
+      "artifact": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-183200/scopes-packaged/result.json",
+      "screenshots": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-183200/scopes-packaged/screenshots/",
+      "latency": "acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-183200/scopes-packaged/scopes-latency.json",
+      "fix_note": "Packaged harness must call out.resolve() before ORGA_DRONE_DATA_DIR; relative --out broke WebView2 studio grid."
+    }
+  },
+  "pytest_aggregates": [
+    "tests/test_scopes_integration_gate.py",
+    "tests/test_managed_sdr_parity_journey.py",
+    "tests/test_color_workspace_regression_contract.py",
+    "tests/test_studio_managed_apply.py + primaries/curves/wheels/lut suites"
+  ],
+  "js_gates": "node --test tests/js/scopes_*.test.js tests/js/managed_color_editor.test.js",
+  "project_composite_tap": "NOT_RUN \u2014 label only; no producer path"
+}

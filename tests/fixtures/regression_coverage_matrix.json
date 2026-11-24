@@ -5,7 +5,7 @@
     283,
     284
   ],
-  "develop_sha_at_authoring": "ed22c9d3037fb935d5a453d032aaf70d471235fb",
+  "develop_sha_at_authoring": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
   "layers": {
     "1_unit": "Domain logic, geometry, operators, validation, persistence, security",
     "2_integration": "Real API, DB, rendering, FFmpeg, export publication, shared actions",
@@ -127,7 +127,7 @@
         "1_unit": "PASS",
         "2_integration": "PASS",
         "3_browser_e2e": "PARTIAL",
-        "4_native_windows_e2e": "NOT_RUN",
+        "4_native_windows_e2e": "PARTIAL",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -138,18 +138,19 @@
         "tests/test_studio_managed_wheels.py",
         "tests/test_studio_managed_lut.py",
         "tests/js/color_workspace.test.js",
-        "tests/js/managed_color_editor.test.js"
+        "tests/js/managed_color_editor.test.js",
+        "packaging/e2e/studio_color_workspace_operators.py"
       ],
-      "notes": "Parallel Color Workspace stream may land additional suites \u2014 wire, do not replace"
+      "notes": "Parallel Color Workspace stream; packaged operators EN+DE PASS @572d6e6 (docs/planning/color-scopes-packaged-e2e-evidence.json)"
     },
     {
       "id": "color-scopes",
       "title": "Color scopes",
       "layer_status": {
         "1_unit": "PASS",
-        "2_integration": "PARTIAL",
+        "2_integration": "PASS",
         "3_browser_e2e": "PASS",
-        "4_native_windows_e2e": "NOT_RUN",
+        "4_native_windows_e2e": "PARTIAL",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -161,7 +162,7 @@
         "tests/js/scopes_nonpackaged_perf.test.js",
         "packaging/e2e/studio_color_scopes.py"
       ],
-      "notes": "Packaged live-tap latency remains NOT_RUN until dated WebView2 evidence"
+      "notes": "Source + packaged scopes PASS @572d6e6 (acceptance-evidence/color-scopes-acceptance/572d6e6/runs/20261124-183200/scopes-packaged/); machine L4 PARTIAL until dated evidence binding lands in regression matrix schema"
     },
     {
       "id": "video-editing-playback",

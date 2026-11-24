@@ -234,6 +234,28 @@ class CDP:
             pass
 
 
+def orga_drone_process_command(
+    exe: Path | None, repo: Path
+) -> tuple[list[str], Path, str, bool]:
+    """Resolve launch command for source-app or packaged orga-drone.exe."""
+    if exe is not None:
+        resolved = exe.resolve()
+        if not resolved.is_file():
+            raise FileNotFoundError(f"missing exe: {resolved}")
+        return (
+            [str(resolved)],
+            resolved.parent,
+            f"packaged:{resolved.name}",
+            True,
+        )
+    return (
+        [sys.executable, "-m", "orga_drone"],
+        repo,
+        "python -m orga_drone + CDP WebView2/Chromium",
+        False,
+    )
+
+
 class AppProcess:
     def __init__(self, exe: Path, data_dir: Path) -> None:
         self.exe = exe
@@ -296,14 +318,59 @@ class AppProcess:
         return self.cdp
 
 
-def wait_until(
-    cdp: CDP, expression: str, *, timeout_s: float, description: str
-) -> Any:
+
+
+def wait_http_ready(base_url: str, timeout_s: float = CDP_START_TIMEOUT_S) -> None:
+    import urllib.request
+    deadline = time.monotonic() + timeout_s
+    url = base_url.rstrip("/") + "/health"
+    last = ""
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as resp:
+                if resp.status == 200:
+                    return
+        except Exception as exc:
+            last = str(exc)
+            time.sleep(0.2)
+    raise E2EError(f"Timed out waiting for {url}: {last}")
+
+
+def connect_studio_page(
+    *,
+    debug_port: int,
+    base_url: str,
+    project_id: int,
+    device: tuple[int, int] = (1440, 900),
+    grid_timeout_s: float = 120,
+) -> CDP:
+    wait_cdp(debug_port, CDP_START_TIMEOUT_S)
+    wait_http_ready(base_url, CDP_START_TIMEOUT_S)
+    page = wait_page_target(debug_port, CDP_START_TIMEOUT_S)
+    cdp = CDP(str(page["webSocketDebuggerUrl"]))
+    cdp.enable_page_runtime()
+    width, height = device
+    cdp.call(
+        "Emulation.setDeviceMetricsOverride",
+        {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False},
+    )
+    studio_url = f"{base_url.rstrip('/')}/studio?project_id={int(project_id)}"
+    cdp.navigate(studio_url, timeout_s=90)
+    wait_until(
+        cdp,
+        "!!document.getElementById('studio-grid')",
+        timeout_s=grid_timeout_s,
+        description="studio-grid",
+    )
+    return cdp
+
+
+def wait_until( cdp: CDP, expression: str, *, timeout_s: float, description: str, await_promise: bool = False ) -> Any:
     deadline = time.monotonic() + timeout_s
     last: Any = None
     while time.monotonic() < deadline:
         try:
-            last = cdp.evaluate(expression, await_promise=True)
+            last = cdp.evaluate(expression, await_promise=await_promise)
         except E2EError:
             time.sleep(0.25)
             continue
@@ -1620,3 +1687,4 @@ def find_media(cdp: CDP, filename: str) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
