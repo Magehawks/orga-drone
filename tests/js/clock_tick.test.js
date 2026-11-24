@@ -7,6 +7,12 @@ import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
+import {
+  mediaReachedPlayEnd,
+  playEndMediaTime,
+  proxyRelativeMediaTime,
+} from "../../src/orga_drone/static/js/studio/proxy-loop-map.js";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(
   path.resolve(here, "../../src/orga_drone/static/js/studio.js"),
@@ -55,6 +61,9 @@ function scenario(options = {}) {
     sectionRepeats: () => 1,
     sectionCycleS: () => 20,
     lutProxyActiveFor: () => !!options.proxy,
+    proxyRelativeMediaTime,
+    playEndMediaTime,
+    mediaReachedPlayEnd,
     applyClipPlayback() {},
     slowBarOf: () => null,
     speedRampOf: () => null,
