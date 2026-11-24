@@ -1,3 +1,6 @@
+﻿> **Archived historical evidence (PR #317 / develop `7dd5930`, 2026-11-07).**
+> Not current develop or release-admission evidence. Reusable tools: `packaging/rc/`.
+> Fresh RC requires a new authorized package against current develop.
 # Windows manual RC acceptance package
 
 Date: 2026-11-07. **CONDITIONAL GO for Product Owner manual testing only.

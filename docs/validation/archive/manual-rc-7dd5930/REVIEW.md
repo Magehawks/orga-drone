@@ -1,3 +1,6 @@
+﻿> **Archived historical evidence (PR #317 / develop `7dd5930`, 2026-11-07).**
+> Not current develop or release-admission evidence. Reusable tools: `packaging/rc/`.
+> Fresh RC requires a new authorized package against current develop.
 # Independent RC validation review
 
 Verdict: **REVIEW_APPROVED**.
