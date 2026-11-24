@@ -1,11 +1,13 @@
-// Source/proxy selection and time mapping for the experimental LUT proxy (#223).
+﻿// Source/proxy selection and time mapping for the experimental LUT proxy (#223 / #294 B).
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy.js');
+const loopMapPromise = import('../../src/orga_drone/static/js/studio/proxy-loop-map.js');
 
 (async () => {
   const policy = await policyPromise;
+  const loopMap = await loopMapPromise;
   const script = fs.readFileSync('src/orga_drone/static/js/studio.js', 'utf8');
   const source = script.split('function colorAnimationKeys')[1].split('function imageSrcFor')[0];
   let customAudio = null;
@@ -25,6 +27,9 @@ const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy
     }),
     readClipAudio: () => customAudio,
     evaluateLutProxyEligibility: policy.evaluateLutProxyEligibility,
+    proxyRelativeMediaTime: loopMap.proxyRelativeMediaTime,
+    playEndMediaTime: loopMap.playEndMediaTime,
+    mediaReachedPlayEnd: loopMap.mediaReachedPlayEnd,
     createManagedGradePreviewCache: () => ({
       readManagedGrade: () => null,
       writeManagedGrade: () => {},
@@ -73,8 +78,11 @@ const policyPromise = import('../../src/orga_drone/static/js/studio/proxy-policy
   assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'slow bar falls back');
   context.slowBarOf = () => null;
   context.sectionRepeats = () => 2;
-  assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'repeat falls back');
+  assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl, 'repeat keeps graded proxy (#294 B)');
   context.sectionRepeats = () => 1;
+  context.forwardLoopActive = () => true;
+  assert.equal(context.videoSrcFor(clip), clip.dataset.lutProxyUrl, 'forward loop keeps graded proxy (#294 B)');
+  context.forwardLoopActive = () => false;
   context.readColorAnimation = () => ({ keys: [{ t: 0 }, { t: 1 }] });
   assert.equal(context.videoSrcFor(clip), '/media/1/stream', 'animated look falls back');
   context.readColorAnimation = () => null;

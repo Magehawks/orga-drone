@@ -1,0 +1,162 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "name": "creative_hides_scopes",
+      "ok": true
+    },
+    {
+      "name": "pro_reveals_four_scopes",
+      "ok": true,
+      "detail": {
+        "mode": "pro",
+        "hidden": false,
+        "kinds": [
+          "histogram",
+          "waveform",
+          "parade",
+          "vectorscope"
+        ]
+      }
+    },
+    {
+      "name": "fixture_disclosure_no_grade_mutation",
+      "ok": true
+    },
+    {
+      "name": "leave_fixture_clears_display",
+      "ok": true
+    },
+    {
+      "name": "live_unavailable_without_fake_tap",
+      "ok": true
+    },
+    {
+      "name": "live_managed_preview_tap",
+      "ok": true,
+      "detail": {
+        "source": "engine-tap",
+        "status": "Heruntergerechnete Messung \u00b7 vectorscope \u00b7 18.30 ms",
+        "hasCanvas": true
+      }
+    },
+    {
+      "name": "switch_all_four_scopes",
+      "ok": true
+    },
+    {
+      "name": "grade_keeps_live_tap",
+      "ok": true,
+      "before": {
+        "status": "Heruntergerechnete Messung \u00b7 vectorscope \u00b7 18.30 ms",
+        "source": "engine-tap"
+      },
+      "after": {
+        "source": "engine-tap",
+        "status": "Heruntergerechnete Messung \u00b7 histogram \u00b7 24.60 ms",
+        "metrics": {
+          "lastProcessMs": 24.59999999962747,
+          "droppedFrames": 0,
+          "acceptedFrames": 1
+        }
+      }
+    },
+    {
+      "name": "clip_switch_rejects_stale_live",
+      "ok": true,
+      "detail": {
+        "source": "unavailable",
+        "selected": "2"
+      }
+    },
+    {
+      "name": "latency_memory_samples",
+      "ok": true
+    },
+    {
+      "name": "preview_export_unaffected_by_scope_visibility",
+      "ok": true,
+      "detail": {
+        "on": {
+          "status": 200,
+          "len": 4098,
+          "hash": "e2a9ce06"
+        },
+        "off": {
+          "status": 200,
+          "len": 4098,
+          "hash": "e2a9ce06"
+        }
+      }
+    },
+    {
+      "name": "source_integrity",
+      "ok": true
+    }
+  ],
+  "measurements": {
+    "cold": {
+      "n": 5,
+      "min_ms": 178.40000000037253,
+      "max_ms": 216.40000000037253,
+      "mean_ms": 196.1800000000745,
+      "p50_ms": 202,
+      "p95_ms": 216.40000000037253
+    },
+    "warm": {
+      "n": 5,
+      "min_ms": 173,
+      "max_ms": 205,
+      "mean_ms": 185.6599999997765,
+      "p50_ms": 184.5,
+      "p95_ms": 205
+    },
+    "heap_delta_samples": [
+      44593547,
+      -29848230,
+      35252806,
+      -25396843,
+      35188995,
+      -34632198,
+      35211034,
+      -33978826,
+      33214854,
+      -33908523
+    ],
+    "panel_metrics": {
+      "lastProcessMs": 24.300000000745058,
+      "droppedFrames": 0,
+      "acceptedFrames": 12
+    },
+    "notes": null,
+    "packaged_exe": false
+  },
+  "packaged_exe": false,
+  "runtime": "python -m orga_drone + CDP WebView2/Chromium",
+  "browser": "Edg/158.0.4370.33",
+  "source_hashes": {
+    "clip-a.jpg": "1ac00328fe36f0dfcc3667873e1825622582aaed7a5b636801875ec5a10dee93",
+    "clip-b.jpg": "811e35fa35f1c429d90c37f673e0d9415dcb0722bf2a8a19e4dc64867701ca3f"
+  },
+  "convert_ui": {
+    "status": "Legacy-Wrapper \u00b7 Rev 1 \u00b7 Look & Farben gesperrt",
+    "wrapHidden": true,
+    "convertHidden": false,
+    "convertDisabled": true
+  },
+  "clip_ids": {
+    "a": 1,
+    "b": 2
+  },
+  "live_media_scopes": "PASS",
+  "screenshots": [
+    "01-fixture-vectorscope.png",
+    "02-live-histogram.png",
+    "02-live-parade.png",
+    "02-live-vectorscope.png",
+    "02-live-waveform.png",
+    "03-after-grade-histogram.png",
+    "04-clip-b-no-stale.png"
+  ],
+  "packaged_exe_latency_memory": "NOT_RUN"
+}

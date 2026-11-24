@@ -95,9 +95,10 @@ is attached.
 | Stale frame rejection | PASS |
 | Panel does not call save APIs | PASS |
 | Creative hides scopes; Pro shows section | PASS (CSS/template tests) |
-| Windows WebView2 fixture UI journey | PASS (`packaging/e2e/studio_color_scopes.py`) |
+| Windows WebView2 fixture + live managed tap journey | PASS (`packaging/e2e/studio_color_scopes.py`) |
 | Managed preview producer + capability gating | PASS (`tests/js/scopes_preview_tap.test.js`) |
-| Live media scope accuracy (packaged WebView2) | NOT_RUN — pending packaged E2E evidence |
+| Live media scope accuracy (source-app WebView2 CDP) | PASS (`packaging/e2e/studio_color_scopes.py`) |
+| Live media scope accuracy (packaged EXE) | NOT_RUN — pending packaged EXE evidence |
 | Engine-tap capability refusal of blit/CSS/JPEG | PASS (`tests/js/scopes_engine_tap.test.js`) |
 | Packaged MOTW E2E | NOT_RUN — not in scope |
 

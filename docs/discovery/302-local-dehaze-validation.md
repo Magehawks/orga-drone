@@ -318,3 +318,7 @@ NumPy, SciPy, a network service, or generative AI.
 - The large-PNG `colorlevels` crash was reproduced on one file; its exact
   trigger is not isolated.
 - No packaged EXE/WebView2 run, no 10-bit source, and no long-clip export.
+
+## Closeout pointer
+
+See [302-closeout.md](302-closeout.md) for the Color Workspace operator blocker and PO close recommendation (2026-11-24).

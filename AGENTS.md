@@ -165,6 +165,7 @@ to repository artifacts.
 | Studio action inventory and Control API contract | `docs/architecture/STUDIO_ACTIONS.md` |
 | Agent workflow and roles | `docs/AGENT_WORKFLOW.md` |
 | PR end-to-end checks | `docs/PR_E2E.md` |
+| Permanent regression / integration gates | `docs/REGRESSION_GATES.md`, `docs/qa/` |
 | Decisions | `docs/decisions/` |
 | User help | `docs/user/` |
 | Packaging and release procedure | `packaging/README.md` |
