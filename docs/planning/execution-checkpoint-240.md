@@ -1,6 +1,6 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-13. Integration branch `develop` includes `#401`, `#402`, and `#403`.
+Updated: 2026-11-24 (dehaze #302 closeout notes). Integration branch `develop` includes `#401`, `#402`, and `#403`.
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -27,7 +27,7 @@ is not acceptance.
 | #299 | Subject Focus | READY | — | — | — | After #298 spike evidence. |
 | #300 | Portrait auto-reframing | VERIFY | manual Ken Burns crop already in `studio_frame.py` | Automatic detection is forbidden. Subject following waits on #298. | #298 evidence | Do not add a second crop model. |
 | #301 | Drone-friendly transitions | VERIFY | #401 merged `88c79e9` | Blur dissolve and four soft wipes landed. Packaged WebView2 for these transitions is NOT_RUN. | PO acceptance | Do not reimplement. Do not add more transition types. |
-| #302 | Dehaze alternatives | BLOCKED | — | FFmpeg-only dehaze is NO-GO | A feasible local alternative still has to be chosen | Do not claim a shipping dehaze. |
+| #302 | Dehaze alternatives | VERIFY | #304, #309 + closeout | Discovery complete. FFmpeg-only Dehaze NO-GO; not an ADR 0035 operator. Packaged EXE NOT_RUN. | PO acceptance to close discovery | Do not add a Dehaze slider or grade operator. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
 | #325 | Timelapse target duration | VERIFY | #404 merged | Target-duration draft drives decoded MP4 evidence. Journey smoke uses fixed red-then-blue clip order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |
