@@ -4,7 +4,8 @@
 - **Date:** 2026-11-24 (recommendations recorded same day)
 - **Deciders:** Product Owner + security review (**not approved**)
 - **Related:** Issues #273, #274; ADR 0032; `docs/discovery/273-pairing-threat-model.md`;
-  `docs/discovery/273-274-secure-assistant-acceptance-and-blockers.md`
+  `docs/discovery/273-274-secure-assistant-acceptance-and-blockers.md;
+  `docs/discovery/273-274-architecture-decision-gate.md``
 
 ## Context
 
@@ -165,3 +166,4 @@ Product Owner must record one of:
 
 Until that comment (or an Accepted revision of this ADR) exists,
 **implementation of production Connect / pairing remains forbidden.**
+
