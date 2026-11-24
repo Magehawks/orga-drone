@@ -1,0 +1,11 @@
+{
+  "elapsed_s": 13.89619070000117,
+  "out_bytes": 2216884,
+  "compose_s": 0.0,
+  "jpeg_write_s": 2.9964529999961087,
+  "ffmpeg_extract_s": 0.0,
+  "encode_s": 1.5178766999997606,
+  "extract_calls": 0,
+  "compose_calls": 0,
+  "cache_hits": 0
+}

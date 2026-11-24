@@ -4,9 +4,11 @@ Reuses the WP4 still compositor for per-frame (or photo-hold) honesty so
 preview and export share layout + grade application. Encodes via the existing
 FFmpeg toolchain; does not invent a second encoder pipeline.
 
-Issue #489 adds a free-space guard on the JPEG staging volume. The composed
-frame sequence is unchanged; streaming or batched encoding remain separate
-follow-ups after further evidence (#487).
+Issue #489 adds a free-space guard on the JPEG staging volume. Issue #487
+prefetch extracts each video leaf with one FFmpeg process into a bounded
+source-frame sequence (duration x fps), then reuses those JPEGs while composing.
+Composed-frame staging remains full-sequence with the free-space reserve;
+streaming encoder input remains a separate follow-up.
 """
 
 from __future__ import annotations
@@ -32,9 +34,17 @@ from orga_drone.studio_collage import iter_leaves, normalize_spec
 from orga_drone.studio_collage_still import (
     EXPORT_LONG_EDGE,
     CollageExportFrames,
+    can_prefetch_export_sequence,
     compose_collage_rgba,
+    prefetch_export_video_sequence,
     refuse_canvas,
+    resolve_leaf_source,
 )
+from orga_drone.studio_color_wheels import ColorWheels, color_wheels_from_effect_settings
+from orga_drone.studio_hsl import HslAdjust, hsl_adjust_from_effect_settings
+from orga_drone.studio_image import ImageAdjust, image_adjust_from_effect_settings
+from orga_drone.studio_lut import ColorLook, color_look_from_effect_settings
+from orga_drone.studio_preview_frame import PreviewFrameRequest
 
 
 ProgressCb = Callable[[dict[str, Any]], None]
@@ -109,6 +119,126 @@ def ensure_staging_space(
 ensure_collage_staging_space = ensure_staging_space
 
 
+def _leaf_preview_request(
+    db: Database,
+    leaf: dict[str, Any],
+    *,
+    long_edge: int,
+) -> tuple[PreviewFrameRequest, float] | None:
+    """Build an export PreviewFrameRequest for a video leaf, or None when skipped."""
+    media = leaf.get("media")
+    if not isinstance(media, dict):
+        return None
+    kind = str(media.get("kind") or "").strip().lower()
+    if kind != "video":
+        return None
+    path = resolve_leaf_source(db, media)
+    if path is None or not path.is_file():
+        return None
+    grade = media.get("grade")
+    effect_settings = None
+    if isinstance(grade, dict) and grade:
+        import json
+
+        try:
+            effect_settings = json.dumps(grade, separators=(",", ":"), sort_keys=True)
+        except (TypeError, ValueError):
+            effect_settings = None
+    image = (
+        image_adjust_from_effect_settings(effect_settings)
+        if effect_settings
+        else ImageAdjust()
+    )
+    look = (
+        color_look_from_effect_settings(effect_settings)
+        if effect_settings
+        else ColorLook()
+    )
+    hsl = (
+        hsl_adjust_from_effect_settings(effect_settings)
+        if effect_settings
+        else HslAdjust()
+    )
+    wheels = (
+        color_wheels_from_effect_settings(effect_settings)
+        if effect_settings
+        else ColorWheels()
+    )
+    from orga_drone.studio_managed_apply import grade_is_managed_sdr
+
+    managed = bool(effect_settings and grade_is_managed_sdr(effect_settings))
+    start_offset = float(media.get("start_offset_s") or 0.0)
+    req = PreviewFrameRequest(
+        media_path=path,
+        kind="video",
+        source_time_s=max(0.0, start_offset),
+        image=image,
+        look=look,
+        hsl=hsl,
+        color_wheels=wheels,
+        max_edge=max(64, int(long_edge)),
+        effect_settings=effect_settings if managed else None,
+        exact_time=True,
+        strict_source=True,
+    )
+    if not can_prefetch_export_sequence(req):
+        return None
+    return req, start_offset
+
+
+def _prefetch_collage_leaf_sequences(
+    db: Database,
+    spec: dict[str, Any],
+    export_frames: CollageExportFrames,
+    *,
+    frame_count: int,
+    long_edge: int,
+    staged_bytes: int,
+    next_write: int,
+    cancel_event: threading.Event | None,
+    on_progress: ProgressCb | None,
+) -> int:
+    """Prefetch one bounded JPEG sequence per eligible video leaf. Returns new staged bytes."""
+    added = 0
+
+    def on_bytes(size: int) -> None:
+        nonlocal added
+        ensure_staging_space(
+            export_frames.cache_dir,
+            next_write_bytes=max(next_write, int(size)),
+            staged_bytes=staged_bytes + added,
+        )
+        added += int(size)
+
+    leaves = list(iter_leaves(normalize_spec(spec)["root"]))
+    total = max(1, sum(1 for leaf in leaves if isinstance(leaf.get("media"), dict)
+                       and str(leaf.get("media", {}).get("kind") or "").lower() == "video"))
+    done = 0
+    for leaf in leaves:
+        _check_cancel(cancel_event)
+        built = _leaf_preview_request(db, leaf, long_edge=long_edge)
+        if built is None:
+            continue
+        req, start_s = built
+        prefetch_export_video_sequence(
+            export_frames,
+            req,
+            frame_count=frame_count,
+            fps=float(EXPORT_FPS),
+            start_s=start_s,
+            cancel_event=cancel_event,
+            on_bytes=on_bytes,
+        )
+        done += 1
+        _emit(
+            on_progress,
+            phase="preparing",
+            percent=int(5 + (done / float(total)) * 5),
+        )
+    return added
+
+
+
 def collage_has_video_leaf(spec: dict[str, Any]) -> bool:
     for leaf in iter_leaves(normalize_spec(spec)["root"]):
         media = leaf.get("media")
@@ -134,11 +264,11 @@ def _canvas_to_rgb_jpeg(canvas, dest: Path) -> None:
         bg = Image.new("RGB", canvas.size, (10, 12, 14))
         try:
             bg.paste(canvas, mask=canvas.split()[3])
-            bg.save(dest, format="JPEG", quality=95, optimize=True, subsampling=0)
+            bg.save(dest, format="JPEG", quality=95, optimize=False, subsampling=0)
         finally:
             bg.close()
         return
-    canvas.convert("RGB").save(dest, format="JPEG", quality=95, optimize=True, subsampling=0)
+    canvas.convert("RGB").save(dest, format="JPEG", quality=95, optimize=False, subsampling=0)
 
 
 def _write_composed_jpeg(
@@ -257,6 +387,17 @@ def render_collage_mp4_segment(
         frame_count = max(1, int(round(dur * EXPORT_FPS)))
         frames_dir = tmp_dir / "frames"
         frames_dir.mkdir(parents=True, exist_ok=True)
+        staged_bytes += _prefetch_collage_leaf_sequences(
+            db,
+            normalized,
+            export_frames,
+            frame_count=frame_count,
+            long_edge=edge,
+            staged_bytes=staged_bytes,
+            next_write=next_write,
+            cancel_event=cancel_event,
+            on_progress=on_progress,
+        )
         for index in range(frame_count):
             _check_cancel(cancel_event)
             t_s = index / float(EXPORT_FPS)

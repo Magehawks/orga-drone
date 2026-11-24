@@ -1,6 +1,10 @@
 {
   "schema": "orga-drone-regression-gate-modules-v1",
-  "issues": [275, 283, 284],
+  "issues": [
+    275,
+    283,
+    284
+  ],
   "python_modules": [
     "tests/test_regression_gate_inventory.py",
     "tests/test_local_http.py",
@@ -12,6 +16,7 @@
     "tests/test_studio_transition.py",
     "tests/test_photo_hsl_export_api.py",
     "tests/test_studio_collage_export.py",
+    "tests/test_studio_collage_disk_safety.py",
     "tests/test_studio_collage_integration.py",
     "tests/test_studio_playback_proxy.py",
     "tests/test_studio_preview_frame.py",
@@ -34,6 +39,7 @@
     "tests/test_studio_transition.py::test_clamp_user_duration_steps",
     "tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png",
     "tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export",
+    "tests/test_studio_collage_disk_safety.py::test_low_space_before_render_preserves_destination",
     "tests/test_pr_journey_smoke.py"
   ],
   "js_modules": [
@@ -53,7 +59,8 @@
     "tests/js/scopes_engine_tap.test.js",
     "tests/js/managed_color_editor.test.js",
     "packaging/e2e/studio_mask_coordinate_align.py",
-    "packaging/e2e/studio_color_scopes.py"
+    "packaging/e2e/studio_color_scopes.py",
+    "packaging/e2e/studio_collage_export_disk.py"
   ],
   "docs": [
     "docs/REGRESSION_GATES.md",
@@ -74,7 +81,8 @@
     "incorrect_transition_timing",
     "missing_collage_export_cleanup",
     "incorrect_scope_accumulation",
-    "authorization_bypass"
+    "authorization_bypass",
+    "disabled_collage_staging_disk_guard"
   ],
-  "notes": "python_modules/js_modules pin inventory existence for masking, Color Workspace, scopes, playback, and collage contracts present on develop. python_gate_nodes + js_gate_nodes are the curated CI/mutation clean suite (lean, artifact-asserting). optional_when_present is inventoried only when the path exists — never claim PASS for missing suites."
+  "notes": "python_modules/js_modules pin inventory existence for masking, Color Workspace, scopes, playback, and collage contracts present on develop. python_gate_nodes + js_gate_nodes are the curated CI/mutation clean suite (lean, artifact-asserting). optional_when_present is inventoried only when the path exists \u2014 never claim PASS for missing suites."
 }

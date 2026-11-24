@@ -73,14 +73,19 @@ Spec  = { version: 1, aspect, gap_px, background, corner_radius_px?,
 - Each export owns its frame cache and removes it with its staging files.
   At video EOF it holds the last decodable frame, even when the container
   has a longer audio stream or ffprobe is unavailable.
-- Collage video export keeps the existing full-sequence JPEG staging path.
-  Before and during composed-frame writes it checks usable free space on the
-  staging volume and aborts before a write would leave less than 1 GiB free
+- Collage video export keeps the existing full-sequence JPEG staging path
+  for composed frames. Before and during composed-frame (and source-sequence)
+  writes it checks usable free space on the staging volume and aborts before
+  a write would leave less than 1 GiB free
   (`COLLAGE_STAGING_FREE_SPACE_RESERVE_BYTES`). The localized error is:
   "Not enough temporary disk space. Free up space and try again." Staging
   directories and intermediate segment MP4s are removed; incomplete output is
-  never published. Streaming or bounded-batch redesigns need separate
-  evidence and approval (#487 / #489).
+  never published.
+- Per video leaf, export may prefetch a bounded source-frame JPEG sequence
+  (duration × export fps) with one FFmpeg process, then reuse those frames
+  while composing. Leaves that need per-frame CPU materialize keep the
+  previous seek path. Streaming composed frames into the encoder remains a
+  separate follow-up (#487 / #489).
 - Collage stills and Story exports containing collages publish completed files
   through an exclusive claim. If the destination does not support an atomic
   claim, the export fails without replacing any existing file.
