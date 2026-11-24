@@ -1363,5 +1363,9 @@
   "Lift value": "Lift-Wert",
   "Gamma value": "Gamma-Wert",
   "Gain value": "Gain-Wert",
-  "Offset value": "Offset-Wert"
+  "Offset value": "Offset-Wert",
+  "Select object: click the subject; Shift+click adds a seed": "Objekt auswählen: Motiv anklicken; Umschalt+Klick fügt einen Saatpunkt hinzu",
+  "Still proposing… {s}s": "Vorschlag läuft noch… {s}s",
+  "Shift+click adds a seed · Esc finishes": "Umschalt+Klick fügt einen Saatpunkt hinzu · Esc beendet",
+  "Object selection ready — refine on canvas": "Objektauswahl bereit — auf der Fläche verfeinern"
 }

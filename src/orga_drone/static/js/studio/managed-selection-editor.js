@@ -66,8 +66,24 @@ export function createManagedSelectionEditor({
   let pendingSample = null;
   let viewerMode = "none";
   let inspectedSelectionId = null;
+  let objectSeeds = [];
+  let objectSelectionId = null;
+  let objectProgressTimer = null;
   let tools = { rebind() {}, destroy() {} };
   const tokens = new Map();
+
+  function clearObjectProgress() {
+    if (objectProgressTimer) {
+      clearInterval(objectProgressTimer);
+      objectProgressTimer = null;
+    }
+  }
+
+  function resetObjectSeedSession() {
+    objectSeeds = [];
+    objectSelectionId = null;
+    clearObjectProgress();
+  }
 
   function setStatus(text) {
     if (status) status.textContent = text || "";
@@ -652,28 +668,46 @@ export function createManagedSelectionEditor({
     }
   }
 
-  async function runObjectSelect(uv) {
+  async function runObjectSelect(uv, mods = {}) {
     const studioId = getSelectedStudioId?.();
     const gradeDoc = getGrade?.() || current;
     if (!studioId || !gradeDoc?.grade || gradeDoc.evaluator !== "managed-sdr-v1") return;
+    const addSeed = Boolean(mods.shiftKey) && objectSeeds.length > 0 && objectSelectionId;
+    if (!addSeed) {
+      resetObjectSeedSession();
+      objectSeeds = [[Number(uv.u), Number(uv.v)]];
+    } else {
+      objectSeeds = [...objectSeeds, [Number(uv.u), Number(uv.v)]].slice(0, 16);
+    }
+    const primary = objectSeeds[0];
     const token = beginRequestToken(tokens, `obj-${studioId}`);
+    const startedAt = Date.now();
+    clearObjectProgress();
     setStatus(messages.objectSelecting || "Proposing object…");
+    objectProgressTimer = setInterval(() => {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      setStatus((messages.objectSelectingSlow || "Still proposing… {s}s").replace("{s}", elapsed));
+    }, 500);
     try {
       const data = await proposeObjectSelect(studioId, {
-        u: uv.u,
-        v: uv.v,
+        u: primary[0],
+        v: primary[1],
+        seeds: objectSeeds.length > 1 ? objectSeeds.slice(1) : undefined,
         expectedRevision: gradeDoc.revision,
       });
+      clearObjectProgress();
       if (!isCurrentRequestToken(tokens, `obj-${studioId}`, token)) return;
       if (String(getSelectedStudioId?.()) !== String(studioId)) return;
       const proposal = data?.proposal;
       if (!proposal?.points || proposal.points.length < 3) {
         setStatus(messages.objectFailed || "Object proposal failed");
         setViewerMode("none");
+        resetObjectSeedSession();
         return;
       }
       const name = messages.objectDefaultName || "Object";
-      const selectionId = `obj-${Date.now().toString(36)}`;
+      const selectionId = objectSelectionId || `obj-${Date.now().toString(36)}`;
+      objectSelectionId = selectionId;
       // Persist as a normal named polygon selection; bind + inspect for refine.
       if (shapeSelect) shapeSelect.value = "polygon";
       inspectedSelectionId = selectionId;
@@ -686,15 +720,25 @@ export function createManagedSelectionEditor({
           name,
         },
       });
-      setViewerMode("polygon");
+      // Stay in object-select so Shift+click can add seeds; polygon tools remain available.
+      setViewerMode("object-select");
       tools.rebind?.();
+      const seedHint = (
+        messages.objectAddSeedHint || "Shift+click adds a seed · Esc finishes"
+      ).replace("{count}", String(objectSeeds.length));
       setStatus(
-        (messages.objectSelected || "Object proposal accepted · {name}").replace("{name}", name)
+        (messages.objectSelected || "Object proposal accepted · {name}")
+          .replace("{name}", name)
+          .concat(` · ${seedHint}`)
       );
     } catch (error) {
+      clearObjectProgress();
       if (!isCurrentRequestToken(tokens, `obj-${studioId}`, token)) return;
       setStatus(String(error.message || messages.objectFailed || error));
-      setViewerMode("none");
+      if (!addSeed) {
+        setViewerMode("none");
+        resetObjectSeedSession();
+      }
     }
   }
 
@@ -705,6 +749,7 @@ export function createManagedSelectionEditor({
     currentId = studioId ? String(studioId) : null;
     if (String(previousId || "") !== String(currentId || "")) {
       inspectedSelectionId = null;
+      resetObjectSeedSession();
       overlayToken += 1;
       clearManagedSelectionOverlay(
         resolveActivePreviewMedia([getPreviewMediaEl?.()].flat().filter(Boolean))
@@ -794,13 +839,26 @@ export function createManagedSelectionEditor({
     tools.rebind?.();
   });
   objectSelectBtn?.addEventListener("click", () => {
-    setViewerMode(viewerMode === "object-select" ? "none" : "object-select");
+    const next = viewerMode === "object-select" ? "none" : "object-select";
+    if (next === "none") resetObjectSeedSession();
+    setViewerMode(next);
     setStatus(
-      viewerMode === "object-select"
-        ? messages.objectSelectHint || "Select object: click the subject on the preview"
+      next === "object-select"
+        ? messages.objectSelectHint || "Select object: click the subject; Shift+click adds a seed"
         : ""
     );
     tools.rebind?.();
+  });
+
+  panel.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (viewerMode !== "object-select") return;
+    if (!objectSelectionId) return;
+    event.preventDefault();
+    resetObjectSeedSession();
+    setViewerMode("polygon");
+    tools.rebind?.();
+    setStatus(messages.objectFinished || "Object selection ready — refine on canvas");
   });
   brushBtn?.addEventListener("click", () => {
     if (shapeSelect) shapeSelect.value = "brush";

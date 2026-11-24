@@ -1315,11 +1315,19 @@
               </div>
             </label>
             <button type="button" class="button ghost" data-managed-hsl-reset>{{ _('Reset managed HSL') }}</button>
-            <div class="studio-managed-selection" data-managed-selection-panel hidden
+            <div class="studio-managed-selection" data-managed-selection-panel hidden tabindex="0"
                  data-msg-sampling="{{ _('Sampling…') }}"
                  data-msg-sampled="{{ _('Sampled — accept to apply qualifier') }}"
                  data-msg-sample-stale="{{ _('Sample is stale. Sample again.') }}"
                  data-msg-eyedropper="{{ _('Eyedropper: click the preview') }}"
+                 data-msg-object-select="{{ _('Select object: click the subject; Shift+click adds a seed') }}"
+                 data-msg-object-selecting="{{ _('Proposing object…') }}"
+                 data-msg-object-selecting-slow="{{ _('Still proposing… {s}s') }}"
+                 data-msg-object-selected="{{ _('Object proposal accepted · {name}') }}"
+                 data-msg-object-add-seed="{{ _('Shift+click adds a seed · Esc finishes') }}"
+                 data-msg-object-finished="{{ _('Object selection ready — refine on canvas') }}"
+                 data-msg-object-failed="{{ _('Object proposal failed') }}"
+                 data-msg-object-default-name="{{ _('Object') }}"
                  data-msg-brush="{{ _('Brush: draw on the preview') }}"
                  data-msg-brush-drawing="{{ _('Brush drawing…') }}"
                  data-msg-brush-cancelled="{{ _('Brush cancelled') }}"

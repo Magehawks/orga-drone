@@ -135,6 +135,21 @@ export function createManagedColorEditor({
       sampleStale: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleStale,
       sampleMeta: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleMeta,
       eyedropperHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgEyedropper,
+      objectSelectHint: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectSelect,
+      objectSelecting: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectSelecting,
+      objectSelectingSlow: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectSelectingSlow,
+      objectSelected: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectSelected,
+      objectAddSeedHint: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectAddSeed,
+      objectFinished: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectFinished,
+      objectFailed: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgObjectFailed,
+      objectDefaultName: panel.querySelector("[data-managed-selection-panel]")?.dataset
+        .msgObjectDefaultName,
       brushHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrush,
       brushDrawing: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrushDrawing,
       brushCancelled: panel.querySelector("[data-managed-selection-panel]")?.dataset
