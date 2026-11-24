@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { proposeObjectSelect } from "../../src/orga_drone/static/js/studio/grade-api.js";
+import {
+  beginRequestToken,
+  isCurrentRequestToken,
+} from "../../src/orga_drone/static/js/studio/color-workspace.js";
 
 test("proposeObjectSelect posts seeds and expand_passes", async () => {
   const calls = [];
@@ -57,4 +61,49 @@ test("proposeObjectSelect posts seeds and expand_passes", async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("stale object-select token does not apply later proposal", async () => {
+  const tokens = new Map();
+  const applied = [];
+  const first = beginRequestToken(tokens, "obj-7");
+  const second = beginRequestToken(tokens, "obj-7");
+  assert.equal(isCurrentRequestToken(tokens, "obj-7", first), false);
+  assert.equal(isCurrentRequestToken(tokens, "obj-7", second), true);
+
+  async function applyIfCurrent(token, proposal) {
+    // Mirrors managed-selection-editor runObjectSelect gate.
+    if (!isCurrentRequestToken(tokens, "obj-7", token)) return false;
+    applied.push(proposal);
+    return true;
+  }
+
+  const late = applyIfCurrent(first, {
+    points: [
+      [0, 0],
+      [1, 0],
+      [0.5, 1],
+    ],
+    name: "stale",
+  });
+  const current = applyIfCurrent(second, {
+    points: [
+      [0.2, 0.2],
+      [0.8, 0.2],
+      [0.5, 0.8],
+    ],
+    name: "fresh",
+  });
+  assert.equal(await late, false);
+  assert.equal(await current, true);
+  assert.deepEqual(applied, [
+    {
+      points: [
+        [0.2, 0.2],
+        [0.8, 0.2],
+        [0.5, 0.8],
+      ],
+      name: "fresh",
+    },
+  ]);
 });

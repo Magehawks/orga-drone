@@ -78,6 +78,66 @@ def build_mutations() -> list[Mutation]:
             ],
         ),
         Mutation(
+            name="stale_object_select_revision",
+            path=ROOT / "src/orga_drone/app.py",
+            old=(
+                "        if expected_revision is not None:\n"
+                "            try:\n"
+                "                if int(expected_revision) != int(model.revision):\n"
+                "                    raise HTTPException(\n"
+                "                        status_code=409,\n"
+                "                        detail={\n"
+                '                            "message": "Grade changed since this proposal started",\n'
+                '                            "code": "STALE_REVISION",\n'
+                '                            "revision": model.revision,\n'
+                "                        },\n"
+                "                    )\n"
+            ),
+            new=(
+                "        if False and expected_revision is not None:  # MUTATION stale_object_select_revision\n"
+                "            try:\n"
+                "                if int(expected_revision) != int(model.revision):\n"
+                "                    raise HTTPException(\n"
+                "                        status_code=409,\n"
+                "                        detail={\n"
+                '                            "message": "Grade changed since this proposal started",\n'
+                '                            "code": "STALE_REVISION",\n'
+                '                            "revision": model.revision,\n'
+                "                        },\n"
+                "                    )\n"
+            ),
+            verify_cmd=[
+                py,
+                "-m",
+                "pytest",
+                "-q",
+                "--tb=line",
+                "tests/test_studio_masking_api_coverage.py::test_object_select_http_single_and_multiseed",
+            ],
+        ),
+        Mutation(
+            name="broken_mask_persistence",
+            path=ROOT / "src/orga_drone/studio_grade_commands.py",
+            old=(
+                "        if not replaced:\n"
+                "            next_selections.append(dict(entry))\n"
+                '        grade["selections"] = next_selections\n'
+            ),
+            new=(
+                "        if not replaced:\n"
+                "            next_selections.append(dict(entry))\n"
+                '        grade["selections"] = selections  # MUTATION broken_mask_persistence\n'
+            ),
+            verify_cmd=[
+                py,
+                "-m",
+                "pytest",
+                "-q",
+                "--tb=line",
+                "tests/test_studio_masking_api_coverage.py::test_mask_crud_rename_bind_overlay_export",
+            ],
+        ),
+        Mutation(
             name="broken_hsl_export",
             path=ROOT / "src/orga_drone/studio_hsl.py",
             old=(

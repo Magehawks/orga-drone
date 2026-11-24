@@ -137,6 +137,8 @@ def test_single_mutation_harness_exists() -> None:
     text = MUTATION_SCRIPT.read_text(encoding="utf-8")
     for token in (
         "incorrect_canvas_coordinate_mapping",
+        "stale_object_select_revision",
+        "broken_mask_persistence",
         "broken_hsl_export",
         "incorrect_clip_targeting",
         "disabled_persistence",

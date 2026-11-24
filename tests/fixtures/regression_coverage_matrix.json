@@ -101,7 +101,7 @@
         "1_unit": "PASS",
         "2_integration": "PASS",
         "3_browser_e2e": "PARTIAL",
-        "4_native_windows_e2e": "PENDING_INTEGRATION",
+        "4_native_windows_e2e": "PARTIAL",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -111,14 +111,24 @@
         "tests/test_studio_managed_selection.py",
         "tests/test_studio_managed_polygon.py",
         "tests/js/managed-viewer-polygon-geometry.test.js",
-        "packaging/e2e/studio_mask_coordinate_align.py"
+        "packaging/e2e/studio_mask_coordinate_align.py",
+        "tests/test_studio_object_select_multiseed.py",
+        "tests/test_studio_masking_api_coverage.py",
+        "tests/test_neon_relic_object_select_coverage.py",
+        "tests/js/grade-api-object-select.test.js",
+        "tests/js/managed-mask-list.test.js",
+        "packaging/e2e/studio_masking_ux.py"
       ],
       "artifact_checks": [
-        "mask box letterbox scale",
         "export masked pixels",
-        "polygon coverage"
+        "mask box letterbox scale",
+        "mask rename/bind/delete persistence",
+        "multi-seed object coverage",
+        "neon leaf recall gate (opt-in fixtures)",
+        "polygon coverage",
+        "stale object-select revision 409"
       ],
-      "notes": "Masking workstream owns additional native evidence; consume on merge"
+      "notes": "Masking suites (#571 + acceptance follow-up) registered. Local packaged studio_masking_ux.py / letterbox align PASS on develop-based EXE (private acceptance-evidence); matrix L4 stays PARTIAL until dated CI-bound native evidence exists. Magenta IoU classical ~0.60."
     },
     {
       "id": "color-workspace-operators",
@@ -140,7 +150,7 @@
         "tests/js/color_workspace.test.js",
         "tests/js/managed_color_editor.test.js"
       ],
-      "notes": "Parallel Color Workspace stream may land additional suites — wire, do not replace"
+      "notes": "Parallel Color Workspace stream may land additional suites \u2014 wire, do not replace"
     },
     {
       "id": "color-scopes",
@@ -400,7 +410,7 @@
   "po_approval_settings_changes": [
     "Do not change GitHub branch protection / required-check contexts without Product Owner approval",
     "Optional: add workflow_dispatch for Windows packaged E2E on develop (does not alter required checks)",
-    "Optional: require Windows packaged E2E on develop PRs — rejected by default (cost/latency); needs explicit PO approval"
+    "Optional: require Windows packaged E2E on develop PRs \u2014 rejected by default (cost/latency); needs explicit PO approval"
   ],
   "authoritative_artifacts": {
     "runner": "scripts/run_regression_gates.py",
