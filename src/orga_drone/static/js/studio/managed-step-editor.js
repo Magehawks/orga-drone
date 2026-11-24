@@ -149,6 +149,7 @@ export function createManagedStepEditor({
     const up = document.createElement("button");
     up.type = "button";
     up.className = "button ghost";
+    up.dataset.managedStepMove = "up";
     up.textContent = messages.moveUp || "Move up";
     up.disabled = index === 0;
     up.addEventListener("click", () => {
@@ -161,6 +162,7 @@ export function createManagedStepEditor({
     const down = document.createElement("button");
     down.type = "button";
     down.className = "button ghost";
+    down.dataset.managedStepMove = "down";
     down.textContent = messages.moveDown || "Move down";
     down.disabled = index >= total - 1;
     down.addEventListener("click", () => {
