@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks, and
-# App journey smoke. The Windows release workflow calls this workflow and
+# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks,
+# App journey smoke, and Creator regression gates. The Windows release workflow calls this workflow and
 # packages only after all checks pass.
 # The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
@@ -124,3 +124,56 @@ jobs:
             echo ""
             echo "Details: \`docs/PR_E2E.md\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  creator_gates:
+    name: Creator regression gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Curated creator regression gates
+        id: gates
+        run: python scripts/run_regression_gates.py
+
+      - name: Explain the check
+        if: always()
+        run: |
+          {
+            echo "### Creator regression gates"
+            echo ""
+            echo "Command: \`python scripts/run_regression_gates.py\`"
+            echo ""
+            echo "Curated Layer 1-2 creator contracts for issues #275, #283, and #284."
+            echo "Integrates existing Control API, history, mask, transition, HSL export,"
+            echo "collage cleanup, journey smoke, and scopes accumulate suites."
+            echo "Does not claim packaged Windows or real-drone Matrix coverage."
+            echo ""
+            echo "**Result:** ${{ steps.gates.outcome }}"
+            echo ""
+            echo "Matrix: \`docs/qa/COVERAGE_MATRIX.md\`. Entry: \`docs/REGRESSION_GATES.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+

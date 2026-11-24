@@ -9,6 +9,9 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  # Optional reproducible Layer-4 acceptance (develop/local). Not a required develop PR check;
+  # making it required needs Product Owner approval of repository settings.
+  workflow_dispatch:
 
 permissions:
   contents: read
