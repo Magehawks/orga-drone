@@ -1,0 +1,412 @@
+{
+  "schema": "orga-drone-regression-coverage-matrix-v1",
+  "issues": [
+    275,
+    283,
+    284
+  ],
+  "develop_sha_at_authoring": "ed22c9d3037fb935d5a453d032aaf70d471235fb",
+  "layers": {
+    "1_unit": "Domain logic, geometry, operators, validation, persistence, security",
+    "2_integration": "Real API, DB, rendering, FFmpeg, export publication, shared actions",
+    "3_browser_e2e": "Fast UI/module regression vs real frontend assets (NOT native Windows acceptance)",
+    "4_native_windows_e2e": "Packaged EXE + WebView2, real input, decoded output",
+    "5_visual_performance": "Numerical fixtures, targeted screenshots, approved tolerances, latency/memory"
+  },
+  "status_vocabulary": {
+    "PASS": "Automated evidence on this branch; suite runnable and green when prerequisites met",
+    "PARTIAL": "Some paths covered; gaps remain",
+    "GAP": "Required evidence missing; must not be claimed as PASS",
+    "NOT_RUN": "Harness or feature exists but no fresh evidence claimed here",
+    "PENDING_INTEGRATION": "Owned by parallel workstream; consume their suite when merged",
+    "N_A": "Out of scope for these issues"
+  },
+  "journeys": [
+    {
+      "id": "library-import-browse-detail",
+      "title": "Library import, browsing, media details",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_pr_journey_smoke.py",
+        "tests/test_browse_pagination.py",
+        "tests/test_media_meta.py",
+        "tests/test_search.py",
+        "tests/test_library_actions.py"
+      ],
+      "artifact_checks": [
+        "indexed media row",
+        "Browse listing",
+        "detail page content",
+        "source bytes unchanged"
+      ],
+      "notes": "No Playwright in-tree; HTML route assertions + JS module tests only"
+    },
+    {
+      "id": "metadata-telemetry-map",
+      "title": "Metadata, telemetry, map exploration",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_srt_track.py",
+        "tests/test_dashboard_map.py",
+        "tests/test_flight_view.py",
+        "tests/test_studio_map.py",
+        "tests/test_studio_hud.py"
+      ],
+      "artifact_checks": [
+        "parsed SRT fields",
+        "map page responds with markers when present"
+      ]
+    },
+    {
+      "id": "photo-hsl-composer-export",
+      "title": "Photo adjustments, HSL, Image Composer, photo export profiles",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/test_photo_hsl_export_api.py",
+        "tests/test_photo_color.py",
+        "tests/test_photo_combine.py",
+        "tests/test_studio_photo_export.py",
+        "tests/test_media_detail_export.py",
+        "tests/js/photo_combine.test.js",
+        "tests/js/hsl_preview.cjs"
+      ],
+      "artifact_checks": [
+        "graded JPG/PNG chroma",
+        "source SHA unchanged",
+        "reopen persistence"
+      ]
+    },
+    {
+      "id": "studio-photo-masks-object-select",
+      "title": "Studio photo editing, masks, object selection",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "PENDING_INTEGRATION",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/test_studio_mask.py",
+        "tests/test_studio_object_select.py",
+        "tests/test_studio_managed_masks.py",
+        "tests/test_studio_managed_selection.py",
+        "tests/test_studio_managed_polygon.py",
+        "tests/js/managed-viewer-polygon-geometry.test.js",
+        "packaging/e2e/studio_mask_coordinate_align.py"
+      ],
+      "artifact_checks": [
+        "mask box letterbox scale",
+        "export masked pixels",
+        "polygon coverage"
+      ],
+      "notes": "Masking workstream owns additional native evidence; consume on merge"
+    },
+    {
+      "id": "color-workspace-operators",
+      "title": "Color Workspace operators",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/test_color_workspace_acceptance_matrix.py",
+        "tests/test_color_workspace_reference_vectors.py",
+        "tests/test_studio_managed_primaries.py",
+        "tests/test_studio_managed_curves.py",
+        "tests/test_studio_managed_wheels.py",
+        "tests/test_studio_managed_lut.py",
+        "tests/js/color_workspace.test.js",
+        "tests/js/managed_color_editor.test.js"
+      ],
+      "notes": "Parallel Color Workspace stream may land additional suites — wire, do not replace"
+    },
+    {
+      "id": "color-scopes",
+      "title": "Color scopes",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PARTIAL",
+        "3_browser_e2e": "PASS",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/js/scopes_accumulate.test.js",
+        "tests/js/scopes_frame.test.js",
+        "tests/js/scopes_panel.test.js",
+        "tests/js/scopes_engine_tap.test.js",
+        "tests/js/scopes_preview_tap.test.js",
+        "tests/js/scopes_nonpackaged_perf.test.js",
+        "packaging/e2e/studio_color_scopes.py"
+      ],
+      "notes": "Packaged live-tap latency remains NOT_RUN until dated WebView2 evidence"
+    },
+    {
+      "id": "video-editing-playback",
+      "title": "Video editing and playback",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/test_studio_cut.py",
+        "tests/test_studio_speed.py",
+        "tests/test_studio_speed_ramp.py",
+        "tests/test_studio_timelapse.py",
+        "tests/test_studio_playback_proxy.py",
+        "tests/test_studio_preview_frame.py",
+        "tests/js/clock_tick.test.js",
+        "tests/js/crossfade_clock.test.js"
+      ],
+      "notes": "Playback effects stream owns additional transition/effect regressions"
+    },
+    {
+      "id": "collage-edit-export",
+      "title": "Collage editing and export",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_studio_collage.py",
+        "tests/test_studio_collage_export.py",
+        "tests/test_studio_collage_integration.py",
+        "tests/test_studio_collage_still.py",
+        "tests/test_creator_journey.py",
+        "tests/js/collage_layout.test.js",
+        "tests/js/collage_playback.test.js"
+      ],
+      "artifact_checks": [
+        "published MP4 size",
+        "failed segment cleanup",
+        "source/export dest preservation"
+      ]
+    },
+    {
+      "id": "transitions-effects",
+      "title": "Supported transitions and effects",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "PARTIAL"
+      },
+      "suites": [
+        "tests/test_studio_transition.py",
+        "tests/test_studio_export_transitions.py",
+        "tests/test_effect_lane.py",
+        "tests/test_studio_forward_loop.py",
+        "tests/js/transition_pack.test.js"
+      ],
+      "artifact_checks": [
+        "xfade filter graph strings",
+        "story length with overlap"
+      ]
+    },
+    {
+      "id": "persistence-undo-redo",
+      "title": "Project persistence and Undo/Redo",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_studio_history.py",
+        "tests/test_studio_project.py",
+        "tests/test_project_actions.py",
+        "tests/test_grade_persistence.py",
+        "tests/test_studio_color_history.py"
+      ],
+      "artifact_checks": [
+        "undo/redo HTTP outcomes",
+        "history flags",
+        "reopen persisted grade"
+      ]
+    },
+    {
+      "id": "control-api-mcp-assistant",
+      "title": "Control API, MCP, assistant connection",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "PARTIAL",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_control_api.py",
+        "tests/test_studio_actions.py",
+        "tests/test_studio_action_semantics.py",
+        "tests/test_intent_matrix.py",
+        "tests/test_control_webview.py",
+        "tests/js/control_bridge.test.js"
+      ],
+      "artifact_checks": [
+        "wrong-clip rejection",
+        "stale token rejection",
+        "two-clip undo binding",
+        "Original preview clip_id null",
+        "loopback/Host/Origin fencing"
+      ],
+      "notes": "MCP adapter contract lives in external orga-drone-mcp; assistant pairing PENDING_INTEGRATION"
+    },
+    {
+      "id": "packaged-windows-startup",
+      "title": "Packaged Windows startup",
+      "layer_status": {
+        "1_unit": "PASS",
+        "2_integration": "PASS",
+        "3_browser_e2e": "N_A",
+        "4_native_windows_e2e": "NOT_RUN",
+        "5_visual_performance": "N_A"
+      },
+      "suites": [
+        "tests/test_packaged_e2e.py",
+        "packaging/e2e/windows_e2e.py",
+        "tests/test_desktop.py",
+        "tests/test_main_admission.py"
+      ],
+      "artifact_checks": [
+        "evidence.json journeys",
+        "health",
+        "Home render",
+        "decoded export"
+      ],
+      "notes": "CI Windows packaged E2E runs only on PRs to main. Develop PRs require local/manual acceptance; do not claim PASS without dated evidence.json"
+    }
+  ],
+  "ui_ux_protection": {
+    "goal": "Protect simple creator experience; not a redesign",
+    "checks": [
+      "short DE/EN labels via locale/catalog tests where present",
+      "primary actions visible/enabled state (e.g. undo/redo disabled start)",
+      "no misleading non-functional controls without disclosure",
+      "constrained layout style regressions for hybrid topbar/home hero",
+      "progress/cancel/error recovery on export/scan jobs"
+    ],
+    "suites": [
+      "tests/test_studio_history.py",
+      "tests/test_ui_fonts.py",
+      "tests/test_home_hero_contain_styles.py",
+      "tests/test_studio_hybrid_h1_topbar_styles.py",
+      "tests/test_export_cancel.py"
+    ]
+  },
+  "parallel_workstream_coordination": [
+    {
+      "stream": "Masking",
+      "issues": [
+        "#535",
+        "#542-544",
+        "#550",
+        "#554"
+      ],
+      "action": "Consume mask coordinate / native align suites; do not weaken assertions"
+    },
+    {
+      "stream": "Color Workspace",
+      "issues": [
+        "#352-357",
+        "#360",
+        "#361",
+        "#363"
+      ],
+      "action": "Wire acceptance/reference suites into matrix on merge"
+    },
+    {
+      "stream": "Color Scopes",
+      "issues": [
+        "#362",
+        "#364-366"
+      ],
+      "action": "Keep accumulate + perf harness; packaged live-tap stays NOT_RUN until evidence"
+    },
+    {
+      "stream": "Collage export",
+      "issues": [
+        "#487",
+        "#489"
+      ],
+      "action": "Consume cleanup/integrity tests; preserve fail-closed export"
+    },
+    {
+      "stream": "Playback effects",
+      "issues": [
+        "#294",
+        "#301",
+        "#211"
+      ],
+      "action": "Consume transition/effect regressions without replacing clock harnesses"
+    },
+    {
+      "stream": "Tracking creator tools",
+      "issues": [
+        "#298-300",
+        "#302"
+      ],
+      "action": "Spike suites remain labeled; no fabricated PASS"
+    },
+    {
+      "stream": "Secure assistant",
+      "issues": [
+        "#273",
+        "#274"
+      ],
+      "action": "Pairing/auth evidence PENDING_INTEGRATION; Control API fencing stays required"
+    }
+  ],
+  "ci_required_today": [
+    "Ruff, MyPy and unit tests",
+    "JavaScript lint, format and tests",
+    "App journey smoke",
+    "Creator regression gates"
+  ],
+  "ci_main_only": [
+    "Windows packaged E2E",
+    "Main admission policy"
+  ],
+  "po_approval_settings_changes": [
+    "Do not change GitHub branch protection / required-check contexts without Product Owner approval",
+    "Optional: add workflow_dispatch for Windows packaged E2E on develop (does not alter required checks)",
+    "Optional: require Windows packaged E2E on develop PRs — rejected by default (cost/latency); needs explicit PO approval"
+  ],
+  "authoritative_artifacts": {
+    "runner": "scripts/run_regression_gates.py",
+    "mutation_harness": "scripts/mutation_check_regression_gates.py",
+    "fixture_manifest": "tests/fixtures/regression_fixture_manifest.json",
+    "coverage_matrix": "tests/fixtures/regression_coverage_matrix.json",
+    "ci_gate_strategy": "docs/REGRESSION_GATES.md"
+  }
+}

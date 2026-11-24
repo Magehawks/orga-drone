@@ -78,10 +78,13 @@ and stopped #320 precision experiments are not weakened.
 
 | Row | Verdict | Evidence |
 |---|---|---|
-| Histogram / waveform / parade / vectorscope | PASS (source) | #428 |
-| ScopeFrameV1 + stale reject | PASS | unit/JS |
+| Histogram / waveform / parade / vectorscope | PASS (source) | #428 + 	ests/scopes_reference.py + JS regression contract |
+| ScopeFrameV1 + stale reject | PASS | unit/JS + live panel `currentScopeView` identity |
+| Live managed-preview scopes (source-app CDP) | PASS | docs/planning/362-scopes-live-cdp.json + docs/architecture/assets/scopes/live/ |
 | Node synthetic accumulate latency + heap delta | PASS | `docs/planning/362-scopes-node-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
-| Packaged latency/memory | NOT_RUN — deferred by PO | — |
+| Integration: grade change moves scopes; no grade/source mutate | PASS | `tests/test_scopes_integration_gate.py` |
+| Wrong-bin / stale regression contract in CI | PASS | mutation proof in integration gate |
+| Packaged EXE latency/memory | NOT_RUN — deferred by PO | Source-app measured; EXE/MOTW not claimed |
 
 ## 8. Performance / memory
 
@@ -131,6 +134,9 @@ pytest tests/test_studio_grade_animation.py \
 | #358 | Client story_s + bounded complex story-local export; fail-closed slow_span / loop+ramp / ramp+repeats; packaged NOT_RUN |
 | #360 | Tetrahedral + capability-gated RGBA32F exact; RGBA16F/RGBA8 exact:false measured; packaged budgets NOT_RUN |
 | #361 | Step editor + Quick Look `apply_preset` compile shipped |
-| #362/#366 | Node accumulate harness PASS; desktop latency/memory NOT_RUN — deferred by PO |
+| #362/#366 | Source-app live tap + Node + CDP latency PASS; packaged EXE latency/memory NOT_RUN — deferred by PO |
 | #363 | Preview tokens + upsert_step_params/selection commands; PUT escape hatch only |
 | #364/#365 | Open until this matrix is PO-accepted and remaining NOT_RUN rows resolved or waived |
+
+
+Detailed scopes gate matrix: [`docs/planning/362-366-scopes-acceptance-matrix.md`](362-366-scopes-acceptance-matrix.md).

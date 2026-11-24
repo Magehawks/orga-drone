@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks, and
-# App journey smoke. The Windows release workflow calls this workflow and
+# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks,
+# App journey smoke, and Creator regression gates. The Windows release workflow calls this workflow and
 # packages only after all checks pass.
 # The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
@@ -47,6 +47,12 @@ jobs:
       - name: Install Chrome for Hybrid H1 style regressions
         uses: browser-actions/setup-chrome@v1
         id: chrome
+
+      - name: Pairing security baseline
+        # Mandatory ADR 0032 credential baseline (wrong bearer, revoke, restart,
+        # no key on disk, no generation path). #273 production pairing remains
+        # blocked until ADR 0033 is Accepted. Do not weaken these assertions.
+        run: pytest tests/test_pairing_spike.py tests/test_pairing_security_baseline.py -q --tb=short
 
       - name: Unit tests
         # The journey file has its own check so a failure is visible as
@@ -123,4 +129,56 @@ jobs:
             echo "A person still checks the WebView2 window, native dialogs, real drone media, playback, and the Mark-of-the-Web zip in \`packaging/README.md\`."
             echo ""
             echo "Details: \`docs/PR_E2E.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  creator_gates:
+    name: Creator regression gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Curated creator regression gates
+        id: gates
+        run: python scripts/run_regression_gates.py
+
+      - name: Explain the check
+        if: always()
+        run: |
+          {
+            echo "### Creator regression gates"
+            echo ""
+            echo "Command: \`python scripts/run_regression_gates.py\`"
+            echo ""
+            echo "Curated Layer 1-2 creator contracts for issues #275, #283, and #284."
+            echo "Integrates existing Control API, history, mask, transition, HSL export,"
+            echo "collage cleanup, journey smoke, and scopes accumulate suites."
+            echo "Does not claim packaged Windows or real-drone Matrix coverage."
+            echo ""
+            echo "**Result:** ${{ steps.gates.outcome }}"
+            echo ""
+            echo "Matrix: \`docs/qa/COVERAGE_MATRIX.md\`. Entry: \`docs/REGRESSION_GATES.md\`."
           } >> "$GITHUB_STEP_SUMMARY"

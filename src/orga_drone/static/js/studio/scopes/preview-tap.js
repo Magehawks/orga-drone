@@ -132,8 +132,17 @@ export function createManagedPreviewScopeProducer({
   let lastIdentityKey = "";
   let lastPausedSeek = "";
   let destroyed = false;
+  let inFlightAbort = null;
+
+  function cancelInFlight() {
+    if (inFlightAbort) {
+      inFlightAbort.abort();
+      inFlightAbort = null;
+    }
+  }
 
   function bump() {
+    cancelInFlight();
     generation += 1;
     return generation;
   }
@@ -173,14 +182,23 @@ export function createManagedPreviewScopeProducer({
     }
     lastAttemptMs = t;
     const gen = generation;
+    cancelInFlight();
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    inFlightAbort = controller;
     let payload;
     try {
       payload = await fetchPreviewJpeg(String(view.clipId), sourceTimeS, {
         gradeRevision: view.gradeRevision,
         generation: gen,
+        signal: controller ? controller.signal : undefined,
       });
     } catch (err) {
+      if (err && (err.name === "AbortError" || err.code === "ABORT_ERR")) {
+        return { accepted: false, reason: "cancelled" };
+      }
       return { accepted: false, reason: "fetch-failed", error: err };
+    } finally {
+      if (inFlightAbort === controller) inFlightAbort = null;
     }
     if (destroyed || gen !== generation) {
       return { accepted: false, reason: "stale-generation" };
@@ -231,6 +249,7 @@ export function createManagedPreviewScopeProducer({
     invalidate: bump,
     destroy() {
       destroyed = true;
+      cancelInFlight();
       bump();
     },
   };

@@ -119,6 +119,11 @@ import {
   evaluateLutWebglHandling,
   lutProxyPrepareKey as proxyPrepareKey,
 } from "./studio/proxy-policy.js";
+import {
+  proxyRelativeMediaTime,
+  playEndMediaTime,
+  mediaReachedPlayEnd,
+} from "./studio/proxy-loop-map.js";
 
 /**
  * Creator Studio UI.
@@ -1175,15 +1180,17 @@ import {
 
   function secondaryVideoTarget(clip, localS, src) {
     const ramp = speedRampOf(clip);
+    const proxySrc = lutProxySrcFor(clip);
+    const proxyActive = !!(proxySrc && src === proxySrc);
     if (ramp)
       return rampMediaTime(
         ramp,
         localS,
         loopPlayInS(clip),
         loopPlayOutS(clip),
-        src === lutProxySrcFor(clip) ? sourceInS(clip) : 0
+        proxyActive ? sourceInS(clip) : 0
       );
-    return loopPlayInS(clip) + playSourceOffset(clip, localS);
+    return proxyRelativeMediaTime(proxyActive, loopPlayInS(clip), playSourceOffset(clip, localS));
   }
 
   function totalDuration() {
@@ -3114,7 +3121,7 @@ import {
   }
 
   function clipMediaTarget(clip, mapped, inS) {
-    return lutProxyActiveFor(clip) ? Math.max(0, mapped) : Math.max(inS, inS + mapped);
+    return proxyRelativeMediaTime(lutProxyActiveFor(clip), inS, mapped);
   }
 
   function clipOffsetFromMediaTime(clip, mediaTime, inS) {
@@ -3903,8 +3910,8 @@ import {
       }
       if (state.playing && clip.dataset.kind !== "photo") {
         clearLutPreviewStill();
-        // Forward loop and manual repeats play without a color proxy
-        // (issue #294): name the loop cause instead of a generic message.
+        // Looped playback without a color proxy still names the loop cause
+        // (issue #294). When a proxy is loaded the graded picture is shown.
         const looped = forwardLoopActive(clip) || sectionRepeats(clip) > 1;
         if (lutProxySrcFor(clip)) {
           setChip("");
@@ -7446,9 +7453,7 @@ import {
       ? rampSpeed(speedRampOf(clip), inS + playSourceOffset(clip, incomingLocal))
       : playbackSpeed(clip);
     // Proxies start at 0 for trimmed sources; reuse the shared secondary mapper.
-    const target = speedRampOf(clip)
-      ? secondaryVideoTarget(clip, incomingLocal, src)
-      : inS + playSourceOffset(clip, incomingLocal);
+    const target = secondaryVideoTarget(clip, incomingLocal, src);
     if (previewVideoB.getAttribute("src") !== src) {
       previewVideoB.src = src;
       previewVideoB.load();
@@ -8202,9 +8207,9 @@ import {
     if (loopOverlap > 0 && loopSpans.length) {
       const index = Math.max(0, Math.min(loopSpans.length - 1, videoLoopIndex));
       const span = loopSpans[index] || 0;
-      const endMedia =
-        inS + (speedRampOf(playing) ? playSourceOffset(playing, span) : span * speed);
-      if (index + 1 < loopSpans.length && mediaTime >= endMedia - 0.02) {
+      const mappedEnd = speedRampOf(playing) ? playSourceOffset(playing, span) : span * speed;
+      const endMedia = playEndMediaTime(lutProxyActiveFor(playing), inS, mappedEnd);
+      if (index + 1 < loopSpans.length && mediaReachedPlayEnd(mediaTime, endMedia, 0.02)) {
         if (loopSeeking) return;
         loopSeeking = true;
         videoLoopIndex = index + 1;
@@ -8223,7 +8228,11 @@ import {
         previewVideo.addEventListener("seeked", settle, { once: true });
         window.setTimeout(settle, 200);
         try {
-          previewVideo.currentTime = inS + playSourceOffset(playing, loopOverlap);
+          previewVideo.currentTime = proxyRelativeMediaTime(
+            lutProxyActiveFor(playing),
+            inS,
+            playSourceOffset(playing, loopOverlap)
+          );
         } catch (_) {
           settle();
         }
@@ -8240,8 +8249,17 @@ import {
       return;
     }
     // Section repeat and a hard-cut soundtrack loop seek the picture back to
-    // source in. Soundtrack time follows projectTimeS and is not restarted here.
-    if (reps > 1 && outS != null && mediaTime >= outS - 0.01 && videoLoopIndex + 1 < reps) {
+    // the start of the current play (proxy-local when a color proxy is loaded).
+    // Soundtrack time follows projectTimeS and is not restarted here.
+    const mappedCycleEnd = speedRampOf(playing)
+      ? playSourceOffset(playing, cycle)
+      : cycle * speed;
+    const cycleEndMedia = playEndMediaTime(
+      lutProxyActiveFor(playing),
+      inS,
+      mappedCycleEnd
+    );
+    if (reps > 1 && mediaReachedPlayEnd(mediaTime, cycleEndMedia, 0.01) && videoLoopIndex + 1 < reps) {
       if (loopSeeking) return;
       loopSeeking = true;
       videoLoopIndex += 1;
@@ -8259,7 +8277,7 @@ import {
       previewVideo.addEventListener("seeked", settle, { once: true });
       window.setTimeout(settle, 200);
       try {
-        previewVideo.currentTime = inS;
+        previewVideo.currentTime = proxyRelativeMediaTime(lutProxyActiveFor(playing), inS, 0);
       } catch (_) {
         settle();
       }
@@ -8270,7 +8288,12 @@ import {
       }
       return;
     }
-    if (outS != null && mediaTime >= outS - 0.05) {
+    const clipOutMedia = playEndMediaTime(
+      lutProxyActiveFor(playing),
+      inS,
+      speedRampOf(playing) ? playSourceOffset(playing, cycle) : cycle * speed
+    );
+    if (mediaReachedPlayEnd(mediaTime, clipOutMedia, 0.05)) {
       advanceToNextOrStop(after);
       return;
     }
@@ -8305,7 +8328,11 @@ import {
       state.projectTimeS = clipStartTime(hit.clip) + (starts[videoLoopIndex] || 0) + endedOverlap;
       updatePlayheadChrome();
       try {
-        previewVideo.currentTime = inS + playSourceOffset(hit.clip, endedOverlap);
+        previewVideo.currentTime = proxyRelativeMediaTime(
+          lutProxyActiveFor(hit.clip),
+          inS,
+          playSourceOffset(hit.clip, endedOverlap)
+        );
       } catch (_) {
         /* ignore */
       }
@@ -8322,7 +8349,7 @@ import {
       state.projectTimeS = clipStartTime(hit.clip) + videoLoopIndex * sectionCycleS(hit.clip);
       updatePlayheadChrome();
       try {
-        previewVideo.currentTime = inS;
+        previewVideo.currentTime = proxyRelativeMediaTime(lutProxyActiveFor(hit.clip), inS, 0);
       } catch (_) {
         /* ignore */
       }
@@ -12380,29 +12407,11 @@ import {
   });
 
   const scopesRoot = document.getElementById("inspector-image-section-scopes");
+  // Panel identity must match the #366 controller view (managed revision +
+  // seek token). A dataset-only digest rejects every live managed frame.
   colorScopes = createColorScopesPanel({
     root: scopesRoot,
-    getView: () => {
-      const clip = selectedAdjustableClip();
-      return {
-        projectId: String(projectId || ""),
-        clipId: clip ? String(clip.dataset.studioId || "") : "",
-        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
-        // Include grade-affecting datasets so local edits invalidate live scopes
-        // until #366 supplies a matching revisioned tap.
-        contextDigest: clip
-          ? [
-              clip.dataset.colorLook || "",
-              clip.dataset.imageAdjust || "",
-              clip.dataset.hsl || "",
-              clip.dataset.colorWheels || "",
-              clip.dataset.detail || "",
-              clip.dataset.saturationRamp || "",
-              clip.dataset.quickLook || "",
-            ].join("|")
-          : "",
-      };
-    },
+    getView: currentScopeView,
     messages: {
       fixtureDisclosure: scopesRoot?.dataset.scopeFixtureDisclosure,
       unavailableDisclosure: scopesRoot?.dataset.scopeUnavailableDisclosure,
@@ -12440,7 +12449,10 @@ import {
         detail: 0,
         expectedRevision: revision || null,
       });
-      const res = await fetch(url, { headers: { Accept: "image/jpeg" } });
+      const res = await fetch(url, {
+        headers: { Accept: "image/jpeg" },
+        signal: meta.signal,
+      });
       if (!res.ok) {
         throw new Error(`preview-frame ${res.status}`);
       }
@@ -12457,6 +12469,17 @@ import {
   });
   syncColorScopesView();
   void colorScopeTap.probe();
+  // CDP/WebView2 E2E inspects live scope metrics without inventing a second renderer.
+  window.__orgaColorScopes = {
+    getState: () => colorScopes?.getState?.() || null,
+    getMetrics: () => colorScopes?.getMetrics?.() || null,
+    getMeasurements: () => colorScopes?.getMeasurements?.() || null,
+    refresh: (reason = "e2e") => refreshColorScopesTap(reason),
+    probe: () => colorScopeTap?.probe?.() || null,
+    destroyProducer: () => colorScopePreviewProducer?.destroy?.(),
+    invalidateProducer: () => colorScopePreviewProducer?.invalidate?.(),
+  };
+  window.__orgaScopePreviewProducer = colorScopePreviewProducer;
 
   colorComparison = createColorCompare({
     button: document.getElementById("inspector-look-compare"),

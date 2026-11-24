@@ -3,10 +3,15 @@
 Reuses the WP4 still compositor for per-frame (or photo-hold) honesty so
 preview and export share layout + grade application. Encodes via the existing
 FFmpeg toolchain; does not invent a second encoder pipeline.
+
+Issue #489 adds a free-space guard on the JPEG staging volume. The composed
+frame sequence is unchanged; streaming or batched encoding remain separate
+follow-ups after further evidence (#487).
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import threading
@@ -33,6 +38,75 @@ from orga_drone.studio_collage_still import (
 
 
 ProgressCb = Callable[[dict[str, Any]], None]
+
+# Documented free-space reserve on the collage JPEG staging volume (#489).
+# Exports abort before a next write would leave less than this remaining.
+COLLAGE_STAGING_FREE_SPACE_RESERVE_BYTES = 1 * 1024**3
+
+# TEST-ONLY: absolute free-byte simulation for the staging volume. When set,
+# reported free space is max(0, int(env) - staged_bytes). Never fill a real disk.
+COLLAGE_STAGING_FREE_BYTES_ENV = "ORGA_DRONE_COLLAGE_STAGING_FREE_BYTES"
+
+COLLAGE_STAGING_DISK_FULL_MESSAGE = (
+    "Not enough temporary disk space. Free up space and try again."
+)
+COLLAGE_STAGING_LOW_SPACE_MESSAGE = COLLAGE_STAGING_DISK_FULL_MESSAGE
+
+# TEST-ONLY monkeypatch hooks used by disk-safety regressions.
+_staging_free_bytes_override: int | None = None
+_staging_free_bytes_provider: Callable[[Path], int] | None = None
+
+
+def estimate_composed_jpeg_bytes(width: int, height: int) -> int:
+    """Conservative upper bound for one quality-95 RGB JPEG at canvas size."""
+    pixels = max(1, int(width) * int(height))
+    return max(64_000, pixels // 2)
+
+
+def usable_staging_free_bytes(path: Path, *, staged_bytes: int = 0) -> int:
+    """Usable free bytes on the volume that holds ``path``.
+
+    Production uses ``shutil.disk_usage``. Test hooks and the TEST-ONLY
+    environment override simulate a shrinking budget without filling a disk.
+    """
+    if _staging_free_bytes_provider is not None:
+        return max(0, int(_staging_free_bytes_provider(path)))
+    if _staging_free_bytes_override is not None:
+        return max(0, int(_staging_free_bytes_override) - max(0, int(staged_bytes)))
+    # TEST-ONLY: absolute free-byte simulation when ORGA_DRONE_E2E=1.
+    if os.environ.get("ORGA_DRONE_E2E") == "1":
+        raw = os.environ.get(COLLAGE_STAGING_FREE_BYTES_ENV)
+        if raw is not None and str(raw).strip() != "":
+            try:
+                budget = int(str(raw).strip())
+            except ValueError as exc:
+                raise StudioExportError(
+                    COLLAGE_STAGING_DISK_FULL_MESSAGE,
+                    code="collage_staging_disk_full",
+                ) from exc
+            return max(0, budget - max(0, int(staged_bytes)))
+    return int(shutil.disk_usage(path).free)
+
+
+def ensure_staging_space(
+    path: Path,
+    *,
+    next_write_bytes: int,
+    staged_bytes: int = 0,
+    reserve_bytes: int = COLLAGE_STAGING_FREE_SPACE_RESERVE_BYTES,
+) -> None:
+    """Abort when the next write would breach the documented free-space reserve."""
+    needed = max(0, int(next_write_bytes))
+    reserve = max(0, int(reserve_bytes))
+    free = usable_staging_free_bytes(path, staged_bytes=staged_bytes)
+    if free - needed < reserve:
+        raise StudioExportError(
+            COLLAGE_STAGING_DISK_FULL_MESSAGE,
+            code="collage_staging_disk_full",
+        )
+
+
+ensure_collage_staging_space = ensure_staging_space
 
 
 def collage_has_video_leaf(spec: dict[str, Any]) -> bool:
@@ -67,6 +141,23 @@ def _canvas_to_rgb_jpeg(canvas, dest: Path) -> None:
     canvas.convert("RGB").save(dest, format="JPEG", quality=95, optimize=True, subsampling=0)
 
 
+def _write_composed_jpeg(
+    canvas,
+    dest: Path,
+    *,
+    staged_bytes: int,
+    next_write_bytes: int,
+) -> int:
+    """Guard, write one composed JPEG, and return bytes added on disk."""
+    ensure_staging_space(
+        dest.parent,
+        next_write_bytes=next_write_bytes,
+        staged_bytes=staged_bytes,
+    )
+    _canvas_to_rgb_jpeg(canvas, dest)
+    return int(dest.stat().st_size)
+
+
 def render_collage_mp4_segment(
     db: Database,
     spec: dict[str, Any],
@@ -93,8 +184,15 @@ def render_collage_mp4_segment(
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp_dir = Path(tempfile.mkdtemp(prefix="orga-drone-collage-mp4-"))
     export_frames = CollageExportFrames(tmp_dir / "source-frames")
+    staged_bytes = 0
+    next_write = estimate_composed_jpeg_bytes(int(width), int(height))
     try:
         _check_cancel(cancel_event)
+        ensure_staging_space(
+            tmp_dir,
+            next_write_bytes=next_write,
+            staged_bytes=staged_bytes,
+        )
         _emit(on_progress, phase="preparing", percent=5)
         if not collage_has_video_leaf(normalized):
             still = tmp_dir / "still.jpg"
@@ -109,7 +207,14 @@ def render_collage_mp4_segment(
             )
             try:
                 _check_cancel(cancel_event)
-                _canvas_to_rgb_jpeg(canvas, still)
+                written = _write_composed_jpeg(
+                    canvas,
+                    still,
+                    staged_bytes=staged_bytes,
+                    next_write_bytes=next_write,
+                )
+                staged_bytes += written
+                next_write = max(next_write, written)
             finally:
                 canvas.close()
             _emit(on_progress, phase="rendering", percent=40)
@@ -166,7 +271,14 @@ def render_collage_mp4_segment(
             )
             try:
                 frame_path = frames_dir / f"frame_{index:06d}.jpg"
-                _canvas_to_rgb_jpeg(canvas, frame_path)
+                written = _write_composed_jpeg(
+                    canvas,
+                    frame_path,
+                    staged_bytes=staged_bytes,
+                    next_write_bytes=next_write,
+                )
+                staged_bytes += written
+                next_write = max(next_write, written)
             finally:
                 canvas.close()
             if on_progress is not None and (index % 5 == 0 or index + 1 == frame_count):
