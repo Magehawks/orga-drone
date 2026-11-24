@@ -140,7 +140,7 @@
         "tests/js/color_workspace.test.js",
         "tests/js/managed_color_editor.test.js"
       ],
-      "notes": "Parallel Color Workspace stream may land additional suites — wire, do not replace"
+      "notes": "Parallel Color Workspace stream may land additional suites \u2014 wire, do not replace"
     },
     {
       "id": "color-scopes",
@@ -181,9 +181,13 @@
         "tests/test_studio_playback_proxy.py",
         "tests/test_studio_preview_frame.py",
         "tests/js/clock_tick.test.js",
-        "tests/js/crossfade_clock.test.js"
+        "tests/js/crossfade_clock.test.js",
+        "tests/test_studio_proxy_forward_loop.py",
+        "tests/test_playback_effects_regression_contract.py",
+        "tests/js/proxy_loop_map.test.js",
+        "tests/js/proxy_policy.test.js"
       ],
-      "notes": "Playback effects stream owns additional transition/effect regressions"
+      "notes": "Playback effects stream owns forward-loop proxy mapping (#294), transition contracts (#301), and color-animation interpolation (#211). Layer-4 matrix stays NOT_RUN (inventory forbids unbound native PASS). Dated packaged evidence recorded at docs/discovery/playback-effects-packaged-e2e-20261124.md (playback + timeline_transitions + lut_parity ok on synthetic fixtures)."
     },
     {
       "id": "collage-edit-export",
@@ -225,12 +229,15 @@
         "tests/test_studio_export_transitions.py",
         "tests/test_effect_lane.py",
         "tests/test_studio_forward_loop.py",
-        "tests/js/transition_pack.test.js"
+        "tests/js/transition_pack.test.js",
+        "tests/test_playback_effects_regression_contract.py",
+        "tests/test_studio_color_animation.py"
       ],
       "artifact_checks": [
         "xfade filter graph strings",
         "story length with overlap"
-      ]
+      ],
+      "notes": "Batch-1 blur_dissolve/soft wipe contracts on develop. Layer-4 matrix stays NOT_RUN (unbound native PASS forbidden). Dated packaged persistence evidence: docs/discovery/playback-effects-packaged-e2e-20261124.md. Pixel-parity remains ADR 0010 approximation / prior NO-GO."
     },
     {
       "id": "persistence-undo-redo",
@@ -368,7 +375,7 @@
         "#301",
         "#211"
       ],
-      "action": "Consume transition/effect regressions without replacing clock harnesses"
+      "action": "Consume proxy-loop-map, transition xfade, and color-animation contracts via existing gates; no second harness. Matrix Layer-4 stays NOT_RUN; dated packaged evidence lives under docs/discovery/."
     },
     {
       "stream": "Tracking creator tools",
@@ -400,7 +407,7 @@
   "po_approval_settings_changes": [
     "Do not change GitHub branch protection / required-check contexts without Product Owner approval",
     "Optional: add workflow_dispatch for Windows packaged E2E on develop (does not alter required checks)",
-    "Optional: require Windows packaged E2E on develop PRs — rejected by default (cost/latency); needs explicit PO approval"
+    "Optional: require Windows packaged E2E on develop PRs \u2014 rejected by default (cost/latency); needs explicit PO approval"
   ],
   "authoritative_artifacts": {
     "runner": "scripts/run_regression_gates.py",

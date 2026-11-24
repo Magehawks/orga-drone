@@ -20,7 +20,7 @@ Update both when evidence changes. Labels follow
 | Masks / object selection | PASS | PASS | PARTIAL | PENDING_INTEGRATION | PARTIAL | mask letterbox/geometry + managed/object-select suites on develop; packaged native align PENDING_INTEGRATION |
 | Color Workspace operators | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | acceptance/reference + managed operator suites on develop; deeper visual/perf still PARTIAL |
 | Scopes | PASS | PARTIAL | PASS | NOT_RUN | PARTIAL | JS accumulate/panel/tap + non-packaged perf; packaged live-tap NOT_RUN |
-| Video editing / playback | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
+| Video editing / playback (incl. forward-loop proxy / effect contracts) | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
 | Collage edit / export | PASS | PASS | PARTIAL | NOT_RUN | N/A | collage model/export cleanup + playback JS; native collage NOT_RUN |
 | Supported transitions / effects | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | transition timing unit+export; soft-wipe / drone packs parallel PENDING |
 | Project persistence / Undo-Redo | PASS | PASS | NOT_RUN | NOT_RUN | N/A | `test_studio_history`, Control API undo conflict/two-clip |
@@ -88,3 +88,7 @@ Update both when evidence changes. Labels follow
 No new performance claim in this PR. Existing spatial/scopes/precision probes remain
 opt-in discovery artifacts. Record baselines under `docs/discovery/` with commit SHA,
 FFmpeg version, and machine class before treating them as gates.
+
+### Playback effects packaged evidence (2026-11-24)
+
+`docs/discovery/playback-effects-packaged-e2e-20261124.md` — Windows EXE journeys `playback`, `timeline_transitions`, `lut_parity` executed **PASS** on synthetic fixtures. Machine-readable matrix Layer-4 stays **NOT_RUN** (inventory forbids unbound native PASS). Real-drone / private `.cube` remain **NOT_RUN**. Soft-wipe pixel-parity approximation unchanged (ADR 0010).

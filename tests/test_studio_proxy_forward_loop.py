@@ -149,6 +149,65 @@ def test_manual_section_repeats_build_and_advertise_a_proxy(
     assert f'data-lut-proxy-url="{url}"' in client.get("/studio").text
 
 
+
+def test_nonzero_source_in_section_repeat_builds_proxy_from_cut_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Non-zero cut-in must stay proxy-eligible and bake source_start into the cache.
+
+    Absolute source seeks (source_in + offset) must not be treated as proxy-local
+    seeks; the graded proxy file always starts at t=0 for the trimmed cycle.
+    """
+    from orga_drone.studio_color_wheels import color_wheels_from_effect_settings
+    from orga_drone.studio_hsl import hsl_adjust_from_effect_settings
+    from orga_drone.studio_image import image_adjust_from_effect_settings
+    from orga_drone.studio_lut import color_look_from_effect_settings
+    from orga_drone.studio_playback_proxy import PlaybackProxyRequest, cache_key_for
+
+    client, db = _client(tmp_path, monkeypatch)
+    clip_id = _seed_video(db, tmp_path / "videos", "CUTIN.MP4", duration_s=6.0)
+    _apply_lut(client, tmp_path, clip_id)
+    url = f"/api/studio/{clip_id}/playback-proxy"
+    source_in = 1.5
+    source_out = 3.5
+    repeated = client.patch(
+        f"/api/studio/{clip_id}/section",
+        json={"source_in_s": source_in, "source_out_s": source_out, "repeats": 2},
+    )
+    assert repeated.status_code == 200, repeated.text
+    body = repeated.json()
+    assert float(body.get("source_in_s", -1)) == pytest.approx(source_in)
+    assert client.post(url).status_code == 200
+    page = client.get("/studio")
+    assert f'data-lut-proxy-url="{url}"' in page.text
+
+    clip = next(c for c in db.list_studio_items() if c.id == clip_id)
+    assert float(clip.source_start or 0.0) == pytest.approx(source_in)
+    assert clip.media_path
+    req = PlaybackProxyRequest(
+        media_path=Path(str(clip.media_path)),
+        source_start_s=max(0.0, float(clip.source_start or 0.0)),
+        source_end_s=float(clip.source_end) if clip.source_end is not None else None,
+        image=image_adjust_from_effect_settings(clip.effect_settings),
+        look=color_look_from_effect_settings(clip.effect_settings),
+        hsl=hsl_adjust_from_effect_settings(clip.effect_settings),
+        color_wheels=color_wheels_from_effect_settings(clip.effect_settings),
+    )
+    assert req.source_start_s == pytest.approx(source_in)
+    st = Path(str(clip.media_path)).stat()
+    key = cache_key_for(
+        req,
+        media_mtime_ns=st.st_mtime_ns,
+        media_size=st.st_size,
+        data_dir=tmp_path / "data",
+    )
+    proxy_file = tmp_path / "data" / "playback-proxies" / f"{key}.mp4"
+    assert proxy_file.is_file() and proxy_file.stat().st_size > 0
+
+    overlap = 0.75
+    assert source_in + overlap != overlap
+
+
 def test_loop_cause_chip_messages_remain_for_proxy_miss(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

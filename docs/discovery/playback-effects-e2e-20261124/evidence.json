@@ -1,0 +1,226 @@
+{
+  "admission": "local-development",
+  "app_version": "2.3.3",
+  "artifact_api_digest": null,
+  "artifact_api_size": null,
+  "artifact_name": null,
+  "artifact_sha256": "",
+  "artifact_size": 0,
+  "base_sha": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
+  "elapsed_ms": 25530,
+  "generated_at": "2026-11-24T16:05:33.107761+00:00",
+  "head_sha": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
+  "journeys": {
+    "edit_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 359,
+      "ok": true
+    },
+    "export": {
+      "detail": {
+        "audio_peak": 0.37705397605895996,
+        "blue_frames": 3,
+        "bytes": 64977,
+        "frames": 5,
+        "red_frames": 2,
+        "sha256": "03e1262e8d3ddd032eea2c4659ba466b42d2680b0f5684ae1152e57e7651d086"
+      },
+      "elapsed_ms": 2593,
+      "ok": true
+    },
+    "export_1080p": {
+      "detail": {
+        "bytes": 67861,
+        "height": 1080,
+        "sha256": "9c6f7791b4c8900a65beb61b083f79e28a518622d98d1ad1e71b784fc79e07a8",
+        "width": 1920
+      },
+      "elapsed_ms": 2250,
+      "ok": true
+    },
+    "image_export": {
+      "detail": {
+        "bytes": 8958,
+        "preset": "instagram",
+        "sha256": "da4e80ee800e0657e56b62ae54bfdddbe91891292c80ee1bbc39c231ef218626"
+      },
+      "elapsed_ms": 297,
+      "ok": true
+    },
+    "library_navigation": {
+      "detail": {
+        "browse_chars": 881
+      },
+      "elapsed_ms": 625,
+      "ok": true
+    },
+    "lut_parity": {
+      "detail": {
+        "asset": "ba875c496c8d433ba6b77288be07a032.cube",
+        "cube_sha256": "5bda4a9ca328a0b664b540833870b7b33faacf837c82017d497c50c6e305c189",
+        "errors": [
+          0.897,
+          0.103,
+          1.672
+        ],
+        "export_mean": [
+          252.0,
+          87.0,
+          87.01
+        ],
+        "preview_mean": [
+          251.1,
+          87.1,
+          85.34
+        ],
+        "tolerance": 8.0
+      },
+      "elapsed_ms": 2734,
+      "ok": true
+    },
+    "media_import": {
+      "detail": {
+        "counts": {
+          "assets": 2,
+          "flows": 0,
+          "live_sidecars": 0,
+          "non_video": 0,
+          "offline": 0,
+          "photos": 1,
+          "preserved": 0,
+          "removed": 0,
+          "sessions": 0,
+          "unavailable": 0,
+          "unchanged": 0,
+          "unreadable": 0,
+          "videos": 1
+        },
+        "job_id": "b984b13a-dc29-4753-9572-d94eabdf9aad"
+      },
+      "elapsed_ms": 1109,
+      "ok": true
+    },
+    "playback": {
+      "detail": {
+        "currentTime": 0.963033,
+        "paused": false,
+        "readyState": 4
+      },
+      "elapsed_ms": 1125,
+      "ok": true
+    },
+    "relaunch_persistence": {
+      "detail": {
+        "exposure": 20
+      },
+      "elapsed_ms": 4608,
+      "ok": true
+    },
+    "sfx_control": {
+      "detail": {
+        "status": "persisted",
+        "volume": 0.35
+      },
+      "elapsed_ms": 94,
+      "ok": true
+    },
+    "sfx_lane": {
+      "detail": {
+        "clips": 2,
+        "dragged_start_s": 1.81,
+        "music": "e2e-bed.wav",
+        "trimmed_source_out_s": 0.7
+      },
+      "elapsed_ms": 1984,
+      "ok": true
+    },
+    "shutdown": {
+      "detail": {
+        "clean": true,
+        "stopped_pids": []
+      },
+      "elapsed_ms": 0,
+      "ok": true
+    },
+    "source_integrity": {
+      "detail": {
+        "files": [
+          "e2e-bed.wav",
+          "e2e-blue.jpg",
+          "e2e-hit.wav",
+          "e2e-red.mp4",
+          "e2e-whoosh.wav"
+        ]
+      },
+      "elapsed_ms": 0,
+      "ok": true
+    },
+    "speed_and_timelapse": {
+      "detail": {
+        "cleared": true,
+        "ramp_effective_duration_s": 1.25,
+        "timelapse_effective_duration_s": 1
+      },
+      "elapsed_ms": 593,
+      "ok": true
+    },
+    "startup": {
+      "detail": {
+        "title": "Start \u00b7 orga-drone",
+        "version": "2.3.3"
+      },
+      "elapsed_ms": 281,
+      "ok": true
+    },
+    "studio_open": {
+      "detail": {
+        "project_id": 1
+      },
+      "elapsed_ms": 1500,
+      "ok": true
+    },
+    "timeline_transitions": {
+      "detail": {
+        "blur_dissolve": {
+          "applied_duration_s": 0.5,
+          "duration_s": 0.5,
+          "fallback_cut": false
+        },
+        "crossfade": {
+          "applied_duration_s": 0.5,
+          "duration_s": 0.5,
+          "fallback_cut": false
+        },
+        "soft_wipe_left": {
+          "applied_duration_s": 0.5,
+          "duration_s": 0.5,
+          "fallback_cut": false
+        }
+      },
+      "elapsed_ms": 281,
+      "ok": true
+    },
+    "undo_redo_timeline": {
+      "detail": {
+        "after_redo": 35,
+        "after_undo": 20,
+        "restored": 20
+      },
+      "elapsed_ms": 765,
+      "ok": true
+    }
+  },
+  "manual_checks_claimed": false,
+  "pr_number": 0,
+  "repository": "Magehawks/orga-drone",
+  "result": "pass",
+  "run_attempt": 0,
+  "run_id": 0,
+  "runner_image": "Windows-11-10.0.26300-SP0",
+  "schema": "orga-drone-packaged-e2e-v1",
+  "tested_merge_sha": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
+  "tested_tree_sha": "2db056a8038ad43a455a95833caedfa4f0a339c7",
+  "webview2_version": "158.0.4370.33"
+}
