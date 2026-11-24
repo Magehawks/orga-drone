@@ -107,11 +107,12 @@ Python:
 ```bash
 ruff check .
 mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py
+pytest tests/test_pairing_spike.py tests/test_pairing_security_baseline.py -q --tb=short
 pytest --ignore=tests/test_pr_journey_smoke.py
 pytest tests/test_pr_journey_smoke.py
 ```
 
-The last Python command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
+The pairing commands are the mandatory **Pairing security baseline** (ADR 0032 credential model only; #273 production pairing stays gated on ADR 0033). The last Python command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
 JavaScript (Node 22.13+):
 

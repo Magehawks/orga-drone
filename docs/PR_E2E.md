@@ -53,7 +53,8 @@ authorization. It does not configure branch protection. See the
 
 | Check | What it does |
 | --- | --- |
-| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
+| **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. Before the general suite, CI also runs the **Pairing security baseline** step below. |
+| **Pairing security baseline** | `pytest tests/test_pairing_spike.py tests/test_pairing_security_baseline.py`. Mandatory ADR 0032 credential regressions (wrong bearer, revoke, restart, no key on disk, no generation path). Do not weaken these assertions to pass CI. This is **not** approval of #273 production pairing (ADR 0033 remains Proposed / blocked). |
 | **JavaScript lint, format and tests** | `npm ci`, `npm run lint:js`, `npm run format:check`, `npm run test:js` on Node 22. No browser and no product data. |
 | **App journey smoke** | `pytest tests/test_pr_journey_smoke.py` |
 | **Windows packaged E2E** (PRs to `main` only) | Builds the onefolder ZIP on `windows-latest`, extracts it, and drives the real EXE/WebView2 over CDP with synthetic media. |
