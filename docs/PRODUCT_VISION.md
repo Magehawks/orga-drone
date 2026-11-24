@@ -192,7 +192,7 @@ professional video-editing knowledge.
 | Managed polygon spatial selections (straight segments, feather, invert; Studio draw + grade API; not AI freistellung) | **Available now** |
 | Named Inspector mask list with preview-only overlay | **Available now** (rename/select/hide/delete; overlay never exports) |
 | On-canvas polygon geometry edit (vertex drag, edge insert, remove, whole-mask move) | **Available now** |
-| Local offline object proposal (click subject → classical flood-fill polygon; refinable; no cloud/model download) | **Available now** (not AI freistellung; photo clips) |
+| Local offline object proposal (click subject → classical flood-fill polygon; multi-seed Shift+click; refinable; no cloud/model download) | **Available now** (not AI freistellung; photo clips) |
 | Further light editing (curves, privacy freeform masks, general keyframes, tracking), extra transition types | **Later** |
 | Independent per-song placement, trimming, or waveforms | **Later** |
 

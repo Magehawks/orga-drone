@@ -1327,5 +1327,9 @@
   "Show selection overlay": "Show selection overlay",
   "unbound": "unbound",
   "Empty": "Empty",
-  "invert": "invert"
+  "invert": "invert",
+  "Select object: click the subject; Shift+click adds a seed": "Select object: click the subject; Shift+click adds a seed",
+  "Still proposing… {s}s": "Still proposing… {s}s",
+  "Shift+click adds a seed · Esc finishes": "Shift+click adds a seed · Esc finishes",
+  "Object selection ready — refine on canvas": "Object selection ready — refine on canvas"
 }

@@ -1,7 +1,10 @@
-"""Local offline object-proposal via classical LAB-ish flood fill (#539/#540).
+"""Local offline object-proposal via classical LAB-ish flood fill (#539/#540/#550).
 
 No cloud, no ONNX, no required model download. Returns a closed UV polygon
 suitable for managed selections; callers persist via upsert_selection.
+
+Multi-seed union and optional connected expand improve coverage on mottled
+subjects without a second mask engine.
 """
 
 from __future__ import annotations
@@ -13,6 +16,8 @@ from pathlib import Path
 from typing import Sequence
 
 from PIL import Image, ImageFilter
+
+MAX_OBJECT_SEEDS = 16
 
 
 class ObjectSelectError(ValueError):
@@ -28,6 +33,8 @@ class ObjectProposal:
     elapsed_s: float
     proposal_size: tuple[int, int]
     seed_uv: tuple[float, float]
+    seeds_uv: tuple[tuple[float, float], ...] = ()
+    expand_passes: int = 0
 
 
 def _clamp01(value: float) -> float:
@@ -220,21 +227,111 @@ def _simplify_closed(
     return simplified
 
 
+def _normalize_seeds(
+    u: float,
+    v: float,
+    seeds: Sequence[Sequence[float]] | None,
+) -> list[tuple[float, float]]:
+    """Primary ``(u, v)`` plus optional extra seeds; capped and de-duplicated."""
+    if not (0.0 <= float(u) <= 1.0 and 0.0 <= float(v) <= 1.0):
+        raise ObjectSelectError("u and v must be in [0, 1]")
+    out: list[tuple[float, float]] = [(_clamp01(u), _clamp01(v))]
+    if seeds:
+        if len(seeds) > MAX_OBJECT_SEEDS:
+            raise ObjectSelectError(f"At most {MAX_OBJECT_SEEDS} seeds allowed")
+        for entry in seeds:
+            try:
+                su = float(entry[0])
+                sv = float(entry[1])
+            except (TypeError, ValueError, IndexError) as exc:
+                raise ObjectSelectError("Each seed must be [u, v]") from exc
+            if not (0.0 <= su <= 1.0 and 0.0 <= sv <= 1.0):
+                raise ObjectSelectError("All seeds must be in [0, 1]")
+            point = (_clamp01(su), _clamp01(sv))
+            if point not in out:
+                out.append(point)
+            if len(out) > MAX_OBJECT_SEEDS:
+                raise ObjectSelectError(f"At most {MAX_OBJECT_SEEDS} seeds allowed")
+    return out
+
+
+def _union_flood_mask(
+    pixels: Sequence[tuple[int, int, int]],
+    width: int,
+    height: int,
+    seeds_xy: Sequence[tuple[int, int]],
+    tol: float,
+) -> list[bool]:
+    mask = [False] * (width * height)
+    for sx, sy in seeds_xy:
+        part = _flood_mask(pixels, width, height, (sx, sy), tol)
+        for i, bit in enumerate(part):
+            if bit:
+                mask[i] = True
+    return mask
+
+
+def _expand_mask_python(
+    pixels: Sequence[tuple[int, int, int]],
+    mask: list[bool],
+    width: int,
+    height: int,
+    primary_xy: tuple[int, int],
+    tol: float,
+    passes: int,
+) -> list[bool]:
+    if passes <= 0:
+        return mask
+    px, py = primary_xy
+    primary = _rgb_to_lab_approx(*pixels[py * width + px])
+    out = list(mask)
+    for step in range(max(0, int(passes))):
+        grow_tol = float(tol) * (1.0 + 0.12 * (step + 1))
+        added = False
+        for y in range(height):
+            for x in range(width):
+                idx = y * width + x
+                if out[idx]:
+                    continue
+                touches = False
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < width and 0 <= ny < height and out[ny * width + nx]:
+                        touches = True
+                        break
+                if not touches:
+                    continue
+                lab = _rgb_to_lab_approx(*pixels[idx])
+                if _chromatic_dist(lab, primary) <= grow_tol:
+                    out[idx] = True
+                    added = True
+        if not added:
+            break
+    return out
+
+
 def propose_object_polygon(
     source_path: Path | str,
     u: float,
     v: float,
     *,
+    seeds: Sequence[Sequence[float]] | None = None,
     max_edge: int = 640,
     tol: float = 16.0,
     max_points: int = 64,
+    expand_passes: int = 2,
 ) -> ObjectProposal:
-    """Propose a closed UV polygon for the connected object under ``(u, v)``."""
-    if not (0.0 <= float(u) <= 1.0 and 0.0 <= float(v) <= 1.0):
-        raise ObjectSelectError("u and v must be in [0, 1]")
+    """Propose a closed UV polygon for the connected object under ``(u, v)``.
+
+    Optional ``seeds`` are unioned with the primary click. ``expand_passes``
+    grows the seed-connected region into nearby similar colors (#550).
+    """
+    seed_list = _normalize_seeds(u, v, seeds)
     path = Path(source_path)
     if not path.is_file():
         raise ObjectSelectError("Source media file is missing")
+    if expand_passes < 0 or expand_passes > 8:
+        raise ObjectSelectError("expand_passes must be 0..8")
     t0 = time.perf_counter()
     with Image.open(path) as src:
         rgb = src.convert("RGB")
@@ -249,11 +346,18 @@ def propose_object_polygon(
         else:
             work = rgb
             nw, nh = sw, sh
-    sx = int(round(_clamp01(u) * (nw - 1)))
-    sy = int(round(_clamp01(v) * (nh - 1)))
+    seeds_xy = [
+        (
+            int(round(su * (nw - 1))),
+            int(round(sv * (nh - 1))),
+        )
+        for su, sv in seed_list
+    ]
+    sx, sy = seeds_xy[0]
     method = "lab-flood+morph+lcc+polyline"
     points: list[list[float]]
     coverage: float
+    used_expand = int(expand_passes)
     try:
         from orga_drone.studio_object_select_fast import (
             contour_points_uv,
@@ -263,7 +367,11 @@ def propose_object_polygon(
 
         if fast_object_select_enabled():
             mask_u8, coverage = propose_mask_fast(
-                work, seed_xy=(sx, sy), tol=float(tol)
+                work,
+                seed_xy=(sx, sy),
+                seeds_xy=seeds_xy,
+                tol=float(tol),
+                expand_passes=used_expand,
             )
             if coverage < 0.001 or coverage > 0.98:
                 raise ObjectSelectError("Object proposal coverage out of usable range")
@@ -271,6 +379,10 @@ def propose_object_polygon(
                 mask_u8, max_points=max(3, int(max_points))
             )
             method = "lab-flood+morph+lcc+polyline+opencv"
+            if len(seed_list) > 1:
+                method += "+multiseed"
+            if used_expand > 0:
+                method += "+expand"
         else:
             raise RuntimeError("fast path disabled")
     except ObjectSelectError:
@@ -280,7 +392,11 @@ def propose_object_polygon(
         pixels = [
             (raw[i], raw[i + 1], raw[i + 2]) for i in range(0, len(raw), 3)
         ]
-        mask = _flood_mask(pixels, nw, nh, (sx, sy), float(tol))
+        mask = _union_flood_mask(pixels, nw, nh, seeds_xy, float(tol))
+        if used_expand > 0:
+            mask = _expand_mask_python(
+                pixels, mask, nw, nh, (sx, sy), float(tol), used_expand
+            )
         # Light morphological close to bridge thin gaps (veins / noise).
         closed = (
             _mask_to_image(mask, nw, nh)
@@ -303,6 +419,10 @@ def propose_object_polygon(
         if len(points) >= 2 and points[0] == points[-1]:
             points = points[:-1]
         method = "lab-flood+morph+lcc+polyline"
+        if len(seed_list) > 1:
+            method += "+multiseed"
+        if used_expand > 0:
+            method += "+expand"
     if len(points) < 3:
         raise ObjectSelectError("Object proposal produced fewer than 3 points")
     elapsed = time.perf_counter() - t0
@@ -313,7 +433,9 @@ def propose_object_polygon(
         method=method,
         elapsed_s=float(elapsed),
         proposal_size=(nw, nh),
-        seed_uv=(float(u), float(v)),
+        seed_uv=seed_list[0],
+        seeds_uv=tuple(seed_list),
+        expand_passes=used_expand,
     )
 
 

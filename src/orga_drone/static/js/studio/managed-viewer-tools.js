@@ -444,7 +444,11 @@ export function createManagedViewerTools({
       return;
     }
     if (mode === "object-select") {
-      void onObjectSelect?.(uv);
+      void onObjectSelect?.(uv, {
+        shiftKey: Boolean(event.shiftKey),
+        altKey: Boolean(event.altKey),
+        metaKey: Boolean(event.metaKey),
+      });
       return;
     }
     if (mode === "brush") {

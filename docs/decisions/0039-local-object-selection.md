@@ -49,6 +49,9 @@ path that conflicts with “works offline without extras” for the first ship.
 - Positive: zero new heavyweight deps; works on CPU; integrates with mask list
   and on-canvas edit; cancellable request stays a single HTTP call.
 - Trade-offs: proposal quality varies with lighting/texture; Neon Relic still
-  needs refine; serrations/droplets are not automatic.
-- Follow-up: Windows UX acceptance (#543), Neon Relic creative (#544); revisit
-  optional local model only with a new ADR.
+  needs refine for serrations/droplets; classical magenta IoU vs TARGET has a
+  ceiling (~0.55–0.65) while leaf recall can exceed 0.90.
+- Follow-up delivered in-tree: multi-seed union + connected expand (#550),
+  sub-1s OpenCV path (#554), HTTP/JS regressions (#542), packaged masking UX
+  harness (`packaging/e2e/studio_masking_ux.py`, #543). Revisit optional local
+  model only with a new ADR.

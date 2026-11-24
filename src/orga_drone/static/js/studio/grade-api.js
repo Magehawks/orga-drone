@@ -329,10 +329,19 @@ export async function sampleEyedropper(
   return data;
 }
 
-/** Local offline object proposal from a preview click (#539/#540). Does not mutate. */
-export async function proposeObjectSelect(studioId, { u, v, expectedRevision, tol } = {}) {
+/** Local offline object proposal from preview click seed(s) (#539/#540/#550). Does not mutate. */
+export async function proposeObjectSelect(
+  studioId,
+  { u, v, seeds, expectedRevision, tol, expandPasses } = {}
+) {
   const body = { u, v, expected_revision: expectedRevision };
   if (Number.isFinite(Number(tol))) body.tol = Number(tol);
+  if (Number.isFinite(Number(expandPasses))) body.expand_passes = Number(expandPasses);
+  if (Array.isArray(seeds) && seeds.length) {
+    body.seeds = seeds
+      .map((entry) => [Number(entry?.[0]), Number(entry?.[1])])
+      .filter((entry) => Number.isFinite(entry[0]) && Number.isFinite(entry[1]));
+  }
   const response = await fetch(`/api/studio/${studioId}/grade/object-select`, {
     method: "POST",
     headers: {

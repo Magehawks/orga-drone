@@ -30,7 +30,7 @@ def test_propose_object_polygon_on_green_blob(tmp_path: Path) -> None:
     assert proposal.closed is True
     assert len(proposal.points) >= 3
     assert 0.05 < proposal.coverage < 0.6
-    assert proposal.method.startswith("lab-flood")
+    assert "lab-flood" in proposal.method
     # Contour should stay near the blob (not whole frame).
     xs = [p[0] for p in proposal.points]
     ys = [p[1] for p in proposal.points]
@@ -57,7 +57,7 @@ def test_propose_object_fast_path_when_opencv_available(tmp_path: Path) -> None:
         pytest.skip("OpenCV/NumPy fast path unavailable")
     path = _fixture(tmp_path)
     proposal = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
-    assert proposal.method.endswith("+opencv")
+    assert "+opencv" in proposal.method
     assert proposal.closed is True
     assert len(proposal.points) >= 3
     assert 0.05 < proposal.coverage < 0.6
@@ -67,11 +67,15 @@ def test_propose_object_python_backend_matches_coverage(tmp_path: Path, monkeypa
     if not fast_object_select_enabled():
         pytest.skip("OpenCV/NumPy fast path unavailable")
     path = _fixture(tmp_path)
-    fast = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
+    fast = propose_object_polygon(
+        path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32, expand_passes=0
+    )
     monkeypatch.setenv("ORGA_OBJECT_SELECT_BACKEND", "python")
     # Force re-import gate via env on next call (gate reads env each time).
     assert not fast_object_select_enabled()
-    ref = propose_object_polygon(path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32)
-    assert ref.method == "lab-flood+morph+lcc+polyline"
+    ref = propose_object_polygon(
+        path, 0.5, 0.5, max_edge=200, tol=18.0, max_points=32, expand_passes=0
+    )
+    assert ref.method.startswith("lab-flood+morph+lcc+polyline")
     assert abs(fast.coverage - ref.coverage) < 1e-9
     assert len(fast.points) >= 3 and len(ref.points) >= 3
