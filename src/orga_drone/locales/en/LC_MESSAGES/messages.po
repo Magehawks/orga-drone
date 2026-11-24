@@ -1287,3 +1287,6 @@ msgstr "{id} → {step}"
 
 msgid "{id} (not bound)"
 msgstr "{id} (not bound)"
+
+msgid "Not enough temporary disk space. Free up space and try again."
+msgstr "Not enough temporary disk space. Free up space and try again."
