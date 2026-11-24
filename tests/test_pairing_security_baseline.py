@@ -9,7 +9,7 @@ or app-generated credentials.
 from __future__ import annotations
 
 import hashlib
-import inspect
+import secrets
 
 import pytest
 
@@ -78,19 +78,30 @@ def test_fresh_service_after_restart_has_no_session(tmp_path) -> None:
     assert caught.value.code == "CONTROL_DISABLED"
 
 
-def test_enable_requires_caller_pairing_key_and_does_not_echo_it(tmp_path) -> None:
+def test_enable_requires_caller_pairing_key_and_does_not_echo_it(
+    tmp_path, monkeypatch
+) -> None:
     service = _service(tmp_path)
     with pytest.raises(ControlError) as missing:
         service.enable({"session_id": "editor-1"})
     assert missing.value.code == "INVALID_PAYLOAD"
+    generated: list[int] = []
+
+    def _forbid_token_hex(nbytes: int = 32) -> str:
+        generated.append(nbytes)
+        return "ff" * nbytes
+
+    monkeypatch.setattr(secrets, "token_hex", _forbid_token_hex)
     key = "ab" * 32
     result = service.enable({"session_id": "editor-1", "pairing_key": key})
     assert result == {"enabled": True}
+    assert list(result.keys()) == ["enabled"]
     assert key not in repr(result)
     assert key.encode() not in service.digest
-    source = inspect.getsource(ControlService.enable)
-    assert "token_hex" not in source
-    assert "pairing_key" in source
+    assert service.digest == hashlib.sha256(key.encode()).digest()
+    # enable must use the caller key only; never invent credentials via secrets.
+    assert generated == []
+    service.authenticate("Bearer " + key)
 
 
 def test_pairing_key_never_written_under_data_dir(tmp_path) -> None:
