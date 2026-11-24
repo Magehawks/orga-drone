@@ -1,4 +1,4 @@
-# Architecture Decision Records (ADRs)
+﻿# Architecture Decision Records (ADRs)
 
 Record significant technical decisions here so agents and humans share the
 same rationale.
@@ -61,7 +61,7 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0030](0030-studio-color-wheels.md) | Studio colour wheels as a generated 3D LUT | Accepted |
 | [0031](0031-main-admission-approval-profile.md) | Main admission packaged E2E and owner authorization | Proposed |
 | [0032](0032-control-api-v1.md) | Opt-in local Studio Control API v1 | Accepted |
-| [0033](0033-secure-local-assistant-pairing.md) | Secure local assistant pairing | Proposed (blocked on PO) |
+| [0033](0033-secure-local-assistant-pairing.md) | Secure local assistant pairing | Proposed (recommendations recorded; blocked awaiting PO approval) |
 | [0034](0034-studio-speed-ramp.md) | Source-anchored Studio speed ramps | Accepted |
 | [0035](0035-color-workspace-contract.md) | Canonical Color Workspace grade and render contracts | Proposed (architecture approval required) |
 | [0036](0036-studio-sfx-lane.md) | Separate Studio sound-effects (SFX) lane | Accepted |
@@ -69,3 +69,4 @@ Skip ADRs for routine bugfixes and small UI tweaks.
 | [0038](0038-studio-collage-composer.md) | Studio Collage Composer | Accepted |
 | [0038](0038-studio-multi-speed-ramp-regions.md) | Up to three speed-ramp regions per clip | Accepted for this branch |
 | [0039](0039-local-object-selection.md) | Local offline object selection (classical proposal) | Accepted |
+
