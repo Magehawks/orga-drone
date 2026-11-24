@@ -1,4 +1,4 @@
-# Secure pairing spike (#273)
+﻿# Secure pairing spike (#273)
 
 Status: architecture and threat model only. This does not change pairing,
 does not store a credential, and does not enable a new connection path.
@@ -60,3 +60,17 @@ and proposed [ADR 0033](../decisions/0033-secure-local-assistant-pairing.md).
 The five PO handoff/store/state/identity/boundary decisions remain unresolved.
 Production pairing and #274 Settings UX stay gated. ADR 0033 is Proposed only.
 
+## Architecture recommendations (2026-11-24) — not Accepted
+
+Concrete recommended answers for handoff, storage, lifecycle, identity, and
+repo boundary are in proposed ADR 0033. Approval status remains **blocked
+awaiting Product Owner**. Production pairing stays gated. Residual same-user
+DPAPI risk is unchanged from this threat model.
+
+## Architecture decision gate (2026-11-24)
+
+Proposed answers to the five PO decisions are recorded in
+[273-274-architecture-decision-gate.md](273-274-architecture-decision-gate.md)
+and [ADR 0033](../decisions/0033-secure-local-assistant-pairing.md).
+ADR 0033 remains **Proposed** until Product Owner acceptance. Production
+pairing and #274 Settings UX stay gated.

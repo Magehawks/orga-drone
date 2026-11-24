@@ -1,31 +1,32 @@
-# Secure assistant connection — acceptance matrix and blockers (#273 / #274)
+﻿# Secure assistant connection — acceptance matrix and blockers (#273 / #274)
 
-Status: **BLOCKED on unresolved security architecture decisions.**
-Audit date: 2026-11-24 (refreshed on fresh worktree).
-Pinned `origin/develop`: `ed22c9d3037fb935d5a453d032aaf70d471235fb`.
-Branch / worktree: `feat/secure-assistant-273-274` at
-`C:\Users\Niwes\.cursor\worktrees\orga-drone\assistant-273-274`.
+Status: **BLOCKED on Product Owner approval of ADR 0033 proposed decisions.**
+Audit date: 2026-11-24 (refreshed).
+Architecture gate revision: 2026-11-24 — five decisions documented as
+**proposed recommendations** in ADR 0033 and
+`docs/discovery/273-274-architecture-decision-gate.md`.
+Pinned baseline: merged PR #570 on `develop`; this follow-up does **not**
+authorize production pairing.
 
-This document records Phase-1 audit findings and the approved baseline security
-regression surface. It does **not** authorize production pairing, credential
-storage, Settings Connect UX, or Control API key generation. No security design
-is invented here.
+This document records Phase-1 audit findings, the approved baseline security
+regression surface, and the architecture decision gate. It does **not**
+authorize production pairing, credential storage, Settings Connect UX, or
+Control API key generation until the Product Owner accepts ADR 0033.
 
 ## Sources reviewed
 
 | Source | Finding |
 | --- | --- |
-| Issue [#273](https://github.com/Magehawks/orga-drone/issues/273) | Secure pairing lifecycle; depends on approved onboarding spike |
+| Issue [#273](https://github.com/Magehawks/orga-drone/issues/273) | Secure pairing lifecycle; **reopened** after premature close on PR #570 |
 | Issue [#274](https://github.com/Magehawks/orga-drone/issues/274) | Connect AI Assistant Settings UX; blocked on #273 |
 | Issue #273 gap comment (2026-11-12) | Explicitly **BLOCKED on PO spike approval**; five PO decisions listed |
-| PR [#403](https://github.com/Magehawks/orga-drone/pull/403) | Merged threat model + `tests/test_pairing_spike.py` only |
-| [273-pairing-threat-model.md](273-pairing-threat-model.md) | Preferred later design sketched; **no production change** until reviewed contract |
-| ADR [0032](../decisions/0032-control-api-v1.md) | Control API v1: caller-supplied key, digest in memory; API never generates keys |
-| Proposed ADR [0033](../decisions/0033-secure-local-assistant-pairing.md) | Open questions only; **not accepted** |
-| [CONTROL_API.md](../CONTROL_API.md) | Same: paste key; API never generates or discloses credentials |
-| [execution-checkpoint-240.md](../planning/execution-checkpoint-240.md) | Spike approved; **production pairing stays gated**; #274 Wait |
-| `orga-drone-mcp` [CODEX_WINDOWS_POC.md](https://github.com/Magehawks/orga-drone-mcp/blob/main/docs/CODEX_WINDOWS_POC.md) | Registration without secret in config.toml; plaintext `--env` risk; list-before-add; registration ≠ authorized |
-| Decisions folder | **No** accepted pairing / DPAPI / assistant-connection ADR |
+| PR [#570](https://github.com/Magehawks/orga-drone/pull/570) | Merged audit + baseline CI; **not** production pairing |
+| [273-pairing-threat-model.md](273-pairing-threat-model.md) | Preferred later design sketched; residual same-user risk |
+| [273-274-architecture-decision-gate.md](273-274-architecture-decision-gate.md) | Five recommended answers; STOP until PO accepts |
+| ADR [0032](../decisions/0032-control-api-v1.md) | Control API v1: caller-supplied key, digest in memory |
+| ADR [0033](../decisions/0033-secure-local-assistant-pairing.md) | Proposed concrete decisions; **not Accepted** |
+| [CONTROL_API.md](../CONTROL_API.md) | Paste key; API never generates credentials (until ADR Accepted) |
+| `orga-drone-mcp` CODEX_WINDOWS_POC | No secrets in config.toml `--env`; registration ≠ authorized; list-before-add |
 
 ## What ships today (unchanged)
 
@@ -36,27 +37,18 @@ is invented here.
 - Studio **External control** paste-key UI (developer-oriented).
 - No app-generated credentials, no DPAPI store, no Settings “Connect AI Assistant”.
 
-## Unresolved security decisions (must approve before coding)
+## Architecture decisions (proposed — require PO approval)
 
-These match the PO gap analysis on #273. Implementation must not choose them
-unilaterally.
+| # | Decision | Proposed answer (summary) | PO status |
+| --- | --- | --- | --- |
+| 1 | Credential handoff | One-shot DPAPI + user ACL slot; MCP memory retrieval; no TOML/`--env`/argv | Awaiting approval |
+| 2 | Storage after handoff | App digest-only; MCP memory-only; restart clears active session | Awaiting approval |
+| 3 | Registered vs authorized | Register may precede authorize; only authorize grants edit access | Awaiting approval |
+| 4 | Connection identity | Single active connection_id; re-pair rotates secret; stale hosts fail | Awaiting approval |
+| 5 | Repo boundary | App owns auth truth; MCP is adapter + Codex registration helpers | Awaiting approval |
 
-1. **Credential handoff channel** — DPAPI-protected file vs ACL-limited slot/pipe
-   vs other Windows-local mechanism. Residual same-user malware risk must be
-   explicitly accepted in a reviewed contract.
-2. **Where the secret lives after handoff** — app-owned encrypted store vs host
-   process memory / env. Codex `--env` / TOML plaintext is a documented risk and
-   must not become the production path.
-3. **registered vs authorized timing** — whether MCP registration may occur
-   before Studio/user authorize, and which states grant Control API edit access.
-4. **Connection identity model** — one digest vs multi connection-IDs /
-   multi-process; how re-pair isolates a stale host process.
-5. **Repo boundary** — retrieval / revoke live in `orga-drone` only vs shared
-   contract with `orga-drone-mcp`.
-
-Until a reviewed ADR (or equivalent PO-approved contract) answers all five,
-**no production pairing code, Settings Connect UX, or CONTROL_API generation
-path may land.**
+Until ADR 0033 is **Accepted**, **no production pairing code, Settings Connect
+UX, or CONTROL_API generation path may land.**
 
 ## Acceptance matrix
 
@@ -68,16 +60,16 @@ executed; `BLOCKED` = cannot start without architecture approval;
 
 | Criterion | Status | Evidence / note |
 | --- | --- | --- |
-| User explicitly approves; registration alone never grants edit access | BLOCKED | No registered≠authorized model approved |
-| App generates strong per-connection credentials | BLOCKED | ADR 0032 / CONTROL_API forbid generation today |
-| Secure local retrieval (approved Windows protection) | BLOCKED | No handoff ADR |
+| User explicitly approves; registration alone never grants edit access | BLOCKED | Proposed in ADR 0033 decision 3; awaiting PO |
+| App generates strong per-connection credentials | BLOCKED | Generation forbidden until ADR 0033 Accepted |
+| Secure local retrieval (approved Windows protection) | BLOCKED | DPAPI slot proposed in ADR 0033 decision 1; awaiting PO |
 | No plaintext secret in Codex config, argv, chat, MCP tools, logs, unsecured files | BLOCKED | Depends on (1)(2); PoC already refuses `--env` secrets |
 | Connect / status / disconnect-revoke / restart / stale / re-pair | BLOCKED | Product states not implemented |
 | Loopback-only, exact Origin, bearer auth preserved | PASS (baseline) | `local_http` + Control API tests; CI pairing gate |
 | Editor lease, state-token, target selection, idempotency, guarded Undo | PASS (baseline) | Existing; must not weaken |
-| Distinguish registered / authorized / reachable | BLOCKED | Missing product model |
+| Distinguish registered / authorized / reachable | BLOCKED | State model proposed in ADR 0033; not implemented |
 | Unauthorized / revoked / stale clients rejected | PARTIAL | Wrong bearer / disable / restart covered by baseline tests; no connection-id revoke |
-| Re-pair does not reauthorize old host process | BLOCKED | Single digest; no host binding |
+| Re-pair does not reauthorize old host process | BLOCKED | connection_id + digest rotation proposed; not implemented |
 | App restart: no unintended active control session | PASS (baseline) | New `ControlService` starts disabled |
 | Manual editing before/during/after pairing | PASS (baseline) | Current paste-key path; Connect UX not started |
 | Automated tests: wrong creds, disconnect, reconnect, multi-process, restart | PARTIAL | Spike + `test_pairing_security_baseline.py` |
@@ -117,7 +109,7 @@ To reduce conflicts with other feature agents:
 | Area | Owner for this workstream | Do not change without coordination |
 | --- | --- | --- |
 | Pairing discovery / acceptance / threat docs | This branch (`docs/discovery/273*`, `274*`) | Other discovery topics |
-| Proposed ADR 0033 | This branch until Accepted/Rejected | Do not mark Accepted without PO |
+| ADR 0033 + architecture gate | This branch until Accepted/Rejected | Do not mark Accepted without PO |
 | Future pairing modules (after ADR) | New small modules under `src/orga_drone/` | Grow `studio.js` for this |
 | `local_http.py` Host/Origin | **Frozen** — never weaken | Any feature |
 | `control.py` auth model | Frozen until ADR Accepted | Timeline/color agents |
@@ -141,14 +133,14 @@ Aligned with [273-pairing-threat-model.md](273-pairing-threat-model.md):
 
 - No production secure pairing lifecycle.
 - No Connect AI Assistant Settings UX.
-- No approved Windows credential-protection ADR (0033 remains Proposed).
+- ADR 0033 now carries proposed concrete choices; still not Accepted / not implementable.
 - Packaged WebView2 assistant journey NOT_RUN.
-- Cross-repo revoke/retrieve contract with `orga-drone-mcp` undecided.
-- This audit PR must **not** close #273 or #274.
+- Cross-repo boundary proposed in ADR 0033 decision 5; awaiting PO.
+- Architecture-gate and implementation PRs must **not** close #273 or #274 until ACs are actually satisfied. #273 was reopened after premature close on PR #570.
 
 ## Required next steps (PO / security)
 
-1. Product Owner answers the five decisions above in writing (issue comment or by accepting ADR 0033 with concrete choices).
+1. Product Owner accepts (or amends) the five proposed decisions in ADR 0033 / this gate doc in writing, then marks ADR 0033 Accepted.
 2. Accept residual same-user risk in a reviewed security contract / ADR.
 3. Only then implement the smallest #273 slice (generate + connection id + consent authorize + revoke/re-pair + status + mandatory security tests + CONTROL_API/ADR update).
 4. #274 Settings UX follows that slice; keep Codex-first wording; no marketplace.
@@ -178,3 +170,5 @@ Temporary mutations to `src/orga_drone/control.py` were applied with
 Unsafe MCP configuration replacement remains covered by the `orga-drone-mcp`
 Codex PoC (`unrelated_preserved` / `name_conflict_rejected`), not by app
 code on this branch.
+
+
