@@ -16,7 +16,7 @@ Update the Status column when evidence changes. Labels follow
 | Photo export profiles | PASS | PASS | NOT_RUN | PARTIAL | N/A | `test_studio_photo_export`, packaged `image_export` |
 | Studio photo editing | PASS | PASS | NOT_RUN | PARTIAL | N/A | studio image/HSL/wheels + packaged edit_persistence |
 | Masks / object selection | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | mask letterbox/geometry PASS on develop; precision/object selection parallel PENDING |
-| Color Workspace operators | PARTIAL | PARTIAL | NOT_RUN | NOT_RUN | PENDING | managed grade suites on develop; in-flight color-ws workstreams PENDING |
+| Color Workspace operators | PARTIAL | PARTIAL | NOT_RUN | NOT_RUN | PENDING | 	est_color_workspace_acceptance_matrix inventoried; in-flight color-ws workstreams PENDING |
 | Scopes | PASS | PARTIAL | NOT_RUN | NOT_RUN | PENDING | JS accumulate/panel/tap suites; packaged scopes probe NOT_RUN |
 | Video editing / playback | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | cut/speed/proxy unit+API; packaged playback harness NOT_RUN on develop CI |
 | Collage edit / export | PASS | PASS | NOT_RUN | NOT_RUN | N/A | collage model/export cleanup assertions; native collage NOT_RUN |

@@ -16,6 +16,8 @@
     "tests/test_studio_collage_export.py",
     "tests/test_pr_journey_smoke.py",
     "tests/test_studio_actions.py",
+    "tests/test_creator_journey.py",
+    "tests/test_color_workspace_acceptance_matrix.py",
     "packaging/e2e/windows_e2e.py",
     "packaging/packaged_e2e.py"
   ],
