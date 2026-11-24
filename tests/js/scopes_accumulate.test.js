@@ -117,3 +117,78 @@ test("alpha=0 samples are ignored", () => {
   assert.equal(hist.absolute.g[255], 1);
   assert.equal(hist.absolute.r[255], 0);
 });
+
+test("partial alpha weights histogram counts", () => {
+  const channels = 4;
+  const width = 2;
+  const height = 1;
+  const stride = width * channels;
+  const rgb = new Float32Array([1, 0, 0, 0.25, 0, 1, 0, 0.75]);
+  const frame = createScopeFrameV1({
+    version: 1,
+    width,
+    height,
+    stride,
+    rgb,
+    channels,
+    profile: "bt709",
+    transfer: "bt709",
+    straightAlpha: true,
+    ptsNum: 0,
+    ptsDen: 1,
+    frameIndex: 0,
+    projectId: "p",
+    clipId: "c",
+    gradeRevision: "1",
+    contextDigest: "d",
+    tapId: SCOPE_TAP_IDS.FIXTURE,
+    roi: { x: 0, y: 0, width, height },
+    sampleFactor: 1,
+    sourceKind: SCOPE_SOURCE_KINDS.FIXTURE,
+  });
+  const hist = accumulateHistogram(frame);
+  assert.equal(hist.weightSum, 1);
+  assert.equal(hist.absolute.r[255], 0.25);
+  assert.equal(hist.absolute.g[255], 0.75);
+});
+
+test("legal-range codes expand exactly once before binning", () => {
+  const channels = 4;
+  const width = 1;
+  const height = 1;
+  const stride = width * channels;
+  const limited = 16 / 255;
+  const rgb = new Float32Array([limited, limited, limited, 1]);
+  const frame = createScopeFrameV1({
+    version: 1,
+    width,
+    height,
+    stride,
+    rgb,
+    channels,
+    profile: "bt709",
+    transfer: "bt709",
+    straightAlpha: true,
+    legalRange: true,
+    ptsNum: 0,
+    ptsDen: 1,
+    frameIndex: 0,
+    projectId: "p",
+    clipId: "c",
+    gradeRevision: "1",
+    contextDigest: "d",
+    tapId: SCOPE_TAP_IDS.FIXTURE,
+    roi: { x: 0, y: 0, width, height },
+    sampleFactor: 1,
+    sourceKind: SCOPE_SOURCE_KINDS.FIXTURE,
+  });
+  const hist = accumulateHistogram(frame);
+  assert.equal(hist.absolute.luma[0], 1);
+});
+
+test("incorrect mid-gray bin expectation fails the regression contract", () => {
+  const hist = accumulateHistogram(createScopeFixture("gray"));
+  assert.throws(() => {
+    assert.equal(hist.absolute.r[0], hist.weightSum);
+  });
+});

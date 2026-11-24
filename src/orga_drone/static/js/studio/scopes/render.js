@@ -2,6 +2,14 @@
 
 import { normalizeDensityLog1p } from "./accumulate.js";
 
+function drawAxisLabels(ctx, width, height, labels) {
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = "10px sans-serif";
+  for (const item of labels) {
+    ctx.fillText(item.text, item.x, item.y);
+  }
+}
+
 function clear(ctx, width, height, fill = "#141414") {
   ctx.fillStyle = fill;
   ctx.fillRect(0, 0, width, height);
@@ -79,6 +87,10 @@ export function paintHistogram(canvas, histogram, { show = ["r", "g", "b", "luma
     }
     ctx.stroke();
   }
+  drawAxisLabels(ctx, width, height, [
+    { text: "0", x: 4, y: height - 4 },
+    { text: "255", x: width - 24, y: height - 4 },
+  ]);
 }
 
 export function paintWaveform(canvas, waveform) {
@@ -96,6 +108,11 @@ export function paintWaveform(canvas, waveform) {
     [230, 230, 230]
   );
   drawGrid(ctx, canvas.width, canvas.height);
+  drawAxisLabels(ctx, canvas.width, canvas.height, [
+    { text: "0", x: 4, y: canvas.height - 4 },
+    { text: "Y'", x: 4, y: 12 },
+    { text: "1", x: 4, y: 22 },
+  ]);
 }
 
 export function paintRgbParade(canvas, parade) {
@@ -123,6 +140,10 @@ export function paintRgbParade(canvas, parade) {
     );
   });
   drawGrid(ctx, width, height, { xLines: 3, yLines: 4 });
+  const labels = ["R", "G", "B"];
+  labels.forEach((text, index) => {
+    drawAxisLabels(ctx, width, height, [{ text, x: index * panelW + 6, y: 12 }]);
+  });
 }
 
 export function paintVectorscope(canvas, vectorscope) {

@@ -93,16 +93,13 @@ export function createColorScopesPanel({
       return;
     }
     if (currentFrame && currentFrame.sourceKind === SCOPE_SOURCE_KINDS.ENGINE_TAP) {
-      disclosureEl.textContent = label(
-        "liveDisclosure",
-        "Engine tap measurement for the selected clip."
-      );
+      disclosureEl.textContent = label("liveDisclosure", "Live measurement for the selected clip.");
       disclosureEl.dataset.scopeSource = "engine-tap";
       return;
     }
     disclosureEl.textContent = label(
       "unavailableDisclosure",
-      "Live scopes wait for the graded render-adapter tap. Display pixels are not used as measurements. Saved grades and export stay unchanged."
+      "Live scopes wait for a graded preview. Display pixels are not used as measurements. Saved grades and export stay unchanged."
     );
     disclosureEl.dataset.scopeSource = "unavailable";
   }
@@ -141,7 +138,7 @@ export function createColorScopesPanel({
     setStatus(
       `${describeScopeSource(frame, {
         fixture: label("sourceFixture", "Test pattern — not a media measurement"),
-        live: label("sourceLive", "Engine tap measurement"),
+        live: label("sourceLive", "Live measurement"),
         composite: label("sourceComposite", "Project composite tap"),
         downsampled: label("sourceDownsampled", "Downsampled measurement"),
       })} · ${activeKind} · ${lastProcessMs.toFixed(2)} ms`
