@@ -34,7 +34,7 @@ are not weakened.
 | Phase B: proxy-local seek/wrap/overlap mapping | **Implemented** | `proxy-loop-map.js` |
 | Phase B: non-zero source in-point + section repeats | **Regression added** | `test_nonzero_source_in_section_repeat_builds_proxy_from_cut_in` |
 | Phase B: decoded-frame still↔proxy parity (synthetic) | **PASS** | mean RGB channel error &lt; 8/255 |
-| Phase B: Windows WebView2 EXE (synthetic media journeys) | **PASS** | `docs/discovery/playback-effects-packaged-e2e-20261124.md` |
+| Phase B: Windows WebView2 EXE (synthetic media journeys) | **Executed PASS** (matrix Layer-4 stays NOT_RUN) | `docs/discovery/playback-effects-packaged-e2e-20261124.md` |
 | Phase B: real drone footage WebView2 | **NOT_RUN** | Private media; not claimed |
 | Proxy never becomes export source | **Preserved** | Export uses library `media_path` only |
 | Fail-closed: animated color / speed≠1 / clip audio | **By design** | Proxy ineligible; chips remain truthful |
@@ -45,7 +45,7 @@ are not weakened.
 |---|---|---|
 | Discovery + batch-1 (`blur_dissolve` + soft wipes) | **Implemented on develop** | #401; ADR 0010 |
 | Export xfade id stability | **Regression contract** | `test_contract_301_xfade_ids_are_native_and_stable` |
-| Packaged WebView2 creative persistence | **PASS** | `timeline_transitions` persisted blur_dissolve + soft_wipe_left |
+| Packaged WebView2 creative persistence | **Executed PASS** (matrix Layer-4 stays NOT_RUN) | `timeline_transitions` persisted blur_dissolve + soft_wipe_left |
 | Packaged soft-wipe / blur pixel-parity | **NOT_RUN / prior NO-GO** | ADR: preview may approximate; PO closeout pending |
 | Whip / luma / zoom-spin / motion-match | **Blocked** | Discovery NO-GO; normalize → `cut`; no silent expansion |
 
@@ -65,7 +65,7 @@ are not weakened.
 | Automatic presets + Manual points + LUT strength | **Implemented on develop** | #215–#217 et al. |
 | Deterministic keyframe interpolation | **Contract + mutation** | `test_contract_211_*` / `broken_keyframe_interpolation` |
 | Persistence / Undo-Redo | **Implemented** | Existing history suites |
-| Packaged WebView2 GUI E2E with synthetic `.cube` | **PASS** | `lut_parity` journey in packaged evidence |
+| Packaged WebView2 GUI E2E with synthetic `.cube` | **Executed PASS** (matrix Layer-4 stays NOT_RUN) | `lut_parity` journey in packaged evidence |
 | User-provided private `.cube` on real drone | **NOT_RUN** | No private media committed |
 | Original AC: grade A→B between two saved looks | **Not in shipped Vision V1** | Leave open / do not fake |
 | Animated highlights/shadows/blacks | **Out of ColorKey V1** | Documented; no silent expansion |

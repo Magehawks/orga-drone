@@ -170,7 +170,7 @@
         "1_unit": "PASS",
         "2_integration": "PASS",
         "3_browser_e2e": "PARTIAL",
-        "4_native_windows_e2e": "PASS",
+        "4_native_windows_e2e": "NOT_RUN",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -187,7 +187,7 @@
         "tests/js/proxy_loop_map.test.js",
         "tests/js/proxy_policy.test.js"
       ],
-      "notes": "Playback effects stream owns forward-loop proxy mapping (#294), transition contracts (#301), and color-animation interpolation (#211). Layer-4 packaged EXE remains NOT_RUN until dated evidence. Packaged WebView2 evidence: acceptance-evidence/playback-effects-e2e/20261124-170507/evidence.json (playback + timeline_transitions + lut_parity ok)."
+      "notes": "Playback effects stream owns forward-loop proxy mapping (#294), transition contracts (#301), and color-animation interpolation (#211). Layer-4 matrix stays NOT_RUN (inventory forbids unbound native PASS). Dated packaged evidence recorded at docs/discovery/playback-effects-packaged-e2e-20261124.md (playback + timeline_transitions + lut_parity ok on synthetic fixtures)."
     },
     {
       "id": "collage-edit-export",
@@ -221,7 +221,7 @@
         "1_unit": "PASS",
         "2_integration": "PASS",
         "3_browser_e2e": "PARTIAL",
-        "4_native_windows_e2e": "PASS",
+        "4_native_windows_e2e": "NOT_RUN",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -237,7 +237,7 @@
         "xfade filter graph strings",
         "story length with overlap"
       ],
-      "notes": "Packaged WebView2 evidence: acceptance-evidence/playback-effects-e2e/20261124-170507/evidence.json (playback + timeline_transitions + lut_parity ok)."
+      "notes": "Batch-1 blur_dissolve/soft wipe contracts on develop. Layer-4 matrix stays NOT_RUN (unbound native PASS forbidden). Dated packaged persistence evidence: docs/discovery/playback-effects-packaged-e2e-20261124.md. Pixel-parity remains ADR 0010 approximation / prior NO-GO."
     },
     {
       "id": "persistence-undo-redo",
@@ -375,7 +375,7 @@
         "#301",
         "#211"
       ],
-      "action": "Consume proxy-loop-map, transition xfade, and color-animation contracts via existing gates; no second harness. Packaged Layer-4 and real-drone evidence stay NOT_RUN until dated."
+      "action": "Consume proxy-loop-map, transition xfade, and color-animation contracts via existing gates; no second harness. Matrix Layer-4 stays NOT_RUN; dated packaged evidence lives under docs/discovery/."
     },
     {
       "stream": "Tracking creator tools",

@@ -91,4 +91,4 @@ FFmpeg version, and machine class before treating them as gates.
 
 ### Playback effects packaged evidence (2026-11-24)
 
-`docs/discovery/playback-effects-packaged-e2e-20261124.md` — Windows EXE journeys `playback`, `timeline_transitions`, `lut_parity` **PASS** (synthetic fixtures). Real-drone / private `.cube` remain **NOT_RUN**. Soft-wipe pixel-parity approximation unchanged (ADR 0010).
+`docs/discovery/playback-effects-packaged-e2e-20261124.md` — Windows EXE journeys `playback`, `timeline_transitions`, `lut_parity` executed **PASS** on synthetic fixtures. Machine-readable matrix Layer-4 stays **NOT_RUN** (inventory forbids unbound native PASS). Real-drone / private `.cube` remain **NOT_RUN**. Soft-wipe pixel-parity approximation unchanged (ADR 0010).

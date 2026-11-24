@@ -144,6 +144,8 @@ def test_single_mutation_harness_exists() -> None:
         "disabled_persistence",
         "broken_undo_redo",
         "incorrect_transition_timing",
+        "broken_loop_mapping",
+        "broken_keyframe_interpolation",
         "missing_collage_export_cleanup",
         "incorrect_scope_accumulation",
         "authorization_bypass",
