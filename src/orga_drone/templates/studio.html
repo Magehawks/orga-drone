@@ -1158,62 +1158,132 @@
               <p class="meta-line" data-managed-step-status role="status" aria-live="polite"></p>
               <div class="studio-managed-step-list" data-managed-step-list role="list" aria-label="{{ _('Serial grade steps') }}"></div>
             </div>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Exposure (stops)') }} <span data-managed-exposure-value>0.00 EV</span></span>
-              <input type="range" data-managed-exposure min="-4" max="4" step="0.05" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-exposure min="-4" max="4" step="0.05" value="0" disabled>
+                <input type="number" data-managed-exposure-number class="studio-slider-number-input"
+                       min="-4" max="4" step="0.05" value="0" inputmode="decimal" disabled
+                       aria-label="{{ _('Exposure value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Temperature') }} <span data-managed-kelvin-value>6500 K</span></span>
-              <input type="range" data-managed-kelvin min="2000" max="15000" step="50" value="6500" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-kelvin min="2000" max="15000" step="50" value="6500" disabled>
+                <input type="number" data-managed-kelvin-number class="studio-slider-number-input"
+                       min="2000" max="15000" step="50" value="6500" inputmode="numeric" disabled
+                       aria-label="{{ _('Temperature value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Tint') }} <span data-managed-tint-value>0</span></span>
-              <input type="range" data-managed-tint min="-100" max="100" step="1" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-tint min="-100" max="100" step="1" value="0" disabled>
+                <input type="number" data-managed-tint-number class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric" disabled
+                       aria-label="{{ _('Tint value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Contrast') }} <span data-managed-contrast-value>1.00</span></span>
-              <input type="range" data-managed-contrast min="0" max="4" step="0.01" value="1" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-contrast min="0" max="4" step="0.01" value="1" disabled>
+                <input type="number" data-managed-contrast-number class="studio-slider-number-input"
+                       min="0" max="4" step="0.01" value="1" inputmode="decimal" disabled
+                       aria-label="{{ _('Contrast value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Pivot') }} <span data-managed-pivot-value>0.180</span></span>
-              <input type="range" data-managed-pivot min="0.001" max="1" step="0.001" value="0.18" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-pivot min="0.001" max="1" step="0.001" value="0.18" disabled>
+                <input type="number" data-managed-pivot-number class="studio-slider-number-input"
+                       min="0.001" max="1" step="0.001" value="0.18" inputmode="decimal" disabled
+                       aria-label="{{ _('Pivot value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Saturation') }} <span data-managed-saturation-value>1.00</span></span>
-              <input type="range" data-managed-saturation min="0" max="4" step="0.01" value="1" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-saturation min="0" max="4" step="0.01" value="1" disabled>
+                <input type="number" data-managed-saturation-number class="studio-slider-number-input"
+                       min="0" max="4" step="0.01" value="1" inputmode="decimal" disabled
+                       aria-label="{{ _('Saturation value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Blacks') }} <span data-managed-blacks-value>0</span></span>
-              <input type="range" data-managed-blacks min="-100" max="100" step="1" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-blacks min="-100" max="100" step="1" value="0" disabled>
+                <input type="number" data-managed-blacks-number class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric" disabled
+                       aria-label="{{ _('Blacks value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Shadows') }} <span data-managed-shadows-value>0</span></span>
-              <input type="range" data-managed-shadows min="-100" max="100" step="1" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-shadows min="-100" max="100" step="1" value="0" disabled>
+                <input type="number" data-managed-shadows-number class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric" disabled
+                       aria-label="{{ _('Shadows value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Highlights') }} <span data-managed-highlights-value>0</span></span>
-              <input type="range" data-managed-highlights min="-100" max="100" step="1" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-highlights min="-100" max="100" step="1" value="0" disabled>
+                <input type="number" data-managed-highlights-number class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric" disabled
+                       aria-label="{{ _('Highlights value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Whites') }} <span data-managed-whites-value>0</span></span>
-              <input type="range" data-managed-whites min="-100" max="100" step="1" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-whites min="-100" max="100" step="1" value="0" disabled>
+                <input type="number" data-managed-whites-number class="studio-slider-number-input"
+                       min="-100" max="100" step="1" value="0" inputmode="numeric" disabled
+                       aria-label="{{ _('Whites value') }}">
+              </div>
             </label>
             <p class="hint">{{ _('Lift / Gamma / Gain / Offset are managed wheels on the same grade.') }}</p>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Lift') }} <span data-managed-lift-value>0.00</span></span>
-              <input type="range" data-managed-lift min="-0.5" max="0.5" step="0.01" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-lift min="-0.5" max="0.5" step="0.01" value="0" disabled>
+                <input type="number" data-managed-lift-number class="studio-slider-number-input"
+                       min="-0.5" max="0.5" step="0.01" value="0" inputmode="decimal" disabled
+                       aria-label="{{ _('Lift value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Gamma') }} <span data-managed-gamma-value>1.00</span></span>
-              <input type="range" data-managed-gamma min="0.2" max="3" step="0.01" value="1" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-gamma min="0.2" max="3" step="0.01" value="1" disabled>
+                <input type="number" data-managed-gamma-number class="studio-slider-number-input"
+                       min="0.2" max="3" step="0.01" value="1" inputmode="decimal" disabled
+                       aria-label="{{ _('Gamma value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Gain') }} <span data-managed-gain-value>1.00</span></span>
-              <input type="range" data-managed-gain min="0" max="4" step="0.01" value="1" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-gain min="0" max="4" step="0.01" value="1" disabled>
+                <input type="number" data-managed-gain-number class="studio-slider-number-input"
+                       min="0" max="4" step="0.01" value="1" inputmode="decimal" disabled
+                       aria-label="{{ _('Gain value') }}">
+              </div>
             </label>
-            <label class="studio-inspector-field">
+            <label class="studio-inspector-field studio-slider-number-field">
               <span>{{ _('Offset') }} <span data-managed-offset-value>0.00</span></span>
-              <input type="range" data-managed-offset min="-0.5" max="0.5" step="0.01" value="0" disabled>
+              <div class="studio-slider-number-row">
+                <input type="range" data-managed-offset min="-0.5" max="0.5" step="0.01" value="0" disabled>
+                <input type="number" data-managed-offset-number class="studio-slider-number-input"
+                       min="-0.5" max="0.5" step="0.01" value="0" inputmode="decimal" disabled
+                       aria-label="{{ _('Offset value') }}">
+              </div>
             </label>
             <button type="button" class="button ghost" data-managed-wheels-reset>{{ _('Reset wheels') }}</button>
             <p class="hint">{{ _('Managed HSL is an encoded-domain step, separate from legacy HSL.') }}</p>
@@ -1250,24 +1320,15 @@
                  data-msg-sampled="{{ _('Sampled — accept to apply qualifier') }}"
                  data-msg-sample-stale="{{ _('Sample is stale. Sample again.') }}"
                  data-msg-eyedropper="{{ _('Eyedropper: click the preview') }}"
-                 data-msg-object-select="{{ _('Select object: click the subject on the preview') }}"
-                 data-msg-object-selecting="{{ _('Proposing object…') }}"
-                 data-msg-object-selected="{{ _('Object proposal accepted · {name}') }}"
-                 data-msg-object-failed="{{ _('Object proposal failed') }}"
-                 data-msg-object-default-name="{{ _('Object') }}"
                  data-msg-brush="{{ _('Brush: draw on the preview') }}"
                  data-msg-brush-drawing="{{ _('Brush drawing…') }}"
                  data-msg-brush-cancelled="{{ _('Brush cancelled') }}"
-                 data-msg-polygon="{{ _('Polygon: click to place points; drag handles, click edge to add, Alt+click to remove, drag interior to move') }}"
+                 data-msg-polygon="{{ _('Polygon: click to place points, drag handles to refine, Enter or double-click to close') }}"
                  data-msg-polygon-drawing="{{ _('Polygon: {count} points — Enter/double-click to close, Esc to cancel') }}"
                  data-msg-polygon-cancelled="{{ _('Polygon cancelled') }}"
                  data-msg-polygon-need-points="{{ _('Polygon needs at least 3 points') }}"
                  data-msg-polygon-dragging="{{ _('Polygon: drag vertex to refine') }}"
                  data-msg-polygon-edited="{{ _('Polygon vertex updated') }}"
-                 data-msg-polygon-vertex-added="{{ _('Polygon: vertex added — drag to place') }}"
-                 data-msg-polygon-vertex-removed="{{ _('Polygon vertex removed') }}"
-                 data-msg-polygon-moving="{{ _('Polygon: move selection') }}"
-                 data-msg-polygon-moved="{{ _('Polygon selection moved') }}"
                  data-msg-saved="{{ _('Selection saved') }}"
                  data-msg-cleared="{{ _('Selection cleared') }}"
                  data-msg-sample-meta="{{ _('Sample · rev {rev} · {domain} · frame {frame}') }}"
@@ -1275,33 +1336,12 @@
                  data-msg-selection-bound="{{ _('Active · {id} on {step} · rev {rev}') }}"
                  data-msg-binding-line="{{ _('{id} → {step}') }}"
                  data-msg-binding-unbound="{{ _('{id} (not bound)') }}"
-                 data-msg-binding-unbound-short="{{ _('unbound') }}"
-                 data-msg-no-selection="{{ _('No selection · rev {rev}') }}"
-                 data-msg-masks-heading="{{ _('Masks') }}"
-                 data-msg-untitled-mask="{{ _('Mask {id}') }}"
-                 data-msg-mask-selected="{{ _('Selected mask · {name}') }}"
-                 data-msg-rename-mask="{{ _('Rename') }}"
-                 data-msg-rename-prompt="{{ _('Mask name') }}"
-                 data-msg-delete-mask="{{ _('Delete') }}"
-                 data-msg-delete-confirm="{{ _('Delete mask “{name}”?') }}"
-                 data-msg-mask-deleted="{{ _('Mask deleted') }}"
-                 data-msg-hide-overlay="{{ _('Hide') }}"
-                 data-msg-show-overlay="{{ _('Show') }}"
-                 data-msg-hide-overlay-aria="{{ _('Hide selection overlay') }}"
-                 data-msg-show-overlay-aria="{{ _('Show selection overlay') }}"
-                 data-msg-type-polygon="{{ _('Polygon') }}"
-                 data-msg-type-brush="{{ _('Brush') }}"
-                 data-msg-type-radial="{{ _('Radial') }}"
-                 data-msg-type-linear="{{ _('Linear') }}"
-                 data-msg-type-empty="{{ _('Empty') }}"
-                 data-msg-invert-short="{{ _('invert') }}">
+                 data-msg-no-selection="{{ _('No selection · rev {rev}') }}">
               <p class="hint">{{ _('Masks and qualifiers bind to one step on the same managed grade.') }}</p>
-              <p class="hint">{{ _('Select a mask to highlight its region on the preview. Overlay is preview-only and never exports. Draw brush paints the bound selection; polygon places editable contour points. With a polygon selected: drag handles, click an edge to add a vertex, Alt+click a handle to remove, drag the interior to move.') }}</p>
+              <p class="hint">{{ _('Active selection is the one bound under Bind to step. Draw brush paints that selection on the preview. Polygon places editable contour points.') }}</p>
               <p class="meta-line" data-managed-selection-status role="status" aria-live="polite"></p>
-              <div class="studio-mask-list-heading" data-managed-mask-list-heading hidden>{{ _('Masks') }}</div>
               <ul class="studio-managed-selection-summary meta-line" data-managed-selection-summary
-                  role="listbox"
-                  aria-label="{{ _('Masks') }}" hidden></ul>
+                  aria-label="{{ _('Selection bindings') }}" hidden></ul>
               <label class="studio-inspector-field">
                 <span>{{ _('Mask shape') }}</span>
                 <select data-managed-mask-shape aria-label="{{ _('Mask shape') }}">
@@ -1338,7 +1378,6 @@
               </label>
               <div class="studio-managed-selection-tools">
                 <button type="button" class="button ghost" data-managed-eyedropper aria-pressed="false">{{ _('Eyedropper') }}</button>
-                <button type="button" class="button ghost" data-managed-object-select aria-pressed="false">{{ _('Select object') }}</button>
                 <button type="button" class="button ghost" data-managed-brush-draw aria-pressed="false">{{ _('Draw brush') }}</button>
                 <button type="button" class="button ghost" data-managed-polygon-draw aria-pressed="false">{{ _('Draw polygon') }}</button>
                 <button type="button" class="button ghost" data-managed-eyedropper-accept disabled>{{ _('Accept sample') }}</button>

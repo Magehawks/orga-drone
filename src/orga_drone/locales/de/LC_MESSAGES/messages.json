@@ -1350,5 +1350,18 @@
   "Show selection overlay": "Auswahl-Overlay einblenden",
   "unbound": "ungebunden",
   "Empty": "Leer",
-  "invert": "invertiert"
+  "invert": "invertiert",
+  "Exposure value": "Belichtungswert",
+  "Temperature value": "Farbtemperaturwert",
+  "Tint value": "Tint-Wert",
+  "Contrast value": "Kontrastwert",
+  "Pivot value": "Pivot-Wert",
+  "Blacks value": "Schwarz-Wert",
+  "Shadows value": "Schattenwert",
+  "Highlights value": "Lichterwert",
+  "Whites value": "Weiß-Wert",
+  "Lift value": "Lift-Wert",
+  "Gamma value": "Gamma-Wert",
+  "Gain value": "Gain-Wert",
+  "Offset value": "Offset-Wert"
 }

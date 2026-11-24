@@ -1327,5 +1327,18 @@
   "Show selection overlay": "Show selection overlay",
   "unbound": "unbound",
   "Empty": "Empty",
-  "invert": "invert"
+  "invert": "invert",
+  "Exposure value": "Exposure value",
+  "Temperature value": "Temperature value",
+  "Tint value": "Tint value",
+  "Contrast value": "Contrast value",
+  "Pivot value": "Pivot value",
+  "Blacks value": "Blacks value",
+  "Shadows value": "Shadows value",
+  "Highlights value": "Highlights value",
+  "Whites value": "Whites value",
+  "Lift value": "Lift value",
+  "Gamma value": "Gamma value",
+  "Gain value": "Gain value",
+  "Offset value": "Offset value"
 }

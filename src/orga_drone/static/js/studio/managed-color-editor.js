@@ -75,11 +75,29 @@ export function createManagedColorEditor({
     highlights: panel.querySelector("[data-managed-highlights]"),
     whites: panel.querySelector("[data-managed-whites]"),
   };
+  const primaryNumberFields = {
+    exposure: panel.querySelector("[data-managed-exposure-number]"),
+    kelvin: panel.querySelector("[data-managed-kelvin-number]"),
+    tint: panel.querySelector("[data-managed-tint-number]"),
+    contrast: panel.querySelector("[data-managed-contrast-number]"),
+    pivot: panel.querySelector("[data-managed-pivot-number]"),
+    saturation: panel.querySelector("[data-managed-saturation-number]"),
+    blacks: panel.querySelector("[data-managed-blacks-number]"),
+    shadows: panel.querySelector("[data-managed-shadows-number]"),
+    highlights: panel.querySelector("[data-managed-highlights-number]"),
+    whites: panel.querySelector("[data-managed-whites-number]"),
+  };
   const wheelFields = {
     lift: panel.querySelector("[data-managed-lift]"),
     gamma: panel.querySelector("[data-managed-gamma]"),
     gain: panel.querySelector("[data-managed-gain]"),
     offset: panel.querySelector("[data-managed-offset]"),
+  };
+  const wheelNumberFields = {
+    lift: panel.querySelector("[data-managed-lift-number]"),
+    gamma: panel.querySelector("[data-managed-gamma-number]"),
+    gain: panel.querySelector("[data-managed-gain-number]"),
+    offset: panel.querySelector("[data-managed-offset-number]"),
   };
   const hslFields = {
     hue: panel.querySelector("[data-managed-hue]"),
@@ -134,15 +152,6 @@ export function createManagedColorEditor({
       sampleStale: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleStale,
       sampleMeta: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSampleMeta,
       eyedropperHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgEyedropper,
-      objectSelectHint: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgObjectSelect,
-      objectSelecting: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgObjectSelecting,
-      objectSelected: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgObjectSelected,
-      objectFailed: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgObjectFailed,
-      objectDefaultName: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgObjectDefaultName,
       brushHint: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrush,
       brushDrawing: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBrushDrawing,
       brushCancelled: panel.querySelector("[data-managed-selection-panel]")?.dataset
@@ -158,13 +167,6 @@ export function createManagedColorEditor({
         .msgPolygonDragging,
       polygonEdited: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgPolygonEdited,
-      polygonVertexAdded: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgPolygonVertexAdded,
-      polygonVertexRemoved: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgPolygonVertexRemoved,
-      polygonMoving: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgPolygonMoving,
-      polygonMoved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgPolygonMoved,
       selectionSaved: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSaved,
       selectionCleared: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgCleared,
       selectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgSelection,
@@ -173,30 +175,8 @@ export function createManagedColorEditor({
       bindingLine: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgBindingLine,
       bindingUnbound: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgBindingUnbound,
-      bindingUnboundShort: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgBindingUnboundShort,
       noSelectionStatus: panel.querySelector("[data-managed-selection-panel]")?.dataset
         .msgNoSelection,
-      untitledMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgUntitledMask,
-      maskSelected: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgMaskSelected,
-      renameMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenameMask,
-      renamePrompt: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgRenamePrompt,
-      deleteMask: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgDeleteMask,
-      deleteConfirm: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgDeleteConfirm,
-      maskDeleted: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgMaskDeleted,
-      hideOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgHideOverlay,
-      showOverlay: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgShowOverlay,
-      hideOverlayAria: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgHideOverlayAria,
-      showOverlayAria: panel.querySelector("[data-managed-selection-panel]")?.dataset
-        .msgShowOverlayAria,
-      typePolygon: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypePolygon,
-      typeBrush: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeBrush,
-      typeRadial: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeRadial,
-      typeLinear: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeLinear,
-      typeEmpty: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgTypeEmpty,
-      invertShort: panel.querySelector("[data-managed-selection-panel]")?.dataset.msgInvertShort,
     },
     onChanged: (payload) => {
       current = payload;
@@ -243,44 +223,69 @@ export function createManagedColorEditor({
     },
   });
 
-  bindValueLabel(fields.exposure, labels.exposure, (v) => `${v.toFixed(2)} EV`);
-  bindValueLabel(fields.kelvin, labels.kelvin, (v) => `${Math.round(v)} K`);
-  bindValueLabel(fields.tint, labels.tint, (v) => `${Math.round(v)}`);
-  bindValueLabel(fields.contrast, labels.contrast, (v) => v.toFixed(2));
-  bindValueLabel(fields.pivot, labels.pivot, (v) => v.toFixed(3));
-  bindValueLabel(fields.saturation, labels.saturation, (v) => v.toFixed(2));
-  bindValueLabel(fields.blacks, labels.blacks, (v) => `${Math.round(v)}`);
-  bindValueLabel(fields.shadows, labels.shadows, (v) => `${Math.round(v)}`);
-  bindValueLabel(fields.highlights, labels.highlights, (v) => `${Math.round(v)}`);
-  bindValueLabel(fields.whites, labels.whites, (v) => `${Math.round(v)}`);
-  bindValueLabel(wheelFields.lift, panel.querySelector("[data-managed-lift-value]"), (v) =>
-    v.toFixed(2)
-  );
-  bindValueLabel(wheelFields.gamma, panel.querySelector("[data-managed-gamma-value]"), (v) =>
-    v.toFixed(2)
-  );
-  bindValueLabel(wheelFields.gain, panel.querySelector("[data-managed-gain-value]"), (v) =>
-    v.toFixed(2)
-  );
-  bindValueLabel(wheelFields.offset, panel.querySelector("[data-managed-offset-value]"), (v) =>
-    v.toFixed(2)
-  );
-  bindValueLabel(
-    hslFields.hue,
-    panel.querySelector("[data-managed-hue-value]"),
-    (v) => `${Math.round(v)}°`
-  );
-  bindValueLabel(hslFields.saturation, panel.querySelector("[data-managed-hsl-sat-value]"), (v) =>
-    v.toFixed(2)
-  );
-  bindValueLabel(hslFields.lightness, panel.querySelector("[data-managed-hsl-light-value]"), (v) =>
-    v.toFixed(2)
-  );
-
+  const liftValueLabel = panel.querySelector("[data-managed-lift-value]");
+  const gammaValueLabel = panel.querySelector("[data-managed-gamma-value]");
+  const gainValueLabel = panel.querySelector("[data-managed-gain-value]");
+  const offsetValueLabel = panel.querySelector("[data-managed-offset-value]");
   const hueValueLabel = panel.querySelector("[data-managed-hue-value]");
   const satValueLabel = panel.querySelector("[data-managed-hsl-sat-value]");
   const lightValueLabel = panel.querySelector("[data-managed-hsl-light-value]");
 
+  const primaryPairSpecs = {
+    exposure: { min: -4, max: 4, step: 0.05, fallback: 0, format: (v) => v.toFixed(2), label: (v) => `${v.toFixed(2)} EV` },
+    kelvin: { min: 2000, max: 15000, step: 50, fallback: 6500, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)} K` },
+    tint: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+    contrast: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), label: (v) => v.toFixed(2) },
+    pivot: { min: 0.001, max: 1, step: 0.001, fallback: 0.18, format: (v) => v.toFixed(3), label: (v) => v.toFixed(3) },
+    saturation: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), label: (v) => v.toFixed(2) },
+    blacks: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+    shadows: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+    highlights: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+    whites: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+  };
+  const wheelPairSpecs = {
+    lift: { min: -0.5, max: 0.5, step: 0.01, fallback: 0, format: (v) => v.toFixed(2), labelEl: liftValueLabel },
+    gamma: { min: 0.2, max: 3, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), labelEl: gammaValueLabel },
+    gain: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), labelEl: gainValueLabel },
+    offset: { min: -0.5, max: 0.5, step: 0.01, fallback: 0, format: (v) => v.toFixed(2), labelEl: offsetValueLabel },
+  };
+
+  const primaryPairs = Object.fromEntries(
+    Object.entries(primaryPairSpecs).map(([key, spec]) => [
+      key,
+      bindSliderNumberPair({
+        slider: fields[key],
+        numberInput: primaryNumberFields[key],
+        min: spec.min,
+        max: spec.max,
+        step: spec.step,
+        fallback: spec.fallback,
+        format: spec.format,
+        onInput: (v) => {
+          if (labels[key]) labels[key].textContent = spec.label(v);
+        },
+        onCommit: () => scheduleSave(),
+      }),
+    ])
+  );
+  const wheelPairs = Object.fromEntries(
+    Object.entries(wheelPairSpecs).map(([key, spec]) => [
+      key,
+      bindSliderNumberPair({
+        slider: wheelFields[key],
+        numberInput: wheelNumberFields[key],
+        min: spec.min,
+        max: spec.max,
+        step: spec.step,
+        fallback: spec.fallback,
+        format: spec.format,
+        onInput: (v) => {
+          if (spec.labelEl) spec.labelEl.textContent = spec.format(v);
+        },
+        onCommit: () => scheduleSave(),
+      }),
+    ])
+  );
   const hslPairs = {
     hue: bindSliderNumberPair({
       slider: hslFields.hue,
@@ -323,11 +328,20 @@ export function createManagedColorEditor({
     }),
   };
 
-  function paintHslGroup(values) {
-    Object.entries(hslPairs).forEach(([key, pair]) => {
+  function paintPairGroup(pairs, values) {
+    Object.entries(pairs).forEach(([key, pair]) => {
       if (!(key in values) || !pair) return;
       pair.setValue(values[key], { emitInput: true });
     });
+  }
+  function paintHslGroup(values) {
+    paintPairGroup(hslPairs, values);
+  }
+  function paintPrimariesGroup(values) {
+    paintPairGroup(primaryPairs, values);
+  }
+  function paintWheelsGroup(values) {
+    paintPairGroup(wheelPairs, values);
   }
 
   function setStatus(message) {
@@ -340,12 +354,18 @@ export function createManagedColorEditor({
         if (input) input.disabled = !enabled || busy;
       }
     );
-    Object.values(hslNumberFields).forEach((input) => {
+    [
+      ...Object.values(primaryNumberFields),
+      ...Object.values(wheelNumberFields),
+      ...Object.values(hslNumberFields),
+    ].forEach((input) => {
       if (input) input.disabled = !enabled || busy;
     });
-    Object.values(hslPairs).forEach((pair) => {
-      pair?.setDisabled?.(!enabled || busy);
-    });
+    [...Object.values(primaryPairs), ...Object.values(wheelPairs), ...Object.values(hslPairs)].forEach(
+      (pair) => {
+        pair?.setDisabled?.(!enabled || busy);
+      }
+    );
     [resetBtn, wheelsResetBtn, hslResetBtn].forEach((button) => {
       if (button) button.disabled = !enabled || busy;
     });
@@ -442,11 +462,11 @@ export function createManagedColorEditor({
       }
       if (!previewTokens.isCurrent(paintToken) || !selectedStillCurrent(studioId)) return;
       if (managed) {
-        paintGroup(fields, {
+        paintPrimariesGroup({
           ...neutralPrimariesParams(),
           ...(findStep(current.grade, "primaries-v1")?.params || {}),
         });
-        paintGroup(wheelFields, {
+        paintWheelsGroup({
           ...neutralWheelsParams(),
           ...(findStep(current.grade, "wheels-v1")?.params || {}),
         });
@@ -631,6 +651,7 @@ export function createManagedColorEditor({
       setStatus(String(error.message || error));
     } finally {
       busy = false;
+      setEnabled(current?.evaluator === "managed-sdr-v1");
     }
   });
 
@@ -659,15 +680,16 @@ export function createManagedColorEditor({
       setStatus(String(error.message || error));
     } finally {
       busy = false;
+      setEnabled(current?.evaluator === "managed-sdr-v1");
     }
   });
 
   resetBtn?.addEventListener("click", () => {
-    paintGroup(fields, neutralPrimariesParams());
+    paintPrimariesGroup(neutralPrimariesParams());
     scheduleSave();
   });
   wheelsResetBtn?.addEventListener("click", () => {
-    paintGroup(wheelFields, neutralWheelsParams());
+    paintWheelsGroup(neutralWheelsParams());
     scheduleSave();
   });
   hslResetBtn?.addEventListener("click", () => {
@@ -691,8 +713,8 @@ export function createManagedColorEditor({
       return previewTokens.isCurrent(token);
     },
     reset() {
-      paintGroup(fields, neutralPrimariesParams());
-      paintGroup(wheelFields, neutralWheelsParams());
+      paintPrimariesGroup(neutralPrimariesParams());
+      paintWheelsGroup(neutralWheelsParams());
       paintHslGroup(neutralManagedHslParams());
       stepEditor.reset();
       previewTokens.invalidate();

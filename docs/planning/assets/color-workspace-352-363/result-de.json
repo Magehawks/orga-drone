@@ -1,0 +1,13 @@
+{
+  "status": "FAIL",
+  "locale": "de",
+  "cases": [],
+  "packaged_exe": "NOT_RUN \u2014 deferred by PO",
+  "browser": "Edg/158.0.4370.33",
+  "source_hashes": {
+    "clip-c.mp4": "1f57d63199267069fb3adb14aa5a9305f78ba97b0cb5ee862c532803a5d9dbf8",
+    "photo-a.jpg": "1ac00328fe36f0dfcc3667873e1825622582aaed7a5b636801875ec5a10dee93",
+    "photo-b.jpg": "bd158987fa990be60b7584030ffa14717baa4770563e5d4e01d852f470d76ab4"
+  },
+  "error": "[WinError 10053] Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen"
+}

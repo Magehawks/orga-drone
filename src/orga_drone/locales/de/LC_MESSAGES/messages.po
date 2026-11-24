@@ -1307,3 +1307,45 @@ msgstr "{id} → {step}"
 
 msgid "{id} (not bound)"
 msgstr "{id} (nicht verknüpft)"
+
+msgid "Exposure value"
+msgstr "Belichtungswert"
+
+msgid "Temperature value"
+msgstr "Farbtemperaturwert"
+
+msgid "Tint value"
+msgstr "Tint-Wert"
+
+msgid "Contrast value"
+msgstr "Kontrastwert"
+
+msgid "Pivot value"
+msgstr "Pivot-Wert"
+
+msgid "Saturation value"
+msgstr "Sättigungswert"
+
+msgid "Blacks value"
+msgstr "Schwarz-Wert"
+
+msgid "Shadows value"
+msgstr "Schattenwert"
+
+msgid "Highlights value"
+msgstr "Lichterwert"
+
+msgid "Whites value"
+msgstr "Weiß-Wert"
+
+msgid "Lift value"
+msgstr "Lift-Wert"
+
+msgid "Gamma value"
+msgstr "Gamma-Wert"
+
+msgid "Gain value"
+msgstr "Gain-Wert"
+
+msgid "Offset value"
+msgstr "Offset-Wert"

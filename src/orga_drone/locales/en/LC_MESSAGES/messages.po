@@ -1287,3 +1287,45 @@ msgstr "{id} → {step}"
 
 msgid "{id} (not bound)"
 msgstr "{id} (not bound)"
+
+msgid "Exposure value"
+msgstr "Exposure value"
+
+msgid "Temperature value"
+msgstr "Temperature value"
+
+msgid "Tint value"
+msgstr "Tint value"
+
+msgid "Contrast value"
+msgstr "Contrast value"
+
+msgid "Pivot value"
+msgstr "Pivot value"
+
+msgid "Saturation value"
+msgstr "Saturation value"
+
+msgid "Blacks value"
+msgstr "Blacks value"
+
+msgid "Shadows value"
+msgstr "Shadows value"
+
+msgid "Highlights value"
+msgstr "Highlights value"
+
+msgid "Whites value"
+msgstr "Whites value"
+
+msgid "Lift value"
+msgstr "Lift value"
+
+msgid "Gamma value"
+msgstr "Gamma value"
+
+msgid "Gain value"
+msgstr "Gain value"
+
+msgid "Offset value"
+msgstr "Offset value"

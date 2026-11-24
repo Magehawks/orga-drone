@@ -79,3 +79,21 @@ Record packaged-only evidence as `NOT_RUN — deferred by PO`.
 2. Packaged rows still NOT_RUN: WebView2 parity, scopes latency/memory, GPU budgets, ≥5 cold/warm samples.
 3. Do not build packaged Windows EXE until PO starts that phase.
 4. Remaining technical fail-closed (document, not silent PASS): story-local `slow_span`, `forward_loop`+ramp, ramp+repeats; GPU exact only on RGBA32F.
+
+## Follow-up slice — `feat/color-workspace-352-363` (2026-11-24)
+
+Pinned develop tip: `ed22c9d`.
+
+### Added in this PR
+- Slider ↔ editable number sync for managed primaries and wheels (HSL already had it).
+- Deterministic CI regression contract detecting incorrect serial order, broken persistence, and preview/export mismatch (`tests/test_color_workspace_regression_contract.py`), including in-process mutation proof for reversed step order.
+- Native source-app WebView2 operator journey harness (`packaging/e2e/studio_color_workspace_operators.py`) with screenshots; packaged EXE remains **NOT_RUN — deferred by PO**.
+
+### Shared-file ownership vs Masking workstream
+- This PR does **not** rewrite `studio_mask.py` or introduce a competing mask engine.
+- Selection UI consumption stays on existing managed selection APIs.
+- Shared touch surface is limited to additive Studio inspector template fields, locales, and tests.
+
+### Issue close readiness
+Source-level operators for #352–#357, #360, #361, #363 remain largely shipped on develop. Packaged Windows EXE ACs stay NOT_RUN. Do not auto-close issues that still require packaged evidence or human PO confirmation.
+
