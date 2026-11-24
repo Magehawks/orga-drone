@@ -1,6 +1,9 @@
 # Shared Studio action contract coverage matrix (#275)
 
-Status: **audit / matrix** on `develop` @ `2f78fb7` (2026-11-12). Does not claim
+Status: **audit / matrix** (living). Permanent entry point:
+[`../REGRESSION_GATES.md`](../REGRESSION_GATES.md) and
+[`../qa/COVERAGE_MATRIX.md`](../qa/COVERAGE_MATRIX.md).
+Historical audit pin included `develop` @ `2f78fb7` (2026-11-12). Does not claim
 Windows packaged MotW E2E unless a real run is recorded. Does not invent new
 quality gates.
 

@@ -1,0 +1,71 @@
+{
+  "schema": "orga-drone-fixture-manifest-v1",
+  "issues": [
+    275,
+    283,
+    284
+  ],
+  "policy": "synthetic-first; optional real footage local-only; never fabricate brand coverage",
+  "in_repo": [
+    {
+      "path": "tests/fixtures/dji_srt_camera_fields_sample.srt",
+      "kind": "srt",
+      "privacy": "sanitized-sample",
+      "notes": "Camera field parsing only"
+    },
+    {
+      "path": "tests/fixtures/dji_srt_hud_sample.srt",
+      "kind": "srt",
+      "privacy": "sanitized-sample",
+      "notes": "HUD sample"
+    },
+    {
+      "path": "tests/fixtures/grade_model_v1.json",
+      "kind": "json",
+      "privacy": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/intent_matrix.json",
+      "kind": "json",
+      "privacy": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/speed_ramp.json",
+      "kind": "json",
+      "privacy": "synthetic"
+    },
+    {
+      "path": "tests/fixtures/regression_gate_modules.json",
+      "kind": "json",
+      "privacy": "synthetic",
+      "notes": "Required regression gate module inventory"
+    }
+  ],
+  "generated_in_test": [
+    {
+      "kind": "jpeg",
+      "tool": "Pillow"
+    },
+    {
+      "kind": "png",
+      "tool": "Pillow"
+    },
+    {
+      "kind": "mp4",
+      "tool": "ffmpeg-lavfi"
+    }
+  ],
+  "optional_real_footage": {
+    "status": "PENDING",
+    "env": "ORGA_DRONE_REAL_FIXTURE_ROOT",
+    "commit_to_repo": false,
+    "fabricate_dji_or_potensic": false
+  },
+  "environment_pins_for_evidence": [
+    "git_sha",
+    "python_version",
+    "ffmpeg_version",
+    "webview2_version",
+    "node_version"
+  ]
+}

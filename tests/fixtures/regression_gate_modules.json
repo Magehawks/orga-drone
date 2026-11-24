@@ -1,0 +1,45 @@
+{
+  "schema": "orga-drone-regression-gate-modules-v1",
+  "issues": [
+    275,
+    283,
+    284
+  ],
+  "python_modules": [
+    "tests/test_regression_gate_inventory.py",
+    "tests/test_local_http.py",
+    "tests/test_control_api.py",
+    "tests/test_studio_history.py",
+    "tests/test_studio_mask.py",
+    "tests/test_studio_transition.py",
+    "tests/test_photo_hsl_export_api.py",
+    "tests/test_studio_collage_export.py",
+    "tests/test_pr_journey_smoke.py",
+    "tests/test_creator_journey.py",
+    "tests/test_studio_actions.py",
+    "packaging/e2e/windows_e2e.py",
+    "packaging/packaged_e2e.py"
+  ],
+  "js_modules": [
+    "tests/js/scopes_accumulate.test.js"
+  ],
+  "docs": [
+    "docs/REGRESSION_GATES.md",
+    "docs/qa/COVERAGE_MATRIX.md",
+    "docs/qa/FIXTURE_MANIFEST.md",
+    "docs/qa/INTEGRATION_OWNERSHIP.md",
+    "tests/fixtures/manifest.json",
+    "docs/discovery/regression-gates-mutation-evidence.md"
+  ],
+  "mutation_targets": [
+    "incorrect_canvas_coordinate_mapping",
+    "broken_hsl_export",
+    "incorrect_clip_targeting",
+    "disabled_persistence",
+    "broken_undo_redo",
+    "incorrect_transition_timing",
+    "missing_collage_export_cleanup",
+    "incorrect_scope_accumulation",
+    "authorization_bypass"
+  ]
+}
