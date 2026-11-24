@@ -12380,29 +12380,11 @@ import {
   });
 
   const scopesRoot = document.getElementById("inspector-image-section-scopes");
+  // Panel identity must match the #366 controller view (managed revision +
+  // seek token). A dataset-only digest rejects every live managed frame.
   colorScopes = createColorScopesPanel({
     root: scopesRoot,
-    getView: () => {
-      const clip = selectedAdjustableClip();
-      return {
-        projectId: String(projectId || ""),
-        clipId: clip ? String(clip.dataset.studioId || "") : "",
-        gradeRevision: clip ? String(clip.dataset.gradeRevision || "0") : "",
-        // Include grade-affecting datasets so local edits invalidate live scopes
-        // until #366 supplies a matching revisioned tap.
-        contextDigest: clip
-          ? [
-              clip.dataset.colorLook || "",
-              clip.dataset.imageAdjust || "",
-              clip.dataset.hsl || "",
-              clip.dataset.colorWheels || "",
-              clip.dataset.detail || "",
-              clip.dataset.saturationRamp || "",
-              clip.dataset.quickLook || "",
-            ].join("|")
-          : "",
-      };
-    },
+    getView: currentScopeView,
     messages: {
       fixtureDisclosure: scopesRoot?.dataset.scopeFixtureDisclosure,
       unavailableDisclosure: scopesRoot?.dataset.scopeUnavailableDisclosure,
@@ -12440,7 +12422,10 @@ import {
         detail: 0,
         expectedRevision: revision || null,
       });
-      const res = await fetch(url, { headers: { Accept: "image/jpeg" } });
+      const res = await fetch(url, {
+        headers: { Accept: "image/jpeg" },
+        signal: meta.signal,
+      });
       if (!res.ok) {
         throw new Error(`preview-frame ${res.status}`);
       }
@@ -12457,6 +12442,17 @@ import {
   });
   syncColorScopesView();
   void colorScopeTap.probe();
+  // CDP/WebView2 E2E inspects live scope metrics without inventing a second renderer.
+  window.__orgaColorScopes = {
+    getState: () => colorScopes?.getState?.() || null,
+    getMetrics: () => colorScopes?.getMetrics?.() || null,
+    getMeasurements: () => colorScopes?.getMeasurements?.() || null,
+    refresh: (reason = "e2e") => refreshColorScopesTap(reason),
+    probe: () => colorScopeTap?.probe?.() || null,
+    destroyProducer: () => colorScopePreviewProducer?.destroy?.(),
+    invalidateProducer: () => colorScopePreviewProducer?.invalidate?.(),
+  };
+  window.__orgaScopePreviewProducer = colorScopePreviewProducer;
 
   colorComparison = createColorCompare({
     button: document.getElementById("inspector-look-compare"),

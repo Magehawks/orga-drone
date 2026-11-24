@@ -249,3 +249,39 @@ test("controller accepts managed preview frames when capability is open", () => 
   assert.equal(result.accepted, true);
   assert.equal(injected.length, 1);
 });
+
+test("producer cancels in-flight fetch on invalidate/destroy", async () => {
+  let abortSeen = false;
+  let resolveFetch;
+  const hanging = new Promise((resolve, reject) => {
+    resolveFetch = { resolve, reject };
+  });
+  const producer = createManagedPreviewScopeProducer({
+    getView: () => ({
+      projectId: "p",
+      clipId: "c",
+      gradeRevision: "1",
+      contextDigest: "d",
+    }),
+    getSourceTimeS: () => 0,
+    fetchPreviewJpeg: (_id, _t, meta = {}) => {
+      if (meta.signal) {
+        meta.signal.addEventListener("abort", () => {
+          abortSeen = true;
+          const err = new Error("aborted");
+          err.name = "AbortError";
+          resolveFetch.reject(err);
+        });
+      }
+      return hanging;
+    },
+    decodeJpegToRgba: async () => ({ rgba: new Uint8ClampedArray(4), width: 1, height: 1 }),
+    tryPublish: () => ({ accepted: true }),
+  });
+  const pending = producer.refresh("manual");
+  producer.invalidate();
+  const result = await pending;
+  assert.equal(result.reason, "cancelled");
+  assert.equal(abortSeen, true);
+  producer.destroy();
+});
