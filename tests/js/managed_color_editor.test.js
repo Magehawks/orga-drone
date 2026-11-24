@@ -59,7 +59,10 @@ function buildPanel() {
     offset: range({ value: 0, disabled: true }),
   };
   const wheelNumbers = Object.fromEntries(
-    Object.entries(wheelFields).map(([key, el]) => [key, range({ value: el.value, disabled: true })])
+    Object.entries(wheelFields).map(([key, el]) => [
+      key,
+      range({ value: el.value, disabled: true }),
+    ])
   );
   const labels = Object.fromEntries(Object.keys(fields).map((key) => [key, label()]));
   const status = { textContent: "" };
@@ -338,7 +341,6 @@ test("managed editor paints primaries and command-saves after reset", async () =
   assert.deepEqual(changed, [8]);
 });
 
-
 test("convert re-enables primaries after busy clears", async () => {
   const fixture = buildPanel();
   let revision = 1;
@@ -354,7 +356,9 @@ test("convert re-enables primaries after busy clears", async () => {
             evaluator: "managed-sdr-v1",
             authority: "canonical",
             revision,
-            grade: { steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }] },
+            grade: {
+              steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }],
+            },
           };
         },
       };
@@ -366,7 +370,9 @@ test("convert re-enables primaries after busy clears", async () => {
           evaluator: "managed-sdr-v1",
           authority: "canonical",
           revision,
-          grade: { steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }] },
+          grade: {
+            steps: [{ type: "primaries-v1", id: "p1", enabled: true, params: { exposure: 0 } }],
+          },
         };
       },
     };

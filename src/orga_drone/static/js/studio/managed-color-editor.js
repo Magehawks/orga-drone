@@ -230,22 +230,120 @@ export function createManagedColorEditor({
   const lightValueLabel = panel.querySelector("[data-managed-hsl-light-value]");
 
   const primaryPairSpecs = {
-    exposure: { min: -4, max: 4, step: 0.05, fallback: 0, format: (v) => v.toFixed(2), label: (v) => `${v.toFixed(2)} EV` },
-    kelvin: { min: 2000, max: 15000, step: 50, fallback: 6500, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)} K` },
-    tint: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
-    contrast: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), label: (v) => v.toFixed(2) },
-    pivot: { min: 0.001, max: 1, step: 0.001, fallback: 0.18, format: (v) => v.toFixed(3), label: (v) => v.toFixed(3) },
-    saturation: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), label: (v) => v.toFixed(2) },
-    blacks: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
-    shadows: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
-    highlights: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
-    whites: { min: -100, max: 100, step: 1, fallback: 0, format: (v) => String(Math.round(v)), label: (v) => `${Math.round(v)}` },
+    exposure: {
+      min: -4,
+      max: 4,
+      step: 0.05,
+      fallback: 0,
+      format: (v) => v.toFixed(2),
+      label: (v) => `${v.toFixed(2)} EV`,
+    },
+    kelvin: {
+      min: 2000,
+      max: 15000,
+      step: 50,
+      fallback: 6500,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)} K`,
+    },
+    tint: {
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)}`,
+    },
+    contrast: {
+      min: 0,
+      max: 4,
+      step: 0.01,
+      fallback: 1,
+      format: (v) => v.toFixed(2),
+      label: (v) => v.toFixed(2),
+    },
+    pivot: {
+      min: 0.001,
+      max: 1,
+      step: 0.001,
+      fallback: 0.18,
+      format: (v) => v.toFixed(3),
+      label: (v) => v.toFixed(3),
+    },
+    saturation: {
+      min: 0,
+      max: 4,
+      step: 0.01,
+      fallback: 1,
+      format: (v) => v.toFixed(2),
+      label: (v) => v.toFixed(2),
+    },
+    blacks: {
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)}`,
+    },
+    shadows: {
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)}`,
+    },
+    highlights: {
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)}`,
+    },
+    whites: {
+      min: -100,
+      max: 100,
+      step: 1,
+      fallback: 0,
+      format: (v) => String(Math.round(v)),
+      label: (v) => `${Math.round(v)}`,
+    },
   };
   const wheelPairSpecs = {
-    lift: { min: -0.5, max: 0.5, step: 0.01, fallback: 0, format: (v) => v.toFixed(2), labelEl: liftValueLabel },
-    gamma: { min: 0.2, max: 3, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), labelEl: gammaValueLabel },
-    gain: { min: 0, max: 4, step: 0.01, fallback: 1, format: (v) => v.toFixed(2), labelEl: gainValueLabel },
-    offset: { min: -0.5, max: 0.5, step: 0.01, fallback: 0, format: (v) => v.toFixed(2), labelEl: offsetValueLabel },
+    lift: {
+      min: -0.5,
+      max: 0.5,
+      step: 0.01,
+      fallback: 0,
+      format: (v) => v.toFixed(2),
+      labelEl: liftValueLabel,
+    },
+    gamma: {
+      min: 0.2,
+      max: 3,
+      step: 0.01,
+      fallback: 1,
+      format: (v) => v.toFixed(2),
+      labelEl: gammaValueLabel,
+    },
+    gain: {
+      min: 0,
+      max: 4,
+      step: 0.01,
+      fallback: 1,
+      format: (v) => v.toFixed(2),
+      labelEl: gainValueLabel,
+    },
+    offset: {
+      min: -0.5,
+      max: 0.5,
+      step: 0.01,
+      fallback: 0,
+      format: (v) => v.toFixed(2),
+      labelEl: offsetValueLabel,
+    },
   };
 
   const primaryPairs = Object.fromEntries(
@@ -359,11 +457,13 @@ export function createManagedColorEditor({
     ].forEach((input) => {
       if (input) input.disabled = !enabled || busy;
     });
-    [...Object.values(primaryPairs), ...Object.values(wheelPairs), ...Object.values(hslPairs)].forEach(
-      (pair) => {
-        pair?.setDisabled?.(!enabled || busy);
-      }
-    );
+    [
+      ...Object.values(primaryPairs),
+      ...Object.values(wheelPairs),
+      ...Object.values(hslPairs),
+    ].forEach((pair) => {
+      pair?.setDisabled?.(!enabled || busy);
+    });
     [resetBtn, wheelsResetBtn, hslResetBtn].forEach((button) => {
       if (button) button.disabled = !enabled || busy;
     });
