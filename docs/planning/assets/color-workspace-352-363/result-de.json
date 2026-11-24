@@ -1,7 +1,130 @@
 {
-  "status": "FAIL",
+  "status": "PASS",
   "locale": "de",
-  "cases": [],
+  "cases": [
+    {
+      "name": "pro_mode",
+      "ok": true,
+      "detail": {
+        "open": true,
+        "mode": "pro"
+      }
+    },
+    {
+      "name": "convert_managed",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "exposureEnabled": true,
+        "numberEnabled": true,
+        "status": "managed-sdr \u00b7 Rev 1 \u00b7 Preview/Export-Bake"
+      }
+    },
+    {
+      "name": "primaries_slider_number_sync",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "slider": "0.35",
+        "number": "0.35",
+        "tintNumber": "12",
+        "label": "0.35 EV"
+      }
+    },
+    {
+      "name": "wheels_hsl_numeric",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "gainSlider": "1.15",
+        "hueSlider": "18"
+      }
+    },
+    {
+      "name": "curve_editor",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "family": "rgb-curves-v1",
+        "path": "M8,152 L212,8"
+      }
+    },
+    {
+      "name": "selection_radial",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "status": "Keine Auswahl \u00b7 Rev 3",
+        "type": null
+      }
+    },
+    {
+      "name": "serial_reorder",
+      "ok": true,
+      "detail": {
+        "before": [
+          "primaries-mwun9wm1",
+          "wheels-mwun9ypn",
+          "hsl-mwun9ypn"
+        ],
+        "after": [
+          "wheels-mwun9ypn",
+          "primaries-mwun9wm1",
+          "hsl-mwun9ypn"
+        ],
+        "domAfter": [
+          "wheels-mwun9ypn",
+          "primaries-mwun9wm1",
+          "hsl-mwun9ypn"
+        ],
+        "uiBefore": [
+          "wheels-mwun9ypn",
+          "primaries-mwun9wm1",
+          "hsl-mwun9ypn"
+        ],
+        "uiAfter": [
+          "primaries-mwun9wm1",
+          "wheels-mwun9ypn",
+          "hsl-mwun9ypn"
+        ],
+        "status": "3 Schritte \u00b7 seriell"
+      }
+    },
+    {
+      "name": "undo_redo",
+      "ok": true,
+      "detail": {
+        "present": true
+      }
+    },
+    {
+      "name": "constrained_layout",
+      "ok": true,
+      "detail": {
+        "imageVisible": true,
+        "managedOpen": true,
+        "previewVisible": true,
+        "window": {
+          "w": 1100,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "video_clip_inspector",
+      "ok": true,
+      "detail": {
+        "enabled": true,
+        "numberEnabled": true,
+        "status": "managed-sdr \u00b7 Rev 6 \u00b7 Preview/Export-Bake",
+        "selected": "3"
+      }
+    },
+    {
+      "name": "source_integrity",
+      "ok": true
+    }
+  ],
   "packaged_exe": "NOT_RUN \u2014 deferred by PO",
   "browser": "Edg/158.0.4370.33",
   "source_hashes": {
@@ -9,5 +132,16 @@
     "photo-a.jpg": "1ac00328fe36f0dfcc3667873e1825622582aaed7a5b636801875ec5a10dee93",
     "photo-b.jpg": "bd158987fa990be60b7584030ffa14717baa4770563e5d4e01d852f470d76ab4"
   },
-  "error": "[WinError 10053] Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen"
+  "clip_ids": [
+    1,
+    2,
+    3
+  ],
+  "screenshots": [
+    "01-before-de.png",
+    "02-managed-de.png",
+    "03-operators-de.png",
+    "04-constrained-de.png",
+    "05-video-de.png"
+  ]
 }

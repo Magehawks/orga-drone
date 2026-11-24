@@ -160,10 +160,18 @@ def run(out: Path, *, locale: str = "en") -> None:
 
     def select(cid: int) -> None:
         ev(
-            f"(()=>{{let e=document.querySelector('#studio-grid [data-select-clip=\"{cid}\"]');"
-            f"let r=e.getBoundingClientRect();"
-            f"e.dispatchEvent(new MouseEvent('click',{{bubbles:true,clientX:r.x+1}}));"
-            f"document.querySelector('[data-inspector-tab-button=image]').click();}})()"
+            f"""(()=>{{
+              const e=document.querySelector('#studio-grid [data-select-clip="{cid}"]');
+              if (!e) throw new Error('clip not found {cid}');
+              e.scrollIntoView({{block:'nearest', inline:'nearest'}});
+              const r=e.getBoundingClientRect();
+              e.dispatchEvent(new MouseEvent('click',{{
+                bubbles:true,
+                clientX:r.x+Math.max(1,r.width/2),
+                clientY:r.y+Math.max(1,r.height/2)
+              }}));
+              document.querySelector('[data-inspector-tab-button=image]')?.click();
+            }})()"""
         )
         until(
             f"document.querySelector('#studio-grid .studio-clip.is-selected')"
@@ -331,14 +339,13 @@ def run(out: Path, *, locale: str = "en") -> None:
         )
         result["cases"].append({"name": "selection_radial", "ok": True, "detail": selection})
 
-        # Ensure >=2 steps, reorder via shared grade command, verify UI, then UI Move down.
-        try:
-            reorder = ev(
+        # Ensure >=2 steps, reorder via shared grade command, verify DOM, then UI Move down.
+        reorder = ev(
             """(async()=>{
               window.confirm = () => true;
               const selected=document.querySelector('#studio-grid .studio-clip.is-selected');
               const studioId=selected?.dataset.studioId;
-              if (!studioId) return {skipped:true, reason:'no selection'};
+              if (!studioId) throw new Error('no selection');
               async function getGrade(){
                 const resp=await fetch('/api/studio/'+studioId+'/grade');
                 return resp.json();
@@ -357,42 +364,49 @@ def run(out: Path, *, locale: str = "en") -> None:
               let rev=body.revision;
               let steps=Array.isArray(body.grade?.steps)?body.grade.steps.slice():[];
               if (!steps.find(s=>s.type==='primaries-v1')) {
-                body=await command('upsert_step_params', {step_id:'p-e2e', type:'primaries-v1', params:{exposure:0.1, kelvin:6500, tint:0, contrast:1, pivot:0.18, saturation:1, blacks:0, shadows:0, highlights:0, whites:0}, enabled:true}, rev);
+                body=await command('upsert_step_params', {step_id:'p-e2e', type:'primaries-v1', params:{exposure:0.1, kelvin:6500, tint:0, contrast:1, pivot:0.18, saturation:1, blacks:0, shadows:0, highlights:0, whites:0}, enabled:true, mix:1, selection_id:null}, rev);
                 rev=body.revision; steps=body.grade.steps;
               }
               if (!steps.find(s=>s.type==='wheels-v1')) {
-                body=await command('upsert_step_params', {step_id:'w-e2e', type:'wheels-v1', params:{lift:0, gamma:1, gain:1.05, offset:0}, enabled:true}, rev);
+                body=await command('upsert_step_params', {step_id:'w-e2e', type:'wheels-v1', params:{lift:0, gamma:1, gain:1.05, offset:0}, enabled:true, mix:1, selection_id:null}, rev);
                 rev=body.revision; steps=body.grade.steps;
               }
               const beforeIds=steps.map(s=>String(s.id));
-              if (beforeIds.length < 2) return {skipped:true, count: beforeIds.length};
+              if (beforeIds.length < 2) throw new Error('need >=2 steps, got '+beforeIds.length);
               const swapped=beforeIds.slice();
               const tmp=swapped[0]; swapped[0]=swapped[1]; swapped[1]=tmp;
               body=await command('reorder_steps', {ids: swapped}, rev);
-              rev=body.revision;
               const apiAfter=(body.grade?.steps||[]).map(s=>String(s.id));
-              // Refresh inspector from server state
-              const clip=document.querySelector('#studio-grid [data-select-clip=\"'+studioId+'\"]');
+              const clip=document.querySelector('#studio-grid [data-select-clip="'+studioId+'"]');
+              clip?.scrollIntoView({block:'nearest'});
               clip?.dispatchEvent(new MouseEvent('click',{bubbles:true}));
               document.querySelector('[data-inspector-tab-button=image]')?.click();
               const panel=document.getElementById('inspector-managed-color');
               if (panel && !panel.open) panel.open = true;
-              await new Promise(r=>setTimeout(r,1000));
-              let domAfter=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')].map(r=>r.dataset.stepId);
-              for (let i=0;i<30 && domAfter.length<2;i++){
+              let domAfter=[];
+              for (let i=0;i<60;i++){
                 await new Promise(r=>setTimeout(r,100));
                 domAfter=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')].map(r=>r.dataset.stepId);
+                if (JSON.stringify(domAfter)===JSON.stringify(apiAfter)) break;
               }
-              // UI gesture: Move down on first row (labels Move down / Nach unten)
-              const rows=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')];
-              const buttons=[...rows[0].querySelectorAll('button')];
-              const moveDown=buttons.find(b=>/down|unten|↓/i.test(b.textContent||'')) || buttons[buttons.length-1];
-              const uiBefore=rows.map(r=>r.dataset.stepId);
-              moveDown?.click();
-              await new Promise(r=>setTimeout(r,1200));
-              const uiAfter=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')].map(r=>r.dataset.stepId);
+              let moveDown=document.querySelector('[data-managed-step-list] [data-step-id] [data-managed-step-move="down"]');
+              for (let i=0;i<50;i++){
+                if (moveDown && !moveDown.disabled) break;
+                await new Promise(r=>setTimeout(r,100));
+                moveDown=document.querySelector('[data-managed-step-list] [data-step-id] [data-managed-step-move="down"]');
+              }
+              if (!moveDown || moveDown.disabled) {
+                throw new Error('move-down unavailable: '+JSON.stringify({domAfter, apiAfter, disabled:!!moveDown?.disabled}));
+              }
+              const uiBefore=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')].map(r=>r.dataset.stepId);
+              moveDown.click();
+              let uiAfter=uiBefore.slice();
+              for (let i=0;i<60;i++){
+                await new Promise(r=>setTimeout(r,100));
+                uiAfter=[...document.querySelectorAll('[data-managed-step-list] [data-step-id]')].map(r=>r.dataset.stepId);
+                if (JSON.stringify(uiAfter)!==JSON.stringify(uiBefore)) break;
+              }
               return {
-                skipped:false,
                 before: beforeIds,
                 after: apiAfter,
                 domAfter,
@@ -402,17 +416,11 @@ def run(out: Path, *, locale: str = "en") -> None:
               };
             })()"""
         )
-        # Deterministic order gates are in unit/regression contract tests.
-        # This journey records UI/API reorder evidence without hard-failing flaky CDP timing.
-        except Exception as exc:  # noqa: BLE001 - CDP/JS reorder can race revisions
-            reorder = {"skipped": True, "reason": str(exc)}
-        result["cases"].append({
-            "name": "serial_reorder",
-            "ok": True,
-            "detail": reorder,
-            "order_changed_api": bool(reorder.get("before") != reorder.get("after")) if not reorder.get("skipped") else False,
-            "order_changed_ui": bool(reorder.get("uiBefore") != reorder.get("uiAfter")) if not reorder.get("skipped") else False,
-        })
+        assert reorder.get("before") != reorder.get("after"), reorder
+        assert reorder.get("domAfter") == reorder.get("after"), reorder
+        assert reorder.get("uiBefore") != reorder.get("uiAfter"), reorder
+        assert len(reorder.get("uiAfter") or []) >= 2, reorder
+        result["cases"].append({"name": "serial_reorder", "ok": True, "detail": reorder})
         _shot(cdp, shots / f"03-operators-{locale}.png")
 
         # Undo / redo if available
@@ -420,12 +428,12 @@ def run(out: Path, *, locale: str = "en") -> None:
             """(async()=>{
               const undoBtn=document.querySelector('[data-studio-undo], #studio-undo, button[data-action=undo]');
               const redoBtn=document.querySelector('[data-studio-redo], #studio-redo, button[data-action=redo]');
-              if (!undoBtn) return {skipped:true};
+              if (!undoBtn) return {present:false};
               undoBtn.click();
               await new Promise(r=>setTimeout(r,400));
               redoBtn?.click();
               await new Promise(r=>setTimeout(r,400));
-              return {skipped:false};
+              return {present:true};
             })()"""
         )
         result["cases"].append({"name": "undo_redo", "ok": True, "detail": undo})
@@ -456,38 +464,37 @@ def run(out: Path, *, locale: str = "en") -> None:
         result["cases"].append({"name": "constrained_layout", "ok": True, "detail": layout})
         _shot(cdp, shots / f"04-constrained-{locale}.png")
 
-        # Switch to video clip, convert if needed.
-        video_case: dict[str, Any] | None
-        try:
-            select(ids[-1])
-            video_case = ev(
-                """(async()=>{
-                  window.confirm = () => true;
-                  const panel=document.getElementById('inspector-managed-color');
-                  if (panel && !panel.open) panel.open = true;
-                  document.querySelector('[data-inspector-tab-button=image]')?.click();
-                  document.querySelector('[data-image-mode=pro]')?.click();
-                  await new Promise(r=>setTimeout(r,400));
-                  const convert=document.querySelector('[data-managed-color-convert]');
-                  if (convert && !convert.hidden && !convert.disabled) {
-                    convert.click();
-                    await new Promise(r=>setTimeout(r,1000));
-                  }
-                  let exposure=null;
-                  for (let i=0;i<40;i++) {
-                    exposure=document.querySelector('[data-managed-exposure]');
-                    if (exposure && !exposure.disabled) break;
-                    await new Promise(r=>setTimeout(r,100));
-                  }
-                  return {
-                    enabled: !!(exposure && !exposure.disabled),
-                    numberEnabled: !!(document.querySelector('[data-managed-exposure-number]') && !document.querySelector('[data-managed-exposure-number]').disabled),
-                    status: document.querySelector('[data-managed-color-status]')?.textContent||''
-                  };
-                })()"""
-            )
-        except AssertionError as exc:
-            video_case = {"skipped": True, "reason": str(exc)}
+        # Switch to video clip, convert if needed, and require managed controls.
+        select(ids[-1])
+        video_case = ev(
+            """(async()=>{
+              window.confirm = () => true;
+              const panel=document.getElementById('inspector-managed-color');
+              if (panel && !panel.open) panel.open = true;
+              document.querySelector('[data-inspector-tab-button=image]')?.click();
+              document.querySelector('[data-image-mode=pro]')?.click();
+              await new Promise(r=>setTimeout(r,400));
+              const convert=document.querySelector('[data-managed-color-convert]');
+              if (convert && !convert.hidden && !convert.disabled) {
+                convert.click();
+              }
+              let exposure=null;
+              for (let i=0;i<60;i++) {
+                exposure=document.querySelector('[data-managed-exposure]');
+                if (exposure && !exposure.disabled) break;
+                await new Promise(r=>setTimeout(r,100));
+              }
+              const number=document.querySelector('[data-managed-exposure-number]');
+              return {
+                enabled: !!(exposure && !exposure.disabled),
+                numberEnabled: !!(number && !number.disabled),
+                status: document.querySelector('[data-managed-color-status]')?.textContent||'',
+                selected: document.querySelector('#studio-grid .studio-clip.is-selected')?.dataset.studioId||null
+              };
+            })()"""
+        )
+        assert video_case.get("enabled") is True, video_case
+        assert video_case.get("numberEnabled") is True, video_case
         result["cases"].append({"name": "video_clip_inspector", "ok": True, "detail": video_case})
         _shot(cdp, shots / f"05-video-{locale}.png")
 

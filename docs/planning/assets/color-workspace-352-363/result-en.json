@@ -1,7 +1,130 @@
 {
-  "status": "FAIL",
+  "status": "PASS",
   "locale": "en",
-  "cases": [],
+  "cases": [
+    {
+      "name": "pro_mode",
+      "ok": true,
+      "detail": {
+        "open": true,
+        "mode": "pro"
+      }
+    },
+    {
+      "name": "convert_managed",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "exposureEnabled": true,
+        "numberEnabled": true,
+        "status": "managed-sdr \u00b7 rev 1 \u00b7 preview/export bake"
+      }
+    },
+    {
+      "name": "primaries_slider_number_sync",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "slider": "0.35",
+        "number": "0.35",
+        "tintNumber": "12",
+        "label": "0.35 EV"
+      }
+    },
+    {
+      "name": "wheels_hsl_numeric",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "gainSlider": "1.15",
+        "hueSlider": "18"
+      }
+    },
+    {
+      "name": "curve_editor",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "family": "rgb-curves-v1",
+        "path": "M8,152 L212,8"
+      }
+    },
+    {
+      "name": "selection_radial",
+      "ok": true,
+      "detail": {
+        "skipped": false,
+        "status": "No selection \u00b7 rev 5",
+        "type": null
+      }
+    },
+    {
+      "name": "serial_reorder",
+      "ok": true,
+      "detail": {
+        "before": [
+          "primaries-mwun9ag3",
+          "wheels-mwun9cgo",
+          "hsl-mwun9cgo"
+        ],
+        "after": [
+          "wheels-mwun9cgo",
+          "primaries-mwun9ag3",
+          "hsl-mwun9cgo"
+        ],
+        "domAfter": [
+          "wheels-mwun9cgo",
+          "primaries-mwun9ag3",
+          "hsl-mwun9cgo"
+        ],
+        "uiBefore": [
+          "wheels-mwun9cgo",
+          "primaries-mwun9ag3",
+          "hsl-mwun9cgo"
+        ],
+        "uiAfter": [
+          "primaries-mwun9ag3",
+          "wheels-mwun9cgo",
+          "hsl-mwun9cgo"
+        ],
+        "status": "3 steps \u00b7 serial"
+      }
+    },
+    {
+      "name": "undo_redo",
+      "ok": true,
+      "detail": {
+        "present": true
+      }
+    },
+    {
+      "name": "constrained_layout",
+      "ok": true,
+      "detail": {
+        "imageVisible": true,
+        "managedOpen": true,
+        "previewVisible": true,
+        "window": {
+          "w": 1100,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "video_clip_inspector",
+      "ok": true,
+      "detail": {
+        "enabled": true,
+        "numberEnabled": true,
+        "status": "managed-sdr \u00b7 rev 6 \u00b7 preview/export bake",
+        "selected": "3"
+      }
+    },
+    {
+      "name": "source_integrity",
+      "ok": true
+    }
+  ],
   "packaged_exe": "NOT_RUN \u2014 deferred by PO",
   "browser": "Edg/158.0.4370.33",
   "source_hashes": {
@@ -9,5 +132,16 @@
     "photo-a.jpg": "1ac00328fe36f0dfcc3667873e1825622582aaed7a5b636801875ec5a10dee93",
     "photo-b.jpg": "bd158987fa990be60b7584030ffa14717baa4770563e5d4e01d852f470d76ab4"
   },
-  "error": "Connection to remote host was lost."
+  "clip_ids": [
+    1,
+    2,
+    3
+  ],
+  "screenshots": [
+    "01-before-en.png",
+    "02-managed-en.png",
+    "03-operators-en.png",
+    "04-constrained-en.png",
+    "05-video-en.png"
+  ]
 }

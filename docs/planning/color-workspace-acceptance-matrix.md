@@ -130,7 +130,7 @@ pytest tests/test_studio_grade_animation.py \
 |---|---|---|
 | Primaries/wheels slider ↔ number sync | PASS | `managed-color-editor.js` + `studio.html` + JS unit |
 | Regression contract (order / persistence / preview-export) | PASS | `tests/test_color_workspace_regression_contract.py` |
-| Native source-app operator journey (CDP) | PASS / NOT_RUN | `packaging/e2e/studio_color_workspace_operators.py` (record actual run) |
+| Native source-app operator journey (CDP) | PASS (local harness) | `packaging/e2e/studio_color_workspace_operators.py` |
 | Packaged EXE WebView2 | NOT_RUN — deferred by PO | unchanged |
 | Shared-file ownership vs Masking | PASS (documented) | Additive UI/locale/tests only; no mask-engine rewrite |
 
