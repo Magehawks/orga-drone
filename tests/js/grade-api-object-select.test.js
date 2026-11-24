@@ -78,7 +78,14 @@ test("stale object-select token does not apply later proposal", async () => {
     return true;
   }
 
-  const late = applyIfCurrent(first, { points: [[0, 0], [1, 0], [0.5, 1]], name: "stale" });
+  const late = applyIfCurrent(first, {
+    points: [
+      [0, 0],
+      [1, 0],
+      [0.5, 1],
+    ],
+    name: "stale",
+  });
   const current = applyIfCurrent(second, {
     points: [
       [0.2, 0.2],
