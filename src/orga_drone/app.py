@@ -3763,13 +3763,19 @@ def create_app() -> FastAPI:
     async def api_studio_grade_object_select(
         studio_item_id: int, request: Request
     ) -> JSONResponse:
-        """Local offline object proposal from a click seed (#539/#540).
+        """Local offline object proposal from click seed(s) (#539/#540/#550).
 
         Does not mutate the grade. Client accepts via upsert_selection.
-        Uses source media pixels only — never uploads.
+        Uses source media pixels only — never uploads. Optional ``seeds`` are
+        unioned with the primary ``u``/``v`` click; ``expand_passes`` grows the
+        connected region into nearby similar colors.
         """
         from orga_drone.studio_grade_model import read_grade
-        from orga_drone.studio_object_select import ObjectSelectError, propose_object_polygon
+        from orga_drone.studio_object_select import (
+            MAX_OBJECT_SEEDS,
+            ObjectSelectError,
+            propose_object_polygon,
+        )
 
         try:
             payload = await request.json()
@@ -3788,9 +3794,15 @@ def create_app() -> FastAPI:
                 int(payload["max_edge"]) if payload.get("max_edge") is not None else 640
             )
             tol = float(payload["tol"]) if payload.get("tol") is not None else 16.0
+            expand_passes = (
+                int(payload["expand_passes"])
+                if payload.get("expand_passes") is not None
+                else 2
+            )
         except (TypeError, ValueError) as exc:
             raise HTTPException(
-                status_code=400, detail="u, v, max_edge and tol must be numbers"
+                status_code=400,
+                detail="u, v, max_edge, tol and expand_passes must be numbers",
             ) from exc
         if not (0.0 <= u <= 1.0 and 0.0 <= v <= 1.0):
             raise HTTPException(status_code=400, detail="u and v must be in [0, 1]")
@@ -3798,6 +3810,30 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="max_edge must be 64..2048")
         if tol < 1.0 or tol > 64.0:
             raise HTTPException(status_code=400, detail="tol must be 1..64")
+        if expand_passes < 0 or expand_passes > 8:
+            raise HTTPException(status_code=400, detail="expand_passes must be 0..8")
+        raw_seeds = payload.get("seeds")
+        seeds: list[list[float]] | None = None
+        if raw_seeds is not None:
+            if not isinstance(raw_seeds, list):
+                raise HTTPException(status_code=400, detail="seeds must be a list")
+            if len(raw_seeds) > MAX_OBJECT_SEEDS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"At most {MAX_OBJECT_SEEDS} seeds allowed",
+                )
+            seeds = []
+            for entry in raw_seeds:
+                if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+                    raise HTTPException(
+                        status_code=400, detail="Each seed must be [u, v]"
+                    )
+                try:
+                    seeds.append([float(entry[0]), float(entry[1])])
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(
+                        status_code=400, detail="Each seed must be [u, v] numbers"
+                    ) from exc
 
         project_id = _clip_project_id(studio_item_id)
         if project_id is None:
@@ -3842,7 +3878,13 @@ def create_app() -> FastAPI:
                 ) from exc
         try:
             proposal = propose_object_polygon(
-                Path(media_path), u, v, max_edge=max_edge, tol=tol
+                Path(media_path),
+                u,
+                v,
+                seeds=seeds,
+                max_edge=max_edge,
+                tol=tol,
+                expand_passes=expand_passes,
             )
         except ObjectSelectError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -3858,6 +3900,8 @@ def create_app() -> FastAPI:
                     "elapsed_s": round(proposal.elapsed_s, 4),
                     "proposal_size": list(proposal.proposal_size),
                     "seed_uv": list(proposal.seed_uv),
+                    "seeds_uv": [list(s) for s in proposal.seeds_uv],
+                    "expand_passes": proposal.expand_passes,
                 },
             }
         )

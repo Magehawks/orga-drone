@@ -110,6 +110,26 @@ partial-rerun, older-green, or mismatched evidence. The workflow and harness
 files must also be unchanged between the PR base and head. Native dialogs,
 MOTW/SmartScreen behavior, and release publication remain manual.
 
+## Masking UX packaged gate (develop / local)
+
+Deterministic unit and HTTP coverage for mask list, object-select (including
+multi-seed), overlay, and still export runs in the required **CI** pytest job
+(`tests/test_studio_object_select*.py`, `tests/test_studio_masking_api_coverage.py`).
+
+Native WebView2 masking acceptance is reproducible via:
+
+```text
+python packaging/e2e/studio_masking_ux.py --exe dist/orga-drone/orga-drone.exe
+```
+
+or against a running E2E-enabled app with `--port` / `--cdp-port`. Neon Relic
+fixtures stay off-repo; optional coverage:
+`ORGA_NEON_RELIC_DIR=… pytest tests/test_neon_relic_object_select_coverage.py`.
+Letterbox coordinate alignment remains
+`packaging/e2e/studio_mask_coordinate_align.py` (#561). These packaging scripts
+are the Windows masking gate for #543; they are not yet part of the main
+admission journey set on every develop PR.
+
 ## Deferred packaged coverage
 
 LUT preview/export parity is not yet part of the packaged E2E. It needs a
