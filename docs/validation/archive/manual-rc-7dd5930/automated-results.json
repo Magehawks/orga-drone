@@ -1,0 +1,324 @@
+{
+  "kind": "local-rc-acceptance-not-release-or-GitHub-admission",
+  "candidate": {
+    "kind": "local-manual-rc-not-release-or-admission-evidence",
+    "build_sha": "7dd593000844ab7b6832bb24608f2629ec515c1c",
+    "exe_sha256": "48914e0b376dc886b8aec4e058b5f8fd89e209b0944de00e758340798bdd2ab1",
+    "verified_current_checkout_modules": 76,
+    "ffmpeg_version": "ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers",
+    "ffmpeg_sha256": "e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf",
+    "third_party_verdict": "GO\n\nThis file is not a compliance certificate and not legal advice.\nNo technical blocker was recorded. This is not a legal opinion.\n\nffmpeg sha256: e9041e42f9cb1e1faccae46aa4af03ffd70e11474cc085846abdc3dd6e8aadcf\nimageio-ffmpeg LICENSE already in the onefolder: true\nreverse-geocoder .py already outside the archive: true\n\nNo blocker was recorded by this script.\n\nOpen legal questions. These lines do not change GO or NO-GO. A technical GO is not a legal opinion.\n- The effect of a separate ffmpeg process on the MIT application is undecided.\n- The PyInstaller bootloader exception is included as text. Its legal effect is undecided.\n",
+    "human_acceptance": "NOT TESTED",
+    "motw_explorer_extraction": "NOT TESTED; required before publication",
+    "isolation": "Start-Manual-RC.cmd -> manual-test-data beside this launcher; ephemeral loopback port; CDP off",
+    "zip_sha256": "79113b062cd8ef8418dcf6ef9612b0bd373a3a76fe21b3719482fcc6beb6d2cf",
+    "zip_bytes": 133441375,
+    "extraction": "PASS, programmatic CRC and every-file SHA-256",
+    "packaged_files": 718
+  },
+  "launcher_verification": {
+    "default_user_data_unchanged": true,
+    "manual_product_test": "NOT TESTED",
+    "MOTW": "NOT TESTED",
+    "launcher_startup": "PASS",
+    "native_webview_navigation": true,
+    "health": {
+      "status": "ok",
+      "version": "2.3.3"
+    },
+    "cdp_enabled": false,
+    "initial_media_count": 0,
+    "initial_root_count": 0
+  },
+  "environment": {
+    "python": "3.12.3",
+    "windows": "Windows-11-10.0.26300-SP0",
+    "webview2": "157.0.4341.42",
+    "node": "v26.13.0",
+    "build_dependencies": {
+      "PyInstaller": "6.22.3",
+      "pyinstaller-hooks-contrib": "2026.9",
+      "pywebview": "6.2.1",
+      "pythonnet": "3.2.1",
+      "clr_loader": "0.3.1",
+      "fastapi": "0.162.0",
+      "uvicorn": "0.54.0",
+      "jinja2": "3.1.6",
+      "python-multipart": "0.0.33",
+      "pillow": "13.0.0",
+      "pillow-heif": "1.8.1",
+      "python-dotenv": "1.2.4",
+      "imageio-ffmpeg": "0.8.1",
+      "reverse-geocoder": "1.5.1"
+    }
+  },
+  "regression": {
+    "ruff": "PASS",
+    "mypy": "PASS, 80 files including new RC scripts",
+    "python_core": "1127 passed, 3 skipped, 438.36 s",
+    "journey_smoke": "2 passed, 7.80 s",
+    "focused_rc_and_lut_smoke": "9 passed (4 new RC safety/reporting checks plus 5 existing LUT gate checks)",
+    "javascript": "lint/format PASS; 106 tests passed"
+  },
+  "commands": {
+    "functional": {
+      "exit_code": 0,
+      "result": "pass",
+      "journeys": {
+        "edit_persistence": {
+          "ok": true,
+          "elapsed_ms": 328
+        },
+        "export": {
+          "ok": true,
+          "elapsed_ms": 1233
+        },
+        "image_export": {
+          "ok": true,
+          "elapsed_ms": 281
+        },
+        "library_navigation": {
+          "ok": true,
+          "elapsed_ms": 436
+        },
+        "media_import": {
+          "ok": true,
+          "elapsed_ms": 563
+        },
+        "playback": {
+          "ok": true,
+          "elapsed_ms": 1343
+        },
+        "relaunch_persistence": {
+          "ok": true,
+          "elapsed_ms": 3125
+        },
+        "source_integrity": {
+          "ok": true,
+          "elapsed_ms": 0
+        },
+        "startup": {
+          "ok": true,
+          "elapsed_ms": 280
+        },
+        "studio_open": {
+          "ok": true,
+          "elapsed_ms": 672
+        }
+      }
+    },
+    "color": {
+      "exit_code": 0,
+      "status": "COMPLETE_DIAGNOSTIC_NOT_PARITY_APPROVAL",
+      "errors": [],
+      "sources_unchanged": true
+    },
+    "lut-creative": {
+      "exit_code": 0,
+      "status": "COMPLETE_LUT_DIAGNOSTIC",
+      "errors": [],
+      "source_unchanged": true,
+      "strict_parity_pass": false,
+      "parity_pass": true,
+      "decision": "GO_BOUNDED_FIXTURE",
+      "lut_role": "creative",
+      "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+      "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+      "paused_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304288194444444
+      },
+      "playing_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304280960648148
+      },
+      "seek_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304288194444444
+      },
+      "persisted_lut_stage": {
+        "conversion_lut": false,
+        "creative_lut": true
+      }
+    },
+    "lut-conversion": {
+      "exit_code": 0,
+      "status": "COMPLETE_LUT_DIAGNOSTIC",
+      "errors": [],
+      "source_unchanged": true,
+      "strict_parity_pass": false,
+      "parity_pass": true,
+      "decision": "GO_BOUNDED_FIXTURE",
+      "lut_role": "conversion",
+      "baseline_max_swatch_mean_rgb_error": 2.6666666666666665,
+      "tolerance_max_swatch_mean_rgb": 4.166666666666666,
+      "paused_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304288194444444
+      },
+      "playing_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304280960648148
+      },
+      "seek_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 3.304280960648148
+      },
+      "persisted_lut_stage": {
+        "conversion_lut": true,
+        "creative_lut": false
+      }
+    },
+    "clock-cut": {
+      "exit_code": 0,
+      "status": "COMPLETE_DIAGNOSTIC_NOT_PARITY_APPROVAL",
+      "errors": [],
+      "sources_unchanged": true,
+      "summary": {
+        "status": "NOT_A_CROSSFADE_TRACE",
+        "samples": 157
+      }
+    },
+    "clock-fade_black": {
+      "exit_code": 0,
+      "status": "COMPLETE_DIAGNOSTIC_NOT_PARITY_APPROVAL",
+      "errors": [],
+      "sources_unchanged": true,
+      "summary": {
+        "status": "NOT_A_CROSSFADE_TRACE",
+        "samples": 157
+      }
+    },
+    "clock-crossfade": {
+      "exit_code": 0,
+      "status": "COMPLETE_DIAGNOSTIC_NOT_PARITY_APPROVAL",
+      "errors": [],
+      "sources_unchanged": true,
+      "summary": {
+        "status": "OBSERVED",
+        "samples": 141,
+        "overlap_samples": 35,
+        "primary_samples": 33,
+        "primary_story_drift_max_s": 0.001402584814216401,
+        "story_plateau_max_ms": 200.40000000037253,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 17,
+        "paused_seek_samples": 2,
+        "paused_seek_primary_error_max_s": 1.2891760906019734e-06,
+        "paused_seek_outgoing_error_max_s": 1.2891760907685068e-06,
+        "paused_seek_progress_error_max": 2.289176090575218e-06,
+        "stable_presented_pairs": 24,
+        "presented_pair_drift_max_s": 0.10000000000000009,
+        "presented_pair_drift_p95_s": 0.10000000000000009
+      }
+    },
+    "crossfade-lut-one": {
+      "exit_code": 0,
+      "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+      "errors": [],
+      "source_unchanged": true,
+      "playback_summary": {
+        "status": "OBSERVED",
+        "samples": 139,
+        "overlap_samples": 32,
+        "primary_samples": 29,
+        "primary_story_drift_max_s": 0.001303231017770634,
+        "story_plateau_max_ms": 200.0,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 16,
+        "paused_seek_samples": 0,
+        "paused_seek_primary_error_max_s": null,
+        "paused_seek_outgoing_error_max_s": null,
+        "paused_seek_progress_error_max": null,
+        "stable_presented_pairs": 21,
+        "presented_pair_drift_max_s": 0.10000000000000009,
+        "presented_pair_drift_p95_s": 0.06666700000000025
+      },
+      "inside_crossfade_summary": {
+        "status": "OBSERVED",
+        "samples": 42,
+        "overlap_samples": 19,
+        "primary_samples": 19,
+        "primary_story_drift_max_s": 0.035967366720516813,
+        "story_plateau_max_ms": 50.600000001490116,
+        "outgoing_seek_delta": 0,
+        "fresh_outgoing_presentations": 13,
+        "paused_seek_samples": 0,
+        "paused_seek_primary_error_max_s": null,
+        "paused_seek_outgoing_error_max_s": null,
+        "paused_seek_progress_error_max": null,
+        "stable_presented_pairs": 17,
+        "presented_pair_drift_max_s": 0.033333999999999975,
+        "presented_pair_drift_p95_s": 0.0
+      },
+      "paused_vs_export": {
+        "max_swatch_mean_rgb_error": 4.0,
+        "full_mean_rgb_error": 2.841304976851852
+      }
+    },
+    "crossfade-lut-two": {
+      "exit_code": 0,
+      "status": "COMPLETE_INTEGRATION_DIAGNOSTIC",
+      "errors": [],
+      "source_unchanged": true,
+      "playback_summary": {
+        "status": "OBSERVED",
+        "samples": 139,
+        "overlap_samples": 33,
+        "primary_samples": 30,
+        "primary_story_drift_max_s": 0.001502261712439168,
+        "story_plateau_max_ms": 200.0,
+        "outgoing_seek_delta": 2,
+        "fresh_outgoing_presentations": 16,
+        "paused_seek_samples": 0,
+        "paused_seek_primary_error_max_s": null,
+        "paused_seek_outgoing_error_max_s": null,
+        "paused_seek_progress_error_max": null,
+        "stable_presented_pairs": 22,
+        "presented_pair_drift_max_s": 0.10000000000000009,
+        "presented_pair_drift_p95_s": 0.10000000000000009
+      },
+      "inside_crossfade_summary": {
+        "status": "OBSERVED",
+        "samples": 40,
+        "overlap_samples": 15,
+        "primary_samples": 15,
+        "primary_story_drift_max_s": 0.042367366720516775,
+        "story_plateau_max_ms": 67.60000000149012,
+        "outgoing_seek_delta": 0,
+        "fresh_outgoing_presentations": 12,
+        "paused_seek_samples": 0,
+        "paused_seek_primary_error_max_s": null,
+        "paused_seek_outgoing_error_max_s": null,
+        "paused_seek_progress_error_max": null,
+        "stable_presented_pairs": 13,
+        "presented_pair_drift_max_s": 0.0,
+        "presented_pair_drift_p95_s": 0.0
+      },
+      "paused_vs_export": {
+        "max_swatch_mean_rgb_error": 4.666666666666667,
+        "full_mean_rgb_error": 3.533236400462963
+      }
+    }
+  },
+  "quality_gates": {
+    "real_DJI_crossfade_one_frame": "FAIL carried from #316; not retested as a human acceptance test",
+    "human_acceptance": "NOT TESTED",
+    "MOTW_Explorer_native_dialogs": "NOT TESTED",
+    "lut_creative_strict_3_levels": "FAIL",
+    "lut_creative_existing_bounded_fixture": "PASS",
+    "lut_conversion_strict_3_levels": "FAIL",
+    "lut_conversion_existing_bounded_fixture": "PASS",
+    "clock-crossfade_synthetic_one_frame": "FAIL",
+    "crossfade-lut-one_synthetic_one_frame": "FAIL",
+    "crossfade-lut-two_synthetic_one_frame": "FAIL"
+  },
+  "human_acceptance": "NOT TESTED",
+  "recommendation": "CONDITIONAL GO for manual RC acceptance only; NO-GO for release/parity sign-off",
+  "post_smoke_package_integrity": {
+    "zip_sha256_unchanged": true,
+    "all_718_extracted_files_match_archive": true,
+    "archived_German_checklist_matches_repository": true
+  },
+  "independent_review": "REVIEW_APPROVED"
+}
