@@ -56,7 +56,8 @@ authorization. It does not configure branch protection. See the
 | **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
 | **JavaScript lint, format and tests** | `npm ci`, `npm run lint:js`, `npm run format:check`, `npm run test:js` on Node 22. No browser and no product data. |
 | **App journey smoke** | `pytest tests/test_pr_journey_smoke.py` |
-| **Windows packaged E2E** (PRs to `main` only) | Builds the onefolder ZIP on `windows-latest`, extracts it, and drives the real EXE/WebView2 over CDP with synthetic media. |
+| **Creator regression gates** | `python scripts/run_regression_gates.py` — curated Layer 1–2 creator contracts for #275/#283/#284. See [`REGRESSION_GATES.md`](REGRESSION_GATES.md). |
+| **Windows packaged E2E** (PRs to `main`) | Builds the onefolder ZIP on `windows-latest`, extracts it, and drives the real EXE/WebView2 over CDP with synthetic media. Not a develop PR required check; offline reproduction is documented in `REGRESSION_GATES.md`. |
 
 A local `pytest` from the repo root runs the unit tests **and** the journey
 file. Install dev tools with `pip install -e ".[dev]"`.
@@ -139,7 +140,10 @@ decides to merge.
 
 Stacked PRs must report their actual base and CI evidence. Normal development
 PRs target develop. Packaged Windows E2E and Main admission are triggered for
-main-targeted PRs; this policy does not add those workflows to develop PRs.
+main-targeted PRs; this policy does not make packaged E2E a required develop PR
+check. Use the local packaged commands in
+[`REGRESSION_GATES.md`](REGRESSION_GATES.md) for reproducible Layer 4 evidence.
+The permanent coverage matrix lives in [`qa/COVERAGE_MATRIX.md`](qa/COVERAGE_MATRIX.md).
 
 ## Periodic and release review
 
