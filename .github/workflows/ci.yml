@@ -48,6 +48,11 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         id: chrome
 
+      - name: Pairing security baseline
+        # Mandatory ADR 0032 / #273 gate: wrong bearer, revoke, restart, no key
+        # on disk, no generation path. Do not weaken these assertions to pass CI.
+        run: pytest tests/test_pairing_spike.py tests/test_pairing_security_baseline.py -q --tb=short
+
       - name: Unit tests
         # The journey file has its own check so a failure is visible as
         # "App journey smoke". Local `pytest` still runs it.
