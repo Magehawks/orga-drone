@@ -12,10 +12,28 @@ test("eligibility keeps the existing video and fallback rules", () => {
   assert.equal(evaluateLutProxyEligibility({ kind: "video", hasClipAudio: true }), false);
   assert.equal(evaluateLutProxyEligibility({ kind: "video", playbackSpeed: 0.5 }), false);
   assert.equal(evaluateLutProxyEligibility({ kind: "video", hasSlowBar: true }), false);
-  assert.equal(evaluateLutProxyEligibility({ kind: "video", sectionRepeats: 2 }), false);
-  assert.equal(evaluateLutProxyEligibility({ kind: "video", forwardLoopActive: true }), false);
   assert.equal(evaluateLutProxyEligibility({ kind: "video", colorAnimationKeys: 2 }), false);
   assert.equal(evaluateLutProxyEligibility({ kind: "video", saturationRampEnabled: true }), false);
+});
+
+test("eligibility accepts looped clips with static LUT/HSL/wheels (#294 Phase B)", () => {
+  assert.equal(
+    evaluateLutProxyEligibility({ kind: "video", hasLut: true, forwardLoopActive: true }),
+    true
+  );
+  assert.equal(
+    evaluateLutProxyEligibility({ kind: "video", hslActive: true, sectionRepeats: 3 }),
+    true
+  );
+  assert.equal(
+    evaluateLutProxyEligibility({
+      kind: "video",
+      hasLut: true,
+      forwardLoopActive: true,
+      colorAnimationKeys: 2,
+    }),
+    false
+  );
 });
 
 test("eligibility accepts LUT, HSL, and colour wheel color work", () => {
