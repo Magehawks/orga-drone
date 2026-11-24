@@ -686,9 +686,7 @@ export function createManagedSelectionEditor({
     setStatus(messages.objectSelecting || "Proposing object…");
     objectProgressTimer = setInterval(() => {
       const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-      setStatus(
-        (messages.objectSelectingSlow || "Still proposing… {s}s").replace("{s}", elapsed)
-      );
+      setStatus((messages.objectSelectingSlow || "Still proposing… {s}s").replace("{s}", elapsed));
     }, 500);
     try {
       const data = await proposeObjectSelect(studioId, {
@@ -846,8 +844,7 @@ export function createManagedSelectionEditor({
     setViewerMode(next);
     setStatus(
       next === "object-select"
-        ? messages.objectSelectHint ||
-            "Select object: click the subject; Shift+click adds a seed"
+        ? messages.objectSelectHint || "Select object: click the subject; Shift+click adds a seed"
         : ""
     );
     tools.rebind?.();
