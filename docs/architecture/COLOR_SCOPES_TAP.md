@@ -78,6 +78,12 @@ Rules:
 
 - Transport is JPEG (quantization disclosed); not a full-resolution linear reference.
 - Continuous high-rate playback scopes are throttled; not a free-running GPU tap.
-- Packaged Windows WebView2 live-pixel latency/memory budgets: measure in E2E
-  evidence (`PASS`/`FAIL`/`NOT_RUN`).
+- Source-app WebView2 live-pixel latency samples: `packaging/e2e/studio_color_scopes.py`.
+- Packaged EXE WebView2 live-pixel latency/memory budgets: **NOT_RUN** until EXE evidence.
 - Project-composite tap is not implemented in this slice.
+
+## Studio wiring note
+
+`createColorScopesPanel({ getView: currentScopeView })` must share the
+controller identity (managed revision + seek token). A dataset-only digest
+rejects every live managed frame as `stale-view`.
