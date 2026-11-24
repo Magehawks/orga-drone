@@ -99,7 +99,7 @@ bounded DOM size via pagination.
 
 ## Quality checks (local and CI)
 
-Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12 and Node 22) with three jobs. Packaged Windows E2E and Main admission additionally run
+Pull requests run GitHub Actions CI (`CI` workflow, Python 3.12 and Node 22) with four jobs. Packaged Windows E2E and Main admission additionally run
 on PRs targeting `main`; see [`docs/PR_E2E.md`](docs/PR_E2E.md).
 
 Python:
@@ -109,9 +109,10 @@ ruff check .
 mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py
 pytest --ignore=tests/test_pr_journey_smoke.py
 pytest tests/test_pr_journey_smoke.py
+python scripts/run_regression_gates.py
 ```
 
-The last Python command is the **App journey smoke** check (synthetic photo, temporary data directory). A local `pytest` runs that file together with the rest of the suite. What the check covers, and what a person still clicks, is in [`docs/PR_E2E.md`](docs/PR_E2E.md).
+`pytest tests/test_pr_journey_smoke.py` is the **App journey smoke** check (synthetic photo, temporary data directory). `python scripts/run_regression_gates.py` is the curated **Creator regression gates** suite (#275/#283/#284). A local `pytest` still runs the journey file with the rest of the suite. Details: [`docs/PR_E2E.md`](docs/PR_E2E.md) and [`docs/REGRESSION_GATES.md`](docs/REGRESSION_GATES.md).
 
 JavaScript (Node 22.13+):
 
