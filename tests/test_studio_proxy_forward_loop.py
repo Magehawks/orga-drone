@@ -200,7 +200,7 @@ def test_forward_loop_proxy_decoded_frame_matches_preview_still(
     assert files, "proxy mp4 missing"
     proxy_file = files[0]
 
-    still = client.get(f"/api/studio/{clip_id}/preview-frame", params={"t": 0.5})
+    still = client.get(f"/api/studio/{clip_id}/preview-frame", params={"t_s": 0.5})
     assert still.status_code == 200
     still_img = tmp_path / "still.jpg"
     still_img.write_bytes(still.content)
@@ -224,3 +224,4 @@ def test_forward_loop_proxy_decoded_frame_matches_preview_still(
     # Documented preview tolerance: keep mean channel error well under 8/255.
     for a, b in zip(still_rgb, proxy_rgb, strict=True):
         assert abs(a - b) < 8.0, (still_rgb, proxy_rgb)
+
