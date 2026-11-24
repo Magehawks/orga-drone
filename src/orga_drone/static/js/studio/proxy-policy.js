@@ -14,7 +14,10 @@ export function evaluateLutProxyEligibility({
   if (kind !== "video") return false;
   if (hasClipAudio) return false;
   if (Number(playbackSpeed) < 0.999 || hasSlowBar) return false;
-  if (Number(sectionRepeats) > 1 || forwardLoopActive) return false;
+  // Forward-loop / section repeats reuse one graded proxy cycle; Story wraps
+  // seek in proxy-local time (#294 Phase B). Keep rejecting animated color.
+  void sectionRepeats;
+  void forwardLoopActive;
   if (Number(colorAnimationKeys) >= 2) return false;
   if (saturationRampEnabled) return false;
   if (hasLut) return true;
