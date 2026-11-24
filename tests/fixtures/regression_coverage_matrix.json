@@ -101,7 +101,7 @@
         "1_unit": "PASS",
         "2_integration": "PASS",
         "3_browser_e2e": "PARTIAL",
-        "4_native_windows_e2e": "PASS",
+        "4_native_windows_e2e": "PARTIAL",
         "5_visual_performance": "PARTIAL"
       },
       "suites": [
@@ -128,7 +128,7 @@
         "polygon coverage",
         "stale object-select revision 409"
       ],
-      "notes": "Masking acceptance complete follow-up: multi-seed/API/Neon suites registered; packaged studio_masking_ux.py PASS on develop-based EXE (acceptance-evidence/masking-acceptance-complete). Magenta IoU vs TARGET remains classical ~0.60 ceiling (PARTIAL visual)."
+      "notes": "Masking suites (#571 + acceptance follow-up) registered. Local packaged studio_masking_ux.py / letterbox align PASS on develop-based EXE (private acceptance-evidence); matrix L4 stays PARTIAL until dated CI-bound native evidence exists. Magenta IoU classical ~0.60."
     },
     {
       "id": "color-workspace-operators",
