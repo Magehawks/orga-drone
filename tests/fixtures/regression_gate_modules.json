@@ -15,10 +15,23 @@
     "tests/test_photo_hsl_export_api.py",
     "tests/test_studio_collage_export.py",
     "tests/test_pr_journey_smoke.py",
-    "tests/test_creator_journey.py",
     "tests/test_studio_actions.py",
     "packaging/e2e/windows_e2e.py",
     "packaging/packaged_e2e.py"
+  ],
+  "python_gate_nodes": [
+    "tests/test_regression_gate_inventory.py",
+    "tests/test_local_http.py",
+    "tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected",
+    "tests/test_control_api.py::test_two_clip_undo_binds_original_project_clip_and_command",
+    "tests/test_control_api.py::test_original_preview_has_no_editable_target_and_rejects_old_write_and_undo",
+    "tests/test_control_api.py::test_security_lifecycle_and_payloads",
+    "tests/test_studio_history.py",
+    "tests/test_studio_mask.py::test_letterbox_box_scales_between_resolutions",
+    "tests/test_studio_transition.py::test_clamp_user_duration_steps",
+    "tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png",
+    "tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export",
+    "tests/test_pr_journey_smoke.py"
   ],
   "js_modules": [
     "tests/js/scopes_accumulate.test.js"
@@ -28,8 +41,7 @@
     "docs/qa/COVERAGE_MATRIX.md",
     "docs/qa/FIXTURE_MANIFEST.md",
     "docs/qa/INTEGRATION_OWNERSHIP.md",
-    "tests/fixtures/manifest.json",
-    "docs/discovery/regression-gates-mutation-evidence.md"
+    "tests/fixtures/manifest.json"
   ],
   "mutation_targets": [
     "incorrect_canvas_coordinate_mapping",
@@ -41,5 +53,6 @@
     "missing_collage_export_cleanup",
     "incorrect_scope_accumulation",
     "authorization_bypass"
-  ]
+  ],
+  "notes": "python_modules pins inventory existence; python_gate_nodes is the curated CI/mutation clean suite (fast, artifact-asserting)."
 }

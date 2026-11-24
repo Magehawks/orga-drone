@@ -26,12 +26,14 @@ def test_regression_gate_module_inventory_exists_and_is_complete() -> None:
     payload = _load(MODULES)
     assert payload["schema"] == "orga-drone-regression-gate-modules-v1"
     assert payload["issues"] == [275, 283, 284]
-    missing = [
+    file_entries = [
         rel
         for key in ("python_modules", "js_modules", "docs")
         for rel in payload[key]
-        if not (ROOT / rel).is_file()
     ]
+    # Node ids may include "::"; only the path portion must exist.
+    file_entries.extend(node.split("::", 1)[0] for node in payload.get("python_gate_nodes", []))
+    missing = [rel for rel in sorted(set(file_entries)) if not (ROOT / rel).is_file()]
     assert not missing, f"Required regression gate files missing: {missing}"
     required_mutations = {
         "incorrect_canvas_coordinate_mapping",

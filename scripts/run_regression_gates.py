@@ -23,16 +23,18 @@ def _env() -> dict[str, str]:
 
 def main() -> int:
     payload = json.loads(MODULES.read_text(encoding="utf-8"))
-    python_tests = [
-        rel
-        for rel in payload["python_modules"]
-        if rel.startswith("tests/") and rel.endswith(".py")
-    ]
+    nodes = list(payload.get("python_gate_nodes") or [])
+    if not nodes:
+        nodes = [
+            rel
+            for rel in payload["python_modules"]
+            if rel.startswith("tests/") and rel.endswith(".py")
+        ]
     js_tests = list(payload["js_modules"])
     print("Creator regression gates — Python")
     print("PYTHONPATH includes", ROOT / "src")
     py = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "--tb=short", *python_tests],
+        [sys.executable, "-m", "pytest", "-q", "--tb=short", *nodes],
         cwd=ROOT,
         env=_env(),
     )

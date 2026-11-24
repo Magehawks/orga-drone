@@ -74,17 +74,9 @@ python scripts/run_regression_gates.py
 Equivalent explicit list:
 
 ```bash
-pytest -q --tb=short \
-  tests/test_regression_gate_inventory.py \
-  tests/test_local_http.py \
-  tests/test_control_api.py \
-  tests/test_studio_history.py \
-  tests/test_studio_mask.py \
-  tests/test_studio_transition.py \
-  tests/test_photo_hsl_export_api.py \
-  tests/test_studio_collage_export.py \
-  tests/test_pr_journey_smoke.py \
-  tests/test_creator_journey.py
+python scripts/run_regression_gates.py
+# equivalent: pytest nodes from tests/fixtures/regression_gate_modules.json
+# python_gate_nodes, then:
 node --test tests/js/scopes_accumulate.test.js
 ```
 

@@ -9,13 +9,19 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to test (branch, tag, or SHA)
+        required: false
+        default: ''
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: windows-packaged-e2e-${{ github.event.pull_request.number }}
+  group: windows-packaged-e2e-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -26,14 +32,18 @@ jobs:
     steps:
       - name: Checkout pull request merge commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Record candidate and tested tree
         id: candidate
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $head = "${{ github.event.pull_request.head.sha }}"
-          $base = "${{ github.event.pull_request.base.sha }}"
+          $head = "${{ github.event.pull_request.head.sha || github.sha }}"
+          $base = "${{ github.event.pull_request.base.sha || github.sha }}"
+          if (-not $head) { $head = (git rev-parse HEAD).Trim() }
+          if (-not $base) { $base = $head }
           $tested = (git rev-parse HEAD).Trim()
           $tree = (git rev-parse "HEAD^{tree}").Trim()
           # The event payload's merge_commit_sha can lag the merge ref that was
@@ -113,7 +123,7 @@ jobs:
       - name: Upload packaged candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          name: orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: orga-drone-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
@@ -125,7 +135,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
-          $name = "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}"
+          $name = "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}"
           $artifact = $null
           for ($i = 0; $i -lt 10 -and -not $artifact; $i++) {
             $payload = gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | ConvertFrom-Json
@@ -146,15 +156,15 @@ jobs:
             --exe "$env:RUNNER_TEMP\orga-e2e-extract\orga-drone\orga-drone.exe" `
             --zip "orga-drone-windows-x64.zip" `
             --zip-sha256 "${{ steps.package.outputs.sha256 }}" `
-            --artifact-name "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}" `
+            --artifact-name "orga-drone-windows-e2e-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}" `
             --artifact-api-digest "${{ steps.artifact.outputs.api_digest }}" `
             --artifact-api-size "${{ steps.artifact.outputs.api_size }}" `
             --output-dir "$env:RUNNER_TEMP\orga-e2e" `
             --ffmpeg "$ffmpeg" `
             --repository "${{ github.repository }}" `
-            --pr-number "${{ github.event.pull_request.number }}" `
-            --head-sha "${{ github.event.pull_request.head.sha }}" `
-            --base-sha "${{ github.event.pull_request.base.sha }}" `
+            --pr-number "${{ github.event.pull_request.number || 0 }}" `
+            --head-sha "${{ github.event.pull_request.head.sha || github.sha }}" `
+            --base-sha "${{ github.event.pull_request.base.sha || github.sha }}" `
             --merge-sha "${{ steps.candidate.outputs.merge_sha }}" `
             --tree-sha "${{ steps.candidate.outputs.tree_sha }}" `
             --run-id "${{ github.run_id }}" `
@@ -165,7 +175,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: windows-e2e-evidence-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          name: windows-e2e-evidence-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/orga-e2e/evidence.json
           if-no-files-found: error
           retention-days: 30
@@ -174,7 +184,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: windows-e2e-diagnostics-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          name: windows-e2e-diagnostics-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/orga-e2e/*.png
             ${{ runner.temp }}/orga-e2e/data/*.log
