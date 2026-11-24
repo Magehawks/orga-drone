@@ -1,6 +1,6 @@
 # 2.4.0 execution checkpoint
 
-Updated: 2026-11-24 (tracking #298–#300 and dehaze #302 discovery closeout). Integration branch `develop` includes `#401`, `#402`, and `#403`.
+Updated: 2026-11-24 (tracking #298–#300 and dehaze #302 discovery closeout; blocker reconfirm). Integration branch `develop` includes `#401`, `#402`, and `#403`.
 
 GitHub has no milestone objects. This inventory is the issue list from the
 2.4.0 execution directive plus `gh issue list --search "2.4.0"`. A merged PR
@@ -23,11 +23,11 @@ is not acceptance.
 | #294 | HSL/LUT playback on forward loop | VERIFY | Phase A on develop | Phase B loop playback parity is not a 2.4.0 blocker unless promised. | Phase B only if PO promises loop parity | Do not start a playback-clock rewrite. |
 | #295 | Studio UX acceptance | VERIFY | #411 | Discovery recommends Concept C: keep shipped hybrid ramp, declutter Speed panel. Packaged WebView2 NOT_RUN. | PO selection of Concept C | Do not rebuild the speed engine. |
 | #297 | Local object removal | DONE | #398 merged `e397c26` | PO accepted the NO-GO. No removal UI. OpenCV is not packaged for this purpose. | — | Do not reopen as a feature. |
-| #298 | Local motion tracking | VERIFY | #305, #402 + acceptance matrix | Discovery complete. Synthetic LK spike NO-GO for shipping tracker. Real footage / WebView2 NOT_RUN. OpenCV-headless exists for masks, not for a tracker product. | PO acceptance to close discovery | Do not ship Subject Focus or a tracker UI. |
+| #298 | Local motion tracking | VERIFY | #305, #402 + acceptance matrix | Discovery complete. Synthetic LK spike NO-GO (scale drift + rotation false confidence). Real footage / WebView2 NOT_RUN. OpenCV-headless exists for masks, not for a tracker product. | PO acceptance to close discovery | Do not ship Subject Focus or a tracker UI. |
 | #299 | Subject Focus | BLOCKED | — | Blocked on approved shared tracking foundation (#298). | #298 foundation + UX approval | Do not implement. |
 | #300 | Portrait auto-reframing | BLOCKED | ADR 0018 zoom/pan | Auto-follow blocked on #298. Manual multi-keyframe portrait needs separate PO approval. | #298 + product approval | Do not add a second crop model. |
 | #301 | Drone-friendly transitions | VERIFY | #401 merged `88c79e9` | Blur dissolve and four soft wipes landed. Packaged WebView2 for these transitions is NOT_RUN. | PO acceptance | Do not reimplement. Do not add more transition types. |
-| #302 | Dehaze alternatives | VERIFY | #304, #309 + closeout | Discovery complete. FFmpeg-only Dehaze NO-GO; not an ADR 0035 operator. Packaged EXE NOT_RUN. | PO acceptance to close discovery | Do not add a Dehaze slider or grade operator. |
+| #302 | Dehaze alternatives | VERIFY | #304, #309 + closeout | Discovery complete. FFmpeg-only Dehaze NO-GO; shadow-protect probe insufficient; not an ADR 0035 operator. Packaged EXE NOT_RUN. | PO acceptance to close discovery | Do not add a Dehaze slider or grade operator. |
 | #317 | Windows RC/MOTW | READY | — | NOT_RUN | Release approval | Maintainer step. Do not publish. |
 | #320 | Strict color parity | VERIFY | closed on GitHub | Closed is not acceptance evidence in this checkpoint | — | Re-read the closed issue before any new parity work. |
 | #325 | Timelapse target duration | VERIFY | #404 merged | Target-duration draft drives decoded MP4 evidence. Journey smoke uses fixed red-then-blue clip order. Packaged WebView2 Timelapse Inspector is NOT_RUN. | PO acceptance | Do not build a second speed engine. |

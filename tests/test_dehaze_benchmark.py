@@ -129,3 +129,35 @@ def test_full_strength_on_dark_scene_raises_near_black_share() -> None:
     assert result_dark > source_dark
     assert result_dark > 0.05
 
+
+
+def _near_black_share(image: Image.Image, threshold: int = 8) -> float:
+    pixels = image.convert("RGB").load()
+    width, height = image.size
+    total = width * height
+    return sum(
+        1 for y in range(height) for x in range(width) if max(pixels[x, y]) < threshold
+    ) / total
+
+
+def test_shadow_protect_reduces_dark_scene_crush() -> None:
+    """Luma-gated blend softens crush but is not a shipping Dehaze operator."""
+    image = Image.new("RGB", (96, 64), (28, 32, 40))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((10, 10, 40, 40), fill=(18, 20, 24))
+    draw.rectangle((50, 8, 90, 28), fill=(220, 230, 240))
+    atmosphere = dehaze.estimate_atmosphere(image)
+    levels = dehaze.levels_for(atmosphere, 100)
+    crushed = dehaze.apply_levels(image, levels)
+    protected = dehaze.apply_levels_shadow_protect(image, levels, protect=0.65)
+    assert _near_black_share(protected) < _near_black_share(crushed)
+    # Still not identity: some darkening remains, so a misleading "safe" slider
+    # would still alter clear/dark scenes without a scene gate.
+    assert _near_black_share(protected) >= _near_black_share(image)
+
+
+def test_shadow_protect_neutral_strength_is_identity() -> None:
+    image = Image.new("RGB", (32, 24), (90, 100, 110))
+    levels = dehaze.levels_for((0.8, 0.8, 0.8), 0)
+    result = dehaze.apply_levels_shadow_protect(image, levels, protect=0.8)
+    assert result.tobytes() == image.tobytes()
