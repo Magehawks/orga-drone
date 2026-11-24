@@ -121,6 +121,22 @@ def _frames(motion: str) -> tuple[list[Any], list[tuple[int, int]]]:
             centers.append((x + width // 2, y + height // 2))
             frames.append(frame)
             continue
+        if motion == "rotate":
+            angle = index * 8.0
+            matrix = cv2.getRotationMatrix2D((9, 9), angle, 1.0)
+            patch_now = cv2.warpAffine(
+                patch,
+                matrix,
+                (18, 18),
+                flags=cv2.INTER_NEAREST,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=(10, 10, 10),
+            )
+            x, y = 54, 39
+            frame[y : y + 18, x : x + 18] = patch_now
+            centers.append((x + 9, y + 9))
+            frames.append(frame)
+            continue
         visible = motion != "occlusion" or index < 8
         if visible:
             x, y = 8 + index * 4, 40
@@ -207,3 +223,24 @@ def test_zoom_keeps_a_box_while_the_center_drifts() -> None:
         for found, truth in zip(path, centers, strict=True)
     ]
     assert max(errors) >= 4.0
+
+
+@pytest.mark.usefixtures("_opencv")
+def test_inplace_rotation_keeps_false_confidence_live_box() -> None:
+    """In-place rotation leaves a live axis-aligned box with no lost signal.
+
+    Discovery evidence for #298: Lucas-Kanade with a fixed box reports continuous
+    success while orientation is untracked. That silent confidence is unsuitable
+    for Subject Focus edges, oriented overlays, or auto-reframe that must know
+    when the subject pose changed without an honest lost / low-confidence state.
+    """
+    frames, centers = _frames("rotate")
+    path, lost_at = _track(frames, (54, 39, 18, 18))
+    assert lost_at is None
+    assert len(path) == len(centers)
+    errors = [
+        abs(found[0] - truth[0]) + abs(found[1] - truth[1])
+        for found, truth in zip(path, centers, strict=True)
+    ]
+    # Center can stay correct while orientation is invisible to the contract.
+    assert max(errors) <= 3.0

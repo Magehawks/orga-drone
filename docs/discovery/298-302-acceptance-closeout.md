@@ -50,3 +50,7 @@ authorization to ship Studio motion tracking or Dehaze.
 Discovery unit/regression only. Product WebView2 E2E for tracker / focus / reframe / dehaze: **NOT_RUN** (no fake product E2E).
 
 Agents must not close issues without Product Owner authorization. Independent ChatGPT GitHub PR review is required before merge. No self-merge, main merge, or release.
+
+## Blocker reconfirm (2026-11-24)
+
+See [`298-302-blocker-reconfirm.md`](298-302-blocker-reconfirm.md). Re-verified on `572d6e6` with rotation false-confidence and shadow-protect probes. Ship verdicts unchanged: tracking **NO-GO**, Dehaze **NO-GO**; #299/#300 stay open.

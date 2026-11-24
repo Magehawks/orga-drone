@@ -66,3 +66,7 @@ and product gates. Agents must not close the issue without PO authorization.
 (`pytest` job). It asserts neutral identity, atmosphere caps, synthetic
 improvement, and FFmpeg `colorlevels` agreement. It does **not** claim a
 shipping Dehaze feature.
+
+## Shadow-protect probe (2026-11-24)
+
+A discovery-only luma-gated blend (`apply_levels_shadow_protect`) reduces near-black crush versus raw global subtraction on a dark synthetic control, but still darkens relative to the source and provides no haze-vs-clear scene gate. It does **not** reopen a Dehaze operator under ADR 0035. See [`298-302-blocker-reconfirm.md`](298-302-blocker-reconfirm.md).

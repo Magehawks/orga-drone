@@ -55,3 +55,7 @@ motion tracker, Subject Focus, or portrait auto-reframe. The spike verdict stays
 **NO-GO for a production tracking editor** until a separately approved
 implementation issue proves preview/export parity, honest lost-state handling
 under scale/rotation, and real-footage evidence.
+
+## Rotation follow-up (2026-11-24)
+
+In-place rotation keeps a live axis-aligned box with `lost_at is None` while orientation is untracked (`test_inplace_rotation_keeps_false_confidence_live_box`). That false confidence strengthens the production **NO-GO**. See [`298-302-blocker-reconfirm.md`](298-302-blocker-reconfirm.md).

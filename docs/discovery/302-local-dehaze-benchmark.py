@@ -206,6 +206,44 @@ def apply_levels(image: Image.Image, levels: Levels) -> Image.Image:
     return Image.merge("RGB", channels)
 
 
+def apply_levels_shadow_protect(
+    image: Image.Image,
+    levels: Levels,
+    protect: float = 0.65,
+) -> Image.Image:
+    """Blend dehazed result back toward the source in dark regions.
+
+    Discovery-only. ``protect`` in 0..1 raises how strongly near-black source
+    luma restores the original sample. This is a bounded local *blend*, not a
+    true transmission map, and it still cannot detect haze vs clear scenes.
+    """
+    if not 0.0 <= float(protect) <= 1.0:
+        raise ValueError("protect must be from 0 to 1")
+    source = image.convert("RGB")
+    if levels.is_neutral or protect <= 0.0:
+        return apply_levels(source, levels) if not levels.is_neutral else source.copy()
+    dehazed = apply_levels(source, levels)
+    src_px = source.load()
+    dst_px = dehazed.load()
+    out = source.copy()
+    out_px = out.load()
+    width, height = source.size
+    for y in range(height):
+        for x in range(width):
+            r, g, b = src_px[x, y]
+            luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+            # Smoothstep from fully protected blacks to unprotected midtones.
+            t = _clamp((luma - 0.05) / 0.30, 0.0, 1.0)
+            weight = protect * (1.0 - t * t * (3.0 - 2.0 * t))
+            dr, dg, db = dst_px[x, y]
+            out_px[x, y] = (
+                int(round(dr * (1.0 - weight) + r * weight)),
+                int(round(dg * (1.0 - weight) + g * weight)),
+                int(round(db * (1.0 - weight) + b * weight)),
+            )
+    return out
+
+
 def run_ffmpeg(src: Path, dst: Path, filter_chain: str) -> None:
     command = [
         ffmpeg_exe(),
