@@ -179,14 +179,11 @@ def run(out: Path, *, locale: str = "en") -> None:
         )
 
     try:
+        # Deterministic startup: CDP endpoint + HTTP ready BEFORE attaching the
+        # page WebSocket. Attaching early and navigating while the shell is still
+        # booting is what aborted the socket on flaky DE/EN runs.
         result["browser"] = wait_cdp(debug, 120)["Browser"]
         result["source_hashes"] = originals
-        cdp = _harness.CDP(wait_page_target(debug, 120)["webSocketDebuggerUrl"])
-        cdp.call("Page.enable")
-        cdp.call(
-            "Emulation.setDeviceMetricsOverride",
-            dict(width=1440, height=900, deviceScaleFactor=1, mobile=False),
-        )
         health_deadline = time.monotonic() + 60
         while time.monotonic() < health_deadline:
             try:
@@ -197,7 +194,14 @@ def run(out: Path, *, locale: str = "en") -> None:
                 time.sleep(0.2)
         else:
             raise AssertionError("Timed out waiting for /health")
-        cdp.call("Page.navigate", {"url": base + f"/studio?project_id={project.id}"})
+        page = wait_page_target(debug, 120)
+        cdp = _harness.CDP(page["webSocketDebuggerUrl"])
+        cdp.enable_page_runtime()
+        cdp.call(
+            "Emulation.setDeviceMetricsOverride",
+            dict(width=1440, height=900, deviceScaleFactor=1, mobile=False),
+        )
+        cdp.navigate(base + f"/studio?project_id={project.id}", timeout_s=90)
         until("!!document.getElementById('studio-grid')", timeout_s=60)
         # Auto-accept managed convert confirm dialogs.
         ev("window.confirm = () => true;")
@@ -521,7 +525,17 @@ def run(out: Path, *, locale: str = "en") -> None:
                 cdp.close()
             except Exception:  # noqa: BLE001
                 pass
-        process.terminate()
+            cdp = None
+        # Kill the whole process tree so WebView2/CDP children cannot leak into
+        # the next DE/EN run and abort a fresh page WebSocket.
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+            )
+        else:
+            process.terminate()
         try:
             process.wait(timeout=20)
         except subprocess.TimeoutExpired:

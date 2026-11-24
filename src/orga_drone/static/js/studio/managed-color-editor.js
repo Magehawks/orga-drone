@@ -27,23 +27,6 @@ function numberFromInput(input, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function bindValueLabel(input, label, format) {
-  if (!input || !label) return;
-  const paint = () => {
-    label.textContent = format(numberFromInput(input, 0));
-  };
-  input.addEventListener("input", paint);
-  paint();
-}
-
-function paintGroup(fields, values) {
-  Object.entries(fields).forEach(([key, input]) => {
-    if (!input || !(key in values)) return;
-    input.value = String(values[key]);
-    input.dispatchEvent(new Event("input"));
-  });
-}
-
 export function createManagedColorEditor({
   panel,
   getSelectedStudioId,
