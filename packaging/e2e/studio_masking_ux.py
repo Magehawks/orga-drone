@@ -166,7 +166,7 @@ def main() -> int:
     parser.add_argument("--keep-open", action="store_true")
     args = parser.parse_args()
 
-    out = args.out
+    out = args.out.expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     app_port = args.port or free_port()
     cdp_port = args.cdp_port or free_port()
@@ -229,16 +229,20 @@ def main() -> int:
         import re
 
         m = re.search(r"scan_job=([^&]+)", str(added.get("url") or ""))
-        if m:
-            job = m.group(1)
-            for _ in range(180):
-                st = fetch(cdp, f"/api/scan-jobs/{job}")["data"]
-                if st.get("state") in {"completed", "failed"}:
-                    break
-                time.sleep(0.25)
-            assert st.get("state") == "completed", st
+        if m is None:
+            raise RuntimeError(f"Scan job id is missing after /library/add: {added!r}")
+        job = m.group(1)
+        st = {}
+        for _ in range(180):
+            st = fetch(cdp, f"/api/scan-jobs/{job}")["data"]
+            if st.get("state") in {"completed", "failed"}:
+                break
+            time.sleep(0.25)
+        assert st.get("state") == "completed", st
 
         search = fetch(cdp, "/api/search", "POST", {"q": "synthetic-leaf.jpg"})["data"]
+        if not search.get("items"):
+            raise RuntimeError(f"Synthetic leaf not indexed after scan: {search!r}")
         photo_id = int(search["items"][0]["id"])
         created = fetch(
             cdp, "/api/studio/projects", "POST", {"title": "Masking UX #543"}

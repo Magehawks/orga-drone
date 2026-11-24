@@ -239,7 +239,7 @@ def main() -> int:
     parser.add_argument("--cdp-port", type=int, default=0)
     args = parser.parse_args()
 
-    out = args.out
+    out = args.out.expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     app_port = args.port or free_port()
     cdp_port = args.cdp_port or free_port()
