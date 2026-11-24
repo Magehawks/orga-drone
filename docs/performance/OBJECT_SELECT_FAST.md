@@ -26,3 +26,18 @@ complete-coverage gate (≥0.90 in `tests/test_neon_relic_object_select_coverage
 when fixtures are present).
 
 Honest labeling: local classical object **proposal**, not AI freistellung.
+
+## Acceptance timings (masking completion)
+
+Measured on Windows against Neon Relic ~2.23 MP (`00-before-original.jpg`),
+multi-seed + expand (`0.55/0.75` + two extra seeds, `max_edge=640`, `expand_passes=2`):
+
+| Mode | Wall time |
+| --- | --- |
+| Cold proposal | ~0.28–0.33 s |
+| Warm median | ~0.08 s |
+| Packaged native object-select (synthetic leaf E2E) | ~0.77 s |
+
+Automated gate: `tests/test_studio_object_select_multiseed.py::test_proposal_under_one_second_on_2mp`
+and Neon opt-in `tests/test_neon_relic_object_select_coverage.py` (requires local fixtures).
+

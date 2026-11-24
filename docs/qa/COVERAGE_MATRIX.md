@@ -17,7 +17,7 @@ Update both when evidence changes. Labels follow
 | Image Composer / photo combine | PASS | PASS | NOT_RUN | NOT_RUN | N/A | `test_photo_combine`, JS `photo_combine.test.js` |
 | Photo export profiles | PASS | PASS | NOT_RUN | PARTIAL | N/A | `test_studio_photo_export`, packaged `image_export` |
 | Studio photo editing | PASS | PASS | NOT_RUN | PARTIAL | N/A | studio image/HSL/wheels + packaged edit_persistence |
-| Masks / object selection | PASS | PASS | PARTIAL | PENDING_INTEGRATION | PARTIAL | mask letterbox/geometry + managed/object-select suites on develop; packaged native align PENDING_INTEGRATION |
+| Masks / object selection | PASS | PASS | PARTIAL | PASS | PARTIAL | Packaged `studio_masking_ux.py` PASS; Neon leaf recall ≥0.90; magenta IoU classical ~0.60 PARTIAL |
 | Color Workspace operators | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | acceptance/reference + managed operator suites on develop; deeper visual/perf still PARTIAL |
 | Scopes | PASS | PARTIAL | PASS | NOT_RUN | PARTIAL | JS accumulate/panel/tap + non-packaged perf; packaged live-tap NOT_RUN |
 | Video editing / playback | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
