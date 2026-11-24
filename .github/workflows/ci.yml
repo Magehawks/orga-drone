@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks, and
-# App journey smoke. The Windows release workflow calls this workflow and
+# Pull requests run quality (Ruff, MyPy, unit tests), JavaScript checks,
+# App journey smoke, and the additive Regression gate inventory check. The Windows release workflow calls this workflow and
 # packages only after all checks pass.
 # The journey is a synthetic library path (docs/PR_E2E.md), not the MOTW zip checklist.
 permissions:
@@ -124,3 +124,40 @@ jobs:
             echo ""
             echo "Details: \`docs/PR_E2E.md\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  regression-gates:
+    name: Regression gate inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Validate permanent regression gate inventory
+        run: pytest tests/test_regression_gates.py -q --tb=short
+
+      - name: Explain the check
+        if: always()
+        run: |
+          {
+            echo "### Regression gate inventory"
+            echo ""
+            echo "Validates docs/REGRESSION_GATES.md companion JSON, fixture manifest,"
+            echo "and mutation harness inventory for issues #275/#283/#284."
+            echo "Does not replace feature suites. Does not claim native Windows PASS."
+            echo ""
+            echo "Details: docs/REGRESSION_GATES.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+

@@ -1,0 +1,150 @@
+{
+  "schema": "orga-drone-regression-mutation-results-v1",
+  "cases": [
+    {
+      "id": "canvas_coordinate_mapping",
+      "description": "Invert letterbox content scale so mask boxes leave the picture",
+      "path": "src/orga_drone/studio_mask.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_studio_mask.py::test_letterbox_box_scales_between_resolutions",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   assert 0 > 0\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_studio_mask.py:177: assert 0 > 0\n=========================== short test summary info ===========================\nFAILED tests/test_studio_mask.py::test_letterbox_box_scales_between_resolutions\n1 failed in 0.31s\n"
+    },
+    {
+      "id": "hsl_export",
+      "description": "No-op HSL apply so graded export matches neutral",
+      "path": "src/orga_drone/studio_hsl.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_photo_hsl_export_api.py:170: assert 0.7450980392157227 < (0.7450980392157227 - 0.15)\n============================== warnings summary ===============================\ntests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png\ntests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png\ntests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png\ntests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png\n  C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_photo_hsl_export_api.py:30: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n    return list(img.convert(\"RGB\").getdata())\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png\n1 failed, 4 warnings in 3.49s\n"
+    },
+    {
+      "id": "clip_targeting",
+      "description": "Skip wrong-clip STALE_SELECTION rejection",
+      "path": "src/orga_drone/control.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   AssertionError: assert 'STALE_STATE' == 'STALE_SELECTION'\n      \n      - STALE_SELECTION\n      + STALE_STATE\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_control_api.py:894: AssertionError: assert 'STALE_STATE' == 'STALE_SELECTION'\n=========================== short test summary info ===========================\nFAILED tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected\n1 failed in 2.38s\n"
+    },
+    {
+      "id": "persistence",
+      "description": "Skip appending story undo snapshots so edits are not reversible in history",
+      "path": "src/orga_drone/studio_history.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_studio_history.py::test_cut_remove_trim_reorder_and_redo_invalidation",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   assert None == 1.0 \u00c2\u00b1 1.0e-06\n      \n      comparison failed\n      Obtained: None\n      Expected: 1.0 \u00c2\u00b1 1.0e-06\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_studio_history.py:153: assert None == 1.0 \u00c2\u00b1 1.0e-06\n=========================== short test summary info ===========================\nFAILED tests/test_studio_history.py::test_cut_remove_trim_reorder_and_redo_invalidation\n1 failed in 3.01s\n"
+    },
+    {
+      "id": "undo_redo",
+      "description": "Make undo_story always report failure",
+      "path": "src/orga_drone/studio_history.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_studio_history.py::test_effects_group_into_one_step_and_restart_drops_history",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   assert 409 == 200\n     +  where 409 = <Response [409 Conflict]>.status_code\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_studio_history.py:208: assert 409 == 200\n=========================== short test summary info ===========================\nFAILED tests/test_studio_history.py::test_effects_group_into_one_step_and_restart_drops_history\n1 failed in 2.33s\n"
+    },
+    {
+      "id": "transition_timing",
+      "description": "Clamp transition duration to a constant wrong value",
+      "path": "src/orga_drone/studio_transition.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_studio_transition.py::test_clamp_user_duration_steps",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   assert 1.7 == 0.1\n     +  where 1.7 = clamp_user_duration(0.05)\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_studio_transition.py:44: assert 1.7 == 0.1\n=========================== short test summary info ===========================\nFAILED tests/test_studio_transition.py::test_clamp_user_duration_steps - asse...\n1 failed in 0.29s\n"
+    },
+    {
+      "id": "collage_export_cleanup",
+      "description": "Skip collage export temp directory cleanup on failure",
+      "path": "src/orga_drone/studio_collage_export.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   AssertionError: assert ([WindowsPath('C:/Users/Niwes/AppData/Local/Temp/orga-drone-collage-mp4-ut48jyem')] and not True)\n     +  where True = exists()\n     +    where exists = WindowsPath('C:/Users/Niwes/AppData/Local/Temp/orga-drone-collage-mp4-ut48jyem').exists\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_studio_collage_export.py:133: AssertionError: assert ([WindowsPath('C:/Users/Niwes/AppData/Local/Temp/orga-drone-collage-mp4-ut48jyem')] and not True)\n=========================== short test summary info ===========================\nFAILED tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export\n1 failed in 1.65s\n"
+    },
+    {
+      "id": "scope_accumulation",
+      "description": "Offset histogram bins so mid-gray no longer peaks at 128",
+      "path": "src/orga_drone/static/js/studio/scopes/accumulate.js",
+      "command": [
+        "npm",
+        "run",
+        "test:js",
+        "--",
+        "tests/js/scopes_accumulate.test.js"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "(node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 0,\n    expected: 64,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at tests\\js\\scopes_accumulate.test.js:41:1\n\u00e2\u0153\u2013 red fixture isolates the red channel (0.4006ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  0 !== 64\n  \n      at TestContext.<anonymous> (file:///C:/Users/Niwes/.cursor/worktrees/orga-drone/gates-275-283-284/tests/js/scopes_accumulate.test.js:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 0,\n    expected: 64,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+    },
+    {
+      "id": "authorization_bypass",
+      "description": "Allow foreign Host instead of returning 403",
+      "path": "src/orga_drone/local_http.py",
+      "command": [
+        "C:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_local_http.py::test_foreign_host_and_origin_are_rejected",
+        "-q",
+        "--tb=line"
+      ],
+      "test_exit_code": 1,
+      "caught": true,
+      "output_tail": "F                                                                        [100%]\n================================== FAILURES ===================================\nE   assert 200 == 403\n     +  where 200 = <Response [200 OK]>.status_code\nC:\\Users\\Niwes\\.cursor\\worktrees\\orga-drone\\gates-275-283-284\\tests\\test_local_http.py:60: assert 200 == 403\n=========================== short test summary info ===========================\nFAILED tests/test_local_http.py::test_foreign_host_and_origin_are_rejected - ...\n1 failed in 1.89s\n"
+    }
+  ],
+  "all_caught": true,
+  "note": "Mutations were temporary and reverted; nothing was committed."
+}

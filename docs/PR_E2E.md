@@ -7,6 +7,17 @@ Orga Drone is a local FastAPI app with an optional pywebview (WebView2) window.
 Media stays on disk. The Ubuntu pull-request runner cannot open a Windows
 desktop; a separate Windows job tests the packaged app.
 
+## Permanent regression gates (#275 / #283 / #284)
+
+The living coverage matrix, fixture manifest, mutation integrity harness, CI inventory, and native Windows limitations are documented in [`REGRESSION_GATES.md`](REGRESSION_GATES.md). Machine-readable inventory:
+
+- `tests/fixtures/regression_coverage_matrix.json`
+- `tests/fixtures/regression_fixture_manifest.json`
+- `tests/test_regression_gates.py`
+- `scripts/regression_mutation_check.py`
+
+Layer 3 (browser/frontend module tests) is never Layer 4 (packaged WebView2). Playwright is not in-tree; do not claim native Windows PASS from HTTP/JS green.
+
 ## Risk-based local checks
 
 Choose checks for the changed behavior and explain the risk in the PR. Small
@@ -56,6 +67,7 @@ authorization. It does not configure branch protection. See the
 | **Ruff, MyPy and unit tests** | `ruff check .`, `mypy src packaging/itch_channel.py packaging/windows_third_party.py packaging/main_admission.py packaging/packaged_e2e.py packaging/e2e/windows_e2e.py`, then `pytest` for unit and route tests. This step skips `tests/test_pr_journey_smoke.py` so a journey failure is reported by the check below. |
 | **JavaScript lint, format and tests** | `npm ci`, `npm run lint:js`, `npm run format:check`, `npm run test:js` on Node 22. No browser and no product data. |
 | **App journey smoke** | `pytest tests/test_pr_journey_smoke.py` |
+| **Regression gate inventory** | `pytest tests/test_regression_gates.py` (matrix/manifest/mutation harness integrity for #275/#283/#284). |
 | **Windows packaged E2E** (PRs to `main` only) | Builds the onefolder ZIP on `windows-latest`, extracts it, and drives the real EXE/WebView2 over CDP with synthetic media. |
 
 A local `pytest` from the repo root runs the unit tests **and** the journey

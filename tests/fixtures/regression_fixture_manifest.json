@@ -1,0 +1,137 @@
+{
+  "schema": "orga-drone-regression-fixture-manifest-v1",
+  "issue_refs": [
+    275,
+    283,
+    284
+  ],
+  "pinned": {
+    "develop_sha_at_authoring": "ed22c9d3037fb935d5a453d032aaf70d471235fb",
+    "python": "3.12",
+    "node": "22",
+    "ffmpeg_policy": "resolve via orga_drone.ffmpeg_bin.find_ffmpeg / packaged third_party; record version in evidence JSON",
+    "webview2_policy": "record Edge WebView2 Runtime pv from HKLM at packaged E2E start",
+    "metric_versions": {
+      "scopes_accumulate": "ADR-0035 ScopeFrameV1",
+      "packaged_e2e_schema": "orga-drone-packaged-e2e-v1",
+      "intent_matrix": "orga-drone-intent-matrix-v1"
+    }
+  },
+  "integrity_rules": [
+    "Never fabricate DJI/Potensic coverage",
+    "Never commit private media, SRT with homes/people, or precise real coordinates",
+    "Synthetic fixtures are the CI default",
+    "Optional real footage stays outside the public tree and is referenced only by local path + content hash"
+  ],
+  "synthetic": [
+    {
+      "id": "synth-jpeg-blue",
+      "kind": "photo",
+      "generator": "Pillow RGB JPEG",
+      "typical_size": "320x180",
+      "used_by": [
+        "tests/test_pr_journey_smoke.py",
+        "tests/test_creator_journey.py",
+        "tests/test_photo_hsl_export_api.py",
+        "packaging/e2e/windows_e2e.py"
+      ],
+      "shipped_in_repo": false,
+      "notes": "Created per-test under tmp_path"
+    },
+    {
+      "id": "synth-mp4-color",
+      "kind": "video",
+      "generator": "ffmpeg lavfi color -> libx264 yuv420p",
+      "typical_duration_s": 1.0,
+      "used_by": [
+        "tests/test_creator_journey.py",
+        "tests/test_studio_export.py",
+        "packaging/e2e/windows_e2e.py"
+      ],
+      "shipped_in_repo": false,
+      "notes": "Requires ffmpeg; tests skip honestly when unavailable"
+    },
+    {
+      "id": "synth-srt-hud",
+      "kind": "telemetry",
+      "path": "tests/fixtures/dji_srt_hud_sample.srt",
+      "shipped_in_repo": true,
+      "notes": "Sanitized sample; not a claim of full DJI fleet coverage"
+    },
+    {
+      "id": "synth-srt-camera",
+      "kind": "telemetry",
+      "path": "tests/fixtures/dji_srt_camera_fields_sample.srt",
+      "shipped_in_repo": true,
+      "notes": "Sanitized sample field coverage"
+    },
+    {
+      "id": "intent-matrix",
+      "kind": "contract",
+      "path": "tests/fixtures/intent_matrix.json",
+      "shipped_in_repo": true
+    },
+    {
+      "id": "grade-model-v1",
+      "kind": "contract",
+      "path": "tests/fixtures/grade_model_v1.json",
+      "shipped_in_repo": true
+    },
+    {
+      "id": "scope-color-bars",
+      "kind": "scopes",
+      "generator": "JS createScopeFixture in studio/scopes/fixtures.js",
+      "shipped_in_repo": true,
+      "used_by": [
+        "tests/js/scopes_accumulate.test.js"
+      ]
+    }
+  ],
+  "optional_real_footage": [
+    {
+      "id": "dji-photo-representative",
+      "kind": "photo",
+      "vendor": "DJI",
+      "status": "NOT_SHIPPED",
+      "local_only": true,
+      "acceptance": "PO provides privacy-safe local path + SHA-256; never upload to CI artifacts",
+      "covers": [
+        "library import",
+        "media detail",
+        "photo HSL export",
+        "Studio photo edit"
+      ]
+    },
+    {
+      "id": "dji-video-representative",
+      "kind": "video",
+      "vendor": "DJI",
+      "status": "NOT_SHIPPED",
+      "local_only": true,
+      "acceptance": "PO provides privacy-safe local path + SHA-256; Windows packaged/manual gate only",
+      "covers": [
+        "playback",
+        "transitions",
+        "export decode",
+        "map/telemetry when present"
+      ]
+    },
+    {
+      "id": "potensic-representative",
+      "kind": "mixed",
+      "vendor": "Potensic",
+      "status": "NOT_FABRICATED",
+      "notes": "No fabricated Potensic footage. Slot remains empty until lawful samples exist."
+    }
+  ],
+  "environment_evidence_fields": [
+    "git_sha",
+    "git_tree",
+    "python_version",
+    "ffmpeg_version",
+    "webview2_version",
+    "os_version",
+    "fixture_ids",
+    "fixture_sha256"
+  ]
+}
