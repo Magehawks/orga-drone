@@ -31,13 +31,13 @@ os.environ["TEMP"] = os.environ["TMP"] = str(root / "scratch")
 Path(os.environ["TEMP"]).mkdir()
 tempfile.tempdir = os.environ["TEMP"]
 
-from orga_drone.db import Database
-from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
-from orga_drone.studio_collage import assign_leaf_media, iter_leaves, preset_spec
-from orga_drone.studio_export import run_studio_export
-import orga_drone.studio_collage_export as collage
-import orga_drone.studio_collage_still as still
-from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError
+from orga_drone.db import Database  # noqa: E402
+from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs  # noqa: E402
+from orga_drone.studio_collage import assign_leaf_media, iter_leaves, preset_spec  # noqa: E402
+from orga_drone.studio_export import run_studio_export  # noqa: E402
+import orga_drone.studio_collage_export as collage  # noqa: E402
+import orga_drone.studio_collage_still as still  # noqa: E402
+from orga_drone.export.studio_encoder import ExportCancelled, StudioExportError  # noqa: E402
 
 ffmpeg = find_ffmpeg()
 assert ffmpeg
