@@ -1,0 +1,162 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "name": "creative_hides_scopes",
+      "ok": true
+    },
+    {
+      "name": "pro_reveals_four_scopes",
+      "ok": true,
+      "detail": {
+        "mode": "pro",
+        "hidden": false,
+        "kinds": [
+          "histogram",
+          "waveform",
+          "parade",
+          "vectorscope"
+        ]
+      }
+    },
+    {
+      "name": "fixture_disclosure_no_grade_mutation",
+      "ok": true
+    },
+    {
+      "name": "leave_fixture_clears_display",
+      "ok": true
+    },
+    {
+      "name": "live_unavailable_without_fake_tap",
+      "ok": true
+    },
+    {
+      "name": "live_managed_preview_tap",
+      "ok": true,
+      "detail": {
+        "source": "engine-tap",
+        "status": "Downsampled measurement \u00b7 vectorscope \u00b7 10.40 ms",
+        "hasCanvas": true
+      }
+    },
+    {
+      "name": "switch_all_four_scopes",
+      "ok": true
+    },
+    {
+      "name": "grade_keeps_live_tap",
+      "ok": true,
+      "before": {
+        "status": "Downsampled measurement \u00b7 vectorscope \u00b7 10.40 ms",
+        "source": "engine-tap"
+      },
+      "after": {
+        "source": "engine-tap",
+        "status": "Downsampled measurement \u00b7 histogram \u00b7 15.00 ms",
+        "metrics": {
+          "lastProcessMs": 15,
+          "droppedFrames": 0,
+          "acceptedFrames": 1
+        }
+      }
+    },
+    {
+      "name": "clip_switch_rejects_stale_live",
+      "ok": true,
+      "detail": {
+        "source": "unavailable",
+        "selected": "2"
+      }
+    },
+    {
+      "name": "latency_memory_samples",
+      "ok": true
+    },
+    {
+      "name": "preview_export_unaffected_by_scope_visibility",
+      "ok": true,
+      "detail": {
+        "on": {
+          "status": 200,
+          "len": 4098,
+          "hash": "e2a9ce06"
+        },
+        "off": {
+          "status": 200,
+          "len": 4098,
+          "hash": "e2a9ce06"
+        }
+      }
+    },
+    {
+      "name": "source_integrity",
+      "ok": true
+    }
+  ],
+  "measurements": {
+    "cold": {
+      "n": 5,
+      "min_ms": 166.90000000596046,
+      "max_ms": 193.19999999552965,
+      "mean_ms": 176.84000000059604,
+      "p50_ms": 173.39999999850988,
+      "p95_ms": 193.19999999552965
+    },
+    "warm": {
+      "n": 5,
+      "min_ms": 165.20000000298023,
+      "max_ms": 208.5,
+      "mean_ms": 180.07999999970198,
+      "p50_ms": 174.89999999850988,
+      "p95_ms": 208.5
+    },
+    "heap_delta_samples": [
+      22972584,
+      -33587368,
+      24002548,
+      -24256419,
+      35187179,
+      -24387073,
+      -34797013,
+      10626488,
+      23629130,
+      -10437634
+    ],
+    "panel_metrics": {
+      "lastProcessMs": 10.399999998509884,
+      "droppedFrames": 0,
+      "acceptedFrames": 12
+    },
+    "notes": null,
+    "packaged_exe": true
+  },
+  "packaged_exe": true,
+  "runtime": "packaged:orga-drone.exe",
+  "browser": "Edg/158.0.4370.33",
+  "source_hashes": {
+    "clip-a.jpg": "1ac00328fe36f0dfcc3667873e1825622582aaed7a5b636801875ec5a10dee93",
+    "clip-b.jpg": "811e35fa35f1c429d90c37f673e0d9415dcb0722bf2a8a19e4dc64867701ca3f"
+  },
+  "convert_ui": {
+    "status": "legacy wrapper \u00b7 rev 1 \u00b7 Look & color locked",
+    "wrapHidden": true,
+    "convertHidden": false,
+    "convertDisabled": true
+  },
+  "clip_ids": {
+    "a": 1,
+    "b": 2
+  },
+  "live_media_scopes": "PASS",
+  "screenshots": [
+    "01-fixture-vectorscope.png",
+    "02-live-histogram.png",
+    "02-live-parade.png",
+    "02-live-vectorscope.png",
+    "02-live-waveform.png",
+    "03-after-grade-histogram.png",
+    "04-clip-b-no-stale.png"
+  ],
+  "packaged_exe_latency_memory": "PASS"
+}

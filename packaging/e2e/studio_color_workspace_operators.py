@@ -38,7 +38,7 @@ def _shot(cdp: Any, path: Path) -> None:
     path.write_bytes(base64.b64decode(shot["data"]))
 
 
-def run(out: Path, *, locale: str = "en") -> None:
+def run(out: Path, *, locale: str = "en", exe: Path | None = None) -> None:
     from orga_drone.config import Settings
     from orga_drone.db import Database
     from orga_drone.ffmpeg_bin import find_ffmpeg, subprocess_no_window_kwargs
@@ -130,10 +130,13 @@ def run(out: Path, *, locale: str = "en") -> None:
     env.pop("ORGA_DRONE_BROWSER", None)
     base = f"http://127.0.0.1:{port}"
     cdp = None
+    cmd, cwd, runtime_label, packaged_exe = _harness.orga_drone_process_command(exe, repo)
+    if packaged_exe:
+        env.pop("PYTHONPATH", None)
     with (out / "app.log").open("wb") as log:
         process = subprocess.Popen(
-            [sys.executable, "-m", "orga_drone"],
-            cwd=repo,
+            cmd,
+            cwd=str(cwd),
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -143,7 +146,7 @@ def run(out: Path, *, locale: str = "en") -> None:
         "status": "INCOMPLETE",
         "locale": locale,
         "cases": [],
-        "packaged_exe": "NOT_RUN — deferred by PO",
+        "packaged_exe": packaged_exe,
     }
 
     def ev(expression: str) -> Any:
@@ -158,7 +161,7 @@ def run(out: Path, *, locale: str = "en") -> None:
             time.sleep(0.05)
         raise AssertionError("Timed out: " + expression)
 
-    def select(cid: int) -> None:
+    def select(cid: int, *, timeout_s: float = 45) -> None:
         ev(
             f"""(()=>{{
               const e=document.querySelector('#studio-grid [data-select-clip="{cid}"]');
@@ -175,7 +178,8 @@ def run(out: Path, *, locale: str = "en") -> None:
         )
         until(
             f"document.querySelector('#studio-grid .studio-clip.is-selected')"
-            f"?.dataset.studioId === '{cid}'"
+            f"?.dataset.studioId === '{cid}'",
+            timeout_s=timeout_s,
         )
 
     try:
@@ -469,7 +473,12 @@ def run(out: Path, *, locale: str = "en") -> None:
         _shot(cdp, shots / f"04-constrained-{locale}.png")
 
         # Switch to video clip, convert if needed, and require managed controls.
-        select(ids[-1])
+        cdp.call(
+            "Emulation.setDeviceMetricsOverride",
+            dict(width=1440, height=900, deviceScaleFactor=1, mobile=False),
+        )
+        time.sleep(0.4)
+        select(ids[-1], timeout_s=90)
         video_case = ev(
             """(async()=>{
               window.confirm = () => true;
@@ -545,10 +554,11 @@ def run(out: Path, *, locale: str = "en") -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--exe", type=Path, default=None, help="Packaged orga-drone.exe (optional)")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--locale", default="en", choices=("en", "de"))
     args = parser.parse_args()
-    run(args.out, locale=args.locale)
+    run(args.out, locale=args.locale, exe=args.exe)
     print(json.dumps({"status": "PASS", "out": str(args.out), "locale": args.locale}, indent=2))
     return 0
 

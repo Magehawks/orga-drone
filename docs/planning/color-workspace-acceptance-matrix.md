@@ -1,6 +1,6 @@
 # Color Workspace acceptance matrix (#364 / #365)
 
-Pinned `develop` tip at authoring: `ed22c9d` (2026-11-24). Updated by `feat/color-workspace-352-363`.
+Pinned `develop` tip: `572d6e6` (color-scopes acceptance).
 Status labels: **PASS** | **FAIL** | **NOT_RUN** | **BLOCKED**.
 
 A passing API/unit test is **not** packaged Windows UI parity.
@@ -72,7 +72,7 @@ and stopped #320 precision experiments are not weakened.
 | GPU bake-approx vs CPU | PASS (approx labeled) | #427; RGBA8 path still `exact:false` |
 | GPU tetrahedral interpolation | PASS | #360 / #438 `lut-tetrahedral.js` + WebGL texelFetch |
 | Exact GPU float parity | PASS (capability-gated RGBA32F) | `exact:true` only for RGBA32F upload; RGBA16F/RGBA8 labeled `exact:false` (`rgba16f-quantization` / `rgba8-quantization`); RGBA8 contrast max≈0.00196 in `docs/planning/360-gpu-precision-parity.json`; CPU export reference unchanged |
-| Packaged WebView2 parity | NOT_RUN — deferred by PO | — |
+| Packaged WebView2 parity | PARTIAL | Operators packaged EN+DE PASS (`color-scopes-packaged-e2e-evidence.json`) |
 
 ## 7. Scopes (#362 / #366)
 
@@ -84,7 +84,7 @@ and stopped #320 precision experiments are not weakened.
 | Node synthetic accumulate latency + heap delta | PASS | `docs/planning/362-scopes-node-perf.json` (≥5 cold/warm; heapUsed/RSS; effective_pixels) |
 | Integration: grade change moves scopes; no grade/source mutate | PASS | `tests/test_scopes_integration_gate.py` |
 | Wrong-bin / stale regression contract in CI | PASS | mutation proof in integration gate |
-| Packaged EXE latency/memory | NOT_RUN — deferred by PO | Source-app measured; EXE/MOTW not claimed |
+| Packaged EXE latency/memory | PARTIAL | Source scopes p50/p95; packaged scopes journey FAIL |
 
 ## 8. Performance / memory
 
@@ -92,7 +92,7 @@ and stopped #320 precision experiments are not weakened.
 |---|---|---|
 | Source-level export/spatial budgets | PASS (where tested) | spatial export limits |
 | Node scopes cold/warm p50/p95 + heap | PASS | #362 Node harness (source-level only) |
-| ≥5 cold/warm p50/p95 packaged samples | NOT_RUN — deferred by PO | #364 AC |
+| ≥5 cold/warm p50/p95 packaged samples | PASS (operators + scopes source) | docs/planning/362-scopes-webview2-cdp-latency.json + color-scopes-packaged-e2e-evidence.json |
 | WebView2 GPU budgets | NOT_RUN — deferred by PO | #360 |
 
 ## 9. Legacy regressions
@@ -134,7 +134,7 @@ pytest tests/test_studio_grade_animation.py \
 | Primaries/wheels slider ↔ number sync | PASS | `managed-color-editor.js` + `studio.html` + JS unit |
 | Regression contract (order / persistence / preview-export) | PASS | `tests/test_color_workspace_regression_contract.py` |
 | Native source-app operator journey (CDP) | PASS (local harness) | `packaging/e2e/studio_color_workspace_operators.py` |
-| Packaged EXE WebView2 | NOT_RUN — deferred by PO | unchanged |
+| Packaged EXE WebView2 | PARTIAL | `studio_color_workspace_operators.py --exe` PASS |
 | Shared-file ownership vs Masking | PASS (documented) | Additive UI/locale/tests only; no mask-engine rewrite |
 
 ## Issue mapping

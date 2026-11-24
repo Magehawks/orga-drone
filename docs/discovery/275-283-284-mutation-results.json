@@ -5,82 +5,141 @@
     283,
     284
   ],
-  "surviving_pr": 574,
   "harness": "scripts/mutation_check_regression_gates.py",
   "all_caught": true,
   "clean_suite_after_revert": "PASS",
   "results": [
     {
       "mutation": "incorrect_canvas_coordinate_mapping",
-      "production_path": "src/orga_drone/studio_mask.py",
-      "verify_target": "tests/test_studio_mask.py::test_letterbox_box_scales_between_resolutions",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_mask.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_mask.py::test_letterbox_box_scales_between_resolutions"
+      ]
     },
     {
       "mutation": "broken_hsl_export",
-      "production_path": "src/orga_drone/studio_hsl.py",
-      "verify_target": "tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_hsl.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_photo_hsl_export_api.py::test_api_export_applies_blue_saturation_minus_100_jpg_and_png"
+      ]
     },
     {
       "mutation": "incorrect_clip_targeting",
-      "production_path": "src/orga_drone/control.py",
-      "verify_target": "tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/control.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected"
+      ]
     },
     {
       "mutation": "disabled_persistence",
-      "production_path": "src/orga_drone/studio_history.py",
-      "verify_target": "tests/test_studio_history.py",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_history.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_history.py"
+      ]
     },
     {
       "mutation": "broken_undo_redo",
-      "production_path": "src/orga_drone/studio_history.py",
-      "verify_target": "tests/test_studio_history.py",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_history.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_history.py"
+      ]
     },
     {
       "mutation": "incorrect_transition_timing",
-      "production_path": "src/orga_drone/studio_transition.py",
-      "verify_target": "tests/test_studio_transition.py::test_clamp_user_duration_steps",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_transition.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_transition.py::test_clamp_user_duration_steps"
+      ]
     },
     {
       "mutation": "missing_collage_export_cleanup",
-      "production_path": "src/orga_drone/studio_collage_export.py",
-      "verify_target": "tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/studio_collage_export.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_collage_export.py::test_story_cleans_up_failed_segment_and_preserves_existing_export"
+      ]
     },
     {
       "mutation": "incorrect_scope_accumulation",
-      "production_path": "src/orga_drone/static/js/studio/scopes/accumulate.js",
-      "verify_target": "tests/js/scopes_accumulate.test.js",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/static/js/studio/scopes/accumulate.js",
+      "verify_cmd": [
+        "node",
+        "--test",
+        "tests/js/scopes_accumulate.test.js"
+      ]
     },
     {
       "mutation": "authorization_bypass",
-      "production_path": "src/orga_drone/local_http.py",
-      "verify_target": "tests/test_local_http.py::test_loopback_hosts_are_trusted",
       "failed_as_expected": true,
       "returncode": 1,
-      "reverted": true
+      "reverted": true,
+      "production_path": "src/orga_drone/local_http.py",
+      "verify_cmd": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_local_http.py::test_loopback_hosts_are_trusted"
+      ]
     }
   ]
 }

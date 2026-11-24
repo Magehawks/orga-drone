@@ -18,8 +18,9 @@ Update both when evidence changes. Labels follow
 | Photo export profiles | PASS | PASS | NOT_RUN | PARTIAL | N/A | `test_studio_photo_export`, packaged `image_export` |
 | Studio photo editing | PASS | PASS | NOT_RUN | PARTIAL | N/A | studio image/HSL/wheels + packaged edit_persistence |
 | Masks / object selection | PASS | PASS | PARTIAL | PENDING_INTEGRATION | PARTIAL | mask letterbox/geometry + managed/object-select suites on develop; packaged native align PENDING_INTEGRATION |
-| Color Workspace operators | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | acceptance/reference + managed operator suites on develop; deeper visual/perf still PARTIAL |
-| Scopes | PASS | PARTIAL | PASS | NOT_RUN | PARTIAL | JS accumulate/panel/tap + non-packaged perf; packaged live-tap NOT_RUN |
+<<<<<<< HEAD
+| Color Workspace operators | PASS | PASS | PARTIAL | PARTIAL | PARTIAL | acceptance/reference + managed operator suites; packaged operators EN/DE PASS (docs/planning/color-scopes-packaged-e2e-evidence.json) |
+| Scopes | PASS | PASS | PASS | PASS | PARTIAL | JS accumulate/panel/tap + scopes packaged PASS @572d6e6; #366 project-composite tap NOT_RUN |
 | Video editing / playback (incl. forward-loop proxy / effect contracts) | PASS | PASS | PARTIAL | NOT_RUN | PARTIAL | cut/speed/proxy/preview + JS clocks; packaged playback NOT_RUN on develop CI |
 | Collage edit / export | PASS | PASS | PARTIAL | NOT_RUN | N/A | collage model/export cleanup + playback JS; native collage NOT_RUN |
 | Supported transitions / effects | PASS | PASS | NOT_RUN | NOT_RUN | PENDING | transition timing unit+export; soft-wipe / drone packs parallel PENDING |
@@ -89,6 +90,14 @@ No new performance claim in this PR. Existing spatial/scopes/precision probes re
 opt-in discovery artifacts. Record baselines under `docs/discovery/` with commit SHA,
 FFmpeg version, and machine class before treating them as gates.
 
+<<<<<<< HEAD
 ### Playback effects packaged evidence (2026-11-24)
 
 `docs/discovery/playback-effects-packaged-e2e-20261124.md` — Windows EXE journeys `playback`, `timeline_transitions`, `lut_parity` executed **PASS** on synthetic fixtures. Machine-readable matrix Layer-4 stays **NOT_RUN** (inventory forbids unbound native PASS). Real-drone / private `.cube` remain **NOT_RUN**. Soft-wipe pixel-parity approximation unchanged (ADR 0010).
+=======
+Color scopes packaged acceptance evidence: `docs/planning/color-scopes-packaged-e2e-evidence.json` (572d6e6).
+>>>>>>> ba796ee (Finalize Color Workspace and scopes acceptance evidence at 572d6e6.)
+<<<<<<< HEAD
+=======
+>>>>>>> 1def508 (Finalize Color Workspace and scopes acceptance evidence at 572d6e6.)
+>>>>>>> 991d30d (Finalize Color Workspace and scopes acceptance evidence at 572d6e6.)
