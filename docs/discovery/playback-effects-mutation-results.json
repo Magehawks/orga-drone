@@ -1,0 +1,58 @@
+{
+  "commit_before_branch_commits": "572d6e646dbf0f54a0123ab24533eb048b834d9d",
+  "results": [
+    {
+      "mutation": "broken_loop_mapping",
+      "failed_as_expected": true,
+      "returncode": 1,
+      "elapsed_s": 0.14,
+      "verify_cmd": [
+        "node",
+        "--test",
+        "tests/js/proxy_loop_map.test.js"
+      ]
+    },
+    {
+      "mutation": "broken_keyframe_interpolation",
+      "failed_as_expected": true,
+      "returncode": 1,
+      "elapsed_s": 1.81,
+      "verify_cmd": [
+        "C:\\Program Files\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_playback_effects_regression_contract.py::test_contract_211_keyframe_interpolation_is_deterministic"
+      ]
+    },
+    {
+      "mutation": "incorrect_transition_timing",
+      "failed_as_expected": true,
+      "returncode": 1,
+      "elapsed_s": 1.88,
+      "verify_cmd": [
+        "C:\\Program Files\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_studio_transition.py::test_clamp_user_duration_steps"
+      ]
+    },
+    {
+      "mutation": "incorrect_clip_targeting",
+      "failed_as_expected": true,
+      "returncode": 1,
+      "elapsed_s": 3.36,
+      "verify_cmd": [
+        "C:\\Program Files\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=line",
+        "tests/test_control_api.py::test_apply_action_wrong_clip_target_is_rejected"
+      ]
+    }
+  ]
+}

@@ -158,6 +158,31 @@ def build_mutations() -> list[Mutation]:
             ],
         ),
         Mutation(
+            name="broken_loop_mapping",
+            path=ROOT / "src/orga_drone/static/js/studio/proxy-loop-map.js",
+            old="  return proxyActive ? offset : inS + offset;\n",
+            new="  return inS + offset; // MUTATION broken_loop_mapping\n",
+            verify_cmd=["node", "--test", "tests/js/proxy_loop_map.test.js"],
+        ),
+        Mutation(
+            name="broken_keyframe_interpolation",
+            path=ROOT / "src/orga_drone/studio_color_animation.py",
+            old=(
+                "        exposure=_clamp_slider(round(_lerp(a.exposure, b.exposure, w))),\n"
+            ),
+            new=(
+                "        exposure=a.exposure,  # MUTATION broken_keyframe_interpolation\n"
+            ),
+            verify_cmd=[
+                py,
+                "-m",
+                "pytest",
+                "-q",
+                "--tb=line",
+                "tests/test_playback_effects_regression_contract.py::test_contract_211_keyframe_interpolation_is_deterministic",
+            ],
+        ),
+        Mutation(
             name="incorrect_transition_timing",
             path=ROOT / "src/orga_drone/studio_transition.py",
             old=(
