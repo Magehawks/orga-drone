@@ -1307,3 +1307,6 @@ msgstr "{id} → {step}"
 
 msgid "{id} (not bound)"
 msgstr "{id} (nicht verknüpft)"
+
+msgid "Not enough temporary disk space. Free up space and try again."
+msgstr "Nicht genug temporärer Speicherplatz. Gib Speicherplatz frei und versuche es erneut."

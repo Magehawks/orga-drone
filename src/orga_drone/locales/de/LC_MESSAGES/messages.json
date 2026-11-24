@@ -1,6 +1,7 @@
 {
   "Collage media changed while reading video metadata. Try again.": "Das Medium der Collage wurde während der Dauerermittlung geändert. Versuche es erneut.",
   "Could not publish the collage export safely.": "Der Collagenexport konnte nicht sicher gespeichert werden.",
+  "Not enough temporary disk space. Free up space and try again.": "Nicht genug temporärer Speicherplatz. Gib Speicherplatz frei und versuche es erneut.",
   "A collage source is unavailable. Reconnect or replace it and try again.": "Eine Collagenquelle ist nicht verfügbar. Verbinde oder ersetze sie und versuche es erneut.",
   "A collage source could not be rendered. Check or replace it and try again.": "Eine Collagenquelle konnte nicht gerendert werden. Prüfe oder ersetze sie und versuche es erneut.",
   "orga-drone": "orga-drone",
