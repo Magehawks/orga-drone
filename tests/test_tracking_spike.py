@@ -1,7 +1,7 @@
 """Feasibility measurements for a manual local tracker. Not a product module.
 
-OpenCV is optional. CI without cv2 records NOT_RUN for the optical-flow cases.
-The box rules below are the only contract this spike is willing to recommend.
+Geometry helpers always run in CI. Optical-flow cases need OpenCV/NumPy; when
+those imports fail the optical-flow tests record NOT_RUN via importorskip.
 """
 
 from __future__ import annotations
@@ -12,8 +12,6 @@ import pytest
 
 cv2: Any
 np: Any
-cv2 = pytest.importorskip("cv2")
-np = pytest.importorskip("numpy")
 
 
 def _clip_box(x: float, y: float, w: float, h: float) -> tuple[float, float, float, float]:
@@ -33,12 +31,59 @@ def _interpolate(
     return _clip_box(*(a + (b - a) * mix for a, b in zip(start, end, strict=True)))
 
 
+def _portrait_crop_9x16(
+    frame_w: int,
+    frame_h: int,
+    center_x: float,
+    center_y: float,
+) -> tuple[float, float, float, float]:
+    """Normalized 9:16 crop centered on a subject, clamped to the frame.
+
+    Discovery-only geometry for #300. Not a Studio framing API.
+    """
+    if frame_w <= 0 or frame_h <= 0:
+        raise ValueError("frame size must be positive")
+    target_aspect = 9.0 / 16.0
+    frame_aspect = frame_w / frame_h
+    if frame_aspect >= target_aspect:
+        crop_h = 1.0
+        crop_w = target_aspect / frame_aspect
+    else:
+        crop_w = 1.0
+        crop_h = frame_aspect / target_aspect
+    left = center_x - crop_w / 2.0
+    top = center_y - crop_h / 2.0
+    return _clip_box(left, top, crop_w, crop_h)
+
+
 def test_manual_correction_interpolates_inside_the_existing_mask_box() -> None:
     start = _clip_box(0.1, 0.2, 0.2, 0.2)
     end = _clip_box(0.5, 0.2, 0.2, 0.2)
     mid = _interpolate(start, end, 0.5)
     assert mid == (0.3, 0.2, 0.2, 0.2)
     assert _interpolate(start, end, 5.0) == end
+
+
+def test_clip_box_rejects_out_of_bounds_and_tiny_sizes() -> None:
+    assert _clip_box(-0.5, -0.5, 0.01, 0.01) == (0.0, 0.0, 0.02, 0.02)
+    assert _clip_box(0.95, 0.95, 0.2, 0.2) == (0.8, 0.8, 0.2, 0.2)
+
+
+def test_portrait_9x16_crop_stays_inside_wide_frame() -> None:
+    box = _portrait_crop_9x16(1920, 1080, 0.5, 0.5)
+    x, y, w, h = box
+    # Normalized boxes are rounded to 4 decimals in the shared clip helper.
+    assert abs((w * 1920) / (h * 1080) - 9.0 / 16.0) < 2e-4
+    assert 0.0 <= x < x + w <= 1.0
+    assert 0.0 <= y < y + h <= 1.0
+
+
+def test_portrait_9x16_crop_clamps_near_edges() -> None:
+    box = _portrait_crop_9x16(1920, 1080, 0.02, 0.98)
+    x, y, w, h = box
+    assert x == 0.0
+    assert abs(y + h - 1.0) < 1e-9
+    assert w > 0.0 and h > 0.0
 
 
 def _marker() -> Any:
@@ -127,6 +172,14 @@ def _track(frames: list[Any], box: tuple[int, int, int, int]) -> tuple[list[tupl
     return path, lost_at
 
 
+@pytest.fixture(scope="module")
+def _opencv() -> None:
+    global cv2, np
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
+
+
+@pytest.mark.usefixtures("_opencv")
 def test_textured_patch_stays_close_during_a_short_pan() -> None:
     frames, centers = _frames("pan")
     path, lost_at = _track(frames, (8, 40, 18, 18))
@@ -136,6 +189,7 @@ def test_textured_patch_stays_close_during_a_short_pan() -> None:
     assert max(errors) <= 3.0
 
 
+@pytest.mark.usefixtures("_opencv")
 def test_occlusion_is_reported_instead_of_a_silent_drift() -> None:
     frames, _centers = _frames("occlusion")
     _path, lost_at = _track(frames, (8, 40, 18, 18))
@@ -143,6 +197,7 @@ def test_occlusion_is_reported_instead_of_a_silent_drift() -> None:
     assert lost_at <= 12
 
 
+@pytest.mark.usefixtures("_opencv")
 def test_zoom_keeps_a_box_while_the_center_drifts() -> None:
     frames, centers = _frames("zoom")
     path, lost_at = _track(frames, (54, 39, 18, 18))
